@@ -6,27 +6,31 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type RefObject,
 } from 'react'
+import type { JSONPatchOperation, Pointer } from 'zod-crud'
+import { useJSONDocument } from 'zod-crud/react'
+import { NanoTextEditor } from './NanoTextEditor'
 import {
   RESIZE_HANDLES,
+  SAMPLE_DECK,
   SAMPLE_SLIDES,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
-  clamp,
-  createInitialDeckEdits,
+  RetouchDeckSchema,
+  blockLocationFromPointer,
+  blockPointer,
+  blockTextPointer,
   exportRetouchDeck,
+  findBlockLocation,
+  findSlideIndex,
   getRect,
-  getText,
   moveRect,
+  rectEquals,
   rectToStyle,
-  resetLayoutPatch,
   resizeRect,
   setLayoutPatch,
   setTextPatch,
-  type DeckEdits,
   type Rect,
   type ResizeHandle,
   type RetouchSlide,
@@ -36,28 +40,21 @@ import './App.css'
 
 type Mode = 'text' | 'layout'
 
-type HistoryState = {
-  past: DeckEdits[]
-  present: DeckEdits
-  future: DeckEdits[]
-}
-
 type EditingState = {
-  blockId: string
-  draft: string
+  pointer: Pointer
 }
 
 type Interaction =
   | {
       kind: 'move'
-      blockId: string
+      pointer: Pointer
       startClientPoint: Point
       startPoint: Point
       startRect: Rect
     }
   | {
       kind: 'resize'
-      blockId: string
+      pointer: Pointer
       handle: ResizeHandle
       startClientPoint: Point
       startPoint: Point
@@ -70,7 +67,7 @@ type Point = {
 }
 
 type DraftLayout = {
-  blockId: string
+  pointer: Pointer
   rect: Rect
 }
 
@@ -81,20 +78,15 @@ type SnapGuides = {
 
 const DRAG_THRESHOLD = 4
 
-const initialHistory: HistoryState = {
-  past: [],
-  present: createInitialDeckEdits(SAMPLE_SLIDES),
-  future: [],
-}
-
 function App() {
+  const doc = useJSONDocument(RetouchDeckSchema, SAMPLE_DECK, {
+    history: 200,
+    selection: { mode: 'extended' },
+  })
   const slideRef = useRef<HTMLDivElement | null>(null)
-  const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   const [mode, setMode] = useState<Mode>('text')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
-  const [history, setHistory] = useState<HistoryState>(initialHistory)
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [draftLayout, setDraftLayout] = useState<DraftLayout | null>(null)
@@ -104,76 +96,57 @@ function App() {
   })
   const [exportOpen, setExportOpen] = useState(false)
 
-  const activeSlide = useMemo(
-    () => SAMPLE_SLIDES.find((slide) => slide.id === activeSlideId) ?? SAMPLE_SLIDES[0],
-    [activeSlideId],
+  const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
+  const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
+  const focusPointer = doc.selection?.focusPointer ?? null
+  const selectedLocation = useMemo(
+    () => blockLocationFromPointer(doc.value, focusPointer),
+    [doc.value, focusPointer],
   )
-  const slideEdits = history.present[activeSlide.id]
-  const selectedBlock = useMemo(
-    () =>
-      selectedBlockId
-        ? activeSlide.blocks.find((block) => block.id === selectedBlockId) ?? null
-        : null,
-    [activeSlide.blocks, selectedBlockId],
+  const selectedPointer =
+    selectedLocation?.slide.id === activeSlide.id ? selectedLocation.pointer : null
+  const selectedBlock =
+    selectedLocation?.slide.id === activeSlide.id ? selectedLocation.block : null
+  const selectedRect =
+    selectedPointer && selectedBlock
+      ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
+      : null
+  const editingLocation = useMemo(
+    () => blockLocationFromPointer(doc.value, editing?.pointer),
+    [doc.value, editing?.pointer],
   )
-  const selectedRect = selectedBlock
-    ? getCurrentRect(selectedBlock, slideEdits, draftLayout)
-    : null
-  const exportCode = useMemo(
-    () => exportRetouchDeck(SAMPLE_SLIDES, history.present),
-    [history.present],
+  const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
+  const baseSelectedLocation =
+    selectedBlock === null
+      ? null
+      : findBlockLocation(SAMPLE_DECK, activeSlide.id, selectedBlock.id)
+  const canResetSelected = Boolean(
+    selectedPointer &&
+      selectedBlock &&
+      baseSelectedLocation &&
+      !rectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
-  const canResetSelected =
-    selectedBlockId !== null &&
-    slideEdits.layoutPatches[selectedBlockId] !== undefined
 
-  const commitEdits = useCallback((updater: (edits: DeckEdits) => DeckEdits) => {
-    setHistory((current) => {
-      const next = updater(current.present)
-
-      if (next === current.present) {
-        return current
+  const commitPatch = useCallback(
+    (
+      patch: JSONPatchOperation[],
+      pointer: Pointer,
+      label: string,
+      mergeKey?: string,
+    ) => {
+      if (patch.length === 0) {
+        return
       }
 
-      return {
-        past: [...current.past, current.present],
-        present: next,
-        future: [],
-      }
-    })
-  }, [])
-
-  const undo = useCallback(() => {
-    setHistory((current) => {
-      const previous = current.past.at(-1)
-
-      if (!previous) {
-        return current
-      }
-
-      return {
-        past: current.past.slice(0, -1),
-        present: previous,
-        future: [current.present, ...current.future],
-      }
-    })
-  }, [])
-
-  const redo = useCallback(() => {
-    setHistory((current) => {
-      const next = current.future[0]
-
-      if (!next) {
-        return current
-      }
-
-      return {
-        past: [...current.past, current.present],
-        present: next,
-        future: current.future.slice(1),
-      }
-    })
-  }, [])
+      doc.commit(patch, {
+        label,
+        mergeKey,
+        origin: 'ppt-retouch',
+        selection: { type: 'collapse', pointer },
+      })
+    },
+    [doc],
+  )
 
   const readSlidePoint = useCallback((event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
     const rect = slideRef.current?.getBoundingClientRect()
@@ -215,15 +188,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!editing) {
-      return
-    }
-
-    editorRef.current?.focus()
-    editorRef.current?.select()
-  }, [editing])
-
-  useEffect(() => {
     if (!interaction) {
       return
     }
@@ -248,7 +212,7 @@ function App() {
 
       const rect = calculateInteractionRect(point, currentInteraction)
       setDraftLayout({
-        blockId: currentInteraction.blockId,
+        pointer: currentInteraction.pointer,
         rect,
       })
       setSnapGuides({
@@ -282,10 +246,11 @@ function App() {
         return
       }
 
-      commitEdits((edits) =>
-        setLayoutPatch(edits, activeSlide.id, currentInteraction.blockId, rect),
+      commitPatch(
+        setLayoutPatch(currentInteraction.pointer, rect),
+        currentInteraction.pointer,
+        `${currentInteraction.kind} layout`,
       )
-      setSelectedBlockId(currentInteraction.blockId)
       setInteraction(null)
       setDraftLayout(null)
       setSnapGuides({ x: null, y: null })
@@ -301,9 +266,8 @@ function App() {
       window.removeEventListener('pointercancel', handlePointerUp)
     }
   }, [
-    activeSlide.id,
     calculateInteractionRect,
-    commitEdits,
+    commitPatch,
     hasMeaningfulPointerDelta,
     interaction,
     readSlidePoint,
@@ -323,62 +287,42 @@ function App() {
 
   function selectSlide(slideId: string) {
     setActiveSlideId(slideId)
-    setSelectedBlockId(null)
+    doc.selection?.empty()
     clearTransientState()
   }
 
-  function startTextEdit(block: SlideBlock) {
+  function selectBlock(pointer: Pointer) {
+    doc.selection?.selectRanges([pointer])
+  }
+
+  function startTextEdit(pointer: Pointer) {
     if (mode !== 'text') {
       return
     }
 
-    setSelectedBlockId(block.id)
-    setEditing({
-      blockId: block.id,
-      draft: getText(block, slideEdits),
-    })
+    selectBlock(pointer)
+    setEditing({ pointer })
   }
 
-  function commitTextEdit() {
-    if (!editing) {
-      return
-    }
-
-    const block = activeSlide.blocks.find((item) => item.id === editing.blockId)
-
-    if (!block) {
-      setEditing(null)
-      return
-    }
-
-    const currentText = getText(block, slideEdits)
-    const nextText = editing.draft
+  function commitTextEdit(pointer: Pointer, text: string) {
+    const location = blockLocationFromPointer(doc.value, pointer)
     setEditing(null)
 
-    if (nextText === currentText) {
+    if (!location || text === location.block.text) {
       return
     }
 
-    commitEdits((edits) =>
-      setTextPatch(edits, activeSlide.id, editing.blockId, nextText),
+    commitPatch(
+      setTextPatch(pointer, text),
+      pointer,
+      'edit text',
+      `text:${blockTextPointer(pointer)}`,
     )
-  }
-
-  function handleTextKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      setEditing(null)
-      return
-    }
-
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault()
-      commitTextEdit()
-    }
   }
 
   function handleBlockPointerDown(
     event: ReactPointerEvent<HTMLElement>,
+    pointer: Pointer,
     block: SlideBlock,
   ) {
     if (mode !== 'layout') {
@@ -393,16 +337,16 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    setSelectedBlockId(block.id)
+    selectBlock(pointer)
     setInteraction({
       kind: 'move',
-      blockId: block.id,
+      pointer,
       startClientPoint: {
         x: event.clientX,
         y: event.clientY,
       },
       startPoint: point,
-      startRect: getCurrentRect(block, slideEdits, draftLayout),
+      startRect: getCurrentRect(pointer, block, draftLayout),
     })
   }
 
@@ -410,7 +354,7 @@ function App() {
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
   ) {
-    if (!selectedBlock || !selectedRect || mode !== 'layout') {
+    if (!selectedBlock || !selectedPointer || !selectedRect || mode !== 'layout') {
       return
     }
 
@@ -424,7 +368,7 @@ function App() {
     event.stopPropagation()
     setInteraction({
       kind: 'resize',
-      blockId: selectedBlock.id,
+      pointer: selectedPointer,
       handle,
       startClientPoint: {
         x: event.clientX,
@@ -436,19 +380,26 @@ function App() {
   }
 
   function resetSelectedLayout() {
-    if (!selectedBlockId || !canResetSelected) {
+    if (
+      !selectedPointer ||
+      !selectedBlock ||
+      !baseSelectedLocation ||
+      !canResetSelected
+    ) {
       return
     }
 
-    commitEdits((edits) =>
-      resetLayoutPatch(edits, activeSlide.id, selectedBlockId),
+    commitPatch(
+      setLayoutPatch(selectedPointer, getRect(baseSelectedLocation.block)),
+      selectedPointer,
+      'reset layout',
     )
   }
 
   return (
     <main className="retouch-app" data-mode={mode}>
       <aside className="slide-rail" aria-label="Slides">
-        {SAMPLE_SLIDES.map((slide, index) => (
+        {doc.value.slides.map((slide, index) => (
           <button
             aria-current={slide.id === activeSlide.id ? 'page' : undefined}
             className="slide-thumb"
@@ -488,15 +439,15 @@ function App() {
 
           <div className="toolbar" role="toolbar" aria-label="Actions">
             <button
-              disabled={history.past.length === 0}
-              onClick={undo}
+              disabled={!doc.history.canUndo}
+              onClick={() => doc.history.undo()}
               type="button"
             >
               Undo
             </button>
             <button
-              disabled={history.future.length === 0}
-              onClick={redo}
+              disabled={!doc.history.canRedo}
+              onClick={() => doc.history.redo()}
               type="button"
             >
               Redo
@@ -522,7 +473,7 @@ function App() {
           className="stage-shell"
           onClick={() => {
             if (mode === 'layout') {
-              setSelectedBlockId(null)
+              doc.selection?.empty()
             }
           }}
         >
@@ -533,9 +484,10 @@ function App() {
               ref={slideRef}
               style={{ '--accent': activeSlide.accent } as CSSProperties}
             >
-              {activeSlide.blocks.map((block) => {
-                const rect = getCurrentRect(block, slideEdits, draftLayout)
-                const selected = block.id === selectedBlockId
+              {activeSlide.blocks.map((block, blockIndex) => {
+                const pointer = blockPointer(activeSlideIndex, blockIndex)
+                const rect = getCurrentRect(pointer, block, draftLayout)
+                const selected = pointer === selectedPointer
                 const className = [
                   'slide-block',
                   block.className,
@@ -550,13 +502,13 @@ function App() {
                     block={block}
                     className={className}
                     key={block.id}
-                    onClick={() => startTextEdit(block)}
+                    onClick={() => startTextEdit(pointer)}
                     onPointerDown={(event) =>
-                      handleBlockPointerDown(event, block)
+                      handleBlockPointerDown(event, pointer, block)
                     }
                     rect={rect}
                     selected={selected}
-                    text={getText(block, slideEdits)}
+                    text={block.text}
                   />
                 )
               })}
@@ -568,19 +520,19 @@ function App() {
                 />
               ) : null}
 
-              {mode === 'text' && editing ? (
-                <TextEditor
-                  block={selectedBlock}
-                  draft={editing.draft}
-                  editorRef={editorRef}
-                  onBlur={commitTextEdit}
-                  onChange={(draft) =>
-                    setEditing((current) =>
-                      current ? { ...current, draft } : current,
-                    )
+              {mode === 'text' && editingLocation ? (
+                <NanoTextEditor
+                  block={editingLocation.block}
+                  key={editingLocation.pointer}
+                  onCancel={() => setEditing(null)}
+                  onCommit={(text) =>
+                    commitTextEdit(editingLocation.pointer, text)
                   }
-                  onKeyDown={handleTextKeyDown}
-                  rect={selectedRect}
+                  rect={getCurrentRect(
+                    editingLocation.pointer,
+                    editingLocation.block,
+                    draftLayout,
+                  )}
                 />
               ) : null}
 
@@ -653,12 +605,7 @@ function MiniSlide({ slide }: { slide: RetouchSlide }) {
         <span
           className={`mini-block ${block.role}`}
           key={block.id}
-          style={rectToStyle({
-            x: block.x,
-            y: block.y,
-            width: block.width,
-            height: block.height,
-          })}
+          style={rectToStyle(getRect(block))}
         />
       ))}
     </span>
@@ -692,60 +639,16 @@ function SelectionOverlay({
   )
 }
 
-function TextEditor({
-  block,
-  draft,
-  editorRef,
-  onBlur,
-  onChange,
-  onKeyDown,
-  rect,
-}: {
-  block: SlideBlock | null
-  draft: string
-  editorRef: RefObject<HTMLTextAreaElement | null>
-  onBlur: () => void
-  onChange: (draft: string) => void
-  onKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void
-  rect: Rect | null
-}) {
-  if (!block || !rect) {
-    return null
-  }
-
-  return (
-    <textarea
-      aria-label="Text"
-      className={`text-editor ${block.className}`}
-      onBlur={onBlur}
-      onChange={(event) => onChange(event.target.value)}
-      onKeyDown={onKeyDown}
-      onPointerDown={(event) => event.stopPropagation()}
-      ref={editorRef}
-      spellCheck={false}
-      style={rectToStyle(rect)}
-      value={draft}
-    />
-  )
-}
-
 function getCurrentRect(
+  pointer: Pointer,
   block: SlideBlock,
-  slideEdits: ReturnType<typeof createInitialDeckEdits>[string],
   draftLayout: DraftLayout | null,
 ) {
-  return draftLayout?.blockId === block.id
-    ? draftLayout.rect
-    : getRect(block, slideEdits)
+  return draftLayout?.pointer === pointer ? draftLayout.rect : getRect(block)
 }
 
-function rectEquals(a: Rect, b: Rect) {
-  return (
-    a.x === b.x &&
-    a.y === b.y &&
-    a.width === b.width &&
-    a.height === b.height
-  )
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 export default App
