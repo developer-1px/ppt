@@ -51,6 +51,7 @@ type Interaction =
   | {
       kind: 'move'
       blockId: string
+      startClientPoint: Point
       startPoint: Point
       startRect: Rect
     }
@@ -58,6 +59,7 @@ type Interaction =
       kind: 'resize'
       blockId: string
       handle: ResizeHandle
+      startClientPoint: Point
       startPoint: Point
       startRect: Rect
     }
@@ -76,6 +78,8 @@ type SnapGuides = {
   x: number | null
   y: number | null
 }
+
+const DRAG_THRESHOLD = 4
 
 const initialHistory: HistoryState = {
   past: [],
@@ -203,6 +207,13 @@ function App() {
     [],
   )
 
+  const hasMeaningfulPointerDelta = useCallback((start: Point, next: Point) => {
+    return (
+      Math.abs(next.x - start.x) >= DRAG_THRESHOLD ||
+      Math.abs(next.y - start.y) >= DRAG_THRESHOLD
+    )
+  }, [])
+
   useEffect(() => {
     if (!editing) {
       return
@@ -226,6 +237,15 @@ function App() {
         return
       }
 
+      if (
+        !hasMeaningfulPointerDelta(currentInteraction.startClientPoint, {
+          x: event.clientX,
+          y: event.clientY,
+        })
+      ) {
+        return
+      }
+
       const rect = calculateInteractionRect(point, currentInteraction)
       setDraftLayout({
         blockId: currentInteraction.blockId,
@@ -239,13 +259,33 @@ function App() {
 
     function handlePointerUp(event: PointerEvent) {
       const point = readSlidePoint(event)
-      const rect = point
-        ? calculateInteractionRect(point, currentInteraction)
-        : currentInteraction.startRect
+
+      if (
+        !point ||
+        !hasMeaningfulPointerDelta(currentInteraction.startClientPoint, {
+          x: event.clientX,
+          y: event.clientY,
+        })
+      ) {
+        setInteraction(null)
+        setDraftLayout(null)
+        setSnapGuides({ x: null, y: null })
+        return
+      }
+
+      const rect = calculateInteractionRect(point, currentInteraction)
+
+      if (rectEquals(rect, currentInteraction.startRect)) {
+        setInteraction(null)
+        setDraftLayout(null)
+        setSnapGuides({ x: null, y: null })
+        return
+      }
 
       commitEdits((edits) =>
         setLayoutPatch(edits, activeSlide.id, currentInteraction.blockId, rect),
       )
+      setSelectedBlockId(currentInteraction.blockId)
       setInteraction(null)
       setDraftLayout(null)
       setSnapGuides({ x: null, y: null })
@@ -264,6 +304,7 @@ function App() {
     activeSlide.id,
     calculateInteractionRect,
     commitEdits,
+    hasMeaningfulPointerDelta,
     interaction,
     readSlidePoint,
   ])
@@ -330,7 +371,7 @@ function App() {
       return
     }
 
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
       commitTextEdit()
     }
@@ -356,6 +397,10 @@ function App() {
     setInteraction({
       kind: 'move',
       blockId: block.id,
+      startClientPoint: {
+        x: event.clientX,
+        y: event.clientY,
+      },
       startPoint: point,
       startRect: getCurrentRect(block, slideEdits, draftLayout),
     })
@@ -381,6 +426,10 @@ function App() {
       kind: 'resize',
       blockId: selectedBlock.id,
       handle,
+      startClientPoint: {
+        x: event.clientX,
+        y: event.clientY,
+      },
       startPoint: point,
       startRect: selectedRect,
     })
@@ -409,6 +458,7 @@ function App() {
           >
             <span className="thumb-number">{index + 1}</span>
             <MiniSlide slide={slide} />
+            <span className="thumb-name">{slide.name}</span>
           </button>
         ))}
       </aside>
@@ -633,6 +683,7 @@ function SelectionOverlay({
           className="resize-handle"
           data-handle={handle}
           key={handle}
+          onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => onResizePointerDown(event, handle)}
           type="button"
         />
@@ -686,6 +737,15 @@ function getCurrentRect(
   return draftLayout?.blockId === block.id
     ? draftLayout.rect
     : getRect(block, slideEdits)
+}
+
+function rectEquals(a: Rect, b: Rect) {
+  return (
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    a.height === b.height
+  )
 }
 
 export default App
