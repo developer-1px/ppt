@@ -111,10 +111,6 @@ function App() {
     selectedPointer && selectedBlock
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
       : null
-  const editingLocation = useMemo(
-    () => blockLocationFromPointer(doc.value, editing?.pointer),
-    [doc.value, editing?.pointer],
-  )
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
   const baseSelectedLocation =
     selectedBlock === null
@@ -488,6 +484,8 @@ function App() {
                 const pointer = blockPointer(activeSlideIndex, blockIndex)
                 const rect = getCurrentRect(pointer, block, draftLayout)
                 const selected = pointer === selectedPointer
+                const editingThisBlock =
+                  mode === 'text' && editing?.pointer === pointer
                 const className = [
                   'slide-block',
                   block.className,
@@ -496,6 +494,18 @@ function App() {
                 ]
                   .filter(Boolean)
                   .join(' ')
+
+                if (editingThisBlock) {
+                  return (
+                    <NanoTextEditor
+                      block={block}
+                      key={`${block.id}:editor`}
+                      onCancel={() => setEditing(null)}
+                      onCommit={(text) => commitTextEdit(pointer, text)}
+                      rect={rect}
+                    />
+                  )
+                }
 
                 return (
                   <SlideBlockElement
@@ -517,22 +527,6 @@ function App() {
                 <SelectionOverlay
                   onResizePointerDown={handleResizePointerDown}
                   rect={selectedRect}
-                />
-              ) : null}
-
-              {mode === 'text' && editingLocation ? (
-                <NanoTextEditor
-                  block={editingLocation.block}
-                  key={editingLocation.pointer}
-                  onCancel={() => setEditing(null)}
-                  onCommit={(text) =>
-                    commitTextEdit(editingLocation.pointer, text)
-                  }
-                  rect={getCurrentRect(
-                    editingLocation.pointer,
-                    editingLocation.block,
-                    draftLayout,
-                  )}
                 />
               ) : null}
 
