@@ -6,6 +6,6 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    dedupe: ['react', 'react-dom', 'zod', 'zod-crud'],
+    dedupe: ['react', 'react-dom', 'zod'],
   },
 })

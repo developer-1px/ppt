@@ -296,13 +296,13 @@ async function runTextScenario(page) {
   const noteAfterCancel = await blockState(page, 's1-note')
   check('Escape cancels text draft', noteAfterCancel.text === noteBeforeCancel, noteAfterCancel)
 
-  await clickSlide(page, 'Board')
+  await clickSlide(page, 'Decision')
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   await replaceEditorText(
     page,
-    'Decision needed: approve the partner incentive pilot with owner, risk, timing, customer impact, renewal coverage, executive sponsor, and next action visible in the slide.',
+    'Decision needed: approve the retention sprint with owner, timing, customer impact, renewal coverage, executive sponsor, and next action visible in the slide.',
   )
   await page.waitFor(`(() => {
     const editor = document.querySelector('.plain-text-editor')
@@ -313,7 +313,7 @@ async function runTextScenario(page) {
   const bottomNoteFit = await blockFitsSlide(page, 's3-note')
   check('autoheight keeps bottom text box inside slide', bottomNoteFit.fits && bottomNoteAfter.height > bottomNoteBefore.height + 10, { before: bottomNoteBefore, after: bottomNoteAfter, fit: bottomNoteFit })
 
-  await clickSlide(page, 'Pipeline')
+  await clickSlide(page, 'Overview')
   const stageScrollTop = await page.eval("document.querySelector('.stage-shell')?.scrollTop ?? null")
   check('slide switch resets stage scroll', stageScrollTop === 0, { stageScrollTop })
 }
@@ -362,6 +362,8 @@ async function runLayoutScenario(page) {
 
 async function runExportScenario(page) {
   await clickMode(page, 'Text')
+  const titleBefore = await blockState(page, 's1-title')
+  const expectedTitle = `${titleBefore.text} Export`
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   await page.send('Input.insertText', { text: ' Export' })
@@ -376,7 +378,7 @@ async function runExportScenario(page) {
     const value = document.querySelector('.export-panel textarea')?.value ?? ''
     const copyButton = Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy')
     return {
-      hasEditedTitle: value.includes('Q3 Pipeline Review Approved Export'),
+      hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
       hasDataSlide: value.includes('data-slide="slide-1"'),
       hasDataBlock: value.includes('data-block="s1-note"'),
       hasStyleCoordinates: /left:\\d/.test(value) && /top:\\d/.test(value),
