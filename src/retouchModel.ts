@@ -452,8 +452,8 @@ export function rectEquals(a: Rect, b: Rect) {
 
 export function exportRetouchDeck(deck: RetouchDeck) {
   const css = [
-    '<style>',
     ':root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#111827;background:#f3f4f6;}',
+    'body{margin:0;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
     '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
@@ -472,10 +472,9 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     '.block-mini{display:block;padding:18px;border:1px solid #dbe3ef;border-radius:8px;background:#f8fafc;color:#111827;font:650 24px/1.24 Inter,system-ui,sans-serif;}',
     '.block-mini.secondary{background:#fff;color:#1f2937;}',
     '.centered{text-align:center;}',
-    '</style>',
   ].join('\n')
 
-  const html = deck.slides
+  const slides = deck.slides
     .map((slide) => {
       const blocks = slide.blocks
         .map((block) => {
@@ -497,7 +496,25 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     })
     .join('\n')
 
-  return `${css}\n\n<main class="deck">\n${html}\n</main>\n`
+  return [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
+    '  <meta charset="utf-8" />',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
+    '  <title>Retouched Slides</title>',
+    '  <style>',
+    indent(css, 4),
+    '  </style>',
+    '</head>',
+    '<body>',
+    '<main class="deck">',
+    slides,
+    '</main>',
+    '</body>',
+    '</html>',
+    '',
+  ].join('\n')
 }
 
 function escapeHtml(value: string) {
@@ -507,4 +524,13 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+function indent(value: string, spaces: number) {
+  const prefix = ' '.repeat(spaces)
+
+  return value
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n')
 }

@@ -536,17 +536,25 @@ async function runExportScenario(page) {
   const exportState = await page.eval(`(() => {
     const value = document.querySelector('.export-buffer')?.value ?? ''
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const parsed = new DOMParser().parseFromString(value, 'text/html')
     return {
       hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
       hasDataSlide: value.includes('data-slide="slide-1"'),
       hasDataBlock: value.includes('data-block="s1-note"'),
       hasStyleCoordinates: /left:\\d/.test(value) && /top:\\d/.test(value),
+      isCompleteDocument:
+        value.trimStart().toLowerCase().startsWith('<!doctype html>') &&
+        !!parsed.querySelector('html head style') &&
+        !!parsed.querySelector('html body main.deck'),
+      parsedEditedTitle:
+        parsed.querySelector('[data-block="s1-title"]')?.textContent ?? '',
       hasRawEditorChrome: value.includes('plain-text-editor') || value.includes('resize-handle'),
       hasCopyAction: !!copyButton,
       hasVisibleRawCodePanel: !!document.querySelector('.export-panel'),
     }
   })()`)
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
+  check('export is a standalone HTML document', exportState.isCompleteDocument && exportState.parsedEditedTitle === expectedTitle, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
