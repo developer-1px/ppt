@@ -270,6 +270,22 @@ async function runTextScenario(page) {
   const titleNoOp = await blockState(page, 's1-title')
   check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
 
+  await clickAt(page, {
+    x: titlePreviewText.textLeft + 2,
+    y: titlePreviewText.textTop + titlePreviewText.textHeight / 2,
+  })
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.send('Input.insertText', { text: 'Q' })
+  const clickCaretText = await page.eval("document.querySelector('.plain-text-editor')?.textContent ?? ''")
+  const clickCaretIndex = clickCaretText.indexOf('Q')
+  check(
+    'Text Mode starts editing at clicked text position',
+    clickCaretIndex >= 0 && clickCaretIndex < titleBefore.text.length,
+    { clickCaretText, clickCaretIndex },
+  )
+  await cancelTextEditor(page)
+  await movePointerAway(page)
+
   await focusBlockAndPress(page, 's1-title', 'Enter')
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const keyboardEditState = await page.eval(`(() => ({
@@ -307,6 +323,7 @@ async function runTextScenario(page) {
 
   await page.send('Input.insertText', { text: ' Approved' })
   await commitTextEditor(page)
+  await movePointerAway(page)
   const titleCommitted = await blockState(page, 's1-title')
   check('title text commit works', titleCommitted.text === `${titleBefore.text} Approved`, titleCommitted)
   check('plain Enter commits text edit', !titleCommitted.editorOpen, titleCommitted)
@@ -892,6 +909,16 @@ async function clickAt(page, point) {
     buttons: 0,
     clickCount: 1,
   })
+}
+
+async function movePointerAway(page) {
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: 4,
+    y: 4,
+    button: 'none',
+  })
+  await delay(50)
 }
 
 async function dragFromTo(page, from, to) {

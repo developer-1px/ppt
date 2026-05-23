@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
@@ -46,6 +47,7 @@ import './App.css'
 type Mode = 'text' | 'layout'
 
 type EditingState = {
+  clientPoint?: Point
   pointer: Pointer
 }
 
@@ -406,13 +408,13 @@ function App() {
     doc.selection?.selectRanges([pointer])
   }
 
-  function startTextEdit(pointer: Pointer) {
+  function startTextEdit(pointer: Pointer, clientPoint?: Point) {
     if (mode !== 'text') {
       return
     }
 
     selectBlock(pointer)
-    setEditing({ pointer })
+    setEditing({ clientPoint, pointer })
   }
 
   function cancelTextEdit() {
@@ -655,6 +657,7 @@ function App() {
                     <PlainTextEditor
                       block={block}
                       key={`${block.id}:editor`}
+                      initialClientPoint={editing.clientPoint}
                       minimumHeight={minimumHeight}
                       onCancel={cancelTextEdit}
                       onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
@@ -668,11 +671,14 @@ function App() {
                     block={block}
                     className={className}
                     key={block.id}
-                    onClick={() => {
+                    onClick={(event) => {
                       if (mode === 'layout') {
                         selectBlock(pointer)
                       } else {
-                        startTextEdit(pointer)
+                        startTextEdit(pointer, {
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
                       }
                     }}
                     onPointerDown={(event) =>
@@ -734,7 +740,7 @@ function SlideBlockElement({
 }: {
   block: SlideBlock
   className: string
-  onClick: () => void
+  onClick: (event: ReactMouseEvent<HTMLElement>) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
   minimumHeight: number
   rect: Rect
@@ -749,9 +755,9 @@ function SlideBlockElement({
       'data-role': block.role,
       'data-selected': selected ? 'true' : 'false',
       className,
-      onClick: (event: MouseEvent) => {
+      onClick: (event: ReactMouseEvent<HTMLElement>) => {
         event.stopPropagation()
-        onClick()
+        onClick(event)
       },
       onPointerDown,
       style: rectToAutoHeightStyle(rect, minimumHeight),

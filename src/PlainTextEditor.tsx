@@ -17,6 +17,10 @@ import {
 
 type PlainTextEditorProps = {
   block: SlideBlock
+  initialClientPoint?: {
+    x: number
+    y: number
+  }
   minimumHeight: number
   onCancel: () => void
   onCommit: (text: string, rect: Rect) => void
@@ -25,6 +29,7 @@ type PlainTextEditorProps = {
 
 export function PlainTextEditor({
   block,
+  initialClientPoint,
   minimumHeight,
   onCancel,
   onCommit,
@@ -46,8 +51,13 @@ export function PlainTextEditor({
     }
 
     editor.focus()
-    placeCaretAtEnd(editor)
-  }, [])
+    if (
+      !initialClientPoint ||
+      !placeCaretFromPoint(editor, initialClientPoint.x, initialClientPoint.y)
+    ) {
+      placeCaretAtEnd(editor)
+    }
+  }, [initialClientPoint])
 
   const syncAutoHeight = useCallback((editor: HTMLElement) => {
     const effectiveMinimumHeight =
@@ -159,4 +169,38 @@ function placeCaretAtEnd(root: HTMLElement) {
   range.collapse(false)
   selection?.removeAllRanges()
   selection?.addRange(range)
+}
+
+function placeCaretFromPoint(root: HTMLElement, x: number, y: number) {
+  const range = readCaretRangeFromPoint(x, y)
+
+  if (!range || !root.contains(range.startContainer)) {
+    return false
+  }
+
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+
+  return true
+}
+
+function readCaretRangeFromPoint(x: number, y: number) {
+  if ('caretPositionFromPoint' in document) {
+    const position = document.caretPositionFromPoint(x, y)
+
+    if (position) {
+      const range = document.createRange()
+      range.setStart(position.offsetNode, position.offset)
+      range.collapse(true)
+
+      return range
+    }
+  }
+
+  if ('caretRangeFromPoint' in document) {
+    return document.caretRangeFromPoint(x, y)
+  }
+
+  return null
 }
