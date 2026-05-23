@@ -43,6 +43,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: 편집 중 바로 Export하면 마지막 글자 수정이 누락됨
   - Fix: Copy/Download HTML은 먼저 live `contenteditable` DOM을 동기 commit하고, 그 최신 deck으로 export HTML을 만든다.
 
+- P0: 편집 중 화면 이동으로 마지막 글자 수정이 누락될 수 있음
+  - Fix: slide 전환과 Arrange 전환도 먼저 live `contenteditable` DOM을 commit한 뒤 이동한다.
+
 - P1: Enter commit 불일치
   - Fix: `PlainTextEditor`에서 Enter commit, Escape cancel을 처리한다.
 
@@ -112,6 +115,7 @@ Covered checks:
 - Text Mode direct edit, Enter commit, Escape cancel
 - no double text rendering
 - live editor text box and committed preview text box parity
+- live edit commit before slide/mode switch
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
 - Text Mode deck reset, undo reset, redo reset

@@ -376,6 +376,38 @@ async function runTextScenario(page) {
   const titleKeyboardRedone = await blockState(page, 's1-title')
   check('keyboard redo restores title edit', titleKeyboardRedone.text === `${titleBefore.text} Approved`, titleKeyboardRedone)
 
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' SlideSwitch' })
+  await clickSlide(page, 'Agenda')
+  await clickSlide(page, 'Overview')
+  const slideSwitchCommit = await blockState(page, 's1-title')
+  check(
+    'Text Mode commits live edit before slide switch',
+    slideSwitchCommit.text === `${titleBefore.text} Approved SlideSwitch` &&
+      !slideSwitchCommit.editorOpen,
+    slideSwitchCommit,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
+
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' ModeSwitch' })
+  await clickMode(page, 'Arrange')
+  const modeSwitchCommit = await blockState(page, 's1-title')
+  const modeAfterLiveEdit = await page.eval("document.querySelector('.retouch-app')?.dataset.mode ?? null")
+  check(
+    'Text Mode commits live edit before Arrange switch',
+    modeSwitchCommit.text === `${titleBefore.text} Approved ModeSwitch` &&
+      modeAfterLiveEdit === 'layout' &&
+      !modeSwitchCommit.editorOpen,
+    { state: modeSwitchCommit, mode: modeAfterLiveEdit },
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
+  await clickMode(page, 'Text')
+
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
