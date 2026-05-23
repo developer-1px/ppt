@@ -458,7 +458,7 @@ function App() {
               role="tab"
               type="button"
             >
-              Layout
+              Arrange
             </button>
           </div>
 
@@ -590,7 +590,7 @@ function App() {
           <section className="export-panel" aria-label="Export">
             <div className="export-actions">
               <button onClick={copyExportCode} type="button">
-                {exportCopied ? 'Copied' : 'Copy'}
+                {exportCopied ? 'Copied' : 'Copy HTML'}
               </button>
             </div>
             <textarea

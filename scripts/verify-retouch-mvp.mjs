@@ -203,14 +203,16 @@ async function runFirstScreenScenario(page) {
     hasEditorShell: !!document.querySelector('.retouch-app'),
     slideCount: document.querySelectorAll('.slide-thumb').length,
     hasTextMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Text'),
-    hasLayoutMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Layout'),
+    hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
+    canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
     hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
   }))()`)
 
   check('first screen is retouch editor', state.hasEditorShell && state.hasMainSlideBlock, state)
   check('slide thumbnails are available', state.slideCount >= 3, state)
-  check('mode toggle is available', state.hasTextMode && state.hasLayoutMode, state)
+  check('mode toggle is available', state.hasTextMode && state.hasArrangeMode, state)
+  check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
 }
 
@@ -334,12 +336,16 @@ async function runTextScenario(page) {
 }
 
 async function runLayoutScenario(page) {
-  await clickMode(page, 'Layout')
+  await clickMode(page, 'Arrange')
+  const arrangeSurface = await page.eval(`(() => ({
+    canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
+  }))()`)
+  check('Arrange Mode shows layout grid only when arranging', arrangeSurface.canvasBackgroundImage !== 'none', arrangeSurface)
   const noteBefore = await blockState(page, 's1-note')
 
   await dragBlock(page, 's1-note', 42, 24)
   const noteMoved = await blockState(page, 's1-note')
-  check('Layout Mode drag moves block only', rectChanged(noteBefore, noteMoved) && noteMoved.text === noteBefore.text, { before: noteBefore, after: noteMoved })
+  check('Arrange Mode drag moves block only', rectChanged(noteBefore, noteMoved) && noteMoved.text === noteBefore.text, { before: noteBefore, after: noteMoved })
   check('drag enables reset', noteMoved.resetDisabled === false, noteMoved)
 
   await clickToolbar(page, 'Undo')
@@ -368,11 +374,11 @@ async function runLayoutScenario(page) {
   })()`)
   await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y + 32 })
   const metricResized = await blockState(page, 's1-metric')
-  check('Layout Mode resize changes box only', metricResized.width > metricBefore.width + 10 && metricResized.height > metricBefore.height + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
+  check('Arrange Mode resize changes box only', metricResized.width > metricBefore.width + 10 && metricResized.height > metricBefore.height + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
 
   await clickBlock(page, 's1-title')
   const noEditorInLayout = await page.eval("!document.querySelector('.plain-text-editor')")
-  check('Layout Mode click does not edit text', noEditorInLayout, null)
+  check('Arrange Mode click does not edit text', noEditorInLayout, null)
 }
 
 async function runExportScenario(page) {
@@ -384,14 +390,14 @@ async function runExportScenario(page) {
   await page.send('Input.insertText', { text: ' Export' })
   await commitTextEditor(page)
 
-  await clickMode(page, 'Layout')
+  await clickMode(page, 'Arrange')
   await dragBlock(page, 's1-note', 24, 16)
 
   await clickToolbar(page, 'Export')
   await page.waitFor("!!document.querySelector('.export-panel textarea')")
   const exportState = await page.eval(`(() => {
     const value = document.querySelector('.export-panel textarea')?.value ?? ''
-    const copyButton = Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy')
+    const copyButton = Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy HTML')
     return {
       hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
       hasDataSlide: value.includes('data-slide="slide-1"'),
@@ -404,7 +410,7 @@ async function runExportScenario(page) {
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
 
-  await page.eval(`Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy')?.click()`)
+  await page.eval(`Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy HTML')?.click()`)
   await page.waitFor(`Array.from(document.querySelectorAll('.export-panel button')).some((button) => button.textContent?.trim() === 'Copied')`)
   const copied = await page.eval(`Array.from(document.querySelectorAll('.export-panel button')).some((button) => button.textContent?.trim() === 'Copied')`)
   check('copy action gives completion feedback', copied, null)
@@ -421,10 +427,10 @@ async function runMobileScenario(cdpPort) {
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
     thumbs: document.querySelectorAll('.slide-thumb').length,
-    hasLayoutMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Layout'),
+    hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
   }))()`)
   check('mobile viewport has no horizontal page overflow', mobile.scrollWidth <= mobile.clientWidth + 1, mobile)
-  check('mobile keeps core controls reachable', mobile.thumbs >= 3 && mobile.hasLayoutMode, mobile)
+  check('mobile keeps core controls reachable', mobile.thumbs >= 3 && mobile.hasArrangeMode, mobile)
   page.close()
 }
 
