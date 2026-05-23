@@ -6,6 +6,7 @@ import {
   type Pointer,
 } from 'zod-crud'
 import { z } from 'zod'
+import slideThemeCss from './slideTheme.css?raw'
 
 export const SLIDE_WIDTH = 1280
 export const SLIDE_HEIGHT = 720
@@ -452,28 +453,14 @@ export function rectEquals(a: Rect, b: Rect) {
 
 export function exportRetouchDeck(deck: RetouchDeck) {
   const css = [
-    ':root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#111827;background:#f3f4f6;}',
+    ':root{--sans:Inter,ui-sans-serif,system-ui,sans-serif;font-family:var(--sans);color:#111827;background:#f3f4f6;}',
     'body{margin:0;}',
     '@page{size:16in 9in;margin:0;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
-    '.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
+    '.slide{position:relative;container-type:inline-size;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
     '@media print{body{background:#fff;}.deck{display:block;padding:0;}.slide{border:0;break-after:page;page-break-after:always;}}',
     '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
-    '.block-title{display:block;color:#111827;font:760 58px/1.04 Inter,system-ui,sans-serif;}',
-    '.block-title.compact{font-size:54px;}',
-    '.block-title.wide{font-size:52px;}',
-    '.block-subtitle{display:block;color:#475569;font:450 24px/1.38 Inter,system-ui,sans-serif;}',
-    '.block-metric{display:block;padding:20px;border:1px solid #dbe3ef;border-radius:8px;background:#f8fafc;color:#111827;font:650 25px/1.28 Inter,system-ui,sans-serif;}',
-    '.block-chart{display:block;padding:20px;border:1px solid #dbe3ef;border-radius:8px;background:#fff;color:#111827;font:650 24px/1.36 Inter,system-ui,sans-serif;}',
-    '.block-note{display:block;padding:18px 22px;border-top:2px solid var(--accent);background:#fff;color:#1f2937;font:620 24px/1.34 Inter,system-ui,sans-serif;}',
-    '.block-note.slim{font-size:22px;}',
-    '.block-step{display:block;padding:22px;border:1px solid #dbe3ef;border-radius:8px;background:#fff;color:#111827;font:650 27px/1.3 Inter,system-ui,sans-serif;}',
-    '.block-step.strong{border-color:var(--accent);background:var(--accent);color:#fff;}',
-    '.block-footer{display:block;color:#334155;font:650 26px/1.24 Inter,system-ui,sans-serif;}',
-    '.block-quote{display:block;color:#111827;font:700 34px/1.18 Inter,system-ui,sans-serif;}',
-    '.block-mini{display:block;padding:18px;border:1px solid #dbe3ef;border-radius:8px;background:#f8fafc;color:#111827;font:650 24px/1.24 Inter,system-ui,sans-serif;}',
-    '.block-mini.secondary{background:#fff;color:#1f2937;}',
-    '.centered{text-align:center;}',
+    slideThemeCss.trim(),
   ].join('\n')
 
   const slides = deck.slides

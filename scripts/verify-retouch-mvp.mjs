@@ -574,6 +574,11 @@ async function runExportScenario(page) {
         value.includes('@page{size:16in 9in;margin:0;}') &&
         value.includes('@media print') &&
         value.includes('break-after:page'),
+      hasSharedSlideTheme:
+        value.includes('container-type:inline-size') &&
+        value.includes('font-size: clamp(10px, 4.5313cqw, 58px);') &&
+        value.includes('padding: clamp(3px, 1.7188cqw, 22px);') &&
+        value.includes('.block-step.strong'),
       parsedEditedTitle:
         parsed.querySelector('[data-block="s1-title"]')?.textContent ?? '',
       hasRawEditorChrome:
@@ -588,6 +593,7 @@ async function runExportScenario(page) {
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
   check('export is a standalone HTML document', exportState.isCompleteDocument && exportState.parsedEditedTitle === expectedTitle, exportState)
   check('export includes print-ready slide CSS', exportState.hasPresentationPrintCss, exportState)
+  check('export uses the same slide theme tokens as preview', exportState.hasSharedSlideTheme, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)

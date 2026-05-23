@@ -55,7 +55,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P1: Export style drift
   - Fix: export CSS에 preview block의 display, alignment, colors, padding, chart background를 반영했다.
-  - Residual: preview CSS와 export CSS는 아직 중복이다. 장기적으로 style token/source를 공유해야 한다.
+  - Fix: slide 디자인 토큰을 `slideTheme.css`로 분리해 preview와 export가 같은 CSS 원천을 사용하게 했다.
 
 ## zod-crud / Text Editing Usage
 
@@ -98,4 +98,5 @@ Covered checks:
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode drag, resize, reset, no text editor
 - Export text/layout reflection, no editor chrome, Copy feedback
+- Export shared slide theme tokens
 - mobile horizontal overflow and core controls
