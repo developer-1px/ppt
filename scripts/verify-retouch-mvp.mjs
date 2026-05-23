@@ -554,6 +554,15 @@ async function runExportScenario(page) {
   await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
   const copied = await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
   check('copy action gives completion feedback', copied, null)
+  const copiedState = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    return {
+      copyState: copyButton?.dataset.copyState,
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check('copy action switches to copied state', copiedState.copyState === 'copied' && copiedState.title === 'Copied', copiedState)
 }
 
 async function runMobileScenario(cdpPort) {

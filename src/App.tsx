@@ -10,7 +10,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
+import { Check, Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import { PlainTextEditor } from './PlainTextEditor'
@@ -610,11 +610,16 @@ function App() {
             <button
               aria-label="Copy HTML"
               aria-pressed={exportCopied}
+              data-copy-state={exportCopied ? 'copied' : 'idle'}
               onClick={copyExportCode}
-              title="Copy HTML"
+              title={exportCopied ? 'Copied' : 'Copy HTML'}
               type="button"
             >
-              <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
+              {exportCopied ? (
+                <Check aria-hidden="true" size={16} strokeWidth={2.4} />
+              ) : (
+                <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
+              )}
             </button>
           </div>
         </header>
