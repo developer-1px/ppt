@@ -77,6 +77,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: Text Mode Reset 범위가 전체 deck이라 한 문구 reset치고 위험함
   - Fix: Text Mode에서 block이 선택되어 있으면 Reset은 선택된 텍스트와 text-owned height만 원본으로 되돌린다.
   - Fix: 선택 텍스트 reset은 다른 layout/text 변경을 유지하고, Undo/Redo로 복구된다.
+  - Fix: Reset 버튼의 `aria-label`, `title`, `data-reset-scope`가 현재 대상인 text/layout/deck을 명시하게 했다.
 
 - P0: Text Mode에서 전체 deck reset 접근 경로가 선택 상태에 가려짐
   - Fix: 빈 stage를 클릭하면 Text Mode 선택이 해제되고, Reset이 전체 deck reset으로 바뀐다.
@@ -196,6 +197,7 @@ Covered checks:
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
+- explicit Reset target scope for text/layout/deck
 - Layout Mode Shift+Arrow large nudge
 - Layout Mode 8-way card resize and reset
 - Arrange Mode Escape clears selection

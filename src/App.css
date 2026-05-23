@@ -306,6 +306,11 @@ button {
   outline-offset: 0;
 }
 
+.retouch-app[data-mode='layout'] .slide-block.is-selected {
+  outline: 2px solid #2563eb;
+  outline-offset: 0;
+}
+
 .retouch-app[data-mode='text'] .slide-block.is-editing,
 .retouch-app[data-mode='text'] .slide-block.is-editing:hover,
 .retouch-app[data-mode='text'] .slide-block.is-editing:focus,

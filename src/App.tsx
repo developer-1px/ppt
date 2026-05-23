@@ -13,7 +13,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Check, Code2, Download, Redo2, RotateCcw, Undo2 } from 'lucide-react'
-import type { JSONPatchOperation, Pointer } from 'zod-crud'
+import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
   RESIZE_HANDLES,
@@ -57,9 +57,11 @@ type Interaction =
   | {
       kind: 'move'
       pointer: Pointer
+      pointers: Pointer[]
       startClientPoint: Point
       startPoint: Point
       startRect: Rect
+      startRects: DraftLayoutRect[]
     }
   | {
       kind: 'resize'
@@ -68,6 +70,7 @@ type Interaction =
       startClientPoint: Point
       startPoint: Point
       startRect: Rect
+      startRects: DraftLayoutRect[]
     }
 
 type Point = {
@@ -76,6 +79,10 @@ type Point = {
 }
 
 type DraftLayout = {
+  rects: DraftLayoutRect[]
+}
+
+type DraftLayoutRect = {
   pointer: Pointer
   rect: Rect
 }
@@ -86,7 +93,7 @@ type SnapGuides = {
 }
 
 const DRAG_THRESHOLD = 8
-const STORAGE_KEY = 'ppt-retouch:v1:deck'
+const STORAGE_KEY = 'ppt-retouch:v2:deck'
 const STORAGE_VERSION = 1
 const CARET_PLACEHOLDER = '\u200B'
 
@@ -100,6 +107,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const exportTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const previousExportCodeRef = useRef<string | null>(null)
+  const suppressBlockClickRef = useRef(false)
   const suppressStageClickRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('text')
@@ -118,10 +126,20 @@ function App() {
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
+  const selectedPointers = (doc.selection?.selectedPointers ?? []).filter((pointer) => {
+    const location = blockLocationFromPointer(doc.value, pointer)
+
+    return location?.slide.id === activeSlide.id
+  })
+  const selectedPointerSet = new Set(selectedPointers)
   const focusPointer = doc.selection?.focusPointer ?? null
+  const primaryPointer =
+    focusPointer && selectedPointerSet.has(focusPointer)
+      ? focusPointer
+      : (selectedPointers.at(-1) ?? null)
   const selectedLocation = useMemo(
-    () => blockLocationFromPointer(doc.value, focusPointer),
-    [doc.value, focusPointer],
+    () => blockLocationFromPointer(doc.value, primaryPointer),
+    [doc.value, primaryPointer],
   )
   const selectedPointer =
     selectedLocation?.slide.id === activeSlide.id ? selectedLocation.pointer : null
@@ -173,8 +191,14 @@ function App() {
     mode === 'layout'
       ? canResetSelectedLayout
       : canResetSelectedText || canResetDeck
+  const resetScope =
+    mode === 'layout' ? 'layout' : selectedPointer ? 'text' : 'deck'
   const resetTitle =
-    mode === 'layout' ? 'Reset layout' : selectedPointer ? 'Reset text' : 'Reset deck'
+    resetScope === 'layout'
+      ? 'Reset layout'
+      : resetScope === 'text'
+        ? 'Reset text'
+        : 'Reset deck'
 
   useEffect(() => {
     persistDeck(doc.value)
@@ -195,7 +219,12 @@ function App() {
   }, [exportCode])
 
   useLayoutEffect(() => {
-    if (mode !== 'layout' || !selectedBlock || !slideRef.current) {
+    if (
+      mode !== 'layout' ||
+      selectedPointers.length !== 1 ||
+      !selectedBlock ||
+      !slideRef.current
+    ) {
       setVisualSelectionRect(null)
       return
     }
@@ -221,7 +250,7 @@ function App() {
     setVisualSelectionRect((currentRect) =>
       currentRect && rectClose(currentRect, nextRect) ? currentRect : nextRect,
     )
-  }, [activeSlide.id, doc.value, draftLayout, mode, selectedBlock])
+  }, [activeSlide.id, doc.value, draftLayout, mode, selectedBlock, selectedPointers.length])
 
   const commitPatch = useCallback(
     (
@@ -229,6 +258,7 @@ function App() {
       pointer: Pointer,
       label: string,
       mergeKey?: string,
+      selection?: SelectionAction,
     ) => {
       if (patch.length === 0) {
         return
@@ -239,7 +269,7 @@ function App() {
         label,
         mergeKey,
         origin: 'ppt-retouch',
-        selection: { type: 'collapse', pointer },
+        selection: selection ?? { type: 'collapse', pointer },
       })
     },
     [doc],
@@ -264,11 +294,10 @@ function App() {
       const dy = nextPoint.y - currentInteraction.startPoint.y
 
       if (currentInteraction.kind === 'move') {
-        const rect = moveRect(currentInteraction.startRect, dx, dy)
-
-        return snapMoveRectToSlideBlocks(
-          rect,
-          currentInteraction.pointer,
+        return calculateMoveInteractionState(
+          dx,
+          dy,
+          currentInteraction,
           activeSlide.blocks,
           activeSlideIndex,
         )
@@ -283,7 +312,7 @@ function App() {
 
       return {
         guides: guidesForInteraction(rect, currentInteraction),
-        rect,
+        rects: [{ pointer: currentInteraction.pointer, rect }],
       }
     },
     [activeSlide.blocks, activeSlideIndex],
@@ -319,10 +348,9 @@ function App() {
         return
       }
 
-      const { guides, rect } = calculateInteractionState(point, currentInteraction)
+      const { guides, rects } = calculateInteractionState(point, currentInteraction)
       setDraftLayout({
-        pointer: currentInteraction.pointer,
-        rect,
+        rects,
       })
       setSnapGuides(guides)
     }
@@ -344,9 +372,9 @@ function App() {
         return
       }
 
-      const { rect } = calculateInteractionState(point, currentInteraction)
+      const { rects } = calculateInteractionState(point, currentInteraction)
 
-      if (rectEquals(rect, currentInteraction.startRect)) {
+      if (draftRectsEqual(rects, currentInteraction.startRects)) {
         suppressStageClickRef.current = true
         setInteraction(null)
         setDraftLayout(null)
@@ -354,15 +382,31 @@ function App() {
         return
       }
 
+      suppressBlockClickRef.current = true
+      window.setTimeout(() => {
+        suppressBlockClickRef.current = false
+      }, 0)
+      const selection =
+        currentInteraction.kind === 'move'
+          ? selectionActionForPointers(
+              currentInteraction.pointers,
+              currentInteraction.pointer,
+            )
+          : undefined
+
       suppressStageClickRef.current = true
       commitPatch(
-        setArrangePatch(currentInteraction.pointer, rect, {
-          includeHeight:
-            currentInteraction.kind === 'resize' &&
-            resizeHandleAffectsHeight(currentInteraction.handle),
-        }),
+        rects.flatMap(({ pointer, rect }) =>
+          setArrangePatch(pointer, rect, {
+            includeHeight:
+              currentInteraction.kind === 'resize' &&
+              resizeHandleAffectsHeight(currentInteraction.handle),
+          }),
+        ),
         currentInteraction.pointer,
         `${currentInteraction.kind} layout`,
+        undefined,
+        selection,
       )
       setInteraction(null)
       setDraftLayout(null)
@@ -499,8 +543,7 @@ function App() {
         event.defaultPrevented ||
         editing ||
         interaction ||
-        !selectedPointer ||
-        !selectedBlock ||
+        selectedPointers.length === 0 ||
         isEditableTarget(event.target) ||
         isControlTarget(event.target)
       ) {
@@ -520,19 +563,45 @@ function App() {
         return
       }
 
-      const rect = moveRect(getRect(selectedBlock), delta.x, delta.y)
+      const targets = selectedPointers
+        .map((pointer) => {
+          const location = blockLocationFromPointer(doc.value, pointer)
 
-      if (rectEquals(rect, getRect(selectedBlock))) {
+          if (!location || location.slide.id !== activeSlide.id) {
+            return null
+          }
+
+          return {
+            pointer,
+            rect: moveRect(getRect(location.block), delta.x, delta.y),
+            startRect: getRect(location.block),
+          }
+        })
+        .filter(
+          (
+            target,
+          ): target is { pointer: Pointer; rect: Rect; startRect: Rect } =>
+            target !== null,
+        )
+
+      if (
+        targets.length === 0 ||
+        targets.every((target) => rectEquals(target.rect, target.startRect))
+      ) {
         return
       }
 
       event.preventDefault()
       event.stopPropagation()
       commitPatch(
-        setArrangePatch(selectedPointer, rect),
-        selectedPointer,
+        targets.flatMap((target) => setArrangePatch(target.pointer, target.rect)),
+        targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
         'nudge layout',
-        `layout:nudge:${selectedPointer}`,
+        `layout:nudge:${targets.map((target) => target.pointer).join('|')}`,
+        selectionActionForPointers(
+          targets.map((target) => target.pointer),
+          targets.at(-1)?.pointer,
+        ),
       )
     }
 
@@ -547,7 +616,9 @@ function App() {
     editing,
     interaction,
     mode,
-    selectedBlock,
+    activeSlide.id,
+    doc.value,
+    selectedPointers,
     selectedPointer,
   ])
 
@@ -579,7 +650,12 @@ function App() {
     clearTransientState()
   }
 
-  function selectBlock(pointer: Pointer) {
+  function selectBlock(pointer: Pointer, additive = false) {
+    if (additive) {
+      doc.selection?.togglePointer(pointer)
+      return
+    }
+
     doc.selection?.selectRanges([pointer])
   }
 
@@ -682,18 +758,45 @@ function App() {
       return
     }
 
+    if (hasSelectionModifier(event)) {
+      return
+    }
+
     event.preventDefault()
     event.stopPropagation()
-    selectBlock(pointer)
+    const activePointers = selectedPointerSet.has(pointer)
+      ? selectedPointers
+      : [pointer]
+    const startRects = activePointers
+      .map((activePointer) => {
+        const location = blockLocationFromPointer(doc.value, activePointer)
+
+        if (!location || location.slide.id !== activeSlide.id) {
+          return null
+        }
+
+        return {
+          pointer: activePointer,
+          rect: getCurrentRect(activePointer, location.block, draftLayout),
+        }
+      })
+      .filter((draftRect): draftRect is DraftLayoutRect => draftRect !== null)
+
+    if (!selectedPointerSet.has(pointer)) {
+      selectBlock(pointer)
+    }
+
     setInteraction({
       kind: 'move',
       pointer,
+      pointers: startRects.map((draftRect) => draftRect.pointer),
       startClientPoint: {
         x: event.clientX,
         y: event.clientY,
       },
       startPoint: point,
       startRect: getCurrentRect(pointer, block, draftLayout),
+      startRects,
     })
   }
 
@@ -701,7 +804,13 @@ function App() {
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
   ) {
-    if (!selectedBlock || !selectedPointer || !selectedRect || mode !== 'layout') {
+    if (
+      selectedPointers.length !== 1 ||
+      !selectedBlock ||
+      !selectedPointer ||
+      !selectedRect ||
+      mode !== 'layout'
+    ) {
       return
     }
 
@@ -723,6 +832,7 @@ function App() {
       },
       startPoint: point,
       startRect: selectedRect,
+      startRects: [{ pointer: selectedPointer, rect: selectedRect }],
     })
   }
 
@@ -935,6 +1045,7 @@ function App() {
           <div className="toolbar" role="toolbar" aria-label="Actions">
             <button
               aria-label="Undo"
+              data-action="undo"
               disabled={!doc.history.canUndo}
               onClick={undoDocumentChange}
               title="Undo"
@@ -944,6 +1055,7 @@ function App() {
             </button>
             <button
               aria-label="Redo"
+              data-action="redo"
               disabled={!doc.history.canRedo}
               onClick={redoDocumentChange}
               title="Redo"
@@ -952,7 +1064,9 @@ function App() {
               <Redo2 aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
             <button
-              aria-label="Reset"
+              aria-label={resetTitle}
+              data-action="reset"
+              data-reset-scope={resetScope}
               disabled={!canReset}
               onClick={resetCurrentTarget}
               title={resetTitle}
@@ -963,6 +1077,7 @@ function App() {
             <button
               aria-label="Copy HTML"
               aria-pressed={exportCopied}
+              data-action="copy-html"
               data-copy-state={copyState}
               onClick={copyExportCode}
               title={copyTitle}
@@ -977,6 +1092,7 @@ function App() {
             <button
               aria-label="Download HTML"
               aria-pressed={exportDownloaded}
+              data-action="download-html"
               data-download-state={exportDownloaded ? 'downloaded' : 'idle'}
               onClick={downloadExportCode}
               title={exportDownloaded ? 'Downloaded' : 'Download HTML'}
@@ -1023,7 +1139,7 @@ function App() {
               {activeSlide.blocks.map((block, blockIndex) => {
                 const pointer = blockPointer(activeSlideIndex, blockIndex)
                 const rect = getCurrentRect(pointer, block, draftLayout)
-                const selected = pointer === selectedPointer
+                const selected = selectedPointerSet.has(pointer)
                 const baseBlock = findBlockLocation(
                   SAMPLE_DECK,
                   activeSlide.id,
@@ -1061,8 +1177,13 @@ function App() {
                     minimumHeight={minimumHeight}
                     onCancel={cancelTextEdit}
                     onClick={(event) => {
+                      if (suppressBlockClickRef.current) {
+                        suppressBlockClickRef.current = false
+                        return
+                      }
+
                       if (mode === 'layout') {
-                        selectBlock(pointer)
+                        selectBlock(pointer, hasSelectionModifier(event))
                       } else {
                         startTextEdit(pointer, {
                           x: event.clientX,
@@ -1083,7 +1204,7 @@ function App() {
                 )
               })}
 
-              {mode === 'layout' && selectedRect ? (
+              {mode === 'layout' && selectedPointers.length === 1 && selectedRect ? (
                 <SelectionOverlay
                   onResizePointerDown={handleResizePointerDown}
                   rect={visualSelectionRect ?? selectedRect}
@@ -1320,6 +1441,7 @@ function SlideBlockElement({
 
     if (nativeEvent.inputType === 'insertText' && nativeEvent.data !== null) {
       event.preventDefault()
+      event.stopPropagation()
       if (
         !insertTextAfterPendingTrailingLineBreak(
           event.currentTarget,
@@ -1337,6 +1459,7 @@ function SlideBlockElement({
       nativeEvent.inputType === 'insertParagraph'
     ) {
       event.preventDefault()
+      event.stopPropagation()
       const beforeText = event.currentTarget.textContent ?? ''
       const lineBreakAtEnd = isSelectionAtTextEnd(event.currentTarget)
 
@@ -1348,6 +1471,7 @@ function SlideBlockElement({
 
   function handlePaste(event: ReactClipboardEvent<HTMLElement>) {
     event.preventDefault()
+    event.stopPropagation()
     const text = event.clipboardData.getData('text/plain')
 
     if (!insertTextAfterPendingTrailingLineBreak(event.currentTarget, text)) {
@@ -1434,10 +1558,6 @@ function SlideBlockElement({
         onClick(event)
       }
     },
-    onBeforeInput: editing ? handleBeforeInput : undefined,
-    onInput: editing ? handleInput : undefined,
-    onKeyDown: editing ? handleKeyDown : undefined,
-    onPaste: editing ? handlePaste : undefined,
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
       if (editing) {
         event.stopPropagation()
@@ -1702,7 +1822,92 @@ function getCurrentRect(
   block: SlideBlock,
   draftLayout: DraftLayout | null,
 ) {
-  return draftLayout?.pointer === pointer ? draftLayout.rect : getRect(block)
+  return (
+    draftLayout?.rects.find((draftRect) => draftRect.pointer === pointer)?.rect ??
+    getRect(block)
+  )
+}
+
+function calculateMoveInteractionState(
+  dx: number,
+  dy: number,
+  interaction: Extract<Interaction, { kind: 'move' }>,
+  blocks: SlideBlock[],
+  slideIndex: number,
+) {
+  const primaryStartRect = interaction.startRect
+  const movedPrimaryRect = moveRect(primaryStartRect, dx, dy)
+  const primarySnap = snapMoveRectToSlideBlocks(
+    movedPrimaryRect,
+    interaction.pointer,
+    blocks,
+    slideIndex,
+    interaction.pointers,
+  )
+  const groupDelta = clampGroupDelta(
+    interaction.startRects,
+    primarySnap.rect.x - primaryStartRect.x,
+    primarySnap.rect.y - primaryStartRect.y,
+  )
+
+  return {
+    guides: primarySnap.guides,
+    rects: interaction.startRects.map(({ pointer, rect }) => ({
+      pointer,
+      rect: {
+        ...rect,
+        x: rect.x + groupDelta.x,
+        y: rect.y + groupDelta.y,
+      },
+    })),
+  }
+}
+
+function clampGroupDelta(rects: DraftLayoutRect[], dx: number, dy: number) {
+  const minX = Math.min(...rects.map(({ rect }) => rect.x))
+  const minY = Math.min(...rects.map(({ rect }) => rect.y))
+  const maxX = Math.max(...rects.map(({ rect }) => rect.x + rect.width))
+  const maxY = Math.max(...rects.map(({ rect }) => rect.y + rect.height))
+
+  return {
+    x: clamp(dx, -minX, SLIDE_WIDTH - maxX),
+    y: clamp(dy, -minY, SLIDE_HEIGHT - maxY),
+  }
+}
+
+function draftRectsEqual(a: DraftLayoutRect[], b: DraftLayoutRect[]) {
+  return (
+    a.length === b.length &&
+    a.every((draftRect) => {
+      const other = b.find((candidate) => candidate.pointer === draftRect.pointer)
+
+      return other ? rectEquals(draftRect.rect, other.rect) : false
+    })
+  )
+}
+
+function selectionActionForPointers(
+  pointers: Pointer[],
+  primaryPointer = pointers.at(-1),
+): SelectionAction {
+  if (pointers.length <= 1) {
+    return { type: 'collapse', pointer: pointers[0] ?? primaryPointer ?? '' }
+  }
+
+  return {
+    type: 'selectRanges',
+    ranges: pointers,
+    primaryIndex: Math.max(0, pointers.indexOf(primaryPointer ?? pointers.at(-1)!)),
+  }
+}
+
+function hasSelectionModifier(
+  event:
+    | ReactMouseEvent<HTMLElement>
+    | ReactPointerEvent<HTMLElement>
+    | ReactPointerEvent<HTMLButtonElement>,
+) {
+  return event.shiftKey || event.metaKey || event.ctrlKey
 }
 
 function snapMoveRectToSlideBlocks(
@@ -1710,9 +1915,14 @@ function snapMoveRectToSlideBlocks(
   pointer: Pointer,
   blocks: SlideBlock[],
   slideIndex: number,
+  excludedPointers: Pointer[] = [pointer],
 ) {
+  const excludedPointerSet = new Set(excludedPointers)
   const peerRects = blocks
-    .filter((_, blockIndex) => blockPointer(slideIndex, blockIndex) !== pointer)
+    .filter(
+      (_, blockIndex) =>
+        !excludedPointerSet.has(blockPointer(slideIndex, blockIndex)),
+    )
     .map(getRect)
   const xSnap = closestAxisSnap(
     [rect.x, rect.x + rect.width / 2, rect.x + rect.width],

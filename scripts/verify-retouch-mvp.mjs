@@ -13,6 +13,7 @@ const CHROME_BIN =
 
 const checks = []
 const browserErrors = []
+const CDP_COMMAND_TIMEOUT_MS = 10000
 let devServer = null
 let chrome = null
 let chromeProfile = null
@@ -144,8 +145,9 @@ async function openPage(cdpPort, url, viewport = null) {
 
     if (!message.id || !pending.has(message.id)) return
 
-    const { resolve, reject } = pending.get(message.id)
+    const { resolve, reject, timeout } = pending.get(message.id)
     pending.delete(message.id)
+    clearTimeout(timeout)
     if (message.error) reject(new Error(JSON.stringify(message.error)))
     else resolve(message.result)
   })
@@ -161,7 +163,16 @@ async function openPage(cdpPort, url, viewport = null) {
       const callId = ++id
       ws.send(JSON.stringify({ id: callId, method, params }))
       return new Promise((resolve, reject) => {
-        pending.set(callId, { resolve, reject })
+        const timeout = setTimeout(() => {
+          pending.delete(callId)
+          reject(
+            new Error(
+              `Timed out CDP command: ${method} ${JSON.stringify(params)}`,
+            ),
+          )
+        }, CDP_COMMAND_TIMEOUT_MS)
+
+        pending.set(callId, { resolve, reject, timeout })
       })
     },
     async eval(expression) {
@@ -212,7 +223,7 @@ async function runFirstScreenScenario(page) {
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
     canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
-    hasStoredDeck: localStorage.getItem('ppt-retouch:v1:deck') !== null,
+    hasStoredDeck: localStorage.getItem('ppt-retouch:v2:deck') !== null,
     hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
   }))()`)
 
@@ -390,6 +401,12 @@ async function runTextScenario(page) {
     'Text Mode starts editing at clicked text position',
     clickCaretIndex >= 0 && clickCaretIndex < titleBefore.text.length,
     { clickCaretText, clickCaretIndex },
+  )
+  const koreanBeforeInput = await insertEditorTextCommand(page, 'ㅇ')
+  check(
+    'Text Mode Korean insertText inserts one character',
+    koreanBeforeInput.after === `${koreanBeforeInput.before}ㅇ`,
+    koreanBeforeInput,
   )
   await cancelTextEditor(page)
   await movePointerAway(page)
@@ -871,6 +888,61 @@ async function runLayoutScenario(page) {
       stepLargeNudgeUndone.text === stepBeforeNudge.text,
     { before: stepBeforeNudge, after: stepLargeNudgeUndone },
   )
+
+  const multiStepOneBefore = await blockState(page, 's2-step-1')
+  const multiStepTwoBefore = await blockState(page, 's2-step-2')
+  await clickBlock(page, 's2-step-1')
+  await clickBlock(page, 's2-step-2', { shift: true })
+  await delay(100)
+  const multiSelectState = await page.eval(`(() => ({
+    selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
+    resizeHandles: document.querySelectorAll('.resize-handle').length,
+    stepOneSelected:
+      document.querySelector('[data-block="s2-step-1"]')?.dataset.selected,
+    stepTwoSelected:
+      document.querySelector('[data-block="s2-step-2"]')?.dataset.selected,
+  }))()`)
+  check(
+    'Arrange Mode Shift-click selects multiple blocks',
+    multiSelectState.selectedBlocks === 2 &&
+      multiSelectState.resizeHandles === 0 &&
+      multiSelectState.stepOneSelected === 'true' &&
+      multiSelectState.stepTwoSelected === 'true',
+    multiSelectState,
+  )
+
+  await dragBlock(page, 's2-step-1', 42, 24)
+  const multiStepOneMoved = await blockState(page, 's2-step-1')
+  const multiStepTwoMoved = await blockState(page, 's2-step-2')
+  const multiMoveSelection = await page.eval(
+    `document.querySelectorAll('[data-selected="true"]').length`,
+  )
+  check(
+    'Arrange Mode drag moves multi-selected blocks together',
+    rectChanged(multiStepOneBefore, multiStepOneMoved) &&
+      rectChanged(multiStepTwoBefore, multiStepTwoMoved) &&
+      multiStepOneMoved.text === multiStepOneBefore.text &&
+      multiStepTwoMoved.text === multiStepTwoBefore.text &&
+      multiMoveSelection === 2,
+    {
+      before: { one: multiStepOneBefore, two: multiStepTwoBefore },
+      after: { one: multiStepOneMoved, two: multiStepTwoMoved },
+      selectedBlocks: multiMoveSelection,
+    },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+  const multiStepOneUndone = await blockState(page, 's2-step-1')
+  const multiStepTwoUndone = await blockState(page, 's2-step-2')
+  check(
+    'undo restores multi-selected drag',
+    !rectChanged(multiStepOneBefore, multiStepOneUndone) &&
+      !rectChanged(multiStepTwoBefore, multiStepTwoUndone),
+    {
+      before: { one: multiStepOneBefore, two: multiStepTwoBefore },
+      after: { one: multiStepOneUndone, two: multiStepTwoUndone },
+    },
+  )
   await clickSlide(page, 'Overview')
 
   const noteBefore = await blockState(page, 's1-note')
@@ -882,7 +954,14 @@ async function runLayoutScenario(page) {
   await dragBlock(page, 's1-note', 42, 24)
   const noteMoved = await blockState(page, 's1-note')
   check('Arrange Mode drag moves block only', rectChanged(noteBefore, noteMoved) && noteMoved.text === noteBefore.text, { before: noteBefore, after: noteMoved })
-  check('drag enables reset', noteMoved.resetDisabled === false, noteMoved)
+  check(
+    'Arrange Mode reset target is explicit',
+    noteMoved.resetDisabled === false &&
+      noteMoved.resetScope === 'layout' &&
+      noteMoved.resetAriaLabel === 'Reset layout' &&
+      noteMoved.resetTitle === 'Reset layout',
+    noteMoved,
+  )
 
   await clickToolbar(page, 'Undo')
   await delay(150)
@@ -953,12 +1032,13 @@ async function runLayoutScenario(page) {
   await pressKey(page, 'Escape')
   await delay(100)
   const layoutEscapeState = await page.eval(`(() => {
-    const reset = document.querySelector('button[aria-label="Reset"]')
+    const reset = document.querySelector('button[data-action="reset"]')
 
     return {
       mode: document.querySelector('.retouch-app')?.dataset.mode,
       overlayCount: document.querySelectorAll('.selection-overlay').length,
       resetDisabled: reset?.disabled ?? null,
+      resetScope: reset?.dataset.resetScope ?? null,
       selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
     }
   })()`)
@@ -975,12 +1055,14 @@ async function runLayoutScenario(page) {
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.dataset.selected === 'true'`)
   await clickMode(page, 'Text')
   const textModeAfterArrange = await page.eval(`(() => {
-    const reset = document.querySelector('button[aria-label="Reset"]')
+    const reset = document.querySelector('button[data-action="reset"]')
 
     return {
       mode: document.querySelector('.retouch-app')?.dataset.mode,
       overlayCount: document.querySelectorAll('.selection-overlay').length,
       resetDisabled: reset?.disabled ?? null,
+      resetAriaLabel: reset?.getAttribute('aria-label'),
+      resetScope: reset?.dataset.resetScope ?? null,
       resetTitle: reset?.getAttribute('title'),
       selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
     }
@@ -991,6 +1073,8 @@ async function runLayoutScenario(page) {
       textModeAfterArrange.overlayCount === 0 &&
       textModeAfterArrange.selectedBlocks === 0 &&
       textModeAfterArrange.resetDisabled === false &&
+      textModeAfterArrange.resetAriaLabel === 'Reset deck' &&
+      textModeAfterArrange.resetScope === 'deck' &&
       textModeAfterArrange.resetTitle === 'Reset deck',
     textModeAfterArrange,
   )
@@ -1477,7 +1561,7 @@ async function runPersistenceScenario(page) {
   const afterReload = await blockState(page, 's1-title')
   const changedThumbAfterReload = await slideThumbState(page, 'Overview')
   const stored = await page.eval(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const raw = localStorage.getItem('ppt-retouch:v2:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return {
@@ -1509,22 +1593,40 @@ async function runPersistenceScenario(page) {
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await typeEditorText(page, ' DraftReset')
+  const textResetReady = await page.eval(`(() => {
+    const reset = document.querySelector('button[data-action="reset"]')
+
+    return {
+      resetAriaLabel: reset?.getAttribute('aria-label') ?? null,
+      resetDisabled: reset?.disabled ?? null,
+      resetScope: reset?.dataset.resetScope ?? null,
+      resetTitle: reset?.getAttribute('title') ?? null,
+    }
+  })()`)
+  check(
+    'Text Mode reset target is explicit',
+    textResetReady.resetDisabled === false &&
+      textResetReady.resetAriaLabel === 'Reset text' &&
+      textResetReady.resetScope === 'text' &&
+      textResetReady.resetTitle === 'Reset text',
+    textResetReady,
+  )
   await clickToolbar(page, 'Reset')
-  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
-  await page.waitFor(`document.querySelector('button[aria-label="Reset"]')?.disabled === true`)
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'PPT Retouch'`)
+  await page.waitFor(`document.querySelector('button[data-action="reset"]')?.disabled === true`)
   await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
   await page.waitFor(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const raw = localStorage.getItem('ppt-retouch:v2:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return parsed?.deck?.slides?.[0]?.blocks?.find((block) => block.id === 's1-title')
-      ?.text === 'Retention Review'
+      ?.text === 'PPT Retouch'
   })()`)
   const resetState = await blockState(page, 's1-title')
   const noteAfterTextReset = await blockState(page, 's1-note')
   const resetThumbState = await slideThumbState(page, 'Overview')
   const resetStorage = await page.eval(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const raw = localStorage.getItem('ppt-retouch:v2:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return {
@@ -1537,7 +1639,7 @@ async function runPersistenceScenario(page) {
 
   check(
     'Text Mode reset restores selected text only',
-    resetState.text === 'Retention Review' &&
+    resetState.text === 'PPT Retouch' &&
       resetState.undoDisabled === false &&
       resetState.resetDisabled === true &&
       !rectChanged(noteBeforeTextReset, noteAfterTextReset),
@@ -1548,7 +1650,7 @@ async function runPersistenceScenario(page) {
     },
   )
   check('Text Mode reset is undoable', resetState.undoDisabled === false, resetState)
-  check('Text Mode reset updates autosave', resetStorage.title === 'Retention Review' && resetStorage.version === 1, resetStorage)
+  check('Text Mode reset updates autosave', resetStorage.title === 'PPT Retouch' && resetStorage.version === 1, resetStorage)
   check(
     'selected text reset keeps other slide changes marked',
     resetThumbState.changed === 'true' && resetThumbState.hasChangeDot,
@@ -1568,12 +1670,12 @@ async function runPersistenceScenario(page) {
   )
 
   await clickToolbar(page, 'Redo')
-  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'PPT Retouch'`)
   const redoResetState = await blockState(page, 's1-title')
   const redoResetThumbState = await slideThumbState(page, 'Overview')
   check(
     'redo reapplies selected text reset',
-    redoResetState.text === 'Retention Review' &&
+    redoResetState.text === 'PPT Retouch' &&
       redoResetState.resetDisabled === true &&
       redoResetThumbState.changed === 'true',
     { state: redoResetState, thumb: redoResetThumbState },
@@ -1582,10 +1684,12 @@ async function runPersistenceScenario(page) {
   await pressKey(page, 'Escape')
   await delay(100)
   const textEscapeResetReady = await page.eval(`(() => {
-    const reset = document.querySelector('button[aria-label="Reset"]')
+    const reset = document.querySelector('button[data-action="reset"]')
 
     return {
       resetDisabled: reset?.disabled ?? null,
+      resetAriaLabel: reset?.getAttribute('aria-label') ?? null,
+      resetScope: reset?.dataset.resetScope ?? null,
       resetTitle: reset?.getAttribute('title'),
       selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
     }
@@ -1593,6 +1697,8 @@ async function runPersistenceScenario(page) {
   check(
     'Text Mode Escape clears selected text and exposes deck reset',
     textEscapeResetReady.resetDisabled === false &&
+      textEscapeResetReady.resetAriaLabel === 'Reset deck' &&
+      textEscapeResetReady.resetScope === 'deck' &&
       textEscapeResetReady.resetTitle === 'Reset deck' &&
       textEscapeResetReady.selectedBlocks === 0,
     textEscapeResetReady,
@@ -1600,10 +1706,12 @@ async function runPersistenceScenario(page) {
 
   await clickStageBackground(page)
   const deckResetReady = await page.eval(`(() => {
-    const reset = document.querySelector('button[aria-label="Reset"]')
+    const reset = document.querySelector('button[data-action="reset"]')
 
     return {
       resetDisabled: reset?.disabled ?? null,
+      resetAriaLabel: reset?.getAttribute('aria-label') ?? null,
+      resetScope: reset?.dataset.resetScope ?? null,
       resetTitle: reset?.getAttribute('title'),
       selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
     }
@@ -1611,6 +1719,8 @@ async function runPersistenceScenario(page) {
   check(
     'Text Mode empty stage click exposes deck reset',
     deckResetReady.resetDisabled === false &&
+      deckResetReady.resetAriaLabel === 'Reset deck' &&
+      deckResetReady.resetScope === 'deck' &&
       deckResetReady.resetTitle === 'Reset deck' &&
       deckResetReady.selectedBlocks === 0,
     deckResetReady,
@@ -1621,10 +1731,10 @@ async function runPersistenceScenario(page) {
   const deckResetState = await blockState(page, 's1-title')
   const noteAfterDeckReset = await blockState(page, 's1-note')
   const deckResetThumbState = await slideThumbState(page, 'Overview')
-  const deckResetStorage = await page.eval(`localStorage.getItem('ppt-retouch:v1:deck')`)
+  const deckResetStorage = await page.eval(`localStorage.getItem('ppt-retouch:v2:deck')`)
   check(
     'Text Mode deck reset restores all slide changes after selection is cleared',
-    deckResetState.text === 'Retention Review' &&
+    deckResetState.text === 'PPT Retouch' &&
       deckResetState.resetDisabled === true &&
       deckResetThumbState.changed === 'false' &&
       deckResetStorage === null &&
@@ -1672,7 +1782,7 @@ async function blockState(page, blockId) {
     const rect = block.getBoundingClientRect()
     const undo = document.querySelector('button[aria-label="Undo"]')
     const redo = document.querySelector('button[aria-label="Redo"]')
-    const reset = document.querySelector('button[aria-label="Reset"]')
+    const reset = document.querySelector('button[data-action="reset"]')
     return {
       text: block.textContent,
       role: block.dataset.role,
@@ -1684,7 +1794,10 @@ async function blockState(page, blockId) {
       editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
       undoDisabled: undo?.disabled ?? null,
       redoDisabled: redo?.disabled ?? null,
+      resetAriaLabel: reset?.getAttribute('aria-label') ?? null,
       resetDisabled: reset?.disabled ?? null,
+      resetScope: reset?.dataset.resetScope ?? null,
+      resetTitle: reset?.getAttribute('title') ?? null,
     }
   })()`)
 }
@@ -1945,7 +2058,19 @@ async function clickMode(page, label) {
 }
 
 async function clickToolbar(page, label) {
-  await page.eval(`document.querySelector('button[aria-label="${label}"]')?.click()`)
+  const actionByLabel = {
+    'Copy HTML': 'copy-html',
+    'Download HTML': 'download-html',
+    Redo: 'redo',
+    Reset: 'reset',
+    Undo: 'undo',
+  }
+  const action = actionByLabel[label]
+  const selector = action
+    ? `button[data-action="${action}"]`
+    : `button[aria-label="${label}"]`
+
+  await page.eval(`document.querySelector(${JSON.stringify(selector)})?.click()`)
 }
 
 async function clickSlide(page, label) {
@@ -2126,6 +2251,33 @@ async function typeEditorText(page, text) {
   }
 }
 
+async function insertEditorTextCommand(page, text) {
+  const before = await page.eval(`(() => {
+    const editor = document.querySelector('[data-editing=\"true\"]')
+
+    if (!editor) {
+      return null
+    }
+
+    editor.focus()
+    const selection = window.getSelection()
+    const range = document.createRange()
+
+    range.selectNodeContents(editor)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    return editor.textContent ?? ''
+  })()`)
+  await page.send('Input.insertText', { text })
+  const after = await page.eval(
+    `document.querySelector('[data-editing=\"true\"]')?.textContent ?? null`,
+  )
+
+  return { before, after }
+}
+
 function keyDescriptorForChar(char) {
   const punctuation = {
     ' ': ['Space', 32],
@@ -2165,9 +2317,9 @@ async function setEditorText(page, text) {
   })()`)
 }
 
-async function clickBlock(page, blockId) {
+async function clickBlock(page, blockId, options = {}) {
   const center = await blockCenter(page, blockId)
-  await clickAt(page, center)
+  await clickAt(page, center, options)
 }
 
 async function clickStageBackground(page) {
@@ -2317,12 +2469,16 @@ async function blockCenter(page, blockId) {
   })()`)
 }
 
-async function clickAt(page, point) {
+async function clickAt(page, point, options = {}) {
+  const modifiers = options.shift ? 8 : 0
+  const modifierParams = modifiers === 0 ? {} : { modifiers }
+
   await page.send('Input.dispatchMouseEvent', {
     type: 'mouseMoved',
     x: point.x,
     y: point.y,
     button: 'none',
+    ...modifierParams,
   })
   await page.send('Input.dispatchMouseEvent', {
     type: 'mousePressed',
@@ -2331,6 +2487,7 @@ async function clickAt(page, point) {
     button: 'left',
     buttons: 1,
     clickCount: 1,
+    ...modifierParams,
   })
   await delay(50)
   await page.send('Input.dispatchMouseEvent', {
@@ -2340,6 +2497,7 @@ async function clickAt(page, point) {
     button: 'left',
     buttons: 0,
     clickCount: 1,
+    ...modifierParams,
   })
 }
 
