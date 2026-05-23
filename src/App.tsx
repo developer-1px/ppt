@@ -458,6 +458,32 @@ function App() {
   }, [activeSlide.id, doc.selection, doc.value, mode])
 
   useEffect(() => {
+    function handleTextSelectionKey(event: KeyboardEvent) {
+      if (
+        mode !== 'text' ||
+        event.defaultPrevented ||
+        editing ||
+        !selectedPointer ||
+        isEditableTarget(event.target) ||
+        isControlTarget(event.target) ||
+        event.key !== 'Escape'
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      doc.selection?.empty()
+    }
+
+    window.addEventListener('keydown', handleTextSelectionKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleTextSelectionKey)
+    }
+  }, [doc.selection, editing, mode, selectedPointer])
+
+  useEffect(() => {
     function handleLayoutKey(event: KeyboardEvent) {
       if (
         mode !== 'layout' ||

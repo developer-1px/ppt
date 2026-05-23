@@ -78,6 +78,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P0: Text Mode에서 전체 deck reset 접근 경로가 선택 상태에 가려짐
   - Fix: 빈 stage를 클릭하면 Text Mode 선택이 해제되고, Reset이 전체 deck reset으로 바뀐다.
+  - Fix: Text Mode에서 편집 중이 아닐 때 `Escape`를 누르면 선택이 해제되고, Reset이 전체 deck reset으로 바뀐다.
 
 - P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
@@ -173,6 +174,7 @@ Covered checks:
 - live edit commit before slide/mode switch
 - selected text reset keeps other slide changes
 - empty stage click exposes deck reset
+- Text Mode Escape clears selected text and exposes deck reset
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor

@@ -1385,6 +1385,25 @@ async function runPersistenceScenario(page) {
     { state: redoResetState, thumb: redoResetThumbState },
   )
 
+  await pressKey(page, 'Escape')
+  await delay(100)
+  const textEscapeResetReady = await page.eval(`(() => {
+    const reset = document.querySelector('button[aria-label="Reset"]')
+
+    return {
+      resetDisabled: reset?.disabled ?? null,
+      resetTitle: reset?.getAttribute('title'),
+      selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+  check(
+    'Text Mode Escape clears selected text and exposes deck reset',
+    textEscapeResetReady.resetDisabled === false &&
+      textEscapeResetReady.resetTitle === 'Reset deck' &&
+      textEscapeResetReady.selectedBlocks === 0,
+    textEscapeResetReady,
+  )
+
   await clickStageBackground(page)
   const deckResetReady = await page.eval(`(() => {
     const reset = document.querySelector('button[aria-label="Reset"]')
