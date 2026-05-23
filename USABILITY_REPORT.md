@@ -46,6 +46,12 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: 편집 중 화면 이동으로 마지막 글자 수정이 누락될 수 있음
   - Fix: slide 전환과 Arrange 전환도 먼저 live `contenteditable` DOM을 commit한 뒤 이동한다.
 
+- P0: 연속 텍스트 블록 편집이 검증되지 않음
+  - Fix: 한 텍스트 블록 편집 중 다른 텍스트 블록을 클릭하면 첫 draft를 commit하고 두 번째 block 편집이 열리는 흐름을 verifier에 고정했다.
+
+- P0: 편집 진입 시 실제 preview 텍스트와 editable 텍스트 사이에 visual gap이 생길 수 있음
+  - Fix: `contenteditable` focus와 caret placement가 stage scroll을 움직이지 못하게 고정하고, compact viewport에서도 box/text 좌표가 변하지 않는지 verifier에 고정했다.
+
 - P0: 편집 중 toolbar Undo가 live draft를 건너뛸 수 있음
   - Fix: toolbar Undo/Redo도 먼저 live `contenteditable` DOM을 commit한 뒤 document history를 실행한다.
 
@@ -126,7 +132,9 @@ Covered checks:
 - Text Mode direct edit, Enter commit, Escape cancel
 - no double text rendering
 - live editor text and committed preview text parity without boxed editor chrome
+- compact viewport edit entry without preview/editor visual gap
 - toolbar Undo/Redo around live text edits
+- consecutive text block edits
 - live edit commit before slide/mode switch
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit

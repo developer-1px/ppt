@@ -30,6 +30,7 @@ try {
 
   await runFirstScreenScenario(page)
   await runEditSurfaceParityScenario(page)
+  await runCompactEditSurfaceScenario(cdpPort)
   await runTextScenario(page)
   await runLayoutScenario(page)
   await runExportScenario(page)
@@ -248,9 +249,15 @@ async function runEditSurfaceParityScenario(page) {
         blockId,
         slideName,
         boxHeightDelta: editor.boxHeight - preview.boxHeight,
+        boxLeftDelta: editor.boxLeft - preview.boxLeft,
+        boxTopDelta: editor.boxTop - preview.boxTop,
+        canvasLeftDelta: editor.canvasLeft - preview.canvasLeft,
+        canvasTopDelta: editor.canvasTop - preview.canvasTop,
         outlineOffset: editorChrome.outlineOffset,
         outlineStyle: editorChrome.outlineStyle,
         outlineWidth: editorChrome.outlineWidth,
+        stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
+        stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
         textHeightDelta: editor.textHeight - preview.textHeight,
         textLeftDelta: editor.textLeft - preview.textLeft,
         textTopDelta: editor.textTop - preview.textTop,
@@ -267,15 +274,68 @@ async function runEditSurfaceParityScenario(page) {
     deltas.every(
       (delta) =>
         Math.abs(delta.boxHeightDelta) < 1 &&
+        Math.abs(delta.boxLeftDelta) < 1 &&
+        Math.abs(delta.boxTopDelta) < 1 &&
+        Math.abs(delta.canvasLeftDelta) < 1 &&
+        Math.abs(delta.canvasTopDelta) < 1 &&
         delta.outlineOffset === '0px' &&
         delta.outlineStyle === 'none' &&
         delta.outlineWidth === '0px' &&
+        Math.abs(delta.stageScrollLeftDelta) < 1 &&
+        Math.abs(delta.stageScrollTopDelta) < 1 &&
         Math.abs(delta.textHeightDelta) < 1 &&
         Math.abs(delta.textLeftDelta) < 1 &&
         Math.abs(delta.textTopDelta) < 1,
     ),
     deltas,
   )
+}
+
+async function runCompactEditSurfaceScenario(cdpPort) {
+  const page = await openPage(cdpPort, appUrl, {
+    width: 1188,
+    height: 635,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+  const deltas = []
+
+  for (const blockId of ['s1-title', 's1-subtitle', 's1-note']) {
+    const preview = await textRangeMetrics(page, `[data-block="${blockId}"]`)
+    await clickAt(page, {
+      x: preview.textLeft + preview.textWidth / 2,
+      y: preview.textTop + preview.textHeight / 2,
+    })
+    await page.waitFor(`document.querySelector('[data-editing=\"true\"]')?.dataset.block === '${blockId}'`)
+    const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
+
+    deltas.push({
+      blockId,
+      boxTopDelta: editor.boxTop - preview.boxTop,
+      canvasTopDelta: editor.canvasTop - preview.canvasTop,
+      stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
+      stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
+      textLeftDelta: editor.textLeft - preview.textLeft,
+      textTopDelta: editor.textTop - preview.textTop,
+    })
+
+    await cancelTextEditor(page)
+  }
+
+  check(
+    'Text Mode compact viewport edit entry has no visual gap',
+    deltas.every(
+      (delta) =>
+        Math.abs(delta.boxTopDelta) < 1 &&
+        Math.abs(delta.canvasTopDelta) < 1 &&
+        Math.abs(delta.stageScrollLeftDelta) < 1 &&
+        Math.abs(delta.stageScrollTopDelta) < 1 &&
+        Math.abs(delta.textLeftDelta) < 1 &&
+        Math.abs(delta.textTopDelta) < 1,
+    ),
+    deltas,
+  )
+  page.close()
 }
 
 async function runTextScenario(page) {
@@ -402,6 +462,43 @@ async function runTextScenario(page) {
       !toolbarRedoState.editorOpen,
     toolbarRedoState,
   )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
+
+  await focusBlockAndPress(page, 's1-title', 'Enter')
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's1-title'")
+  await page.send('Input.insertText', { text: ' ChainTitle' })
+  const chainSubtitleBefore = await blockState(page, 's1-subtitle')
+  const chainSubtitleText = await textRangeMetrics(page, '[data-block="s1-subtitle"]')
+  await clickAt(page, {
+    x: chainSubtitleText.textLeft + chainSubtitleText.textWidth / 2,
+    y: chainSubtitleText.textTop + chainSubtitleText.textHeight / 2,
+  })
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's1-subtitle'")
+  const chainedTitleCommit = await blockState(page, 's1-title')
+  const chainedEditor = await page.eval(`(() => ({
+    blockId: document.querySelector('[data-editing=\"true\"]')?.dataset.block ?? null,
+    text: document.querySelector('[data-editing=\"true\"]')?.textContent ?? null,
+  }))()`)
+  check(
+    'Text Mode commits current block before editing another text block',
+    chainedTitleCommit.text === `${titleBefore.text} Approved ChainTitle` &&
+      chainedEditor.blockId === 's1-subtitle' &&
+      chainedEditor.text === chainSubtitleBefore.text,
+    { title: chainedTitleCommit, editor: chainedEditor },
+  )
+
+  await page.send('Input.insertText', { text: ' ChainSubtitle' })
+  await commitTextEditor(page)
+  const chainedSubtitleCommit = await blockState(page, 's1-subtitle')
+  check(
+    'Text Mode commits the second block in consecutive edits',
+    chainedSubtitleCommit.text.includes('ChainSubtitle') &&
+      chainedSubtitleCommit.text !== chainSubtitleBefore.text,
+    { before: chainSubtitleBefore, after: chainedSubtitleCommit },
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`!document.querySelector('[data-block="s1-subtitle"]')?.textContent.includes('ChainSubtitle')`)
   await clickToolbar(page, 'Undo')
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
 
@@ -1083,12 +1180,18 @@ async function textRangeMetrics(page, selector) {
     range.selectNodeContents(element)
     const textRect = range.getBoundingClientRect()
     const boxRect = element.getBoundingClientRect()
+    const canvasRect = document.querySelector('.slide-canvas')?.getBoundingClientRect()
+    const stage = document.querySelector('.stage-shell')
 
     return {
       boxTop: boxRect.top,
       boxLeft: boxRect.left,
       boxWidth: boxRect.width,
       boxHeight: boxRect.height,
+      canvasTop: canvasRect?.top ?? 0,
+      canvasLeft: canvasRect?.left ?? 0,
+      stageScrollTop: stage?.scrollTop ?? 0,
+      stageScrollLeft: stage?.scrollLeft ?? 0,
       textTop: textRect.top,
       textLeft: textRect.left,
       textWidth: textRect.width,

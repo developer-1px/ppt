@@ -971,13 +971,17 @@ function SlideBlockElement({
     }
 
     committedRef.current = false
-    element.focus()
+    const scrollPosition = rememberStageScroll(element)
+
+    element.focus({ preventScroll: true })
+    restoreStageScroll(scrollPosition)
     if (
       !initialClientPoint ||
       !placeCaretFromPoint(element, initialClientPoint.x, initialClientPoint.y)
     ) {
       placeCaretAtEnd(element)
     }
+    restoreStageScroll(scrollPosition)
   }, [block.id, editing, initialClientPoint, text])
 
   const syncAutoHeight = useCallback((element: HTMLElement) => {
@@ -1163,6 +1167,29 @@ function readCaretRangeFromPoint(x: number, y: number) {
   }
 
   return null
+}
+
+function rememberStageScroll(element: HTMLElement) {
+  const stage = element.closest<HTMLElement>('.stage-shell')
+
+  return stage
+    ? {
+        element: stage,
+        left: stage.scrollLeft,
+        top: stage.scrollTop,
+      }
+    : null
+}
+
+function restoreStageScroll(
+  position: { element: HTMLElement; left: number; top: number } | null,
+) {
+  if (!position) {
+    return
+  }
+
+  position.element.scrollLeft = position.left
+  position.element.scrollTop = position.top
 }
 
 function MiniSlide({ slide }: { slide: RetouchSlide }) {
