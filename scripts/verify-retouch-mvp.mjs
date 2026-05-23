@@ -190,12 +190,14 @@ async function openPage(cdpPort, url, viewport = null) {
     await page.send('Emulation.setDeviceMetricsOverride', viewport)
     await page.send('Page.navigate', { url })
   }
-  await page.eval(`
-    new Promise((resolve) => {
-      if (document.readyState === 'complete') resolve()
-      else addEventListener('load', resolve, { once: true })
-    })
-  `)
+  await waitUntil(
+    async () =>
+      page.eval(
+        `location.href === ${JSON.stringify(url)} && document.readyState === 'complete'`,
+      ),
+    `Timed out loading page: ${url}`,
+    15000,
+  )
   await page.waitFor("!!document.querySelector('[data-block=\"s1-title\"]')")
 
   return page
@@ -792,6 +794,17 @@ async function runExportScenario(page) {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
     const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
     const parsed = new DOMParser().parseFromString(value, 'text/html')
+    const patchText =
+      parsed.querySelector('script[type="application/json"][data-retouch-patch]')
+        ?.textContent ?? ''
+    let patch = null
+
+    try {
+      patch = JSON.parse(patchText)
+    } catch {
+      patch = null
+    }
+
     return {
       hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
       hasDataSlide: value.includes('data-slide="slide-1"'),
@@ -819,12 +832,30 @@ async function runExportScenario(page) {
       hasCopyAction: !!copyButton,
       hasDownloadAction: !!downloadButton,
       hasVisibleRawCodePanel: !!document.querySelector('.export-panel'),
+      patchVersion: patch?.version ?? null,
+      patchTextCount: patch?.text?.length ?? null,
+      patchLayoutCount: patch?.layout?.length ?? null,
+      patchTitle:
+        patch?.text?.find((entry) => entry.blockId === 's1-title')?.text ?? null,
+      patchMovedNote:
+        patch?.layout?.find((entry) => entry.blockId === 's1-note')?.rect ?? null,
     }
   })()`)
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
   check('export is a standalone HTML document', exportState.isCompleteDocument && exportState.parsedEditedTitle === expectedTitle, exportState)
   check('export includes print-ready slide CSS', exportState.hasPresentationPrintCss, exportState)
   check('export uses the same slide theme tokens as preview', exportState.hasSharedSlideTheme, exportState)
+  check(
+    'export carries a structured retouch patch manifest',
+    exportState.patchVersion === 1 &&
+      exportState.patchTextCount >= 1 &&
+      exportState.patchLayoutCount >= 1 &&
+      exportState.patchTitle === expectedTitle &&
+      exportState.patchMovedNote?.x !== undefined &&
+      exportState.patchMovedNote?.y !== undefined &&
+      exportState.patchMovedNote?.width !== undefined,
+    exportState,
+  )
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)

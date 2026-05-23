@@ -53,12 +53,31 @@ export const RetouchDeckSchema = z.object({
   slides: z.array(RetouchSlideSchema),
 })
 
+export const RetouchTextPatchSchema = z.object({
+  slideId: z.string(),
+  blockId: z.string(),
+  text: z.string(),
+})
+
+export const RetouchLayoutPatchSchema = z.object({
+  slideId: z.string(),
+  blockId: z.string(),
+  rect: RectSchema,
+})
+
+export const RetouchPatchManifestSchema = z.object({
+  version: z.literal(1),
+  text: z.array(RetouchTextPatchSchema),
+  layout: z.array(RetouchLayoutPatchSchema),
+})
+
 export type BlockRole = z.infer<typeof BlockRoleSchema>
 export type BlockTag = z.infer<typeof BlockTagSchema>
 export type Rect = z.infer<typeof RectSchema>
 export type SlideBlock = z.infer<typeof SlideBlockSchema>
 export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
+export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
 
 export type ResizeHandle = 'e' | 'w'
 
@@ -482,6 +501,7 @@ function snapAlignedCenter(
 }
 
 export function exportRetouchDeck(deck: RetouchDeck) {
+  const patchManifest = buildRetouchPatchManifest(SAMPLE_DECK, deck)
   const css = [
     ':root{--sans:Inter,ui-sans-serif,system-ui,sans-serif;font-family:var(--sans);color:#111827;background:#f3f4f6;}',
     'body{margin:0;}',
@@ -530,10 +550,53 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     '<main class="deck">',
     slides,
     '</main>',
+    '  <script type="application/json" data-retouch-patch>',
+    indent(escapeScriptJson(JSON.stringify(patchManifest, null, 2)), 4),
+    '  </script>',
     '</body>',
     '</html>',
     '',
   ].join('\n')
+}
+
+export function buildRetouchPatchManifest(
+  baseDeck: RetouchDeck,
+  deck: RetouchDeck,
+): RetouchPatchManifest {
+  const text: RetouchPatchManifest['text'] = []
+  const layout: RetouchPatchManifest['layout'] = []
+
+  for (const slide of deck.slides) {
+    const baseSlide = baseDeck.slides.find((candidate) => candidate.id === slide.id)
+
+    for (const block of slide.blocks) {
+      const baseBlock = baseSlide?.blocks.find(
+        (candidate) => candidate.id === block.id,
+      )
+
+      if (!baseBlock || block.text !== baseBlock.text) {
+        text.push({
+          slideId: slide.id,
+          blockId: block.id,
+          text: block.text,
+        })
+      }
+
+      if (!baseBlock || !rectEquals(getRect(block), getRect(baseBlock))) {
+        layout.push({
+          slideId: slide.id,
+          blockId: block.id,
+          rect: getRect(block),
+        })
+      }
+    }
+  }
+
+  return {
+    version: 1,
+    text,
+    layout,
+  }
 }
 
 function escapeHtml(value: string) {
@@ -543,6 +606,13 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+function escapeScriptJson(value: string) {
+  return value
+    .replaceAll('&', '\\u0026')
+    .replaceAll('<', '\\u003c')
+    .replaceAll('>', '\\u003e')
 }
 
 function indent(value: string, spaces: number) {
