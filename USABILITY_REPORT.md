@@ -63,6 +63,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: Text Mode에서 실수로 드래그해도 배치가 안 바뀌는지 약하게 검증됨
   - Fix: Text Mode drag attempt가 rect/text를 바꾸지 않고 resize handle도 노출하지 않는지 verifier에 고정했다.
 
+- P0: First Experiment의 본문 문장 줄이기 플로우가 약하게 검증됨
+  - Fix: `role="body"` 문장을 짧게 바꾸고, 위치/폭 유지와 Undo/Redo를 verifier에 고정했다.
+
 - P0: 편집 중 Reset 후 Undo하면 live draft가 복구되지 않음
   - Fix: Text Mode reset도 먼저 live `contenteditable` DOM을 commit한 뒤 undoable root reset을 실행한다.
 
@@ -149,6 +152,7 @@ Covered checks:
 - toolbar Undo/Redo around live text edits
 - keyboard Undo inside live text edit
 - Text Mode drag attempt does not change layout
+- body sentence shortening without layout movement
 - consecutive text block edits
 - live edit commit before slide/mode switch
 - selected text reset keeps other slide changes

@@ -473,6 +473,39 @@ async function runTextScenario(page) {
   const titleKeyboardRedone = await blockState(page, 's1-title')
   check('keyboard redo restores title edit', titleKeyboardRedone.text === `${titleBefore.text} Approved`, titleKeyboardRedone)
 
+  await clickSlide(page, 'Agenda')
+  const bodyBefore = await blockState(page, 's2-footer')
+  const bodyText = await textRangeMetrics(page, '[data-block="s2-footer"]')
+  const shortenedBodyText = 'Decide faster.'
+  await clickAt(page, {
+    x: bodyText.textLeft + bodyText.textWidth / 2,
+    y: bodyText.textTop + bodyText.textHeight / 2,
+  })
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's2-footer'")
+  await replaceEditorText(page, shortenedBodyText)
+  await commitTextEditor(page)
+  const bodyShortened = await blockState(page, 's2-footer')
+  check(
+    'Text Mode shortens a body sentence without moving it',
+    bodyBefore.role === 'body' &&
+      bodyShortened.text === shortenedBodyText &&
+      bodyShortened.text.length < bodyBefore.text.length &&
+      Math.abs(bodyShortened.x - bodyBefore.x) < 1 &&
+      Math.abs(bodyShortened.y - bodyBefore.y) < 1 &&
+      Math.abs(bodyShortened.width - bodyBefore.width) < 1 &&
+      bodyShortened.height <= bodyBefore.height + 1,
+    { before: bodyBefore, after: bodyShortened },
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s2-footer"]')?.textContent === ${JSON.stringify(bodyBefore.text)}`)
+  const bodyShortenUndone = await blockState(page, 's2-footer')
+  check('undo restores shortened body sentence', bodyShortenUndone.text === bodyBefore.text, bodyShortenUndone)
+  await clickToolbar(page, 'Redo')
+  await page.waitFor(`document.querySelector('[data-block="s2-footer"]')?.textContent === ${JSON.stringify(shortenedBodyText)}`)
+  const bodyShortenRedone = await blockState(page, 's2-footer')
+  check('redo reapplies shortened body sentence', bodyShortenRedone.text === shortenedBodyText, bodyShortenRedone)
+  await clickSlide(page, 'Overview')
+
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await typeEditorText(page, ' ToolbarUndo')
@@ -1217,6 +1250,7 @@ async function blockState(page, blockId) {
     const reset = document.querySelector('button[aria-label="Reset"]')
     return {
       text: block.textContent,
+      role: block.dataset.role,
       x: rect.x,
       y: rect.y,
       width: rect.width,
