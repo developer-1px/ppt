@@ -218,19 +218,20 @@ async function runTextScenario(page) {
   const titleBefore = await blockState(page, 's1-title')
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
-    editorCount: document.querySelectorAll('.nano-text-editor').length,
-    editorText: document.querySelector('.nano-text-editor .ProseMirror')?.textContent,
+    editorCount: document.querySelectorAll('.plain-text-editor').length,
+    editorText: document.querySelector('.plain-text-editor')?.textContent,
+    contentEditable: document.querySelector('.plain-text-editor')?.contentEditable,
   }))()`)
-  check('Text Mode replaces original block with one editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1, editingTitle)
+  check('Text Mode replaces original block with one plaintext editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1 && editingTitle.contentEditable === 'plaintext-only', editingTitle)
 
   await page.send('Input.insertText', { text: ' Approved' })
   await commitTextEditor(page)
   const titleCommitted = await blockState(page, 's1-title')
   check('title text commit works', titleCommitted.text === `${titleBefore.text} Approved`, titleCommitted)
-  check('plain Enter commits text edit', !titleCommitted.text.includes('ProseMirror') && !titleCommitted.editorOpen, titleCommitted)
+  check('plain Enter commits text edit', !titleCommitted.editorOpen, titleCommitted)
   check('text commit enables undo', titleCommitted.undoDisabled === false, titleCommitted)
 
   await clickToolbar(page, 'Undo')
@@ -245,18 +246,18 @@ async function runTextScenario(page) {
 
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const editBefore = await editorMetrics(page)
   await page.send('Input.insertText', {
-    text: ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling.',
+    text: ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling. Add owner names, renewal risk, partner follow-up, timing, decision path, and executive review notes so the content clearly exceeds the original text box height.',
   })
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.nano-text-editor')
+    const editor = document.querySelector('.plain-text-editor')
     return editor && editor.getBoundingClientRect().height > ${editBefore.height + 10}
   })()`)
   const autoHeight = await editorMetrics(page)
   check('Text Mode autoheight grows box, not scroll/clip', autoHeight.height > editBefore.height + 10 && autoHeight.wrapperOverflowY === 'visible' && autoHeight.editorOverflowY === 'visible', autoHeight)
-  check('Text Mode autoheight keeps content top stable while typing', Math.abs(autoHeight.top - editBefore.top) < 1 && Math.abs(autoHeight.proseTop - editBefore.proseTop) < 1, { before: editBefore, after: autoHeight })
+  check('Text Mode autoheight keeps content top stable while typing', Math.abs(autoHeight.top - editBefore.top) < 1 && Math.abs(autoHeight.textTop - editBefore.textTop) < 1, { before: editBefore, after: autoHeight })
 
   await commitTextEditor(page)
   const subtitleGrown = await blockState(page, 's1-subtitle')
@@ -273,11 +274,11 @@ async function runTextScenario(page) {
   check('redo restores autoheight growth', subtitleRedone.text === subtitleGrown.text && Math.abs(subtitleRedone.height - subtitleGrown.height) < 1, { before: subtitleGrown, after: subtitleRedone })
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const grownEditHeight = await editorHeight(page)
   await replaceEditorText(page, 'Short follow-up.')
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.nano-text-editor')
+    const editor = document.querySelector('.plain-text-editor')
     return editor && editor.getBoundingClientRect().height < ${grownEditHeight - 10}
   })()`)
   const shrinkHeight = await editorHeight(page)
@@ -288,8 +289,8 @@ async function runTextScenario(page) {
   check('autoheight shrink persists after commit', subtitleShrunk.text === 'Short follow-up.' && subtitleShrunk.height < subtitleGrown.height - 10, { before: subtitleGrown, after: subtitleShrunk })
 
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
-  const noteBeforeCancel = await page.eval(`document.querySelector('.nano-text-editor .ProseMirror')?.textContent ?? ''`)
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  const noteBeforeCancel = await page.eval(`document.querySelector('.plain-text-editor')?.textContent ?? ''`)
   await page.send('Input.insertText', { text: ' Cancelled draft' })
   await cancelTextEditor(page)
   const noteAfterCancel = await blockState(page, 's1-note')
@@ -298,13 +299,13 @@ async function runTextScenario(page) {
   await clickSlide(page, 'Board')
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   await replaceEditorText(
     page,
     'Decision needed: approve the partner incentive pilot with owner, risk, timing, customer impact, renewal coverage, executive sponsor, and next action visible in the slide.',
   )
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.nano-text-editor')
+    const editor = document.querySelector('.plain-text-editor')
     return editor && editor.getBoundingClientRect().height > ${bottomNoteBefore.height + 10}
   })()`)
   await commitTextEditor(page)
@@ -355,14 +356,14 @@ async function runLayoutScenario(page) {
   check('Layout Mode resize changes box only', metricResized.width > metricBefore.width + 10 && metricResized.height > metricBefore.height + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
 
   await clickBlock(page, 's1-title')
-  const noEditorInLayout = await page.eval("!document.querySelector('.nano-text-editor')")
+  const noEditorInLayout = await page.eval("!document.querySelector('.plain-text-editor')")
   check('Layout Mode click does not edit text', noEditorInLayout, null)
 }
 
 async function runExportScenario(page) {
   await clickMode(page, 'Text')
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   await page.send('Input.insertText', { text: ' Export' })
   await commitTextEditor(page)
 
@@ -379,7 +380,7 @@ async function runExportScenario(page) {
       hasDataSlide: value.includes('data-slide="slide-1"'),
       hasDataBlock: value.includes('data-block="s1-note"'),
       hasStyleCoordinates: /left:\\d/.test(value) && /top:\\d/.test(value),
-      hasRawEditorChrome: value.includes('nano-text-editor') || value.includes('resize-handle'),
+      hasRawEditorChrome: value.includes('plain-text-editor') || value.includes('resize-handle'),
       hasCopyAction: !!copyButton,
     }
   })()`)
@@ -424,7 +425,7 @@ async function blockState(page, blockId) {
       width: rect.width,
       height: rect.height,
       selected: block.dataset.selected,
-      editorOpen: !!document.querySelector('.nano-text-editor'),
+      editorOpen: !!document.querySelector('.plain-text-editor'),
       undoDisabled: undo?.disabled ?? null,
       redoDisabled: redo?.disabled ?? null,
       resetDisabled: reset?.disabled ?? null,
@@ -457,27 +458,24 @@ async function blockFitsSlide(page, blockId) {
 }
 
 async function editorHeight(page) {
-  return page.eval("document.querySelector('.nano-text-editor')?.getBoundingClientRect().height ?? 0")
+  return page.eval("document.querySelector('.plain-text-editor')?.getBoundingClientRect().height ?? 0")
 }
 
 async function editorMetrics(page) {
   return page.eval(`(() => {
-    const wrapper = document.querySelector('.nano-text-editor')
-    const editor = wrapper?.querySelector('.editor')
-    const prose = wrapper?.querySelector('.ProseMirror')
+    const wrapper = document.querySelector('.plain-text-editor')
     const wrapperRect = wrapper?.getBoundingClientRect()
-    const proseRect = prose?.getBoundingClientRect()
 
     return {
       top: wrapperRect?.top ?? 0,
       height: wrapperRect?.height ?? 0,
-      proseTop: proseRect?.top ?? 0,
-      proseHeight: proseRect?.height ?? 0,
+      textTop: wrapperRect?.top ?? 0,
+      textHeight: wrapperRect?.height ?? 0,
       wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : null,
       wrapperAlignItems: wrapper ? getComputedStyle(wrapper).alignItems : null,
       wrapperOverflowY: wrapper ? getComputedStyle(wrapper).overflowY : null,
-      editorOverflowY: editor ? getComputedStyle(editor).overflowY : null,
-      proseMinHeight: prose ? getComputedStyle(prose).minHeight : null,
+      editorOverflowY: wrapper ? getComputedStyle(wrapper).overflowY : null,
+      minHeight: wrapper ? getComputedStyle(wrapper).minHeight : null,
     }
   })()`)
 }
@@ -497,7 +495,7 @@ async function clickSlide(page, label) {
 }
 
 async function commitTextEditor(page) {
-  await page.eval("document.querySelector('.nano-text-editor .ProseMirror')?.focus()")
+  await page.eval("document.querySelector('.plain-text-editor')?.focus()")
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Enter',
@@ -512,11 +510,11 @@ async function commitTextEditor(page) {
     windowsVirtualKeyCode: 13,
     nativeVirtualKeyCode: 13,
   })
-  await page.waitFor("!document.querySelector('.nano-text-editor')")
+  await page.waitFor("!document.querySelector('.plain-text-editor')")
 }
 
 async function cancelTextEditor(page) {
-  await page.eval("document.querySelector('.nano-text-editor .ProseMirror')?.focus()")
+  await page.eval("document.querySelector('.plain-text-editor')?.focus()")
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Escape',
@@ -531,12 +529,12 @@ async function cancelTextEditor(page) {
     windowsVirtualKeyCode: 27,
     nativeVirtualKeyCode: 27,
   })
-  await page.waitFor("!document.querySelector('.nano-text-editor')")
+  await page.waitFor("!document.querySelector('.plain-text-editor')")
 }
 
 async function replaceEditorText(page, text) {
   await page.eval(`(() => {
-    const editor = document.querySelector('.nano-text-editor .ProseMirror')
+    const editor = document.querySelector('.plain-text-editor')
     editor.focus()
     const selection = window.getSelection()
     const range = document.createRange()

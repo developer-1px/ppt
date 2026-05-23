@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
-import { NanoTextEditor } from './NanoTextEditor'
+import { PlainTextEditor } from './PlainTextEditor'
 import {
   RESIZE_HANDLES,
   MIN_BLOCK_SIZE,
@@ -527,7 +527,7 @@ function App() {
 
                 if (editingThisBlock) {
                   return (
-                    <NanoTextEditor
+                    <PlainTextEditor
                       block={block}
                       key={`${block.id}:editor`}
                       minimumHeight={

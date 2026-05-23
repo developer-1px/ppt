@@ -477,7 +477,7 @@ button {
   height: 1px;
 }
 
-.nano-text-editor {
+.plain-text-editor {
   position: absolute;
   z-index: 8;
   box-sizing: border-box;
@@ -489,77 +489,24 @@ button {
   white-space: pre-wrap;
 }
 
-.nano-text-editor {
+.plain-text-editor {
   display: block;
   align-items: normal;
   justify-content: normal;
   overflow: visible;
   background: transparent;
   color: inherit;
-}
-
-.nano-text-editor .nano,
-.nano-text-editor .editor,
-.nano-text-editor .ProseMirror {
-  box-sizing: border-box;
-  width: 100%;
-}
-
-.nano-text-editor .nano {
-  min-height: 0;
-  display: block;
-  background: transparent;
-  color: inherit;
   font: inherit;
 }
 
-.nano-text-editor .toolbar,
-.nano-text-editor .block-picker,
-.nano-text-editor .nano-block-add,
-.nano-text-editor .nano-block-handle,
-.nano-text-editor .nano-command-palette,
-.nano-text-editor .inspector,
-.nano-text-editor .inspector-trigger,
-.nano-text-editor .nano-inspector,
-.nano-text-editor .nano-inspector-trigger {
-  display: none;
+.plain-text-editor:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
 }
 
-.nano-text-editor .editor {
-  min-height: 0;
-  padding: 0;
-  overflow: visible;
-  background: transparent;
-}
-
-.nano-text-editor .ProseMirror {
-  min-height: 0;
-  outline: none;
-  color: inherit;
-  font: inherit;
-  line-height: inherit;
-  white-space: pre-wrap;
-}
-
-.nano-text-editor .nano-block {
-  max-width: none;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  line-height: inherit;
-}
-
-.nano-text-editor .nano-block + .nano-block {
-  margin-top: 0;
-}
-
-.nano-text-editor .nano-block-active::before {
-  display: none;
-}
-
-.nano-text-editor.block-title,
-.nano-text-editor.block-subtitle,
-.nano-text-editor.block-footer {
+.plain-text-editor.block-title,
+.plain-text-editor.block-subtitle,
+.plain-text-editor.block-footer {
   padding: 0;
 }
 
