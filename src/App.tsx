@@ -99,6 +99,7 @@ function App() {
   const slideRef = useRef<HTMLDivElement | null>(null)
   const stageRef = useRef<HTMLDivElement | null>(null)
   const exportTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const previousExportCodeRef = useRef<string | null>(null)
 
   const [mode, setMode] = useState<Mode>('text')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
@@ -111,7 +112,7 @@ function App() {
   })
   const [copiedExportCode, setCopiedExportCode] = useState<string | null>(null)
   const [downloadedExportCode, setDownloadedExportCode] = useState<string | null>(null)
-  const [copyFailed, setCopyFailed] = useState(false)
+  const [failedCopyExportCode, setFailedCopyExportCode] = useState<string | null>(null)
   const [visualSelectionRect, setVisualSelectionRect] = useState<Rect | null>(null)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
@@ -134,9 +135,11 @@ function App() {
   const exportCopied = exportStatusMatchesVisibleSlide && copiedExportCode === exportCode
   const exportDownloaded =
     exportStatusMatchesVisibleSlide && downloadedExportCode === exportCode
+  const exportCopyFailed =
+    exportStatusMatchesVisibleSlide && failedCopyExportCode === exportCode
   const copyState = exportCopied
     ? 'copied'
-    : exportStatusMatchesVisibleSlide && copyFailed
+    : exportCopyFailed
       ? 'failed'
       : 'idle'
   const copyTitle =
@@ -175,6 +178,20 @@ function App() {
   useEffect(() => {
     persistDeck(doc.value)
   }, [doc.value])
+
+  useEffect(() => {
+    if (previousExportCodeRef.current === null) {
+      previousExportCodeRef.current = exportCode
+      return
+    }
+
+    if (previousExportCodeRef.current === exportCode) {
+      return
+    }
+
+    previousExportCodeRef.current = exportCode
+    setFailedCopyExportCode(null)
+  }, [exportCode])
 
   useLayoutEffect(() => {
     if (mode !== 'layout' || !selectedBlock || !slideRef.current) {
@@ -216,6 +233,7 @@ function App() {
         return
       }
 
+      setFailedCopyExportCode(null)
       doc.commit(patch, {
         label,
         mergeKey,
@@ -732,7 +750,7 @@ function App() {
     setActiveSlideId(SAMPLE_SLIDES[0].id)
     setCopiedExportCode(null)
     setDownloadedExportCode(null)
-    setCopyFailed(false)
+    setFailedCopyExportCode(null)
     stageRef.current?.scrollTo({ left: 0, top: 0 })
     doc.commit([{ op: 'replace', path: '', value: SAMPLE_DECK }], {
       label: 'reset deck',
@@ -770,11 +788,11 @@ function App() {
 
     if (!copied) {
       setCopiedExportCode(null)
-      setCopyFailed(true)
+      setFailedCopyExportCode(nextExportCode)
       return
     }
 
-    setCopyFailed(false)
+    setFailedCopyExportCode(null)
     setCopiedExportCode(nextExportCode)
   }
 

@@ -1058,6 +1058,51 @@ async function runExportScenario(page) {
     failedCopyFeedback,
   )
 
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await typeEditorText(page, ' AfterFail')
+  const failedDuringDraft = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    return {
+      editorOpen: !!document.querySelector('[data-editing="true"]'),
+      copyState: copyButton?.dataset.copyState,
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'copy failure clears while a live text draft is visible',
+    failedDuringDraft.editorOpen &&
+      failedDuringDraft.copyState === 'idle' &&
+      failedDuringDraft.title === 'Copy HTML',
+    failedDuringDraft,
+  )
+  await commitTextEditor(page)
+  await page.waitFor(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const title = document.querySelector('[data-block="s1-title"]')?.textContent ?? ''
+
+    return title.endsWith('AfterFail') && copyButton?.dataset.copyState === 'idle'
+  })()`)
+  const failedAfterCommit = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    return {
+      copyState: copyButton?.dataset.copyState,
+      text: document.querySelector('[data-block="s1-title"]')?.textContent ?? '',
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'copy failure does not stick to a new export state',
+    failedAfterCommit.text.endsWith('AfterFail') &&
+      failedAfterCommit.copyState === 'idle' &&
+      failedAfterCommit.title === 'Copy HTML',
+    failedAfterCommit,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(expectedTitle)}`)
+
   await page.eval(`(() => {
     window.__pptRetouchDownload = null
     const originalClick = HTMLAnchorElement.prototype.click

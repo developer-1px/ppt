@@ -41,6 +41,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: Export panel에 `Copy` 버튼과 `Copied` feedback을 추가했다.
   - Fix: live draft나 drag draft가 보이는 동안에는 `Copied`/`Downloaded` feedback을 숨겨, 완료 상태가 현재 화면보다 앞서 보이지 않게 했다.
   - Fix: Clipboard와 fallback copy가 모두 실패하면 `Copied`로 표시하지 않고 실패 상태로 남긴다.
+  - Fix: Copy 실패 feedback도 해당 export HTML에만 묶어, 문서가 바뀌면 현재 상태에서는 숨긴다.
 
 - P0: 편집 중 바로 Export하면 마지막 글자 수정이 누락됨
   - Fix: Copy/Download HTML은 먼저 live `contenteditable` DOM을 동기 commit하고, 그 최신 deck으로 export HTML을 만든다.
@@ -172,6 +173,7 @@ Covered checks:
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export feedback clears during live visible drafts
 - Export Copy does not claim success when clipboard fails
+- Export Copy failure clears after visible content changes
 - Export commits live text before Copy/Download
 - Export shared slide theme tokens
 - Export structured retouch patch manifest
