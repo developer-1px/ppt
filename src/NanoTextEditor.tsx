@@ -15,6 +15,7 @@ import {
   type NanoDocumentEngine,
 } from 'nano-edit'
 import {
+  MIN_BLOCK_SIZE,
   rectToStyle,
   type Rect,
   type SlideBlock,
@@ -22,23 +23,37 @@ import {
 
 type NanoTextEditorProps = {
   block: SlideBlock
+  minimumHeight: number
   onCancel: () => void
-  onCommit: (text: string) => void
+  onCommit: (text: string, rect: Rect) => void
+  onRectChange: (rect: Rect) => void
   rect: Rect
 }
 
 export function NanoTextEditor({
   block,
+  minimumHeight,
   onCancel,
   onCommit,
+  onRectChange,
   rect,
 }: NanoTextEditorProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const engineRef = useRef<NanoDocumentEngine | null>(null)
+  const rectRef = useRef(rect)
+  const onRectChangeRef = useRef(onRectChange)
   const initialDocument = useMemo(
     () => nanoDocumentFromText(block.id, block.text),
     [block.id, block.text],
   )
+
+  useEffect(() => {
+    rectRef.current = rect
+  }, [rect])
+
+  useEffect(() => {
+    onRectChangeRef.current = onRectChange
+  }, [onRectChange])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -57,32 +72,49 @@ export function NanoTextEditor({
     const handle = createNanoView({ mount, engine })
     engineRef.current = engine
 
+    const measure = () => {
+      const nextRect = autoHeightRect(mount, rectRef.current, minimumHeight)
+      if (Math.abs(nextRect.height - rectRef.current.height) >= 1) {
+        rectRef.current = nextRect
+        onRectChangeRef.current(nextRect)
+      }
+    }
+    const observer = new ResizeObserver(() => measure())
+    const editor = mount.querySelector<HTMLElement>('.editor')
+    if (editor) {
+      observer.observe(editor)
+    }
+
     let caretFrame = 0
+    let measureFrame = 0
     const focusFrame = requestAnimationFrame(() => {
       const editor = mount.querySelector<HTMLElement>('.ProseMirror')
       editor?.focus()
       if (editor) {
         caretFrame = requestAnimationFrame(() => placeCaretAtEnd(editor))
       }
+      measureFrame = requestAnimationFrame(measure)
     })
 
     return () => {
+      observer.disconnect()
       cancelAnimationFrame(focusFrame)
       cancelAnimationFrame(caretFrame)
+      cancelAnimationFrame(measureFrame)
       handle.destroy()
       engineRef.current = null
     }
-  }, [block.text.length, initialDocument])
+  }, [block.text.length, initialDocument, minimumHeight])
 
   function commit() {
     const engine = engineRef.current
 
     if (!engine) {
-      onCommit(block.text)
+      onCommit(block.text, rectRef.current)
       return
     }
 
-    onCommit(textFromNanoDocument(engine.value))
+    onCommit(textFromNanoDocument(engine.value), rectRef.current)
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -136,6 +168,33 @@ function textFromNanoDocument(document: NanoDocument) {
 
 function blockText(block: NanoBlock) {
   return 'text' in block && typeof block.text === 'string' ? block.text : ''
+}
+
+function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {
+  const editor = mount.querySelector<HTMLElement>('.editor')
+  const mountBox = mount.getBoundingClientRect()
+  const editorBox = editor?.getBoundingClientRect()
+
+  if (!editor || mountBox.width === 0 || !editorBox) {
+    return rect
+  }
+
+  const style = getComputedStyle(mount)
+  const verticalChrome =
+    readPixels(style.paddingTop) +
+    readPixels(style.paddingBottom) +
+    readPixels(style.borderTopWidth) +
+    readPixels(style.borderBottomWidth)
+  const slideUnitsPerCssPixel = rect.width / mountBox.width
+  const contentHeight = (editorBox.height + verticalChrome) * slideUnitsPerCssPixel
+  const height = Math.max(minimumHeight, MIN_BLOCK_SIZE, Math.ceil(contentHeight))
+
+  return rect.height === height ? rect : { ...rect, height }
+}
+
+function readPixels(value: string) {
+  const number = Number.parseFloat(value)
+  return Number.isFinite(number) ? number : 0
 }
 
 function placeCaretAtEnd(root: HTMLElement) {

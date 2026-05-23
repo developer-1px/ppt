@@ -300,19 +300,39 @@ function App() {
     setEditing({ pointer })
   }
 
-  function commitTextEdit(pointer: Pointer, text: string) {
+  function cancelTextEdit() {
+    setEditing(null)
+    setDraftLayout(null)
+  }
+
+  function resizeTextBox(pointer: Pointer, rect: Rect) {
+    setDraftLayout((current) =>
+      current?.pointer === pointer && rectEquals(current.rect, rect)
+        ? current
+        : { pointer, rect },
+    )
+  }
+
+  function commitTextEdit(pointer: Pointer, text: string, rect: Rect) {
     const location = blockLocationFromPointer(doc.value, pointer)
     setEditing(null)
+    setDraftLayout(null)
 
-    if (!location || text === location.block.text) {
+    if (!location) {
       return
     }
 
+    const currentRect = getRect(location.block)
+    const patch = [
+      ...(text === location.block.text ? [] : setTextPatch(pointer, text)),
+      ...(rectEquals(rect, currentRect) ? [] : setLayoutPatch(pointer, rect)),
+    ]
+
     commitPatch(
-      setTextPatch(pointer, text),
+      patch,
       pointer,
-      'edit text',
-      `text:${blockTextPointer(pointer)}`,
+      text === location.block.text ? 'resize text box' : 'edit text',
+      text === location.block.text ? undefined : `text:${blockTextPointer(pointer)}`,
     )
   }
 
@@ -500,8 +520,10 @@ function App() {
                     <NanoTextEditor
                       block={block}
                       key={`${block.id}:editor`}
-                      onCancel={() => setEditing(null)}
-                      onCommit={(text) => commitTextEdit(pointer, text)}
+                      minimumHeight={getRect(block).height}
+                      onCancel={cancelTextEdit}
+                      onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
+                      onRectChange={(rect) => resizeTextBox(pointer, rect)}
                       rect={rect}
                     />
                   )
