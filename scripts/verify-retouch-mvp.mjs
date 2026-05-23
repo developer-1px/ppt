@@ -1014,6 +1014,33 @@ async function runExportScenario(page, cdpPort) {
     { before: exportNoteBeforeMove, after: exportNoteMoved },
   )
 
+  await clickSlide(page, 'Agenda')
+  const exportCardBeforeResize = await blockState(page, 's2-step-2')
+  await clickBlock(page, 's2-step-2')
+  await page.waitFor("!!document.querySelector('.resize-handle[data-handle=\"se\"]')")
+  const exportCardResizeHandle = await resizeHandleCenter(page, 'se')
+  await dragFromTo(page, exportCardResizeHandle, {
+    x: exportCardResizeHandle.x + 48,
+    y: exportCardResizeHandle.y + 48,
+  })
+  const exportCardResized = await blockState(page, 's2-step-2')
+  check(
+    'Export scenario resizes a card before exporting',
+    exportCardResized.width > exportCardBeforeResize.width + 10 &&
+      exportCardResized.height > exportCardBeforeResize.height + 10 &&
+      exportCardResized.text === exportCardBeforeResize.text,
+    { before: exportCardBeforeResize, after: exportCardResized },
+  )
+  const previewAgendaExportMetrics = await exportedPreviewMetrics(page, 'slide-2', [
+    's2-step-2',
+  ])
+  await clickSlide(page, 'Overview')
+  const previewOverviewExportMetrics = await exportedPreviewMetrics(
+    page,
+    'slide-1',
+    ['s1-title', 's1-note'],
+  )
+
   await clickToolbar(page, 'Copy HTML')
   await page.waitFor("!!document.querySelector('.export-buffer')")
   const exportState = await page.eval(`(() => {
@@ -1037,6 +1064,8 @@ async function runExportScenario(page, cdpPort) {
       hasDataSlide: value.includes('data-slide="slide-1"'),
       hasDataBlock: value.includes('data-block="s1-note"'),
       hasStyleCoordinates: /left:\\d/.test(value) && /top:\\d/.test(value),
+      resizedCardStyle:
+        parsed.querySelector('[data-block="s2-step-2"]')?.getAttribute('style') ?? '',
       isCompleteDocument:
         value.trimStart().toLowerCase().startsWith('<!doctype html>') &&
         !!parsed.querySelector('html head style') &&
@@ -1066,6 +1095,8 @@ async function runExportScenario(page, cdpPort) {
         patch?.text?.find((entry) => entry.blockId === 's1-title')?.text ?? null,
       patchMovedNote:
         patch?.layout?.find((entry) => entry.blockId === 's1-note')?.rect ?? null,
+      patchResizedCard:
+        patch?.layout?.find((entry) => entry.blockId === 's2-step-2')?.rect ?? null,
       html: value,
     }
   })()`)
@@ -1081,35 +1112,57 @@ async function runExportScenario(page, cdpPort) {
       exportState.patchTitle === expectedTitle &&
       exportState.patchMovedNote?.x !== undefined &&
       exportState.patchMovedNote?.y !== undefined &&
-      exportState.patchMovedNote?.width !== undefined,
+      exportState.patchMovedNote?.width !== undefined &&
+      exportState.patchResizedCard?.width !== undefined &&
+      exportState.patchResizedCard?.height !== undefined &&
+      exportState.resizedCardStyle.includes('min-height:'),
     exportState,
   )
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
-  const previewExportMetrics = await exportedPreviewMetrics(page, [
-    's1-title',
-    's1-note',
-  ])
   const exportedPage = await openExportedHtmlPage(cdpPort, exportState.html)
-  const renderedExportMetrics = await exportedPreviewMetrics(exportedPage, [
-    's1-title',
-    's1-note',
-  ])
+  const renderedOverviewExportMetrics = await exportedPreviewMetrics(
+    exportedPage,
+    'slide-1',
+    ['s1-title', 's1-note'],
+  )
+  const renderedAgendaExportMetrics = await exportedPreviewMetrics(
+    exportedPage,
+    'slide-2',
+    ['s2-step-2'],
+  )
   check(
     'exported HTML renders like the current preview',
-    renderedExportMetrics['s1-title']?.text === previewExportMetrics['s1-title']?.text &&
-      renderedExportMetrics['s1-note']?.text === previewExportMetrics['s1-note']?.text &&
+    renderedOverviewExportMetrics['s1-title']?.text ===
+      previewOverviewExportMetrics['s1-title']?.text &&
+      renderedOverviewExportMetrics['s1-note']?.text ===
+        previewOverviewExportMetrics['s1-note']?.text &&
+      renderedAgendaExportMetrics['s2-step-2']?.text ===
+        previewAgendaExportMetrics['s2-step-2']?.text &&
       exportedBlockMetricsMatch(
-        renderedExportMetrics['s1-title'],
-        previewExportMetrics['s1-title'],
+        renderedOverviewExportMetrics['s1-title'],
+        previewOverviewExportMetrics['s1-title'],
       ) &&
       exportedBlockMetricsMatch(
-        renderedExportMetrics['s1-note'],
-        previewExportMetrics['s1-note'],
+        renderedOverviewExportMetrics['s1-note'],
+        previewOverviewExportMetrics['s1-note'],
+      ) &&
+      exportedBlockMetricsMatch(
+        renderedAgendaExportMetrics['s2-step-2'],
+        previewAgendaExportMetrics['s2-step-2'],
       ),
-    { preview: previewExportMetrics, exported: renderedExportMetrics },
+    {
+      preview: {
+        ...previewOverviewExportMetrics,
+        ...previewAgendaExportMetrics,
+      },
+      exported: {
+        ...renderedOverviewExportMetrics,
+        ...renderedAgendaExportMetrics,
+      },
+    },
   )
   exportedPage.close()
 
@@ -1746,15 +1799,24 @@ async function openExportedHtmlPage(cdpPort, html) {
   )
 }
 
-async function exportedPreviewMetrics(page, blockIds) {
+async function exportedPreviewMetrics(page, slideId, blockIds) {
   return page.eval(`(() => {
-    const slide = document.querySelector('[data-slide="slide-1"]')
-    const slideRect = slide.getBoundingClientRect()
+    const slide = document.querySelector('[data-slide="${slideId}"]')
     const ids = ${JSON.stringify(blockIds)}
     const result = {}
 
+    if (!slide) {
+      for (const blockId of ids) {
+        result[blockId] = null
+      }
+
+      return result
+    }
+
+    const slideRect = slide.getBoundingClientRect()
+
     for (const blockId of ids) {
-      const block = document.querySelector('[data-block="' + blockId + '"]')
+      const block = slide.querySelector('[data-block="' + blockId + '"]')
 
       if (!block) {
         result[blockId] = null
