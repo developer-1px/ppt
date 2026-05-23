@@ -895,17 +895,48 @@ async function runLayoutScenario(page) {
   await clickBlock(page, 's1-metric')
   await page.waitFor(`document.querySelector('[data-block="s1-metric"]')?.dataset.selected === 'true'`)
   await page.waitFor("!!document.querySelector('.resize-handle[data-handle=\"e\"]')")
-  const handle = await page.eval(`(() => {
-    const handle = document.querySelector('.resize-handle[data-handle="e"]')
-    const rect = handle.getBoundingClientRect()
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
-  })()`)
+  const handle = await resizeHandleCenter(page, 'e')
   await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y })
   const metricResized = await blockState(page, 's1-metric')
-  check('Arrange Mode resize changes width only', metricResized.width > metricBefore.width + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
+  check(
+    'Arrange Mode east resize changes width only',
+    metricResized.width > metricBefore.width + 10 &&
+      Math.abs(metricResized.height - metricBefore.height) < 1 &&
+      metricResized.text === metricBefore.text,
+    { before: metricBefore, after: metricResized },
+  )
   await page.waitFor(`document.querySelector('[data-block="s1-metric"]')?.dataset.selected === 'true' && !!document.querySelector('.selection-overlay')`)
   const overlayFit = await selectionOverlayFitsBlock(page, 's1-metric')
   check('Arrange Mode selection follows autoheight block', overlayFit.fits, overlayFit)
+
+  await clickSlide(page, 'Agenda')
+  const cardBeforeResize = await blockState(page, 's2-step-2')
+  await clickBlock(page, 's2-step-2')
+  await page.waitFor(`document.querySelector('[data-block="s2-step-2"]')?.dataset.selected === 'true'`)
+  await page.waitFor("!!document.querySelector('.resize-handle[data-handle=\"se\"]')")
+  const cornerHandle = await resizeHandleCenter(page, 'se')
+  await dragFromTo(page, cornerHandle, {
+    x: cornerHandle.x + 48,
+    y: cornerHandle.y + 48,
+  })
+  const cardCornerResized = await blockState(page, 's2-step-2')
+  check(
+    'Arrange Mode corner resize grows a card in both axes',
+    cardCornerResized.width > cardBeforeResize.width + 10 &&
+      cardCornerResized.height > cardBeforeResize.height + 10 &&
+      cardCornerResized.text === cardBeforeResize.text,
+    { before: cardBeforeResize, after: cardCornerResized },
+  )
+  await clickToolbar(page, 'Reset')
+  await delay(150)
+  const cardResizeReset = await blockState(page, 's2-step-2')
+  check(
+    'Arrange Mode reset restores card width and height',
+    !rectChanged(cardBeforeResize, cardResizeReset) &&
+      cardResizeReset.text === cardBeforeResize.text,
+    { before: cardBeforeResize, after: cardResizeReset },
+  )
+  await clickSlide(page, 'Overview')
 
   await clickBlock(page, 's1-title')
   const noEditorInLayout = await page.eval("!document.querySelector('[data-editing=\"true\"]')")
@@ -1979,6 +2010,15 @@ async function clickStageBackground(page) {
   })()`)
 
   await clickAt(page, point)
+}
+
+async function resizeHandleCenter(page, handle) {
+  return page.eval(`(() => {
+    const handle = document.querySelector('.resize-handle[data-handle="${handle}"]')
+    const rect = handle.getBoundingClientRect()
+
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+  })()`)
 }
 
 async function dragBlock(page, blockId, dx, dy) {

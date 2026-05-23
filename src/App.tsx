@@ -100,6 +100,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const exportTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const previousExportCodeRef = useRef<string | null>(null)
+  const suppressStageClickRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('text')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
@@ -158,7 +159,7 @@ function App() {
     selectedPointer &&
       selectedBlock &&
       baseSelectedLocation &&
-      !arrangeRectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
+      !arrangeResetEquals(selectedBlock, baseSelectedLocation.block),
   )
   const canResetSelectedText = Boolean(
     selectedPointer &&
@@ -277,6 +278,7 @@ function App() {
         currentInteraction.startRect,
         currentInteraction.handle,
         dx,
+        dy,
       )
 
       return {
@@ -335,6 +337,7 @@ function App() {
           y: event.clientY,
         })
       ) {
+        suppressStageClickRef.current = true
         setInteraction(null)
         setDraftLayout(null)
         setSnapGuides({ x: null, y: null })
@@ -344,14 +347,20 @@ function App() {
       const { rect } = calculateInteractionState(point, currentInteraction)
 
       if (rectEquals(rect, currentInteraction.startRect)) {
+        suppressStageClickRef.current = true
         setInteraction(null)
         setDraftLayout(null)
         setSnapGuides({ x: null, y: null })
         return
       }
 
+      suppressStageClickRef.current = true
       commitPatch(
-        setArrangePatch(currentInteraction.pointer, rect),
+        setArrangePatch(currentInteraction.pointer, rect, {
+          includeHeight:
+            currentInteraction.kind === 'resize' &&
+            resizeHandleAffectsHeight(currentInteraction.handle),
+        }),
         currentInteraction.pointer,
         `${currentInteraction.kind} layout`,
       )
@@ -614,7 +623,16 @@ function App() {
     }
 
     const text = normalizeEditableText(element.textContent ?? '')
-    const minimumHeight = text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
+    const baseBlock = findBlockLocation(
+      SAMPLE_DECK,
+      location.slide.id,
+      location.block.id,
+    )?.block
+    const minimumHeight = minimumHeightForBlock(
+      location.block,
+      baseBlock,
+      getRect(location.block),
+    )
     const rect = autoHeightRect(blockElement, getRect(location.block), minimumHeight)
 
     return commitTextPatch(activeEditing.pointer, text, rect)
@@ -720,7 +738,11 @@ function App() {
     }
 
     commitPatch(
-      setArrangePatch(selectedPointer, getRect(baseSelectedLocation.block)),
+      setArrangePatch(selectedPointer, getRect(baseSelectedLocation.block), {
+        includeHeight:
+          selectedBlock.text === baseSelectedLocation.block.text &&
+          selectedBlock.height !== baseSelectedLocation.block.height,
+      }),
       selectedPointer,
       'reset layout',
     )
@@ -752,7 +774,13 @@ function App() {
       element?.textContent ?? location.block.text,
     )
     const liveMinimumHeight =
-      liveText.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
+      liveText.length === 0
+        ? EMPTY_TEXT_BOX_HEIGHT
+        : minimumHeightForBlock(
+            location.block,
+            baseLocation.block,
+            getRect(location.block),
+          )
     const liveRect = element && blockElement
       ? autoHeightRect(blockElement, getRect(location.block), liveMinimumHeight)
       : getRect(location.block)
@@ -966,6 +994,11 @@ function App() {
         <div
           className="stage-shell"
           onClick={() => {
+            if (suppressStageClickRef.current) {
+              suppressStageClickRef.current = false
+              return
+            }
+
             if (mode === 'text') {
               commitActiveTextEdit()
             }
@@ -984,8 +1017,19 @@ function App() {
                 const pointer = blockPointer(activeSlideIndex, blockIndex)
                 const rect = getCurrentRect(pointer, block, draftLayout)
                 const selected = pointer === selectedPointer
-                const minimumHeight =
-                  block.text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
+                const baseBlock = findBlockLocation(
+                  SAMPLE_DECK,
+                  activeSlide.id,
+                  block.id,
+                )?.block
+                const minimumHeight = minimumHeightForBlock(
+                  block,
+                  baseBlock,
+                  rect,
+                  interaction?.kind === 'resize' &&
+                    interaction.pointer === pointer &&
+                    resizeHandleAffectsHeight(interaction.handle),
+                )
                 const editingThisBlock =
                   mode === 'text' && editing?.pointer === pointer
                 const className = [
@@ -1734,24 +1778,37 @@ function guidesForInteraction(rect: Rect, interaction: Interaction): SnapGuides 
   const left = rect.x
   const centerX = rect.x + rect.width / 2
   const right = rect.x + rect.width
+  const top = rect.y
+  const centerY = rect.y + rect.height / 2
+  const bottom = rect.y + rect.height
 
   if (interaction.kind === 'move') {
     return {
       x: alignedGuideFor(left, centerX, right, SLIDE_WIDTH),
-      y: alignedGuideFor(
-        rect.y,
-        rect.y + rect.height / 2,
-        rect.y + rect.height,
-        SLIDE_HEIGHT,
-      ),
+      y: alignedGuideFor(top, centerY, bottom, SLIDE_HEIGHT),
     }
   }
 
-  const activeEdge = interaction.handle === 'e' ? right : left
+  const activeEdgeX = interaction.handle.includes('e')
+    ? right
+    : interaction.handle.includes('w')
+      ? left
+      : null
+  const activeEdgeY = interaction.handle.includes('s')
+    ? bottom
+    : interaction.handle.includes('n')
+      ? top
+      : null
 
   return {
-    x: alignedGuideFor(activeEdge, centerX, activeEdge, SLIDE_WIDTH),
-    y: null,
+    x:
+      activeEdgeX === null
+        ? null
+        : alignedGuideFor(activeEdgeX, centerX, activeEdgeX, SLIDE_WIDTH),
+    y:
+      activeEdgeY === null
+        ? null
+        : alignedGuideFor(activeEdgeY, centerY, activeEdgeY, SLIDE_HEIGHT),
   }
 }
 
@@ -1786,8 +1843,39 @@ function rectClose(a: Rect, b: Rect) {
   )
 }
 
-function arrangeRectEquals(a: Rect, b: Rect) {
-  return a.x === b.x && a.y === b.y && a.width === b.width
+function resizeHandleAffectsHeight(handle: ResizeHandle) {
+  return handle.includes('n') || handle.includes('s')
+}
+
+function minimumHeightForBlock(
+  block: SlideBlock,
+  baseBlock: SlideBlock | undefined,
+  rect: Rect,
+  draftHeightResize = false,
+) {
+  if (block.text.length === 0) {
+    return EMPTY_TEXT_BOX_HEIGHT
+  }
+
+  if (
+    draftHeightResize ||
+    (baseBlock && block.text === baseBlock.text && block.height !== baseBlock.height)
+  ) {
+    return rect.height
+  }
+
+  return 0
+}
+
+function arrangeResetEquals(a: SlideBlock, b: SlideBlock) {
+  const heightChangedByArrange = a.text === b.text && a.height !== b.height
+
+  return (
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    !heightChangedByArrange
+  )
 }
 
 function textResetEquals(a: SlideBlock, b: SlideBlock) {

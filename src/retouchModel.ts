@@ -79,10 +79,16 @@ export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
 export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
 
-export type ResizeHandle = 'e' | 'w'
+export type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 
 export const RESIZE_HANDLES: ResizeHandle[] = [
+  'nw',
+  'n',
+  'ne',
   'e',
+  'se',
+  's',
+  'sw',
   'w',
 ]
 
@@ -391,12 +397,23 @@ export function setLayoutPatch(
 export function setArrangePatch(
   pointer: Pointer,
   rect: Rect,
+  options: { includeHeight?: boolean } = {},
 ): JSONPatchOperation[] {
-  return [
+  const patch: JSONPatchOperation[] = [
     { op: 'replace', path: appendSegment(pointer, 'x'), value: rect.x },
     { op: 'replace', path: appendSegment(pointer, 'y'), value: rect.y },
     { op: 'replace', path: appendSegment(pointer, 'width'), value: rect.width },
   ]
+
+  if (options.includeHeight) {
+    patch.push({
+      op: 'replace',
+      path: appendSegment(pointer, 'height'),
+      value: rect.height,
+    })
+  }
+
+  return patch
 }
 
 export function rectToStyle(rect: Rect) {
@@ -454,22 +471,35 @@ export function resizeRect(
   rect: Rect,
   handle: ResizeHandle,
   dx: number,
+  dy: number,
 ): Rect {
   let left = rect.x
   let right = rect.x + rect.width
+  let top = rect.y
+  let bottom = rect.y + rect.height
 
-  if (handle === 'w') {
+  if (handle.includes('w')) {
     left = clamp(snap(left + dx), 0, right - MIN_BLOCK_SIZE)
   }
 
-  if (handle === 'e') {
+  if (handle.includes('e')) {
     right = clamp(snap(right + dx), left + MIN_BLOCK_SIZE, SLIDE_WIDTH)
+  }
+
+  if (handle.includes('n')) {
+    top = clamp(snap(top + dy), 0, bottom - MIN_BLOCK_SIZE)
+  }
+
+  if (handle.includes('s')) {
+    bottom = clamp(snap(bottom + dy), top + MIN_BLOCK_SIZE, SLIDE_HEIGHT)
   }
 
   return {
     ...rect,
     x: left,
+    y: top,
     width: right - left,
+    height: bottom - top,
   }
 }
 
@@ -515,14 +545,20 @@ export function exportRetouchDeck(deck: RetouchDeck) {
 
   const slides = deck.slides
     .map((slide) => {
+      const baseSlide = SAMPLE_DECK.slides.find(
+        (candidate) => candidate.id === slide.id,
+      )
       const blocks = slide.blocks
         .map((block) => {
+          const baseBlock = baseSlide?.blocks.find(
+            (candidate) => candidate.id === block.id,
+          )
           const text = escapeHtml(block.text)
           const style = [
             `left:${block.x}px`,
             `top:${block.y}px`,
             `width:${block.width}px`,
-            block.text.length === 0 ? `min-height:${EMPTY_TEXT_BOX_HEIGHT}px` : '',
+            exportBlockMinimumHeight(block, baseBlock),
           ]
             .filter(Boolean)
             .join(';')
@@ -557,6 +593,18 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     '</html>',
     '',
   ].join('\n')
+}
+
+function exportBlockMinimumHeight(block: SlideBlock, baseBlock: SlideBlock | undefined) {
+  if (block.text.length === 0) {
+    return `min-height:${EMPTY_TEXT_BOX_HEIGHT}px`
+  }
+
+  if (baseBlock && block.text === baseBlock.text && block.height !== baseBlock.height) {
+    return `min-height:${block.height}px`
+  }
+
+  return ''
 }
 
 export function buildRetouchPatchManifest(

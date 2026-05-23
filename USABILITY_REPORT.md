@@ -114,6 +114,11 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: 선택된 block을 화살표 키로 한 칸씩 nudge할 수 있게 했다. Text Mode와 편집 중에는 동작하지 않는다.
   - Fix: Shift+Arrow는 더 큰 nudge로 동작하고 undo로 복구되는지 검증한다.
 
+- P1: Arrange Mode 리사이즈가 가로폭에만 제한됨
+  - Fix: 선택 박스에 8방향 resize handle을 제공한다.
+  - Fix: corner resize로 card를 가로/세로 모두 키우고, Reset으로 width/height가 함께 복구되는지 검증한다.
+  - Fix: 리사이즈 직후 생기는 stage click이 선택을 지우지 않게 해, 바로 Reset할 수 있게 했다.
+
 - P1: 수정된 slide 식별 부족
   - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
 
@@ -187,6 +192,7 @@ Covered checks:
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
 - Layout Mode Shift+Arrow large nudge
+- Layout Mode 8-way card resize and reset
 - Arrange Mode Escape clears selection
 - Text Mode clears hidden Arrange selection on mode switch
 - Text Mode selected reset, undo reset, redo reset
