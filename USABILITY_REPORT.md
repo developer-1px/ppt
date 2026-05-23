@@ -62,8 +62,8 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
 
-- P1: Enter commit 불일치
-  - Fix: `PlainTextEditor`에서 Enter commit, Escape cancel을 처리한다.
+- P1: 직접 텍스트 편집에서 줄바꿈이 숨겨짐
+  - Fix: plain Enter는 줄바꿈으로 두고, blur 또는 Cmd/Ctrl+Enter로 commit한다. Escape cancel은 유지한다.
 
 - P1: Autoheight가 grow 중심이고 bottom clipping 정책이 없음
   - Fix: 편집 중에는 CSS `height: auto`로 자연스럽게 grow/shrink한다. commit 순간에만 DOM height를 측정해 저장하고, slide 하단을 넘으면 y를 보정해 box가 slide 안에 남게 한다.
@@ -129,7 +129,7 @@ pnpm verify:mvp
 Covered checks:
 
 - first screen editor
-- Text Mode direct edit, Enter commit, Escape cancel
+- Text Mode direct edit, Enter line break, shortcut/blur commit, Escape cancel
 - no double text rendering
 - live editor text and committed preview text parity without boxed editor chrome
 - compact viewport edit entry without preview/editor visual gap

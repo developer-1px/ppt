@@ -88,6 +88,7 @@ type SnapGuides = {
 const DRAG_THRESHOLD = 8
 const STORAGE_KEY = 'ppt-retouch:v1:deck'
 const STORAGE_VERSION = 1
+const CARET_PLACEHOLDER = '\u200B'
 
 function App() {
   const initialDeck = useMemo(() => readInitialDeck(), [])
@@ -517,7 +518,7 @@ function App() {
       return doc.value
     }
 
-    const text = element.textContent ?? ''
+    const text = normalizeEditableText(element.textContent ?? '')
     const minimumHeight = text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
     const rect = autoHeightRect(element, getRect(location.block), minimumHeight)
 
@@ -939,6 +940,7 @@ function SlideBlockElement({
 }) {
   const elementRef = useRef<HTMLElement | null>(null)
   const editingSessionRef = useRef<{ blockId: string; text: string } | null>(null)
+  const pendingTrailingLineBreakRef = useRef<{ beforeText: string } | null>(null)
   const rectRef = useRef(rect)
   const committedRef = useRef(false)
 
@@ -1005,7 +1007,7 @@ function SlideBlockElement({
 
     committedRef.current = true
     element?.blur()
-    onCommit(element?.textContent ?? text, nextRect)
+    onCommit(normalizeEditableText(element?.textContent ?? text), nextRect)
   }, [editing, onCommit, syncAutoHeight, text])
 
   function resetDraft() {
@@ -1035,19 +1037,118 @@ function SlideBlockElement({
       return
     }
 
-    if (
-      event.key === 'Enter' &&
-      (event.metaKey || event.ctrlKey || !event.shiftKey)
-    ) {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
       event.stopPropagation()
       commit()
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.stopPropagation()
+      const beforeText = event.currentTarget.textContent ?? ''
+      const lineBreakAtEnd = isSelectionAtTextEnd(event.currentTarget)
+
+      insertTextAtSelection(event.currentTarget, '\n')
+      pendingTrailingLineBreakRef.current = lineBreakAtEnd ? { beforeText } : null
+      syncAutoHeight(event.currentTarget)
+      return
+    }
+
+    if (
+      event.key.length === 1 &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!insertTextAfterPendingTrailingLineBreak(event.currentTarget, event.key)) {
+        insertTextAtSelection(event.currentTarget, event.key)
+      }
+      syncAutoHeight(event.currentTarget)
+    }
+  }
+
+  function handleBeforeInput(event: ReactFormEvent<HTMLElement>) {
+    const nativeEvent = event.nativeEvent as InputEvent
+
+    if (nativeEvent.isComposing) {
+      return
+    }
+
+    if (nativeEvent.inputType === 'insertText' && nativeEvent.data !== null) {
+      event.preventDefault()
+      if (
+        !insertTextAfterPendingTrailingLineBreak(
+          event.currentTarget,
+          nativeEvent.data,
+        )
+      ) {
+        insertTextAtSelection(event.currentTarget, nativeEvent.data)
+      }
+      syncAutoHeight(event.currentTarget)
+      return
+    }
+
+    if (
+      nativeEvent.inputType === 'insertLineBreak' ||
+      nativeEvent.inputType === 'insertParagraph'
+    ) {
+      event.preventDefault()
+      const beforeText = event.currentTarget.textContent ?? ''
+      const lineBreakAtEnd = isSelectionAtTextEnd(event.currentTarget)
+
+      insertTextAtSelection(event.currentTarget, '\n')
+      pendingTrailingLineBreakRef.current = lineBreakAtEnd ? { beforeText } : null
+      syncAutoHeight(event.currentTarget)
     }
   }
 
   function handlePaste(event: ReactClipboardEvent<HTMLElement>) {
     event.preventDefault()
-    document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
+    const text = event.clipboardData.getData('text/plain')
+
+    if (!insertTextAfterPendingTrailingLineBreak(event.currentTarget, text)) {
+      insertTextAtSelection(event.currentTarget, text)
+    }
+    syncAutoHeight(event.currentTarget)
+  }
+
+  function insertTextAfterPendingTrailingLineBreak(
+    element: HTMLElement,
+    insertedText: string,
+  ) {
+    const pendingLineBreak = pendingTrailingLineBreakRef.current
+
+    pendingTrailingLineBreakRef.current = null
+
+    if (
+      !pendingLineBreak ||
+      element.textContent !== `${pendingLineBreak.beforeText}\n`
+    ) {
+      return false
+    }
+
+    element.textContent = `${pendingLineBreak.beforeText}\n${insertedText}`
+    placeCaretAtTextOffset(
+      element,
+      pendingLineBreak.beforeText.length + 1 + insertedText.length,
+    )
+
+    return true
+  }
+
+  function handleInput(event: ReactFormEvent<HTMLElement>) {
+    const pendingLineBreak = pendingTrailingLineBreakRef.current
+
+    if (pendingLineBreak) {
+      pendingTrailingLineBreakRef.current = null
+      repairTrailingLineBreakInput(event.currentTarget, pendingLineBreak.beforeText)
+    }
+
+    syncAutoHeight(event.currentTarget)
   }
 
   const sharedProps = {
@@ -1065,9 +1166,8 @@ function SlideBlockElement({
         onClick(event)
       }
     },
-    onInput: editing
-      ? (event: ReactFormEvent<HTMLElement>) => syncAutoHeight(event.currentTarget)
-      : undefined,
+    onBeforeInput: editing ? handleBeforeInput : undefined,
+    onInput: editing ? handleInput : undefined,
     onKeyDown: editing ? handleKeyDown : undefined,
     onPaste: editing ? handlePaste : undefined,
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
@@ -1133,6 +1233,104 @@ function placeCaretAtEnd(root: HTMLElement) {
   range.collapse(false)
   selection?.removeAllRanges()
   selection?.addRange(range)
+}
+
+function isSelectionAtTextEnd(root: HTMLElement) {
+  const selection = window.getSelection()
+
+  if (!selection || selection.rangeCount === 0) {
+    return true
+  }
+
+  const range = selection.getRangeAt(0)
+
+  if (!root.contains(range.commonAncestorContainer)) {
+    return true
+  }
+
+  const afterCaret = range.cloneRange()
+  afterCaret.selectNodeContents(root)
+  afterCaret.setStart(range.endContainer, range.endOffset)
+
+  return afterCaret.toString().length === 0
+}
+
+function insertTextAtSelection(root: HTMLElement, text: string) {
+  const selection = window.getSelection()
+  const insertedText = text
+
+  if (!selection || selection.rangeCount === 0) {
+    root.append(document.createTextNode(insertedText))
+    placeCaretAtEnd(root)
+    return
+  }
+
+  const range = selection.getRangeAt(0)
+
+  if (!root.contains(range.commonAncestorContainer)) {
+    root.append(document.createTextNode(insertedText))
+    placeCaretAtEnd(root)
+    return
+  }
+
+  const textNode = document.createTextNode(insertedText)
+
+  range.deleteContents()
+  range.insertNode(textNode)
+  range.setStart(textNode, insertedText.length)
+  range.collapse(true)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+function repairTrailingLineBreakInput(root: HTMLElement, beforeText: string) {
+  const text = root.textContent ?? ''
+
+  if (text === `${beforeText}\n`) {
+    return
+  }
+
+  if (!text.startsWith(beforeText) || !text.endsWith('\n')) {
+    return
+  }
+
+  const insertedText = text.slice(beforeText.length, -1)
+
+  if (insertedText.length === 0) {
+    return
+  }
+
+  root.textContent = `${beforeText}\n${insertedText}`
+  placeCaretAtTextOffset(root, beforeText.length + 1 + insertedText.length)
+}
+
+function placeCaretAtTextOffset(root: HTMLElement, offset: number) {
+  const selection = window.getSelection()
+  const range = document.createRange()
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let remainingOffset = offset
+  let node = walker.nextNode()
+
+  while (node) {
+    const textLength = node.textContent?.length ?? 0
+
+    if (remainingOffset <= textLength) {
+      range.setStart(node, remainingOffset)
+      range.collapse(true)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      return
+    }
+
+    remainingOffset -= textLength
+    node = walker.nextNode()
+  }
+
+  placeCaretAtEnd(root)
+}
+
+function normalizeEditableText(text: string) {
+  return text.replaceAll(CARET_PLACEHOLDER, '')
 }
 
 function placeCaretFromPoint(root: HTMLElement, x: number, y: number) {

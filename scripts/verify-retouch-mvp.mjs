@@ -353,7 +353,7 @@ async function runTextScenario(page) {
     y: titlePreviewText.textTop + titlePreviewText.textHeight / 2,
   })
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: 'Q' })
+  await typeEditorText(page, 'Q')
   const clickCaretText = await page.eval("document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''")
   const clickCaretIndex = clickCaretText.indexOf('Q')
   check(
@@ -409,12 +409,36 @@ async function runTextScenario(page) {
     { before: titlePreviewText, after: titleEditorText },
   )
 
-  await page.send('Input.insertText', { text: ' Approved' })
+  await pressEditorEnter(page)
+  const titleLineBreakEdit = await page.eval(`(() => ({
+    editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
+    text: document.querySelector('[data-editing=\"true\"]')?.textContent ?? '',
+  }))()`)
+  check(
+    'plain Enter inserts a text line break without closing editor',
+    titleLineBreakEdit.editorOpen && titleLineBreakEdit.text.includes('\n'),
+    titleLineBreakEdit,
+  )
+  await typeEditorText(page, 'Next line')
+  await commitTextEditor(page)
+  const titleLineBreakCommit = await blockState(page, 's1-title')
+  check(
+    'committed preview keeps plain Enter line break',
+    titleLineBreakCommit.text === `${titleBefore.text}\nNext line` &&
+      !titleLineBreakCommit.editorOpen,
+    titleLineBreakCommit,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(titleBefore.text)}`)
+
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await typeEditorText(page, ' Approved')
   await commitTextEditor(page)
   await movePointerAway(page)
   const titleCommitted = await blockState(page, 's1-title')
   check('title text commit works', titleCommitted.text === `${titleBefore.text} Approved`, titleCommitted)
-  check('plain Enter commits text edit', !titleCommitted.editorOpen, titleCommitted)
+  check('keyboard shortcut commits text edit', !titleCommitted.editorOpen, titleCommitted)
   const titleChromeAfterCommit = await blockChrome(page, 's1-title')
   check('Text Mode returns to clean preview after commit', titleChromeAfterCommit.outlineStyle === 'none', titleChromeAfterCommit)
   check('text commit enables undo', titleCommitted.undoDisabled === false, titleCommitted)
@@ -441,7 +465,7 @@ async function runTextScenario(page) {
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' ToolbarUndo' })
+  await typeEditorText(page, ' ToolbarUndo')
   await clickToolbar(page, 'Undo')
   await page.waitFor(`!document.querySelector('[data-editing=\"true\"]') && document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
   const toolbarUndoState = await blockState(page, 's1-title')
@@ -467,7 +491,7 @@ async function runTextScenario(page) {
 
   await focusBlockAndPress(page, 's1-title', 'Enter')
   await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's1-title'")
-  await page.send('Input.insertText', { text: ' ChainTitle' })
+  await typeEditorText(page, ' ChainTitle')
   const chainSubtitleBefore = await blockState(page, 's1-subtitle')
   const chainSubtitleText = await textRangeMetrics(page, '[data-block="s1-subtitle"]')
   await clickAt(page, {
@@ -488,7 +512,7 @@ async function runTextScenario(page) {
     { title: chainedTitleCommit, editor: chainedEditor },
   )
 
-  await page.send('Input.insertText', { text: ' ChainSubtitle' })
+  await typeEditorText(page, ' ChainSubtitle')
   await commitTextEditor(page)
   const chainedSubtitleCommit = await blockState(page, 's1-subtitle')
   check(
@@ -504,7 +528,7 @@ async function runTextScenario(page) {
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' SlideSwitch' })
+  await typeEditorText(page, ' SlideSwitch')
   await clickSlide(page, 'Agenda')
   await clickSlide(page, 'Overview')
   const slideSwitchCommit = await blockState(page, 's1-title')
@@ -519,7 +543,7 @@ async function runTextScenario(page) {
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' ModeSwitch' })
+  await typeEditorText(page, ' ModeSwitch')
   await clickMode(page, 'Arrange')
   const modeSwitchCommit = await blockState(page, 's1-title')
   const modeAfterLiveEdit = await page.eval("document.querySelector('.retouch-app')?.dataset.mode ?? null")
@@ -538,9 +562,10 @@ async function runTextScenario(page) {
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const editBefore = await editorMetrics(page)
-  await page.send('Input.insertText', {
-    text: ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling. Add owner names, renewal risk, partner follow-up, timing, decision path, and executive review notes so the content clearly exceeds the original text box height.',
-  })
+  await typeEditorText(
+    page,
+    ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling. Add owner names, renewal risk, partner follow-up, timing, decision path, and executive review notes so the content clearly exceeds the original text box height.',
+  )
   await page.waitFor(`(() => {
     const editor = document.querySelector('[data-editing=\"true\"]')
     return editor && editor.getBoundingClientRect().height > ${editBefore.height + 10}
@@ -630,7 +655,7 @@ async function runTextScenario(page) {
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const noteBeforeCancel = await page.eval(`document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''`)
-  await page.send('Input.insertText', { text: ' Cancelled draft' })
+  await typeEditorText(page, ' Cancelled draft')
   await cancelTextEditor(page)
   const noteAfterCancel = await blockState(page, 's1-note')
   check('Escape cancels text draft', noteAfterCancel.text === noteBeforeCancel, noteAfterCancel)
@@ -754,7 +779,7 @@ async function runExportScenario(page) {
   const expectedTitle = `${titleBefore.text} Export`
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' Export' })
+  await typeEditorText(page, ' Export')
   await commitTextEditor(page)
 
   await clickMode(page, 'Arrange')
@@ -855,7 +880,7 @@ async function runExportScenario(page) {
   }`)
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' DraftCopy' })
+  await typeEditorText(page, ' DraftCopy')
   await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
   await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
   const immediateCopy = await page.eval(`(() => {
@@ -893,7 +918,7 @@ async function runExportScenario(page) {
   })()`)
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' DraftDownload' })
+  await typeEditorText(page, ' DraftDownload')
   await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
   await page.waitFor("!document.querySelector('[data-editing=\"true\"]') && window.__pptRetouchBlobText !== null")
   const immediateDownload = await page.eval(`(() => {
@@ -959,7 +984,7 @@ async function runPersistenceScenario(page) {
   const resetDraftTitle = `${beforeReload.text} DraftReset`
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
-  await page.send('Input.insertText', { text: ' DraftReset' })
+  await typeEditorText(page, ' DraftReset')
   await clickToolbar(page, 'Reset')
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
   await page.waitFor(`document.querySelector('button[aria-label="Reset"]')?.disabled === true`)
@@ -1308,6 +1333,27 @@ async function commitTextEditor(page) {
     code: 'Enter',
     windowsVirtualKeyCode: 13,
     nativeVirtualKeyCode: 13,
+    modifiers: 2,
+  })
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: 'Enter',
+    code: 'Enter',
+    windowsVirtualKeyCode: 13,
+    nativeVirtualKeyCode: 13,
+    modifiers: 2,
+  })
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+}
+
+async function pressEditorEnter(page) {
+  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: 'Enter',
+    code: 'Enter',
+    windowsVirtualKeyCode: 13,
+    nativeVirtualKeyCode: 13,
   })
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyUp',
@@ -1316,7 +1362,6 @@ async function commitTextEditor(page) {
     windowsVirtualKeyCode: 13,
     nativeVirtualKeyCode: 13,
   })
-  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
 }
 
 async function cancelTextEditor(page) {
@@ -1348,7 +1393,63 @@ async function replaceEditorText(page, text) {
     selection.removeAllRanges()
     selection.addRange(range)
   })()`)
-  await page.send('Input.insertText', { text })
+  await typeEditorText(page, text)
+}
+
+async function typeEditorText(page, text) {
+  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+
+  for (const char of text) {
+    if (char === '\n') {
+      await pressEditorEnter(page)
+      continue
+    }
+
+    const { code, keyCode } = keyDescriptorForChar(char)
+
+    await page.send('Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key: char,
+      code,
+      windowsVirtualKeyCode: keyCode,
+      nativeVirtualKeyCode: keyCode,
+      text: char,
+      unmodifiedText: char,
+    })
+    await page.send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: char,
+      code,
+      windowsVirtualKeyCode: keyCode,
+      nativeVirtualKeyCode: keyCode,
+    })
+  }
+}
+
+function keyDescriptorForChar(char) {
+  const punctuation = {
+    ' ': ['Space', 32],
+    '.': ['Period', 190],
+    ',': ['Comma', 188],
+    '-': ['Minus', 189],
+    "'": ['Quote', 222],
+    ':': ['Semicolon', 186],
+  }
+
+  if (punctuation[char]) {
+    const [code, keyCode] = punctuation[char]
+
+    return { code, keyCode }
+  }
+
+  if (/^[0-9]$/.test(char)) {
+    return { code: `Digit${char}`, keyCode: char.charCodeAt(0) }
+  }
+
+  return {
+    code: /^[a-z]$/i.test(char) ? `Key${char.toUpperCase()}` : '',
+    keyCode: char.toUpperCase().charCodeAt(0),
+  }
 }
 
 async function setEditorText(page, text) {
