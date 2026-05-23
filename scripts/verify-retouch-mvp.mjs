@@ -239,6 +239,7 @@ async function runEditSurfaceParityScenario(page) {
 
         return {
           outlineOffset: style.outlineOffset,
+          outlineStyle: style.outlineStyle,
           outlineWidth: style.outlineWidth,
         }
       })()`)
@@ -248,6 +249,7 @@ async function runEditSurfaceParityScenario(page) {
         slideName,
         boxHeightDelta: editor.boxHeight - preview.boxHeight,
         outlineOffset: editorChrome.outlineOffset,
+        outlineStyle: editorChrome.outlineStyle,
         outlineWidth: editorChrome.outlineWidth,
         textHeightDelta: editor.textHeight - preview.textHeight,
         textLeftDelta: editor.textLeft - preview.textLeft,
@@ -261,12 +263,13 @@ async function runEditSurfaceParityScenario(page) {
   await clickSlide(page, 'Overview')
 
   check(
-    'Text Mode editor opens on the same visual text box',
+    'Text Mode editor opens on the same text without boxed chrome',
     deltas.every(
       (delta) =>
         Math.abs(delta.boxHeightDelta) < 1 &&
         delta.outlineOffset === '0px' &&
-        delta.outlineWidth === '2px' &&
+        delta.outlineStyle === 'none' &&
+        delta.outlineWidth === '0px' &&
         Math.abs(delta.textHeightDelta) < 1 &&
         Math.abs(delta.textLeftDelta) < 1 &&
         Math.abs(delta.textTopDelta) < 1,

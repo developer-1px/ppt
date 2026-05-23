@@ -46,6 +46,10 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: 편집 중 화면 이동으로 마지막 글자 수정이 누락될 수 있음
   - Fix: slide 전환과 Arrange 전환도 먼저 live `contenteditable` DOM을 commit한 뒤 이동한다.
 
+- P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
+  - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
+  - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
+
 - P1: Enter commit 불일치
   - Fix: `PlainTextEditor`에서 Enter commit, Escape cancel을 처리한다.
 
@@ -85,6 +89,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - `contenteditable="plaintext-only"`
   - Text Mode에서 실제 글자 편집 surface로 사용한다.
   - 직접 편집 중에는 별도 preview/editor block을 같이 렌더링하지 않는다.
+  - 편집 중에는 비어 있지 않은 글자에 별도 boxed chrome을 그리지 않는다.
   - 편집 중에는 React children을 비워 live DOM과 preview state가 경쟁하지 않게 한다.
   - 별도 editor document를 만들지 않고 DOM textContent를 commit/cancel의 draft로 사용한다.
   - PPT 도형 스타일 수치 편집 UI로 확장하지 않았다.
@@ -114,7 +119,7 @@ Covered checks:
 - first screen editor
 - Text Mode direct edit, Enter commit, Escape cancel
 - no double text rendering
-- live editor text box and committed preview text box parity
+- live editor text and committed preview text parity without boxed editor chrome
 - live edit commit before slide/mode switch
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
