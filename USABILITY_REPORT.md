@@ -79,6 +79,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
+  - Fix: Text Mode hover/focus도 일반 텍스트 block outline을 그리지 않는다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
 
 - P1: 직접 텍스트 편집에서 줄바꿈이 숨겨짐

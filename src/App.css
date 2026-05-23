@@ -252,16 +252,7 @@ button {
 
 .retouch-app[data-mode='text'] .slide-block {
   cursor: text;
-}
-
-.retouch-app[data-mode='text'] .slide-block:hover {
-  outline: 1px solid #2563eb;
-  outline-offset: 0;
-}
-
-.retouch-app[data-mode='text'] .slide-block:focus-visible {
-  outline: 1px solid #2563eb;
-  outline-offset: 0;
+  outline: 0;
 }
 
 .retouch-app[data-mode='text'] .slide-block[data-empty='true'] {

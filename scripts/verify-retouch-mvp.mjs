@@ -351,6 +351,22 @@ async function runCompactEditSurfaceScenario(cdpPort) {
 async function runTextScenario(page) {
   const titleBefore = await blockState(page, 's1-title')
   const titlePreviewText = await textRangeMetrics(page, '[data-block="s1-title"]')
+  const titleHoverPoint = await blockCenter(page, 's1-title')
+
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: titleHoverPoint.x,
+    y: titleHoverPoint.y,
+    button: 'none',
+  })
+  await delay(50)
+  const titleHoverChrome = await blockChrome(page, 's1-title')
+  check(
+    'Text Mode hover does not draw a text box',
+    titleHoverChrome.outlineStyle === 'none',
+    titleHoverChrome,
+  )
+  await movePointerAway(page)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
