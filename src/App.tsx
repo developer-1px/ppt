@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
@@ -33,6 +34,7 @@ import {
   rectToAutoHeightStyle,
   rectToStyle,
   resizeRect,
+  setArrangePatch,
   setLayoutPatch,
   setTextPatch,
   type Rect,
@@ -80,7 +82,7 @@ type SnapGuides = {
   y: number | null
 }
 
-const DRAG_THRESHOLD = 4
+const DRAG_THRESHOLD = 8
 
 function App() {
   const doc = useJSONDocument(RetouchDeckSchema, SAMPLE_DECK, {
@@ -125,10 +127,10 @@ function App() {
       ? null
       : findBlockLocation(SAMPLE_DECK, activeSlide.id, selectedBlock.id)
   const canResetSelected = Boolean(
-    selectedPointer &&
+      selectedPointer &&
       selectedBlock &&
       baseSelectedLocation &&
-      !rectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
+      !arrangeRectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
 
   useLayoutEffect(() => {
@@ -247,10 +249,7 @@ function App() {
         pointer: currentInteraction.pointer,
         rect,
       })
-      setSnapGuides({
-        x: rect.x,
-        y: rect.y,
-      })
+      setSnapGuides(guidesForInteraction(rect, currentInteraction))
     }
 
     function handlePointerUp(event: PointerEvent) {
@@ -279,7 +278,7 @@ function App() {
       }
 
       commitPatch(
-        setLayoutPatch(currentInteraction.pointer, rect),
+        setArrangePatch(currentInteraction.pointer, rect),
         currentInteraction.pointer,
         `${currentInteraction.kind} layout`,
       )
@@ -473,7 +472,7 @@ function App() {
     }
 
     commitPatch(
-      setLayoutPatch(selectedPointer, getRect(baseSelectedLocation.block)),
+      setArrangePatch(selectedPointer, getRect(baseSelectedLocation.block)),
       selectedPointer,
       'reset layout',
     )
@@ -487,6 +486,19 @@ function App() {
       document.execCommand('copy')
     }
     setCopiedExportCode(exportCode)
+  }
+
+  function handleBlockKeyDown(
+    event: ReactKeyboardEvent<HTMLElement>,
+    pointer: Pointer,
+  ) {
+    if (mode !== 'text' || (event.key !== 'Enter' && event.key !== 'F2')) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    startTextEdit(pointer)
   }
 
   return (
@@ -632,6 +644,7 @@ function App() {
                     onPointerDown={(event) =>
                       handleBlockPointerDown(event, pointer, block)
                     }
+                    onKeyDown={(event) => handleBlockKeyDown(event, pointer)}
                     minimumHeight={minimumHeight}
                     rect={rect}
                     selected={selected}
@@ -680,6 +693,7 @@ function SlideBlockElement({
   block,
   className,
   onClick,
+  onKeyDown,
   onPointerDown,
   minimumHeight,
   rect,
@@ -689,6 +703,7 @@ function SlideBlockElement({
   block: SlideBlock
   className: string
   onClick: () => void
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
   minimumHeight: number
   rect: Rect
@@ -699,6 +714,7 @@ function SlideBlockElement({
     block.tag,
     {
       'data-block': block.id,
+      'data-empty': text.length === 0 ? 'true' : undefined,
       'data-role': block.role,
       'data-selected': selected ? 'true' : 'false',
       className,
@@ -706,6 +722,7 @@ function SlideBlockElement({
         event.stopPropagation()
         onClick()
       },
+      onKeyDown,
       onPointerDown,
       style: rectToAutoHeightStyle(rect, minimumHeight),
       tabIndex: 0,
@@ -763,6 +780,17 @@ function getCurrentRect(
   return draftLayout?.pointer === pointer ? draftLayout.rect : getRect(block)
 }
 
+function guidesForInteraction(rect: Rect, interaction: Interaction): SnapGuides {
+  if (interaction.kind === 'move') {
+    return { x: rect.x, y: rect.y }
+  }
+
+  return {
+    x: interaction.handle === 'e' ? rect.x + rect.width : rect.x,
+    y: null,
+  }
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -774,6 +802,10 @@ function rectClose(a: Rect, b: Rect) {
     Math.abs(a.width - b.width) < 0.5 &&
     Math.abs(a.height - b.height) < 0.5
   )
+}
+
+function arrangeRectEquals(a: Rect, b: Rect) {
+  return a.x === b.x && a.y === b.y && a.width === b.width
 }
 
 function isHistoryShortcut(event: KeyboardEvent) {

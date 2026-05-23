@@ -365,6 +365,17 @@ export function setLayoutPatch(
   ]
 }
 
+export function setArrangePatch(
+  pointer: Pointer,
+  rect: Rect,
+): JSONPatchOperation[] {
+  return [
+    { op: 'replace', path: appendSegment(pointer, 'x'), value: rect.x },
+    { op: 'replace', path: appendSegment(pointer, 'y'), value: rect.y },
+    { op: 'replace', path: appendSegment(pointer, 'width'), value: rect.width },
+  ]
+}
+
 export function rectToStyle(rect: Rect) {
   return {
     left: `${(rect.x / SLIDE_WIDTH) * 100}%`,

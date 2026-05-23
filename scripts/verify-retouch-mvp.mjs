@@ -270,6 +270,15 @@ async function runTextScenario(page) {
   const titleNoOp = await blockState(page, 's1-title')
   check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
 
+  await focusBlockAndPress(page, 's1-title', 'Enter')
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  const keyboardEditState = await page.eval(`(() => ({
+    editorOpen: !!document.querySelector('.plain-text-editor'),
+    editorText: document.querySelector('.plain-text-editor')?.textContent ?? null,
+  }))()`)
+  check('keyboard Enter starts text edit', keyboardEditState.editorOpen && keyboardEditState.editorText === titleBefore.text, keyboardEditState)
+  await cancelTextEditor(page)
+
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const titleEditorText = await textRangeMetrics(page, '.plain-text-editor')
@@ -350,6 +359,11 @@ async function runTextScenario(page) {
   const subtitleRedone = await blockState(page, 's1-subtitle')
   check('redo restores autoheight growth', subtitleRedone.text === subtitleGrown.text && Math.abs(subtitleRedone.height - subtitleGrown.height) < 1, { before: subtitleGrown, after: subtitleRedone })
 
+  await clickMode(page, 'Arrange')
+  const autoheightOnlyLayoutState = await blockState(page, 's1-subtitle')
+  check('Arrange Reset ignores text autoheight only changes', autoheightOnlyLayoutState.resetDisabled === true, autoheightOnlyLayoutState)
+  await clickMode(page, 'Text')
+
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const grownEditHeight = await editorHeight(page)
@@ -376,6 +390,27 @@ async function runTextScenario(page) {
   await commitTextEditor(page)
   const longPreviewFit = await inlineFits(page, '[data-block="s1-subtitle"]')
   check('preview wraps long unbroken text after commit', longPreviewFit.fits, longPreviewFit)
+
+  await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await setEditorText(page, '')
+  await commitTextEditor(page)
+  const emptySubtitle = await page.eval(`(() => {
+    const block = document.querySelector('[data-block="s1-subtitle"]')
+    const rect = block.getBoundingClientRect()
+    return {
+      text: block.textContent,
+      empty: block.dataset.empty,
+      width: rect.width,
+      height: rect.height,
+    }
+  })()`)
+  check('empty text block remains findable', emptySubtitle.text === '' && emptySubtitle.empty === 'true' && emptySubtitle.width > 0 && emptySubtitle.height > 0, emptySubtitle)
+  await focusBlockAndPress(page, 's1-subtitle', 'Enter')
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  const emptyReopen = await page.eval(`document.querySelector('.plain-text-editor')?.textContent ?? null`)
+  check('empty text block can be reopened from keyboard', emptyReopen === '', { emptyReopen })
+  await cancelTextEditor(page)
 
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
@@ -418,6 +453,10 @@ async function runLayoutScenario(page) {
   }))()`)
   check('Arrange Mode shows layout grid only when arranging', arrangeSurface.canvasBackgroundImage !== 'none', arrangeSurface)
   const noteBefore = await blockState(page, 's1-note')
+
+  await dragBlock(page, 's1-note', 5, 5)
+  const noteAfterSmallDrag = await blockState(page, 's1-note')
+  check('Arrange Mode ignores tiny accidental drag', !rectChanged(noteBefore, noteAfterSmallDrag), { before: noteBefore, after: noteAfterSmallDrag })
 
   await dragBlock(page, 's1-note', 42, 24)
   const noteMoved = await blockState(page, 's1-note')
@@ -685,6 +724,31 @@ async function clickSlide(page, label) {
   await delay(150)
 }
 
+async function focusBlockAndPress(page, blockId, key) {
+  await page.eval(`document.querySelector('[data-block="${blockId}"]')?.focus()`)
+  await pressKey(page, key)
+}
+
+async function pressKey(page, key) {
+  const code = key === 'Enter' ? 'Enter' : `Key${key.toUpperCase()}`
+  const keyCode = key === 'Enter' ? 13 : key.toUpperCase().charCodeAt(0)
+
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+    nativeVirtualKeyCode: keyCode,
+  })
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+    nativeVirtualKeyCode: keyCode,
+  })
+}
+
 async function pressHistoryShortcut(page, key) {
   const normalizedKey = key.toLowerCase()
   await page.send('Input.dispatchKeyEvent', {
@@ -754,6 +818,19 @@ async function replaceEditorText(page, text) {
     selection.addRange(range)
   })()`)
   await page.send('Input.insertText', { text })
+}
+
+async function setEditorText(page, text) {
+  await page.eval(`(() => {
+    const editor = document.querySelector('.plain-text-editor')
+    editor.focus()
+    editor.textContent = ${JSON.stringify(text)}
+    editor.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      data: ${JSON.stringify(text)},
+      inputType: 'insertText',
+    }))
+  })()`)
 }
 
 async function clickBlock(page, blockId) {
