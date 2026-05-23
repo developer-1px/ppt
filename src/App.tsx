@@ -458,7 +458,7 @@ function App() {
   }, [activeSlide.id, doc.selection, doc.value, mode])
 
   useEffect(() => {
-    function handleLayoutNudgeKey(event: KeyboardEvent) {
+    function handleLayoutKey(event: KeyboardEvent) {
       if (
         mode !== 'layout' ||
         event.defaultPrevented ||
@@ -469,6 +469,13 @@ function App() {
         isEditableTarget(event.target) ||
         isControlTarget(event.target)
       ) {
+        return
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        doc.selection?.empty()
         return
       }
 
@@ -494,13 +501,14 @@ function App() {
       )
     }
 
-    window.addEventListener('keydown', handleLayoutNudgeKey)
+    window.addEventListener('keydown', handleLayoutKey)
 
     return () => {
-      window.removeEventListener('keydown', handleLayoutNudgeKey)
+      window.removeEventListener('keydown', handleLayoutKey)
     }
   }, [
     commitPatch,
+    doc.selection,
     editing,
     interaction,
     mode,

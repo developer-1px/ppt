@@ -97,6 +97,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: Arrange 선택이 Text Mode에서 숨은 Reset 대상이 될 수 있음
   - Fix: Arrange에서 Text Mode로 전환하면 선택을 비워 Reset 대상이 숨은 block이 아니라 deck이 되게 한다.
 
+- P1: Arrange 선택 해제 경로 부족
+  - Fix: Arrange Mode에서 `Escape`를 누르면 선택, selection overlay, selected reset 대상이 사라진다.
+
 - P1: Arrange Mode 중앙 정렬 기준 부족
   - Fix: block을 slide 중앙선 근처로 드래그하면 center snap이 적용되고 중앙 guide가 표시된다.
 
@@ -173,6 +176,7 @@ Covered checks:
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
+- Arrange Mode Escape clears selection
 - Text Mode clears hidden Arrange selection on mode switch
 - Text Mode selected reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback

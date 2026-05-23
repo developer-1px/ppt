@@ -878,6 +878,7 @@ async function runLayoutScenario(page) {
   await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y })
   const metricResized = await blockState(page, 's1-metric')
   check('Arrange Mode resize changes width only', metricResized.width > metricBefore.width + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
+  await page.waitFor(`document.querySelector('[data-block="s1-metric"]')?.dataset.selected === 'true' && !!document.querySelector('.selection-overlay')`)
   const overlayFit = await selectionOverlayFitsBlock(page, 's1-metric')
   check('Arrange Mode selection follows autoheight block', overlayFit.fits, overlayFit)
 
@@ -885,6 +886,29 @@ async function runLayoutScenario(page) {
   const noEditorInLayout = await page.eval("!document.querySelector('[data-editing=\"true\"]')")
   check('Arrange Mode click does not edit text', noEditorInLayout, null)
 
+  await pressKey(page, 'Escape')
+  await delay(100)
+  const layoutEscapeState = await page.eval(`(() => {
+    const reset = document.querySelector('button[aria-label="Reset"]')
+
+    return {
+      mode: document.querySelector('.retouch-app')?.dataset.mode,
+      overlayCount: document.querySelectorAll('.selection-overlay').length,
+      resetDisabled: reset?.disabled ?? null,
+      selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+  check(
+    'Arrange Mode Escape clears selection',
+    layoutEscapeState.mode === 'layout' &&
+      layoutEscapeState.overlayCount === 0 &&
+      layoutEscapeState.selectedBlocks === 0 &&
+      layoutEscapeState.resetDisabled === true,
+    layoutEscapeState,
+  )
+
+  await clickBlock(page, 's1-title')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.dataset.selected === 'true'`)
   await clickMode(page, 'Text')
   const textModeAfterArrange = await page.eval(`(() => {
     const reset = document.querySelector('button[aria-label="Reset"]')
@@ -918,7 +942,21 @@ async function runExportScenario(page) {
   await commitTextEditor(page)
 
   await clickMode(page, 'Arrange')
-  await dragBlock(page, 's1-note', 24, 16)
+  const exportNoteBeforeMove = await blockState(page, 's1-note')
+  await dragBlockBySlideUnits(page, 's1-note', 48, 32)
+  await page.waitFor(`(() => {
+    const block = document.querySelector('[data-block="s1-note"]')
+    const rect = block.getBoundingClientRect()
+
+    return Math.abs(rect.x - ${exportNoteBeforeMove.x}) > 1 ||
+      Math.abs(rect.y - ${exportNoteBeforeMove.y}) > 1
+  })()`)
+  const exportNoteMoved = await blockState(page, 's1-note')
+  check(
+    'Export scenario moves note layout before exporting',
+    rectChanged(exportNoteBeforeMove, exportNoteMoved),
+    { before: exportNoteBeforeMove, after: exportNoteMoved },
+  )
 
   await clickToolbar(page, 'Copy HTML')
   await page.waitFor("!!document.querySelector('.export-buffer')")
@@ -1500,6 +1538,15 @@ async function selectionOverlayFitsBlock(page, blockId) {
   return page.eval(`(() => {
     const block = document.querySelector('[data-block="${blockId}"]')
     const overlay = document.querySelector('.selection-overlay')
+
+    if (!block || !overlay) {
+      return {
+        fits: false,
+        hasBlock: !!block,
+        hasOverlay: !!overlay,
+      }
+    }
+
     const blockRect = block.getBoundingClientRect()
     const overlayRect = overlay.getBoundingClientRect()
 
@@ -1630,8 +1677,9 @@ async function pressKey(page, key) {
     ArrowRight: 39,
     ArrowUp: 38,
     Enter: 13,
+    Escape: 27,
   }
-  const code = key.startsWith('Arrow') || key === 'Enter'
+  const code = key.startsWith('Arrow') || key === 'Enter' || key === 'Escape'
     ? key
     : `Key${key.toUpperCase()}`
   const keyCode = keyCodeByKey[key] ?? key.toUpperCase().charCodeAt(0)
@@ -1831,6 +1879,12 @@ async function clickStageBackground(page) {
 async function dragBlock(page, blockId, dx, dy) {
   const center = await blockCenter(page, blockId)
   await dragFromTo(page, center, { x: center.x + dx, y: center.y + dy })
+}
+
+async function dragBlockBySlideUnits(page, blockId, dx, dy) {
+  const center = await blockCenter(page, blockId)
+  const delta = await slideUnitsToScreenDelta(page, dx, dy)
+  await dragFromTo(page, center, { x: center.x + delta.x, y: center.y + delta.y })
 }
 
 async function dragBlockBySlideUnitsWithProbe(page, blockId, dx, dy) {
