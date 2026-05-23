@@ -605,7 +605,10 @@ function App() {
     setCopiedExportCode(null)
     setDownloadedExportCode(null)
     stageRef.current?.scrollTo({ left: 0, top: 0 })
-    doc.reset(SAMPLE_DECK)
+    doc.commit([{ op: 'replace', path: '', value: SAMPLE_DECK }], {
+      label: 'reset deck',
+      origin: 'ppt-retouch',
+    })
   }
 
   function resetCurrentTarget() {

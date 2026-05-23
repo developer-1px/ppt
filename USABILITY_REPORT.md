@@ -59,6 +59,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: 수정된 slide 식별 부족
   - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
 
+- P1: Text Mode 전체 reset이 복구 불가
+  - Fix: 전체 deck reset을 `doc.reset()`이 아니라 root replace patch `doc.commit()`으로 처리해 Undo/Redo로 복구 가능하게 했다.
+
 - P1: slide 전환 후 stage scroll 잔류
   - Fix: slide 선택 시 stage scroll을 `(0, 0)`으로 reset한다.
 
@@ -108,6 +111,7 @@ Covered checks:
 - live editor text box and committed preview text box parity
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
+- Text Mode deck reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export shared slide theme tokens
 - modified slide thumbnail state

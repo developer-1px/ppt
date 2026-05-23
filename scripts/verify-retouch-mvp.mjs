@@ -757,15 +757,40 @@ async function runPersistenceScenario(page) {
   check(
     'Text Mode reset restores the sample deck',
     resetState.text === 'Retention Review' &&
-      resetState.undoDisabled === true &&
+      resetState.undoDisabled === false &&
       resetState.resetDisabled === true,
     resetState,
   )
+  check('Text Mode reset is undoable', resetState.undoDisabled === false, resetState)
   check('Text Mode reset updates autosave', resetStorage.title === 'Retention Review' && resetStorage.version === 1, resetStorage)
   check(
     'reset clears slide thumbnail modified state',
     resetThumbState.changed === 'false' && !resetThumbState.hasChangeDot,
     resetThumbState,
+  )
+
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review Approved Export'`)
+  const undoResetState = await blockState(page, 's1-title')
+  const undoResetThumbState = await slideThumbState(page, 'Overview')
+  check(
+    'undo restores deck after reset',
+    undoResetState.text === 'Retention Review Approved Export' &&
+      undoResetState.resetDisabled === false &&
+      undoResetThumbState.changed === 'true',
+    { state: undoResetState, thumb: undoResetThumbState },
+  )
+
+  await clickToolbar(page, 'Redo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
+  const redoResetState = await blockState(page, 's1-title')
+  const redoResetThumbState = await slideThumbState(page, 'Overview')
+  check(
+    'redo reapplies deck reset',
+    redoResetState.text === 'Retention Review' &&
+      redoResetState.resetDisabled === true &&
+      redoResetThumbState.changed === 'false',
+    { state: redoResetState, thumb: redoResetThumbState },
   )
 }
 
