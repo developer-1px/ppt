@@ -859,9 +859,14 @@ async function runPersistenceScenario(page) {
     { beforeReload: changedThumbBeforeReload, afterReload: changedThumbAfterReload },
   )
 
+  const resetDraftTitle = `${beforeReload.text} DraftReset`
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' DraftReset' })
   await clickToolbar(page, 'Reset')
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
   await page.waitFor(`document.querySelector('button[aria-label="Reset"]')?.disabled === true`)
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
   await page.waitFor(`(() => {
     const raw = localStorage.getItem('ppt-retouch:v1:deck')
     const parsed = raw ? JSON.parse(raw) : null
@@ -899,12 +904,12 @@ async function runPersistenceScenario(page) {
   )
 
   await clickToolbar(page, 'Undo')
-  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review Approved Export'`)
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(resetDraftTitle)}`)
   const undoResetState = await blockState(page, 's1-title')
   const undoResetThumbState = await slideThumbState(page, 'Overview')
   check(
-    'undo restores deck after reset',
-    undoResetState.text === 'Retention Review Approved Export' &&
+    'undo restores deck including live reset draft',
+    undoResetState.text === resetDraftTitle &&
       undoResetState.resetDisabled === false &&
       undoResetThumbState.changed === 'true',
     { state: undoResetState, thumb: undoResetThumbState },

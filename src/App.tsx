@@ -635,6 +635,7 @@ function App() {
       return
     }
 
+    commitActiveTextEdit()
     clearTransientState()
     doc.selection?.empty()
     setActiveSlideId(SAMPLE_SLIDES[0].id)
