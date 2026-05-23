@@ -139,14 +139,26 @@ function App() {
     selectedBlock === null
       ? null
       : findBlockLocation(SAMPLE_DECK, activeSlide.id, selectedBlock.id)
-  const canResetSelected = Boolean(
-      selectedPointer &&
+  const canResetSelectedLayout = Boolean(
+    selectedPointer &&
       selectedBlock &&
       baseSelectedLocation &&
       !arrangeRectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
-  const canReset = mode === 'layout' ? canResetSelected : hasDeckChanges
-  const resetTitle = mode === 'layout' ? 'Reset layout' : 'Reset deck'
+  const canResetSelectedText = Boolean(
+    selectedPointer &&
+      selectedBlock &&
+      baseSelectedLocation &&
+      (!textResetEquals(selectedBlock, baseSelectedLocation.block) ||
+        editing?.pointer === selectedPointer),
+  )
+  const canResetDeck = !selectedPointer && hasDeckChanges
+  const canReset =
+    mode === 'layout'
+      ? canResetSelectedLayout
+      : canResetSelectedText || canResetDeck
+  const resetTitle =
+    mode === 'layout' ? 'Reset layout' : selectedPointer ? 'Reset text' : 'Reset deck'
 
   useEffect(() => {
     persistDeck(doc.value)
@@ -621,7 +633,7 @@ function App() {
       !selectedPointer ||
       !selectedBlock ||
       !baseSelectedLocation ||
-      !canResetSelected
+      !canResetSelectedLayout
     ) {
       return
     }
@@ -631,6 +643,58 @@ function App() {
       selectedPointer,
       'reset layout',
     )
+  }
+
+  function resetSelectedText() {
+    if (mode !== 'text') {
+      return
+    }
+
+    const pointer = editing?.pointer ?? selectedPointer
+    const location = pointer ? blockLocationFromPointer(doc.value, pointer) : null
+    const baseLocation = location
+      ? findBlockLocation(SAMPLE_DECK, location.slide.id, location.block.id)
+      : null
+
+    if (!pointer || !location || !baseLocation) {
+      return
+    }
+
+    const element =
+      editing?.pointer === pointer
+        ? slideRef.current?.querySelector<HTMLElement>('[data-editing="true"]')
+        : null
+    const liveText = normalizeEditableText(
+      element?.textContent ?? location.block.text,
+    )
+    const liveMinimumHeight =
+      liveText.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
+    const liveRect = element
+      ? autoHeightRect(element, getRect(location.block), liveMinimumHeight)
+      : getRect(location.block)
+    const resetRect = {
+      ...liveRect,
+      height: baseLocation.block.height,
+    }
+
+    if (element && liveText !== location.block.text) {
+      commitTextPatch(pointer, liveText, liveRect)
+    }
+
+    setEditing(null)
+    setDraftLayout(null)
+
+    const patch = [
+      ...(liveText !== baseLocation.block.text ||
+      location.block.text !== baseLocation.block.text
+        ? setTextPatch(pointer, baseLocation.block.text)
+        : []),
+      ...(liveRect.height !== resetRect.height
+        ? setLayoutPatch(pointer, resetRect)
+        : []),
+    ]
+
+    commitPatch(patch, pointer, 'reset text')
   }
 
   function resetDeck() {
@@ -654,6 +718,11 @@ function App() {
   function resetCurrentTarget() {
     if (mode === 'layout') {
       resetSelectedLayout()
+      return
+    }
+
+    if (selectedPointer) {
+      resetSelectedText()
       return
     }
 
@@ -1519,6 +1588,10 @@ function rectClose(a: Rect, b: Rect) {
 
 function arrangeRectEquals(a: Rect, b: Rect) {
   return a.x === b.x && a.y === b.y && a.width === b.width
+}
+
+function textResetEquals(a: SlideBlock, b: SlideBlock) {
+  return a.text === b.text && a.height === b.height
 }
 
 function deckEquals(a: unknown, b: unknown) {

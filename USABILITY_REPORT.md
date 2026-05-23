@@ -66,6 +66,10 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: 편집 중 Reset 후 Undo하면 live draft가 복구되지 않음
   - Fix: Text Mode reset도 먼저 live `contenteditable` DOM을 commit한 뒤 undoable root reset을 실행한다.
 
+- P0: Text Mode Reset 범위가 전체 deck이라 한 문구 reset치고 위험함
+  - Fix: Text Mode에서 block이 선택되어 있으면 Reset은 선택된 텍스트와 text-owned height만 원본으로 되돌린다.
+  - Fix: 선택 텍스트 reset은 다른 layout/text 변경을 유지하고, Undo/Redo로 복구된다.
+
 - P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
@@ -88,9 +92,6 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P1: 수정된 slide 식별 부족
   - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
-
-- P1: Text Mode 전체 reset이 복구 불가
-  - Fix: 전체 deck reset을 `doc.reset()`이 아니라 root replace patch `doc.commit()`으로 처리해 Undo/Redo로 복구 가능하게 했다.
 
 - P1: slide 전환 후 stage scroll 잔류
   - Fix: slide 선택 시 stage scroll을 `(0, 0)`으로 reset한다.
@@ -150,10 +151,11 @@ Covered checks:
 - Text Mode drag attempt does not change layout
 - consecutive text block edits
 - live edit commit before slide/mode switch
+- selected text reset keeps other slide changes
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
-- Text Mode deck reset, undo reset, redo reset
+- Text Mode selected reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export feedback clears during live visible drafts
 - Export commits live text before Copy/Download

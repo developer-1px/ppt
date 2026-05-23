@@ -1107,6 +1107,7 @@ async function runPersistenceScenario(page) {
   )
 
   const resetDraftTitle = `${beforeReload.text} DraftReset`
+  const noteBeforeTextReset = await blockState(page, 's1-note')
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await typeEditorText(page, ' DraftReset')
@@ -1122,6 +1123,7 @@ async function runPersistenceScenario(page) {
       ?.text === 'Retention Review'
   })()`)
   const resetState = await blockState(page, 's1-title')
+  const noteAfterTextReset = await blockState(page, 's1-note')
   const resetThumbState = await slideThumbState(page, 'Overview')
   const resetStorage = await page.eval(`(() => {
     const raw = localStorage.getItem('ppt-retouch:v1:deck')
@@ -1136,17 +1138,22 @@ async function runPersistenceScenario(page) {
   })()`)
 
   check(
-    'Text Mode reset restores the sample deck',
+    'Text Mode reset restores selected text only',
     resetState.text === 'Retention Review' &&
       resetState.undoDisabled === false &&
-      resetState.resetDisabled === true,
-    resetState,
+      resetState.resetDisabled === true &&
+      !rectChanged(noteBeforeTextReset, noteAfterTextReset),
+    {
+      resetState,
+      noteBefore: noteBeforeTextReset,
+      noteAfter: noteAfterTextReset,
+    },
   )
   check('Text Mode reset is undoable', resetState.undoDisabled === false, resetState)
   check('Text Mode reset updates autosave', resetStorage.title === 'Retention Review' && resetStorage.version === 1, resetStorage)
   check(
-    'reset clears slide thumbnail modified state',
-    resetThumbState.changed === 'false' && !resetThumbState.hasChangeDot,
+    'selected text reset keeps other slide changes marked',
+    resetThumbState.changed === 'true' && resetThumbState.hasChangeDot,
     resetThumbState,
   )
 
@@ -1155,7 +1162,7 @@ async function runPersistenceScenario(page) {
   const undoResetState = await blockState(page, 's1-title')
   const undoResetThumbState = await slideThumbState(page, 'Overview')
   check(
-    'undo restores deck including live reset draft',
+    'undo restores selected text reset draft',
     undoResetState.text === resetDraftTitle &&
       undoResetState.resetDisabled === false &&
       undoResetThumbState.changed === 'true',
@@ -1167,10 +1174,10 @@ async function runPersistenceScenario(page) {
   const redoResetState = await blockState(page, 's1-title')
   const redoResetThumbState = await slideThumbState(page, 'Overview')
   check(
-    'redo reapplies deck reset',
+    'redo reapplies selected text reset',
     redoResetState.text === 'Retention Review' &&
       redoResetState.resetDisabled === true &&
-      redoResetThumbState.changed === 'false',
+      redoResetThumbState.changed === 'true',
     { state: redoResetState, thumb: redoResetThumbState },
   )
 }
