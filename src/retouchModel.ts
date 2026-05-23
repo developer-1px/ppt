@@ -439,7 +439,7 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     ':root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#111827;background:#f3f4f6;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
-    '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;white-space:pre-wrap;}',
+    '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
     '.block-title{display:block;color:#111827;font:760 58px/1.04 Inter,system-ui,sans-serif;}',
     '.block-title.compact{font-size:54px;}',
     '.block-title.wide{font-size:52px;}',

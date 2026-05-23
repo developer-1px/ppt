@@ -266,6 +266,12 @@ async function runTextScenario(page) {
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await commitTextEditor(page)
+  const titleNoOp = await blockState(page, 's1-title')
+  check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
+
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const titleEditorText = await textRangeMetrics(page, '.plain-text-editor')
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
@@ -304,6 +310,16 @@ async function runTextScenario(page) {
   await delay(150)
   const titleRedone = await blockState(page, 's1-title')
   check('redo restores title edit', titleRedone.text === `${titleBefore.text} Approved`, titleRedone)
+
+  await pressHistoryShortcut(page, 'z')
+  await delay(150)
+  const titleKeyboardUndone = await blockState(page, 's1-title')
+  check('keyboard undo restores title text', titleKeyboardUndone.text === titleBefore.text, titleKeyboardUndone)
+
+  await pressHistoryShortcut(page, 'y')
+  await delay(150)
+  const titleKeyboardRedone = await blockState(page, 's1-title')
+  check('keyboard redo restores title edit', titleKeyboardRedone.text === `${titleBefore.text} Approved`, titleKeyboardRedone)
 
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
@@ -349,6 +365,18 @@ async function runTextScenario(page) {
   const subtitleShrunk = await blockState(page, 's1-subtitle')
   check('autoheight shrink persists after commit', subtitleShrunk.text === 'Short follow-up.' && subtitleShrunk.height < subtitleGrown.height - 10, { before: subtitleGrown, after: subtitleShrunk })
 
+  await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
+  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await replaceEditorText(
+    page,
+    'enterprise-renewal-risk-account-owner-review-decision-path-follow-up-needed-before-month-close',
+  )
+  const longEditorFit = await inlineFits(page, '.plain-text-editor')
+  check('Text Mode wraps long unbroken text while editing', longEditorFit.fits, longEditorFit)
+  await commitTextEditor(page)
+  const longPreviewFit = await inlineFits(page, '[data-block="s1-subtitle"]')
+  check('preview wraps long unbroken text after commit', longPreviewFit.fits, longPreviewFit)
+
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const noteBeforeCancel = await page.eval(`document.querySelector('.plain-text-editor')?.textContent ?? ''`)
@@ -361,14 +389,18 @@ async function runTextScenario(page) {
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  const bottomNoteDraftText =
+    'Decision needed: approve the retention sprint with owner, timing, customer impact, renewal coverage, executive sponsor, next action, weekly check-in, risk review, onboarding help, and discount guidance visible in the slide.'
   await replaceEditorText(
     page,
-    'Decision needed: approve the retention sprint with owner, timing, customer impact, renewal coverage, executive sponsor, and next action visible in the slide.',
+    bottomNoteDraftText,
   )
   await page.waitFor(`(() => {
     const editor = document.querySelector('.plain-text-editor')
     return editor && editor.getBoundingClientRect().height > ${bottomNoteBefore.height + 10}
   })()`)
+  const bottomEditorFit = await editorFitsSlide(page)
+  check('autoheight keeps bottom editor inside slide while typing', bottomEditorFit.fits, bottomEditorFit)
   await commitTextEditor(page)
   const bottomNoteAfter = await blockState(page, 's3-note')
   const bottomNoteFit = await blockFitsSlide(page, 's3-note')
@@ -419,6 +451,8 @@ async function runLayoutScenario(page) {
   await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y })
   const metricResized = await blockState(page, 's1-metric')
   check('Arrange Mode resize changes width only', metricResized.width > metricBefore.width + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
+  const overlayFit = await selectionOverlayFitsBlock(page, 's1-metric')
+  check('Arrange Mode selection follows autoheight block', overlayFit.fits, overlayFit)
 
   await clickBlock(page, 's1-title')
   const noEditorInLayout = await page.eval("!document.querySelector('.plain-text-editor')")
@@ -437,11 +471,11 @@ async function runExportScenario(page) {
   await clickMode(page, 'Arrange')
   await dragBlock(page, 's1-note', 24, 16)
 
-  await clickToolbar(page, 'Export')
-  await page.waitFor("!!document.querySelector('.export-panel textarea')")
+  await clickToolbar(page, 'Copy HTML')
+  await page.waitFor("!!document.querySelector('.export-buffer')")
   const exportState = await page.eval(`(() => {
-    const value = document.querySelector('.export-panel textarea')?.value ?? ''
-    const copyButton = Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy HTML')
+    const value = document.querySelector('.export-buffer')?.value ?? ''
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
     return {
       hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
       hasDataSlide: value.includes('data-slide="slide-1"'),
@@ -449,14 +483,16 @@ async function runExportScenario(page) {
       hasStyleCoordinates: /left:\\d/.test(value) && /top:\\d/.test(value),
       hasRawEditorChrome: value.includes('plain-text-editor') || value.includes('resize-handle'),
       hasCopyAction: !!copyButton,
+      hasVisibleRawCodePanel: !!document.querySelector('.export-panel'),
     }
   })()`)
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
+  check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
-  await page.eval(`Array.from(document.querySelectorAll('.export-panel button')).find((button) => button.textContent?.trim() === 'Copy HTML')?.click()`)
-  await page.waitFor(`Array.from(document.querySelectorAll('.export-panel button')).some((button) => button.textContent?.trim() === 'Copied')`)
-  const copied = await page.eval(`Array.from(document.querySelectorAll('.export-panel button')).some((button) => button.textContent?.trim() === 'Copied')`)
+  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
+  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
+  const copied = await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
   check('copy action gives completion feedback', copied, null)
 }
 
@@ -472,9 +508,17 @@ async function runMobileScenario(cdpPort) {
     scrollWidth: document.documentElement.scrollWidth,
     thumbs: document.querySelectorAll('.slide-thumb').length,
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
+    slideWidth: document.querySelector('.slide-canvas').getBoundingClientRect().width,
+    slideHeight: document.querySelector('.slide-canvas').getBoundingClientRect().height,
+    stageClientWidth: document.querySelector('.stage-shell').clientWidth,
+    stageScrollWidth: document.querySelector('.stage-shell').scrollWidth,
+    topbarHeight: document.querySelector('.topbar').getBoundingClientRect().height,
+    railHeight: document.querySelector('.slide-rail').getBoundingClientRect().height,
   }))()`)
   check('mobile viewport has no horizontal page overflow', mobile.scrollWidth <= mobile.clientWidth + 1, mobile)
   check('mobile keeps core controls reachable', mobile.thumbs >= 3 && mobile.hasArrangeMode, mobile)
+  check('mobile keeps slide readable with internal stage pan', mobile.slideWidth >= 560 && mobile.slideHeight >= 315 && mobile.stageScrollWidth > mobile.stageClientWidth, mobile)
+  check('mobile chrome stays compact', mobile.topbarHeight <= 56 && mobile.railHeight <= 96, mobile)
   page.close()
 }
 
@@ -520,6 +564,65 @@ async function blockFitsSlide(page, blockId) {
         blockRect.top >= slideRect.top - 1 &&
         blockRect.bottom <= slideRect.bottom + 1 &&
         block.scrollHeight <= block.clientHeight + 1,
+    }
+  })()`)
+}
+
+async function editorFitsSlide(page) {
+  return page.eval(`(() => {
+    const editor = document.querySelector('.plain-text-editor')
+    const slide = document.querySelector('.slide-canvas')
+    const editorRect = editor.getBoundingClientRect()
+    const slideRect = slide.getBoundingClientRect()
+    const style = getComputedStyle(editor)
+
+    return {
+      editorTop: editorRect.top,
+      editorBottom: editorRect.bottom,
+      slideTop: slideRect.top,
+      slideBottom: slideRect.bottom,
+      scrollHeight: editor.scrollHeight,
+      clientHeight: editor.clientHeight,
+      overflowY: style.overflowY,
+      fits:
+        editorRect.top >= slideRect.top - 1 &&
+        editorRect.bottom <= slideRect.bottom + 1 &&
+        editor.scrollHeight <= editor.clientHeight + 1,
+    }
+  })()`)
+}
+
+async function selectionOverlayFitsBlock(page, blockId) {
+  return page.eval(`(() => {
+    const block = document.querySelector('[data-block="${blockId}"]')
+    const overlay = document.querySelector('.selection-overlay')
+    const blockRect = block.getBoundingClientRect()
+    const overlayRect = overlay.getBoundingClientRect()
+
+    return {
+      blockHeight: blockRect.height,
+      overlayHeight: overlayRect.height,
+      blockWidth: blockRect.width,
+      overlayWidth: overlayRect.width,
+      fits:
+        Math.abs(blockRect.height - overlayRect.height) < 1 &&
+        Math.abs(blockRect.width - overlayRect.width) < 1,
+    }
+  })()`)
+}
+
+async function inlineFits(page, selector) {
+  return page.eval(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)})
+    const rect = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+
+    return {
+      width: rect.width,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      overflowWrap: style.overflowWrap,
+      fits: element.scrollWidth <= element.clientWidth + 1,
     }
   })()`)
 }
@@ -580,6 +683,26 @@ async function clickToolbar(page, label) {
 async function clickSlide(page, label) {
   await page.eval(`Array.from(document.querySelectorAll('.slide-thumb')).find((button) => button.textContent?.includes('${label}'))?.click()`)
   await delay(150)
+}
+
+async function pressHistoryShortcut(page, key) {
+  const normalizedKey = key.toLowerCase()
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: normalizedKey,
+    code: `Key${normalizedKey.toUpperCase()}`,
+    windowsVirtualKeyCode: normalizedKey.toUpperCase().charCodeAt(0),
+    nativeVirtualKeyCode: normalizedKey.toUpperCase().charCodeAt(0),
+    modifiers: 2,
+  })
+  await page.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: normalizedKey,
+    code: `Key${normalizedKey.toUpperCase()}`,
+    windowsVirtualKeyCode: normalizedKey.toUpperCase().charCodeAt(0),
+    nativeVirtualKeyCode: normalizedKey.toUpperCase().charCodeAt(0),
+    modifiers: 2,
+  })
 }
 
 async function commitTextEditor(page) {

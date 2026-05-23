@@ -9,6 +9,7 @@ import {
 import {
   MIN_BLOCK_SIZE,
   SLIDE_HEIGHT,
+  SLIDE_WIDTH,
   type Rect,
   type SlideBlock,
   rectToAutoHeightStyle,
@@ -48,20 +49,30 @@ export function PlainTextEditor({
     placeCaretAtEnd(editor)
   }, [])
 
+  const syncAutoHeight = useCallback((editor: HTMLElement) => {
+    const nextRect = autoHeightRect(editor, rectRef.current, minimumHeight)
+    rectRef.current = nextRect
+    applyEditorStyle(editor, nextRect, minimumHeight)
+
+    return nextRect
+  }, [minimumHeight])
+
   const commit = useCallback(() => {
     if (committedRef.current) {
       return
     }
 
     const editor = editorRef.current
-    const nextRect = editor
-      ? autoHeightRect(editor, rectRef.current, minimumHeight)
-      : rectRef.current
+    const nextRect = editor ? syncAutoHeight(editor) : rectRef.current
     committedRef.current = true
     onCommit(editor?.textContent ?? block.text, nextRect)
-  }, [block.text, minimumHeight, onCommit])
+  }, [block.text, onCommit, syncAutoHeight])
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
+
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -89,6 +100,7 @@ export function PlainTextEditor({
       className={`plain-text-editor ${block.className}`}
       contentEditable="plaintext-only"
       onBlur={commit}
+      onInput={(event) => syncAutoHeight(event.currentTarget)}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       onPointerDown={(event) => event.stopPropagation()}
@@ -104,6 +116,18 @@ export function PlainTextEditor({
 
 function editorStyle(rect: Rect, minimumHeight: number): CSSProperties {
   return rectToAutoHeightStyle(rect, minimumHeight)
+}
+
+function applyEditorStyle(
+  editor: HTMLElement,
+  rect: Rect,
+  minimumHeight: number,
+) {
+  editor.style.left = `${(rect.x / SLIDE_WIDTH) * 100}%`
+  editor.style.top = `${(rect.y / SLIDE_HEIGHT) * 100}%`
+  editor.style.width = `${(rect.width / SLIDE_WIDTH) * 100}%`
+  editor.style.height = 'auto'
+  editor.style.minHeight = `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`
 }
 
 function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {

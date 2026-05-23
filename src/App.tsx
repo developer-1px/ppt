@@ -2,6 +2,7 @@ import {
   createElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -99,8 +100,8 @@ function App() {
     x: null,
     y: null,
   })
-  const [exportOpen, setExportOpen] = useState(false)
   const [copiedExportCode, setCopiedExportCode] = useState<string | null>(null)
+  const [visualSelectionRect, setVisualSelectionRect] = useState<Rect | null>(null)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
@@ -118,7 +119,7 @@ function App() {
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
       : null
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
-  const exportCopied = exportOpen && copiedExportCode === exportCode
+  const exportCopied = copiedExportCode === exportCode
   const baseSelectedLocation =
     selectedBlock === null
       ? null
@@ -129,6 +130,35 @@ function App() {
       baseSelectedLocation &&
       !rectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
+
+  useLayoutEffect(() => {
+    if (mode !== 'layout' || !selectedBlock || !slideRef.current) {
+      setVisualSelectionRect(null)
+      return
+    }
+
+    const slideBox = slideRef.current.getBoundingClientRect()
+    const block = slideRef.current.querySelector<HTMLElement>(
+      `[data-block="${selectedBlock.id}"]`,
+    )
+
+    if (!block || slideBox.width === 0 || slideBox.height === 0) {
+      setVisualSelectionRect(null)
+      return
+    }
+
+    const blockBox = block.getBoundingClientRect()
+    const nextRect = {
+      x: ((blockBox.left - slideBox.left) / slideBox.width) * SLIDE_WIDTH,
+      y: ((blockBox.top - slideBox.top) / slideBox.height) * SLIDE_HEIGHT,
+      width: (blockBox.width / slideBox.width) * SLIDE_WIDTH,
+      height: (blockBox.height / slideBox.height) * SLIDE_HEIGHT,
+    }
+
+    setVisualSelectionRect((currentRect) =>
+      currentRect && rectClose(currentRect, nextRect) ? currentRect : nextRect,
+    )
+  }, [activeSlide.id, doc.value, draftLayout, mode, selectedBlock])
 
   const commitPatch = useCallback(
     (
@@ -274,6 +304,43 @@ function App() {
     interaction,
     readSlidePoint,
   ])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        !isHistoryShortcut(event) ||
+        isEditableTarget(event.target)
+      ) {
+        return
+      }
+
+      const key = event.key.toLowerCase()
+
+      if (key === 'z' && event.shiftKey && doc.history.canRedo) {
+        event.preventDefault()
+        doc.history.redo()
+        return
+      }
+
+      if (key === 'z' && doc.history.canUndo) {
+        event.preventDefault()
+        doc.history.undo()
+        return
+      }
+
+      if (key === 'y' && doc.history.canRedo) {
+        event.preventDefault()
+        doc.history.redo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [doc.history])
 
   function clearTransientState() {
     setEditing(null)
@@ -492,10 +559,10 @@ function App() {
               <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
             <button
-              aria-label="Export"
-              aria-pressed={exportOpen}
-              onClick={() => setExportOpen((open) => !open)}
-              title="Export"
+              aria-label="Copy HTML"
+              aria-pressed={exportCopied}
+              onClick={copyExportCode}
+              title="Copy HTML"
               type="button"
             >
               <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
@@ -576,7 +643,7 @@ function App() {
               {mode === 'layout' && selectedRect ? (
                 <SelectionOverlay
                   onResizePointerDown={handleResizePointerDown}
-                  rect={selectedRect}
+                  rect={visualSelectionRect ?? selectedRect}
                 />
               ) : null}
 
@@ -596,21 +663,14 @@ function App() {
           </div>
         </div>
 
-        {exportOpen ? (
-          <section className="export-panel" aria-label="Export">
-            <div className="export-actions">
-              <button onClick={copyExportCode} type="button">
-                {exportCopied ? 'Copied' : 'Copy HTML'}
-              </button>
-            </div>
-            <textarea
-              readOnly
-              ref={exportTextareaRef}
-              spellCheck={false}
-              value={exportCode}
-            />
-          </section>
-        ) : null}
+        <textarea
+          aria-hidden="true"
+          className="export-buffer"
+          readOnly
+          ref={exportTextareaRef}
+          tabIndex={-1}
+          value={exportCode}
+        />
       </section>
     </main>
   )
@@ -705,6 +765,27 @@ function getCurrentRect(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+function rectClose(a: Rect, b: Rect) {
+  return (
+    Math.abs(a.x - b.x) < 0.5 &&
+    Math.abs(a.y - b.y) < 0.5 &&
+    Math.abs(a.width - b.width) < 0.5 &&
+    Math.abs(a.height - b.height) < 0.5
+  )
+}
+
+function isHistoryShortcut(event: KeyboardEvent) {
+  return (event.metaKey || event.ctrlKey) && !event.altKey
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(target.closest('[contenteditable], textarea, input, select'))
 }
 
 export default App
