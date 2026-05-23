@@ -6,7 +6,18 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    dedupe: ['react', 'react-dom', 'zod', 'zod-crud'],
+    dedupe: [
+      'react',
+      'react-dom',
+      'zod',
+      'zod-crud',
+      'prosemirror-commands',
+      'prosemirror-keymap',
+      'prosemirror-model',
+      'prosemirror-state',
+      'prosemirror-transform',
+      'prosemirror-view',
+    ],
     preserveSymlinks: true,
   },
 })

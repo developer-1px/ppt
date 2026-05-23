@@ -485,15 +485,20 @@ button {
 }
 
 .nano-text-editor {
-  display: block;
+  display: flex;
   overflow: hidden;
   background: transparent;
   color: inherit;
 }
 
-.nano-text-editor .nano {
+.nano-text-editor .nano,
+.nano-text-editor .editor,
+.nano-text-editor .ProseMirror {
+  box-sizing: border-box;
   width: 100%;
-  height: 100%;
+}
+
+.nano-text-editor .nano {
   min-height: 0;
   display: block;
   background: transparent;
@@ -506,14 +511,14 @@ button {
 .nano-text-editor .nano-block-add,
 .nano-text-editor .nano-block-handle,
 .nano-text-editor .nano-command-palette,
+.nano-text-editor .inspector,
+.nano-text-editor .inspector-trigger,
 .nano-text-editor .nano-inspector,
 .nano-text-editor .nano-inspector-trigger {
   display: none;
 }
 
 .nano-text-editor .editor {
-  width: 100%;
-  height: 100%;
   min-height: 0;
   padding: 0;
   overflow: hidden;
@@ -521,7 +526,6 @@ button {
 }
 
 .nano-text-editor .ProseMirror {
-  min-height: 100%;
   outline: none;
   color: inherit;
   font: inherit;
