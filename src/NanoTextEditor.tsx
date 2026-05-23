@@ -27,7 +27,6 @@ type NanoTextEditorProps = {
   minimumHeight: number
   onCancel: () => void
   onCommit: (text: string, rect: Rect) => void
-  onRectChange: (rect: Rect) => void
   rect: Rect
 }
 
@@ -36,7 +35,6 @@ export function NanoTextEditor({
   minimumHeight,
   onCancel,
   onCommit,
-  onRectChange,
   rect,
 }: NanoTextEditorProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
@@ -44,7 +42,6 @@ export function NanoTextEditor({
   const rectRef = useRef(rect)
   const onCancelRef = useRef(onCancel)
   const onCommitRef = useRef(onCommit)
-  const onRectChangeRef = useRef(onRectChange)
   const initialDocument = useMemo(
     () => nanoDocumentFromText(block.id, block.text),
     [block.id, block.text],
@@ -62,18 +59,17 @@ export function NanoTextEditor({
     onCommitRef.current = onCommit
   }, [onCommit])
 
-  useEffect(() => {
-    onRectChangeRef.current = onRectChange
-  }, [onRectChange])
-
   const commit = useCallback(() => {
     const engine = engineRef.current
+    const rect = mountRef.current
+      ? autoHeightRect(mountRef.current, rectRef.current, minimumHeight)
+      : rectRef.current
 
     onCommitRef.current(
       engine ? textFromNanoDocument(engine.value) : block.text,
-      rectRef.current,
+      rect,
     )
-  }, [block.text])
+  }, [block.text, minimumHeight])
 
   const handleEditorKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -127,39 +123,22 @@ export function NanoTextEditor({
     const handle = createNanoView({ mount, engine })
     engineRef.current = engine
 
-    const measure = () => {
-      const nextRect = autoHeightRect(mount, rectRef.current, minimumHeight)
-      if (Math.abs(nextRect.height - rectRef.current.height) >= 1) {
-        rectRef.current = nextRect
-        onRectChangeRef.current(nextRect)
-      }
-    }
-    const observer = new ResizeObserver(() => measure())
-    const editor = mount.querySelector<HTMLElement>('.editor')
-    if (editor) {
-      observer.observe(editor)
-    }
-
     let caretFrame = 0
-    let measureFrame = 0
     const focusFrame = requestAnimationFrame(() => {
       const editor = mount.querySelector<HTMLElement>('.ProseMirror')
       editor?.focus()
       if (editor) {
         caretFrame = requestAnimationFrame(() => placeCaretAtEnd(editor))
       }
-      measureFrame = requestAnimationFrame(measure)
     })
 
     return () => {
-      observer.disconnect()
       cancelAnimationFrame(focusFrame)
       cancelAnimationFrame(caretFrame)
-      cancelAnimationFrame(measureFrame)
       handle.destroy()
       engineRef.current = null
     }
-  }, [block.text.length, initialDocument, minimumHeight])
+  }, [block.text.length, initialDocument])
 
   return (
     <div
@@ -171,7 +150,7 @@ export function NanoTextEditor({
       }}
       onPointerDown={(event) => event.stopPropagation()}
       ref={mountRef}
-      style={rectToStyle(rect) as CSSProperties}
+      style={editorStyle(rect, minimumHeight)}
     />
   )
 }
@@ -198,32 +177,27 @@ function blockText(block: NanoBlock) {
   return 'text' in block && typeof block.text === 'string' ? block.text : ''
 }
 
-function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {
-  const editor = mount.querySelector<HTMLElement>('.editor')
-  const mountBox = mount.getBoundingClientRect()
-  const editorBox = editor?.getBoundingClientRect()
+function editorStyle(rect: Rect, minimumHeight: number): CSSProperties {
+  return {
+    ...rectToStyle(rect),
+    height: 'auto',
+    minHeight: `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`,
+  }
+}
 
-  if (!editor || mountBox.width === 0 || !editorBox) {
+function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {
+  const mountBox = mount.getBoundingClientRect()
+
+  if (mountBox.width === 0) {
     return rect
   }
 
-  const style = getComputedStyle(mount)
-  const verticalChrome =
-    readPixels(style.paddingTop) +
-    readPixels(style.paddingBottom) +
-    readPixels(style.borderTopWidth) +
-    readPixels(style.borderBottomWidth)
   const slideUnitsPerCssPixel = rect.width / mountBox.width
-  const contentHeight = (editorBox.height + verticalChrome) * slideUnitsPerCssPixel
+  const contentHeight = mountBox.height * slideUnitsPerCssPixel
   const height = Math.max(minimumHeight, MIN_BLOCK_SIZE, Math.ceil(contentHeight))
   const y = Math.min(rect.y, Math.max(0, SLIDE_HEIGHT - height))
 
   return rect.height === height && rect.y === y ? rect : { ...rect, y, height }
-}
-
-function readPixels(value: string) {
-  const number = Number.parseFloat(value)
-  return Number.isFinite(number) ? number : 0
 }
 
 function placeCaretAtEnd(root: HTMLElement) {

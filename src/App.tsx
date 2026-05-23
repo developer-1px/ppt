@@ -311,14 +311,6 @@ function App() {
     setDraftLayout(null)
   }
 
-  function resizeTextBox(pointer: Pointer, rect: Rect) {
-    setDraftLayout((current) =>
-      current?.pointer === pointer && rectEquals(current.rect, rect)
-        ? current
-        : { pointer, rect },
-    )
-  }
-
   function commitTextEdit(pointer: Pointer, text: string, rect: Rect) {
     const location = blockLocationFromPointer(doc.value, pointer)
     setEditing(null)
@@ -544,7 +536,6 @@ function App() {
                       }
                       onCancel={cancelTextEdit}
                       onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
-                      onRectChange={(rect) => resizeTextBox(pointer, rect)}
                       rect={rect}
                     />
                   )

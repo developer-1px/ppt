@@ -43,7 +43,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: `NanoTextEditor`에서 native capture keydown으로 Enter commit, Escape cancel을 처리한다.
 
 - P1: Autoheight가 grow 중심이고 bottom clipping 정책이 없음
-  - Fix: content height를 측정해 box height를 grow/shrink한다. slide 하단을 넘으면 y를 보정해 box가 slide 안에 남게 한다.
+  - Fix: 편집 중에는 CSS `height: auto`로 자연스럽게 grow/shrink한다. commit 순간에만 DOM height를 측정해 저장하고, slide 하단을 넘으면 y를 보정해 box가 slide 안에 남게 한다.
 
 - P1: Layout click selection / resize race
   - Fix: Layout Mode에서 block click도 selection으로 처리한다. verifier는 selected block 확인 후 resize한다.
@@ -72,6 +72,8 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 Text Mode는 일반 layout tool을 제공하지 않는다.
 
 다만 autoheight는 content-owned geometry로 본다. 즉 사용자가 글자를 바꾸면 box height가 content에 맞춰 바뀔 수 있고, 하단 clipping을 피하기 위한 최소 y 보정은 허용한다. 자유 이동/리사이즈는 Layout Mode에만 남긴다.
+
+편집 중에는 React state로 height를 계속 쓰지 않는다. CSS autoheight로 보여주고, commit 시점에만 measured height를 zod-crud patch로 저장한다.
 
 ## Regression
 
