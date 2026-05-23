@@ -114,6 +114,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: 수정된 slide 식별 부족
   - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
 
+- P1: 변경 없는 clean deck도 autosave에 남음
+  - Fix: 현재 deck이 sample deck과 같으면 autosave storage를 제거한다. 초기 clean 상태와 deck reset 후에는 저장소가 비어 있다.
+
 - P1: slide 전환 후 stage scroll 잔류
   - Fix: slide 선택 시 stage scroll을 `(0, 0)`으로 reset한다.
 
@@ -192,4 +195,5 @@ Covered checks:
 - Export shared slide theme tokens
 - Export structured retouch patch manifest
 - modified slide thumbnail state
+- clean deck does not leave autosave storage
 - mobile horizontal overflow and core controls

@@ -212,12 +212,14 @@ async function runFirstScreenScenario(page) {
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
     canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
+    hasStoredDeck: localStorage.getItem('ppt-retouch:v1:deck') !== null,
     hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
   }))()`)
 
   check('first screen is retouch editor', state.hasEditorShell && state.hasMainSlideBlock, state)
   check('slide thumbnails are available', state.slideCount >= 3, state)
   check('slide thumbnails start without modified marks', state.changedSlideCount === 0, state)
+  check('clean initial deck does not create autosave', !state.hasStoredDeck, state)
   check('mode toggle is available', state.hasTextMode && state.hasArrangeMode, state)
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
@@ -1478,14 +1480,17 @@ async function runPersistenceScenario(page) {
   const deckResetState = await blockState(page, 's1-title')
   const noteAfterDeckReset = await blockState(page, 's1-note')
   const deckResetThumbState = await slideThumbState(page, 'Overview')
+  const deckResetStorage = await page.eval(`localStorage.getItem('ppt-retouch:v1:deck')`)
   check(
     'Text Mode deck reset restores all slide changes after selection is cleared',
     deckResetState.text === 'Retention Review' &&
       deckResetState.resetDisabled === true &&
       deckResetThumbState.changed === 'false' &&
+      deckResetStorage === null &&
       !deckResetThumbState.hasChangeDot &&
       rectChanged(noteBeforeTextReset, noteAfterDeckReset),
     {
+      storage: deckResetStorage,
       state: deckResetState,
       thumb: deckResetThumbState,
       noteBefore: noteBeforeTextReset,

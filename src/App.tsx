@@ -1890,6 +1890,11 @@ function persistDeck(deck: unknown) {
   }
 
   try {
+    if (deckEquals(deck, SAMPLE_DECK)) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return
+    }
+
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
