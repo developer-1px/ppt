@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ButtonHTMLAttributes,
   type CSSProperties,
   type ClipboardEvent as ReactClipboardEvent,
   type FormEvent as ReactFormEvent,
@@ -12,6 +13,13 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import {
+  listboxDefinition,
+  reducePatternData,
+  useListboxPattern,
+  type PatternData,
+  type PatternEvent,
+} from '@interactive-os/aria/react'
 import { Check, Code2, Download, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
@@ -994,20 +1002,84 @@ function App() {
     setDownloadedExportCode(nextExportCode)
   }
 
+  const slideRailData = useMemo<PatternData>(() => {
+    const slideIds = doc.value.slides.map((slide) => slide.id)
+
+    return {
+      items: Object.fromEntries(
+        doc.value.slides.map((slide) => [
+          slide.id,
+          {
+            label: changedSlideIds.has(slide.id)
+              ? `${slide.name}, modified`
+              : slide.name,
+            textValue: slide.name,
+          },
+        ]),
+      ),
+      relations: { rootKeys: slideIds },
+      state: {
+        activeKey: activeSlide.id,
+        selectedKeys: [activeSlide.id],
+      },
+      refs: { label: 'Slides' },
+    }
+  }, [activeSlide.id, changedSlideIds, doc.value.slides])
+  const slideRailListbox = useListboxPattern(
+    slideRailData,
+    (event: PatternEvent) => {
+      if (event.type === 'select') {
+        const selectedSlideId = event.keys[0]
+
+        if (selectedSlideId) {
+          selectSlide(selectedSlideId)
+        }
+        return
+      }
+
+      if (event.type === 'navigate') {
+        const nextSlideId = reducePatternData(
+          listboxDefinition,
+          slideRailData,
+          event,
+        ).state?.activeKey
+
+        if (nextSlideId) {
+          selectSlide(nextSlideId)
+        }
+      }
+    },
+    {
+      elementIdPrefix: 'slide-thumb-',
+      focusStrategy: 'rovingTabIndex',
+      orientation: 'vertical',
+      selectionMode: 'single',
+      typeaheadEnabled: true,
+    },
+  )
+
   return (
     <main className="retouch-app" data-mode={mode}>
-      <aside className="slide-rail" aria-label="Slides">
-        {doc.value.slides.map((slide, index) => {
+      <aside {...slideRailListbox.rootProps} className="slide-rail">
+        {slideRailListbox.renderItems.map((item, index) => {
+          const slide = doc.value.slides.find((candidate) => candidate.id === item.key)
+
+          if (!slide) {
+            return null
+          }
+
           const changed = changedSlideIds.has(slide.id)
+          const optionProps =
+            item.optionProps as ButtonHTMLAttributes<HTMLButtonElement>
 
           return (
             <button
+              {...optionProps}
               aria-current={slide.id === activeSlide.id ? 'page' : undefined}
               aria-label={changed ? `${slide.name}, modified` : slide.name}
               className="slide-thumb"
               data-changed={changed ? 'true' : 'false'}
               key={slide.id}
-              onClick={() => selectSlide(slide.id)}
               type="button"
             >
               <span className="thumb-number">{index + 1}</span>

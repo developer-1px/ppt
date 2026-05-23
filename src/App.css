@@ -39,7 +39,8 @@
   background: #ffffff;
 }
 
-.slide-thumb[aria-current='page'] {
+.slide-thumb[aria-current='page'],
+.slide-thumb[aria-selected='true'] {
   border-color: #2563eb;
   background: #ffffff;
   color: #111827;
