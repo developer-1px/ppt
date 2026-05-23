@@ -14,6 +14,8 @@ export const GRID_SIZE = 8
 export const MIN_BLOCK_SIZE = 72
 export const EMPTY_TEXT_BOX_HEIGHT = 32
 
+const ALIGN_SNAP_DISTANCE = GRID_SIZE
+
 export const BlockRoleSchema = z.enum([
   'title',
   'subtitle',
@@ -409,13 +411,21 @@ export function snap(value: number) {
 }
 
 export function moveRect(rect: Rect, dx: number, dy: number): Rect {
-  const x = clamp(snap(rect.x + dx), 0, SLIDE_WIDTH - rect.width)
-  const y = clamp(snap(rect.y + dy), 0, SLIDE_HEIGHT - rect.height)
+  const x = snapAlignedCenter(
+    snap(rect.x + dx),
+    rect.width,
+    SLIDE_WIDTH,
+  )
+  const y = snapAlignedCenter(
+    snap(rect.y + dy),
+    rect.height,
+    SLIDE_HEIGHT,
+  )
 
   return {
     ...rect,
-    x,
-    y,
+    x: clamp(x, 0, SLIDE_WIDTH - rect.width),
+    y: clamp(y, 0, SLIDE_HEIGHT - rect.height),
   }
 }
 
@@ -449,6 +459,15 @@ export function rectEquals(a: Rect, b: Rect) {
     a.width === b.width &&
     a.height === b.height
   )
+}
+
+function snapAlignedCenter(start: number, size: number, containerSize: number) {
+  const center = start + size / 2
+  const target = containerSize / 2
+
+  return Math.abs(center - target) <= ALIGN_SNAP_DISTANCE
+    ? target - size / 2
+    : start
 }
 
 export function exportRetouchDeck(deck: RetouchDeck) {

@@ -1086,14 +1086,46 @@ function getCurrentRect(
 }
 
 function guidesForInteraction(rect: Rect, interaction: Interaction): SnapGuides {
+  const left = rect.x
+  const centerX = rect.x + rect.width / 2
+  const right = rect.x + rect.width
+
   if (interaction.kind === 'move') {
-    return { x: rect.x, y: rect.y }
+    return {
+      x: alignedGuideFor(left, centerX, right, SLIDE_WIDTH),
+      y: alignedGuideFor(
+        rect.y,
+        rect.y + rect.height / 2,
+        rect.y + rect.height,
+        SLIDE_HEIGHT,
+      ),
+    }
   }
 
+  const activeEdge = interaction.handle === 'e' ? right : left
+
   return {
-    x: interaction.handle === 'e' ? rect.x + rect.width : rect.x,
+    x: alignedGuideFor(activeEdge, centerX, activeEdge, SLIDE_WIDTH),
     y: null,
   }
+}
+
+function alignedGuideFor(start: number, center: number, end: number, containerSize: number) {
+  const target = containerSize / 2
+
+  if (Math.abs(center - target) < 0.5) {
+    return target
+  }
+
+  if (Math.abs(start) < 0.5) {
+    return 0
+  }
+
+  if (Math.abs(end - containerSize) < 0.5) {
+    return containerSize
+  }
+
+  return null
 }
 
 function clamp(value: number, min: number, max: number) {

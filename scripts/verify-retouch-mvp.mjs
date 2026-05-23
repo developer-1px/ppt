@@ -496,6 +496,19 @@ async function runLayoutScenario(page) {
     canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
   }))()`)
   check('Arrange Mode shows layout grid only when arranging', arrangeSurface.canvasBackgroundImage !== 'none', arrangeSurface)
+
+  await clickSlide(page, 'Agenda')
+  const centerSnapProbe = await dragBlockBySlideUnitsWithProbe(page, 's2-step-1', 337, 0)
+  const centerSnapped = await blockCenterAlignment(page, 's2-step-1')
+  check(
+    'Arrange Mode snaps blocks to the slide center',
+    centerSnapProbe.hasCenterGuideX && centerSnapped.centeredX,
+    { probe: centerSnapProbe, alignment: centerSnapped },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+  await clickSlide(page, 'Overview')
+
   const noteBefore = await blockState(page, 's1-note')
 
   await dragBlock(page, 's1-note', 5, 5)
@@ -1024,6 +1037,93 @@ async function clickBlock(page, blockId) {
 async function dragBlock(page, blockId, dx, dy) {
   const center = await blockCenter(page, blockId)
   await dragFromTo(page, center, { x: center.x + dx, y: center.y + dy })
+}
+
+async function dragBlockBySlideUnitsWithProbe(page, blockId, dx, dy) {
+  const center = await blockCenter(page, blockId)
+  const delta = await slideUnitsToScreenDelta(page, dx, dy)
+  const target = { x: center.x + delta.x, y: center.y + delta.y }
+
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: center.x,
+    y: center.y,
+    button: 'none',
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: center.x,
+    y: center.y,
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: target.x,
+    y: target.y,
+    button: 'left',
+    buttons: 1,
+  })
+  await delay(100)
+
+  const probe = await page.eval(`(() => {
+    const slide = document.querySelector('.slide-canvas')
+    const guideX = document.querySelector('.snap-guide-x')
+    const guideY = document.querySelector('.snap-guide-y')
+    const slideRect = slide.getBoundingClientRect()
+    const guideXRect = guideX?.getBoundingClientRect()
+    const guideYRect = guideY?.getBoundingClientRect()
+
+    return {
+      hasCenterGuideX:
+        !!guideXRect &&
+        Math.abs(guideXRect.left - (slideRect.left + slideRect.width / 2)) < 1,
+      hasCenterGuideY:
+        !!guideYRect &&
+        Math.abs(guideYRect.top - (slideRect.top + slideRect.height / 2)) < 1,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: target.x,
+    y: target.y,
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+  })
+  await delay(150)
+
+  return probe
+}
+
+async function slideUnitsToScreenDelta(page, dx, dy) {
+  return page.eval(`(() => {
+    const rect = document.querySelector('.slide-canvas').getBoundingClientRect()
+
+    return {
+      x: (${dx} / 1280) * rect.width,
+      y: (${dy} / 720) * rect.height,
+    }
+  })()`)
+}
+
+async function blockCenterAlignment(page, blockId) {
+  return page.eval(`(() => {
+    const block = document.querySelector('[data-block="${blockId}"]')
+    const slide = document.querySelector('.slide-canvas')
+    const blockRect = block.getBoundingClientRect()
+    const slideRect = slide.getBoundingClientRect()
+    const blockCenterX = blockRect.left + blockRect.width / 2
+    const slideCenterX = slideRect.left + slideRect.width / 2
+
+    return {
+      blockCenterX,
+      slideCenterX,
+      centeredX: Math.abs(blockCenterX - slideCenterX) < 1,
+    }
+  })()`)
 }
 
 async function blockCenter(page, blockId) {
