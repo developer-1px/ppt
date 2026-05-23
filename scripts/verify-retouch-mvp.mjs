@@ -955,6 +955,9 @@ async function runExportScenario(page) {
   check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
+  await page.eval(`navigator.clipboard.writeText = async (value) => {
+    window.__pptRetouchCopiedHtml = value
+  }`)
   await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
   await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
   const copied = await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
@@ -1009,6 +1012,34 @@ async function runExportScenario(page) {
       canceledDraftExportFeedback.copyState === 'copied' &&
       canceledDraftExportFeedback.title === 'Copied',
     canceledDraftExportFeedback,
+  )
+
+  await page.eval(`(() => {
+    window.__pptRetouchOriginalExecCommand = document.execCommand
+    navigator.clipboard.writeText = async () => {
+      throw new Error('clipboard unavailable')
+    }
+    document.execCommand = () => false
+  })()`)
+  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
+  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.dataset.copyState === 'failed'`)
+  const failedCopyFeedback = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    document.execCommand = window.__pptRetouchOriginalExecCommand
+
+    return {
+      copyPressed: copyButton?.getAttribute('aria-pressed'),
+      copyState: copyButton?.dataset.copyState,
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'copy action does not show copied state when clipboard fails',
+    failedCopyFeedback.copyPressed === 'false' &&
+      failedCopyFeedback.copyState === 'failed' &&
+      failedCopyFeedback.title === 'Copy failed',
+    failedCopyFeedback,
   )
 
   await page.eval(`(() => {

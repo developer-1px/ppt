@@ -111,6 +111,7 @@ function App() {
   })
   const [copiedExportCode, setCopiedExportCode] = useState<string | null>(null)
   const [downloadedExportCode, setDownloadedExportCode] = useState<string | null>(null)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [visualSelectionRect, setVisualSelectionRect] = useState<Rect | null>(null)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
@@ -133,6 +134,17 @@ function App() {
   const exportCopied = exportStatusMatchesVisibleSlide && copiedExportCode === exportCode
   const exportDownloaded =
     exportStatusMatchesVisibleSlide && downloadedExportCode === exportCode
+  const copyState = exportCopied
+    ? 'copied'
+    : exportStatusMatchesVisibleSlide && copyFailed
+      ? 'failed'
+      : 'idle'
+  const copyTitle =
+    copyState === 'copied'
+      ? 'Copied'
+      : copyState === 'failed'
+        ? 'Copy failed'
+        : 'Copy HTML'
   const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
   const changedSlideIds = useMemo(() => changedSlides(doc.value), [doc.value])
   const baseSelectedLocation =
@@ -720,6 +732,7 @@ function App() {
     setActiveSlideId(SAMPLE_SLIDES[0].id)
     setCopiedExportCode(null)
     setDownloadedExportCode(null)
+    setCopyFailed(false)
     stageRef.current?.scrollTo({ left: 0, top: 0 })
     doc.commit([{ op: 'replace', path: '', value: SAMPLE_DECK }], {
       label: 'reset deck',
@@ -753,16 +766,15 @@ function App() {
 
   async function copyExportCode() {
     const nextExportCode = exportRetouchDeck(commitActiveTextEdit())
+    const copied = await writeExportToClipboard(nextExportCode, exportTextareaRef.current)
 
-    try {
-      await navigator.clipboard.writeText(nextExportCode)
-    } catch {
-      if (exportTextareaRef.current) {
-        exportTextareaRef.current.value = nextExportCode
-        exportTextareaRef.current.select()
-      }
-      document.execCommand('copy')
+    if (!copied) {
+      setCopiedExportCode(null)
+      setCopyFailed(true)
+      return
     }
+
+    setCopyFailed(false)
     setCopiedExportCode(nextExportCode)
   }
 
@@ -862,9 +874,9 @@ function App() {
             <button
               aria-label="Copy HTML"
               aria-pressed={exportCopied}
-              data-copy-state={exportCopied ? 'copied' : 'idle'}
+              data-copy-state={copyState}
               onClick={copyExportCode}
-              title={exportCopied ? 'Copied' : 'Copy HTML'}
+              title={copyTitle}
               type="button"
             >
               {exportCopied ? (
@@ -1681,6 +1693,25 @@ function arrangeRectEquals(a: Rect, b: Rect) {
 
 function textResetEquals(a: SlideBlock, b: SlideBlock) {
   return a.text === b.text && a.height === b.height
+}
+
+async function writeExportToClipboard(
+  exportCode: string,
+  fallbackTextarea: HTMLTextAreaElement | null,
+) {
+  try {
+    await navigator.clipboard.writeText(exportCode)
+    return true
+  } catch {
+    if (!fallbackTextarea) {
+      return false
+    }
+
+    fallbackTextarea.value = exportCode
+    fallbackTextarea.select()
+
+    return document.execCommand('copy')
+  }
 }
 
 function deckEquals(a: unknown, b: unknown) {
