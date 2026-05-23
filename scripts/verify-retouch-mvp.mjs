@@ -1041,10 +1041,13 @@ async function runExportScenario(page) {
   await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.dataset.copyState === 'failed'`)
   const failedCopyFeedback = await page.eval(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const style = getComputedStyle(copyButton)
 
     document.execCommand = window.__pptRetouchOriginalExecCommand
 
     return {
+      backgroundColor: style.backgroundColor,
+      color: style.color,
       copyPressed: copyButton?.getAttribute('aria-pressed'),
       copyState: copyButton?.dataset.copyState,
       title: copyButton?.getAttribute('title'),
@@ -1055,6 +1058,12 @@ async function runExportScenario(page) {
     failedCopyFeedback.copyPressed === 'false' &&
       failedCopyFeedback.copyState === 'failed' &&
       failedCopyFeedback.title === 'Copy failed',
+    failedCopyFeedback,
+  )
+  check(
+    'copy failure is visibly distinguishable',
+    failedCopyFeedback.color === 'rgb(185, 28, 28)' &&
+      failedCopyFeedback.backgroundColor === 'rgb(254, 242, 242)',
     failedCopyFeedback,
   )
 

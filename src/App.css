@@ -186,6 +186,12 @@ button {
   color: #1d4ed8;
 }
 
+.toolbar button[data-copy-state='failed'] {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .toolbar button:disabled {
   color: #a1a1aa;
   cursor: not-allowed;
