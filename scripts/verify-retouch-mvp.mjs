@@ -224,8 +224,14 @@ async function runTextScenario(page) {
     editorCount: document.querySelectorAll('.plain-text-editor').length,
     editorText: document.querySelector('.plain-text-editor')?.textContent,
     contentEditable: document.querySelector('.plain-text-editor')?.contentEditable,
+    hasMarkdownChrome:
+      document.body.textContent.includes('**') ||
+      document.body.textContent.includes('H1') ||
+      document.body.textContent.includes('MD') ||
+      !!document.querySelector('.ProseMirror, .nano, .block-picker, .command-palette'),
   }))()`)
   check('Text Mode replaces original block with one plaintext editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1 && editingTitle.contentEditable === 'plaintext-only', editingTitle)
+  check('Text Mode does not show markdown editor chrome', !editingTitle.hasMarkdownChrome, editingTitle)
 
   await page.send('Input.insertText', { text: ' Approved' })
   await commitTextEditor(page)
