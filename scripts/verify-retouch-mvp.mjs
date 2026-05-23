@@ -690,6 +690,74 @@ async function runExportScenario(page) {
       downloadState.download?.href?.startsWith('blob:'),
     downloadState,
   )
+
+  await clickMode(page, 'Text')
+  await page.eval(`navigator.clipboard.writeText = async (value) => {
+    window.__pptRetouchCopiedHtml = value
+  }`)
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' DraftCopy' })
+  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+  const immediateCopy = await page.eval(`(() => {
+    const copied = window.__pptRetouchCopiedHtml ?? ''
+    const parsed = new DOMParser().parseFromString(copied, 'text/html')
+
+    return {
+      blockText: document.querySelector('[data-block="s1-title"]')?.textContent ?? '',
+      copiedTitle: parsed.querySelector('[data-block="s1-title"]')?.textContent ?? '',
+      copiedHasDraft: copied.includes('DraftCopy'),
+    }
+  })()`)
+  check(
+    'Copy HTML commits live text before exporting',
+    immediateCopy.blockText.endsWith('DraftCopy') &&
+      immediateCopy.copiedTitle.endsWith('DraftCopy') &&
+      immediateCopy.copiedHasDraft,
+    immediateCopy,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(expectedTitle)}`)
+
+  await page.eval(`(() => {
+    window.__pptRetouchBlobText = null
+    const originalCreateObjectURL = URL.createObjectURL
+
+    URL.createObjectURL = function patchedCreateObjectURL(blob) {
+      blob.text().then((text) => {
+        window.__pptRetouchBlobText = text
+      })
+      URL.createObjectURL = originalCreateObjectURL
+
+      return originalCreateObjectURL.call(URL, blob)
+    }
+  })()`)
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' DraftDownload' })
+  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]') && window.__pptRetouchBlobText !== null")
+  const immediateDownload = await page.eval(`(() => {
+    const html = window.__pptRetouchBlobText ?? ''
+    const parsed = new DOMParser().parseFromString(html, 'text/html')
+
+    return {
+      blockText: document.querySelector('[data-block="s1-title"]')?.textContent ?? '',
+      downloadedTitle:
+        parsed.querySelector('[data-block="s1-title"]')?.textContent ?? '',
+      downloadedHasDraft: html.includes('DraftDownload'),
+    }
+  })()`)
+  check(
+    'Download HTML commits live text before exporting',
+    immediateDownload.blockText.endsWith('DraftDownload') &&
+      immediateDownload.downloadedTitle.endsWith('DraftDownload') &&
+      immediateDownload.downloadedHasDraft,
+    immediateDownload,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(expectedTitle)}`)
 }
 
 async function runPersistenceScenario(page) {

@@ -40,6 +40,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: Export 완료 액션 부재
   - Fix: Export panel에 `Copy` 버튼과 `Copied` feedback을 추가했다.
 
+- P0: 편집 중 바로 Export하면 마지막 글자 수정이 누락됨
+  - Fix: Copy/Download HTML은 먼저 live `contenteditable` DOM을 동기 commit하고, 그 최신 deck으로 export HTML을 만든다.
+
 - P1: Enter commit 불일치
   - Fix: `PlainTextEditor`에서 Enter commit, Escape cancel을 처리한다.
 
@@ -113,6 +116,7 @@ Covered checks:
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
 - Text Mode deck reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
+- Export commits live text before Copy/Download
 - Export shared slide theme tokens
 - modified slide thumbnail state
 - mobile horizontal overflow and core controls

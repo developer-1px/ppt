@@ -459,11 +459,16 @@ function App() {
   }
 
   function changeMode(nextMode: Mode) {
+    if (mode === 'text') {
+      commitActiveTextEdit()
+    }
+
     setMode(nextMode)
     clearTransientState()
   }
 
   function selectSlide(slideId: string) {
+    commitActiveTextEdit()
     setActiveSlideId(slideId)
     doc.selection?.empty()
     stageRef.current?.scrollTo({ left: 0, top: 0 })
@@ -489,12 +494,41 @@ function App() {
   }
 
   function commitTextEdit(pointer: Pointer, text: string, rect: Rect) {
-    const location = blockLocationFromPointer(doc.value, pointer)
+    setEditing(null)
+    setDraftLayout(null)
+    commitTextPatch(pointer, text, rect)
+  }
+
+  function commitActiveTextEdit() {
+    if (!editing) {
+      return doc.value
+    }
+
+    const activeEditing = editing
+    const location = blockLocationFromPointer(doc.value, activeEditing.pointer)
+    const element = slideRef.current?.querySelector<HTMLElement>(
+      '[data-editing="true"]',
+    )
+
     setEditing(null)
     setDraftLayout(null)
 
+    if (!location || !element) {
+      return doc.value
+    }
+
+    const text = element.textContent ?? ''
+    const minimumHeight = text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
+    const rect = autoHeightRect(element, getRect(location.block), minimumHeight)
+
+    return commitTextPatch(activeEditing.pointer, text, rect)
+  }
+
+  function commitTextPatch(pointer: Pointer, text: string, rect: Rect) {
+    const location = blockLocationFromPointer(doc.value, pointer)
+
     if (!location) {
-      return
+      return doc.value
     }
 
     const currentRect = getRect(location.block)
@@ -515,6 +549,8 @@ function App() {
       textChanged ? 'edit text' : 'resize text box',
       textChanged ? `text:${blockTextPointer(pointer)}` : undefined,
     )
+
+    return doc.value
   }
 
   function handleBlockPointerDown(
@@ -621,18 +657,24 @@ function App() {
   }
 
   async function copyExportCode() {
+    const nextExportCode = exportRetouchDeck(commitActiveTextEdit())
+
     try {
-      await navigator.clipboard.writeText(exportCode)
+      await navigator.clipboard.writeText(nextExportCode)
     } catch {
-      exportTextareaRef.current?.select()
+      if (exportTextareaRef.current) {
+        exportTextareaRef.current.value = nextExportCode
+        exportTextareaRef.current.select()
+      }
       document.execCommand('copy')
     }
-    setCopiedExportCode(exportCode)
+    setCopiedExportCode(nextExportCode)
   }
 
   function downloadExportCode() {
+    const nextExportCode = exportRetouchDeck(commitActiveTextEdit())
     const url = URL.createObjectURL(
-      new Blob([exportCode], { type: 'text/html;charset=utf-8' }),
+      new Blob([nextExportCode], { type: 'text/html;charset=utf-8' }),
     )
     const anchor = document.createElement('a')
 
@@ -643,7 +685,7 @@ function App() {
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(url)
-    setDownloadedExportCode(exportCode)
+    setDownloadedExportCode(nextExportCode)
   }
 
   return (
