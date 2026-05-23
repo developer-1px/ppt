@@ -33,6 +33,7 @@ try {
   await runTextScenario(page)
   await runLayoutScenario(page)
   await runExportScenario(page)
+  await runPersistenceScenario(page)
   await runMobileScenario(cdpPort)
 
   await page.close()
@@ -589,6 +590,35 @@ async function runExportScenario(page) {
     }
   })()`)
   check('copy action switches to copied state', copiedState.copyState === 'copied' && copiedState.title === 'Copied', copiedState)
+}
+
+async function runPersistenceScenario(page) {
+  const beforeReload = await blockState(page, 's1-title')
+  await page.send('Page.reload', { ignoreCache: true })
+  await delay(300)
+  await page.waitFor(
+    "document.readyState === 'complete' && !!document.querySelector('[data-block=\"s1-title\"]')",
+  )
+  const afterReload = await blockState(page, 's1-title')
+  const stored = await page.eval(`(() => {
+    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const parsed = raw ? JSON.parse(raw) : null
+
+    return {
+      hasStoredDeck: !!parsed?.deck?.slides?.length,
+      version: parsed?.version ?? null,
+      title:
+        parsed?.deck?.slides?.[0]?.blocks?.find((block) => block.id === 's1-title')
+          ?.text ?? null,
+    }
+  })()`)
+
+  check(
+    'edits persist after reload',
+    afterReload.text === beforeReload.text && stored.title === beforeReload.text,
+    { beforeReload, afterReload, stored },
+  )
+  check('autosave stores a versioned deck', stored.version === 1 && stored.hasStoredDeck, stored)
 }
 
 async function runMobileScenario(cdpPort) {

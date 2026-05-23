@@ -85,9 +85,12 @@ type SnapGuides = {
 }
 
 const DRAG_THRESHOLD = 8
+const STORAGE_KEY = 'ppt-retouch:v1:deck'
+const STORAGE_VERSION = 1
 
 function App() {
-  const doc = useJSONDocument(RetouchDeckSchema, SAMPLE_DECK, {
+  const initialDeck = useMemo(() => readInitialDeck(), [])
+  const doc = useJSONDocument(RetouchDeckSchema, initialDeck, {
     history: 200,
     selection: { mode: 'extended' },
   })
@@ -134,6 +137,10 @@ function App() {
       baseSelectedLocation &&
       !arrangeRectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
+
+  useEffect(() => {
+    persistDeck(doc.value)
+  }, [doc.value])
 
   useLayoutEffect(() => {
     if (mode !== 'layout' || !selectedBlock || !slideRef.current) {
@@ -1058,6 +1065,63 @@ function isEditableTarget(target: EventTarget | null) {
   }
 
   return Boolean(target.closest('[contenteditable], textarea, input, select'))
+}
+
+function readInitialDeck() {
+  if (typeof window === 'undefined') {
+    return SAMPLE_DECK
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+
+    if (!raw) {
+      return SAMPLE_DECK
+    }
+
+    const payload: unknown = JSON.parse(raw)
+
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      !('version' in payload) ||
+      payload.version !== STORAGE_VERSION ||
+      !('deck' in payload)
+    ) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return SAMPLE_DECK
+    }
+
+    const parsed = RetouchDeckSchema.safeParse(payload.deck)
+
+    if (!parsed.success) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return SAMPLE_DECK
+    }
+
+    return parsed.data
+  } catch {
+    window.localStorage.removeItem(STORAGE_KEY)
+    return SAMPLE_DECK
+  }
+}
+
+function persistDeck(deck: unknown) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        deck,
+      }),
+    )
+  } catch {
+    // Autosave is best-effort; editing must keep working if storage is unavailable.
+  }
 }
 
 export default App
