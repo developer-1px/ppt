@@ -381,6 +381,32 @@ async function runTextScenario(page) {
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await page.send('Input.insertText', { text: ' ToolbarUndo' })
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`!document.querySelector('[data-editing=\"true\"]') && document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
+  const toolbarUndoState = await blockState(page, 's1-title')
+  check(
+    'toolbar Undo commits live edit before undoing it',
+    toolbarUndoState.text === `${titleBefore.text} Approved` &&
+      !toolbarUndoState.editorOpen &&
+      toolbarUndoState.redoDisabled === false,
+    toolbarUndoState,
+  )
+
+  await clickToolbar(page, 'Redo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved ToolbarUndo`)}`)
+  const toolbarRedoState = await blockState(page, 's1-title')
+  check(
+    'toolbar Redo restores text undone from a live edit',
+    toolbarRedoState.text === `${titleBefore.text} Approved ToolbarUndo` &&
+      !toolbarRedoState.editorOpen,
+    toolbarRedoState,
+  )
+  await clickToolbar(page, 'Undo')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
+
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await page.send('Input.insertText', { text: ' SlideSwitch' })
   await clickSlide(page, 'Agenda')
   await clickSlide(page, 'Overview')

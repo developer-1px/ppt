@@ -656,6 +656,16 @@ function App() {
     resetDeck()
   }
 
+  function undoDocumentChange() {
+    commitActiveTextEdit()
+    doc.history.undo()
+  }
+
+  function redoDocumentChange() {
+    commitActiveTextEdit()
+    doc.history.redo()
+  }
+
   async function copyExportCode() {
     const nextExportCode = exportRetouchDeck(commitActiveTextEdit())
 
@@ -740,7 +750,7 @@ function App() {
             <button
               aria-label="Undo"
               disabled={!doc.history.canUndo}
-              onClick={() => doc.history.undo()}
+              onClick={undoDocumentChange}
               title="Undo"
               type="button"
             >
@@ -749,7 +759,7 @@ function App() {
             <button
               aria-label="Redo"
               disabled={!doc.history.canRedo}
-              onClick={() => doc.history.redo()}
+              onClick={redoDocumentChange}
               title="Redo"
               type="button"
             >
