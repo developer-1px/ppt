@@ -223,6 +223,19 @@ button {
   user-select: none;
 }
 
+.slide-block.is-editing {
+  z-index: 8;
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+  cursor: text;
+  user-select: text;
+}
+
+.slide-block.is-editing:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 .retouch-app[data-mode='text'] .slide-block {
   cursor: text;
 }
@@ -438,34 +451,6 @@ button {
   left: 0;
   width: 100%;
   height: 1px;
-}
-
-.plain-text-editor {
-  position: absolute;
-  z-index: 8;
-  box-sizing: border-box;
-  margin: 0;
-  resize: none;
-  outline: 2px solid #2563eb;
-  outline-offset: 3px;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.plain-text-editor {
-  display: block;
-  overflow: visible;
-}
-
-.plain-text-editor:focus {
-  outline: 2px solid #2563eb;
-  outline-offset: 3px;
-}
-
-.plain-text-editor.block-title,
-.plain-text-editor.block-subtitle,
-.plain-text-editor.block-footer {
-  padding: 0;
 }
 
 .export-buffer {

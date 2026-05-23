@@ -229,8 +229,8 @@ async function runEditSurfaceParityScenario(page) {
     for (const blockId of blockIds) {
       const preview = await textRangeMetrics(page, `[data-block="${blockId}"]`)
       await page.eval(`document.querySelector('[data-block="${blockId}"]').click()`)
-      await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
-      const editor = await textRangeMetrics(page, '.plain-text-editor')
+      await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+      const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
 
       deltas.push({
         blockId,
@@ -265,7 +265,7 @@ async function runTextScenario(page) {
   const titlePreviewText = await textRangeMetrics(page, '[data-block="s1-title"]')
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await commitTextEditor(page)
   const titleNoOp = await blockState(page, 's1-title')
   check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
@@ -274,9 +274,9 @@ async function runTextScenario(page) {
     x: titlePreviewText.textLeft + 2,
     y: titlePreviewText.textTop + titlePreviewText.textHeight / 2,
   })
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await page.send('Input.insertText', { text: 'Q' })
-  const clickCaretText = await page.eval("document.querySelector('.plain-text-editor')?.textContent ?? ''")
+  const clickCaretText = await page.eval("document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''")
   const clickCaretIndex = clickCaretText.indexOf('Q')
   check(
     'Text Mode starts editing at clicked text position',
@@ -287,30 +287,40 @@ async function runTextScenario(page) {
   await movePointerAway(page)
 
   await focusBlockAndPress(page, 's1-title', 'Enter')
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const keyboardEditState = await page.eval(`(() => ({
-    editorOpen: !!document.querySelector('.plain-text-editor'),
-    editorText: document.querySelector('.plain-text-editor')?.textContent ?? null,
+    editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
+    editorText: document.querySelector('[data-editing=\"true\"]')?.textContent ?? null,
   }))()`)
   check('keyboard Enter starts text edit', keyboardEditState.editorOpen && keyboardEditState.editorText === titleBefore.text, keyboardEditState)
   await cancelTextEditor(page)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
-  const titleEditorText = await textRangeMetrics(page, '.plain-text-editor')
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  const titleEditorText = await textRangeMetrics(page, '[data-editing=\"true\"]')
   const titleEditorBox = await editorMetrics(page)
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
-    editorCount: document.querySelectorAll('.plain-text-editor').length,
-    editorText: document.querySelector('.plain-text-editor')?.textContent,
-    contentEditable: document.querySelector('.plain-text-editor')?.contentEditable,
+    editorCount: document.querySelectorAll('[data-editing=\"true\"]').length,
+    editsOriginalBlock:
+      document.querySelector('[data-block="s1-title"]') ===
+      document.querySelector('[data-editing=\"true\"]'),
+    editorText: document.querySelector('[data-editing=\"true\"]')?.textContent,
+    contentEditable: document.querySelector('[data-editing=\"true\"]')?.contentEditable,
     hasMarkdownChrome:
       document.body.textContent.includes('**') ||
       document.body.textContent.includes('H1') ||
       document.body.textContent.includes('MD') ||
       !!document.querySelector('.ProseMirror, .nano, .block-picker, .command-palette'),
   }))()`)
-  check('Text Mode replaces original block with one plaintext editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1 && editingTitle.contentEditable === 'plaintext-only', editingTitle)
+  check(
+    'Text Mode edits the original block directly',
+    editingTitle.originalBlockCount === 1 &&
+      editingTitle.editorCount === 1 &&
+      editingTitle.editsOriginalBlock &&
+      editingTitle.contentEditable === 'plaintext-only',
+    editingTitle,
+  )
   check('Text Mode does not show markdown editor chrome', !editingTitle.hasMarkdownChrome, editingTitle)
   check('Text Mode non-empty editor does not inherit source min-height', titleEditorBox.minHeight === '0px', titleEditorBox)
   check(
@@ -353,13 +363,13 @@ async function runTextScenario(page) {
 
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const editBefore = await editorMetrics(page)
   await page.send('Input.insertText', {
     text: ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling. Add owner names, renewal risk, partner follow-up, timing, decision path, and executive review notes so the content clearly exceeds the original text box height.',
   })
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     return editor && editor.getBoundingClientRect().height > ${editBefore.height + 10}
   })()`)
   const autoHeight = await editorMetrics(page)
@@ -386,11 +396,11 @@ async function runTextScenario(page) {
   await clickMode(page, 'Text')
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const grownEditHeight = await editorHeight(page)
   await replaceEditorText(page, 'Short follow-up.')
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     return editor && editor.getBoundingClientRect().height < ${grownEditHeight - 10}
   })()`)
   const shrinkHeight = await editorHeight(page)
@@ -401,19 +411,19 @@ async function runTextScenario(page) {
   check('autoheight shrink persists after commit', subtitleShrunk.text === 'Short follow-up.' && subtitleShrunk.height < subtitleGrown.height - 10, { before: subtitleGrown, after: subtitleShrunk })
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await replaceEditorText(
     page,
     'enterprise-renewal-risk-account-owner-review-decision-path-follow-up-needed-before-month-close',
   )
-  const longEditorFit = await inlineFits(page, '.plain-text-editor')
+  const longEditorFit = await inlineFits(page, '[data-editing=\"true\"]')
   check('Text Mode wraps long unbroken text while editing', longEditorFit.fits, longEditorFit)
   await commitTextEditor(page)
   const longPreviewFit = await inlineFits(page, '[data-block="s1-subtitle"]')
   check('preview wraps long unbroken text after commit', longPreviewFit.fits, longPreviewFit)
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await setEditorText(page, '')
   await commitTextEditor(page)
   const emptySubtitle = await page.eval(`(() => {
@@ -428,14 +438,14 @@ async function runTextScenario(page) {
   })()`)
   check('empty text block remains findable', emptySubtitle.text === '' && emptySubtitle.empty === 'true' && emptySubtitle.width > 0 && emptySubtitle.height > 0, emptySubtitle)
   await focusBlockAndPress(page, 's1-subtitle', 'Enter')
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
-  const emptyReopen = await page.eval(`document.querySelector('.plain-text-editor')?.textContent ?? null`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  const emptyReopen = await page.eval(`document.querySelector('[data-editing=\"true\"]')?.textContent ?? null`)
   check('empty text block can be reopened from keyboard', emptyReopen === '', { emptyReopen })
   await cancelTextEditor(page)
 
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
-  const noteBeforeCancel = await page.eval(`document.querySelector('.plain-text-editor')?.textContent ?? ''`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  const noteBeforeCancel = await page.eval(`document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''`)
   await page.send('Input.insertText', { text: ' Cancelled draft' })
   await cancelTextEditor(page)
   const noteAfterCancel = await blockState(page, 's1-note')
@@ -444,7 +454,7 @@ async function runTextScenario(page) {
   await clickSlide(page, 'Decision')
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   const bottomNoteDraftText =
     'Decision needed: approve the retention sprint with owner, timing, customer impact, renewal coverage, executive sponsor, next action, weekly check-in, risk review, onboarding help, and discount guidance visible in the slide.'
   await replaceEditorText(
@@ -452,7 +462,7 @@ async function runTextScenario(page) {
     bottomNoteDraftText,
   )
   await page.waitFor(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     return editor && editor.getBoundingClientRect().height > ${bottomNoteBefore.height + 10}
   })()`)
   const bottomEditorFit = await editorFitsSlide(page)
@@ -515,7 +525,7 @@ async function runLayoutScenario(page) {
   check('Arrange Mode selection follows autoheight block', overlayFit.fits, overlayFit)
 
   await clickBlock(page, 's1-title')
-  const noEditorInLayout = await page.eval("!document.querySelector('.plain-text-editor')")
+  const noEditorInLayout = await page.eval("!document.querySelector('[data-editing=\"true\"]')")
   check('Arrange Mode click does not edit text', noEditorInLayout, null)
 }
 
@@ -524,7 +534,7 @@ async function runExportScenario(page) {
   const titleBefore = await blockState(page, 's1-title')
   const expectedTitle = `${titleBefore.text} Export`
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await page.send('Input.insertText', { text: ' Export' })
   await commitTextEditor(page)
 
@@ -546,15 +556,23 @@ async function runExportScenario(page) {
         value.trimStart().toLowerCase().startsWith('<!doctype html>') &&
         !!parsed.querySelector('html head style') &&
         !!parsed.querySelector('html body main.deck'),
+      hasPresentationPrintCss:
+        value.includes('@page{size:16in 9in;margin:0;}') &&
+        value.includes('@media print') &&
+        value.includes('break-after:page'),
       parsedEditedTitle:
         parsed.querySelector('[data-block="s1-title"]')?.textContent ?? '',
-      hasRawEditorChrome: value.includes('plain-text-editor') || value.includes('resize-handle'),
+      hasRawEditorChrome:
+        value.includes('data-editing') ||
+        value.includes('plain-text-editor') ||
+        value.includes('resize-handle'),
       hasCopyAction: !!copyButton,
       hasVisibleRawCodePanel: !!document.querySelector('.export-panel'),
     }
   })()`)
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
   check('export is a standalone HTML document', exportState.isCompleteDocument && exportState.parsedEditedTitle === expectedTitle, exportState)
+  check('export includes print-ready slide CSS', exportState.hasPresentationPrintCss, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
@@ -613,7 +631,7 @@ async function blockState(page, blockId) {
       width: rect.width,
       height: rect.height,
       selected: block.dataset.selected,
-      editorOpen: !!document.querySelector('.plain-text-editor'),
+      editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
       undoDisabled: undo?.disabled ?? null,
       redoDisabled: redo?.disabled ?? null,
       resetDisabled: reset?.disabled ?? null,
@@ -660,7 +678,7 @@ async function blockFitsSlide(page, blockId) {
 
 async function editorFitsSlide(page) {
   return page.eval(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     const slide = document.querySelector('.slide-canvas')
     const editorRect = editor.getBoundingClientRect()
     const slideRect = slide.getBoundingClientRect()
@@ -718,7 +736,7 @@ async function inlineFits(page, selector) {
 }
 
 async function editorHeight(page) {
-  return page.eval("document.querySelector('.plain-text-editor')?.getBoundingClientRect().height ?? 0")
+  return page.eval("document.querySelector('[data-editing=\"true\"]')?.getBoundingClientRect().height ?? 0")
 }
 
 async function textRangeMetrics(page, selector) {
@@ -744,7 +762,7 @@ async function textRangeMetrics(page, selector) {
 
 async function editorMetrics(page) {
   return page.eval(`(() => {
-    const wrapper = document.querySelector('.plain-text-editor')
+    const wrapper = document.querySelector('[data-editing=\"true\"]')
     const wrapperRect = wrapper?.getBoundingClientRect()
 
     return {
@@ -821,7 +839,7 @@ async function pressHistoryShortcut(page, key) {
 }
 
 async function commitTextEditor(page) {
-  await page.eval("document.querySelector('.plain-text-editor')?.focus()")
+  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Enter',
@@ -836,11 +854,11 @@ async function commitTextEditor(page) {
     windowsVirtualKeyCode: 13,
     nativeVirtualKeyCode: 13,
   })
-  await page.waitFor("!document.querySelector('.plain-text-editor')")
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
 }
 
 async function cancelTextEditor(page) {
-  await page.eval("document.querySelector('.plain-text-editor')?.focus()")
+  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Escape',
@@ -855,12 +873,12 @@ async function cancelTextEditor(page) {
     windowsVirtualKeyCode: 27,
     nativeVirtualKeyCode: 27,
   })
-  await page.waitFor("!document.querySelector('.plain-text-editor')")
+  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
 }
 
 async function replaceEditorText(page, text) {
   await page.eval(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     editor.focus()
     const selection = window.getSelection()
     const range = document.createRange()
@@ -873,7 +891,7 @@ async function replaceEditorText(page, text) {
 
 async function setEditorText(page, text) {
   await page.eval(`(() => {
-    const editor = document.querySelector('.plain-text-editor')
+    const editor = document.querySelector('[data-editing=\"true\"]')
     editor.focus()
     editor.textContent = ${JSON.stringify(text)}
     editor.dispatchEvent(new InputEvent('input', {

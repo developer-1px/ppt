@@ -454,8 +454,10 @@ export function exportRetouchDeck(deck: RetouchDeck) {
   const css = [
     ':root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#111827;background:#f3f4f6;}',
     'body{margin:0;}',
+    '@page{size:16in 9in;margin:0;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
+    '@media print{body{background:#fff;}.deck{display:block;padding:0;}.slide{border:0;break-after:page;page-break-after:always;}}',
     '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
     '.block-title{display:block;color:#111827;font:760 58px/1.04 Inter,system-ui,sans-serif;}',
     '.block-title.compact{font-size:54px;}',

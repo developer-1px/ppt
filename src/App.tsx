@@ -1,5 +1,4 @@
 import {
-  createElement,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -7,13 +6,15 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ClipboardEvent as ReactClipboardEvent,
+  type FormEvent as ReactFormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Check, Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
-import { PlainTextEditor } from './PlainTextEditor'
 import {
   RESIZE_HANDLES,
   SAMPLE_DECK,
@@ -652,30 +653,23 @@ function App() {
                   'slide-block',
                   block.className,
                   selected ? 'is-selected' : '',
+                  editingThisBlock ? 'is-editing' : '',
                   mode === 'text' ? 'is-text-mode' : 'is-layout-mode',
                 ]
                   .filter(Boolean)
                   .join(' ')
 
-                if (editingThisBlock) {
-                  return (
-                    <PlainTextEditor
-                      block={block}
-                      key={`${block.id}:editor`}
-                      initialClientPoint={editing.clientPoint}
-                      minimumHeight={minimumHeight}
-                      onCancel={cancelTextEdit}
-                      onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
-                      rect={rect}
-                    />
-                  )
-                }
-
                 return (
                   <SlideBlockElement
                     block={block}
                     className={className}
+                    editing={editingThisBlock}
+                    initialClientPoint={
+                      editingThisBlock ? editing.clientPoint : undefined
+                    }
                     key={block.id}
+                    minimumHeight={minimumHeight}
+                    onCancel={cancelTextEdit}
                     onClick={(event) => {
                       if (mode === 'layout') {
                         selectBlock(pointer)
@@ -689,7 +683,9 @@ function App() {
                     onPointerDown={(event) =>
                       handleBlockPointerDown(event, pointer, block)
                     }
-                    minimumHeight={minimumHeight}
+                    onCommit={(text, nextRect) =>
+                      commitTextEdit(pointer, text, nextRect)
+                    }
                     rect={rect}
                     selected={selected}
                     text={block.text}
@@ -736,8 +732,12 @@ function App() {
 function SlideBlockElement({
   block,
   className,
+  editing,
+  initialClientPoint,
   onClick,
   onPointerDown,
+  onCancel,
+  onCommit,
   minimumHeight,
   rect,
   selected,
@@ -745,31 +745,230 @@ function SlideBlockElement({
 }: {
   block: SlideBlock
   className: string
+  editing: boolean
+  initialClientPoint?: Point
   onClick: (event: ReactMouseEvent<HTMLElement>) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
+  onCancel: () => void
+  onCommit: (text: string, rect: Rect) => void
   minimumHeight: number
   rect: Rect
   selected: boolean
   text: string
 }) {
-  return createElement(
-    block.tag,
-    {
-      'data-block': block.id,
-      'data-empty': text.length === 0 ? 'true' : undefined,
-      'data-role': block.role,
-      'data-selected': selected ? 'true' : 'false',
-      className,
-      onClick: (event: ReactMouseEvent<HTMLElement>) => {
-        event.stopPropagation()
+  const rectRef = useRef(rect)
+  const committedRef = useRef(false)
+
+  useEffect(() => {
+    rectRef.current = rect
+  }, [rect])
+
+  useEffect(() => {
+    if (!editing) {
+      committedRef.current = false
+      return
+    }
+
+    const element = readBlockElement(block.id)
+
+    if (!element) {
+      return
+    }
+
+    committedRef.current = false
+    element.focus()
+    if (
+      !initialClientPoint ||
+      !placeCaretFromPoint(element, initialClientPoint.x, initialClientPoint.y)
+    ) {
+      placeCaretAtEnd(element)
+    }
+  }, [block.id, editing, initialClientPoint])
+
+  const syncAutoHeight = useCallback((element: HTMLElement) => {
+    const effectiveMinimumHeight =
+      element.textContent?.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : minimumHeight
+    const nextRect = autoHeightRect(element, rectRef.current, effectiveMinimumHeight)
+
+    rectRef.current = nextRect
+    applyAutoHeightStyle(element, nextRect, effectiveMinimumHeight)
+
+    return nextRect
+  }, [minimumHeight])
+
+  const commit = useCallback(() => {
+    if (!editing || committedRef.current) {
+      return
+    }
+
+    const element = readBlockElement(block.id)
+    const nextRect = element ? syncAutoHeight(element) : rectRef.current
+
+    committedRef.current = true
+    element?.blur()
+    onCommit(element?.textContent ?? text, nextRect)
+  }, [block.id, editing, onCommit, syncAutoHeight, text])
+
+  function resetDraft() {
+    const element = readBlockElement(block.id)
+
+    if (!element) {
+      return
+    }
+
+    const effectiveMinimumHeight =
+      text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : minimumHeight
+    element.textContent = text
+    rectRef.current = rect
+    applyAutoHeightStyle(element, rect, effectiveMinimumHeight)
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      resetDraft()
+      onCancel()
+      return
+    }
+
+    if (
+      event.key === 'Enter' &&
+      (event.metaKey || event.ctrlKey || !event.shiftKey)
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      commit()
+    }
+  }
+
+  function handlePaste(event: ReactClipboardEvent<HTMLElement>) {
+    event.preventDefault()
+    document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
+  }
+
+  const sharedProps = {
+    'data-block': block.id,
+    'data-editing': editing ? 'true' : undefined,
+    'data-empty': text.length === 0 ? 'true' : undefined,
+    'data-role': block.role,
+    'data-selected': selected ? 'true' : 'false',
+    className,
+    contentEditable: editing ? ('plaintext-only' as const) : undefined,
+    onBlur: editing ? commit : undefined,
+    onClick: (event: ReactMouseEvent<HTMLElement>) => {
+      event.stopPropagation()
+      if (!editing) {
         onClick(event)
-      },
-      onPointerDown,
-      style: rectToAutoHeightStyle(rect, minimumHeight),
-      tabIndex: 0,
+      }
     },
-    text,
-  )
+    onInput: editing
+      ? (event: ReactFormEvent<HTMLElement>) => syncAutoHeight(event.currentTarget)
+      : undefined,
+    onKeyDown: editing ? handleKeyDown : undefined,
+    onPaste: editing ? handlePaste : undefined,
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+      if (editing) {
+        event.stopPropagation()
+        return
+      }
+
+      onPointerDown(event)
+    },
+    spellCheck: editing ? false : undefined,
+    style: rectToAutoHeightStyle(rect, minimumHeight),
+    suppressContentEditableWarning: editing ? true : undefined,
+    tabIndex: 0,
+  }
+
+  if (block.tag === 'h1') {
+    return <h1 {...sharedProps}>{text}</h1>
+  }
+
+  if (block.tag === 'p') {
+    return <p {...sharedProps}>{text}</p>
+  }
+
+  return <div {...sharedProps}>{text}</div>
+}
+
+function readBlockElement(blockId: string) {
+  return document.querySelector<HTMLElement>(`[data-block="${blockId}"]`)
+}
+
+function applyAutoHeightStyle(
+  element: HTMLElement,
+  rect: Rect,
+  minimumHeight: number,
+) {
+  element.style.left = `${(rect.x / SLIDE_WIDTH) * 100}%`
+  element.style.top = `${(rect.y / SLIDE_HEIGHT) * 100}%`
+  element.style.width = `${(rect.width / SLIDE_WIDTH) * 100}%`
+  element.style.height = 'auto'
+  element.style.minHeight =
+    minimumHeight > 0 ? `${(minimumHeight / SLIDE_HEIGHT) * 100}%` : ''
+}
+
+function autoHeightRect(element: HTMLElement, rect: Rect, minimumHeight: number): Rect {
+  const elementBox = element.getBoundingClientRect()
+
+  if (elementBox.width === 0) {
+    return rect
+  }
+
+  const slideUnitsPerCssPixel = rect.width / elementBox.width
+  const contentHeight = elementBox.height * slideUnitsPerCssPixel
+  const height = Math.max(minimumHeight, Math.ceil(contentHeight))
+  const y = Math.min(rect.y, Math.max(0, SLIDE_HEIGHT - height))
+
+  return rect.height === height && rect.y === y ? rect : { ...rect, y, height }
+}
+
+function placeCaretAtEnd(root: HTMLElement) {
+  const selection = window.getSelection()
+  const range = document.createRange()
+  range.selectNodeContents(root)
+  range.collapse(false)
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+
+function placeCaretFromPoint(root: HTMLElement, x: number, y: number) {
+  const range = readCaretRangeFromPoint(x, y)
+
+  if (!range || !root.contains(range.startContainer)) {
+    return false
+  }
+
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+
+  return true
+}
+
+function readCaretRangeFromPoint(x: number, y: number) {
+  if ('caretPositionFromPoint' in document) {
+    const position = document.caretPositionFromPoint(x, y)
+
+    if (position) {
+      const range = document.createRange()
+      range.setStart(position.offsetNode, position.offset)
+      range.collapse(true)
+
+      return range
+    }
+  }
+
+  if ('caretRangeFromPoint' in document) {
+    return document.caretRangeFromPoint(x, y)
+  }
+
+  return null
 }
 
 function MiniSlide({ slide }: { slide: RetouchSlide }) {
