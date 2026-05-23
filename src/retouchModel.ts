@@ -412,14 +412,16 @@ export function snap(value: number) {
 
 export function moveRect(rect: Rect, dx: number, dy: number): Rect {
   const x = snapAlignedCenter(
-    snap(rect.x + dx),
+    dx === 0 ? rect.x : snap(rect.x + dx),
     rect.width,
     SLIDE_WIDTH,
+    dx !== 0,
   )
   const y = snapAlignedCenter(
-    snap(rect.y + dy),
+    dy === 0 ? rect.y : snap(rect.y + dy),
     rect.height,
     SLIDE_HEIGHT,
+    dy !== 0,
   )
 
   return {
@@ -461,7 +463,16 @@ export function rectEquals(a: Rect, b: Rect) {
   )
 }
 
-function snapAlignedCenter(start: number, size: number, containerSize: number) {
+function snapAlignedCenter(
+  start: number,
+  size: number,
+  containerSize: number,
+  enabled: boolean,
+) {
+  if (!enabled) {
+    return start
+  }
+
   const center = start + size / 2
   const target = containerSize / 2
 

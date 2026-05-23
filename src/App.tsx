@@ -17,6 +17,7 @@ import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
   RESIZE_HANDLES,
+  GRID_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
   SLIDE_HEIGHT,
@@ -397,6 +398,57 @@ function App() {
       window.removeEventListener('keydown', handleFocusedBlockEditKey)
     }
   }, [activeSlide.id, doc.selection, doc.value, mode])
+
+  useEffect(() => {
+    function handleLayoutNudgeKey(event: KeyboardEvent) {
+      if (
+        mode !== 'layout' ||
+        event.defaultPrevented ||
+        editing ||
+        interaction ||
+        !selectedPointer ||
+        !selectedBlock ||
+        isEditableTarget(event.target) ||
+        isControlTarget(event.target)
+      ) {
+        return
+      }
+
+      const delta = arrowKeyDelta(event.key, event.shiftKey)
+
+      if (!delta) {
+        return
+      }
+
+      const rect = moveRect(getRect(selectedBlock), delta.x, delta.y)
+
+      if (rectEquals(rect, getRect(selectedBlock))) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      commitPatch(
+        setArrangePatch(selectedPointer, rect),
+        selectedPointer,
+        'nudge layout',
+        `layout:nudge:${selectedPointer}`,
+      )
+    }
+
+    window.addEventListener('keydown', handleLayoutNudgeKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleLayoutNudgeKey)
+    }
+  }, [
+    commitPatch,
+    editing,
+    interaction,
+    mode,
+    selectedBlock,
+    selectedPointer,
+  ])
 
   function clearTransientState() {
     setEditing(null)
@@ -1166,6 +1218,36 @@ function isEditableTarget(target: EventTarget | null) {
   }
 
   return Boolean(target.closest('[contenteditable], textarea, input, select'))
+}
+
+function isControlTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(target.closest('button, [role="tab"], [role="toolbar"]'))
+}
+
+function arrowKeyDelta(key: string, largeStep: boolean): Point | null {
+  const step = largeStep ? GRID_SIZE * 5 : GRID_SIZE
+
+  if (key === 'ArrowLeft') {
+    return { x: -step, y: 0 }
+  }
+
+  if (key === 'ArrowRight') {
+    return { x: step, y: 0 }
+  }
+
+  if (key === 'ArrowUp') {
+    return { x: 0, y: -step }
+  }
+
+  if (key === 'ArrowDown') {
+    return { x: 0, y: step }
+  }
+
+  return null
 }
 
 function readInitialDeck() {

@@ -507,6 +507,28 @@ async function runLayoutScenario(page) {
   )
   await clickToolbar(page, 'Undo')
   await delay(150)
+
+  const stepBeforeNudge = await blockState(page, 's2-step-1')
+  await clickBlock(page, 's2-step-1')
+  await pressKey(page, 'ArrowRight')
+  await delay(150)
+  const stepNudged = await blockState(page, 's2-step-1')
+  check(
+    'Arrange Mode arrow keys nudge the selected block',
+    stepNudged.x > stepBeforeNudge.x + 4 &&
+      Math.abs(stepNudged.y - stepBeforeNudge.y) < 1 &&
+      stepNudged.text === stepBeforeNudge.text,
+    { before: stepBeforeNudge, after: stepNudged },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+  const stepNudgeUndone = await blockState(page, 's2-step-1')
+  check(
+    'undo restores keyboard nudged layout',
+    !rectChanged(stepBeforeNudge, stepNudgeUndone) &&
+      stepNudgeUndone.text === stepBeforeNudge.text,
+    { before: stepBeforeNudge, after: stepNudgeUndone },
+  )
   await clickSlide(page, 'Overview')
 
   const noteBefore = await blockState(page, 's1-note')
@@ -926,8 +948,17 @@ async function focusBlockAndPress(page, blockId, key) {
 }
 
 async function pressKey(page, key) {
-  const code = key === 'Enter' ? 'Enter' : `Key${key.toUpperCase()}`
-  const keyCode = key === 'Enter' ? 13 : key.toUpperCase().charCodeAt(0)
+  const keyCodeByKey = {
+    ArrowDown: 40,
+    ArrowLeft: 37,
+    ArrowRight: 39,
+    ArrowUp: 38,
+    Enter: 13,
+  }
+  const code = key.startsWith('Arrow') || key === 'Enter'
+    ? key
+    : `Key${key.toUpperCase()}`
+  const keyCode = keyCodeByKey[key] ?? key.toUpperCase().charCodeAt(0)
 
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
