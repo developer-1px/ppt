@@ -153,8 +153,9 @@ button {
 }
 
 .toolbar button {
-  min-width: 56px;
-  padding: 0 9px;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
 }
 
 .mode-button:hover,
@@ -216,7 +217,7 @@ button {
   position: absolute;
   box-sizing: border-box;
   margin: 0;
-  overflow: hidden;
+  overflow: visible;
   white-space: pre-wrap;
   user-select: none;
 }
@@ -402,46 +403,10 @@ button {
   background: #ffffff;
 }
 
-.resize-handle[data-handle='nw'] {
-  top: -18px;
-  left: -18px;
-  cursor: nwse-resize;
-}
-
-.resize-handle[data-handle='n'] {
-  top: -18px;
-  left: calc(50% - 17px);
-  cursor: ns-resize;
-}
-
-.resize-handle[data-handle='ne'] {
-  top: -18px;
-  right: -18px;
-  cursor: nesw-resize;
-}
-
 .resize-handle[data-handle='e'] {
   top: calc(50% - 17px);
   right: -18px;
   cursor: ew-resize;
-}
-
-.resize-handle[data-handle='se'] {
-  right: -18px;
-  bottom: -18px;
-  cursor: nwse-resize;
-}
-
-.resize-handle[data-handle='s'] {
-  bottom: -18px;
-  left: calc(50% - 17px);
-  cursor: ns-resize;
-}
-
-.resize-handle[data-handle='sw'] {
-  bottom: -18px;
-  left: -18px;
-  cursor: nesw-resize;
 }
 
 .resize-handle[data-handle='w'] {

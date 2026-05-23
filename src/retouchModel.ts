@@ -56,16 +56,10 @@ export type SlideBlock = z.infer<typeof SlideBlockSchema>
 export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
 
-export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+export type ResizeHandle = 'e' | 'w'
 
 export const RESIZE_HANDLES: ResizeHandle[] = [
-  'nw',
-  'n',
-  'ne',
   'e',
-  'se',
-  's',
-  'sw',
   'w',
 ]
 
@@ -380,6 +374,14 @@ export function rectToStyle(rect: Rect) {
   }
 }
 
+export function rectToAutoHeightStyle(rect: Rect, minimumHeight: number) {
+  return {
+    ...rectToStyle(rect),
+    height: 'auto',
+    minHeight: `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`,
+  }
+}
+
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -403,34 +405,22 @@ export function resizeRect(
   rect: Rect,
   handle: ResizeHandle,
   dx: number,
-  dy: number,
 ): Rect {
   let left = rect.x
-  let top = rect.y
   let right = rect.x + rect.width
-  let bottom = rect.y + rect.height
 
-  if (handle.includes('w')) {
+  if (handle === 'w') {
     left = clamp(snap(left + dx), 0, right - MIN_BLOCK_SIZE)
   }
 
-  if (handle.includes('e')) {
+  if (handle === 'e') {
     right = clamp(snap(right + dx), left + MIN_BLOCK_SIZE, SLIDE_WIDTH)
   }
 
-  if (handle.includes('n')) {
-    top = clamp(snap(top + dy), 0, bottom - MIN_BLOCK_SIZE)
-  }
-
-  if (handle.includes('s')) {
-    bottom = clamp(snap(bottom + dy), top + MIN_BLOCK_SIZE, SLIDE_HEIGHT)
-  }
-
   return {
+    ...rect,
     x: left,
-    y: top,
     width: right - left,
-    height: bottom - top,
   }
 }
 
@@ -449,7 +439,7 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     ':root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#111827;background:#f3f4f6;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
-    '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:hidden;white-space:pre-wrap;}',
+    '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;white-space:pre-wrap;}',
     '.block-title{display:block;color:#111827;font:760 58px/1.04 Inter,system-ui,sans-serif;}',
     '.block-title.compact{font-size:54px;}',
     '.block-title.wide{font-size:52px;}',
@@ -477,7 +467,7 @@ export function exportRetouchDeck(deck: RetouchDeck) {
             `left:${block.x}px`,
             `top:${block.y}px`,
             `width:${block.width}px`,
-            `height:${block.height}px`,
+            `min-height:${Math.max(block.height, MIN_BLOCK_SIZE)}px`,
           ].join(';')
 
           return `    <${block.tag} data-block="${block.id}" data-role="${block.role}" class="${block.className}" style="${style}">${text}</${block.tag}>`

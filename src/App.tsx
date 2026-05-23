@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import { PlainTextEditor } from './PlainTextEditor'
@@ -28,6 +29,7 @@ import {
   getRect,
   moveRect,
   rectEquals,
+  rectToAutoHeightStyle,
   rectToStyle,
   resizeRect,
   setLayoutPatch,
@@ -175,7 +177,6 @@ function App() {
         currentInteraction.startRect,
         currentInteraction.handle,
         dx,
-        dy,
       )
     },
     [],
@@ -464,32 +465,40 @@ function App() {
 
           <div className="toolbar" role="toolbar" aria-label="Actions">
             <button
+              aria-label="Undo"
               disabled={!doc.history.canUndo}
               onClick={() => doc.history.undo()}
+              title="Undo"
               type="button"
             >
-              Undo
+              <Undo2 aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
             <button
+              aria-label="Redo"
               disabled={!doc.history.canRedo}
               onClick={() => doc.history.redo()}
+              title="Redo"
               type="button"
             >
-              Redo
+              <Redo2 aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
             <button
+              aria-label="Reset"
               disabled={mode !== 'layout' || !canResetSelected}
               onClick={resetSelectedLayout}
+              title="Reset"
               type="button"
             >
-              Reset
+              <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
             <button
+              aria-label="Export"
               aria-pressed={exportOpen}
               onClick={() => setExportOpen((open) => !open)}
+              title="Export"
               type="button"
             >
-              Export
+              <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
             </button>
           </div>
         </header>
@@ -514,6 +523,9 @@ function App() {
                 const pointer = blockPointer(activeSlideIndex, blockIndex)
                 const rect = getCurrentRect(pointer, block, draftLayout)
                 const selected = pointer === selectedPointer
+                const minimumHeight =
+                  findBlockLocation(SAMPLE_DECK, activeSlide.id, block.id)?.block
+                    .height ?? MIN_BLOCK_SIZE
                 const editingThisBlock =
                   mode === 'text' && editing?.pointer === pointer
                 const className = [
@@ -530,10 +542,7 @@ function App() {
                     <PlainTextEditor
                       block={block}
                       key={`${block.id}:editor`}
-                      minimumHeight={
-                        findBlockLocation(SAMPLE_DECK, activeSlide.id, block.id)
-                          ?.block.height ?? MIN_BLOCK_SIZE
-                      }
+                      minimumHeight={minimumHeight}
                       onCancel={cancelTextEdit}
                       onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
                       rect={rect}
@@ -556,6 +565,7 @@ function App() {
                     onPointerDown={(event) =>
                       handleBlockPointerDown(event, pointer, block)
                     }
+                    minimumHeight={minimumHeight}
                     rect={rect}
                     selected={selected}
                     text={block.text}
@@ -611,6 +621,7 @@ function SlideBlockElement({
   className,
   onClick,
   onPointerDown,
+  minimumHeight,
   rect,
   selected,
   text,
@@ -619,6 +630,7 @@ function SlideBlockElement({
   className: string
   onClick: () => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
+  minimumHeight: number
   rect: Rect
   selected: boolean
   text: string
@@ -635,7 +647,7 @@ function SlideBlockElement({
         onClick()
       },
       onPointerDown,
-      style: rectToStyle(rect),
+      style: rectToAutoHeightStyle(rect, minimumHeight),
       tabIndex: 0,
     },
     text,

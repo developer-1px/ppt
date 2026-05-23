@@ -29,6 +29,7 @@ try {
   })
 
   await runFirstScreenScenario(page)
+  await runEditSurfaceParityScenario(page)
   await runTextScenario(page)
   await runLayoutScenario(page)
   await runExportScenario(page)
@@ -216,6 +217,49 @@ async function runFirstScreenScenario(page) {
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
 }
 
+async function runEditSurfaceParityScenario(page) {
+  const deltas = []
+
+  for (const slideName of ['Overview', 'Agenda', 'Decision']) {
+    await clickSlide(page, slideName)
+    const blockIds = await page.eval(
+      "Array.from(document.querySelectorAll('[data-block]')).map((block) => block.dataset.block)",
+    )
+
+    for (const blockId of blockIds) {
+      const preview = await textRangeMetrics(page, `[data-block="${blockId}"]`)
+      await page.eval(`document.querySelector('[data-block="${blockId}"]').click()`)
+      await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+      const editor = await textRangeMetrics(page, '.plain-text-editor')
+
+      deltas.push({
+        blockId,
+        slideName,
+        boxHeightDelta: editor.boxHeight - preview.boxHeight,
+        textHeightDelta: editor.textHeight - preview.textHeight,
+        textLeftDelta: editor.textLeft - preview.textLeft,
+        textTopDelta: editor.textTop - preview.textTop,
+      })
+
+      await cancelTextEditor(page)
+    }
+  }
+
+  await clickSlide(page, 'Overview')
+
+  check(
+    'Text Mode editor opens on the same visual text box',
+    deltas.every(
+      (delta) =>
+        Math.abs(delta.boxHeightDelta) < 1 &&
+        Math.abs(delta.textHeightDelta) < 1 &&
+        Math.abs(delta.textLeftDelta) < 1 &&
+        Math.abs(delta.textTopDelta) < 1,
+    ),
+    deltas,
+  )
+}
+
 async function runTextScenario(page) {
   const titleBefore = await blockState(page, 's1-title')
   const titlePreviewText = await textRangeMetrics(page, '[data-block="s1-title"]')
@@ -366,15 +410,15 @@ async function runLayoutScenario(page) {
   const metricBefore = await blockState(page, 's1-metric')
   await clickBlock(page, 's1-metric')
   await page.waitFor(`document.querySelector('[data-block="s1-metric"]')?.dataset.selected === 'true'`)
-  await page.waitFor("!!document.querySelector('.resize-handle[data-handle=\"se\"]')")
+  await page.waitFor("!!document.querySelector('.resize-handle[data-handle=\"e\"]')")
   const handle = await page.eval(`(() => {
-    const handle = document.querySelector('.resize-handle[data-handle="se"]')
+    const handle = document.querySelector('.resize-handle[data-handle="e"]')
     const rect = handle.getBoundingClientRect()
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
   })()`)
-  await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y + 32 })
+  await dragFromTo(page, handle, { x: handle.x + 44, y: handle.y })
   const metricResized = await blockState(page, 's1-metric')
-  check('Arrange Mode resize changes box only', metricResized.width > metricBefore.width + 10 && metricResized.height > metricBefore.height + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
+  check('Arrange Mode resize changes width only', metricResized.width > metricBefore.width + 10 && metricResized.text === metricBefore.text, { before: metricBefore, after: metricResized })
 
   await clickBlock(page, 's1-title')
   const noEditorInLayout = await page.eval("!document.querySelector('.plain-text-editor')")
@@ -438,9 +482,9 @@ async function blockState(page, blockId) {
   return page.eval(`(() => {
     const block = document.querySelector('[data-block="${blockId}"]')
     const rect = block.getBoundingClientRect()
-    const undo = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Undo')
-    const redo = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Redo')
-    const reset = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Reset')
+    const undo = document.querySelector('button[aria-label="Undo"]')
+    const redo = document.querySelector('button[aria-label="Redo"]')
+    const reset = document.querySelector('button[aria-label="Reset"]')
     return {
       text: block.textContent,
       x: rect.x,
@@ -530,7 +574,7 @@ async function clickMode(page, label) {
 }
 
 async function clickToolbar(page, label) {
-  await page.eval(`Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === '${label}')?.click()`)
+  await page.eval(`document.querySelector('button[aria-label="${label}"]')?.click()`)
 }
 
 async function clickSlide(page, label) {

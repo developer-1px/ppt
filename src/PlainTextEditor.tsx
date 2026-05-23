@@ -9,9 +9,9 @@ import {
 import {
   MIN_BLOCK_SIZE,
   SLIDE_HEIGHT,
-  rectToStyle,
   type Rect,
   type SlideBlock,
+  rectToAutoHeightStyle,
 } from './retouchModel'
 
 type PlainTextEditorProps = {
@@ -103,11 +103,7 @@ export function PlainTextEditor({
 }
 
 function editorStyle(rect: Rect, minimumHeight: number): CSSProperties {
-  return {
-    ...rectToStyle(rect),
-    height: 'auto',
-    minHeight: `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`,
-  }
+  return rectToAutoHeightStyle(rect, minimumHeight)
 }
 
 function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {
