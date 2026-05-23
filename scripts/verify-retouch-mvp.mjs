@@ -258,6 +258,8 @@ async function runEditSurfaceParityScenario(page) {
         outlineOffset: editorChrome.outlineOffset,
         outlineStyle: editorChrome.outlineStyle,
         outlineWidth: editorChrome.outlineWidth,
+        previewTextInsideBox: preview.textInsideBox,
+        editorTextInsideBox: editor.textInsideBox,
         stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
         stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
         textHeightDelta: editor.textHeight - preview.textHeight,
@@ -283,6 +285,8 @@ async function runEditSurfaceParityScenario(page) {
         delta.outlineOffset === '0px' &&
         delta.outlineStyle === 'none' &&
         delta.outlineWidth === '0px' &&
+        delta.previewTextInsideBox &&
+        delta.editorTextInsideBox &&
         Math.abs(delta.stageScrollLeftDelta) < 1 &&
         Math.abs(delta.stageScrollTopDelta) < 1 &&
         Math.abs(delta.textHeightDelta) < 1 &&
@@ -315,6 +319,8 @@ async function runCompactEditSurfaceScenario(cdpPort) {
       blockId,
       boxTopDelta: editor.boxTop - preview.boxTop,
       canvasTopDelta: editor.canvasTop - preview.canvasTop,
+      previewTextInsideBox: preview.textInsideBox,
+      editorTextInsideBox: editor.textInsideBox,
       stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
       stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
       textLeftDelta: editor.textLeft - preview.textLeft,
@@ -330,6 +336,8 @@ async function runCompactEditSurfaceScenario(cdpPort) {
       (delta) =>
         Math.abs(delta.boxTopDelta) < 1 &&
         Math.abs(delta.canvasTopDelta) < 1 &&
+        delta.previewTextInsideBox &&
+        delta.editorTextInsideBox &&
         Math.abs(delta.stageScrollLeftDelta) < 1 &&
         Math.abs(delta.stageScrollTopDelta) < 1 &&
         Math.abs(delta.textLeftDelta) < 1 &&
@@ -874,6 +882,48 @@ async function runExportScenario(page) {
   })()`)
   check('copy action switches to copied state', copiedState.copyState === 'copied' && copiedState.title === 'Copied', copiedState)
 
+  await clickMode(page, 'Text')
+  await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await typeEditorText(page, ' LiveDraft')
+  const liveDraftExportFeedback = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    return {
+      editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
+      copyPressed: copyButton?.getAttribute('aria-pressed'),
+      copyState: copyButton?.dataset.copyState,
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'copy feedback clears while a live text draft is visible',
+    liveDraftExportFeedback.editorOpen &&
+      liveDraftExportFeedback.copyPressed === 'false' &&
+      liveDraftExportFeedback.copyState === 'idle' &&
+      liveDraftExportFeedback.title === 'Copy HTML',
+    liveDraftExportFeedback,
+  )
+  await cancelTextEditor(page)
+  const canceledDraftExportFeedback = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+
+    return {
+      editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
+      copyPressed: copyButton?.getAttribute('aria-pressed'),
+      copyState: copyButton?.dataset.copyState,
+      title: copyButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'copy feedback returns after canceling an uncommitted draft',
+    !canceledDraftExportFeedback.editorOpen &&
+      canceledDraftExportFeedback.copyPressed === 'true' &&
+      canceledDraftExportFeedback.copyState === 'copied' &&
+      canceledDraftExportFeedback.title === 'Copied',
+    canceledDraftExportFeedback,
+  )
+
   await page.eval(`(() => {
     window.__pptRetouchDownload = null
     const originalClick = HTMLAnchorElement.prototype.click
@@ -1244,6 +1294,8 @@ async function textRangeMetrics(page, selector) {
       boxLeft: boxRect.left,
       boxWidth: boxRect.width,
       boxHeight: boxRect.height,
+      boxRight: boxRect.right,
+      boxBottom: boxRect.bottom,
       canvasTop: canvasRect?.top ?? 0,
       canvasLeft: canvasRect?.left ?? 0,
       stageScrollTop: stage?.scrollTop ?? 0,
@@ -1252,6 +1304,13 @@ async function textRangeMetrics(page, selector) {
       textLeft: textRect.left,
       textWidth: textRect.width,
       textHeight: textRect.height,
+      textRight: textRect.right,
+      textBottom: textRect.bottom,
+      textInsideBox:
+        textRect.top >= boxRect.top - 1 &&
+        textRect.left >= boxRect.left - 1 &&
+        textRect.right <= boxRect.right + 1 &&
+        textRect.bottom <= boxRect.bottom + 1,
     }
   })()`)
 }

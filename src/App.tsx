@@ -129,8 +129,10 @@ function App() {
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
       : null
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
-  const exportCopied = copiedExportCode === exportCode
-  const exportDownloaded = downloadedExportCode === exportCode
+  const exportStatusMatchesVisibleSlide = !editing && !interaction && !draftLayout
+  const exportCopied = exportStatusMatchesVisibleSlide && copiedExportCode === exportCode
+  const exportDownloaded =
+    exportStatusMatchesVisibleSlide && downloadedExportCode === exportCode
   const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
   const changedSlideIds = useMemo(() => changedSlides(doc.value), [doc.value])
   const baseSelectedLocation =

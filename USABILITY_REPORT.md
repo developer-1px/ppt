@@ -39,6 +39,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P0: Export 완료 액션 부재
   - Fix: Export panel에 `Copy` 버튼과 `Copied` feedback을 추가했다.
+  - Fix: live draft나 drag draft가 보이는 동안에는 `Copied`/`Downloaded` feedback을 숨겨, 완료 상태가 현재 화면보다 앞서 보이지 않게 했다.
 
 - P0: 편집 중 바로 Export하면 마지막 글자 수정이 누락됨
   - Fix: Copy/Download HTML은 먼저 live `contenteditable` DOM을 동기 commit하고, 그 최신 deck으로 export HTML을 만든다.
@@ -51,6 +52,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P0: 편집 진입 시 실제 preview 텍스트와 editable 텍스트 사이에 visual gap이 생길 수 있음
   - Fix: `contenteditable` focus와 caret placement가 stage scroll을 움직이지 못하게 고정하고, compact viewport에서도 box/text 좌표가 변하지 않는지 verifier에 고정했다.
+  - Fix: title token의 과도하게 낮은 `line-height`를 제거해 실제 글자 range가 preview/edit box 밖으로 튀어나가지 않게 했다.
 
 - P0: 편집 중 toolbar Undo가 live draft를 건너뛸 수 있음
   - Fix: toolbar Undo/Redo도 먼저 live `contenteditable` DOM을 commit한 뒤 document history를 실행한다.
@@ -136,6 +138,7 @@ Covered checks:
 - no double text rendering
 - live editor text and committed preview text parity without boxed editor chrome
 - compact viewport edit entry without preview/editor visual gap
+- preview/editor text range stays inside its box
 - toolbar Undo/Redo around live text edits
 - consecutive text block edits
 - live edit commit before slide/mode switch
@@ -144,6 +147,7 @@ Covered checks:
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
 - Text Mode deck reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
+- Export feedback clears during live visible drafts
 - Export commits live text before Copy/Download
 - Export shared slide theme tokens
 - Export structured retouch patch manifest

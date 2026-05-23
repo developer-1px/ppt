@@ -4,7 +4,7 @@
   font-family: var(--sans);
   font-size: clamp(10px, 4.5313cqw, 58px);
   font-weight: 760;
-  line-height: 1.04;
+  line-height: normal;
 }
 
 .block-title.compact {
