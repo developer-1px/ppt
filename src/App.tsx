@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
@@ -16,11 +15,11 @@ import { useJSONDocument } from 'zod-crud/react'
 import { PlainTextEditor } from './PlainTextEditor'
 import {
   RESIZE_HANDLES,
-  MIN_BLOCK_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
+  EMPTY_TEXT_BOX_HEIGHT,
   RetouchDeckSchema,
   blockLocationFromPointer,
   blockPointer,
@@ -341,6 +340,49 @@ function App() {
     }
   }, [doc.history])
 
+  useEffect(() => {
+    function handleFocusedBlockEditKey(event: KeyboardEvent) {
+      if (
+        mode !== 'text' ||
+        event.defaultPrevented ||
+        isEditableTarget(event.target) ||
+        (event.key !== 'Enter' && event.key !== 'F2')
+      ) {
+        return
+      }
+
+      const activeElement = document.activeElement
+
+      if (!(activeElement instanceof HTMLElement)) {
+        return
+      }
+
+      const blockElement = activeElement.closest<HTMLElement>('[data-block]')
+      const blockId = blockElement?.dataset.block
+
+      if (!blockId) {
+        return
+      }
+
+      const location = findBlockLocation(doc.value, activeSlide.id, blockId)
+
+      if (!location) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      doc.selection?.selectRanges([location.pointer])
+      setEditing({ pointer: location.pointer })
+    }
+
+    window.addEventListener('keydown', handleFocusedBlockEditKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleFocusedBlockEditKey)
+    }
+  }, [activeSlide.id, doc.selection, doc.value, mode])
+
   function clearTransientState() {
     setEditing(null)
     setInteraction(null)
@@ -388,16 +430,22 @@ function App() {
     }
 
     const currentRect = getRect(location.block)
+    const textChanged = text !== location.block.text
+    const layoutChanged =
+      rect.x !== currentRect.x ||
+      rect.y !== currentRect.y ||
+      rect.width !== currentRect.width ||
+      (textChanged && rect.height !== currentRect.height)
     const patch = [
-      ...(text === location.block.text ? [] : setTextPatch(pointer, text)),
-      ...(rectEquals(rect, currentRect) ? [] : setLayoutPatch(pointer, rect)),
+      ...(textChanged ? setTextPatch(pointer, text) : []),
+      ...(layoutChanged ? setLayoutPatch(pointer, rect) : []),
     ]
 
     commitPatch(
       patch,
       pointer,
-      text === location.block.text ? 'resize text box' : 'edit text',
-      text === location.block.text ? undefined : `text:${blockTextPointer(pointer)}`,
+      textChanged ? 'edit text' : 'resize text box',
+      textChanged ? `text:${blockTextPointer(pointer)}` : undefined,
     )
   }
 
@@ -486,19 +534,6 @@ function App() {
       document.execCommand('copy')
     }
     setCopiedExportCode(exportCode)
-  }
-
-  function handleBlockKeyDown(
-    event: ReactKeyboardEvent<HTMLElement>,
-    pointer: Pointer,
-  ) {
-    if (mode !== 'text' || (event.key !== 'Enter' && event.key !== 'F2')) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-    startTextEdit(pointer)
   }
 
   return (
@@ -603,8 +638,7 @@ function App() {
                 const rect = getCurrentRect(pointer, block, draftLayout)
                 const selected = pointer === selectedPointer
                 const minimumHeight =
-                  findBlockLocation(SAMPLE_DECK, activeSlide.id, block.id)?.block
-                    .height ?? MIN_BLOCK_SIZE
+                  block.text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
                 const editingThisBlock =
                   mode === 'text' && editing?.pointer === pointer
                 const className = [
@@ -644,7 +678,6 @@ function App() {
                     onPointerDown={(event) =>
                       handleBlockPointerDown(event, pointer, block)
                     }
-                    onKeyDown={(event) => handleBlockKeyDown(event, pointer)}
                     minimumHeight={minimumHeight}
                     rect={rect}
                     selected={selected}
@@ -693,7 +726,6 @@ function SlideBlockElement({
   block,
   className,
   onClick,
-  onKeyDown,
   onPointerDown,
   minimumHeight,
   rect,
@@ -703,7 +735,6 @@ function SlideBlockElement({
   block: SlideBlock
   className: string
   onClick: () => void
-  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
   minimumHeight: number
   rect: Rect
@@ -722,7 +753,6 @@ function SlideBlockElement({
         event.stopPropagation()
         onClick()
       },
-      onKeyDown,
       onPointerDown,
       style: rectToAutoHeightStyle(rect, minimumHeight),
       tabIndex: 0,

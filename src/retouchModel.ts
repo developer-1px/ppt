@@ -11,6 +11,7 @@ export const SLIDE_WIDTH = 1280
 export const SLIDE_HEIGHT = 720
 export const GRID_SIZE = 8
 export const MIN_BLOCK_SIZE = 72
+export const EMPTY_TEXT_BOX_HEIGHT = 32
 
 export const BlockRoleSchema = z.enum([
   'title',
@@ -387,9 +388,14 @@ export function rectToStyle(rect: Rect) {
 
 export function rectToAutoHeightStyle(rect: Rect, minimumHeight: number) {
   return {
-    ...rectToStyle(rect),
+    left: `${(rect.x / SLIDE_WIDTH) * 100}%`,
+    top: `${(rect.y / SLIDE_HEIGHT) * 100}%`,
+    width: `${(rect.width / SLIDE_WIDTH) * 100}%`,
     height: 'auto',
-    minHeight: `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`,
+    minHeight:
+      minimumHeight > 0
+        ? `${(minimumHeight / SLIDE_HEIGHT) * 100}%`
+        : undefined,
   }
 }
 
@@ -478,8 +484,10 @@ export function exportRetouchDeck(deck: RetouchDeck) {
             `left:${block.x}px`,
             `top:${block.y}px`,
             `width:${block.width}px`,
-            `min-height:${Math.max(block.height, MIN_BLOCK_SIZE)}px`,
-          ].join(';')
+            block.text.length === 0 ? `min-height:${EMPTY_TEXT_BOX_HEIGHT}px` : '',
+          ]
+            .filter(Boolean)
+            .join(';')
 
           return `    <${block.tag} data-block="${block.id}" data-role="${block.role}" class="${block.className}" style="${style}">${text}</${block.tag}>`
         })

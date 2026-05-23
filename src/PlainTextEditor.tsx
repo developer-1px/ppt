@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import {
-  MIN_BLOCK_SIZE,
+  EMPTY_TEXT_BOX_HEIGHT,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   type Rect,
@@ -50,9 +50,15 @@ export function PlainTextEditor({
   }, [])
 
   const syncAutoHeight = useCallback((editor: HTMLElement) => {
-    const nextRect = autoHeightRect(editor, rectRef.current, minimumHeight)
+    const effectiveMinimumHeight =
+      editor.textContent?.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : minimumHeight
+    const nextRect = autoHeightRect(
+      editor,
+      rectRef.current,
+      effectiveMinimumHeight,
+    )
     rectRef.current = nextRect
-    applyEditorStyle(editor, nextRect, minimumHeight)
+    applyEditorStyle(editor, nextRect, effectiveMinimumHeight)
 
     return nextRect
   }, [minimumHeight])
@@ -127,7 +133,8 @@ function applyEditorStyle(
   editor.style.top = `${(rect.y / SLIDE_HEIGHT) * 100}%`
   editor.style.width = `${(rect.width / SLIDE_WIDTH) * 100}%`
   editor.style.height = 'auto'
-  editor.style.minHeight = `${(Math.max(minimumHeight, MIN_BLOCK_SIZE) / SLIDE_HEIGHT) * 100}%`
+  editor.style.minHeight =
+    minimumHeight > 0 ? `${(minimumHeight / SLIDE_HEIGHT) * 100}%` : ''
 }
 
 function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): Rect {
@@ -139,7 +146,7 @@ function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): 
 
   const slideUnitsPerCssPixel = rect.width / mountBox.width
   const contentHeight = mountBox.height * slideUnitsPerCssPixel
-  const height = Math.max(minimumHeight, MIN_BLOCK_SIZE, Math.ceil(contentHeight))
+  const height = Math.max(minimumHeight, Math.ceil(contentHeight))
   const y = Math.min(rect.y, Math.max(0, SLIDE_HEIGHT - height))
 
   return rect.height === height && rect.y === y ? rect : { ...rect, y, height }

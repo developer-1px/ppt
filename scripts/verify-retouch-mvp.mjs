@@ -282,6 +282,7 @@ async function runTextScenario(page) {
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
   const titleEditorText = await textRangeMetrics(page, '.plain-text-editor')
+  const titleEditorBox = await editorMetrics(page)
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
     editorCount: document.querySelectorAll('.plain-text-editor').length,
@@ -295,6 +296,7 @@ async function runTextScenario(page) {
   }))()`)
   check('Text Mode replaces original block with one plaintext editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1 && editingTitle.contentEditable === 'plaintext-only', editingTitle)
   check('Text Mode does not show markdown editor chrome', !editingTitle.hasMarkdownChrome, editingTitle)
+  check('Text Mode non-empty editor does not inherit source min-height', titleEditorBox.minHeight === '0px', titleEditorBox)
   check(
     'Text Mode editor keeps preview text position',
     Math.abs(titleEditorText.textTop - titlePreviewText.textTop) < 1 &&
@@ -308,6 +310,8 @@ async function runTextScenario(page) {
   const titleCommitted = await blockState(page, 's1-title')
   check('title text commit works', titleCommitted.text === `${titleBefore.text} Approved`, titleCommitted)
   check('plain Enter commits text edit', !titleCommitted.editorOpen, titleCommitted)
+  const titleChromeAfterCommit = await blockChrome(page, 's1-title')
+  check('Text Mode returns to clean preview after commit', titleChromeAfterCommit.outlineStyle === 'none', titleChromeAfterCommit)
   check('text commit enables undo', titleCommitted.undoDisabled === false, titleCommitted)
 
   await clickToolbar(page, 'Undo')
@@ -579,6 +583,19 @@ async function blockState(page, blockId) {
       undoDisabled: undo?.disabled ?? null,
       redoDisabled: redo?.disabled ?? null,
       resetDisabled: reset?.disabled ?? null,
+    }
+  })()`)
+}
+
+async function blockChrome(page, blockId) {
+  return page.eval(`(() => {
+    const block = document.querySelector('[data-block="${blockId}"]')
+    const style = getComputedStyle(block)
+
+    return {
+      outlineColor: style.outlineColor,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
     }
   })()`)
 }
