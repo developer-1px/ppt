@@ -438,6 +438,14 @@ async function runTextScenario(page) {
       Math.abs(titleEditorText.textHeight - titlePreviewText.textHeight) < 1,
     { before: titlePreviewText, after: titleEditorText },
   )
+  check(
+    'Text Mode edit surface hugs visible text',
+    Math.abs(titleEditorText.boxLeft - titleEditorText.textLeft) < 1 &&
+      Math.abs(titleEditorText.boxTop - titleEditorText.textTop) < 1 &&
+      Math.abs(titleEditorText.boxWidth - titleEditorText.textWidth) < 1 &&
+      Math.abs(titleEditorText.boxHeight - titleEditorText.textHeight) < 1,
+    titleEditorText,
+  )
 
   await pressEditorEnter(page)
   const titleLineBreakEdit = await page.eval(`(() => ({

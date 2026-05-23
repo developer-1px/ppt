@@ -86,6 +86,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
   - Fix: Text Mode hover/focus도 일반 텍스트 block outline을 그리지 않는다.
   - Fix: padding/border가 있는 block도 박스 전체가 아니라 내부 text surface에만 `contenteditable`을 붙인다.
+  - Fix: 편집 중 `.slide-block-text`를 `inline-block`으로 줄여 centered text에서도 편집 surface가 실제 글자 폭을 감싸게 했다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
 
 - P1: 직접 텍스트 편집에서 줄바꿈이 숨겨짐
@@ -97,6 +98,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P1: Layout click selection / resize race
   - Fix: Layout Mode에서 block click도 selection으로 처리한다. verifier는 selected block 확인 후 resize한다.
+  - Fix: stage background click은 block/selection/resize handle에서 올라온 click을 무시해 선택이 순간 해제되지 않게 했다.
 
 - P1: Arrange 선택이 Text Mode에서 숨은 Reset 대상이 될 수 있음
   - Fix: Arrange에서 Text Mode로 전환하면 선택을 비워 Reset 대상이 숨은 block이 아니라 deck이 되게 한다.
@@ -180,6 +182,7 @@ Covered checks:
 - no double text rendering
 - live editor text and committed preview text parity without boxed editor chrome
 - compact viewport edit entry without preview/editor visual gap
+- text edit surface hugs visible text instead of the full layout box
 - preview/editor text range stays inside its box
 - toolbar Undo/Redo around live text edits
 - keyboard Undo inside live text edit

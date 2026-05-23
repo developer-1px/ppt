@@ -993,9 +993,16 @@ function App() {
 
         <div
           className="stage-shell"
-          onClick={() => {
+          onClick={(event) => {
             if (suppressStageClickRef.current) {
               suppressStageClickRef.current = false
+              return
+            }
+
+            const target =
+              event.target instanceof HTMLElement ? event.target : null
+
+            if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
               return
             }
 

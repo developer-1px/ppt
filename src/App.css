@@ -267,9 +267,20 @@ button {
 }
 
 .slide-block.is-editing .slide-block-text {
+  display: inline-block;
+  width: auto;
+  min-width: 1px;
+  max-width: 100%;
   cursor: text;
   outline: 0;
   user-select: text;
+  vertical-align: top;
+}
+
+.slide-block.is-editing[data-empty='true'] .slide-block-text {
+  display: block;
+  width: 100%;
+  max-width: 100%;
 }
 
 .slide-block.is-editing:focus {
