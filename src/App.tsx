@@ -13,6 +13,7 @@ import { useJSONDocument } from 'zod-crud/react'
 import { NanoTextEditor } from './NanoTextEditor'
 import {
   RESIZE_HANDLES,
+  MIN_BLOCK_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
   SLIDE_HEIGHT,
@@ -84,6 +85,8 @@ function App() {
     selection: { mode: 'extended' },
   })
   const slideRef = useRef<HTMLDivElement | null>(null)
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const exportTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const [mode, setMode] = useState<Mode>('text')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
@@ -95,6 +98,7 @@ function App() {
     y: null,
   })
   const [exportOpen, setExportOpen] = useState(false)
+  const [copiedExportCode, setCopiedExportCode] = useState<string | null>(null)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
@@ -112,6 +116,7 @@ function App() {
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
       : null
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
+  const exportCopied = exportOpen && copiedExportCode === exportCode
   const baseSelectedLocation =
     selectedBlock === null
       ? null
@@ -284,6 +289,7 @@ function App() {
   function selectSlide(slideId: string) {
     setActiveSlideId(slideId)
     doc.selection?.empty()
+    stageRef.current?.scrollTo({ left: 0, top: 0 })
     clearTransientState()
   }
 
@@ -397,6 +403,7 @@ function App() {
 
   function resetSelectedLayout() {
     if (
+      mode !== 'layout' ||
       !selectedPointer ||
       !selectedBlock ||
       !baseSelectedLocation ||
@@ -410,6 +417,16 @@ function App() {
       selectedPointer,
       'reset layout',
     )
+  }
+
+  async function copyExportCode() {
+    try {
+      await navigator.clipboard.writeText(exportCode)
+    } catch {
+      exportTextareaRef.current?.select()
+      document.execCommand('copy')
+    }
+    setCopiedExportCode(exportCode)
   }
 
   return (
@@ -469,7 +486,7 @@ function App() {
               Redo
             </button>
             <button
-              disabled={!canResetSelected}
+              disabled={mode !== 'layout' || !canResetSelected}
               onClick={resetSelectedLayout}
               type="button"
             >
@@ -492,6 +509,7 @@ function App() {
               doc.selection?.empty()
             }
           }}
+          ref={stageRef}
         >
           <div className="slide-frame">
             <div
@@ -520,7 +538,10 @@ function App() {
                     <NanoTextEditor
                       block={block}
                       key={`${block.id}:editor`}
-                      minimumHeight={getRect(block).height}
+                      minimumHeight={
+                        findBlockLocation(SAMPLE_DECK, activeSlide.id, block.id)
+                          ?.block.height ?? MIN_BLOCK_SIZE
+                      }
                       onCancel={cancelTextEdit}
                       onCommit={(text, rect) => commitTextEdit(pointer, text, rect)}
                       onRectChange={(rect) => resizeTextBox(pointer, rect)}
@@ -534,7 +555,13 @@ function App() {
                     block={block}
                     className={className}
                     key={block.id}
-                    onClick={() => startTextEdit(pointer)}
+                    onClick={() => {
+                      if (mode === 'layout') {
+                        selectBlock(pointer)
+                      } else {
+                        startTextEdit(pointer)
+                      }
+                    }}
                     onPointerDown={(event) =>
                       handleBlockPointerDown(event, pointer, block)
                     }
@@ -570,7 +597,17 @@ function App() {
 
         {exportOpen ? (
           <section className="export-panel" aria-label="Export">
-            <textarea readOnly spellCheck={false} value={exportCode} />
+            <div className="export-actions">
+              <button onClick={copyExportCode} type="button">
+                {exportCopied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <textarea
+              readOnly
+              ref={exportTextareaRef}
+              spellCheck={false}
+              value={exportCode}
+            />
           </section>
         ) : null}
       </section>

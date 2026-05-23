@@ -1,9 +1,9 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import {
   createNanoDocument,
@@ -16,6 +16,7 @@ import {
 } from 'nano-edit'
 import {
   MIN_BLOCK_SIZE,
+  SLIDE_HEIGHT,
   rectToStyle,
   type Rect,
   type SlideBlock,
@@ -41,6 +42,8 @@ export function NanoTextEditor({
   const mountRef = useRef<HTMLDivElement | null>(null)
   const engineRef = useRef<NanoDocumentEngine | null>(null)
   const rectRef = useRef(rect)
+  const onCancelRef = useRef(onCancel)
+  const onCommitRef = useRef(onCommit)
   const onRectChangeRef = useRef(onRectChange)
   const initialDocument = useMemo(
     () => nanoDocumentFromText(block.id, block.text),
@@ -52,8 +55,60 @@ export function NanoTextEditor({
   }, [rect])
 
   useEffect(() => {
+    onCancelRef.current = onCancel
+  }, [onCancel])
+
+  useEffect(() => {
+    onCommitRef.current = onCommit
+  }, [onCommit])
+
+  useEffect(() => {
     onRectChangeRef.current = onRectChange
   }, [onRectChange])
+
+  const commit = useCallback(() => {
+    const engine = engineRef.current
+
+    onCommitRef.current(
+      engine ? textFromNanoDocument(engine.value) : block.text,
+      rectRef.current,
+    )
+  }, [block.text])
+
+  const handleEditorKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        onCancelRef.current()
+        return
+      }
+
+      if (
+        event.key === 'Enter' &&
+        (event.metaKey || event.ctrlKey || !event.shiftKey)
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        commit()
+      }
+    },
+    [commit],
+  )
+
+  useEffect(() => {
+    const mount = mountRef.current
+
+    if (!mount) {
+      return
+    }
+
+    mount.addEventListener('keydown', handleEditorKeyDown, true)
+
+    return () => {
+      mount.removeEventListener('keydown', handleEditorKeyDown, true)
+    }
+  }, [handleEditorKeyDown])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -106,32 +161,6 @@ export function NanoTextEditor({
     }
   }, [block.text.length, initialDocument, minimumHeight])
 
-  function commit() {
-    const engine = engineRef.current
-
-    if (!engine) {
-      onCommit(block.text, rectRef.current)
-      return
-    }
-
-    onCommit(textFromNanoDocument(engine.value), rectRef.current)
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      onCancel()
-      return
-    }
-
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault()
-      event.stopPropagation()
-      commit()
-    }
-  }
-
   return (
     <div
       className={`nano-text-editor ${block.className}`}
@@ -140,7 +169,6 @@ export function NanoTextEditor({
           commit()
         }
       }}
-      onKeyDownCapture={handleKeyDown}
       onPointerDown={(event) => event.stopPropagation()}
       ref={mountRef}
       style={rectToStyle(rect) as CSSProperties}
@@ -188,8 +216,9 @@ function autoHeightRect(mount: HTMLElement, rect: Rect, minimumHeight: number): 
   const slideUnitsPerCssPixel = rect.width / mountBox.width
   const contentHeight = (editorBox.height + verticalChrome) * slideUnitsPerCssPixel
   const height = Math.max(minimumHeight, MIN_BLOCK_SIZE, Math.ceil(contentHeight))
+  const y = Math.min(rect.y, Math.max(0, SLIDE_HEIGHT - height))
 
-  return rect.height === height ? rect : { ...rect, height }
+  return rect.height === height && rect.y === y ? rect : { ...rect, y, height }
 }
 
 function readPixels(value: string) {

@@ -229,6 +229,11 @@ button {
   cursor: grab;
 }
 
+.retouch-app[data-mode='layout'] .slide-block:hover {
+  outline: 1px solid #2563eb;
+  outline-offset: 3px;
+}
+
 .retouch-app[data-mode='layout'] .slide-block:active {
   cursor: grabbing;
 }
@@ -559,6 +564,24 @@ button {
   min-height: 156px;
   border-top: 1px solid #d7dbe3;
   background: #ffffff;
+}
+
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 10px;
+  border-bottom: 1px solid #d7dbe3;
+}
+
+.export-actions button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font: 600 13px/1 var(--sans);
+  cursor: pointer;
 }
 
 .export-panel textarea {
