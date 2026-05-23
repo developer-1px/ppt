@@ -93,7 +93,7 @@ type SnapGuides = {
 }
 
 const DRAG_THRESHOLD = 8
-const STORAGE_KEY = 'ppt-retouch:v2:deck'
+const STORAGE_KEY = 'ppt-retouch:v3:deck'
 const STORAGE_VERSION = 1
 const CARET_PLACEHOLDER = '\u200B'
 

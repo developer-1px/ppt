@@ -223,7 +223,7 @@ async function runFirstScreenScenario(page) {
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
     canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
-    hasStoredDeck: localStorage.getItem('ppt-retouch:v2:deck') !== null,
+    hasStoredDeck: localStorage.getItem('ppt-retouch:v3:deck') !== null,
     hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
   }))()`)
 
@@ -1561,7 +1561,7 @@ async function runPersistenceScenario(page) {
   const afterReload = await blockState(page, 's1-title')
   const changedThumbAfterReload = await slideThumbState(page, 'Overview')
   const stored = await page.eval(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v2:deck')
+    const raw = localStorage.getItem('ppt-retouch:v3:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return {
@@ -1616,7 +1616,7 @@ async function runPersistenceScenario(page) {
   await page.waitFor(`document.querySelector('button[data-action="reset"]')?.disabled === true`)
   await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
   await page.waitFor(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v2:deck')
+    const raw = localStorage.getItem('ppt-retouch:v3:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return parsed?.deck?.slides?.[0]?.blocks?.find((block) => block.id === 's1-title')
@@ -1626,7 +1626,7 @@ async function runPersistenceScenario(page) {
   const noteAfterTextReset = await blockState(page, 's1-note')
   const resetThumbState = await slideThumbState(page, 'Overview')
   const resetStorage = await page.eval(`(() => {
-    const raw = localStorage.getItem('ppt-retouch:v2:deck')
+    const raw = localStorage.getItem('ppt-retouch:v3:deck')
     const parsed = raw ? JSON.parse(raw) : null
 
     return {
@@ -1731,7 +1731,7 @@ async function runPersistenceScenario(page) {
   const deckResetState = await blockState(page, 's1-title')
   const noteAfterDeckReset = await blockState(page, 's1-note')
   const deckResetThumbState = await slideThumbState(page, 'Overview')
-  const deckResetStorage = await page.eval(`localStorage.getItem('ppt-retouch:v2:deck')`)
+  const deckResetStorage = await page.eval(`localStorage.getItem('ppt-retouch:v3:deck')`)
   check(
     'Text Mode deck reset restores all slide changes after selection is cleared',
     deckResetState.text === 'PPT Retouch' &&
