@@ -1021,13 +1021,33 @@ function SlideBlockElement({
 
     const effectiveMinimumHeight =
       text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : minimumHeight
+    pendingTrailingLineBreakRef.current = null
     element.textContent = text
     rectRef.current = rect
     applyAutoHeightStyle(element, rect, effectiveMinimumHeight)
   }
 
+  function undoDraft() {
+    resetDraft()
+
+    if (elementRef.current) {
+      placeCaretAtEnd(elementRef.current)
+    }
+  }
+
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.nativeEvent.isComposing) {
+      return
+    }
+
+    if (
+      isHistoryShortcut(event.nativeEvent) &&
+      event.key.toLowerCase() === 'z' &&
+      !event.shiftKey
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      undoDraft()
       return
     }
 

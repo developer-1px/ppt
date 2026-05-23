@@ -670,6 +670,50 @@ async function runTextScenario(page) {
   const noteAfterCancel = await blockState(page, 's1-note')
   check('Escape cancels text draft', noteAfterCancel.text === noteBeforeCancel, noteAfterCancel)
 
+  await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
+  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await typeEditorText(page, ' Mistyped')
+  await pressHistoryShortcut(page, 'z')
+  const noteAfterLiveUndo = await page.eval(`(() => {
+    const editor = document.querySelector('[data-editing=\"true\"]')
+
+    return {
+      editorOpen: !!editor,
+      text: editor?.textContent ?? '',
+    }
+  })()`)
+  check(
+    'Text Mode keyboard undo reverts live text draft',
+    noteAfterLiveUndo.editorOpen && noteAfterLiveUndo.text === noteBeforeCancel,
+    noteAfterLiveUndo,
+  )
+  await cancelTextEditor(page)
+
+  const subtitleBeforeTextDrag = await blockState(page, 's1-subtitle')
+  const textModeResizeHandles = await page.eval(
+    "document.querySelectorAll('.resize-handle').length",
+  )
+  await dragBlock(page, 's1-subtitle', 48, 24)
+  const subtitleAfterTextDrag = await blockState(page, 's1-subtitle')
+  const editorAfterTextDrag = await page.eval(
+    "!!document.querySelector('[data-editing=\"true\"]')",
+  )
+  check(
+    'Text Mode drag attempt does not change layout',
+    textModeResizeHandles === 0 &&
+      !rectChanged(subtitleBeforeTextDrag, subtitleAfterTextDrag) &&
+      subtitleAfterTextDrag.text === subtitleBeforeTextDrag.text,
+    {
+      before: subtitleBeforeTextDrag,
+      after: subtitleAfterTextDrag,
+      editorOpen: editorAfterTextDrag,
+      resizeHandles: textModeResizeHandles,
+    },
+  )
+  if (editorAfterTextDrag) {
+    await cancelTextEditor(page)
+  }
+
   await clickSlide(page, 'Decision')
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
@@ -1345,7 +1389,8 @@ async function clickToolbar(page, label) {
 
 async function clickSlide(page, label) {
   await page.eval(`Array.from(document.querySelectorAll('.slide-thumb')).find((button) => button.textContent?.includes('${label}'))?.click()`)
-  await delay(150)
+  await page.waitFor(`document.querySelector('.slide-thumb[aria-current="page"]')?.textContent?.includes('${label}')`)
+  await delay(100)
 }
 
 async function slideThumbState(page, label) {
