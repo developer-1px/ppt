@@ -226,14 +226,14 @@ button {
 .slide-block.is-editing {
   z-index: 8;
   outline: 2px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 0;
   cursor: text;
   user-select: text;
 }
 
 .slide-block.is-editing:focus {
   outline: 2px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 0;
 }
 
 .retouch-app[data-mode='text'] .slide-block {
@@ -242,17 +242,17 @@ button {
 
 .retouch-app[data-mode='text'] .slide-block:hover {
   outline: 1px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 0;
 }
 
 .retouch-app[data-mode='text'] .slide-block:focus-visible {
   outline: 1px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 0;
 }
 
 .retouch-app[data-mode='text'] .slide-block[data-empty='true'] {
   outline: 1px dashed #94a3b8;
-  outline-offset: 3px;
+  outline-offset: 0;
 }
 
 .retouch-app[data-mode='layout'] .slide-block {
@@ -261,7 +261,15 @@ button {
 
 .retouch-app[data-mode='layout'] .slide-block:hover {
   outline: 1px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 0;
+}
+
+.retouch-app[data-mode='text'] .slide-block.is-editing,
+.retouch-app[data-mode='text'] .slide-block.is-editing:hover,
+.retouch-app[data-mode='text'] .slide-block.is-editing:focus,
+.retouch-app[data-mode='text'] .slide-block.is-editing:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 0;
 }
 
 .retouch-app[data-mode='layout'] .slide-block:active {

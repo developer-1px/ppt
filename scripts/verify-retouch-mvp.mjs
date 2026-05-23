@@ -232,11 +232,21 @@ async function runEditSurfaceParityScenario(page) {
       await page.eval(`document.querySelector('[data-block="${blockId}"]').click()`)
       await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
       const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
+      const editorChrome = await page.eval(`(() => {
+        const style = getComputedStyle(document.querySelector('[data-editing=\"true\"]'))
+
+        return {
+          outlineOffset: style.outlineOffset,
+          outlineWidth: style.outlineWidth,
+        }
+      })()`)
 
       deltas.push({
         blockId,
         slideName,
         boxHeightDelta: editor.boxHeight - preview.boxHeight,
+        outlineOffset: editorChrome.outlineOffset,
+        outlineWidth: editorChrome.outlineWidth,
         textHeightDelta: editor.textHeight - preview.textHeight,
         textLeftDelta: editor.textLeft - preview.textLeft,
         textTopDelta: editor.textTop - preview.textTop,
@@ -253,6 +263,8 @@ async function runEditSurfaceParityScenario(page) {
     deltas.every(
       (delta) =>
         Math.abs(delta.boxHeightDelta) < 1 &&
+        delta.outlineOffset === '0px' &&
+        delta.outlineWidth === '2px' &&
         Math.abs(delta.textHeightDelta) < 1 &&
         Math.abs(delta.textLeftDelta) < 1 &&
         Math.abs(delta.textTopDelta) < 1,
@@ -547,6 +559,7 @@ async function runExportScenario(page) {
   const exportState = await page.eval(`(() => {
     const value = document.querySelector('.export-buffer')?.value ?? ''
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
     const parsed = new DOMParser().parseFromString(value, 'text/html')
     return {
       hasEditedTitle: value.includes(${JSON.stringify(expectedTitle)}),
@@ -568,6 +581,7 @@ async function runExportScenario(page) {
         value.includes('plain-text-editor') ||
         value.includes('resize-handle'),
       hasCopyAction: !!copyButton,
+      hasDownloadAction: !!downloadButton,
       hasVisibleRawCodePanel: !!document.querySelector('.export-panel'),
     }
   })()`)
@@ -575,6 +589,7 @@ async function runExportScenario(page) {
   check('export is a standalone HTML document', exportState.isCompleteDocument && exportState.parsedEditedTitle === expectedTitle, exportState)
   check('export includes print-ready slide CSS', exportState.hasPresentationPrintCss, exportState)
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
+  check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
 
   await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
@@ -590,6 +605,37 @@ async function runExportScenario(page) {
     }
   })()`)
   check('copy action switches to copied state', copiedState.copyState === 'copied' && copiedState.title === 'Copied', copiedState)
+
+  await page.eval(`(() => {
+    window.__pptRetouchDownload = null
+    const originalClick = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = function patchedClick() {
+      window.__pptRetouchDownload = {
+        download: this.download,
+        href: this.href,
+      }
+      HTMLAnchorElement.prototype.click = originalClick
+    }
+  })()`)
+  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
+  await page.waitFor(`document.querySelector('button[aria-label="Download HTML"]')?.getAttribute('aria-pressed') === 'true'`)
+  const downloadState = await page.eval(`(() => {
+    const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
+
+    return {
+      downloadState: downloadButton?.dataset.downloadState,
+      title: downloadButton?.getAttribute('title'),
+      download: window.__pptRetouchDownload ?? null,
+    }
+  })()`)
+  check(
+    'download action emits an HTML file',
+    downloadState.downloadState === 'downloaded' &&
+      downloadState.title === 'Downloaded' &&
+      downloadState.download?.download === 'retouched-slides.html' &&
+      downloadState.download?.href?.startsWith('blob:'),
+    downloadState,
+  )
 }
 
 async function runPersistenceScenario(page) {

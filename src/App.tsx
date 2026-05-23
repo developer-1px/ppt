@@ -12,7 +12,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { Check, Code2, Redo2, RotateCcw, Undo2 } from 'lucide-react'
+import { Check, Code2, Download, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
@@ -108,6 +108,7 @@ function App() {
     y: null,
   })
   const [copiedExportCode, setCopiedExportCode] = useState<string | null>(null)
+  const [downloadedExportCode, setDownloadedExportCode] = useState<string | null>(null)
   const [visualSelectionRect, setVisualSelectionRect] = useState<Rect | null>(null)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
@@ -127,6 +128,7 @@ function App() {
       : null
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
   const exportCopied = copiedExportCode === exportCode
+  const exportDownloaded = downloadedExportCode === exportCode
   const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
   const baseSelectedLocation =
     selectedBlock === null
@@ -548,6 +550,7 @@ function App() {
     doc.selection?.empty()
     setActiveSlideId(SAMPLE_SLIDES[0].id)
     setCopiedExportCode(null)
+    setDownloadedExportCode(null)
     stageRef.current?.scrollTo({ left: 0, top: 0 })
     doc.reset(SAMPLE_DECK)
   }
@@ -569,6 +572,22 @@ function App() {
       document.execCommand('copy')
     }
     setCopiedExportCode(exportCode)
+  }
+
+  function downloadExportCode() {
+    const url = URL.createObjectURL(
+      new Blob([exportCode], { type: 'text/html;charset=utf-8' }),
+    )
+    const anchor = document.createElement('a')
+
+    anchor.href = url
+    anchor.download = 'retouched-slides.html'
+    anchor.rel = 'noopener'
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    setDownloadedExportCode(exportCode)
   }
 
   return (
@@ -652,6 +671,20 @@ function App() {
                 <Check aria-hidden="true" size={16} strokeWidth={2.4} />
               ) : (
                 <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
+              )}
+            </button>
+            <button
+              aria-label="Download HTML"
+              aria-pressed={exportDownloaded}
+              data-download-state={exportDownloaded ? 'downloaded' : 'idle'}
+              onClick={downloadExportCode}
+              title={exportDownloaded ? 'Downloaded' : 'Download HTML'}
+              type="button"
+            >
+              {exportDownloaded ? (
+                <Check aria-hidden="true" size={16} strokeWidth={2.4} />
+              ) : (
+                <Download aria-hidden="true" size={16} strokeWidth={2.2} />
               )}
             </button>
           </div>
