@@ -216,9 +216,11 @@ async function runFirstScreenScenario(page) {
 
 async function runTextScenario(page) {
   const titleBefore = await blockState(page, 's1-title')
+  const titlePreviewText = await textRangeMetrics(page, '[data-block="s1-title"]')
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('.plain-text-editor[contenteditable]')")
+  const titleEditorText = await textRangeMetrics(page, '.plain-text-editor')
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
     editorCount: document.querySelectorAll('.plain-text-editor').length,
@@ -232,6 +234,13 @@ async function runTextScenario(page) {
   }))()`)
   check('Text Mode replaces original block with one plaintext editor', editingTitle.originalBlockCount === 0 && editingTitle.editorCount === 1 && editingTitle.contentEditable === 'plaintext-only', editingTitle)
   check('Text Mode does not show markdown editor chrome', !editingTitle.hasMarkdownChrome, editingTitle)
+  check(
+    'Text Mode editor keeps preview text position',
+    Math.abs(titleEditorText.textTop - titlePreviewText.textTop) < 1 &&
+      Math.abs(titleEditorText.textLeft - titlePreviewText.textLeft) < 1 &&
+      Math.abs(titleEditorText.textHeight - titlePreviewText.textHeight) < 1,
+    { before: titlePreviewText, after: titleEditorText },
+  )
 
   await page.send('Input.insertText', { text: ' Approved' })
   await commitTextEditor(page)
@@ -467,6 +476,27 @@ async function blockFitsSlide(page, blockId) {
 
 async function editorHeight(page) {
   return page.eval("document.querySelector('.plain-text-editor')?.getBoundingClientRect().height ?? 0")
+}
+
+async function textRangeMetrics(page, selector) {
+  return page.eval(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)})
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const textRect = range.getBoundingClientRect()
+    const boxRect = element.getBoundingClientRect()
+
+    return {
+      boxTop: boxRect.top,
+      boxLeft: boxRect.left,
+      boxWidth: boxRect.width,
+      boxHeight: boxRect.height,
+      textTop: textRect.top,
+      textLeft: textRect.left,
+      textWidth: textRect.width,
+      textHeight: textRect.height,
+    }
+  })()`)
 }
 
 async function editorMetrics(page) {

@@ -472,18 +472,12 @@ button {
   resize: none;
   outline: 2px solid #2563eb;
   outline-offset: 3px;
-  border: 0;
   white-space: pre-wrap;
 }
 
 .plain-text-editor {
   display: block;
-  align-items: normal;
-  justify-content: normal;
   overflow: visible;
-  background: transparent;
-  color: inherit;
-  font: inherit;
 }
 
 .plain-text-editor:focus {
