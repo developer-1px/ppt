@@ -893,9 +893,10 @@ function App() {
         <div
           className="stage-shell"
           onClick={() => {
-            if (mode === 'layout') {
-              doc.selection?.empty()
+            if (mode === 'text') {
+              commitActiveTextEdit()
             }
+            doc.selection?.empty()
           }}
           ref={stageRef}
         >

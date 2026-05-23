@@ -1223,6 +1223,44 @@ async function runPersistenceScenario(page) {
       redoResetThumbState.changed === 'true',
     { state: redoResetState, thumb: redoResetThumbState },
   )
+
+  await clickStageBackground(page)
+  const deckResetReady = await page.eval(`(() => {
+    const reset = document.querySelector('button[aria-label="Reset"]')
+
+    return {
+      resetDisabled: reset?.disabled ?? null,
+      resetTitle: reset?.getAttribute('title'),
+      selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+  check(
+    'Text Mode empty stage click exposes deck reset',
+    deckResetReady.resetDisabled === false &&
+      deckResetReady.resetTitle === 'Reset deck' &&
+      deckResetReady.selectedBlocks === 0,
+    deckResetReady,
+  )
+
+  await clickToolbar(page, 'Reset')
+  await page.waitFor(`document.querySelector('.slide-thumb[aria-current="page"]')?.dataset.changed === 'false'`)
+  const deckResetState = await blockState(page, 's1-title')
+  const noteAfterDeckReset = await blockState(page, 's1-note')
+  const deckResetThumbState = await slideThumbState(page, 'Overview')
+  check(
+    'Text Mode deck reset restores all slide changes after selection is cleared',
+    deckResetState.text === 'Retention Review' &&
+      deckResetState.resetDisabled === true &&
+      deckResetThumbState.changed === 'false' &&
+      !deckResetThumbState.hasChangeDot &&
+      rectChanged(noteBeforeTextReset, noteAfterDeckReset),
+    {
+      state: deckResetState,
+      thumb: deckResetThumbState,
+      noteBefore: noteBeforeTextReset,
+      noteAfter: noteAfterDeckReset,
+    },
+  )
 }
 
 async function runMobileScenario(cdpPort) {
@@ -1654,6 +1692,17 @@ async function setEditorText(page, text) {
 async function clickBlock(page, blockId) {
   const center = await blockCenter(page, blockId)
   await clickAt(page, center)
+}
+
+async function clickStageBackground(page) {
+  const point = await page.eval(`(() => {
+    const stage = document.querySelector('.stage-shell')
+    const rect = stage.getBoundingClientRect()
+
+    return { x: rect.left + 8, y: rect.top + 8 }
+  })()`)
+
+  await clickAt(page, point)
 }
 
 async function dragBlock(page, blockId, dx, dy) {

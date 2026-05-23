@@ -73,6 +73,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
   - Fix: Text Mode에서 block이 선택되어 있으면 Reset은 선택된 텍스트와 text-owned height만 원본으로 되돌린다.
   - Fix: 선택 텍스트 reset은 다른 layout/text 변경을 유지하고, Undo/Redo로 복구된다.
 
+- P0: Text Mode에서 전체 deck reset 접근 경로가 선택 상태에 가려짐
+  - Fix: 빈 stage를 클릭하면 Text Mode 선택이 해제되고, Reset이 전체 deck reset으로 바뀐다.
+
 - P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
@@ -159,6 +162,7 @@ Covered checks:
 - consecutive text block edits
 - live edit commit before slide/mode switch
 - selected text reset keeps other slide changes
+- empty stage click exposes deck reset
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
