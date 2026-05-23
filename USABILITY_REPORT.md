@@ -131,6 +131,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: Export style drift
   - Fix: export CSS에 preview block의 display, alignment, colors, padding, chart background를 반영했다.
   - Fix: slide 디자인 토큰을 `slideTheme.css`로 분리해 preview와 export가 같은 CSS 원천을 사용하게 했다.
+  - Fix: exported HTML을 실제 브라우저에 다시 렌더링해 현재 preview의 핵심 block geometry/text와 맞는지 검증한다.
 
 - P1: Export가 최종 HTML만 만들고 retouch patch 근거를 잃음
   - Fix: exported HTML에 `data-retouch-patch` JSON manifest를 함께 포함해 text/layout 수정 내역을 구조화했다.
@@ -204,6 +205,7 @@ Covered checks:
 - Export Copy failure clears after visible content changes
 - Export commits live text before Copy/Download
 - Export shared slide theme tokens
+- Export rendered HTML parity with current preview
 - Export structured retouch patch manifest
 - modified slide thumbnail state
 - clean deck does not leave autosave storage

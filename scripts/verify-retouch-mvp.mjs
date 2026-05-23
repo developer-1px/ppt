@@ -33,7 +33,7 @@ try {
   await runCompactEditSurfaceScenario(cdpPort)
   await runTextScenario(page)
   await runLayoutScenario(page)
-  await runExportScenario(page)
+  await runExportScenario(page, cdpPort)
   await runPersistenceScenario(page)
   await runMobileScenario(cdpPort)
 
@@ -988,7 +988,7 @@ async function runLayoutScenario(page) {
   )
 }
 
-async function runExportScenario(page) {
+async function runExportScenario(page, cdpPort) {
   await clickMode(page, 'Text')
   const titleBefore = await blockState(page, 's1-title')
   const expectedTitle = `${titleBefore.text} Export`
@@ -1066,6 +1066,7 @@ async function runExportScenario(page) {
         patch?.text?.find((entry) => entry.blockId === 's1-title')?.text ?? null,
       patchMovedNote:
         patch?.layout?.find((entry) => entry.blockId === 's1-note')?.rect ?? null,
+      html: value,
     }
   })()`)
   check('export reflects current text and layout state', exportState.hasEditedTitle && exportState.hasDataSlide && exportState.hasDataBlock && exportState.hasStyleCoordinates && !exportState.hasRawEditorChrome, exportState)
@@ -1086,6 +1087,31 @@ async function runExportScenario(page) {
   check('export has a clear copy action', exportState.hasCopyAction, exportState)
   check('export has a direct HTML download action', exportState.hasDownloadAction, exportState)
   check('export does not expose raw code panel by default', !exportState.hasVisibleRawCodePanel, exportState)
+
+  const previewExportMetrics = await exportedPreviewMetrics(page, [
+    's1-title',
+    's1-note',
+  ])
+  const exportedPage = await openExportedHtmlPage(cdpPort, exportState.html)
+  const renderedExportMetrics = await exportedPreviewMetrics(exportedPage, [
+    's1-title',
+    's1-note',
+  ])
+  check(
+    'exported HTML renders like the current preview',
+    renderedExportMetrics['s1-title']?.text === previewExportMetrics['s1-title']?.text &&
+      renderedExportMetrics['s1-note']?.text === previewExportMetrics['s1-note']?.text &&
+      exportedBlockMetricsMatch(
+        renderedExportMetrics['s1-title'],
+        previewExportMetrics['s1-title'],
+      ) &&
+      exportedBlockMetricsMatch(
+        renderedExportMetrics['s1-note'],
+        previewExportMetrics['s1-note'],
+      ),
+    { preview: previewExportMetrics, exported: renderedExportMetrics },
+  )
+  exportedPage.close()
 
   await page.eval(`navigator.clipboard.writeText = async (value) => {
     window.__pptRetouchCopiedHtml = value
@@ -1705,6 +1731,79 @@ async function inlineFits(page, selector) {
       fits: element.scrollWidth <= element.clientWidth + 1,
     }
   })()`)
+}
+
+async function openExportedHtmlPage(cdpPort, html) {
+  return openPage(
+    cdpPort,
+    `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    {
+      width: 1500,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    },
+  )
+}
+
+async function exportedPreviewMetrics(page, blockIds) {
+  return page.eval(`(() => {
+    const slide = document.querySelector('[data-slide="slide-1"]')
+    const slideRect = slide.getBoundingClientRect()
+    const ids = ${JSON.stringify(blockIds)}
+    const result = {}
+
+    for (const blockId of ids) {
+      const block = document.querySelector('[data-block="' + blockId + '"]')
+
+      if (!block) {
+        result[blockId] = null
+        continue
+      }
+
+      const textElement = block.querySelector('.slide-block-text') ?? block
+      const range = document.createRange()
+      range.selectNodeContents(textElement)
+      const blockRect = block.getBoundingClientRect()
+      const textRect = range.getBoundingClientRect()
+      const xScale = 1280 / slideRect.width
+      const yScale = 720 / slideRect.height
+
+      result[blockId] = {
+        text: block.textContent,
+        x: (blockRect.left - slideRect.left) * xScale,
+        y: (blockRect.top - slideRect.top) * yScale,
+        width: blockRect.width * xScale,
+        height: blockRect.height * yScale,
+        textX: (textRect.left - slideRect.left) * xScale,
+        textY: (textRect.top - slideRect.top) * yScale,
+        textWidth: textRect.width * xScale,
+        textHeight: textRect.height * yScale,
+      }
+    }
+
+    return result
+  })()`)
+}
+
+function exportedBlockMetricsMatch(exported, preview) {
+  if (!exported || !preview) {
+    return false
+  }
+
+  const blockTolerance = 2
+  const textTolerance = 8
+
+  return (
+    Math.abs(exported.x - preview.x) < blockTolerance &&
+    Math.abs(exported.y - preview.y) < blockTolerance &&
+    Math.abs(exported.width - preview.width) < blockTolerance &&
+    Math.abs(exported.height - preview.height) < blockTolerance &&
+    Math.abs(exported.textX - preview.textX) < textTolerance &&
+    Math.abs(exported.textY - preview.textY) < textTolerance &&
+    Math.abs(exported.textWidth - preview.textWidth) < textTolerance &&
+    Math.abs(exported.textHeight - preview.textHeight) < textTolerance
+  )
 }
 
 async function editorHeight(page) {
