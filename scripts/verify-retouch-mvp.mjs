@@ -204,6 +204,7 @@ async function runFirstScreenScenario(page) {
   const state = await page.eval(`(() => ({
     hasEditorShell: !!document.querySelector('.retouch-app'),
     slideCount: document.querySelectorAll('.slide-thumb').length,
+    changedSlideCount: document.querySelectorAll('.slide-thumb[data-changed="true"]').length,
     hasTextMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Text'),
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
     canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
@@ -213,6 +214,7 @@ async function runFirstScreenScenario(page) {
 
   check('first screen is retouch editor', state.hasEditorShell && state.hasMainSlideBlock, state)
   check('slide thumbnails are available', state.slideCount >= 3, state)
+  check('slide thumbnails start without modified marks', state.changedSlideCount === 0, state)
   check('mode toggle is available', state.hasTextMode && state.hasArrangeMode, state)
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
@@ -386,12 +388,23 @@ async function runTextScenario(page) {
     return editor && editor.getBoundingClientRect().height > ${editBefore.height + 10}
   })()`)
   const autoHeight = await editorMetrics(page)
+  const autoHeightText = await textRangeMetrics(page, '[data-editing="true"]')
   check('Text Mode autoheight grows box, not scroll/clip', autoHeight.height > editBefore.height + 10 && autoHeight.wrapperOverflowY === 'visible' && autoHeight.editorOverflowY === 'visible', autoHeight)
   check('Text Mode autoheight keeps content top stable while typing', Math.abs(autoHeight.top - editBefore.top) < 1 && Math.abs(autoHeight.textTop - editBefore.textTop) < 1, { before: editBefore, after: autoHeight })
 
   await commitTextEditor(page)
   const subtitleGrown = await blockState(page, 's1-subtitle')
+  const subtitleGrownText = await textRangeMetrics(page, '[data-block="s1-subtitle"]')
   check('autoheight persists after commit', subtitleGrown.height > subtitleBefore.height + 10, { before: subtitleBefore, after: subtitleGrown })
+  check(
+    'committed preview matches live editor text box',
+    Math.abs(subtitleGrownText.boxTop - autoHeightText.boxTop) < 1 &&
+      Math.abs(subtitleGrownText.boxHeight - autoHeightText.boxHeight) < 1 &&
+      Math.abs(subtitleGrownText.textTop - autoHeightText.textTop) < 1 &&
+      Math.abs(subtitleGrownText.textLeft - autoHeightText.textLeft) < 1 &&
+      Math.abs(subtitleGrownText.textHeight - autoHeightText.textHeight) < 1,
+    { editing: autoHeightText, committed: subtitleGrownText },
+  )
 
   await clickToolbar(page, 'Undo')
   await delay(150)
@@ -681,12 +694,14 @@ async function runExportScenario(page) {
 
 async function runPersistenceScenario(page) {
   const beforeReload = await blockState(page, 's1-title')
+  const changedThumbBeforeReload = await slideThumbState(page, 'Overview')
   await page.send('Page.reload', { ignoreCache: true })
   await delay(300)
   await page.waitFor(
     "document.readyState === 'complete' && !!document.querySelector('[data-block=\"s1-title\"]')",
   )
   const afterReload = await blockState(page, 's1-title')
+  const changedThumbAfterReload = await slideThumbState(page, 'Overview')
   const stored = await page.eval(`(() => {
     const raw = localStorage.getItem('ppt-retouch:v1:deck')
     const parsed = raw ? JSON.parse(raw) : null
@@ -706,6 +721,14 @@ async function runPersistenceScenario(page) {
     { beforeReload, afterReload, stored },
   )
   check('autosave stores a versioned deck', stored.version === 1 && stored.hasStoredDeck, stored)
+  check(
+    'slide thumbnails mark edited slides',
+    changedThumbBeforeReload.changed === 'true' &&
+      changedThumbAfterReload.changed === 'true' &&
+      changedThumbAfterReload.ariaLabel.includes('modified') &&
+      changedThumbAfterReload.hasChangeDot,
+    { beforeReload: changedThumbBeforeReload, afterReload: changedThumbAfterReload },
+  )
 
   await clickToolbar(page, 'Reset')
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
@@ -718,6 +741,7 @@ async function runPersistenceScenario(page) {
       ?.text === 'Retention Review'
   })()`)
   const resetState = await blockState(page, 's1-title')
+  const resetThumbState = await slideThumbState(page, 'Overview')
   const resetStorage = await page.eval(`(() => {
     const raw = localStorage.getItem('ppt-retouch:v1:deck')
     const parsed = raw ? JSON.parse(raw) : null
@@ -738,6 +762,11 @@ async function runPersistenceScenario(page) {
     resetState,
   )
   check('Text Mode reset updates autosave', resetStorage.title === 'Retention Review' && resetStorage.version === 1, resetStorage)
+  check(
+    'reset clears slide thumbnail modified state',
+    resetThumbState.changed === 'false' && !resetThumbState.hasChangeDot,
+    resetThumbState,
+  )
 }
 
 async function runMobileScenario(cdpPort) {
@@ -940,6 +969,19 @@ async function clickToolbar(page, label) {
 async function clickSlide(page, label) {
   await page.eval(`Array.from(document.querySelectorAll('.slide-thumb')).find((button) => button.textContent?.includes('${label}'))?.click()`)
   await delay(150)
+}
+
+async function slideThumbState(page, label) {
+  return page.eval(`(() => {
+    const thumb = Array.from(document.querySelectorAll('.slide-thumb'))
+      .find((button) => button.textContent?.includes('${label}'))
+
+    return {
+      ariaLabel: thumb?.getAttribute('aria-label') ?? '',
+      changed: thumb?.dataset.changed ?? null,
+      hasChangeDot: !!thumb?.querySelector('.thumb-change'),
+    }
+  })()`)
 }
 
 async function focusBlockAndPress(page, blockId, key) {

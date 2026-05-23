@@ -34,8 +34,8 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 ## Findings And Fixes
 
 - P0: Text edit 이중 렌더링
-  - Fix: 편집 중인 block은 preview block을 숨기고 `PlainTextEditor`만 렌더링한다.
-  - Fix: `contenteditable="plaintext-only"`를 사용해 editor document를 따로 만들지 않고 DOM textContent를 draft로 사용한다.
+  - Fix: 원본 slide block 하나에만 `contenteditable="plaintext-only"`를 붙인다.
+  - Fix: 편집 중에는 React가 block 내부 text children을 다시 렌더링하지 않게 하고, 브라우저 live DOM의 `textContent`를 draft로 사용한다.
 
 - P0: Export 완료 액션 부재
   - Fix: Export panel에 `Copy` 버튼과 `Copied` feedback을 추가했다.
@@ -56,6 +56,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: Arrange Mode 미세 조정 부족
   - Fix: 선택된 block을 화살표 키로 한 칸씩 nudge할 수 있게 했다. Text Mode와 편집 중에는 동작하지 않는다.
 
+- P1: 수정된 slide 식별 부족
+  - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
+
 - P1: slide 전환 후 stage scroll 잔류
   - Fix: slide 선택 시 stage scroll을 `(0, 0)`으로 reset한다.
 
@@ -72,7 +75,8 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - `contenteditable="plaintext-only"`
   - Text Mode에서 실제 글자 편집 surface로 사용한다.
-  - 직접 편집 중에는 원본 preview block을 같이 렌더링하지 않는다.
+  - 직접 편집 중에는 별도 preview/editor block을 같이 렌더링하지 않는다.
+  - 편집 중에는 React children을 비워 live DOM과 preview state가 경쟁하지 않게 한다.
   - 별도 editor document를 만들지 않고 DOM textContent를 commit/cancel의 draft로 사용한다.
   - PPT 도형 스타일 수치 편집 UI로 확장하지 않았다.
 
@@ -101,8 +105,10 @@ Covered checks:
 - first screen editor
 - Text Mode direct edit, Enter commit, Escape cancel
 - no double text rendering
+- live editor text box and committed preview text box parity
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export shared slide theme tokens
+- modified slide thumbnail state
 - mobile horizontal overflow and core controls

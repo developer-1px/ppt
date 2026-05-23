@@ -131,6 +131,7 @@ function App() {
   const exportCopied = copiedExportCode === exportCode
   const exportDownloaded = downloadedExportCode === exportCode
   const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
+  const changedSlideIds = useMemo(() => changedSlides(doc.value), [doc.value])
   const baseSelectedLocation =
     selectedBlock === null
       ? null
@@ -645,19 +646,26 @@ function App() {
   return (
     <main className="retouch-app" data-mode={mode}>
       <aside className="slide-rail" aria-label="Slides">
-        {doc.value.slides.map((slide, index) => (
-          <button
-            aria-current={slide.id === activeSlide.id ? 'page' : undefined}
-            className="slide-thumb"
-            key={slide.id}
-            onClick={() => selectSlide(slide.id)}
-            type="button"
-          >
-            <span className="thumb-number">{index + 1}</span>
-            <MiniSlide slide={slide} />
-            <span className="thumb-name">{slide.name}</span>
-          </button>
-        ))}
+        {doc.value.slides.map((slide, index) => {
+          const changed = changedSlideIds.has(slide.id)
+
+          return (
+            <button
+              aria-current={slide.id === activeSlide.id ? 'page' : undefined}
+              aria-label={changed ? `${slide.name}, modified` : slide.name}
+              className="slide-thumb"
+              data-changed={changed ? 'true' : 'false'}
+              key={slide.id}
+              onClick={() => selectSlide(slide.id)}
+              type="button"
+            >
+              <span className="thumb-number">{index + 1}</span>
+              <MiniSlide slide={slide} />
+              <span className="thumb-name">{slide.name}</span>
+              {changed ? <span aria-hidden="true" className="thumb-change" /> : null}
+            </button>
+          )
+        })}
       </aside>
 
       <section className="retouch-workspace">
@@ -873,6 +881,8 @@ function SlideBlockElement({
   selected: boolean
   text: string
 }) {
+  const elementRef = useRef<HTMLElement | null>(null)
+  const editingSessionRef = useRef<{ blockId: string; text: string } | null>(null)
   const rectRef = useRef(rect)
   const committedRef = useRef(false)
 
@@ -880,16 +890,28 @@ function SlideBlockElement({
     rectRef.current = rect
   }, [rect])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editing) {
       committedRef.current = false
+      editingSessionRef.current = null
       return
     }
 
-    const element = readBlockElement(block.id)
+    const element = elementRef.current
 
     if (!element) {
       return
+    }
+
+    const editingSession = editingSessionRef.current
+
+    if (
+      !editingSession ||
+      editingSession.blockId !== block.id ||
+      editingSession.text !== text
+    ) {
+      element.textContent = text
+      editingSessionRef.current = { blockId: block.id, text }
     }
 
     committedRef.current = false
@@ -900,7 +922,7 @@ function SlideBlockElement({
     ) {
       placeCaretAtEnd(element)
     }
-  }, [block.id, editing, initialClientPoint])
+  }, [block.id, editing, initialClientPoint, text])
 
   const syncAutoHeight = useCallback((element: HTMLElement) => {
     const effectiveMinimumHeight =
@@ -918,16 +940,16 @@ function SlideBlockElement({
       return
     }
 
-    const element = readBlockElement(block.id)
+    const element = elementRef.current
     const nextRect = element ? syncAutoHeight(element) : rectRef.current
 
     committedRef.current = true
     element?.blur()
     onCommit(element?.textContent ?? text, nextRect)
-  }, [block.id, editing, onCommit, syncAutoHeight, text])
+  }, [editing, onCommit, syncAutoHeight, text])
 
   function resetDraft() {
-    const element = readBlockElement(block.id)
+    const element = elementRef.current
 
     if (!element) {
       return
@@ -996,6 +1018,9 @@ function SlideBlockElement({
 
       onPointerDown(event)
     },
+    ref: (element: HTMLElement | null) => {
+      elementRef.current = element
+    },
     spellCheck: editing ? false : undefined,
     style: rectToAutoHeightStyle(rect, minimumHeight),
     suppressContentEditableWarning: editing ? true : undefined,
@@ -1003,18 +1028,14 @@ function SlideBlockElement({
   }
 
   if (block.tag === 'h1') {
-    return <h1 {...sharedProps}>{text}</h1>
+    return <h1 {...sharedProps}>{editing ? null : text}</h1>
   }
 
   if (block.tag === 'p') {
-    return <p {...sharedProps}>{text}</p>
+    return <p {...sharedProps}>{editing ? null : text}</p>
   }
 
-  return <div {...sharedProps}>{text}</div>
-}
-
-function readBlockElement(blockId: string) {
-  return document.querySelector<HTMLElement>(`[data-block="${blockId}"]`)
+  return <div {...sharedProps}>{editing ? null : text}</div>
 }
 
 function applyAutoHeightStyle(
@@ -1206,6 +1227,27 @@ function deckEquals(a: unknown, b: unknown) {
   }
 
   return JSON.stringify(parsedA.data) === JSON.stringify(parsedB.data)
+}
+
+function changedSlides(deck: unknown) {
+  const parsed = RetouchDeckSchema.safeParse(deck)
+  const parsedBase = RetouchDeckSchema.safeParse(SAMPLE_DECK)
+
+  if (!parsed.success || !parsedBase.success) {
+    return new Set<string>()
+  }
+
+  return new Set(
+    parsed.data.slides
+      .filter((slide) => {
+        const baseSlide = parsedBase.data.slides.find(
+          (candidate) => candidate.id === slide.id,
+        )
+
+        return !baseSlide || JSON.stringify(slide) !== JSON.stringify(baseSlide)
+      })
+      .map((slide) => slide.id),
+  )
 }
 
 function isHistoryShortcut(event: KeyboardEvent) {
