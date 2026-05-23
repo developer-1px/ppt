@@ -94,6 +94,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: Layout click selection / resize race
   - Fix: Layout Mode에서 block click도 selection으로 처리한다. verifier는 selected block 확인 후 resize한다.
 
+- P1: Arrange 선택이 Text Mode에서 숨은 Reset 대상이 될 수 있음
+  - Fix: Arrange에서 Text Mode로 전환하면 선택을 비워 Reset 대상이 숨은 block이 아니라 deck이 되게 한다.
+
 - P1: Arrange Mode 중앙 정렬 기준 부족
   - Fix: block을 slide 중앙선 근처로 드래그하면 center snap이 적용되고 중앙 guide가 표시된다.
 
@@ -170,6 +173,7 @@ Covered checks:
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
+- Text Mode clears hidden Arrange selection on mode switch
 - Text Mode selected reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export feedback clears during live visible drafts

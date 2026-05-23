@@ -520,6 +520,10 @@ function App() {
       commitActiveTextEdit()
     }
 
+    if (mode !== 'text' && nextMode === 'text') {
+      doc.selection?.empty()
+    }
+
     setMode(nextMode)
     clearTransientState()
   }

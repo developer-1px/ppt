@@ -884,6 +884,28 @@ async function runLayoutScenario(page) {
   await clickBlock(page, 's1-title')
   const noEditorInLayout = await page.eval("!document.querySelector('[data-editing=\"true\"]')")
   check('Arrange Mode click does not edit text', noEditorInLayout, null)
+
+  await clickMode(page, 'Text')
+  const textModeAfterArrange = await page.eval(`(() => {
+    const reset = document.querySelector('button[aria-label="Reset"]')
+
+    return {
+      mode: document.querySelector('.retouch-app')?.dataset.mode,
+      overlayCount: document.querySelectorAll('.selection-overlay').length,
+      resetDisabled: reset?.disabled ?? null,
+      resetTitle: reset?.getAttribute('title'),
+      selectedBlocks: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+  check(
+    'Text Mode clears hidden Arrange selection on mode switch',
+    textModeAfterArrange.mode === 'text' &&
+      textModeAfterArrange.overlayCount === 0 &&
+      textModeAfterArrange.selectedBlocks === 0 &&
+      textModeAfterArrange.resetDisabled === false &&
+      textModeAfterArrange.resetTitle === 'Reset deck',
+    textModeAfterArrange,
+  )
 }
 
 async function runExportScenario(page) {
