@@ -44,6 +44,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P1: Autoheight가 grow 중심이고 bottom clipping 정책이 없음
   - Fix: 편집 중에는 CSS `height: auto`로 자연스럽게 grow/shrink한다. commit 순간에만 DOM height를 측정해 저장하고, slide 하단을 넘으면 y를 보정해 box가 slide 안에 남게 한다.
+  - Fix: 편집 overlay에서 block의 flex vertical centering을 reset해, 타이핑 중 content top이 재중앙정렬로 튀지 않게 했다.
 
 - P1: Layout click selection / resize race
   - Fix: Layout Mode에서 block click도 selection으로 처리한다. verifier는 selected block 확인 후 resize한다.

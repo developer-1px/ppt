@@ -246,25 +246,17 @@ async function runTextScenario(page) {
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
   await page.waitFor("!!document.querySelector('.nano-text-editor .ProseMirror')")
-  const editBeforeHeight = await editorHeight(page)
+  const editBefore = await editorMetrics(page)
   await page.send('Input.insertText', {
     text: ' Extra context that wraps onto more lines so this fixed-width text box grows vertically instead of clipping or scrolling.',
   })
   await page.waitFor(`(() => {
     const editor = document.querySelector('.nano-text-editor')
-    return editor && editor.getBoundingClientRect().height > ${editBeforeHeight + 10}
+    return editor && editor.getBoundingClientRect().height > ${editBefore.height + 10}
   })()`)
-  const autoHeight = await page.eval(`(() => {
-    const wrapper = document.querySelector('.nano-text-editor')
-    const editor = wrapper.querySelector('.editor')
-    return {
-      wrapperHeight: wrapper.getBoundingClientRect().height,
-      proseHeight: wrapper.querySelector('.ProseMirror').getBoundingClientRect().height,
-      wrapperOverflowY: getComputedStyle(wrapper).overflowY,
-      editorOverflowY: getComputedStyle(editor).overflowY,
-    }
-  })()`)
-  check('Text Mode autoheight grows box, not scroll/clip', autoHeight.wrapperHeight > editBeforeHeight + 10 && autoHeight.wrapperOverflowY === 'visible' && autoHeight.editorOverflowY === 'visible', autoHeight)
+  const autoHeight = await editorMetrics(page)
+  check('Text Mode autoheight grows box, not scroll/clip', autoHeight.height > editBefore.height + 10 && autoHeight.wrapperOverflowY === 'visible' && autoHeight.editorOverflowY === 'visible', autoHeight)
+  check('Text Mode autoheight keeps content top stable while typing', Math.abs(autoHeight.top - editBefore.top) < 1 && Math.abs(autoHeight.proseTop - editBefore.proseTop) < 1, { before: editBefore, after: autoHeight })
 
   await commitTextEditor(page)
   const subtitleGrown = await blockState(page, 's1-subtitle')
@@ -466,6 +458,28 @@ async function blockFitsSlide(page, blockId) {
 
 async function editorHeight(page) {
   return page.eval("document.querySelector('.nano-text-editor')?.getBoundingClientRect().height ?? 0")
+}
+
+async function editorMetrics(page) {
+  return page.eval(`(() => {
+    const wrapper = document.querySelector('.nano-text-editor')
+    const editor = wrapper?.querySelector('.editor')
+    const prose = wrapper?.querySelector('.ProseMirror')
+    const wrapperRect = wrapper?.getBoundingClientRect()
+    const proseRect = prose?.getBoundingClientRect()
+
+    return {
+      top: wrapperRect?.top ?? 0,
+      height: wrapperRect?.height ?? 0,
+      proseTop: proseRect?.top ?? 0,
+      proseHeight: proseRect?.height ?? 0,
+      wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : null,
+      wrapperAlignItems: wrapper ? getComputedStyle(wrapper).alignItems : null,
+      wrapperOverflowY: wrapper ? getComputedStyle(wrapper).overflowY : null,
+      editorOverflowY: editor ? getComputedStyle(editor).overflowY : null,
+      proseMinHeight: prose ? getComputedStyle(prose).minHeight : null,
+    }
+  })()`)
 }
 
 async function clickMode(page, label) {

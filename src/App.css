@@ -490,7 +490,9 @@ button {
 }
 
 .nano-text-editor {
-  display: flex;
+  display: block;
+  align-items: normal;
+  justify-content: normal;
   overflow: visible;
   background: transparent;
   color: inherit;
@@ -531,6 +533,7 @@ button {
 }
 
 .nano-text-editor .ProseMirror {
+  min-height: 0;
   outline: none;
   color: inherit;
   font: inherit;
