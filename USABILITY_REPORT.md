@@ -34,8 +34,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 ## Findings And Fixes
 
 - P0: Text edit 이중 렌더링
-  - Fix: 원본 slide block 하나에만 `contenteditable="plaintext-only"`를 붙인다.
+  - Fix: 원본 slide block 내부의 실제 text surface 하나에만 `contenteditable="plaintext-only"`를 붙인다.
   - Fix: 편집 중에는 React가 block 내부 text children을 다시 렌더링하지 않게 하고, 브라우저 live DOM의 `textContent`를 draft로 사용한다.
+  - Fix: 배치/디자인 outer block과 실제 글자 surface를 분리해, 편집은 내부 text node 하나에서만 일어나게 했다.
 
 - P0: Export 완료 액션 부재
   - Fix: Export panel에 `Copy` 버튼과 `Copied` feedback을 추가했다.
@@ -84,6 +85,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P0: 편집 중 별도 박스 outline이 실제 글자와 떨어져 보임
   - Fix: Text Mode 편집 상태에서는 별도 boxed chrome을 그리지 않고 실제 글자 DOM과 caret만 사용한다.
   - Fix: Text Mode hover/focus도 일반 텍스트 block outline을 그리지 않는다.
+  - Fix: padding/border가 있는 block도 박스 전체가 아니라 내부 text surface에만 `contenteditable`을 붙인다.
   - Fix: 빈 텍스트 block만 다시 찾을 수 있도록 최소 dashed outline을 유지한다.
 
 - P1: 직접 텍스트 편집에서 줄바꿈이 숨겨짐
@@ -110,6 +112,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - P1: Arrange Mode 미세 조정 부족
   - Fix: 선택된 block을 화살표 키로 한 칸씩 nudge할 수 있게 했다. Text Mode와 편집 중에는 동작하지 않는다.
+  - Fix: Shift+Arrow는 더 큰 nudge로 동작하고 undo로 복구되는지 검증한다.
 
 - P1: 수정된 slide 식별 부족
   - Fix: 변경된 slide thumbnail에 작은 modified marker와 aria label을 추가했다.
@@ -136,6 +139,7 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 
 - `contenteditable="plaintext-only"`
   - Text Mode에서 실제 글자 편집 surface로 사용한다.
+  - outer block은 배치/디자인을 맡고, 내부 `.slide-block-text` 하나만 편집 surface가 된다.
   - 직접 편집 중에는 별도 preview/editor block을 같이 렌더링하지 않는다.
   - 편집 중에는 비어 있지 않은 글자에 별도 boxed chrome을 그리지 않는다.
   - 편집 중에는 React children을 비워 live DOM과 preview state가 경쟁하지 않게 한다.
@@ -182,6 +186,7 @@ Covered checks:
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
 - Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
+- Layout Mode Shift+Arrow large nudge
 - Arrange Mode Escape clears selection
 - Text Mode clears hidden Arrange selection on mode switch
 - Text Mode selected reset, undo reset, redo reset

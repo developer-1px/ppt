@@ -244,11 +244,31 @@ button {
   user-select: none;
 }
 
+.slide-block-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  overflow-wrap: inherit;
+  text-align: inherit;
+  white-space: inherit;
+}
+
 .slide-block.is-editing {
   z-index: 8;
   outline: 0;
   cursor: text;
   caret-color: #2563eb;
+  user-select: text;
+}
+
+.slide-block.is-editing .slide-block-text {
+  cursor: text;
+  outline: 0;
   user-select: text;
 }
 

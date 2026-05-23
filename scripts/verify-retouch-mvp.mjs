@@ -238,6 +238,7 @@ async function runEditSurfaceParityScenario(page) {
       const preview = await textRangeMetrics(page, `[data-block="${blockId}"]`)
       await page.eval(`document.querySelector('[data-block="${blockId}"]').click()`)
       await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+      const blockAfter = await textRangeMetrics(page, `[data-block="${blockId}"]`)
       const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
       const editorChrome = await page.eval(`(() => {
         const style = getComputedStyle(document.querySelector('[data-editing=\"true\"]'))
@@ -252,18 +253,18 @@ async function runEditSurfaceParityScenario(page) {
       deltas.push({
         blockId,
         slideName,
-        boxHeightDelta: editor.boxHeight - preview.boxHeight,
-        boxLeftDelta: editor.boxLeft - preview.boxLeft,
-        boxTopDelta: editor.boxTop - preview.boxTop,
-        canvasLeftDelta: editor.canvasLeft - preview.canvasLeft,
-        canvasTopDelta: editor.canvasTop - preview.canvasTop,
+        boxHeightDelta: blockAfter.boxHeight - preview.boxHeight,
+        boxLeftDelta: blockAfter.boxLeft - preview.boxLeft,
+        boxTopDelta: blockAfter.boxTop - preview.boxTop,
+        canvasLeftDelta: blockAfter.canvasLeft - preview.canvasLeft,
+        canvasTopDelta: blockAfter.canvasTop - preview.canvasTop,
         outlineOffset: editorChrome.outlineOffset,
         outlineStyle: editorChrome.outlineStyle,
         outlineWidth: editorChrome.outlineWidth,
         previewTextInsideBox: preview.textInsideBox,
         editorTextInsideBox: editor.textInsideBox,
-        stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
-        stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
+        stageScrollLeftDelta: blockAfter.stageScrollLeft - preview.stageScrollLeft,
+        stageScrollTopDelta: blockAfter.stageScrollTop - preview.stageScrollTop,
         textHeightDelta: editor.textHeight - preview.textHeight,
         textLeftDelta: editor.textLeft - preview.textLeft,
         textTopDelta: editor.textTop - preview.textTop,
@@ -314,17 +315,18 @@ async function runCompactEditSurfaceScenario(cdpPort) {
       x: preview.textLeft + preview.textWidth / 2,
       y: preview.textTop + preview.textHeight / 2,
     })
-    await page.waitFor(`document.querySelector('[data-editing=\"true\"]')?.dataset.block === '${blockId}'`)
+    await page.waitFor(`document.querySelector('[data-editing=\"true\"]')?.dataset.editingBlock === '${blockId}'`)
+    const blockAfter = await textRangeMetrics(page, `[data-block="${blockId}"]`)
     const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
 
     deltas.push({
       blockId,
-      boxTopDelta: editor.boxTop - preview.boxTop,
-      canvasTopDelta: editor.canvasTop - preview.canvasTop,
+      boxTopDelta: blockAfter.boxTop - preview.boxTop,
+      canvasTopDelta: blockAfter.canvasTop - preview.canvasTop,
       previewTextInsideBox: preview.textInsideBox,
       editorTextInsideBox: editor.textInsideBox,
-      stageScrollLeftDelta: editor.stageScrollLeft - preview.stageScrollLeft,
-      stageScrollTopDelta: editor.stageScrollTop - preview.stageScrollTop,
+      stageScrollLeftDelta: blockAfter.stageScrollLeft - preview.stageScrollLeft,
+      stageScrollTopDelta: blockAfter.stageScrollTop - preview.stageScrollTop,
       textLeftDelta: editor.textLeft - preview.textLeft,
       textTopDelta: editor.textTop - preview.textTop,
     })
@@ -407,10 +409,10 @@ async function runTextScenario(page) {
   const titleEditorBox = await editorMetrics(page)
   const editingTitle = await page.eval(`(() => ({
     originalBlockCount: document.querySelectorAll('[data-block="s1-title"]').length,
-    editorCount: document.querySelectorAll('[data-editing=\"true\"]').length,
-    editsOriginalBlock:
-      document.querySelector('[data-block="s1-title"]') ===
-      document.querySelector('[data-editing=\"true\"]'),
+    editorCount: document.querySelectorAll('[data-editing=\"true\"][contenteditable]').length,
+    editsOriginalBlockText:
+      document.querySelector('[data-editing=\"true\"]')?.closest('[data-block="s1-title"]') ===
+      document.querySelector('[data-block="s1-title"]'),
     editorText: document.querySelector('[data-editing=\"true\"]')?.textContent,
     contentEditable: document.querySelector('[data-editing=\"true\"]')?.contentEditable,
     hasMarkdownChrome:
@@ -423,7 +425,7 @@ async function runTextScenario(page) {
     'Text Mode edits the original block directly',
     editingTitle.originalBlockCount === 1 &&
       editingTitle.editorCount === 1 &&
-      editingTitle.editsOriginalBlock &&
+      editingTitle.editsOriginalBlockText &&
       editingTitle.contentEditable === 'plaintext-only',
     editingTitle,
   )
@@ -499,7 +501,7 @@ async function runTextScenario(page) {
     x: bodyText.textLeft + bodyText.textWidth / 2,
     y: bodyText.textTop + bodyText.textHeight / 2,
   })
-  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's2-footer'")
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.editingBlock === 's2-footer'")
   await replaceEditorText(page, shortenedBodyText)
   await commitTextEditor(page)
   const bodyShortened = await blockState(page, 's2-footer')
@@ -551,7 +553,7 @@ async function runTextScenario(page) {
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
 
   await focusBlockAndPress(page, 's1-title', 'Enter')
-  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's1-title'")
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.editingBlock === 's1-title'")
   await typeEditorText(page, ' ChainTitle')
   const chainSubtitleBefore = await blockState(page, 's1-subtitle')
   const chainSubtitleText = await textRangeMetrics(page, '[data-block="s1-subtitle"]')
@@ -559,10 +561,10 @@ async function runTextScenario(page) {
     x: chainSubtitleText.textLeft + chainSubtitleText.textWidth / 2,
     y: chainSubtitleText.textTop + chainSubtitleText.textHeight / 2,
   })
-  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.block === 's1-subtitle'")
+  await page.waitFor("document.querySelector('[data-editing=\"true\"]')?.dataset.editingBlock === 's1-subtitle'")
   const chainedTitleCommit = await blockState(page, 's1-title')
   const chainedEditor = await page.eval(`(() => ({
-    blockId: document.querySelector('[data-editing=\"true\"]')?.dataset.block ?? null,
+    blockId: document.querySelector('[data-editing=\"true\"]')?.dataset.editingBlock ?? null,
     text: document.querySelector('[data-editing=\"true\"]')?.textContent ?? null,
   }))()`)
   check(
@@ -839,6 +841,27 @@ async function runLayoutScenario(page) {
     !rectChanged(stepBeforeNudge, stepNudgeUndone) &&
       stepNudgeUndone.text === stepBeforeNudge.text,
     { before: stepBeforeNudge, after: stepNudgeUndone },
+  )
+
+  await clickBlock(page, 's2-step-1')
+  await pressKey(page, 'ArrowRight', { shift: true })
+  await delay(150)
+  const stepLargeNudged = await blockState(page, 's2-step-1')
+  check(
+    'Arrange Mode Shift+Arrow nudges the selected block by a larger step',
+    stepLargeNudged.x > stepBeforeNudge.x + 20 &&
+      Math.abs(stepLargeNudged.y - stepBeforeNudge.y) < 1 &&
+      stepLargeNudged.text === stepBeforeNudge.text,
+    { before: stepBeforeNudge, after: stepLargeNudged },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+  const stepLargeNudgeUndone = await blockState(page, 's2-step-1')
+  check(
+    'undo restores large keyboard nudged layout',
+    !rectChanged(stepBeforeNudge, stepLargeNudgeUndone) &&
+      stepLargeNudgeUndone.text === stepBeforeNudge.text,
+    { before: stepBeforeNudge, after: stepLargeNudgeUndone },
   )
   await clickSlide(page, 'Overview')
 
@@ -1660,8 +1683,12 @@ async function editorHeight(page) {
 async function textRangeMetrics(page, selector) {
   return page.eval(`(() => {
     const element = document.querySelector(${JSON.stringify(selector)})
+    const textElement =
+      element.matches('[data-block]')
+        ? element.querySelector('.slide-block-text') ?? element
+        : element
     const range = document.createRange()
-    range.selectNodeContents(element)
+    range.selectNodeContents(textElement)
     const textRect = range.getBoundingClientRect()
     const boxRect = element.getBoundingClientRect()
     const canvasRect = document.querySelector('.slide-canvas')?.getBoundingClientRect()
@@ -1745,7 +1772,7 @@ async function focusBlockAndPress(page, blockId, key) {
   await pressKey(page, key)
 }
 
-async function pressKey(page, key) {
+async function pressKey(page, key, options = {}) {
   const keyCodeByKey = {
     ArrowDown: 40,
     ArrowLeft: 37,
@@ -1758,11 +1785,13 @@ async function pressKey(page, key) {
     ? key
     : `Key${key.toUpperCase()}`
   const keyCode = keyCodeByKey[key] ?? key.toUpperCase().charCodeAt(0)
+  const modifiers = options.shift ? 8 : 0
 
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key,
     code,
+    modifiers,
     windowsVirtualKeyCode: keyCode,
     nativeVirtualKeyCode: keyCode,
   })
@@ -1770,6 +1799,7 @@ async function pressKey(page, key) {
     type: 'keyUp',
     key,
     code,
+    modifiers,
     windowsVirtualKeyCode: keyCode,
     nativeVirtualKeyCode: keyCode,
   })

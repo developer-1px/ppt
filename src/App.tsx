@@ -602,19 +602,20 @@ function App() {
     const activeEditing = editing
     const location = blockLocationFromPointer(doc.value, activeEditing.pointer)
     const element = slideRef.current?.querySelector<HTMLElement>(
-      '[data-editing="true"]',
+      '[data-editing="true"][contenteditable]',
     )
+    const blockElement = element?.closest<HTMLElement>('[data-block]')
 
     setEditing(null)
     setDraftLayout(null)
 
-    if (!location || !element) {
+    if (!location || !element || !blockElement) {
       return doc.value
     }
 
     const text = normalizeEditableText(element.textContent ?? '')
     const minimumHeight = text.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
-    const rect = autoHeightRect(element, getRect(location.block), minimumHeight)
+    const rect = autoHeightRect(blockElement, getRect(location.block), minimumHeight)
 
     return commitTextPatch(activeEditing.pointer, text, rect)
   }
@@ -742,15 +743,18 @@ function App() {
 
     const element =
       editing?.pointer === pointer
-        ? slideRef.current?.querySelector<HTMLElement>('[data-editing="true"]')
+        ? slideRef.current?.querySelector<HTMLElement>(
+            '[data-editing="true"][contenteditable]',
+          )
         : null
+    const blockElement = element?.closest<HTMLElement>('[data-block]')
     const liveText = normalizeEditableText(
       element?.textContent ?? location.block.text,
     )
     const liveMinimumHeight =
       liveText.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : 0
-    const liveRect = element
-      ? autoHeightRect(element, getRect(location.block), liveMinimumHeight)
+    const liveRect = element && blockElement
+      ? autoHeightRect(blockElement, getRect(location.block), liveMinimumHeight)
       : getRect(location.block)
     const resetRect = {
       ...liveRect,
@@ -1091,7 +1095,8 @@ function SlideBlockElement({
   selected: boolean
   text: string
 }) {
-  const elementRef = useRef<HTMLElement | null>(null)
+  const blockRef = useRef<HTMLElement | null>(null)
+  const editorRef = useRef<HTMLElement | null>(null)
   const editingSessionRef = useRef<{ blockId: string; text: string } | null>(null)
   const pendingTrailingLineBreakRef = useRef<{ beforeText: string } | null>(null)
   const rectRef = useRef(rect)
@@ -1108,7 +1113,7 @@ function SlideBlockElement({
       return
     }
 
-    const element = elementRef.current
+    const element = editorRef.current
 
     if (!element) {
       return
@@ -1140,12 +1145,22 @@ function SlideBlockElement({
   }, [block.id, editing, initialClientPoint, text])
 
   const syncAutoHeight = useCallback((element: HTMLElement) => {
+    const blockElement = blockRef.current
+
+    if (!blockElement) {
+      return rectRef.current
+    }
+
     const effectiveMinimumHeight =
       element.textContent?.length === 0 ? EMPTY_TEXT_BOX_HEIGHT : minimumHeight
-    const nextRect = autoHeightRect(element, rectRef.current, effectiveMinimumHeight)
+    const nextRect = autoHeightRect(
+      blockElement,
+      rectRef.current,
+      effectiveMinimumHeight,
+    )
 
     rectRef.current = nextRect
-    applyAutoHeightStyle(element, nextRect, effectiveMinimumHeight)
+    applyAutoHeightStyle(blockElement, nextRect, effectiveMinimumHeight)
 
     return nextRect
   }, [minimumHeight])
@@ -1155,7 +1170,7 @@ function SlideBlockElement({
       return
     }
 
-    const element = elementRef.current
+    const element = editorRef.current
     const nextRect = element ? syncAutoHeight(element) : rectRef.current
 
     committedRef.current = true
@@ -1164,9 +1179,10 @@ function SlideBlockElement({
   }, [editing, onCommit, syncAutoHeight, text])
 
   function resetDraft() {
-    const element = elementRef.current
+    const element = editorRef.current
+    const blockElement = blockRef.current
 
-    if (!element) {
+    if (!element || !blockElement) {
       return
     }
 
@@ -1175,14 +1191,14 @@ function SlideBlockElement({
     pendingTrailingLineBreakRef.current = null
     element.textContent = text
     rectRef.current = rect
-    applyAutoHeightStyle(element, rect, effectiveMinimumHeight)
+    applyAutoHeightStyle(blockElement, rect, effectiveMinimumHeight)
   }
 
   function undoDraft() {
     resetDraft()
 
-    if (elementRef.current) {
-      placeCaretAtEnd(elementRef.current)
+    if (editorRef.current) {
+      placeCaretAtEnd(editorRef.current)
     }
   }
 
@@ -1324,15 +1340,43 @@ function SlideBlockElement({
     syncAutoHeight(event.currentTarget)
   }
 
+  const textContent = (
+    <span
+      className="slide-block-text"
+      contentEditable={editing ? ('plaintext-only' as const) : undefined}
+      data-editing={editing ? 'true' : undefined}
+      data-editing-block={editing ? block.id : undefined}
+      onBeforeInput={editing ? handleBeforeInput : undefined}
+      onBlur={editing ? commit : undefined}
+      onClick={(event: ReactMouseEvent<HTMLElement>) => {
+        if (editing) {
+          event.stopPropagation()
+        }
+      }}
+      onInput={editing ? handleInput : undefined}
+      onKeyDown={editing ? handleKeyDown : undefined}
+      onPaste={editing ? handlePaste : undefined}
+      onPointerDown={(event: ReactPointerEvent<HTMLElement>) => {
+        if (editing) {
+          event.stopPropagation()
+        }
+      }}
+      ref={(element: HTMLElement | null) => {
+        editorRef.current = element
+      }}
+      spellCheck={editing ? false : undefined}
+      suppressContentEditableWarning={editing ? true : undefined}
+    >
+      {editing ? null : text}
+    </span>
+  )
+
   const sharedProps = {
     'data-block': block.id,
-    'data-editing': editing ? 'true' : undefined,
     'data-empty': text.length === 0 ? 'true' : undefined,
     'data-role': block.role,
     'data-selected': selected ? 'true' : 'false',
     className,
-    contentEditable: editing ? ('plaintext-only' as const) : undefined,
-    onBlur: editing ? commit : undefined,
     onClick: (event: ReactMouseEvent<HTMLElement>) => {
       event.stopPropagation()
       if (!editing) {
@@ -1352,23 +1396,21 @@ function SlideBlockElement({
       onPointerDown(event)
     },
     ref: (element: HTMLElement | null) => {
-      elementRef.current = element
+      blockRef.current = element
     },
-    spellCheck: editing ? false : undefined,
     style: rectToAutoHeightStyle(rect, minimumHeight),
-    suppressContentEditableWarning: editing ? true : undefined,
     tabIndex: 0,
   }
 
   if (block.tag === 'h1') {
-    return <h1 {...sharedProps}>{editing ? null : text}</h1>
+    return <h1 {...sharedProps}>{textContent}</h1>
   }
 
   if (block.tag === 'p') {
-    return <p {...sharedProps}>{editing ? null : text}</p>
+    return <p {...sharedProps}>{textContent}</p>
   }
 
-  return <div {...sharedProps}>{editing ? null : text}</div>
+  return <div {...sharedProps}>{textContent}</div>
 }
 
 function applyAutoHeightStyle(
