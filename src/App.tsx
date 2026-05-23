@@ -848,6 +848,7 @@ function App() {
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(url)
+    setFailedCopyExportCode(null)
     setDownloadedExportCode(nextExportCode)
   }
 

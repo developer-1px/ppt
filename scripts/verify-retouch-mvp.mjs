@@ -1127,6 +1127,57 @@ async function runExportScenario(page) {
     failedCopyFeedback,
   )
 
+  await page.eval(`(() => {
+    window.__pptRetouchDownloadAfterCopyFailure = null
+    const originalClick = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = function patchedClick() {
+      window.__pptRetouchDownloadAfterCopyFailure = {
+        download: this.download,
+        href: this.href,
+      }
+      HTMLAnchorElement.prototype.click = originalClick
+    }
+  })()`)
+  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
+  await page.waitFor(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
+
+    return copyButton?.dataset.copyState === 'idle' &&
+      downloadButton?.dataset.downloadState === 'downloaded'
+  })()`)
+  const downloadAfterCopyFailure = await page.eval(`(() => {
+    const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
+    const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
+
+    return {
+      copyState: copyButton?.dataset.copyState,
+      copyTitle: copyButton?.getAttribute('title'),
+      download: window.__pptRetouchDownloadAfterCopyFailure ?? null,
+      downloadState: downloadButton?.dataset.downloadState,
+      downloadTitle: downloadButton?.getAttribute('title'),
+    }
+  })()`)
+  check(
+    'download clears prior copy failure state',
+    downloadAfterCopyFailure.copyState === 'idle' &&
+      downloadAfterCopyFailure.copyTitle === 'Copy HTML' &&
+      downloadAfterCopyFailure.downloadState === 'downloaded' &&
+      downloadAfterCopyFailure.downloadTitle === 'Downloaded' &&
+      downloadAfterCopyFailure.download?.download === 'retouched-slides.html',
+    downloadAfterCopyFailure,
+  )
+
+  await page.eval(`(() => {
+    navigator.clipboard.writeText = async () => {
+      throw new Error('clipboard unavailable')
+    }
+    document.execCommand = () => false
+  })()`)
+  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
+  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.dataset.copyState === 'failed'`)
+  await page.eval(`document.execCommand = window.__pptRetouchOriginalExecCommand`)
+
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await typeEditorText(page, ' AfterFail')
