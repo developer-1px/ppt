@@ -90,6 +90,9 @@ NORTH_STAR.md 기준으로 PPT retouch MVP를 검증했다.
 - P1: Arrange Mode 중앙 정렬 기준 부족
   - Fix: block을 slide 중앙선 근처로 드래그하면 center snap이 적용되고 중앙 guide가 표시된다.
 
+- P1: Arrange Mode가 slide 기준만 snap해서 카드끼리 정렬하기 어려움
+  - Fix: 드래그 중인 block의 edge/center가 다른 block의 edge/center 근처에 오면 sibling snap guide가 적용된다.
+
 - P1: Arrange Mode 미세 조정 부족
   - Fix: 선택된 block을 화살표 키로 한 칸씩 nudge할 수 있게 했다. Text Mode와 편집 중에는 동작하지 않는다.
 
@@ -158,7 +161,7 @@ Covered checks:
 - selected text reset keeps other slide changes
 - reset undo restores live text drafts
 - autoheight grow/shrink, undo/redo, bottom slide fit
-- Layout Mode center snap, arrow nudge, drag, resize, reset, no text editor
+- Layout Mode center/sibling snap, arrow nudge, drag, resize, reset, no text editor
 - Text Mode selected reset, undo reset, redo reset
 - Export text/layout reflection, no editor chrome, Copy feedback
 - Export feedback clears during live visible drafts

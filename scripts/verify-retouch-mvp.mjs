@@ -791,6 +791,16 @@ async function runLayoutScenario(page) {
   await clickToolbar(page, 'Undo')
   await delay(150)
 
+  const siblingSnapProbe = await dragBlockBySlideUnitsWithProbe(page, 's2-step-1', 599, 0)
+  const siblingEdgeAligned = await blockEdgeAlignment(page, 's2-step-1', 's2-step-2')
+  check(
+    'Arrange Mode snaps blocks to sibling edges',
+    siblingSnapProbe.hasGuideXAt770 && siblingEdgeAligned.leftToPeerRight,
+    { probe: siblingSnapProbe, alignment: siblingEdgeAligned },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+
   const stepBeforeNudge = await blockState(page, 's2-step-1')
   await clickBlock(page, 's2-step-1')
   await pressKey(page, 'ArrowRight')
@@ -1694,6 +1704,12 @@ async function dragBlockBySlideUnitsWithProbe(page, blockId, dx, dy) {
       hasCenterGuideY:
         !!guideYRect &&
         Math.abs(guideYRect.top - (slideRect.top + slideRect.height / 2)) < 1,
+      guideXSlideUnits: guideXRect
+        ? ((guideXRect.left - slideRect.left) / slideRect.width) * 1280
+        : null,
+      hasGuideXAt770: guideXRect
+        ? Math.abs(((guideXRect.left - slideRect.left) / slideRect.width) * 1280 - 770) < 1
+        : false,
     }
   })()`)
 
@@ -1734,6 +1750,21 @@ async function blockCenterAlignment(page, blockId) {
       blockCenterX,
       slideCenterX,
       centeredX: Math.abs(blockCenterX - slideCenterX) < 1,
+    }
+  })()`)
+}
+
+async function blockEdgeAlignment(page, blockId, peerBlockId) {
+  return page.eval(`(() => {
+    const block = document.querySelector('[data-block="${blockId}"]')
+    const peer = document.querySelector('[data-block="${peerBlockId}"]')
+    const blockRect = block.getBoundingClientRect()
+    const peerRect = peer.getBoundingClientRect()
+
+    return {
+      blockLeft: blockRect.left,
+      peerRight: peerRect.right,
+      leftToPeerRight: Math.abs(blockRect.left - peerRect.right) < 1,
     }
   })()`)
 }

@@ -227,22 +227,34 @@ function App() {
     }
   }, [])
 
-  const calculateInteractionRect = useCallback(
+  const calculateInteractionState = useCallback(
     (nextPoint: Point, currentInteraction: Interaction) => {
       const dx = nextPoint.x - currentInteraction.startPoint.x
       const dy = nextPoint.y - currentInteraction.startPoint.y
 
       if (currentInteraction.kind === 'move') {
-        return moveRect(currentInteraction.startRect, dx, dy)
+        const rect = moveRect(currentInteraction.startRect, dx, dy)
+
+        return snapMoveRectToSlideBlocks(
+          rect,
+          currentInteraction.pointer,
+          activeSlide.blocks,
+          activeSlideIndex,
+        )
       }
 
-      return resizeRect(
+      const rect = resizeRect(
         currentInteraction.startRect,
         currentInteraction.handle,
         dx,
       )
+
+      return {
+        guides: guidesForInteraction(rect, currentInteraction),
+        rect,
+      }
     },
-    [],
+    [activeSlide.blocks, activeSlideIndex],
   )
 
   const hasMeaningfulPointerDelta = useCallback((start: Point, next: Point) => {
@@ -275,12 +287,12 @@ function App() {
         return
       }
 
-      const rect = calculateInteractionRect(point, currentInteraction)
+      const { guides, rect } = calculateInteractionState(point, currentInteraction)
       setDraftLayout({
         pointer: currentInteraction.pointer,
         rect,
       })
-      setSnapGuides(guidesForInteraction(rect, currentInteraction))
+      setSnapGuides(guides)
     }
 
     function handlePointerUp(event: PointerEvent) {
@@ -299,7 +311,7 @@ function App() {
         return
       }
 
-      const rect = calculateInteractionRect(point, currentInteraction)
+      const { rect } = calculateInteractionState(point, currentInteraction)
 
       if (rectEquals(rect, currentInteraction.startRect)) {
         setInteraction(null)
@@ -328,7 +340,7 @@ function App() {
       window.removeEventListener('pointercancel', handlePointerUp)
     }
   }, [
-    calculateInteractionRect,
+    calculateInteractionState,
     commitPatch,
     hasMeaningfulPointerDelta,
     interaction,
@@ -1528,6 +1540,82 @@ function getCurrentRect(
   draftLayout: DraftLayout | null,
 ) {
   return draftLayout?.pointer === pointer ? draftLayout.rect : getRect(block)
+}
+
+function snapMoveRectToSlideBlocks(
+  rect: Rect,
+  pointer: Pointer,
+  blocks: SlideBlock[],
+  slideIndex: number,
+) {
+  const peerRects = blocks
+    .filter((_, blockIndex) => blockPointer(slideIndex, blockIndex) !== pointer)
+    .map(getRect)
+  const xSnap = closestAxisSnap(
+    [rect.x, rect.x + rect.width / 2, rect.x + rect.width],
+    peerRects.flatMap((peerRect) => [
+      peerRect.x,
+      peerRect.x + peerRect.width / 2,
+      peerRect.x + peerRect.width,
+    ]),
+  )
+  const ySnap = closestAxisSnap(
+    [rect.y, rect.y + rect.height / 2, rect.y + rect.height],
+    peerRects.flatMap((peerRect) => [
+      peerRect.y,
+      peerRect.y + peerRect.height / 2,
+      peerRect.y + peerRect.height,
+    ]),
+  )
+  const snappedRect = {
+    ...rect,
+    x: clamp(rect.x + (xSnap?.offset ?? 0), 0, SLIDE_WIDTH - rect.width),
+    y: clamp(rect.y + (ySnap?.offset ?? 0), 0, SLIDE_HEIGHT - rect.height),
+  }
+  const slideGuideX = alignedGuideFor(
+    snappedRect.x,
+    snappedRect.x + snappedRect.width / 2,
+    snappedRect.x + snappedRect.width,
+    SLIDE_WIDTH,
+  )
+  const slideGuideY = alignedGuideFor(
+    snappedRect.y,
+    snappedRect.y + snappedRect.height / 2,
+    snappedRect.y + snappedRect.height,
+    SLIDE_HEIGHT,
+  )
+
+  return {
+    guides: {
+      x: slideGuideX ?? xSnap?.guide ?? null,
+      y: slideGuideY ?? ySnap?.guide ?? null,
+    },
+    rect: snappedRect,
+  }
+}
+
+function closestAxisSnap(sources: number[], targets: number[]) {
+  let closest: { distance: number; guide: number; offset: number } | null = null
+
+  for (const source of sources) {
+    for (const target of targets) {
+      const distance = Math.abs(source - target)
+
+      if (distance > GRID_SIZE) {
+        continue
+      }
+
+      if (!closest || distance < closest.distance) {
+        closest = {
+          distance,
+          guide: target,
+          offset: target - source,
+        }
+      }
+    }
+  }
+
+  return closest
 }
 
 function guidesForInteraction(rect: Rect, interaction: Interaction): SnapGuides {
