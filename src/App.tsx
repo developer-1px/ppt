@@ -127,6 +127,7 @@ function App() {
       : null
   const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
   const exportCopied = copiedExportCode === exportCode
+  const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
   const baseSelectedLocation =
     selectedBlock === null
       ? null
@@ -137,6 +138,8 @@ function App() {
       baseSelectedLocation &&
       !arrangeRectEquals(getRect(selectedBlock), getRect(baseSelectedLocation.block)),
   )
+  const canReset = mode === 'layout' ? canResetSelected : hasDeckChanges
+  const resetTitle = mode === 'layout' ? 'Reset layout' : 'Reset deck'
 
   useEffect(() => {
     persistDeck(doc.value)
@@ -536,6 +539,28 @@ function App() {
     )
   }
 
+  function resetDeck() {
+    if (mode === 'layout' || !hasDeckChanges) {
+      return
+    }
+
+    clearTransientState()
+    doc.selection?.empty()
+    setActiveSlideId(SAMPLE_SLIDES[0].id)
+    setCopiedExportCode(null)
+    stageRef.current?.scrollTo({ left: 0, top: 0 })
+    doc.reset(SAMPLE_DECK)
+  }
+
+  function resetCurrentTarget() {
+    if (mode === 'layout') {
+      resetSelectedLayout()
+      return
+    }
+
+    resetDeck()
+  }
+
   async function copyExportCode() {
     try {
       await navigator.clipboard.writeText(exportCode)
@@ -608,9 +633,9 @@ function App() {
             </button>
             <button
               aria-label="Reset"
-              disabled={mode !== 'layout' || !canResetSelected}
-              onClick={resetSelectedLayout}
-              title="Reset"
+              disabled={!canReset}
+              onClick={resetCurrentTarget}
+              title={resetTitle}
               type="button"
             >
               <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
@@ -1053,6 +1078,17 @@ function rectClose(a: Rect, b: Rect) {
 
 function arrangeRectEquals(a: Rect, b: Rect) {
   return a.x === b.x && a.y === b.y && a.width === b.width
+}
+
+function deckEquals(a: unknown, b: unknown) {
+  const parsedA = RetouchDeckSchema.safeParse(a)
+  const parsedB = RetouchDeckSchema.safeParse(b)
+
+  if (!parsedA.success || !parsedB.success) {
+    return false
+  }
+
+  return JSON.stringify(parsedA.data) === JSON.stringify(parsedB.data)
 }
 
 function isHistoryShortcut(event: KeyboardEvent) {

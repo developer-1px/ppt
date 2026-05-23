@@ -619,6 +619,38 @@ async function runPersistenceScenario(page) {
     { beforeReload, afterReload, stored },
   )
   check('autosave stores a versioned deck', stored.version === 1 && stored.hasStoredDeck, stored)
+
+  await clickToolbar(page, 'Reset')
+  await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'Retention Review'`)
+  await page.waitFor(`document.querySelector('button[aria-label="Reset"]')?.disabled === true`)
+  await page.waitFor(`(() => {
+    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const parsed = raw ? JSON.parse(raw) : null
+
+    return parsed?.deck?.slides?.[0]?.blocks?.find((block) => block.id === 's1-title')
+      ?.text === 'Retention Review'
+  })()`)
+  const resetState = await blockState(page, 's1-title')
+  const resetStorage = await page.eval(`(() => {
+    const raw = localStorage.getItem('ppt-retouch:v1:deck')
+    const parsed = raw ? JSON.parse(raw) : null
+
+    return {
+      title:
+        parsed?.deck?.slides?.[0]?.blocks?.find((block) => block.id === 's1-title')
+          ?.text ?? null,
+      version: parsed?.version ?? null,
+    }
+  })()`)
+
+  check(
+    'Text Mode reset restores the sample deck',
+    resetState.text === 'Retention Review' &&
+      resetState.undoDisabled === true &&
+      resetState.resetDisabled === true,
+    resetState,
+  )
+  check('Text Mode reset updates autosave', resetStorage.title === 'Retention Review' && resetStorage.version === 1, resetStorage)
 }
 
 async function runMobileScenario(cdpPort) {
