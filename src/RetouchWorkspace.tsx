@@ -62,6 +62,7 @@ type RetouchWorkspaceProps = {
   onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
   onCopyExport: () => void
   onDownloadExport: () => void
+  onInsertTextBlock: () => void
   onNotesChange: (notes: string) => void
   onOpenSlide: (slideId: string) => void
   onPresent: () => void
@@ -116,6 +117,7 @@ export function RetouchWorkspace({
   onCommitTextEdit,
   onCopyExport,
   onDownloadExport,
+  onInsertTextBlock,
   onNotesChange,
   onOpenSlide,
   onPresent,
@@ -154,6 +156,7 @@ export function RetouchWorkspace({
         onChangeMode={onChangeMode}
         onCopyExport={onCopyExport}
         onDownloadExport={onDownloadExport}
+        onInsertTextBlock={onInsertTextBlock}
         onPresent={onPresent}
         onRedo={onRedo}
         onReset={onReset}

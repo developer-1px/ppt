@@ -11,6 +11,7 @@ import {
   SAMPLE_DECK,
   SAMPLE_SLIDES,
   RetouchDeckSchema,
+  blockPointer,
   findSlideIndex,
   slideAccentPointer,
   slideNamePointer,
@@ -20,6 +21,7 @@ import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
+import { createTextBlock } from './slideBlockOperations'
 import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
@@ -369,6 +371,24 @@ function App() {
     clearTransientState()
   }
 
+  function insertTextBlock() {
+    commitActiveTextEdit()
+    const nextBlock = createTextBlock(activeSlide)
+    const blockIndex = activeSlide.blocks.length
+    const pointer = blockPointer(activeSlideIndex, blockIndex)
+
+    doc.commit([{ op: 'add', path: pointer, value: nextBlock }], {
+      label: 'add text block',
+      origin: 'ppt-retouch',
+      selection: { type: 'collapse', pointer },
+    })
+    setCanvasView('slide')
+    setMode('text')
+    clearLayoutInteraction()
+    setEditing({ pointer })
+    stageRef.current?.scrollTo({ left: 0, top: 0 })
+  }
+
   function startPresentation() {
     commitActiveTextEdit()
     setCanvasView('slide')
@@ -462,6 +482,7 @@ function App() {
         onCommitTextEdit={commitTextEdit}
         onCopyExport={copyExportCode}
         onDownloadExport={downloadExportCode}
+        onInsertTextBlock={insertTextBlock}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}
         onNotesChange={(notes) =>
