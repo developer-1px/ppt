@@ -1,4 +1,5 @@
 import type {
+  CSSProperties,
   MouseEvent as ReactMouseEvent,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
@@ -28,6 +29,7 @@ import type {
 } from './layoutInteraction'
 
 type Mode = 'text' | 'layout'
+type CanvasZoom = 'fit' | number
 
 type EditingState = {
   clientPoint?: Point
@@ -41,7 +43,10 @@ type RetouchWorkspaceProps = {
   canRedo: boolean
   canReset: boolean
   canUndo: boolean
+  canZoomIn: boolean
+  canZoomOut: boolean
   canvasView: 'slide' | 'grid'
+  canvasZoom: CanvasZoom
   copyState: 'copied' | 'failed' | 'idle'
   copyTitle: string
   draftLayout: DraftLayout | null
@@ -89,6 +94,9 @@ type RetouchWorkspaceProps = {
   onSlideAccentChange: (accent: string) => void
   onSlideNameChange: (name: string) => void
   onUndo: () => void
+  onZoomFit: () => void
+  onZoomIn: () => void
+  onZoomOut: () => void
   resetScope: 'deck' | 'layout' | 'text'
   resetTitle: string
   selectedPointerSet: Set<Pointer>
@@ -102,6 +110,7 @@ type RetouchWorkspaceProps = {
   stageRef: RefObject<HTMLDivElement | null>
   suppressStageClickRef: MutableRefObject<boolean>
   visualSelectionRect: Rect | null
+  zoomLabel: string
 }
 
 export function RetouchWorkspace({
@@ -111,7 +120,10 @@ export function RetouchWorkspace({
   canRedo,
   canReset,
   canUndo,
+  canZoomIn,
+  canZoomOut,
   canvasView,
+  canvasZoom,
   copyState,
   copyTitle,
   draftLayout,
@@ -149,6 +161,9 @@ export function RetouchWorkspace({
   onSlideAccentChange,
   onSlideNameChange,
   onUndo,
+  onZoomFit,
+  onZoomIn,
+  onZoomOut,
   resetScope,
   resetTitle,
   changedSlideIds,
@@ -162,6 +177,7 @@ export function RetouchWorkspace({
   stageRef,
   suppressStageClickRef,
   visualSelectionRect,
+  zoomLabel,
 }: RetouchWorkspaceProps) {
   return (
     <section className="retouch-workspace">
@@ -169,6 +185,8 @@ export function RetouchWorkspace({
         canRedo={canRedo}
         canReset={canReset}
         canUndo={canUndo}
+        canZoomIn={canZoomIn}
+        canZoomOut={canZoomOut}
         copyState={copyState}
         copyTitle={copyTitle}
         exportCopied={exportCopied}
@@ -182,8 +200,12 @@ export function RetouchWorkspace({
         onRedo={onRedo}
         onReset={onReset}
         onUndo={onUndo}
+        onZoomFit={onZoomFit}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
         resetScope={resetScope}
         resetTitle={resetTitle}
+        zoomLabel={zoomLabel}
       />
 
       {canvasView === 'grid' ? (
@@ -198,6 +220,7 @@ export function RetouchWorkspace({
       ) : (
         <div
           className="stage-shell"
+          data-zoom-mode={canvasZoom === 'fit' ? 'fit' : 'manual'}
           onClick={(event) => {
             if (suppressStageClickRef.current) {
               suppressStageClickRef.current = false
@@ -217,6 +240,11 @@ export function RetouchWorkspace({
             onStageBackgroundClick()
           }}
           ref={stageRef}
+          style={
+            canvasZoom === 'fit'
+              ? undefined
+              : ({ '--canvas-zoom': canvasZoom } as CSSProperties)
+          }
         >
           <StageCanvas
             activeSlide={activeSlide}

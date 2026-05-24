@@ -71,6 +71,9 @@ import './App.css'
 type Mode = 'text' | 'layout'
 type CanvasView = 'slide' | 'grid'
 type RectField = keyof Rect
+type CanvasZoom = 'fit' | number
+
+const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
 type EditingState = {
   clientPoint?: Point
@@ -136,6 +139,7 @@ function App() {
 
   const [mode, setMode] = useState<Mode>('text')
   const [canvasView, setCanvasView] = useState<CanvasView>('slide')
+  const [canvasZoom, setCanvasZoom] = useState<CanvasZoom>('fit')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
@@ -345,6 +349,28 @@ function App() {
     }
 
     setCanvasView(nextView)
+  }
+
+  function zoomStep(direction: -1 | 1) {
+    const currentZoom = canvasZoom === 'fit' ? 1 : canvasZoom
+    const currentIndex = CANVAS_ZOOM_STEPS.findIndex((step) => step >= currentZoom)
+    const fallbackIndex = CANVAS_ZOOM_STEPS.indexOf(1)
+    const nextIndex =
+      direction > 0
+        ? currentZoom >= CANVAS_ZOOM_STEPS.at(-1)!
+          ? CANVAS_ZOOM_STEPS.length - 1
+          : Math.max(0, currentIndex) + 1
+        : currentZoom <= CANVAS_ZOOM_STEPS[0]
+          ? 0
+          : currentIndex > 0
+            ? currentIndex - 1
+            : fallbackIndex
+
+    setCanvasZoom(CANVAS_ZOOM_STEPS[nextIndex] ?? 1)
+  }
+
+  function fitCanvasZoom() {
+    setCanvasZoom('fit')
   }
 
   function activateSlide(slideId: string) {
@@ -793,7 +819,10 @@ function App() {
         canRedo={doc.history.canRedo}
         canReset={canReset}
         canUndo={doc.history.canUndo}
+        canZoomIn={canvasZoom === 'fit' || canvasZoom < CANVAS_ZOOM_STEPS.at(-1)!}
+        canZoomOut={canvasZoom === 'fit' || canvasZoom > CANVAS_ZOOM_STEPS[0]}
         canvasView={canvasView}
+        canvasZoom={canvasZoom}
         changedSlideIds={changedSlideIds}
         copyState={copyState}
         copyTitle={copyTitle}
@@ -835,6 +864,9 @@ function App() {
         onDistributeSelection={distributeSelectedBlocks}
         onLayerOrderChange={changeSelectedLayerOrder}
         onInsertTextBlock={insertTextBlock}
+        onZoomFit={fitCanvasZoom}
+        onZoomIn={() => zoomStep(1)}
+        onZoomOut={() => zoomStep(-1)}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}
         onNotesChange={(notes) =>
@@ -868,6 +900,9 @@ function App() {
         stageRef={stageRef}
         suppressStageClickRef={suppressStageClickRef}
         visualSelectionRect={visualSelectionRect}
+        zoomLabel={
+          canvasZoom === 'fit' ? 'Fit' : `${Math.round(canvasZoom * 100)}%`
+        }
       />
 
       {presenting ? (

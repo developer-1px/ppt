@@ -2,11 +2,14 @@ import {
   Check,
   Code2,
   Download,
+  Maximize2,
   Play,
   Redo2,
   RotateCcw,
   Type,
   Undo2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 
 type Mode = 'text' | 'layout'
@@ -15,6 +18,8 @@ type TopbarProps = {
   canRedo: boolean
   canReset: boolean
   canUndo: boolean
+  canZoomIn: boolean
+  canZoomOut: boolean
   copyState: 'copied' | 'failed' | 'idle'
   copyTitle: string
   exportCopied: boolean
@@ -28,14 +33,20 @@ type TopbarProps = {
   onRedo: () => void
   onReset: () => void
   onUndo: () => void
+  onZoomFit: () => void
+  onZoomIn: () => void
+  onZoomOut: () => void
   resetScope: 'deck' | 'layout' | 'text'
   resetTitle: string
+  zoomLabel: string
 }
 
 export function Topbar({
   canRedo,
   canReset,
   canUndo,
+  canZoomIn,
+  canZoomOut,
   copyState,
   copyTitle,
   exportCopied,
@@ -49,8 +60,12 @@ export function Topbar({
   onRedo,
   onReset,
   onUndo,
+  onZoomFit,
+  onZoomIn,
+  onZoomOut,
   resetScope,
   resetTitle,
+  zoomLabel,
 }: TopbarProps) {
   return (
     <header className="topbar">
@@ -72,6 +87,38 @@ export function Topbar({
           type="button"
         >
           Arrange
+        </button>
+      </div>
+
+      <div className="zoom-controls" role="toolbar" aria-label="Canvas zoom">
+        <button
+          aria-label="Zoom out"
+          disabled={!canZoomOut}
+          onClick={onZoomOut}
+          title="Zoom out"
+          type="button"
+        >
+          <ZoomOut aria-hidden="true" size={16} strokeWidth={2.2} />
+        </button>
+        <span aria-live="polite" className="zoom-value">
+          {zoomLabel}
+        </span>
+        <button
+          aria-label="Zoom in"
+          disabled={!canZoomIn}
+          onClick={onZoomIn}
+          title="Zoom in"
+          type="button"
+        >
+          <ZoomIn aria-hidden="true" size={16} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Fit canvas"
+          onClick={onZoomFit}
+          title="Fit canvas"
+          type="button"
+        >
+          <Maximize2 aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
       </div>
 

@@ -199,6 +199,7 @@
 }
 
 .mode-toggle,
+.zoom-controls,
 .toolbar {
   display: inline-flex;
   align-items: center;
@@ -214,11 +215,16 @@
   justify-content: flex-end;
 }
 
+.zoom-controls {
+  flex: 0 0 auto;
+}
+
 button {
   font: inherit;
 }
 
 .mode-button,
+.zoom-controls button,
 .toolbar button {
   height: 30px;
   display: inline-grid;
@@ -236,13 +242,15 @@ button {
   padding: 0 12px;
 }
 
-.toolbar button {
+.toolbar button,
+.zoom-controls button {
   width: 30px;
   min-width: 30px;
   padding: 0;
 }
 
 .mode-button:hover,
+.zoom-controls button:hover:not(:disabled),
 .toolbar button:hover:not(:disabled) {
   border-color: #cbd5e1;
   background: #ffffff;
@@ -255,13 +263,22 @@ button {
   color: #1d4ed8;
 }
 
+.zoom-value {
+  width: 44px;
+  display: inline-grid;
+  place-items: center;
+  color: #334155;
+  font: 760 12px/1 var(--sans);
+}
+
 .toolbar button[data-copy-state='failed'] {
   border-color: #dc2626;
   background: #fef2f2;
   color: #b91c1c;
 }
 
-.toolbar button:disabled {
+.toolbar button:disabled,
+.zoom-controls button:disabled {
   color: #a1a1aa;
   cursor: not-allowed;
 }
@@ -278,6 +295,10 @@ button {
   background: #eef1f5;
 }
 
+.stage-shell[data-zoom-mode='manual'] {
+  place-items: start center;
+}
+
 .stage-shell-grid {
   display: block;
   padding: 18px;
@@ -288,6 +309,11 @@ button {
   max-width: 1180px;
   aspect-ratio: 16 / 9;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+}
+
+.stage-shell[data-zoom-mode='manual'] .slide-frame {
+  width: calc(1280px * var(--canvas-zoom));
+  max-width: none;
 }
 
 .slide-canvas {
