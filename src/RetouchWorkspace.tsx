@@ -15,6 +15,7 @@ import type {
   RetouchSlide,
   SlideBlock,
 } from './retouchModel'
+import type { AlignSelectionAction } from './selectionAlignment'
 import type {
   DraftLayout,
   Interaction,
@@ -58,6 +59,7 @@ type RetouchWorkspaceProps = {
     pointer: Pointer,
     block: SlideBlock,
   ) => void
+  onAlignSelection: (action: AlignSelectionAction) => void
   onCancelTextEdit: () => void
   onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
   onChangeMode: (mode: Mode) => void
@@ -118,6 +120,7 @@ export function RetouchWorkspace({
   notes,
   onBlockClick,
   onBlockPointerDown,
+  onAlignSelection,
   onCancelTextEdit,
   onCanvasPointerDown,
   onChangeMode,
@@ -246,6 +249,7 @@ export function RetouchWorkspace({
         canvasView={canvasView}
         mode={mode}
         notes={notes}
+        onAlignSelection={onAlignSelection}
         onDeleteBlock={onDeleteBlock}
         onDuplicateBlock={onDuplicateBlock}
         onNotesChange={onNotesChange}

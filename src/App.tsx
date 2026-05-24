@@ -18,6 +18,7 @@ import {
   blockPointer,
   clamp,
   findSlideIndex,
+  getRect,
   rectEquals,
   slideAccentPointer,
   slideNamePointer,
@@ -32,6 +33,11 @@ import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
 import { createTextBlock, duplicateBlock } from './slideBlockOperations'
 import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
+import {
+  alignRectToBounds,
+  alignmentBounds,
+  type AlignSelectionAction,
+} from './selectionAlignment'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
 import { useRetouchMarqueeSelection } from './useRetouchMarqueeSelection'
@@ -571,6 +577,45 @@ function App() {
     }
   }
 
+  function alignSelectedBlocks(action: AlignSelectionAction) {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length === 0) {
+      return
+    }
+
+    const bounds = alignmentBounds(locations.map((location) => getRect(location.block)))
+
+    if (!bounds) {
+      return
+    }
+
+    const targets = locations.map((location) => ({
+      pointer: location.pointer,
+      rect: alignRectToBounds(getRect(location.block), bounds, action),
+      startRect: getRect(location.block),
+    }))
+
+    if (targets.every((target) => rectEquals(target.rect, target.startRect))) {
+      return
+    }
+
+    commitActiveTextEdit()
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+    commitPatch(
+      targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
+      targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
+      'align selection',
+      undefined,
+      selectionActionForPointers(
+        targets.map((target) => target.pointer),
+        selectedPointer ?? targets.at(-1)?.pointer,
+      ),
+    )
+  }
+
   function changeSelectedBlockRect(rect: Rect, changedField?: RectField) {
     if (!selectedPointer || !selectedBlock || !selectedRect) {
       return
@@ -695,6 +740,7 @@ function App() {
         onDeleteBlock={deleteSelectedBlock}
         onDownloadExport={downloadExportCode}
         onDuplicateBlock={duplicateSelectedBlock}
+        onAlignSelection={alignSelectedBlocks}
         onInsertTextBlock={insertTextBlock}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}

@@ -1,6 +1,17 @@
 import { useRef, useState } from 'react'
-import { Copy, Play, Trash2 } from 'lucide-react'
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  Copy,
+  Play,
+  Trash2,
+} from 'lucide-react'
 import type { Rect, SlideBlock } from './retouchModel'
+import type { AlignSelectionAction } from './selectionAlignment'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
 
 type RectField = keyof Rect
@@ -11,6 +22,7 @@ type InspectorPanelProps = {
   canvasView: 'slide' | 'grid'
   mode: 'text' | 'layout'
   notes: string
+  onAlignSelection: (action: AlignSelectionAction) => void
   onDeleteBlock: () => void
   onDuplicateBlock: () => void
   onNotesChange: (notes: string) => void
@@ -30,12 +42,26 @@ const GEOMETRY_FIELDS: { field: RectField; label: string }[] = [
   { field: 'height', label: 'H' },
 ]
 
+const ALIGNMENT_ACTIONS: {
+  action: AlignSelectionAction
+  icon: typeof AlignStartVertical
+  label: string
+}[] = [
+  { action: 'left', icon: AlignStartVertical, label: 'Align left' },
+  { action: 'center-x', icon: AlignCenterVertical, label: 'Align horizontal center' },
+  { action: 'right', icon: AlignEndVertical, label: 'Align right' },
+  { action: 'top', icon: AlignStartHorizontal, label: 'Align top' },
+  { action: 'middle-y', icon: AlignCenterHorizontal, label: 'Align vertical middle' },
+  { action: 'bottom', icon: AlignEndHorizontal, label: 'Align bottom' },
+]
+
 export function InspectorPanel({
   activeSlideAccent,
   activeSlideName,
   canvasView,
   mode,
   notes,
+  onAlignSelection,
   onDeleteBlock,
   onDuplicateBlock,
   onNotesChange,
@@ -127,12 +153,15 @@ export function InspectorPanel({
           ) : null}
         </div>
         {hasMultiSelection ? (
-          <dl>
-            <div>
-              <dt>Blocks</dt>
-              <dd>{selectedCount} selected</dd>
-            </div>
-          </dl>
+          <>
+            <dl>
+              <div>
+                <dt>Blocks</dt>
+                <dd>{selectedCount} selected</dd>
+              </div>
+            </dl>
+            <AlignmentTools onAlignSelection={onAlignSelection} />
+          </>
         ) : selectedBlock ? (
           <>
             <dl>
@@ -145,6 +174,7 @@ export function InspectorPanel({
                 <dd>{selectedBlock.role}</dd>
               </div>
             </dl>
+            <AlignmentTools onAlignSelection={onAlignSelection} />
             {selectedRect ? (
               <GeometryEditor
                 key={`${selectedBlock.id}:${selectedRect.x}:${selectedRect.y}:${selectedRect.width}:${selectedRect.height}`}
@@ -168,6 +198,28 @@ export function InspectorPanel({
         />
       </section>
     </aside>
+  )
+}
+
+function AlignmentTools({
+  onAlignSelection,
+}: {
+  onAlignSelection: (action: AlignSelectionAction) => void
+}) {
+  return (
+    <div aria-label="Alignment" className="alignment-tools" role="toolbar">
+      {ALIGNMENT_ACTIONS.map(({ action, icon: Icon, label }) => (
+        <button
+          aria-label={label}
+          key={action}
+          onClick={() => onAlignSelection(action)}
+          title={label}
+          type="button"
+        >
+          <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+      ))}
+    </div>
   )
 }
 
