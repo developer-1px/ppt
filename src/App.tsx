@@ -8,14 +8,22 @@ import {
 import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
+  MIN_BLOCK_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
+  SLIDE_HEIGHT,
+  SLIDE_WIDTH,
   RetouchDeckSchema,
   blockPointer,
+  clamp,
   findSlideIndex,
+  rectEquals,
   slideAccentPointer,
   slideNamePointer,
   slidePointer,
+  setLayoutPatch,
+  snap,
+  type Rect,
 } from './retouchModel'
 import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
@@ -45,10 +53,57 @@ import './App.css'
 
 type Mode = 'text' | 'layout'
 type CanvasView = 'slide' | 'grid'
+type RectField = keyof Rect
 
 type EditingState = {
   clientPoint?: Point
   pointer: Pointer
+}
+
+function finiteNumber(value: number, fallback: number) {
+  return Number.isFinite(value) ? value : fallback
+}
+
+function normalizeInspectorRect(
+  rect: Rect,
+  currentRect: Rect,
+  changedField?: RectField,
+): Rect {
+  const nextRect = { ...currentRect }
+
+  if (changedField === 'x') {
+    nextRect.x = clamp(
+      snap(finiteNumber(rect.x, currentRect.x)),
+      0,
+      SLIDE_WIDTH - currentRect.width,
+    )
+  }
+
+  if (changedField === 'y') {
+    nextRect.y = clamp(
+      snap(finiteNumber(rect.y, currentRect.y)),
+      0,
+      SLIDE_HEIGHT - currentRect.height,
+    )
+  }
+
+  if (changedField === 'width') {
+    nextRect.width = clamp(
+      snap(finiteNumber(rect.width, currentRect.width)),
+      MIN_BLOCK_SIZE,
+      SLIDE_WIDTH - currentRect.x,
+    )
+  }
+
+  if (changedField === 'height') {
+    nextRect.height = clamp(
+      snap(finiteNumber(rect.height, currentRect.height)),
+      MIN_BLOCK_SIZE,
+      SLIDE_HEIGHT - currentRect.y,
+    )
+  }
+
+  return nextRect
 }
 
 function App() {
@@ -480,6 +535,29 @@ function App() {
     }
   }
 
+  function changeSelectedBlockRect(rect: Rect, changedField?: RectField) {
+    if (!selectedPointer || !selectedBlock || !selectedRect) {
+      return
+    }
+
+    const nextRect = normalizeInspectorRect(rect, selectedRect, changedField)
+
+    if (rectEquals(nextRect, selectedRect)) {
+      return
+    }
+
+    commitActiveTextEdit()
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+    commitPatch(
+      setLayoutPatch(selectedPointer, nextRect),
+      selectedPointer,
+      'edit block geometry',
+      `layout:geometry:${selectedPointer}`,
+    )
+  }
+
   function startPresentation() {
     commitActiveTextEdit()
     setCanvasView('slide')
@@ -593,6 +671,7 @@ function App() {
         onRedo={redoDocumentChange}
         onReset={resetCurrentTarget}
         onResizePointerDown={startResizeInteraction}
+        onSelectedRectChange={changeSelectedBlockRect}
         onStageBackgroundClick={() => {
           if (mode === 'text') {
             commitActiveTextEdit()

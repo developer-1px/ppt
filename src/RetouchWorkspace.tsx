@@ -74,6 +74,7 @@ type RetouchWorkspaceProps = {
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
   ) => void
+  onSelectedRectChange: (rect: Rect, changedField?: keyof Rect) => void
   onStageBackgroundClick: () => void
   onSlideAccentChange: (accent: string) => void
   onSlideNameChange: (name: string) => void
@@ -128,6 +129,7 @@ export function RetouchWorkspace({
   onRedo,
   onReset,
   onResizePointerDown,
+  onSelectedRectChange,
   onStageBackgroundClick,
   onSlideAccentChange,
   onSlideNameChange,
@@ -238,9 +240,11 @@ export function RetouchWorkspace({
         onDuplicateBlock={onDuplicateBlock}
         onNotesChange={onNotesChange}
         onPresent={onPresent}
+        onSelectedRectChange={onSelectedRectChange}
         onSlideAccentChange={onSlideAccentChange}
         onSlideNameChange={onSlideNameChange}
         selectedBlock={selectedBlock}
+        selectedRect={selectedRect}
       />
     </section>
   )

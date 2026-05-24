@@ -681,6 +681,42 @@ button {
   outline: 2px solid rgba(37, 99, 235, 0.18);
 }
 
+.geometry-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.geometry-field {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+}
+
+.geometry-field span {
+  color: #64748b;
+  font: 700 11px/1 var(--sans);
+}
+
+.geometry-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2937;
+  font: 650 12px/1.2 var(--sans);
+}
+
+.geometry-field input:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+}
+
 .accent-swatches {
   display: flex;
   flex-wrap: wrap;

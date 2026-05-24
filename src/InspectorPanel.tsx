@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import { Copy, Play, Trash2 } from 'lucide-react'
-import type { SlideBlock } from './retouchModel'
+import type { Rect, SlideBlock } from './retouchModel'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
+
+type RectField = keyof Rect
 
 type InspectorPanelProps = {
   activeSlideAccent: string
@@ -13,10 +15,19 @@ type InspectorPanelProps = {
   onDuplicateBlock: () => void
   onNotesChange: (notes: string) => void
   onPresent: () => void
+  onSelectedRectChange: (rect: Rect, changedField?: RectField) => void
   onSlideAccentChange: (accent: string) => void
   onSlideNameChange: (name: string) => void
   selectedBlock: SlideBlock | null
+  selectedRect: Rect | null
 }
+
+const GEOMETRY_FIELDS: { field: RectField; label: string }[] = [
+  { field: 'x', label: 'X' },
+  { field: 'y', label: 'Y' },
+  { field: 'width', label: 'W' },
+  { field: 'height', label: 'H' },
+]
 
 export function InspectorPanel({
   activeSlideAccent,
@@ -28,9 +39,11 @@ export function InspectorPanel({
   onDuplicateBlock,
   onNotesChange,
   onPresent,
+  onSelectedRectChange,
   onSlideAccentChange,
   onSlideNameChange,
   selectedBlock,
+  selectedRect,
 }: InspectorPanelProps) {
   return (
     <aside className="inspector-panel" aria-label="Slide details">
@@ -107,16 +120,25 @@ export function InspectorPanel({
           ) : null}
         </div>
         {selectedBlock ? (
-          <dl>
-            <div>
-              <dt>Block</dt>
-              <dd>{selectedBlock.id}</dd>
-            </div>
-            <div>
-              <dt>Role</dt>
-              <dd>{selectedBlock.role}</dd>
-            </div>
-          </dl>
+          <>
+            <dl>
+              <div>
+                <dt>Block</dt>
+                <dd>{selectedBlock.id}</dd>
+              </div>
+              <div>
+                <dt>Role</dt>
+                <dd>{selectedBlock.role}</dd>
+              </div>
+            </dl>
+            {selectedRect ? (
+              <GeometryEditor
+                key={`${selectedBlock.id}:${selectedRect.x}:${selectedRect.y}:${selectedRect.width}:${selectedRect.height}`}
+                onRectChange={onSelectedRectChange}
+                rect={selectedRect}
+              />
+            ) : null}
+          </>
         ) : (
           <p className="inspector-empty">None</p>
         )}
@@ -132,6 +154,94 @@ export function InspectorPanel({
         />
       </section>
     </aside>
+  )
+}
+
+function rectDraft(rect: Rect): Record<RectField, string> {
+  return {
+    x: String(rect.x),
+    y: String(rect.y),
+    width: String(rect.width),
+    height: String(rect.height),
+  }
+}
+
+function GeometryEditor({
+  onRectChange,
+  rect,
+}: {
+  onRectChange: (rect: Rect, changedField?: RectField) => void
+  rect: Rect
+}) {
+  const [draft, setDraft] = useState(() => rectDraft(rect))
+  const draftRef = useRef(draft)
+  const skipNextCommitRef = useRef<RectField | null>(null)
+
+  function updateDraftField(field: RectField, value: string) {
+    const nextDraft = {
+      ...draftRef.current,
+      [field]: value,
+    }
+
+    draftRef.current = nextDraft
+    setDraft(nextDraft)
+  }
+
+  function commitField(field: RectField) {
+    if (skipNextCommitRef.current === field) {
+      skipNextCommitRef.current = null
+      return
+    }
+
+    const value = Number(draftRef.current[field])
+
+    if (!Number.isFinite(value)) {
+      updateDraftField(field, String(rect[field]))
+      return
+    }
+
+    if (value === rect[field]) {
+      return
+    }
+
+    onRectChange({ ...rect, [field]: value }, field)
+  }
+
+  return (
+    <div aria-label="Geometry" className="geometry-editor" role="group">
+      {GEOMETRY_FIELDS.map(({ field, label }) => (
+        <label className="geometry-field" key={field}>
+          <span>{label}</span>
+          <input
+            aria-label={label}
+            inputMode="numeric"
+            min={field === 'width' || field === 'height' ? 72 : 0}
+            onBlur={() => commitField(field)}
+            onChange={(event) => {
+              const value =
+                event.target instanceof HTMLInputElement ? event.target.value : ''
+
+              updateDraftField(field, value)
+            }}
+            onFocus={(event) => event.currentTarget.select()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.currentTarget.blur()
+              }
+
+              if (event.key === 'Escape') {
+                skipNextCommitRef.current = field
+                updateDraftField(field, String(rect[field]))
+                event.currentTarget.blur()
+              }
+            }}
+            step={8}
+            type="number"
+            value={draft[field]}
+          />
+        </label>
+      ))}
+    </div>
   )
 }
 
