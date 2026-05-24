@@ -325,6 +325,30 @@ function App() {
     activateSlide(nextSlide.id)
   }
 
+  function moveSlide(direction: -1 | 1) {
+    const nextIndex = activeSlideIndex + direction
+
+    if (nextIndex < 0 || nextIndex >= doc.value.slides.length) {
+      return
+    }
+
+    commitActiveTextEdit()
+    doc.commit(
+      [
+        { op: 'remove', path: slidePointer(activeSlideIndex) },
+        { op: 'add', path: slidePointer(nextIndex), value: activeSlide },
+      ],
+      {
+        label: direction < 0 ? 'move slide up' : 'move slide down',
+        origin: 'ppt-retouch',
+      },
+    )
+    setActiveSlideId(activeSlide.id)
+    setCanvasView('slide')
+    doc.selection?.empty()
+    clearTransientState()
+  }
+
   function changeSlideName(name: string) {
     const nextName = name.trim() || 'Untitled'
 
@@ -497,6 +521,8 @@ function App() {
     <main className="retouch-app" data-mode={mode}>
       <SlideRail
         activeSlideId={activeSlide.id}
+        canMoveSlideDown={activeSlideIndex < doc.value.slides.length - 1}
+        canMoveSlideUp={activeSlideIndex > 0}
         canvasView={canvasView}
         changedSlideIds={changedSlideIds}
         canDeleteSlide={doc.value.slides.length > 1}
@@ -504,6 +530,8 @@ function App() {
         onAddSlide={addSlide}
         onDeleteSlide={deleteSlide}
         onDuplicateSlide={copySlide}
+        onMoveSlideDown={() => moveSlide(1)}
+        onMoveSlideUp={() => moveSlide(-1)}
         onSelectSlide={selectSlide}
         slides={doc.value.slides}
       />

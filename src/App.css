@@ -49,7 +49,7 @@
 
 .rail-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 2px;
   padding: 2px;
   border: 1px solid #d1d5db;
@@ -874,8 +874,8 @@ button {
   }
 
   .rail-actions {
-    width: 92px;
-    flex: 0 0 92px;
+    width: 148px;
+    flex: 0 0 148px;
     align-self: stretch;
   }
 

@@ -1,5 +1,7 @@
 import { type ButtonHTMLAttributes, type CSSProperties, useMemo } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
   Copy,
   Plus,
   Trash2,
@@ -16,12 +18,16 @@ import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 type SlideRailProps = {
   activeSlideId: string
   canDeleteSlide: boolean
+  canMoveSlideDown: boolean
+  canMoveSlideUp: boolean
   canvasView: 'slide' | 'grid'
   changedSlideIds: Set<string>
   onAddSlide: () => void
   onChangeCanvasView: (view: 'slide' | 'grid') => void
   onDeleteSlide: () => void
   onDuplicateSlide: () => void
+  onMoveSlideDown: () => void
+  onMoveSlideUp: () => void
   onSelectSlide: (slideId: string) => void
   slides: RetouchSlide[]
 }
@@ -29,12 +35,16 @@ type SlideRailProps = {
 export function SlideRail({
   activeSlideId,
   canDeleteSlide,
+  canMoveSlideDown,
+  canMoveSlideUp,
   canvasView,
   changedSlideIds,
   onAddSlide,
   onChangeCanvasView,
   onDeleteSlide,
   onDuplicateSlide,
+  onMoveSlideDown,
+  onMoveSlideUp,
   onSelectSlide,
   slides,
 }: SlideRailProps) {
@@ -127,6 +137,24 @@ export function SlideRail({
           type="button"
         >
           <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Move slide up"
+          disabled={!canMoveSlideUp}
+          onClick={onMoveSlideUp}
+          title="Move slide up"
+          type="button"
+        >
+          <ArrowUp aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Move slide down"
+          disabled={!canMoveSlideDown}
+          onClick={onMoveSlideDown}
+          title="Move slide down"
+          type="button"
+        >
+          <ArrowDown aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
         <button
           aria-label="Delete slide"
