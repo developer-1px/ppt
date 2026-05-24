@@ -1,5 +1,10 @@
 import { type ButtonHTMLAttributes, type CSSProperties, useMemo } from 'react'
 import {
+  Copy,
+  Plus,
+  Trash2,
+} from 'lucide-react'
+import {
   listboxDefinition,
   reducePatternData,
   useListboxPattern,
@@ -10,18 +15,26 @@ import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 
 type SlideRailProps = {
   activeSlideId: string
+  canDeleteSlide: boolean
   canvasView: 'slide' | 'grid'
   changedSlideIds: Set<string>
+  onAddSlide: () => void
   onChangeCanvasView: (view: 'slide' | 'grid') => void
+  onDeleteSlide: () => void
+  onDuplicateSlide: () => void
   onSelectSlide: (slideId: string) => void
   slides: RetouchSlide[]
 }
 
 export function SlideRail({
   activeSlideId,
+  canDeleteSlide,
   canvasView,
   changedSlideIds,
+  onAddSlide,
   onChangeCanvasView,
+  onDeleteSlide,
+  onDuplicateSlide,
   onSelectSlide,
   slides,
 }: SlideRailProps) {
@@ -100,6 +113,29 @@ export function SlideRail({
           type="button"
         >
           Grid
+        </button>
+      </div>
+
+      <div className="rail-actions" role="toolbar" aria-label="Slide actions">
+        <button aria-label="Add slide" onClick={onAddSlide} title="Add slide" type="button">
+          <Plus aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Duplicate slide"
+          onClick={onDuplicateSlide}
+          title="Duplicate slide"
+          type="button"
+        >
+          <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Delete slide"
+          disabled={!canDeleteSlide}
+          onClick={onDeleteSlide}
+          title="Delete slide"
+          type="button"
+        >
+          <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
       </div>
 

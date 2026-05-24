@@ -12,11 +12,13 @@ import {
   SAMPLE_SLIDES,
   RetouchDeckSchema,
   findSlideIndex,
+  slidePointer,
 } from './retouchModel'
 import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
+import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
 import { useRetouchKeyboardShortcuts } from './useRetouchKeyboardShortcuts'
@@ -255,13 +257,68 @@ function App() {
     setCanvasView(nextView)
   }
 
-  function selectSlide(slideId: string) {
-    commitActiveTextEdit()
+  function activateSlide(slideId: string) {
     setActiveSlideId(slideId)
     setCanvasView('slide')
     doc.selection?.empty()
     stageRef.current?.scrollTo({ left: 0, top: 0 })
     clearTransientState()
+  }
+
+  function selectSlide(slideId: string) {
+    commitActiveTextEdit()
+    activateSlide(slideId)
+  }
+
+  function addSlide() {
+    commitActiveTextEdit()
+    const nextSlide = createBlankSlide(doc.value.slides)
+    const insertIndex = activeSlideIndex + 1
+
+    doc.commit([{ op: 'add', path: slidePointer(insertIndex), value: nextSlide }], {
+      label: 'add slide',
+      origin: 'ppt-retouch',
+    })
+    activateSlide(nextSlide.id)
+  }
+
+  function copySlide() {
+    commitActiveTextEdit()
+    const nextSlide = duplicateSlide(activeSlide, doc.value.slides)
+    const insertIndex = activeSlideIndex + 1
+
+    doc.commit([{ op: 'add', path: slidePointer(insertIndex), value: nextSlide }], {
+      label: 'duplicate slide',
+      origin: 'ppt-retouch',
+    })
+    setNotesBySlideId((current) => ({
+      ...current,
+      [nextSlide.id]: current[activeSlide.id] ?? '',
+    }))
+    activateSlide(nextSlide.id)
+  }
+
+  function deleteSlide() {
+    if (doc.value.slides.length <= 1) {
+      return
+    }
+
+    commitActiveTextEdit()
+    const nextSlide =
+      doc.value.slides[activeSlideIndex + 1] ??
+      doc.value.slides[activeSlideIndex - 1] ??
+      doc.value.slides[0]
+
+    doc.commit([{ op: 'remove', path: slidePointer(activeSlideIndex) }], {
+      label: 'delete slide',
+      origin: 'ppt-retouch',
+    })
+    setNotesBySlideId((current) => {
+      const next = { ...current }
+      delete next[activeSlide.id]
+      return next
+    })
+    activateSlide(nextSlide.id)
   }
 
   function startPresentation() {
@@ -307,7 +364,11 @@ function App() {
         activeSlideId={activeSlide.id}
         canvasView={canvasView}
         changedSlideIds={changedSlideIds}
+        canDeleteSlide={doc.value.slides.length > 1}
         onChangeCanvasView={changeCanvasView}
+        onAddSlide={addSlide}
+        onDeleteSlide={deleteSlide}
+        onDuplicateSlide={copySlide}
         onSelectSlide={selectSlide}
         slides={doc.value.slides}
       />
