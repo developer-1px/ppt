@@ -628,6 +628,12 @@ button {
   gap: 4px;
 }
 
+.layer-tools {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 4px;
+}
+
 .inspector-section h2,
 .inspector-notes label {
   margin: 0;
@@ -654,7 +660,8 @@ button {
   color: #1d4ed8;
 }
 
-.alignment-tools button {
+.alignment-tools button,
+.layer-tools button {
   width: 28px;
   height: 28px;
   display: inline-grid;
@@ -667,7 +674,8 @@ button {
   cursor: pointer;
 }
 
-.alignment-tools button:hover {
+.alignment-tools button:hover,
+.layer-tools button:hover {
   border-color: #2563eb;
   color: #1d4ed8;
 }

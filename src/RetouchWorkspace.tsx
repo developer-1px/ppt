@@ -16,6 +16,7 @@ import type {
   SlideBlock,
 } from './retouchModel'
 import type { AlignSelectionAction } from './selectionAlignment'
+import type { LayerOrderAction } from './selectionLayerOrder'
 import type {
   DraftLayout,
   Interaction,
@@ -69,6 +70,7 @@ type RetouchWorkspaceProps = {
   onDownloadExport: () => void
   onDuplicateBlock: () => void
   onInsertTextBlock: () => void
+  onLayerOrderChange: (action: LayerOrderAction) => void
   onNotesChange: (notes: string) => void
   onOpenSlide: (slideId: string) => void
   onPresent: () => void
@@ -130,6 +132,7 @@ export function RetouchWorkspace({
   onDownloadExport,
   onDuplicateBlock,
   onInsertTextBlock,
+  onLayerOrderChange,
   onNotesChange,
   onOpenSlide,
   onPresent,
@@ -252,6 +255,7 @@ export function RetouchWorkspace({
         onAlignSelection={onAlignSelection}
         onDeleteBlock={onDeleteBlock}
         onDuplicateBlock={onDuplicateBlock}
+        onLayerOrderChange={onLayerOrderChange}
         onNotesChange={onNotesChange}
         onPresent={onPresent}
         onSelectedRectChange={onSelectedRectChange}

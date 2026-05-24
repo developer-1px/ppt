@@ -6,12 +6,17 @@ import {
   AlignEndVertical,
   AlignStartHorizontal,
   AlignStartVertical,
+  BringToFront,
   Copy,
+  MoveDown,
+  MoveUp,
   Play,
+  SendToBack,
   Trash2,
 } from 'lucide-react'
 import type { Rect, SlideBlock } from './retouchModel'
 import type { AlignSelectionAction } from './selectionAlignment'
+import type { LayerOrderAction } from './selectionLayerOrder'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
 
 type RectField = keyof Rect
@@ -25,6 +30,7 @@ type InspectorPanelProps = {
   onAlignSelection: (action: AlignSelectionAction) => void
   onDeleteBlock: () => void
   onDuplicateBlock: () => void
+  onLayerOrderChange: (action: LayerOrderAction) => void
   onNotesChange: (notes: string) => void
   onPresent: () => void
   onSelectedRectChange: (rect: Rect, changedField?: RectField) => void
@@ -55,6 +61,17 @@ const ALIGNMENT_ACTIONS: {
   { action: 'bottom', icon: AlignEndHorizontal, label: 'Align bottom' },
 ]
 
+const LAYER_ORDER_ACTIONS: {
+  action: LayerOrderAction
+  icon: typeof BringToFront
+  label: string
+}[] = [
+  { action: 'front', icon: BringToFront, label: 'Bring to front' },
+  { action: 'forward', icon: MoveUp, label: 'Bring forward' },
+  { action: 'backward', icon: MoveDown, label: 'Send backward' },
+  { action: 'back', icon: SendToBack, label: 'Send to back' },
+]
+
 export function InspectorPanel({
   activeSlideAccent,
   activeSlideName,
@@ -64,6 +81,7 @@ export function InspectorPanel({
   onAlignSelection,
   onDeleteBlock,
   onDuplicateBlock,
+  onLayerOrderChange,
   onNotesChange,
   onPresent,
   onSelectedRectChange,
@@ -161,6 +179,7 @@ export function InspectorPanel({
               </div>
             </dl>
             <AlignmentTools onAlignSelection={onAlignSelection} />
+            <LayerOrderTools onLayerOrderChange={onLayerOrderChange} />
           </>
         ) : selectedBlock ? (
           <>
@@ -175,6 +194,7 @@ export function InspectorPanel({
               </div>
             </dl>
             <AlignmentTools onAlignSelection={onAlignSelection} />
+            <LayerOrderTools onLayerOrderChange={onLayerOrderChange} />
             {selectedRect ? (
               <GeometryEditor
                 key={`${selectedBlock.id}:${selectedRect.x}:${selectedRect.y}:${selectedRect.width}:${selectedRect.height}`}
@@ -198,6 +218,28 @@ export function InspectorPanel({
         />
       </section>
     </aside>
+  )
+}
+
+function LayerOrderTools({
+  onLayerOrderChange,
+}: {
+  onLayerOrderChange: (action: LayerOrderAction) => void
+}) {
+  return (
+    <div aria-label="Layer order" className="layer-tools" role="toolbar">
+      {LAYER_ORDER_ACTIONS.map(({ action, icon: Icon, label }) => (
+        <button
+          aria-label={label}
+          key={action}
+          onClick={() => onLayerOrderChange(action)}
+          title={label}
+          type="button"
+        >
+          <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+      ))}
+    </div>
   )
 }
 

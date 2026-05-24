@@ -20,6 +20,7 @@ import {
   findSlideIndex,
   getRect,
   rectEquals,
+  slideBlocksPointer,
   slideAccentPointer,
   slideNamePointer,
   slidePointer,
@@ -38,6 +39,11 @@ import {
   alignmentBounds,
   type AlignSelectionAction,
 } from './selectionAlignment'
+import {
+  blockOrderChanged,
+  reorderBlocksByLayer,
+  type LayerOrderAction,
+} from './selectionLayerOrder'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
 import { useRetouchMarqueeSelection } from './useRetouchMarqueeSelection'
@@ -616,6 +622,50 @@ function App() {
     )
   }
 
+  function changeSelectedLayerOrder(action: LayerOrderAction) {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length === 0) {
+      return
+    }
+
+    const selectedIds = locations.map((location) => location.block.id)
+    const nextBlocks = reorderBlocksByLayer(activeSlide.blocks, selectedIds, action)
+
+    if (!blockOrderChanged(activeSlide.blocks, nextBlocks)) {
+      return
+    }
+
+    const selectedIdSet = new Set(selectedIds)
+    const nextSelectedPointers = nextBlocks
+      .map((block, blockIndex) =>
+        selectedIdSet.has(block.id) ? blockPointer(activeSlideIndex, blockIndex) : null,
+      )
+      .filter((pointer): pointer is Pointer => pointer !== null)
+
+    commitActiveTextEdit()
+    doc.commit(
+      [
+        {
+          op: 'replace',
+          path: slideBlocksPointer(activeSlideIndex),
+          value: nextBlocks,
+        },
+      ],
+      {
+        label: 'reorder layers',
+        origin: 'ppt-retouch',
+        selection: selectionActionForPointers(
+          nextSelectedPointers,
+          nextSelectedPointers.at(-1),
+        ),
+      },
+    )
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+  }
+
   function changeSelectedBlockRect(rect: Rect, changedField?: RectField) {
     if (!selectedPointer || !selectedBlock || !selectedRect) {
       return
@@ -741,6 +791,7 @@ function App() {
         onDownloadExport={downloadExportCode}
         onDuplicateBlock={duplicateSelectedBlock}
         onAlignSelection={alignSelectedBlocks}
+        onLayerOrderChange={changeSelectedLayerOrder}
         onInsertTextBlock={insertTextBlock}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}
