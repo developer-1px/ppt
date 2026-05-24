@@ -1,6 +1,6 @@
 import type { RetouchSlide } from './retouchModel'
 
-const SLIDE_ACCENTS = [
+export const SLIDE_ACCENTS = [
   '#2563eb',
   '#0f766e',
   '#4f46e5',

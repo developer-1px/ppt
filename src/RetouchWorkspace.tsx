@@ -31,6 +31,7 @@ type EditingState = {
 
 type RetouchWorkspaceProps = {
   activeSlide: RetouchSlide
+  activeSlideAccent: string
   activeSlideIndex: number
   canRedo: boolean
   canReset: boolean
@@ -71,6 +72,8 @@ type RetouchWorkspaceProps = {
     handle: ResizeHandle,
   ) => void
   onStageBackgroundClick: () => void
+  onSlideAccentChange: (accent: string) => void
+  onSlideNameChange: (name: string) => void
   onUndo: () => void
   resetScope: 'deck' | 'layout' | 'text'
   resetTitle: string
@@ -89,6 +92,7 @@ type RetouchWorkspaceProps = {
 
 export function RetouchWorkspace({
   activeSlide,
+  activeSlideAccent,
   activeSlideIndex,
   canRedo,
   canReset,
@@ -119,6 +123,8 @@ export function RetouchWorkspace({
   onReset,
   onResizePointerDown,
   onStageBackgroundClick,
+  onSlideAccentChange,
+  onSlideNameChange,
   onUndo,
   resetScope,
   resetTitle,
@@ -216,12 +222,15 @@ export function RetouchWorkspace({
       />
 
       <InspectorPanel
+        activeSlideAccent={activeSlideAccent}
         activeSlideName={activeSlide.name}
         canvasView={canvasView}
         mode={mode}
         notes={notes}
         onNotesChange={onNotesChange}
         onPresent={onPresent}
+        onSlideAccentChange={onSlideAccentChange}
+        onSlideNameChange={onSlideNameChange}
         selectedBlock={selectedBlock}
       />
     </section>

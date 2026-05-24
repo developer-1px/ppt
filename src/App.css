@@ -659,6 +659,46 @@ button {
   white-space: nowrap;
 }
 
+.inspector-name-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2937;
+  font: 650 12px/1.2 var(--sans);
+}
+
+.inspector-name-input:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+}
+
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.accent-swatch {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px #cbd5e1;
+  cursor: pointer;
+}
+
+.accent-swatch[aria-checked='true'] {
+  box-shadow:
+    0 0 0 1px #ffffff,
+    0 0 0 3px #2563eb;
+}
+
 .inspector-notes {
   min-height: 0;
   flex: 1;

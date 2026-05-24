@@ -105,6 +105,14 @@ export function slidePointer(slideIndex: number): Pointer {
   return buildPointer(['slides', slideIndex])
 }
 
+export function slideNamePointer(slideIndex: number): Pointer {
+  return appendSegment(slidePointer(slideIndex), 'name')
+}
+
+export function slideAccentPointer(slideIndex: number): Pointer {
+  return appendSegment(slidePointer(slideIndex), 'accent')
+}
+
 export function blockPointer(slideIndex: number, blockIndex: number): Pointer {
   return buildPointer(['slides', slideIndex, 'blocks', blockIndex])
 }

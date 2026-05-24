@@ -12,6 +12,8 @@ import {
   SAMPLE_SLIDES,
   RetouchDeckSchema,
   findSlideIndex,
+  slideAccentPointer,
+  slideNamePointer,
   slidePointer,
 } from './retouchModel'
 import { exportRetouchDeck } from './retouchExport'
@@ -321,6 +323,52 @@ function App() {
     activateSlide(nextSlide.id)
   }
 
+  function changeSlideName(name: string) {
+    const nextName = name.trim() || 'Untitled'
+
+    if (nextName === activeSlide.name) {
+      return
+    }
+
+    commitActiveTextEdit()
+    doc.commit(
+      [
+        {
+          op: 'replace',
+          path: slideNamePointer(activeSlideIndex),
+          value: nextName,
+        },
+      ],
+      {
+        label: 'rename slide',
+        origin: 'ppt-retouch',
+      },
+    )
+    clearTransientState()
+  }
+
+  function changeSlideAccent(accent: string) {
+    if (accent === activeSlide.accent) {
+      return
+    }
+
+    commitActiveTextEdit()
+    doc.commit(
+      [
+        {
+          op: 'replace',
+          path: slideAccentPointer(activeSlideIndex),
+          value: accent,
+        },
+      ],
+      {
+        label: 'change slide accent',
+        origin: 'ppt-retouch',
+      },
+    )
+    clearTransientState()
+  }
+
   function startPresentation() {
     commitActiveTextEdit()
     setCanvasView('slide')
@@ -376,6 +424,7 @@ function App() {
       <RetouchWorkspace
         activeSlide={activeSlide}
         activeSlideIndex={activeSlideIndex}
+        activeSlideAccent={activeSlide.accent}
         canRedo={doc.history.canRedo}
         canReset={canReset}
         canUndo={doc.history.canUndo}
@@ -413,6 +462,8 @@ function App() {
         onCommitTextEdit={commitTextEdit}
         onCopyExport={copyExportCode}
         onDownloadExport={downloadExportCode}
+        onSlideAccentChange={changeSlideAccent}
+        onSlideNameChange={changeSlideName}
         onNotesChange={(notes) =>
           setNotesBySlideId((current) => ({
             ...current,
