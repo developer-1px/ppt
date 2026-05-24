@@ -19,6 +19,7 @@ type InspectorPanelProps = {
   onSlideAccentChange: (accent: string) => void
   onSlideNameChange: (name: string) => void
   selectedBlock: SlideBlock | null
+  selectedCount: number
   selectedRect: Rect | null
 }
 
@@ -43,8 +44,12 @@ export function InspectorPanel({
   onSlideAccentChange,
   onSlideNameChange,
   selectedBlock,
+  selectedCount,
   selectedRect,
 }: InspectorPanelProps) {
+  const hasSelection = selectedCount > 0
+  const hasMultiSelection = selectedCount > 1
+
   return (
     <aside className="inspector-panel" aria-label="Slide details">
       <section className="inspector-section">
@@ -98,20 +103,22 @@ export function InspectorPanel({
       <section className="inspector-section">
         <div className="inspector-heading">
           <h2>Selection</h2>
-          {selectedBlock ? (
+          {hasSelection ? (
             <div className="selection-actions">
               <button
-                aria-label="Duplicate block"
+                aria-label={
+                  hasMultiSelection ? 'Duplicate selection' : 'Duplicate block'
+                }
                 onClick={onDuplicateBlock}
-                title="Duplicate block"
+                title={hasMultiSelection ? 'Duplicate selection' : 'Duplicate block'}
                 type="button"
               >
                 <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
               </button>
               <button
-                aria-label="Delete block"
+                aria-label={hasMultiSelection ? 'Delete selection' : 'Delete block'}
                 onClick={onDeleteBlock}
-                title="Delete block"
+                title={hasMultiSelection ? 'Delete selection' : 'Delete block'}
                 type="button"
               >
                 <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
@@ -119,7 +126,14 @@ export function InspectorPanel({
             </div>
           ) : null}
         </div>
-        {selectedBlock ? (
+        {hasMultiSelection ? (
+          <dl>
+            <div>
+              <dt>Blocks</dt>
+              <dd>{selectedCount} selected</dd>
+            </div>
+          </dl>
+        ) : selectedBlock ? (
           <>
             <dl>
               <div>

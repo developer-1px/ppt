@@ -83,6 +83,26 @@ export function StageCanvas({
   snapGuides,
   visualSelectionRect,
 }: StageCanvasProps) {
+  const blockEntries = activeSlide.blocks.map((block, blockIndex) => {
+    const pointer = blockPointer(activeSlideIndex, blockIndex)
+
+    return {
+      block,
+      pointer,
+      rect: getCurrentRect(pointer, block, draftLayout),
+      selected: selectedPointerSet.has(pointer),
+    }
+  })
+  const selectedBounds = rectBounds(
+    blockEntries
+      .filter(({ pointer }) => selectedPointerSet.has(pointer))
+      .map(({ rect }) => rect),
+  )
+  const overlayRect =
+    selectedPointers.length === 1 && selectedRect
+      ? (visualSelectionRect ?? selectedRect)
+      : selectedBounds
+
   return (
     <div className="slide-frame">
       <div
@@ -91,10 +111,7 @@ export function StageCanvas({
         ref={slideRef}
         style={{ '--accent': activeSlide.accent } as CSSProperties}
       >
-        {activeSlide.blocks.map((block, blockIndex) => {
-          const pointer = blockPointer(activeSlideIndex, blockIndex)
-          const rect = getCurrentRect(pointer, block, draftLayout)
-          const selected = selectedPointerSet.has(pointer)
+        {blockEntries.map(({ block, pointer, rect, selected }) => {
           const baseBlock = findBlockLocation(
             SAMPLE_DECK,
             activeSlide.id,
@@ -138,10 +155,11 @@ export function StageCanvas({
           )
         })}
 
-        {mode === 'layout' && selectedPointers.length === 1 && selectedRect ? (
+        {mode === 'layout' && overlayRect ? (
           <SelectionOverlay
             onResizePointerDown={onResizePointerDown}
-            rect={visualSelectionRect ?? selectedRect}
+            rect={overlayRect}
+            resizable={selectedPointers.length === 1}
           />
         ) : null}
 
@@ -165,26 +183,52 @@ export function StageCanvas({
 function SelectionOverlay({
   onResizePointerDown,
   rect,
+  resizable,
 }: {
   onResizePointerDown: (
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
   ) => void
   rect: Rect
+  resizable: boolean
 }) {
   return (
-    <div className="selection-overlay" style={rectToStyle(rect)}>
-      {RESIZE_HANDLES.map((handle) => (
-        <button
-          aria-label={`Resize ${handle}`}
-          className="resize-handle"
-          data-handle={handle}
-          key={handle}
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => onResizePointerDown(event, handle)}
-          type="button"
-        />
-      ))}
+    <div
+      className="selection-overlay"
+      data-resizable={resizable ? 'true' : 'false'}
+      style={rectToStyle(rect)}
+    >
+      {resizable
+        ? RESIZE_HANDLES.map((handle) => (
+            <button
+              aria-label={`Resize ${handle}`}
+              className="resize-handle"
+              data-handle={handle}
+              key={handle}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => onResizePointerDown(event, handle)}
+              type="button"
+            />
+          ))
+        : null}
     </div>
   )
+}
+
+function rectBounds(rects: Rect[]) {
+  if (rects.length === 0) {
+    return null
+  }
+
+  const left = Math.min(...rects.map((rect) => rect.x))
+  const top = Math.min(...rects.map((rect) => rect.y))
+  const right = Math.max(...rects.map((rect) => rect.x + rect.width))
+  const bottom = Math.max(...rects.map((rect) => rect.y + rect.height))
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  }
 }

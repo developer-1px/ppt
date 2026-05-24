@@ -244,6 +244,7 @@ export function RetouchWorkspace({
         onSlideAccentChange={onSlideAccentChange}
         onSlideNameChange={onSlideNameChange}
         selectedBlock={selectedBlock}
+        selectedCount={selectedPointers.length}
         selectedRect={selectedRect}
       />
     </section>

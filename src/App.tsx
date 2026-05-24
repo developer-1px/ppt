@@ -14,6 +14,7 @@ import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   RetouchDeckSchema,
+  blockLocationFromPointer,
   blockPointer,
   clamp,
   findSlideIndex,
@@ -47,6 +48,7 @@ import {
 import {
   getCurrentRect,
   hasSelectionModifier,
+  selectionActionForPointers,
   type Point,
 } from './layoutInteraction'
 import './App.css'
@@ -468,28 +470,48 @@ function App() {
     stageRef.current?.scrollTo({ left: 0, top: 0 })
   }
 
+  function selectedActiveBlockLocations() {
+    return selectedPointers
+      .map((pointer) => blockLocationFromPointer(doc.value, pointer))
+      .filter(
+        (location): location is NonNullable<typeof location> =>
+          location !== null && location.slide.id === activeSlide.id,
+      )
+      .sort((a, b) => a.blockIndex - b.blockIndex)
+  }
+
   function duplicateSelectedBlock() {
-    if (!selectedBlock) {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length === 0) {
       return
     }
 
     commitActiveTextEdit()
-    const selectedBlockIndex = activeSlide.blocks.findIndex(
-      (block) => block.id === selectedBlock.id,
-    )
+    const duplicatedBlocks: typeof activeSlide.blocks = []
 
-    if (selectedBlockIndex < 0) {
-      return
+    for (const location of locations) {
+      duplicatedBlocks.push(
+        duplicateBlock(location.block, {
+          ...activeSlide,
+          blocks: [...activeSlide.blocks, ...duplicatedBlocks],
+        }),
+      )
     }
 
-    const nextBlock = duplicateBlock(selectedBlock, activeSlide)
-    const insertIndex = selectedBlockIndex + 1
-    const pointer = blockPointer(activeSlideIndex, insertIndex)
+    const insertIndex = locations.at(-1)!.blockIndex + 1
+    const duplicatePointers = duplicatedBlocks.map((_, offset) =>
+      blockPointer(activeSlideIndex, insertIndex + offset),
+    )
 
-    doc.commit([{ op: 'add', path: pointer, value: nextBlock }], {
-      label: 'duplicate block',
+    doc.commit(duplicatedBlocks.map((block, offset) => ({
+      op: 'add',
+      path: blockPointer(activeSlideIndex, insertIndex + offset),
+      value: block,
+    })), {
+      label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
       origin: 'ppt-retouch',
-      selection: { type: 'collapse', pointer },
+      selection: selectionActionForPointers(duplicatePointers),
     })
     setCanvasView('slide')
     setMode('layout')
@@ -498,28 +520,27 @@ function App() {
   }
 
   function deleteSelectedBlock() {
-    if (!selectedBlock) {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length === 0) {
       return
     }
 
     commitActiveTextEdit()
-    const selectedBlockIndex = activeSlide.blocks.findIndex(
-      (block) => block.id === selectedBlock.id,
+    const nextSelectionIndex = Math.min(
+      locations[0].blockIndex,
+      activeSlide.blocks.length - locations.length - 1,
     )
 
-    if (selectedBlockIndex < 0) {
-      return
-    }
-
-    const nextSelectionIndex =
-      selectedBlockIndex < activeSlide.blocks.length - 1
-        ? selectedBlockIndex
-        : selectedBlockIndex - 1
-
     doc.commit(
-      [{ op: 'remove', path: blockPointer(activeSlideIndex, selectedBlockIndex) }],
+      [...locations]
+        .sort((a, b) => b.blockIndex - a.blockIndex)
+        .map((location) => ({
+          op: 'remove',
+          path: blockPointer(activeSlideIndex, location.blockIndex),
+        })),
       {
-        label: 'delete block',
+        label: locations.length > 1 ? 'delete blocks' : 'delete block',
         origin: 'ppt-retouch',
       },
     )

@@ -480,6 +480,10 @@ button {
   pointer-events: none;
 }
 
+.selection-overlay[data-resizable='false'] {
+  border-width: 1.5px;
+}
+
 .resize-handle {
   position: absolute;
   width: 34px;
