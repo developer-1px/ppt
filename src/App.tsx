@@ -34,6 +34,7 @@ import { createTextBlock, duplicateBlock } from './slideBlockOperations'
 import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
+import { useRetouchMarqueeSelection } from './useRetouchMarqueeSelection'
 import { useRetouchKeyboardShortcuts } from './useRetouchKeyboardShortcuts'
 import { useRetouchResetActions } from './useRetouchResetActions'
 import { useRetouchSelectionState } from './useRetouchSelectionState'
@@ -215,6 +216,19 @@ function App() {
     setEditing,
     slideRef,
   })
+  const {
+    clearMarqueeSelection,
+    marqueeRect,
+    startMarqueeSelection,
+  } = useRetouchMarqueeSelection({
+    activeSlide,
+    activeSlideIndex,
+    mode,
+    selectedPointers,
+    selection: doc.selection,
+    slideRef,
+    suppressStageClickRef,
+  })
   const selectedRect =
     selectedPointer && selectedBlock
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
@@ -293,6 +307,7 @@ function App() {
   function clearTransientState() {
     setEditing(null)
     clearLayoutInteraction()
+    clearMarqueeSelection()
   }
 
   function changeMode(nextMode: Mode) {
@@ -654,6 +669,7 @@ function App() {
         exportTextareaRef={exportTextareaRef}
         interaction={interaction}
         mode={mode}
+        marqueeRect={marqueeRect}
         notes={notesBySlideId[activeSlide.id] ?? ''}
         onBlockClick={(event, pointer) => {
           if (suppressBlockClickRef.current) {
@@ -675,6 +691,7 @@ function App() {
         onChangeMode={changeMode}
         onCommitTextEdit={commitTextEdit}
         onCopyExport={copyExportCode}
+        onCanvasPointerDown={startMarqueeSelection}
         onDeleteBlock={deleteSelectedBlock}
         onDownloadExport={downloadExportCode}
         onDuplicateBlock={duplicateSelectedBlock}

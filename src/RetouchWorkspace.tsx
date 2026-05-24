@@ -46,6 +46,7 @@ type RetouchWorkspaceProps = {
   exportDownloaded: boolean
   exportTextareaRef: RefObject<HTMLTextAreaElement | null>
   interaction: Interaction | null
+  marqueeRect: Rect | null
   mode: Mode
   notes: string
   onBlockClick: (
@@ -58,6 +59,7 @@ type RetouchWorkspaceProps = {
     block: SlideBlock,
   ) => void
   onCancelTextEdit: () => void
+  onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
   onChangeMode: (mode: Mode) => void
   onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
   onCopyExport: () => void
@@ -111,11 +113,13 @@ export function RetouchWorkspace({
   exportDownloaded,
   exportTextareaRef,
   interaction,
+  marqueeRect,
   mode,
   notes,
   onBlockClick,
   onBlockPointerDown,
   onCancelTextEdit,
+  onCanvasPointerDown,
   onChangeMode,
   onCommitTextEdit,
   onCopyExport,
@@ -191,7 +195,11 @@ export function RetouchWorkspace({
 
             const target = event.target instanceof HTMLElement ? event.target : null
 
-            if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
+            if (
+              target?.closest(
+                '[data-block], .selection-overlay, .resize-handle, .marquee-selection',
+              )
+            ) {
               return
             }
 
@@ -205,9 +213,11 @@ export function RetouchWorkspace({
             draftLayout={draftLayout}
             editing={editing}
             interaction={interaction}
+            marqueeRect={marqueeRect}
             mode={mode}
             onBlockClick={onBlockClick}
             onBlockPointerDown={onBlockPointerDown}
+            onCanvasPointerDown={onCanvasPointerDown}
             onCancelTextEdit={onCancelTextEdit}
             onCommitTextEdit={onCommitTextEdit}
             onResizePointerDown={onResizePointerDown}

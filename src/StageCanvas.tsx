@@ -40,6 +40,7 @@ type StageCanvasProps = {
   draftLayout: DraftLayout | null
   editing: EditingState | null
   interaction: Interaction | null
+  marqueeRect: Rect | null
   mode: 'text' | 'layout'
   onBlockClick: (
     event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
@@ -50,6 +51,7 @@ type StageCanvasProps = {
     pointer: Pointer,
     block: SlideBlock,
   ) => void
+  onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
   onCancelTextEdit: () => void
   onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
   onResizePointerDown: (
@@ -70,9 +72,11 @@ export function StageCanvas({
   draftLayout,
   editing,
   interaction,
+  marqueeRect,
   mode,
   onBlockClick,
   onBlockPointerDown,
+  onCanvasPointerDown,
   onCancelTextEdit,
   onCommitTextEdit,
   onResizePointerDown,
@@ -108,6 +112,7 @@ export function StageCanvas({
       <div
         className="slide-canvas"
         data-slide={activeSlide.id}
+        onPointerDown={onCanvasPointerDown}
         ref={slideRef}
         style={{ '--accent': activeSlide.accent } as CSSProperties}
       >
@@ -161,6 +166,10 @@ export function StageCanvas({
             rect={overlayRect}
             resizable={selectedPointers.length === 1}
           />
+        ) : null}
+
+        {mode === 'layout' && marqueeRect ? (
+          <div className="marquee-selection" style={rectToStyle(marqueeRect)} />
         ) : null}
 
         {mode === 'layout' && snapGuides.x !== null ? (
