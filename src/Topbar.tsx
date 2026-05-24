@@ -1,4 +1,4 @@
-import { Check, Code2, Download, Redo2, RotateCcw, Undo2 } from 'lucide-react'
+import { Check, Code2, Download, Play, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 
 type Mode = 'text' | 'layout'
 
@@ -14,6 +14,7 @@ type TopbarProps = {
   onChangeMode: (mode: Mode) => void
   onCopyExport: () => void
   onDownloadExport: () => void
+  onPresent: () => void
   onRedo: () => void
   onReset: () => void
   onUndo: () => void
@@ -33,6 +34,7 @@ export function Topbar({
   onChangeMode,
   onCopyExport,
   onDownloadExport,
+  onPresent,
   onRedo,
   onReset,
   onUndo,
@@ -93,6 +95,15 @@ export function Topbar({
           type="button"
         >
           <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label="Present"
+          data-action="present"
+          onClick={onPresent}
+          title="Present"
+          type="button"
+        >
+          <Play aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
           aria-label="Copy HTML"

@@ -63,6 +63,7 @@ type RetouchWorkspaceProps = {
   onDownloadExport: () => void
   onNotesChange: (notes: string) => void
   onOpenSlide: (slideId: string) => void
+  onPresent: () => void
   onRedo: () => void
   onReset: () => void
   onResizePointerDown: (
@@ -113,6 +114,7 @@ export function RetouchWorkspace({
   onDownloadExport,
   onNotesChange,
   onOpenSlide,
+  onPresent,
   onRedo,
   onReset,
   onResizePointerDown,
@@ -146,6 +148,7 @@ export function RetouchWorkspace({
         onChangeMode={onChangeMode}
         onCopyExport={onCopyExport}
         onDownloadExport={onDownloadExport}
+        onPresent={onPresent}
         onRedo={onRedo}
         onReset={onReset}
         onUndo={onUndo}
@@ -218,6 +221,7 @@ export function RetouchWorkspace({
         mode={mode}
         notes={notes}
         onNotesChange={onNotesChange}
+        onPresent={onPresent}
         selectedBlock={selectedBlock}
       />
     </section>

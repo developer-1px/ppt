@@ -14,6 +14,7 @@ import {
   findSlideIndex,
 } from './retouchModel'
 import { exportRetouchDeck } from './retouchExport'
+import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
 import { useExportControls } from './useExportControls'
@@ -60,6 +61,7 @@ function App() {
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
+  const [presenting, setPresenting] = useState(false)
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
@@ -262,6 +264,34 @@ function App() {
     clearTransientState()
   }
 
+  function startPresentation() {
+    commitActiveTextEdit()
+    setCanvasView('slide')
+    doc.selection?.empty()
+    clearTransientState()
+    setPresenting(true)
+  }
+
+  function closePresentation() {
+    setPresenting(false)
+  }
+
+  function navigatePresentation(direction: -1 | 1) {
+    const nextIndex = Math.min(
+      doc.value.slides.length - 1,
+      Math.max(0, activeSlideIndex + direction),
+    )
+    const nextSlide = doc.value.slides[nextIndex]
+
+    if (!nextSlide || nextSlide.id === activeSlide.id) {
+      return
+    }
+
+    setActiveSlideId(nextSlide.id)
+    doc.selection?.empty()
+    clearTransientState()
+  }
+
   function selectBlock(pointer: Pointer, additive = false) {
     if (additive) {
       doc.selection?.togglePointer(pointer)
@@ -329,6 +359,7 @@ function App() {
           }))
         }
         onOpenSlide={selectSlide}
+        onPresent={startPresentation}
         onRedo={redoDocumentChange}
         onReset={resetCurrentTarget}
         onResizePointerDown={startResizeInteraction}
@@ -352,6 +383,18 @@ function App() {
         suppressStageClickRef={suppressStageClickRef}
         visualSelectionRect={visualSelectionRect}
       />
+
+      {presenting ? (
+        <PresentationOverlay
+          activeSlide={activeSlide}
+          activeSlideIndex={activeSlideIndex}
+          notes={notesBySlideId[activeSlide.id] ?? ''}
+          onClose={closePresentation}
+          onNext={() => navigatePresentation(1)}
+          onPrevious={() => navigatePresentation(-1)}
+          slideCount={doc.value.slides.length}
+        />
+      ) : null}
     </main>
   )
 }

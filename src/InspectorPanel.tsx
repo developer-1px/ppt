@@ -1,3 +1,4 @@
+import { Play } from 'lucide-react'
 import type { SlideBlock } from './retouchModel'
 
 type InspectorPanelProps = {
@@ -6,6 +7,7 @@ type InspectorPanelProps = {
   mode: 'text' | 'layout'
   notes: string
   onNotesChange: (notes: string) => void
+  onPresent: () => void
   selectedBlock: SlideBlock | null
 }
 
@@ -15,12 +17,18 @@ export function InspectorPanel({
   mode,
   notes,
   onNotesChange,
+  onPresent,
   selectedBlock,
 }: InspectorPanelProps) {
   return (
     <aside className="inspector-panel" aria-label="Slide details">
       <section className="inspector-section">
-        <h2>Slide</h2>
+        <div className="inspector-heading">
+          <h2>Slide</h2>
+          <button aria-label="Present" onClick={onPresent} title="Present" type="button">
+            <Play aria-hidden="true" size={15} strokeWidth={2.2} />
+          </button>
+        </div>
         <dl>
           <div>
             <dt>Name</dt>
