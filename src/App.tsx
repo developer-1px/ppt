@@ -316,6 +316,9 @@ function App() {
     history: doc.history,
     interaction,
     mode,
+    onDeleteSelection: deleteSelectedBlock,
+    onDuplicateSelection: duplicateSelectedBlock,
+    onSelectAllBlocks: selectAllBlocks,
     selectedPointer,
     selectedPointers,
     selection: doc.selection,
@@ -791,6 +794,22 @@ function App() {
     }
 
     doc.selection?.selectRanges([pointer])
+  }
+
+  function selectAllBlocks() {
+    if (activeSlide.blocks.length === 0) {
+      doc.selection?.empty()
+      return
+    }
+
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+    doc.selection?.selectRanges(
+      activeSlide.blocks.map((_, blockIndex) =>
+        blockPointer(activeSlideIndex, blockIndex),
+      ),
+    )
   }
 
   return (

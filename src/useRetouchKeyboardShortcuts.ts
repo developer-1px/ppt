@@ -51,6 +51,9 @@ export function useRetouchKeyboardShortcuts({
   history,
   interaction,
   mode,
+  onDeleteSelection,
+  onDuplicateSelection,
+  onSelectAllBlocks,
   selectedPointer,
   selectedPointers,
   selection,
@@ -63,6 +66,9 @@ export function useRetouchKeyboardShortcuts({
   history: HistoryApi
   interaction: Interaction | null
   mode: 'text' | 'layout'
+  onDeleteSelection: () => void
+  onDuplicateSelection: () => void
+  onSelectAllBlocks: () => void
   selectedPointer: Pointer | null
   selectedPointers: Pointer[]
   selection: SelectionApi | undefined
@@ -173,6 +179,62 @@ export function useRetouchKeyboardShortcuts({
       window.removeEventListener('keydown', handleTextSelectionKey)
     }
   }, [editing, mode, selectedPointer, selection])
+
+  useEffect(() => {
+    function handleLayoutCommandKey(event: KeyboardEvent) {
+      if (
+        mode !== 'layout' ||
+        event.defaultPrevented ||
+        editing ||
+        interaction ||
+        isEditableTarget(event.target) ||
+        isControlTarget(event.target)
+      ) {
+        return
+      }
+
+      const key = event.key.toLowerCase()
+      const commandKey = event.metaKey || event.ctrlKey
+
+      if (commandKey && key === 'a') {
+        event.preventDefault()
+        event.stopPropagation()
+        onSelectAllBlocks()
+        return
+      }
+
+      if (commandKey && key === 'd' && selectedPointers.length > 0) {
+        event.preventDefault()
+        event.stopPropagation()
+        onDuplicateSelection()
+        return
+      }
+
+      if (
+        !commandKey &&
+        (event.key === 'Delete' || event.key === 'Backspace') &&
+        selectedPointers.length > 0
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        onDeleteSelection()
+      }
+    }
+
+    window.addEventListener('keydown', handleLayoutCommandKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleLayoutCommandKey)
+    }
+  }, [
+    editing,
+    interaction,
+    mode,
+    onDeleteSelection,
+    onDuplicateSelection,
+    onSelectAllBlocks,
+    selectedPointers.length,
+  ])
 
   useEffect(() => {
     function handleLayoutKey(event: KeyboardEvent) {
