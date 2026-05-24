@@ -2,6 +2,8 @@ import slideThemeCss from './slideTheme.css?raw'
 import { SAMPLE_DECK } from './sampleDeck'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
+  SLIDE_HEIGHT,
+  SLIDE_WIDTH,
   getRect,
   rectEquals,
   type RetouchDeck,
@@ -12,13 +14,15 @@ import {
 export function exportRetouchDeck(deck: RetouchDeck) {
   const patchManifest = buildRetouchPatchManifest(SAMPLE_DECK, deck)
   const css = [
-    ':root{--sans:Inter,ui-sans-serif,system-ui,sans-serif;font-family:var(--sans);color:#111827;background:#f3f4f6;}',
+    ":root{--sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-family:var(--sans);color:#111827;background:#f3f4f6;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}",
+    '*{box-sizing:border-box;}',
     'body{margin:0;}',
     '@page{size:16in 9in;margin:0;}',
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;container-type:inline-size;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
     '@media print{body{background:#fff;}.deck{display:block;padding:0;}.slide{border:0;break-after:page;page-break-after:always;}}',
     '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
+    '.slide-block-text{display:block;width:100%;min-width:0;max-width:100%;color:inherit;font:inherit;letter-spacing:inherit;line-height:inherit;overflow-wrap:inherit;text-align:inherit;white-space:inherit;}',
     slideThemeCss.trim(),
   ].join('\n')
 
@@ -34,15 +38,15 @@ export function exportRetouchDeck(deck: RetouchDeck) {
           )
           const text = escapeHtml(block.text)
           const style = [
-            `left:${block.x}px`,
-            `top:${block.y}px`,
-            `width:${block.width}px`,
+            `left:${slidePercent(block.x, SLIDE_WIDTH)}`,
+            `top:${slidePercent(block.y, SLIDE_HEIGHT)}`,
+            `width:${slidePercent(block.width, SLIDE_WIDTH)}`,
             exportBlockMinimumHeight(block, baseBlock),
           ]
             .filter(Boolean)
             .join(';')
 
-          return `    <${block.tag} data-block="${block.id}" data-role="${block.role}" class="${block.className}" style="${style}">${text}</${block.tag}>`
+          return `    <${block.tag} data-block="${block.id}" data-role="${block.role}" class="${block.className}" style="${style}"><span class="slide-block-text">${text}</span></${block.tag}>`
         })
         .join('\n')
 
@@ -76,14 +80,22 @@ export function exportRetouchDeck(deck: RetouchDeck) {
 
 function exportBlockMinimumHeight(block: SlideBlock, baseBlock: SlideBlock | undefined) {
   if (block.text.length === 0) {
-    return `min-height:${EMPTY_TEXT_BOX_HEIGHT}px`
+    return `min-height:${slidePercent(EMPTY_TEXT_BOX_HEIGHT, SLIDE_HEIGHT)}`
   }
 
-  if (baseBlock && block.text === baseBlock.text && block.height !== baseBlock.height) {
-    return `min-height:${block.height}px`
+  if (
+    baseBlock &&
+    block.text === baseBlock.text &&
+    (block.height !== baseBlock.height || block.width !== baseBlock.width)
+  ) {
+    return `min-height:${slidePercent(block.height, SLIDE_HEIGHT)}`
   }
 
   return ''
+}
+
+function slidePercent(value: number, total: number) {
+  return `${Number(((value / total) * 100).toFixed(4))}%`
 }
 
 function buildRetouchPatchManifest(

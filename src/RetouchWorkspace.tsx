@@ -1,5 +1,6 @@
 import type {
   CSSProperties,
+  HTMLAttributes,
   MouseEvent as ReactMouseEvent,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
@@ -46,6 +47,7 @@ type RetouchWorkspaceProps = {
   canZoomIn: boolean
   canZoomOut: boolean
   canvasView: 'slide' | 'grid'
+  canvasViewPanelProps: HTMLAttributes<HTMLDivElement>
   canvasZoom: CanvasZoom
   copyState: 'copied' | 'failed' | 'idle'
   copyTitle: string
@@ -123,6 +125,7 @@ export function RetouchWorkspace({
   canZoomIn,
   canZoomOut,
   canvasView,
+  canvasViewPanelProps,
   canvasZoom,
   copyState,
   copyTitle,
@@ -209,7 +212,11 @@ export function RetouchWorkspace({
       />
 
       {canvasView === 'grid' ? (
-        <div className="stage-shell stage-shell-grid" ref={stageRef}>
+        <div
+          {...canvasViewPanelProps}
+          className="stage-shell stage-shell-grid"
+          ref={stageRef}
+        >
           <DeckGrid
             activeSlideId={activeSlide.id}
             changedSlideIds={changedSlideIds}
@@ -219,6 +226,7 @@ export function RetouchWorkspace({
         </div>
       ) : (
         <div
+          {...canvasViewPanelProps}
           className="stage-shell"
           data-zoom-mode={canvasZoom === 'fit' ? 'fit' : 'manual'}
           onClick={(event) => {

@@ -13,6 +13,7 @@ import {
   blockLocationFromPointer,
   resizeRect,
   setArrangePatch,
+  type Rect,
   type RetouchDeck,
   type ResizeHandle,
   type SlideBlock,
@@ -24,7 +25,6 @@ import {
   getCurrentRect,
   guidesForInteraction,
   hasSelectionModifier,
-  resizeHandleAffectsHeight,
   selectionActionForPointers,
   type DraftLayout,
   type DraftLayoutRect,
@@ -101,6 +101,26 @@ export function useRetouchLayoutInteraction({
     return {
       x: clamp(((event.clientX - rect.left) / rect.width) * SLIDE_WIDTH, 0, SLIDE_WIDTH),
       y: clamp(((event.clientY - rect.top) / rect.height) * SLIDE_HEIGHT, 0, SLIDE_HEIGHT),
+    }
+  }, [slideRef])
+
+  const readBlockVisualRect = useCallback((blockId: string, fallback: Rect) => {
+    const slideElement = slideRef.current
+    const slideRect = slideElement?.getBoundingClientRect()
+    const blockElement = Array.from(
+      slideElement?.querySelectorAll<HTMLElement>('[data-block]') ?? [],
+    ).find((element) => element.dataset.block === blockId)
+    const blockRect = blockElement?.getBoundingClientRect()
+
+    if (!slideRect || !blockRect || slideRect.width === 0 || slideRect.height === 0) {
+      return fallback
+    }
+
+    return {
+      x: ((blockRect.left - slideRect.left) / slideRect.width) * SLIDE_WIDTH,
+      y: ((blockRect.top - slideRect.top) / slideRect.height) * SLIDE_HEIGHT,
+      width: (blockRect.width / slideRect.width) * SLIDE_WIDTH,
+      height: (blockRect.height / slideRect.height) * SLIDE_HEIGHT,
     }
   }, [slideRef])
 
@@ -203,9 +223,7 @@ export function useRetouchLayoutInteraction({
       commitPatch(
         rects.flatMap(({ pointer, rect }) =>
           setArrangePatch(pointer, rect, {
-            includeHeight:
-              currentInteraction.kind === 'resize' &&
-              resizeHandleAffectsHeight(currentInteraction.handle),
+            includeHeight: currentInteraction.kind === 'resize',
           }),
         ),
         currentInteraction.pointer,
@@ -298,7 +316,10 @@ export function useRetouchLayoutInteraction({
   ) {
     const currentSelectedRect =
       selectedPointer && selectedBlock
-        ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
+        ? readBlockVisualRect(
+            selectedBlock.id,
+            getCurrentRect(selectedPointer, selectedBlock, draftLayout),
+          )
         : null
 
     if (

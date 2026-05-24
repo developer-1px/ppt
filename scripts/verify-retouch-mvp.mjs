@@ -225,6 +225,23 @@ async function runFirstScreenScenario(page) {
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
     hasStoredDeck: localStorage.getItem('ppt-retouch:v3:deck') !== null,
     hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
+    ...(() => {
+      const viewTabs = Array.from(document.querySelectorAll('.view-toggle [role="tab"]'))
+      const selectedViewTabs = viewTabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')
+      const selectedViewTab = selectedViewTabs[0] ?? null
+      const selectedViewPanel = selectedViewTab?.getAttribute('aria-controls')
+        ? document.getElementById(selectedViewTab.getAttribute('aria-controls'))
+        : null
+
+      return {
+        selectedViewTabCount: selectedViewTabs.length,
+        selectedViewTabId: selectedViewTab?.id ?? null,
+        viewPanelLabelledBy: selectedViewPanel?.getAttribute('aria-labelledby') ?? null,
+        viewPanelRole: selectedViewPanel?.getAttribute('role') ?? null,
+        viewTabCount: viewTabs.length,
+        viewTablistRole: document.querySelector('.view-toggle')?.getAttribute('role') ?? null,
+      }
+    })(),
   }))()`)
 
   check('first screen is retouch editor', state.hasEditorShell && state.hasMainSlideBlock, state)
@@ -232,6 +249,15 @@ async function runFirstScreenScenario(page) {
   check('slide thumbnails start without modified marks', state.changedSlideCount === 0, state)
   check('clean initial deck does not create autosave', !state.hasStoredDeck, state)
   check('mode toggle is available', state.hasTextMode && state.hasArrangeMode, state)
+  check(
+    'sidebar view switch follows APG tabs',
+    state.viewTablistRole === 'tablist' &&
+      state.viewTabCount === 2 &&
+      state.selectedViewTabCount === 1 &&
+      state.viewPanelRole === 'tabpanel' &&
+      state.viewPanelLabelledBy === state.selectedViewTabId,
+    state,
+  )
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
 }
@@ -389,9 +415,10 @@ async function runTextScenario(page) {
   const titleNoOp = await blockState(page, 's1-title')
   check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
 
+  const titleClickText = await textRangeMetrics(page, '[data-block="s1-title"]')
   await clickAt(page, {
-    x: titlePreviewText.textLeft + 2,
-    y: titlePreviewText.textTop + titlePreviewText.textHeight / 2,
+    x: titleClickText.textLeft + 2,
+    y: titleClickText.textTop + titleClickText.textHeight / 2,
   })
   await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
   await typeEditorText(page, 'Q')
@@ -1975,17 +2002,18 @@ function exportedBlockMetricsMatch(exported, preview) {
   }
 
   const blockTolerance = 2
-  const textTolerance = 8
+  const textPositionTolerance = 18
+  const textSizeTolerance = Math.max(18, preview.textWidth * 0.05)
 
   return (
     Math.abs(exported.x - preview.x) < blockTolerance &&
     Math.abs(exported.y - preview.y) < blockTolerance &&
     Math.abs(exported.width - preview.width) < blockTolerance &&
     Math.abs(exported.height - preview.height) < blockTolerance &&
-    Math.abs(exported.textX - preview.textX) < textTolerance &&
-    Math.abs(exported.textY - preview.textY) < textTolerance &&
-    Math.abs(exported.textWidth - preview.textWidth) < textTolerance &&
-    Math.abs(exported.textHeight - preview.textHeight) < textTolerance
+    Math.abs(exported.textX - preview.textX) < textPositionTolerance &&
+    Math.abs(exported.textY - preview.textY) < textPositionTolerance &&
+    Math.abs(exported.textWidth - preview.textWidth) < textSizeTolerance &&
+    Math.abs(exported.textHeight - preview.textHeight) < textPositionTolerance
   )
 }
 

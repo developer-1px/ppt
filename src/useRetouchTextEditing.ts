@@ -1,7 +1,13 @@
 import type { RefObject } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import {
+  applyPatch,
+  type JSONPatchOperation,
+  type Pointer,
+  type SelectionAction,
+} from 'zod-crud'
 import {
   SAMPLE_DECK,
+  RetouchDeckSchema,
   blockLocationFromPointer,
   blockTextPointer,
   findBlockLocation,
@@ -120,6 +126,10 @@ export function useRetouchTextEditing({
       ...(layoutChanged ? setLayoutPatch(pointer, rect) : []),
     ]
 
+    if (patch.length === 0) {
+      return deckValue
+    }
+
     commitPatch(
       patch,
       pointer,
@@ -127,7 +137,9 @@ export function useRetouchTextEditing({
       textChanged ? `text:${blockTextPointer(pointer)}` : undefined,
     )
 
-    return deckValue
+    const applied = applyPatch(RetouchDeckSchema, deckValue, patch)
+
+    return applied.result.ok ? applied.state : deckValue
   }
 
   return {

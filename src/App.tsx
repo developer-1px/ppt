@@ -1,4 +1,6 @@
 import {
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
   useCallback,
   useEffect,
   useMemo,
@@ -7,6 +9,13 @@ import {
 } from 'react'
 import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
+import {
+  reducePatternData,
+  tabsDefinition,
+  useTabsPattern,
+  type PatternData,
+  type PatternEvent,
+} from '@interactive-os/aria/react'
 import {
   MIN_BLOCK_SIZE,
   SAMPLE_DECK,
@@ -75,6 +84,15 @@ type RectField = keyof Rect
 type CanvasZoom = 'fit' | number
 
 const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const CANVAS_VIEW_TABS = [
+  { label: 'Slide', panelKey: 'slide-panel', tabKey: 'slide', view: 'slide' },
+  { label: 'Grid', panelKey: 'grid-panel', tabKey: 'grid', view: 'grid' },
+] as const satisfies readonly {
+  label: string
+  panelKey: string
+  tabKey: string
+  view: CanvasView
+}[]
 
 type EditingState = {
   clientPoint?: Point
@@ -83,6 +101,31 @@ type EditingState = {
 
 function finiteNumber(value: number, fallback: number) {
   return Number.isFinite(value) ? value : fallback
+}
+
+function canvasViewTab(view: CanvasView) {
+  return CANVAS_VIEW_TABS.find((tab) => tab.view === view) ?? CANVAS_VIEW_TABS[0]
+}
+
+function canvasViewFromTabKey(tabKey: string | null | undefined): CanvasView | null {
+  return CANVAS_VIEW_TABS.find((tab) => tab.tabKey === tabKey)?.view ?? null
+}
+
+function canvasViewFromTabsEvent(
+  data: PatternData,
+  event: PatternEvent,
+): CanvasView | null {
+  if (event.type === 'select') {
+    return canvasViewFromTabKey(event.keys[0])
+  }
+
+  if (event.type === 'navigate') {
+    const nextData = reducePatternData(tabsDefinition, data, event)
+
+    return canvasViewFromTabKey(nextData.state?.activeKey)
+  }
+
+  return null
 }
 
 function normalizeInspectorRect(
@@ -358,6 +401,61 @@ function App() {
 
     setCanvasView(nextView)
   }
+
+  const canvasViewTabData = useMemo<PatternData>(() => {
+    const activeTab = canvasViewTab(canvasView)
+
+    return {
+      items: Object.fromEntries(
+        CANVAS_VIEW_TABS.flatMap((tab) => [
+          [tab.tabKey, { label: tab.label }],
+          [tab.panelKey, { label: `${tab.label} view` }],
+        ]),
+      ),
+      relations: {
+        controlsByKey: Object.fromEntries(
+          CANVAS_VIEW_TABS.map((tab) => [tab.tabKey, [tab.panelKey]]),
+        ),
+        ownerByKey: Object.fromEntries(
+          CANVAS_VIEW_TABS.map((tab) => [tab.panelKey, tab.tabKey]),
+        ),
+        rootKeys: CANVAS_VIEW_TABS.map((tab) => tab.tabKey),
+      },
+      refs: { label: 'Canvas view' },
+      state: {
+        activeKey: activeTab.tabKey,
+        selectedKeys: [activeTab.tabKey],
+      },
+    }
+  }, [canvasView])
+  const canvasViewTabs = useTabsPattern(
+    canvasViewTabData,
+    (event: PatternEvent) => {
+      const nextView = canvasViewFromTabsEvent(canvasViewTabData, event)
+
+      if (nextView) {
+        changeCanvasView(nextView)
+      }
+    },
+    {
+      activationMode: 'automatic',
+      elementIdPrefix: 'canvas-view-',
+      orientation: 'horizontal',
+    },
+  )
+  const canvasViewPanelProps = canvasViewTabs.getTabPanelProps(
+    canvasViewTab(canvasView).panelKey,
+  ) as HTMLAttributes<HTMLDivElement>
+  const canvasViewTabProps = {
+    grid: canvasViewTabs.getTabProps(
+      canvasViewTab('grid').tabKey,
+    ) as ButtonHTMLAttributes<HTMLButtonElement>,
+    slide: canvasViewTabs.getTabProps(
+      canvasViewTab('slide').tabKey,
+    ) as ButtonHTMLAttributes<HTMLButtonElement>,
+  }
+  const canvasViewTablistProps =
+    canvasViewTabs.getTablistProps() as HTMLAttributes<HTMLDivElement>
 
   function zoomStep(direction: -1 | 1) {
     const currentZoom = canvasZoom === 'fit' ? 1 : canvasZoom
@@ -871,10 +969,10 @@ function App() {
         activeSlideId={activeSlide.id}
         canMoveSlideDown={activeSlideIndex < doc.value.slides.length - 1}
         canMoveSlideUp={activeSlideIndex > 0}
-        canvasView={canvasView}
+        canvasViewTablistProps={canvasViewTablistProps}
+        canvasViewTabProps={canvasViewTabProps}
         changedSlideIds={changedSlideIds}
         canDeleteSlide={doc.value.slides.length > 1}
-        onChangeCanvasView={changeCanvasView}
         onAddSlide={addSlide}
         onDeleteSlide={deleteSlide}
         onDuplicateSlide={copySlide}
@@ -894,6 +992,7 @@ function App() {
         canZoomIn={canvasZoom === 'fit' || canvasZoom < CANVAS_ZOOM_STEPS.at(-1)!}
         canZoomOut={canvasZoom === 'fit' || canvasZoom > CANVAS_ZOOM_STEPS[0]}
         canvasView={canvasView}
+        canvasViewPanelProps={canvasViewPanelProps}
         canvasZoom={canvasZoom}
         changedSlideIds={changedSlideIds}
         copyState={copyState}

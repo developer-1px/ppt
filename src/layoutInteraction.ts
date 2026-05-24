@@ -312,7 +312,9 @@ export function minimumHeightForBlock(
 
   if (
     draftHeightResize ||
-    (baseBlock && block.text === baseBlock.text && block.height !== baseBlock.height)
+    (baseBlock &&
+      block.text === baseBlock.text &&
+      (block.height !== baseBlock.height || block.width !== baseBlock.width))
   ) {
     return rect.height
   }

@@ -1,4 +1,9 @@
-import { type ButtonHTMLAttributes, type CSSProperties, useMemo } from 'react'
+import {
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type HTMLAttributes,
+  useMemo,
+} from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -20,10 +25,10 @@ type SlideRailProps = {
   canDeleteSlide: boolean
   canMoveSlideDown: boolean
   canMoveSlideUp: boolean
-  canvasView: 'slide' | 'grid'
+  canvasViewTablistProps: HTMLAttributes<HTMLDivElement>
+  canvasViewTabProps: Record<'slide' | 'grid', ButtonHTMLAttributes<HTMLButtonElement>>
   changedSlideIds: Set<string>
   onAddSlide: () => void
-  onChangeCanvasView: (view: 'slide' | 'grid') => void
   onDeleteSlide: () => void
   onDuplicateSlide: () => void
   onMoveSlideDown: () => void
@@ -37,10 +42,10 @@ export function SlideRail({
   canDeleteSlide,
   canMoveSlideDown,
   canMoveSlideUp,
-  canvasView,
+  canvasViewTablistProps,
+  canvasViewTabProps,
   changedSlideIds,
   onAddSlide,
-  onChangeCanvasView,
   onDeleteSlide,
   onDuplicateSlide,
   onMoveSlideDown,
@@ -107,19 +112,15 @@ export function SlideRail({
 
   return (
     <aside className="slide-rail">
-      <div className="view-toggle" role="tablist" aria-label="Canvas view">
+      <div {...canvasViewTablistProps} className="view-toggle">
         <button
-          aria-selected={canvasView === 'slide'}
-          onClick={() => onChangeCanvasView('slide')}
-          role="tab"
+          {...canvasViewTabProps.slide}
           type="button"
         >
           Slide
         </button>
         <button
-          aria-selected={canvasView === 'grid'}
-          onClick={() => onChangeCanvasView('grid')}
-          role="tab"
+          {...canvasViewTabProps.grid}
           type="button"
         >
           Grid
