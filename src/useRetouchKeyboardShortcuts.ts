@@ -1,0 +1,262 @@
+import { useEffect } from 'react'
+import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import {
+  blockLocationFromPointer,
+  findBlockLocation,
+  getRect,
+  moveRect,
+  rectEquals,
+  setArrangePatch,
+  type Rect,
+  type RetouchDeck,
+} from './retouchModel'
+import {
+  arrowKeyDelta,
+  isControlTarget,
+  isEditableTarget,
+  isHistoryShortcut,
+} from './editorKeyboard'
+import { selectionActionForPointers, type Interaction, type Point } from './layoutInteraction'
+
+type EditingState = {
+  clientPoint?: Point
+  pointer: Pointer
+}
+
+type CommitPatch = (
+  patch: JSONPatchOperation[],
+  pointer: Pointer,
+  label: string,
+  mergeKey?: string,
+  selection?: SelectionAction,
+) => void
+
+type HistoryApi = {
+  canRedo: boolean
+  canUndo: boolean
+  redo: () => void
+  undo: () => void
+}
+
+type SelectionApi = {
+  empty?: () => void
+  selectRanges?: (pointers: Pointer[]) => void
+}
+
+export function useRetouchKeyboardShortcuts({
+  activeSlideId,
+  commitPatch,
+  deckValue,
+  editing,
+  history,
+  interaction,
+  mode,
+  selectedPointer,
+  selectedPointers,
+  selection,
+  setEditing,
+}: {
+  activeSlideId: string
+  commitPatch: CommitPatch
+  deckValue: RetouchDeck
+  editing: EditingState | null
+  history: HistoryApi
+  interaction: Interaction | null
+  mode: 'text' | 'layout'
+  selectedPointer: Pointer | null
+  selectedPointers: Pointer[]
+  selection: SelectionApi | undefined
+  setEditing: (editing: EditingState) => void
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        !isHistoryShortcut(event) ||
+        isEditableTarget(event.target)
+      ) {
+        return
+      }
+
+      const key = event.key.toLowerCase()
+
+      if (key === 'z' && event.shiftKey && history.canRedo) {
+        event.preventDefault()
+        history.redo()
+        return
+      }
+
+      if (key === 'z' && history.canUndo) {
+        event.preventDefault()
+        history.undo()
+        return
+      }
+
+      if (key === 'y' && history.canRedo) {
+        event.preventDefault()
+        history.redo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [history])
+
+  useEffect(() => {
+    function handleFocusedBlockEditKey(event: KeyboardEvent) {
+      if (
+        mode !== 'text' ||
+        event.defaultPrevented ||
+        isEditableTarget(event.target) ||
+        (event.key !== 'Enter' && event.key !== 'F2')
+      ) {
+        return
+      }
+
+      const activeElement = document.activeElement
+
+      if (!(activeElement instanceof HTMLElement)) {
+        return
+      }
+
+      const blockElement = activeElement.closest<HTMLElement>('[data-block]')
+      const blockId = blockElement?.dataset.block
+
+      if (!blockId) {
+        return
+      }
+
+      const location = findBlockLocation(deckValue, activeSlideId, blockId)
+
+      if (!location) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      selection?.selectRanges?.([location.pointer])
+      setEditing({ pointer: location.pointer })
+    }
+
+    window.addEventListener('keydown', handleFocusedBlockEditKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleFocusedBlockEditKey)
+    }
+  }, [activeSlideId, deckValue, mode, selection, setEditing])
+
+  useEffect(() => {
+    function handleTextSelectionKey(event: KeyboardEvent) {
+      if (
+        mode !== 'text' ||
+        event.defaultPrevented ||
+        editing ||
+        !selectedPointer ||
+        isEditableTarget(event.target) ||
+        isControlTarget(event.target) ||
+        event.key !== 'Escape'
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      selection?.empty?.()
+    }
+
+    window.addEventListener('keydown', handleTextSelectionKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleTextSelectionKey)
+    }
+  }, [editing, mode, selectedPointer, selection])
+
+  useEffect(() => {
+    function handleLayoutKey(event: KeyboardEvent) {
+      if (
+        mode !== 'layout' ||
+        event.defaultPrevented ||
+        editing ||
+        interaction ||
+        selectedPointers.length === 0 ||
+        isEditableTarget(event.target) ||
+        isControlTarget(event.target)
+      ) {
+        return
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        selection?.empty?.()
+        return
+      }
+
+      const delta = arrowKeyDelta(event.key, event.shiftKey)
+
+      if (!delta) {
+        return
+      }
+
+      const targets = selectedPointers
+        .map((pointer) => {
+          const location = blockLocationFromPointer(deckValue, pointer)
+
+          if (!location || location.slide.id !== activeSlideId) {
+            return null
+          }
+
+          return {
+            pointer,
+            rect: moveRect(getRect(location.block), delta.x, delta.y),
+            startRect: getRect(location.block),
+          }
+        })
+        .filter(
+          (
+            target,
+          ): target is { pointer: Pointer; rect: Rect; startRect: Rect } =>
+            target !== null,
+        )
+
+      if (
+        targets.length === 0 ||
+        targets.every((target) => rectEquals(target.rect, target.startRect))
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      commitPatch(
+        targets.flatMap((target) => setArrangePatch(target.pointer, target.rect)),
+        targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
+        'nudge layout',
+        `layout:nudge:${targets.map((target) => target.pointer).join('|')}`,
+        selectionActionForPointers(
+          targets.map((target) => target.pointer),
+          targets.at(-1)?.pointer,
+        ),
+      )
+    }
+
+    window.addEventListener('keydown', handleLayoutKey)
+
+    return () => {
+      window.removeEventListener('keydown', handleLayoutKey)
+    }
+  }, [
+    activeSlideId,
+    commitPatch,
+    deckValue,
+    editing,
+    interaction,
+    mode,
+    selectedPointer,
+    selectedPointers,
+    selection,
+  ])
+}

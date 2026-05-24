@@ -1,0 +1,189 @@
+import type {
+  MouseEvent as ReactMouseEvent,
+  MutableRefObject,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from 'react'
+import type { Pointer } from 'zod-crud'
+import { StageCanvas } from './StageCanvas'
+import { Topbar } from './Topbar'
+import type {
+  Rect,
+  ResizeHandle,
+  RetouchSlide,
+  SlideBlock,
+} from './retouchModel'
+import type {
+  DraftLayout,
+  Interaction,
+  Point,
+  SnapGuides,
+} from './layoutInteraction'
+
+type Mode = 'text' | 'layout'
+
+type EditingState = {
+  clientPoint?: Point
+  pointer: Pointer
+}
+
+type RetouchWorkspaceProps = {
+  activeSlide: RetouchSlide
+  activeSlideIndex: number
+  canRedo: boolean
+  canReset: boolean
+  canUndo: boolean
+  copyState: 'copied' | 'failed' | 'idle'
+  copyTitle: string
+  draftLayout: DraftLayout | null
+  editing: EditingState | null
+  exportCode: string
+  exportCopied: boolean
+  exportDownloaded: boolean
+  exportTextareaRef: RefObject<HTMLTextAreaElement | null>
+  interaction: Interaction | null
+  mode: Mode
+  onBlockClick: (
+    event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
+    pointer: Pointer,
+  ) => void
+  onBlockPointerDown: (
+    event: ReactPointerEvent<HTMLElement>,
+    pointer: Pointer,
+    block: SlideBlock,
+  ) => void
+  onCancelTextEdit: () => void
+  onChangeMode: (mode: Mode) => void
+  onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
+  onCopyExport: () => void
+  onDownloadExport: () => void
+  onRedo: () => void
+  onReset: () => void
+  onResizePointerDown: (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    handle: ResizeHandle,
+  ) => void
+  onStageBackgroundClick: () => void
+  onUndo: () => void
+  resetScope: 'deck' | 'layout' | 'text'
+  resetTitle: string
+  selectedPointerSet: Set<Pointer>
+  selectedPointers: Pointer[]
+  selectedRect: Rect | null
+  slideRef: RefObject<HTMLDivElement | null>
+  snapGuides: SnapGuides
+  stageRef: RefObject<HTMLDivElement | null>
+  suppressStageClickRef: MutableRefObject<boolean>
+  visualSelectionRect: Rect | null
+}
+
+export function RetouchWorkspace({
+  activeSlide,
+  activeSlideIndex,
+  canRedo,
+  canReset,
+  canUndo,
+  copyState,
+  copyTitle,
+  draftLayout,
+  editing,
+  exportCode,
+  exportCopied,
+  exportDownloaded,
+  exportTextareaRef,
+  interaction,
+  mode,
+  onBlockClick,
+  onBlockPointerDown,
+  onCancelTextEdit,
+  onChangeMode,
+  onCommitTextEdit,
+  onCopyExport,
+  onDownloadExport,
+  onRedo,
+  onReset,
+  onResizePointerDown,
+  onStageBackgroundClick,
+  onUndo,
+  resetScope,
+  resetTitle,
+  selectedPointerSet,
+  selectedPointers,
+  selectedRect,
+  slideRef,
+  snapGuides,
+  stageRef,
+  suppressStageClickRef,
+  visualSelectionRect,
+}: RetouchWorkspaceProps) {
+  return (
+    <section className="retouch-workspace">
+      <Topbar
+        canRedo={canRedo}
+        canReset={canReset}
+        canUndo={canUndo}
+        copyState={copyState}
+        copyTitle={copyTitle}
+        exportCopied={exportCopied}
+        exportDownloaded={exportDownloaded}
+        mode={mode}
+        onChangeMode={onChangeMode}
+        onCopyExport={onCopyExport}
+        onDownloadExport={onDownloadExport}
+        onRedo={onRedo}
+        onReset={onReset}
+        onUndo={onUndo}
+        resetScope={resetScope}
+        resetTitle={resetTitle}
+      />
+
+      <div
+        className="stage-shell"
+        onClick={(event) => {
+          if (suppressStageClickRef.current) {
+            suppressStageClickRef.current = false
+            return
+          }
+
+          const target = event.target instanceof HTMLElement ? event.target : null
+
+          if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
+            return
+          }
+
+          onStageBackgroundClick()
+        }}
+        ref={stageRef}
+      >
+        <StageCanvas
+          activeSlide={activeSlide}
+          activeSlideIndex={activeSlideIndex}
+          draftLayout={draftLayout}
+          editing={editing}
+          interaction={interaction}
+          mode={mode}
+          onBlockClick={onBlockClick}
+          onBlockPointerDown={onBlockPointerDown}
+          onCancelTextEdit={onCancelTextEdit}
+          onCommitTextEdit={onCommitTextEdit}
+          onResizePointerDown={onResizePointerDown}
+          selectedPointerSet={selectedPointerSet}
+          selectedPointers={selectedPointers}
+          selectedRect={selectedRect}
+          slideRef={slideRef}
+          snapGuides={snapGuides}
+          visualSelectionRect={visualSelectionRect}
+        />
+      </div>
+
+      <textarea
+        aria-hidden="true"
+        className="export-buffer"
+        readOnly
+        ref={exportTextareaRef}
+        tabIndex={-1}
+        value={exportCode}
+      />
+    </section>
+  )
+}
