@@ -634,6 +634,12 @@ button {
   gap: 4px;
 }
 
+.distribution-tools {
+  display: grid;
+  grid-template-columns: repeat(2, 28px);
+  gap: 4px;
+}
+
 .inspector-section h2,
 .inspector-notes label {
   margin: 0;
@@ -661,7 +667,8 @@ button {
 }
 
 .alignment-tools button,
-.layer-tools button {
+.layer-tools button,
+.distribution-tools button {
   width: 28px;
   height: 28px;
   display: inline-grid;
@@ -675,9 +682,15 @@ button {
 }
 
 .alignment-tools button:hover,
-.layer-tools button:hover {
+.layer-tools button:hover,
+.distribution-tools button:hover:not(:disabled) {
   border-color: #2563eb;
   color: #1d4ed8;
+}
+
+.distribution-tools button:disabled {
+  color: #a1a1aa;
+  cursor: not-allowed;
 }
 
 .inspector-section dl {

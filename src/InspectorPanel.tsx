@@ -4,8 +4,10 @@ import {
   AlignCenterVertical,
   AlignEndHorizontal,
   AlignEndVertical,
+  AlignHorizontalSpaceBetween,
   AlignStartHorizontal,
   AlignStartVertical,
+  AlignVerticalSpaceBetween,
   BringToFront,
   Copy,
   MoveDown,
@@ -15,7 +17,10 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { Rect, SlideBlock } from './retouchModel'
-import type { AlignSelectionAction } from './selectionAlignment'
+import type {
+  AlignSelectionAction,
+  DistributeSelectionAction,
+} from './selectionAlignment'
 import type { LayerOrderAction } from './selectionLayerOrder'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
 
@@ -29,6 +34,7 @@ type InspectorPanelProps = {
   notes: string
   onAlignSelection: (action: AlignSelectionAction) => void
   onDeleteBlock: () => void
+  onDistributeSelection: (action: DistributeSelectionAction) => void
   onDuplicateBlock: () => void
   onLayerOrderChange: (action: LayerOrderAction) => void
   onNotesChange: (notes: string) => void
@@ -72,6 +78,23 @@ const LAYER_ORDER_ACTIONS: {
   { action: 'back', icon: SendToBack, label: 'Send to back' },
 ]
 
+const DISTRIBUTION_ACTIONS: {
+  action: DistributeSelectionAction
+  icon: typeof AlignHorizontalSpaceBetween
+  label: string
+}[] = [
+  {
+    action: 'horizontal',
+    icon: AlignHorizontalSpaceBetween,
+    label: 'Distribute horizontal spacing',
+  },
+  {
+    action: 'vertical',
+    icon: AlignVerticalSpaceBetween,
+    label: 'Distribute vertical spacing',
+  },
+]
+
 export function InspectorPanel({
   activeSlideAccent,
   activeSlideName,
@@ -80,6 +103,7 @@ export function InspectorPanel({
   notes,
   onAlignSelection,
   onDeleteBlock,
+  onDistributeSelection,
   onDuplicateBlock,
   onLayerOrderChange,
   onNotesChange,
@@ -179,6 +203,10 @@ export function InspectorPanel({
               </div>
             </dl>
             <AlignmentTools onAlignSelection={onAlignSelection} />
+            <DistributionTools
+              disabled={selectedCount < 3}
+              onDistributeSelection={onDistributeSelection}
+            />
             <LayerOrderTools onLayerOrderChange={onLayerOrderChange} />
           </>
         ) : selectedBlock ? (
@@ -218,6 +246,31 @@ export function InspectorPanel({
         />
       </section>
     </aside>
+  )
+}
+
+function DistributionTools({
+  disabled,
+  onDistributeSelection,
+}: {
+  disabled: boolean
+  onDistributeSelection: (action: DistributeSelectionAction) => void
+}) {
+  return (
+    <div aria-label="Distribution" className="distribution-tools" role="toolbar">
+      {DISTRIBUTION_ACTIONS.map(({ action, icon: Icon, label }) => (
+        <button
+          aria-label={label}
+          disabled={disabled}
+          key={action}
+          onClick={() => onDistributeSelection(action)}
+          title={label}
+          type="button"
+        >
+          <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
+        </button>
+      ))}
+    </div>
   )
 }
 

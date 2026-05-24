@@ -37,7 +37,9 @@ import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import {
   alignRectToBounds,
   alignmentBounds,
+  distributeRects,
   type AlignSelectionAction,
+  type DistributeSelectionAction,
 } from './selectionAlignment'
 import {
   blockOrderChanged,
@@ -622,6 +624,45 @@ function App() {
     )
   }
 
+  function distributeSelectedBlocks(action: DistributeSelectionAction) {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length < 3) {
+      return
+    }
+
+    const targets = distributeRects(
+      locations.map((location) => ({
+        item: location,
+        rect: getRect(location.block),
+      })),
+      action,
+    ).map(({ item: location, rect }) => ({
+      pointer: location.pointer,
+      rect,
+      startRect: getRect(location.block),
+    }))
+
+    if (targets.every((target) => rectEquals(target.rect, target.startRect))) {
+      return
+    }
+
+    commitActiveTextEdit()
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+    commitPatch(
+      targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
+      targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
+      'distribute selection',
+      undefined,
+      selectionActionForPointers(
+        targets.map((target) => target.pointer),
+        selectedPointer ?? targets.at(-1)?.pointer,
+      ),
+    )
+  }
+
   function changeSelectedLayerOrder(action: LayerOrderAction) {
     const locations = selectedActiveBlockLocations()
 
@@ -791,6 +832,7 @@ function App() {
         onDownloadExport={downloadExportCode}
         onDuplicateBlock={duplicateSelectedBlock}
         onAlignSelection={alignSelectedBlocks}
+        onDistributeSelection={distributeSelectedBlocks}
         onLayerOrderChange={changeSelectedLayerOrder}
         onInsertTextBlock={insertTextBlock}
         onSlideAccentChange={changeSlideAccent}
