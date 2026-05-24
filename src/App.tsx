@@ -21,7 +21,7 @@ import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
-import { createTextBlock } from './slideBlockOperations'
+import { createTextBlock, duplicateBlock } from './slideBlockOperations'
 import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import { useExportControls } from './useExportControls'
 import { useRetouchLayoutInteraction } from './useRetouchLayoutInteraction'
@@ -389,6 +389,73 @@ function App() {
     stageRef.current?.scrollTo({ left: 0, top: 0 })
   }
 
+  function duplicateSelectedBlock() {
+    if (!selectedBlock) {
+      return
+    }
+
+    commitActiveTextEdit()
+    const selectedBlockIndex = activeSlide.blocks.findIndex(
+      (block) => block.id === selectedBlock.id,
+    )
+
+    if (selectedBlockIndex < 0) {
+      return
+    }
+
+    const nextBlock = duplicateBlock(selectedBlock, activeSlide)
+    const insertIndex = selectedBlockIndex + 1
+    const pointer = blockPointer(activeSlideIndex, insertIndex)
+
+    doc.commit([{ op: 'add', path: pointer, value: nextBlock }], {
+      label: 'duplicate block',
+      origin: 'ppt-retouch',
+      selection: { type: 'collapse', pointer },
+    })
+    setCanvasView('slide')
+    setMode('layout')
+    setEditing(null)
+    clearLayoutInteraction()
+  }
+
+  function deleteSelectedBlock() {
+    if (!selectedBlock) {
+      return
+    }
+
+    commitActiveTextEdit()
+    const selectedBlockIndex = activeSlide.blocks.findIndex(
+      (block) => block.id === selectedBlock.id,
+    )
+
+    if (selectedBlockIndex < 0) {
+      return
+    }
+
+    const nextSelectionIndex =
+      selectedBlockIndex < activeSlide.blocks.length - 1
+        ? selectedBlockIndex
+        : selectedBlockIndex - 1
+
+    doc.commit(
+      [{ op: 'remove', path: blockPointer(activeSlideIndex, selectedBlockIndex) }],
+      {
+        label: 'delete block',
+        origin: 'ppt-retouch',
+      },
+    )
+    setCanvasView('slide')
+    setMode('layout')
+    setEditing(null)
+    clearLayoutInteraction()
+
+    if (nextSelectionIndex >= 0) {
+      doc.selection?.selectRanges?.([blockPointer(activeSlideIndex, nextSelectionIndex)])
+    } else {
+      doc.selection?.empty()
+    }
+  }
+
   function startPresentation() {
     commitActiveTextEdit()
     setCanvasView('slide')
@@ -481,7 +548,9 @@ function App() {
         onChangeMode={changeMode}
         onCommitTextEdit={commitTextEdit}
         onCopyExport={copyExportCode}
+        onDeleteBlock={deleteSelectedBlock}
         onDownloadExport={downloadExportCode}
+        onDuplicateBlock={duplicateSelectedBlock}
         onInsertTextBlock={insertTextBlock}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}

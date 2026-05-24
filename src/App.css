@@ -604,6 +604,11 @@ button {
   gap: 8px;
 }
 
+.selection-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
 .inspector-section h2,
 .inspector-notes label {
   margin: 0;

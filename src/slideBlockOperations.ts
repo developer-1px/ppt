@@ -1,4 +1,12 @@
-import type { RetouchSlide, SlideBlock } from './retouchModel'
+import {
+  SLIDE_HEIGHT,
+  SLIDE_WIDTH,
+  clamp,
+  type RetouchSlide,
+  type SlideBlock,
+} from './retouchModel'
+
+const DUPLICATE_OFFSET = 32
 
 export function createTextBlock(slide: RetouchSlide): SlideBlock {
   const ordinal = nextTextBlockOrdinal(slide)
@@ -15,6 +23,18 @@ export function createTextBlock(slide: RetouchSlide): SlideBlock {
     y: 312 + offset,
     width: 560,
     height: 56,
+  }
+}
+
+export function duplicateBlock(
+  block: SlideBlock,
+  slide: RetouchSlide,
+): SlideBlock {
+  return {
+    ...block,
+    id: uniqueBlockId(slide, `${block.id}-copy`),
+    x: clamp(block.x + DUPLICATE_OFFSET, 0, SLIDE_WIDTH - block.width),
+    y: clamp(block.y + DUPLICATE_OFFSET, 0, SLIDE_HEIGHT - block.height),
   }
 }
 

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Play } from 'lucide-react'
+import { Copy, Play, Trash2 } from 'lucide-react'
 import type { SlideBlock } from './retouchModel'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
 
@@ -9,6 +9,8 @@ type InspectorPanelProps = {
   canvasView: 'slide' | 'grid'
   mode: 'text' | 'layout'
   notes: string
+  onDeleteBlock: () => void
+  onDuplicateBlock: () => void
   onNotesChange: (notes: string) => void
   onPresent: () => void
   onSlideAccentChange: (accent: string) => void
@@ -22,6 +24,8 @@ export function InspectorPanel({
   canvasView,
   mode,
   notes,
+  onDeleteBlock,
+  onDuplicateBlock,
   onNotesChange,
   onPresent,
   onSlideAccentChange,
@@ -79,7 +83,29 @@ export function InspectorPanel({
       </section>
 
       <section className="inspector-section">
-        <h2>Selection</h2>
+        <div className="inspector-heading">
+          <h2>Selection</h2>
+          {selectedBlock ? (
+            <div className="selection-actions">
+              <button
+                aria-label="Duplicate block"
+                onClick={onDuplicateBlock}
+                title="Duplicate block"
+                type="button"
+              >
+                <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
+              </button>
+              <button
+                aria-label="Delete block"
+                onClick={onDeleteBlock}
+                title="Delete block"
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
+              </button>
+            </div>
+          ) : null}
+        </div>
         {selectedBlock ? (
           <dl>
             <div>
