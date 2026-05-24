@@ -51,8 +51,11 @@ export function useRetouchKeyboardShortcuts({
   history,
   interaction,
   mode,
+  canPasteSelection,
+  onCopySelection,
   onDeleteSelection,
   onDuplicateSelection,
+  onPasteSelection,
   onSelectAllBlocks,
   selectedPointer,
   selectedPointers,
@@ -66,8 +69,11 @@ export function useRetouchKeyboardShortcuts({
   history: HistoryApi
   interaction: Interaction | null
   mode: 'text' | 'layout'
+  canPasteSelection: boolean
+  onCopySelection: () => void
   onDeleteSelection: () => void
   onDuplicateSelection: () => void
+  onPasteSelection: () => void
   onSelectAllBlocks: () => void
   selectedPointer: Pointer | null
   selectedPointers: Pointer[]
@@ -210,6 +216,20 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
+      if (commandKey && key === 'c' && selectedPointers.length > 0) {
+        event.preventDefault()
+        event.stopPropagation()
+        onCopySelection()
+        return
+      }
+
+      if (commandKey && key === 'v' && canPasteSelection) {
+        event.preventDefault()
+        event.stopPropagation()
+        onPasteSelection()
+        return
+      }
+
       if (
         !commandKey &&
         (event.key === 'Delete' || event.key === 'Backspace') &&
@@ -227,11 +247,14 @@ export function useRetouchKeyboardShortcuts({
       window.removeEventListener('keydown', handleLayoutCommandKey)
     }
   }, [
+    canPasteSelection,
     editing,
     interaction,
     mode,
+    onCopySelection,
     onDeleteSelection,
     onDuplicateSelection,
+    onPasteSelection,
     onSelectAllBlocks,
     selectedPointers.length,
   ])

@@ -27,6 +27,7 @@ import {
   setLayoutPatch,
   snap,
   type Rect,
+  type SlideBlock,
 } from './retouchModel'
 import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
@@ -142,6 +143,7 @@ function App() {
   const [canvasZoom, setCanvasZoom] = useState<CanvasZoom>('fit')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
+  const [blockClipboard, setBlockClipboard] = useState<SlideBlock[]>([])
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
   const [presenting, setPresenting] = useState(false)
 
@@ -316,8 +318,11 @@ function App() {
     history: doc.history,
     interaction,
     mode,
+    canPasteSelection: blockClipboard.length > 0,
+    onCopySelection: copySelectedBlocks,
     onDeleteSelection: deleteSelectedBlock,
     onDuplicateSelection: duplicateSelectedBlock,
+    onPasteSelection: pasteCopiedBlocks,
     onSelectAllBlocks: selectAllBlocks,
     selectedPointer,
     selectedPointers,
@@ -536,6 +541,54 @@ function App() {
           location !== null && location.slide.id === activeSlide.id,
       )
       .sort((a, b) => a.blockIndex - b.blockIndex)
+  }
+
+  function copySelectedBlocks() {
+    const locations = selectedActiveBlockLocations()
+
+    if (locations.length === 0) {
+      return
+    }
+
+    setBlockClipboard(locations.map((location) => ({ ...location.block })))
+  }
+
+  function pasteCopiedBlocks() {
+    if (blockClipboard.length === 0) {
+      return
+    }
+
+    commitActiveTextEdit()
+    const pastedBlocks: SlideBlock[] = []
+
+    for (const block of blockClipboard) {
+      pastedBlocks.push(
+        duplicateBlock(block, {
+          ...activeSlide,
+          blocks: [...activeSlide.blocks, ...pastedBlocks],
+        }),
+      )
+    }
+
+    const insertIndex = activeSlide.blocks.length
+    const pastedPointers = pastedBlocks.map((_, offset) =>
+      blockPointer(activeSlideIndex, insertIndex + offset),
+    )
+
+    doc.commit(pastedBlocks.map((block, offset) => ({
+      op: 'add',
+      path: blockPointer(activeSlideIndex, insertIndex + offset),
+      value: block,
+    })), {
+      label: 'paste blocks',
+      origin: 'ppt-retouch',
+      selection: selectionActionForPointers(pastedPointers),
+    })
+    setBlockClipboard(pastedBlocks)
+    setCanvasView('slide')
+    setMode('layout')
+    setEditing(null)
+    clearLayoutInteraction()
   }
 
   function duplicateSelectedBlock() {
