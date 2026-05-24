@@ -37,6 +37,7 @@ import {
 import './App.css'
 
 type Mode = 'text' | 'layout'
+type CanvasView = 'slide' | 'grid'
 
 type EditingState = {
   clientPoint?: Point
@@ -55,8 +56,10 @@ function App() {
   const suppressStageClickRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('text')
+  const [canvasView, setCanvasView] = useState<CanvasView>('slide')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
+  const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
 
   const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
@@ -240,9 +243,20 @@ function App() {
     clearTransientState()
   }
 
+  function changeCanvasView(nextView: CanvasView) {
+    if (nextView === 'grid') {
+      commitActiveTextEdit()
+      doc.selection?.empty()
+      clearTransientState()
+    }
+
+    setCanvasView(nextView)
+  }
+
   function selectSlide(slideId: string) {
     commitActiveTextEdit()
     setActiveSlideId(slideId)
+    setCanvasView('slide')
     doc.selection?.empty()
     stageRef.current?.scrollTo({ left: 0, top: 0 })
     clearTransientState()
@@ -261,7 +275,9 @@ function App() {
     <main className="retouch-app" data-mode={mode}>
       <SlideRail
         activeSlideId={activeSlide.id}
+        canvasView={canvasView}
         changedSlideIds={changedSlideIds}
+        onChangeCanvasView={changeCanvasView}
         onSelectSlide={selectSlide}
         slides={doc.value.slides}
       />
@@ -272,6 +288,8 @@ function App() {
         canRedo={doc.history.canRedo}
         canReset={canReset}
         canUndo={doc.history.canUndo}
+        canvasView={canvasView}
+        changedSlideIds={changedSlideIds}
         copyState={copyState}
         copyTitle={copyTitle}
         draftLayout={draftLayout}
@@ -282,6 +300,7 @@ function App() {
         exportTextareaRef={exportTextareaRef}
         interaction={interaction}
         mode={mode}
+        notes={notesBySlideId[activeSlide.id] ?? ''}
         onBlockClick={(event, pointer) => {
           if (suppressBlockClickRef.current) {
             suppressBlockClickRef.current = false
@@ -303,6 +322,13 @@ function App() {
         onCommitTextEdit={commitTextEdit}
         onCopyExport={copyExportCode}
         onDownloadExport={downloadExportCode}
+        onNotesChange={(notes) =>
+          setNotesBySlideId((current) => ({
+            ...current,
+            [activeSlide.id]: notes,
+          }))
+        }
+        onOpenSlide={selectSlide}
         onRedo={redoDocumentChange}
         onReset={resetCurrentTarget}
         onResizePointerDown={startResizeInteraction}
@@ -315,9 +341,11 @@ function App() {
         onUndo={undoDocumentChange}
         resetScope={resetScope}
         resetTitle={resetTitle}
+        selectedBlock={selectedBlock}
         selectedPointerSet={selectedPointerSet}
         selectedPointers={selectedPointers}
         selectedRect={selectedRect}
+        slides={doc.value.slides}
         slideRef={slideRef}
         snapGuides={snapGuides}
         stageRef={stageRef}

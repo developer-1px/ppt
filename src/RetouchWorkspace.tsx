@@ -5,6 +5,8 @@ import type {
   RefObject,
 } from 'react'
 import type { Pointer } from 'zod-crud'
+import { DeckGrid } from './DeckGrid'
+import { InspectorPanel } from './InspectorPanel'
 import { StageCanvas } from './StageCanvas'
 import { Topbar } from './Topbar'
 import type {
@@ -33,6 +35,7 @@ type RetouchWorkspaceProps = {
   canRedo: boolean
   canReset: boolean
   canUndo: boolean
+  canvasView: 'slide' | 'grid'
   copyState: 'copied' | 'failed' | 'idle'
   copyTitle: string
   draftLayout: DraftLayout | null
@@ -43,6 +46,7 @@ type RetouchWorkspaceProps = {
   exportTextareaRef: RefObject<HTMLTextAreaElement | null>
   interaction: Interaction | null
   mode: Mode
+  notes: string
   onBlockClick: (
     event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
     pointer: Pointer,
@@ -57,6 +61,8 @@ type RetouchWorkspaceProps = {
   onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
   onCopyExport: () => void
   onDownloadExport: () => void
+  onNotesChange: (notes: string) => void
+  onOpenSlide: (slideId: string) => void
   onRedo: () => void
   onReset: () => void
   onResizePointerDown: (
@@ -68,8 +74,11 @@ type RetouchWorkspaceProps = {
   resetScope: 'deck' | 'layout' | 'text'
   resetTitle: string
   selectedPointerSet: Set<Pointer>
+  selectedBlock: SlideBlock | null
   selectedPointers: Pointer[]
   selectedRect: Rect | null
+  changedSlideIds: Set<string>
+  slides: RetouchSlide[]
   slideRef: RefObject<HTMLDivElement | null>
   snapGuides: SnapGuides
   stageRef: RefObject<HTMLDivElement | null>
@@ -83,6 +92,7 @@ export function RetouchWorkspace({
   canRedo,
   canReset,
   canUndo,
+  canvasView,
   copyState,
   copyTitle,
   draftLayout,
@@ -93,6 +103,7 @@ export function RetouchWorkspace({
   exportTextareaRef,
   interaction,
   mode,
+  notes,
   onBlockClick,
   onBlockPointerDown,
   onCancelTextEdit,
@@ -100,6 +111,8 @@ export function RetouchWorkspace({
   onCommitTextEdit,
   onCopyExport,
   onDownloadExport,
+  onNotesChange,
+  onOpenSlide,
   onRedo,
   onReset,
   onResizePointerDown,
@@ -107,9 +120,12 @@ export function RetouchWorkspace({
   onUndo,
   resetScope,
   resetTitle,
+  changedSlideIds,
+  selectedBlock,
   selectedPointerSet,
   selectedPointers,
   selectedRect,
+  slides,
   slideRef,
   snapGuides,
   stageRef,
@@ -137,44 +153,55 @@ export function RetouchWorkspace({
         resetTitle={resetTitle}
       />
 
-      <div
-        className="stage-shell"
-        onClick={(event) => {
-          if (suppressStageClickRef.current) {
-            suppressStageClickRef.current = false
-            return
-          }
+      {canvasView === 'grid' ? (
+        <div className="stage-shell stage-shell-grid" ref={stageRef}>
+          <DeckGrid
+            activeSlideId={activeSlide.id}
+            changedSlideIds={changedSlideIds}
+            onOpenSlide={onOpenSlide}
+            slides={slides}
+          />
+        </div>
+      ) : (
+        <div
+          className="stage-shell"
+          onClick={(event) => {
+            if (suppressStageClickRef.current) {
+              suppressStageClickRef.current = false
+              return
+            }
 
-          const target = event.target instanceof HTMLElement ? event.target : null
+            const target = event.target instanceof HTMLElement ? event.target : null
 
-          if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
-            return
-          }
+            if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
+              return
+            }
 
-          onStageBackgroundClick()
-        }}
-        ref={stageRef}
-      >
-        <StageCanvas
-          activeSlide={activeSlide}
-          activeSlideIndex={activeSlideIndex}
-          draftLayout={draftLayout}
-          editing={editing}
-          interaction={interaction}
-          mode={mode}
-          onBlockClick={onBlockClick}
-          onBlockPointerDown={onBlockPointerDown}
-          onCancelTextEdit={onCancelTextEdit}
-          onCommitTextEdit={onCommitTextEdit}
-          onResizePointerDown={onResizePointerDown}
-          selectedPointerSet={selectedPointerSet}
-          selectedPointers={selectedPointers}
-          selectedRect={selectedRect}
-          slideRef={slideRef}
-          snapGuides={snapGuides}
-          visualSelectionRect={visualSelectionRect}
-        />
-      </div>
+            onStageBackgroundClick()
+          }}
+          ref={stageRef}
+        >
+          <StageCanvas
+            activeSlide={activeSlide}
+            activeSlideIndex={activeSlideIndex}
+            draftLayout={draftLayout}
+            editing={editing}
+            interaction={interaction}
+            mode={mode}
+            onBlockClick={onBlockClick}
+            onBlockPointerDown={onBlockPointerDown}
+            onCancelTextEdit={onCancelTextEdit}
+            onCommitTextEdit={onCommitTextEdit}
+            onResizePointerDown={onResizePointerDown}
+            selectedPointerSet={selectedPointerSet}
+            selectedPointers={selectedPointers}
+            selectedRect={selectedRect}
+            slideRef={slideRef}
+            snapGuides={snapGuides}
+            visualSelectionRect={visualSelectionRect}
+          />
+        </div>
+      )}
 
       <textarea
         aria-hidden="true"
@@ -183,6 +210,15 @@ export function RetouchWorkspace({
         ref={exportTextareaRef}
         tabIndex={-1}
         value={exportCode}
+      />
+
+      <InspectorPanel
+        activeSlideName={activeSlide.name}
+        canvasView={canvasView}
+        mode={mode}
+        notes={notes}
+        onNotesChange={onNotesChange}
+        selectedBlock={selectedBlock}
       />
     </section>
   )
