@@ -5,6 +5,11 @@ import {
   type JSONPatchOperation,
   type Pointer,
 } from 'zod-crud'
+import {
+  RESIZE_HANDLES as CANVAS_RESIZE_HANDLES,
+  clamp as clampNumber,
+  type ResizeHandle as CanvasResizeHandle,
+} from 'canvas/core'
 import { z } from 'zod'
 
 export const SLIDE_WIDTH = 1280
@@ -78,18 +83,9 @@ export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
 export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
 
-export type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+export type ResizeHandle = CanvasResizeHandle
 
-export const RESIZE_HANDLES: ResizeHandle[] = [
-  'nw',
-  'n',
-  'ne',
-  'e',
-  'se',
-  's',
-  'sw',
-  'w',
-]
+export const RESIZE_HANDLES = CANVAS_RESIZE_HANDLES
 
 export { SAMPLE_DECK, SAMPLE_SLIDES } from './sampleDeck'
 
@@ -270,7 +266,7 @@ export function rectToAutoHeightStyle(rect: Rect, minimumHeight: number) {
 }
 
 export function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
+  return clampNumber(value, min, max)
 }
 
 export function snap(value: number) {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import {
   blockLocationFromPointer,
   findBlockLocation,
@@ -16,7 +16,7 @@ import {
   isEditableTarget,
   isHistoryShortcut,
 } from './editorKeyboard'
-import { selectionActionForPointers, type Interaction, type Point } from './layoutInteraction'
+import { selectionSnapForPointers, type Interaction, type Point } from './layoutInteraction'
 
 type EditingState = {
   clientPoint?: Point
@@ -28,7 +28,7 @@ type CommitPatch = (
   pointer: Pointer,
   label: string,
   mergeKey?: string,
-  selection?: SelectionAction,
+  selection?: SelectionSnap,
 ) => void
 
 type HistoryApi = {
@@ -85,7 +85,7 @@ export function useRetouchKeyboardShortcuts({
       if (
         event.defaultPrevented ||
         !isHistoryShortcut(event) ||
-        isEditableTarget(event.target)
+        isEditableTarget(event)
       ) {
         return
       }
@@ -122,7 +122,7 @@ export function useRetouchKeyboardShortcuts({
       if (
         mode !== 'text' ||
         event.defaultPrevented ||
-        isEditableTarget(event.target) ||
+        isEditableTarget(event) ||
         (event.key !== 'Enter' && event.key !== 'F2')
       ) {
         return
@@ -167,8 +167,8 @@ export function useRetouchKeyboardShortcuts({
         event.defaultPrevented ||
         editing ||
         !selectedPointer ||
-        isEditableTarget(event.target) ||
-        isControlTarget(event.target) ||
+        isEditableTarget(event) ||
+        isControlTarget(event) ||
         event.key !== 'Escape'
       ) {
         return
@@ -193,8 +193,8 @@ export function useRetouchKeyboardShortcuts({
         event.defaultPrevented ||
         editing ||
         interaction ||
-        isEditableTarget(event.target) ||
-        isControlTarget(event.target)
+        isEditableTarget(event) ||
+        isControlTarget(event)
       ) {
         return
       }
@@ -267,8 +267,8 @@ export function useRetouchKeyboardShortcuts({
         editing ||
         interaction ||
         selectedPointers.length === 0 ||
-        isEditableTarget(event.target) ||
-        isControlTarget(event.target)
+        isEditableTarget(event) ||
+        isControlTarget(event)
       ) {
         return
       }
@@ -321,7 +321,7 @@ export function useRetouchKeyboardShortcuts({
         targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
         'nudge layout',
         `layout:nudge:${targets.map((target) => target.pointer).join('|')}`,
-        selectionActionForPointers(
+        selectionSnapForPointers(
           targets.map((target) => target.pointer),
           targets.at(-1)?.pointer,
         ),

@@ -50,12 +50,8 @@ try {
   console.log(JSON.stringify(result, null, 2))
   process.exitCode = failed.length === 0 && browserErrors.length === 0 ? 0 : 1
 } finally {
-  if (chrome) {
-    const exited = new Promise((resolve) => chrome.once('exit', resolve))
-    chrome.kill()
-    await Promise.race([exited, delay(1000)])
-  }
-  if (devServer) devServer.kill()
+  if (chrome) await stopChrome()
+  if (devServer) await stopDevServer()
   if (chromeProfile) {
     await rm(chromeProfile, {
       recursive: true,
@@ -63,6 +59,33 @@ try {
       maxRetries: 5,
       retryDelay: 100,
     })
+  }
+}
+
+async function stopChrome() {
+  if (!chrome) return
+
+  const exited = new Promise((resolve) => chrome.once('exit', resolve))
+
+  if (chrome.pid) {
+    try {
+      process.kill(-chrome.pid, 'SIGTERM')
+    } catch {
+      chrome.kill()
+    }
+  } else {
+    chrome.kill()
+  }
+
+  await Promise.race([exited, delay(1000)])
+
+  if (chrome.exitCode === null && chrome.signalCode === null && chrome.pid) {
+    try {
+      process.kill(-chrome.pid, 'SIGKILL')
+    } catch {
+      chrome.kill('SIGKILL')
+    }
+    await Promise.race([exited, delay(1000)])
   }
 }
 
@@ -84,12 +107,39 @@ async function ensureAppServer() {
     '--strictPort',
   ], {
     cwd: process.cwd(),
+    detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   devServer.stdout.on('data', () => undefined)
   devServer.stderr.on('data', () => undefined)
 
   await waitUntil(async () => isHttpReady(appUrl), 'Vite dev server did not start', 15000)
+}
+
+async function stopDevServer() {
+  if (!devServer) return
+
+  const exited = new Promise((resolve) => devServer.once('exit', resolve))
+
+  if (devServer.pid) {
+    try {
+      process.kill(-devServer.pid, 'SIGTERM')
+    } catch {
+      devServer.kill()
+    }
+  } else {
+    devServer.kill()
+  }
+
+  await Promise.race([exited, delay(1000)])
+
+  if (devServer.exitCode === null && devServer.signalCode === null && devServer.pid) {
+    try {
+      process.kill(-devServer.pid, 'SIGKILL')
+    } catch {
+      devServer.kill('SIGKILL')
+    }
+  }
 }
 
 async function launchChrome(port) {
@@ -102,6 +152,7 @@ async function launchChrome(port) {
     '--no-default-browser-check',
     'about:blank',
   ], {
+    detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   chrome.stderr.on('data', () => undefined)
@@ -190,7 +241,12 @@ async function openPage(cdpPort, url, viewport = null) {
       return waitUntil(async () => page.eval(expression), `Timed out: ${expression}`, timeout)
     },
     close() {
+      const closeTarget = fetch(
+        `http://127.0.0.1:${cdpPort}/json/close/${target.id}`,
+      ).catch(() => undefined)
+
       ws.close()
+      return closeTarget
     },
   }
 
@@ -386,7 +442,7 @@ async function runCompactEditSurfaceScenario(cdpPort) {
     ),
     deltas,
   )
-  page.close()
+  await page.close()
 }
 
 async function runTextScenario(page) {
@@ -972,6 +1028,30 @@ async function runLayoutScenario(page) {
   )
   await clickSlide(page, 'Overview')
 
+  const layerOrderBefore = await slideBlockOrder(page)
+  const layerOrderTarget = layerOrderBefore[0]
+  await clickBlock(page, layerOrderTarget)
+  await clickToolbar(page, 'Bring to front')
+  await page.waitFor(
+    `Array.from(document.querySelectorAll('.slide-canvas [data-block]')).at(-1)?.dataset.block === ${JSON.stringify(layerOrderTarget)}`,
+  )
+  const layerOrderAfter = await slideBlockOrder(page)
+  check(
+    'Arrange Mode brings selected block to front',
+    layerOrderBefore.length === layerOrderAfter.length &&
+      layerOrderBefore[0] === layerOrderTarget &&
+      layerOrderAfter.at(-1) === layerOrderTarget,
+    { before: layerOrderBefore, after: layerOrderAfter, target: layerOrderTarget },
+  )
+  await clickToolbar(page, 'Undo')
+  await delay(150)
+  const layerOrderUndone = await slideBlockOrder(page)
+  check(
+    'undo restores layer order',
+    sameArray(layerOrderBefore, layerOrderUndone),
+    { before: layerOrderBefore, after: layerOrderUndone },
+  )
+
   const noteBefore = await blockState(page, 's1-note')
 
   await dragBlock(page, 's1-note', 5, 5)
@@ -1283,7 +1363,7 @@ async function runExportScenario(page, cdpPort) {
       },
     },
   )
-  exportedPage.close()
+  await exportedPage.close()
 
   await page.eval(`navigator.clipboard.writeText = async (value) => {
     window.__pptRetouchCopiedHtml = value
@@ -1800,7 +1880,7 @@ async function runMobileScenario(cdpPort) {
   check('mobile keeps core controls reachable', mobile.thumbs >= 3 && mobile.hasArrangeMode, mobile)
   check('mobile keeps slide readable with internal stage pan', mobile.slideWidth >= 560 && mobile.slideHeight >= 315 && mobile.stageScrollWidth > mobile.stageClientWidth, mobile)
   check('mobile chrome stays compact', mobile.topbarHeight <= 56 && mobile.railHeight <= 96, mobile)
-  page.close()
+  await page.close()
 }
 
 async function blockState(page, blockId) {
@@ -2105,6 +2185,16 @@ async function clickSlide(page, label) {
   await page.eval(`Array.from(document.querySelectorAll('.slide-thumb')).find((button) => button.textContent?.includes('${label}'))?.click()`)
   await page.waitFor(`document.querySelector('.slide-thumb[aria-current="page"]')?.textContent?.includes('${label}')`)
   await delay(100)
+}
+
+async function slideBlockOrder(page) {
+  return page.eval(
+    `Array.from(document.querySelectorAll('.slide-canvas [data-block]')).map((block) => block.dataset.block)`,
+  )
+}
+
+function sameArray(a, b) {
+  return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
 async function slideThumbState(page, label) {

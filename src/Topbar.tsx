@@ -1,3 +1,10 @@
+import { useMemo, type ButtonHTMLAttributes } from 'react'
+import {
+  useToolbarPattern,
+  type PatternData,
+  type PatternEvent,
+  type ReactToolbarRenderItem,
+} from '@interactive-os/aria/react'
 import {
   Check,
   Code2,
@@ -13,6 +20,28 @@ import {
 } from 'lucide-react'
 
 type Mode = 'text' | 'layout'
+type ModeToolbarKey = Mode
+type ZoomToolbarKey = 'fit' | 'in' | 'out'
+type ActionToolbarKey =
+  | 'add-text'
+  | 'copy-html'
+  | 'download-html'
+  | 'present'
+  | 'redo'
+  | 'reset'
+  | 'undo'
+
+const MODE_TOOLBAR_KEYS = ['text', 'layout'] as const
+const ZOOM_TOOLBAR_KEYS = ['out', 'in', 'fit'] as const
+const ACTION_TOOLBAR_KEYS = [
+  'undo',
+  'redo',
+  'reset',
+  'add-text',
+  'present',
+  'copy-html',
+  'download-html',
+] as const
 
 type TopbarProps = {
   canRedo: boolean
@@ -67,34 +96,157 @@ export function Topbar({
   resetTitle,
   zoomLabel,
 }: TopbarProps) {
+  const modeToolbarData = useMemo<PatternData>(() => ({
+    items: {
+      layout: { label: 'Arrange' },
+      text: { label: 'Text' },
+    },
+    relations: { rootKeys: MODE_TOOLBAR_KEYS },
+    refs: { label: 'Mode' },
+    state: {
+      activeKey: mode,
+      selectedKeys: [mode],
+    },
+  }), [mode])
+  const modeToolbar = useToolbarPattern(
+    modeToolbarData,
+    (event) => {
+      for (const key of selectedToolbarKeys(event)) {
+        if (isModeToolbarKey(key)) {
+          onChangeMode(key)
+        }
+      }
+    },
+    {
+      elementIdPrefix: 'mode-tool-',
+      orientation: 'horizontal',
+    },
+  )
+  const modeToolbarProps = toolbarItemPropsByKey<ModeToolbarKey>(
+    modeToolbar.renderItems,
+  )
+  const zoomDisabledKeys = useMemo(() => [
+    ...(!canZoomOut ? ['out' as const] : []),
+    ...(!canZoomIn ? ['in' as const] : []),
+  ], [canZoomIn, canZoomOut])
+  const zoomToolbarData = useMemo<PatternData>(() => ({
+    items: {
+      fit: { label: 'Fit canvas' },
+      in: { label: 'Zoom in' },
+      out: { label: 'Zoom out' },
+    },
+    relations: { rootKeys: ZOOM_TOOLBAR_KEYS },
+    refs: { label: 'Canvas zoom' },
+    state: {
+      activeKey: firstEnabledToolbarKey(ZOOM_TOOLBAR_KEYS, zoomDisabledKeys),
+      disabledKeys: zoomDisabledKeys,
+    },
+  }), [zoomDisabledKeys])
+  const zoomToolbar = useToolbarPattern(
+    zoomToolbarData,
+    (event) => {
+      for (const key of selectedToolbarKeys(event)) {
+        if (key === 'out') {
+          onZoomOut()
+        }
+        if (key === 'in') {
+          onZoomIn()
+        }
+        if (key === 'fit') {
+          onZoomFit()
+        }
+      }
+    },
+    {
+      elementIdPrefix: 'zoom-tool-',
+      orientation: 'horizontal',
+    },
+  )
+  const zoomToolbarProps = toolbarItemPropsByKey<ZoomToolbarKey>(
+    zoomToolbar.renderItems,
+  )
+  const actionDisabledKeys = useMemo(() => [
+    ...(!canUndo ? ['undo' as const] : []),
+    ...(!canRedo ? ['redo' as const] : []),
+    ...(!canReset ? ['reset' as const] : []),
+  ], [canRedo, canReset, canUndo])
+  const actionToolbarData = useMemo<PatternData>(() => ({
+    items: {
+      'add-text': { label: 'Add text box' },
+      'copy-html': { label: 'Copy HTML' },
+      'download-html': { label: 'Download HTML' },
+      present: { label: 'Present' },
+      redo: { label: 'Redo' },
+      reset: { label: resetTitle },
+      undo: { label: 'Undo' },
+    },
+    relations: { rootKeys: ACTION_TOOLBAR_KEYS },
+    refs: { label: 'Actions' },
+    state: {
+      activeKey: firstEnabledToolbarKey(ACTION_TOOLBAR_KEYS, actionDisabledKeys),
+      disabledKeys: actionDisabledKeys,
+    },
+  }), [actionDisabledKeys, resetTitle])
+  const actionToolbar = useToolbarPattern(
+    actionToolbarData,
+    (event) => {
+      for (const key of selectedToolbarKeys(event)) {
+        if (key === 'undo') {
+          onUndo()
+        }
+        if (key === 'redo') {
+          onRedo()
+        }
+        if (key === 'reset') {
+          onReset()
+        }
+        if (key === 'add-text') {
+          onInsertTextBlock()
+        }
+        if (key === 'present') {
+          onPresent()
+        }
+        if (key === 'copy-html') {
+          onCopyExport()
+        }
+        if (key === 'download-html') {
+          onDownloadExport()
+        }
+      }
+    },
+    {
+      elementIdPrefix: 'action-tool-',
+      orientation: 'horizontal',
+    },
+  )
+  const actionToolbarProps = toolbarItemPropsByKey<ActionToolbarKey>(
+    actionToolbar.renderItems,
+  )
+
   return (
     <header className="topbar">
-      <div className="mode-toggle" role="tablist" aria-label="Mode">
+      <div {...modeToolbar.rootProps} className="mode-toggle">
         <button
-          aria-selected={mode === 'text'}
+          {...modeToolbarProps.text}
           className="mode-button"
-          onClick={() => onChangeMode('text')}
-          role="tab"
           type="button"
         >
           Text
         </button>
         <button
-          aria-selected={mode === 'layout'}
+          {...modeToolbarProps.layout}
           className="mode-button"
-          onClick={() => onChangeMode('layout')}
-          role="tab"
           type="button"
         >
           Arrange
         </button>
       </div>
 
-      <div className="zoom-controls" role="toolbar" aria-label="Canvas zoom">
+      <div {...zoomToolbar.rootProps} className="zoom-controls">
         <button
+          {...zoomToolbarProps.out}
           aria-label="Zoom out"
           disabled={!canZoomOut}
-          onClick={onZoomOut}
           title="Zoom out"
           type="button"
         >
@@ -104,17 +256,17 @@ export function Topbar({
           {zoomLabel}
         </span>
         <button
+          {...zoomToolbarProps.in}
           aria-label="Zoom in"
           disabled={!canZoomIn}
-          onClick={onZoomIn}
           title="Zoom in"
           type="button"
         >
           <ZoomIn aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...zoomToolbarProps.fit}
           aria-label="Fit canvas"
-          onClick={onZoomFit}
           title="Fit canvas"
           type="button"
         >
@@ -122,62 +274,62 @@ export function Topbar({
         </button>
       </div>
 
-      <div className="toolbar" role="toolbar" aria-label="Actions">
+      <div {...actionToolbar.rootProps} className="toolbar">
         <button
+          {...actionToolbarProps.undo}
           aria-label="Undo"
           data-action="undo"
           disabled={!canUndo}
-          onClick={onUndo}
           title="Undo"
           type="button"
         >
           <Undo2 aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...actionToolbarProps.redo}
           aria-label="Redo"
           data-action="redo"
           disabled={!canRedo}
-          onClick={onRedo}
           title="Redo"
           type="button"
         >
           <Redo2 aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...actionToolbarProps.reset}
           aria-label={resetTitle}
           data-action="reset"
           data-reset-scope={resetScope}
           disabled={!canReset}
-          onClick={onReset}
           title={resetTitle}
           type="button"
         >
           <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...actionToolbarProps['add-text']}
           aria-label="Add text box"
           data-action="add-text"
-          onClick={onInsertTextBlock}
           title="Add text box"
           type="button"
         >
           <Type aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...actionToolbarProps.present}
           aria-label="Present"
           data-action="present"
-          onClick={onPresent}
           title="Present"
           type="button"
         >
           <Play aria-hidden="true" size={16} strokeWidth={2.2} />
         </button>
         <button
+          {...actionToolbarProps['copy-html']}
           aria-label="Copy HTML"
           aria-pressed={exportCopied}
           data-action="copy-html"
           data-copy-state={copyState}
-          onClick={onCopyExport}
           title={copyTitle}
           type="button"
         >
@@ -188,11 +340,11 @@ export function Topbar({
           )}
         </button>
         <button
+          {...actionToolbarProps['download-html']}
           aria-label="Download HTML"
           aria-pressed={exportDownloaded}
           data-action="download-html"
           data-download-state={exportDownloaded ? 'downloaded' : 'idle'}
-          onClick={onDownloadExport}
           title={exportDownloaded ? 'Downloaded' : 'Download HTML'}
           type="button"
         >
@@ -205,4 +357,30 @@ export function Topbar({
       </div>
     </header>
   )
+}
+
+function selectedToolbarKeys(event: PatternEvent) {
+  return event.type === 'select' ? event.keys : []
+}
+
+function toolbarItemPropsByKey<TKey extends string>(
+  items: readonly ReactToolbarRenderItem[],
+) {
+  return Object.fromEntries(
+    items.map((item) => [
+      item.key,
+      item.itemProps as ButtonHTMLAttributes<HTMLButtonElement>,
+    ]),
+  ) as Record<TKey, ButtonHTMLAttributes<HTMLButtonElement>>
+}
+
+function firstEnabledToolbarKey<TKey extends string>(
+  keys: readonly TKey[],
+  disabledKeys: readonly string[],
+) {
+  return keys.find((key) => !disabledKeys.includes(key)) ?? keys[0] ?? null
+}
+
+function isModeToolbarKey(key: string): key is ModeToolbarKey {
+  return key === 'text' || key === 'layout'
 }

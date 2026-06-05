@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,6 +13,14 @@
   },
   "dependencies": {
     "@interactive-os/aria": "link:../apg-patterns",
+    "@interactive-os/keyboard": "link:../keyboard/packages/keyboard",
+    "@interactive-os/object-surface": "link:../object-surface/packages/object-surface",
+    "@zod-crud/collection": "link:../zod-crud/packages/collection",
+    "@zod-crud/dirty-state": "link:../zod-crud/packages/dirty-state",
+    "@zod-crud/id-resolver": "link:../zod-crud/packages/id-resolver",
+    "@zod-crud/layer-order": "link:../zod-crud/labs/extensions/layer-order",
+    "@zod-crud/persist-web": "link:../zod-crud/packages/persist-web",
+    "canvas": "link:../canvas",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

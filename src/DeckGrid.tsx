@@ -3,6 +3,10 @@ import {
   rectToStyle,
   type RetouchSlide,
 } from './retouchModel'
+import {
+  htmlSlideBlockAttributes,
+  htmlSlideRootAttributes,
+} from './htmlSlideContract'
 
 type DeckGridProps = {
   activeSlideId: string
@@ -31,13 +35,13 @@ export function DeckGrid({
           <span className="grid-slide-index">{index + 1}</span>
           <span
             className="grid-slide-canvas"
-            data-slide={slide.id}
+            {...htmlSlideRootAttributes(slide.id)}
             style={{ '--accent': slide.accent } as CSSProperties}
           >
-            {slide.blocks.map((block) => (
+            {slide.blocks.map((block, blockIndex) => (
               <span
                 className={`grid-slide-block ${block.className}`}
-                data-role={block.role}
+                {...htmlSlideBlockAttributes(block, blockIndex)}
                 key={block.id}
                 style={rectToStyle(block)}
               >

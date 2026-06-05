@@ -15,8 +15,10 @@ import {
   listboxDefinition,
   reducePatternData,
   useListboxPattern,
+  useToolbarPattern,
   type PatternData,
   type PatternEvent,
+  type ReactToolbarRenderItem,
 } from '@interactive-os/aria/react'
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 
@@ -36,6 +38,21 @@ type SlideRailProps = {
   onSelectSlide: (slideId: string) => void
   slides: RetouchSlide[]
 }
+
+type SlideRailActionKey =
+  | 'add'
+  | 'delete'
+  | 'duplicate'
+  | 'move-down'
+  | 'move-up'
+
+const SLIDE_RAIL_ACTION_KEYS = [
+  'add',
+  'duplicate',
+  'move-up',
+  'move-down',
+  'delete',
+] as const
 
 export function SlideRail({
   activeSlideId,
@@ -109,6 +126,58 @@ export function SlideRail({
       typeaheadEnabled: true,
     },
   )
+  const railActionDisabledKeys = useMemo(() => [
+    ...(!canMoveSlideUp ? ['move-up' as const] : []),
+    ...(!canMoveSlideDown ? ['move-down' as const] : []),
+    ...(!canDeleteSlide ? ['delete' as const] : []),
+  ], [canDeleteSlide, canMoveSlideDown, canMoveSlideUp])
+  const railActionData = useMemo<PatternData>(() => ({
+    items: {
+      add: { label: 'Add slide' },
+      delete: { label: 'Delete slide' },
+      duplicate: { label: 'Duplicate slide' },
+      'move-down': { label: 'Move slide down' },
+      'move-up': { label: 'Move slide up' },
+    },
+    relations: { rootKeys: SLIDE_RAIL_ACTION_KEYS },
+    refs: { label: 'Slide actions' },
+    state: {
+      activeKey: firstEnabledToolbarKey(
+        SLIDE_RAIL_ACTION_KEYS,
+        railActionDisabledKeys,
+      ),
+      disabledKeys: railActionDisabledKeys,
+    },
+  }), [railActionDisabledKeys])
+  const railActionToolbar = useToolbarPattern(
+    railActionData,
+    (event) => {
+      for (const key of selectedToolbarKeys(event)) {
+        if (key === 'add') {
+          onAddSlide()
+        }
+        if (key === 'duplicate') {
+          onDuplicateSlide()
+        }
+        if (key === 'move-up') {
+          onMoveSlideUp()
+        }
+        if (key === 'move-down') {
+          onMoveSlideDown()
+        }
+        if (key === 'delete') {
+          onDeleteSlide()
+        }
+      }
+    },
+    {
+      elementIdPrefix: 'slide-action-',
+      orientation: 'horizontal',
+    },
+  )
+  const railActionProps = toolbarItemPropsByKey<SlideRailActionKey>(
+    railActionToolbar.renderItems,
+  )
 
   return (
     <aside className="slide-rail">
@@ -127,40 +196,45 @@ export function SlideRail({
         </button>
       </div>
 
-      <div className="rail-actions" role="toolbar" aria-label="Slide actions">
-        <button aria-label="Add slide" onClick={onAddSlide} title="Add slide" type="button">
+      <div {...railActionToolbar.rootProps} className="rail-actions">
+        <button
+          {...railActionProps.add}
+          aria-label="Add slide"
+          title="Add slide"
+          type="button"
+        >
           <Plus aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
         <button
+          {...railActionProps.duplicate}
           aria-label="Duplicate slide"
-          onClick={onDuplicateSlide}
           title="Duplicate slide"
           type="button"
         >
           <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
         <button
+          {...railActionProps['move-up']}
           aria-label="Move slide up"
           disabled={!canMoveSlideUp}
-          onClick={onMoveSlideUp}
           title="Move slide up"
           type="button"
         >
           <ArrowUp aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
         <button
+          {...railActionProps['move-down']}
           aria-label="Move slide down"
           disabled={!canMoveSlideDown}
-          onClick={onMoveSlideDown}
           title="Move slide down"
           type="button"
         >
           <ArrowDown aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
         <button
+          {...railActionProps.delete}
           aria-label="Delete slide"
           disabled={!canDeleteSlide}
-          onClick={onDeleteSlide}
           title="Delete slide"
           type="button"
         >
@@ -200,6 +274,28 @@ export function SlideRail({
       </div>
     </aside>
   )
+}
+
+function selectedToolbarKeys(event: PatternEvent) {
+  return event.type === 'select' ? event.keys : []
+}
+
+function toolbarItemPropsByKey<TKey extends string>(
+  items: readonly ReactToolbarRenderItem[],
+) {
+  return Object.fromEntries(
+    items.map((item) => [
+      item.key,
+      item.itemProps as ButtonHTMLAttributes<HTMLButtonElement>,
+    ]),
+  ) as Record<TKey, ButtonHTMLAttributes<HTMLButtonElement>>
+}
+
+function firstEnabledToolbarKey<TKey extends string>(
+  keys: readonly TKey[],
+  disabledKeys: readonly string[],
+) {
+  return keys.find((key) => !disabledKeys.includes(key)) ?? keys[0] ?? null
 }
 
 function MiniSlide({ slide }: { slide: RetouchSlide }) {

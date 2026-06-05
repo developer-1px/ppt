@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
   SAMPLE_DECK,
@@ -15,8 +15,12 @@ import {
   type RetouchDeck,
   type SlideBlock,
 } from './retouchModel'
-import { autoHeightRect, normalizeEditableText } from './editableTextDom'
+import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock, type Point } from './layoutInteraction'
+import {
+  PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
+  normalizePlainTextBlockEditorText,
+} from './plainTextBlockEditor'
 
 type EditingState = {
   clientPoint?: Point
@@ -28,7 +32,7 @@ type CommitPatch = (
   pointer: Pointer,
   label: string,
   mergeKey?: string,
-  selection?: SelectionAction,
+  selection?: SelectionSnap,
 ) => void
 
 type HistoryApi = {
@@ -123,11 +127,11 @@ export function useRetouchResetActions({
     const element =
       editing?.pointer === pointer
         ? slideRef.current?.querySelector<HTMLElement>(
-            '[data-editing="true"][contenteditable]',
+            PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
           )
         : null
     const blockElement = element?.closest<HTMLElement>('[data-block]')
-    const liveText = normalizeEditableText(
+    const liveText = normalizePlainTextBlockEditorText(
       element?.textContent ?? location.block.text,
     )
     const liveMinimumHeight =

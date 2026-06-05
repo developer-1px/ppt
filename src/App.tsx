@@ -2,12 +2,11 @@ import {
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
   reducePatternData,
@@ -26,10 +25,8 @@ import {
   blockLocationFromPointer,
   blockPointer,
   clamp,
-  findSlideIndex,
   getRect,
   rectEquals,
-  slideBlocksPointer,
   slideAccentPointer,
   slideNamePointer,
   slidePointer,
@@ -52,8 +49,7 @@ import {
   type DistributeSelectionAction,
 } from './selectionAlignment'
 import {
-  blockOrderChanged,
-  reorderBlocksByLayer,
+  createLayerOrderPatch,
   type LayerOrderAction,
 } from './selectionLayerOrder'
 import { useExportControls } from './useExportControls'
@@ -66,14 +62,15 @@ import { useRetouchTextEditing } from './useRetouchTextEditing'
 import { useVisualSelectionRect } from './useVisualSelectionRect'
 import {
   changedSlides,
-  deckEquals,
-  persistDeck,
   readInitialDeck,
+  useRetouchDraftPersistence,
 } from './retouchPersistence'
+import { createRetouchCollection } from './retouchCollection'
+import { createRetouchIdResolver } from './retouchIdResolver'
 import {
   getCurrentRect,
   hasSelectionModifier,
-  selectionActionForPointers,
+  selectionSnapForPointers,
   type Point,
 } from './layoutInteraction'
 import './App.css'
@@ -190,9 +187,14 @@ function App() {
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
   const [presenting, setPresenting] = useState(false)
 
-  const activeSlideIndex = Math.max(0, findSlideIndex(doc.value, activeSlideId))
+  const retouchIds = useMemo(() => createRetouchIdResolver(doc), [doc])
+  const retouchCollection = useMemo(() => createRetouchCollection(doc), [doc])
+  const activeSlideIndex = Math.max(
+    0,
+    retouchIds.resolveSlideIndex(activeSlideId) ?? 0,
+  )
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
-  const hasDeckChanges = !deckEquals(doc.value, SAMPLE_DECK)
+  const { hasDeckChanges } = useRetouchDraftPersistence(doc)
   const changedSlideIds = useMemo(() => changedSlides(doc.value), [doc.value])
   const {
     baseSelectedLocation,
@@ -214,17 +216,13 @@ function App() {
     selectedPointersFromDocument: doc.selection?.selectedPointers ?? [],
   })
 
-  useEffect(() => {
-    persistDeck(doc.value)
-  }, [doc.value])
-
   const commitPatch = useCallback(
     (
       patch: JSONPatchOperation[],
       pointer: Pointer,
       label: string,
       mergeKey?: string,
-      selection?: SelectionAction,
+      selection?: SelectionSnap,
     ) => {
       if (patch.length === 0) {
         return
@@ -234,7 +232,7 @@ function App() {
         label,
         mergeKey,
         origin: 'ppt-retouch',
-        selection: selection ?? { type: 'collapse', pointer },
+        selection: selection ?? selectionSnapForPointers([pointer]),
       })
     },
     [doc],
@@ -531,10 +529,11 @@ function App() {
       doc.value.slides[activeSlideIndex - 1] ??
       doc.value.slides[0]
 
-    doc.commit([{ op: 'remove', path: slidePointer(activeSlideIndex) }], {
-      label: 'delete slide',
-      origin: 'ppt-retouch',
-    })
+    const deleted = retouchCollection.deleteSlide(activeSlideIndex)
+    if (!deleted.ok) {
+      return
+    }
+
     setNotesBySlideId((current) => {
       const next = { ...current }
       delete next[activeSlide.id]
@@ -551,16 +550,11 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(
-      [
-        { op: 'remove', path: slidePointer(activeSlideIndex) },
-        { op: 'add', path: slidePointer(nextIndex), value: activeSlide },
-      ],
-      {
-        label: direction < 0 ? 'move slide up' : 'move slide down',
-        origin: 'ppt-retouch',
-      },
-    )
+    const moved = retouchCollection.moveSlide(activeSlideIndex, direction)
+    if (!moved.ok) {
+      return
+    }
+
     setActiveSlideId(activeSlide.id)
     setCanvasView('slide')
     doc.selection?.empty()
@@ -622,7 +616,7 @@ function App() {
     doc.commit([{ op: 'add', path: pointer, value: nextBlock }], {
       label: 'add text block',
       origin: 'ppt-retouch',
-      selection: { type: 'collapse', pointer },
+      selection: selectionSnapForPointers([pointer]),
     })
     setCanvasView('slide')
     setMode('text')
@@ -680,7 +674,7 @@ function App() {
     })), {
       label: 'paste blocks',
       origin: 'ppt-retouch',
-      selection: selectionActionForPointers(pastedPointers),
+      selection: selectionSnapForPointers(pastedPointers),
     })
     setBlockClipboard(pastedBlocks)
     setCanvasView('slide')
@@ -720,7 +714,7 @@ function App() {
     })), {
       label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
       origin: 'ppt-retouch',
-      selection: selectionActionForPointers(duplicatePointers),
+      selection: selectionSnapForPointers(duplicatePointers),
     })
     setCanvasView('slide')
     setMode('layout')
@@ -741,18 +735,13 @@ function App() {
       activeSlide.blocks.length - locations.length - 1,
     )
 
-    doc.commit(
-      [...locations]
-        .sort((a, b) => b.blockIndex - a.blockIndex)
-        .map((location) => ({
-          op: 'remove',
-          path: blockPointer(activeSlideIndex, location.blockIndex),
-        })),
-      {
-        label: locations.length > 1 ? 'delete blocks' : 'delete block',
-        origin: 'ppt-retouch',
-      },
+    const deleted = retouchCollection.deleteBlocks(
+      locations.map((location) => location.pointer),
     )
+    if (!deleted.ok) {
+      return
+    }
+
     setCanvasView('slide')
     setMode('layout')
     setEditing(null)
@@ -797,7 +786,7 @@ function App() {
       targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
       'align selection',
       undefined,
-      selectionActionForPointers(
+      selectionSnapForPointers(
         targets.map((target) => target.pointer),
         selectedPointer ?? targets.at(-1)?.pointer,
       ),
@@ -836,7 +825,7 @@ function App() {
       targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
       'distribute selection',
       undefined,
-      selectionActionForPointers(
+      selectionSnapForPointers(
         targets.map((target) => target.pointer),
         selectedPointer ?? targets.at(-1)?.pointer,
       ),
@@ -851,34 +840,27 @@ function App() {
     }
 
     const selectedIds = locations.map((location) => location.block.id)
-    const nextBlocks = reorderBlocksByLayer(activeSlide.blocks, selectedIds, action)
+    const layerOrderPatch = createLayerOrderPatch({
+      action,
+      activeSlideIndex,
+      doc,
+      selectedIds,
+      selectedPointers: locations.map((location) => location.pointer),
+    })
 
-    if (!blockOrderChanged(activeSlide.blocks, nextBlocks)) {
+    if (!layerOrderPatch) {
       return
     }
 
-    const selectedIdSet = new Set(selectedIds)
-    const nextSelectedPointers = nextBlocks
-      .map((block, blockIndex) =>
-        selectedIdSet.has(block.id) ? blockPointer(activeSlideIndex, blockIndex) : null,
-      )
-      .filter((pointer): pointer is Pointer => pointer !== null)
-
     commitActiveTextEdit()
     doc.commit(
-      [
-        {
-          op: 'replace',
-          path: slideBlocksPointer(activeSlideIndex),
-          value: nextBlocks,
-        },
-      ],
+      layerOrderPatch.operations,
       {
         label: 'reorder layers',
         origin: 'ppt-retouch',
-        selection: selectionActionForPointers(
-          nextSelectedPointers,
-          nextSelectedPointers.at(-1),
+        selection: selectionSnapForPointers(
+          layerOrderPatch.nextSelectedPointers,
+          layerOrderPatch.nextSelectedPointers.at(-1),
         ),
       },
     )

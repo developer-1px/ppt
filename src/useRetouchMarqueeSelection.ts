@@ -1,4 +1,8 @@
 import {
+  rectFromPoints,
+  selectSurfaceObjectsInMarquee,
+} from '@interactive-os/object-surface'
+import {
   useCallback,
   useEffect,
   useState,
@@ -10,12 +14,16 @@ import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
-  blockPointer,
-  getRect,
   type Rect,
   type RetouchSlide,
 } from './retouchModel'
 import { clamp, hasSelectionModifier, type Point } from './layoutInteraction'
+import {
+  objectSurfaceSelectionFromPointers,
+  pointersFromObjectSurfaceSelection,
+  retouchSurfaceAdapter,
+  retouchSurfaceItems,
+} from './retouchObjectSurface'
 
 const MARQUEE_THRESHOLD = 6
 
@@ -133,16 +141,14 @@ export function useRetouchMarqueeSelection({
       }
 
       const rect = rectFromPoints(currentMarquee.startPoint, point)
-      const marqueePointers = activeSlide.blocks
-        .map((block, blockIndex) => ({
-          pointer: blockPointer(activeSlideIndex, blockIndex),
-          rect: getRect(block),
-        }))
-        .filter((blockRect) => rectIntersects(rect, blockRect.rect))
-        .map(({ pointer }) => pointer)
-      const nextPointers = currentMarquee.additive
-        ? [...new Set([...selectedPointers, ...marqueePointers])]
-        : marqueePointers
+      const nextSurfaceSelection = selectSurfaceObjectsInMarquee({
+        adapter: retouchSurfaceAdapter,
+        items: retouchSurfaceItems(activeSlide, activeSlideIndex),
+        mode: currentMarquee.additive ? 'add' : 'replace',
+        rect,
+        selection: objectSurfaceSelectionFromPointers(selectedPointers),
+      })
+      const nextPointers = pointersFromObjectSurfaceSelection(nextSurfaceSelection)
 
       if (nextPointers.length > 0) {
         selection?.selectRanges?.(nextPointers)
@@ -164,7 +170,7 @@ export function useRetouchMarqueeSelection({
       window.removeEventListener('pointercancel', clearMarqueeSelection)
     }
   }, [
-    activeSlide.blocks,
+    activeSlide,
     activeSlideIndex,
     clearMarqueeSelection,
     marquee,
@@ -185,28 +191,5 @@ function hasMeaningfulClientDelta(start: Point, next: Pick<PointerEvent, 'client
   return (
     Math.abs(next.clientX - start.x) >= MARQUEE_THRESHOLD ||
     Math.abs(next.clientY - start.y) >= MARQUEE_THRESHOLD
-  )
-}
-
-function rectFromPoints(start: Point, end: Point): Rect {
-  const left = Math.min(start.x, end.x)
-  const top = Math.min(start.y, end.y)
-  const right = Math.max(start.x, end.x)
-  const bottom = Math.max(start.y, end.y)
-
-  return {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top,
-  }
-}
-
-function rectIntersects(a: Rect, b: Rect) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
   )
 }

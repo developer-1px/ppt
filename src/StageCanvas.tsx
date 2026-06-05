@@ -19,6 +19,7 @@ import {
   type SlideBlock,
 } from './retouchModel'
 import { SlideBlockElement } from './SlideBlockElement'
+import { htmlSlideRootAttributes } from './htmlSlideContract'
 import {
   getCurrentRect,
   minimumHeightForBlock,
@@ -28,7 +29,10 @@ import {
   type Point,
   type SnapGuides,
 } from './layoutInteraction'
-import { rectBounds } from './selectionAlignment'
+import {
+  retouchCanvasSceneEntries,
+  retouchCanvasSelectionBounds,
+} from './retouchCanvasScene'
 
 type EditingState = {
   clientPoint?: Point
@@ -93,15 +97,20 @@ export function StageCanvas({
 
     return {
       block,
+      blockIndex,
       pointer,
       rect: getCurrentRect(pointer, block, draftLayout),
       selected: selectedPointerSet.has(pointer),
     }
   })
-  const selectedBounds = rectBounds(
-    blockEntries
-      .filter(({ pointer }) => selectedPointerSet.has(pointer))
-      .map(({ rect }) => rect),
+  const surfaceItems = blockEntries.map(({ block, pointer, rect }) => ({
+    block,
+    pointer,
+    rect,
+  }))
+  const selectedBounds = retouchCanvasSelectionBounds(
+    retouchCanvasSceneEntries(surfaceItems),
+    selectedPointers,
   )
   const overlayRect =
     selectedPointers.length === 1 && selectedRect
@@ -112,12 +121,12 @@ export function StageCanvas({
     <div className="slide-frame">
       <div
         className="slide-canvas"
-        data-slide={activeSlide.id}
+        {...htmlSlideRootAttributes(activeSlide.id)}
         onPointerDown={onCanvasPointerDown}
         ref={slideRef}
         style={{ '--accent': activeSlide.accent } as CSSProperties}
       >
-        {blockEntries.map(({ block, pointer, rect, selected }) => {
+        {blockEntries.map(({ block, blockIndex, pointer, rect, selected }) => {
           const baseBlock = findBlockLocation(
             SAMPLE_DECK,
             activeSlide.id,
@@ -145,6 +154,7 @@ export function StageCanvas({
           return (
             <SlideBlockElement
               block={block}
+              blockIndex={blockIndex}
               className={className}
               editing={editingThisBlock}
               initialClientPoint={editingThisBlock ? editing.clientPoint : undefined}

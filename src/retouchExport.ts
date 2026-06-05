@@ -10,6 +10,12 @@ import {
   type RetouchPatchManifest,
   type SlideBlock,
 } from './retouchModel'
+import {
+  HTML_SLIDE_ATTRIBUTES,
+  HTML_SLIDE_CLASSES,
+  htmlSlideBlockAttributes,
+  htmlSlideRootAttributes,
+} from './htmlSlideContract'
 
 export function exportRetouchDeck(deck: RetouchDeck) {
   const patchManifest = buildRetouchPatchManifest(SAMPLE_DECK, deck)
@@ -21,8 +27,8 @@ export function exportRetouchDeck(deck: RetouchDeck) {
     '.deck{display:grid;gap:32px;padding:32px;}',
     '.slide{position:relative;container-type:inline-size;width:1280px;height:720px;overflow:hidden;background:#fff;border:1px solid #d1d5db;}',
     '@media print{body{background:#fff;}.deck{display:block;padding:0;}.slide{border:0;break-after:page;page-break-after:always;}}',
-    '[data-block]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}',
-    '.slide-block-text{display:block;width:100%;min-width:0;max-width:100%;color:inherit;font:inherit;letter-spacing:inherit;line-height:inherit;overflow-wrap:inherit;text-align:inherit;white-space:inherit;}',
+    `[${HTML_SLIDE_ATTRIBUTES.block}]{position:absolute;box-sizing:border-box;margin:0;overflow:visible;overflow-wrap:anywhere;white-space:pre-wrap;}`,
+    `.${HTML_SLIDE_CLASSES.blockText}{display:block;width:100%;min-width:0;max-width:100%;color:inherit;font:inherit;letter-spacing:inherit;line-height:inherit;overflow-wrap:inherit;text-align:inherit;white-space:inherit;}`,
     slideThemeCss.trim(),
   ].join('\n')
 
@@ -32,7 +38,7 @@ export function exportRetouchDeck(deck: RetouchDeck) {
         (candidate) => candidate.id === slide.id,
       )
       const blocks = slide.blocks
-        .map((block) => {
+        .map((block, blockIndex) => {
           const baseBlock = baseSlide?.blocks.find(
             (candidate) => candidate.id === block.id,
           )
@@ -46,11 +52,11 @@ export function exportRetouchDeck(deck: RetouchDeck) {
             .filter(Boolean)
             .join(';')
 
-          return `    <${block.tag} data-block="${block.id}" data-role="${block.role}" class="${block.className}" style="${style}"><span class="slide-block-text">${text}</span></${block.tag}>`
+          return `    <${block.tag} ${htmlAttributes(htmlSlideBlockAttributes(block, blockIndex))} class="${escapeHtml(block.className)}" style="${style}"><span class="${HTML_SLIDE_CLASSES.blockText}">${text}</span></${block.tag}>`
         })
         .join('\n')
 
-      return `  <section data-slide="${slide.id}" class="slide" style="--accent:${slide.accent}">\n${blocks}\n  </section>`
+      return `  <section ${htmlAttributes(htmlSlideRootAttributes(slide.id))} class="slide" style="--accent:${escapeHtml(slide.accent)}">\n${blocks}\n  </section>`
     })
     .join('\n')
 
@@ -145,6 +151,12 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+function htmlAttributes(attributes: Record<string, string>) {
+  return Object.entries(attributes)
+    .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
+    .join(' ')
 }
 
 function escapeScriptJson(value: string) {

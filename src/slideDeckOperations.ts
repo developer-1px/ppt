@@ -1,4 +1,10 @@
 import type { RetouchSlide } from './retouchModel'
+import {
+  createRetouchDuplicatedSlideBlockId,
+  createRetouchSlideId,
+  createRetouchSlideName,
+  nextRetouchSlideOrdinal,
+} from './retouchIdResolver'
 
 export const SLIDE_ACCENTS = [
   '#2563eb',
@@ -12,12 +18,12 @@ export const SLIDE_ACCENTS = [
 ]
 
 export function createBlankSlide(slides: RetouchSlide[]): RetouchSlide {
-  const ordinal = nextSlideOrdinal(slides)
-  const id = uniqueSlideId(slides, `slide-${ordinal}`)
+  const ordinal = nextRetouchSlideOrdinal(slides)
+  const id = createRetouchSlideId(slides, ordinal)
 
   return {
     id,
-    name: uniqueSlideName(slides, `Slide ${ordinal}`),
+    name: createRetouchSlideName(slides, `Slide ${ordinal}`),
     accent: SLIDE_ACCENTS[(ordinal - 1) % SLIDE_ACCENTS.length],
     blocks: [
       {
@@ -61,58 +67,16 @@ export function duplicateSlide(
   slide: RetouchSlide,
   slides: RetouchSlide[],
 ): RetouchSlide {
-  const ordinal = nextSlideOrdinal(slides)
-  const id = uniqueSlideId(slides, `slide-${ordinal}`)
+  const ordinal = nextRetouchSlideOrdinal(slides)
+  const id = createRetouchSlideId(slides, ordinal)
 
   return {
     ...slide,
     id,
-    name: uniqueSlideName(slides, `${slide.name} copy`),
+    name: createRetouchSlideName(slides, `${slide.name} copy`),
     blocks: slide.blocks.map((block, index) => ({
       ...block,
-      id: `${id}-block-${index + 1}`,
+      id: createRetouchDuplicatedSlideBlockId(id, index),
     })),
-  }
-}
-
-function nextSlideOrdinal(slides: RetouchSlide[]) {
-  const maxOrdinal = slides.reduce((max, slide) => {
-    const match = /^slide-(\d+)$/.exec(slide.id)
-
-    return match ? Math.max(max, Number(match[1])) : max
-  }, 0)
-
-  return Math.max(maxOrdinal, slides.length) + 1
-}
-
-function uniqueSlideId(slides: RetouchSlide[], baseId: string) {
-  const existingIds = new Set(slides.map((slide) => slide.id))
-
-  if (!existingIds.has(baseId)) {
-    return baseId
-  }
-
-  for (let suffix = 2; ; suffix += 1) {
-    const candidate = `${baseId}-${suffix}`
-
-    if (!existingIds.has(candidate)) {
-      return candidate
-    }
-  }
-}
-
-function uniqueSlideName(slides: RetouchSlide[], baseName: string) {
-  const existingNames = new Set(slides.map((slide) => slide.name))
-
-  if (!existingNames.has(baseName)) {
-    return baseName
-  }
-
-  for (let suffix = 2; ; suffix += 1) {
-    const candidate = `${baseName} ${suffix}`
-
-    if (!existingNames.has(candidate)) {
-      return candidate
-    }
   }
 }

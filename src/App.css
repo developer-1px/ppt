@@ -257,6 +257,7 @@ button {
 }
 
 .mode-button[aria-selected='true'],
+.mode-button[aria-pressed='true'],
 .toolbar button[aria-pressed='true'] {
   border-color: #2563eb;
   background: #eff6ff;

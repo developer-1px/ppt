@@ -1,6 +1,11 @@
 import { useEffect, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { matchesShortcut } from '@interactive-os/keyboard'
 import { rectToStyle, type RetouchSlide } from './retouchModel'
+import {
+  htmlSlideBlockAttributes,
+  htmlSlideRootAttributes,
+} from './htmlSlideContract'
 
 type PresentationOverlayProps = {
   activeSlide: RetouchSlide
@@ -23,19 +28,19 @@ export function PresentationOverlay({
 }: PresentationOverlayProps) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (matchesShortcut(event, 'Escape')) {
         event.preventDefault()
         onClose()
         return
       }
 
-      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+      if (matchesShortcut(event, 'ArrowRight PageDown Space')) {
         event.preventDefault()
         onNext()
         return
       }
 
-      if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+      if (matchesShortcut(event, 'ArrowLeft PageUp')) {
         event.preventDefault()
         onPrevious()
       }
@@ -57,14 +62,13 @@ export function PresentationOverlay({
         <div className="presentation-slide-frame">
           <div
             className="presentation-slide"
-            data-slide={activeSlide.id}
+            {...htmlSlideRootAttributes(activeSlide.id)}
             style={{ '--accent': activeSlide.accent } as CSSProperties}
           >
-            {activeSlide.blocks.map((block) => (
+            {activeSlide.blocks.map((block, blockIndex) => (
               <div
                 className={`presentation-block ${block.className}`}
-                data-block={block.id}
-                data-role={block.role}
+                {...htmlSlideBlockAttributes(block, blockIndex)}
                 key={block.id}
                 style={rectToStyle(block)}
               >

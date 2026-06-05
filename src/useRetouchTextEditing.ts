@@ -3,7 +3,7 @@ import {
   applyPatch,
   type JSONPatchOperation,
   type Pointer,
-  type SelectionAction,
+  type SelectionSnap,
 } from 'zod-crud'
 import {
   SAMPLE_DECK,
@@ -17,8 +17,12 @@ import {
   type Rect,
   type RetouchDeck,
 } from './retouchModel'
-import { autoHeightRect, normalizeEditableText } from './editableTextDom'
+import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock, type Point } from './layoutInteraction'
+import {
+  PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
+  normalizePlainTextBlockEditorText,
+} from './plainTextBlockEditor'
 
 type EditingState = {
   clientPoint?: Point
@@ -30,7 +34,7 @@ type CommitPatch = (
   pointer: Pointer,
   label: string,
   mergeKey?: string,
-  selection?: SelectionAction,
+  selection?: SelectionSnap,
 ) => void
 
 export function useRetouchTextEditing({
@@ -80,7 +84,7 @@ export function useRetouchTextEditing({
     const activeEditing = editing
     const location = blockLocationFromPointer(deckValue, activeEditing.pointer)
     const element = slideRef.current?.querySelector<HTMLElement>(
-      '[data-editing="true"][contenteditable]',
+      PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
     )
     const blockElement = element?.closest<HTMLElement>('[data-block]')
 
@@ -91,7 +95,7 @@ export function useRetouchTextEditing({
       return deckValue
     }
 
-    const text = normalizeEditableText(element.textContent ?? '')
+    const text = normalizePlainTextBlockEditorText(element.textContent ?? '')
     const baseBlock = findBlockLocation(
       SAMPLE_DECK,
       location.slide.id,

@@ -1,4 +1,5 @@
-import type { Pointer, SelectionAction } from 'zod-crud'
+import type { Point } from 'canvas/core'
+import type { Pointer, SelectionSnap } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
   GRID_SIZE,
@@ -33,10 +34,7 @@ export type Interaction =
       startRects: DraftLayoutRect[]
     }
 
-export type Point = {
-  x: number
-  y: number
-}
+export type { Point }
 
 export type DraftLayout = {
   rects: DraftLayoutRect[]
@@ -127,18 +125,26 @@ export function draftRectsEqual(a: DraftLayoutRect[], b: DraftLayoutRect[]) {
   )
 }
 
-export function selectionActionForPointers(
+export function selectionSnapForPointers(
   pointers: Pointer[],
   primaryPointer = pointers.at(-1),
-): SelectionAction {
-  if (pointers.length <= 1) {
-    return { type: 'collapse', pointer: pointers[0] ?? primaryPointer ?? '' }
-  }
+): SelectionSnap {
+  const selectedPointers = [...new Set(pointers)]
+  const fallbackPrimary = selectedPointers.at(-1) ?? null
+  const primary = primaryPointer && selectedPointers.includes(primaryPointer)
+    ? primaryPointer
+    : fallbackPrimary
+  const primaryIndex = primary ? selectedPointers.indexOf(primary) : -1
 
   return {
-    type: 'selectRanges',
-    ranges: pointers,
-    primaryIndex: Math.max(0, pointers.indexOf(primaryPointer ?? pointers.at(-1)!)),
+    anchor: primary,
+    focus: primary,
+    primaryIndex,
+    selectedPointers,
+    selectionRanges: selectedPointers.map((pointer) => ({
+      anchor: pointer,
+      focus: pointer,
+    })),
   }
 }
 

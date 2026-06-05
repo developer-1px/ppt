@@ -1,24 +1,40 @@
+import {
+  getDeepTarget,
+  isEditableTarget as isKeyboardEditableTarget,
+  matchesShortcut,
+} from '@interactive-os/keyboard'
 import { GRID_SIZE } from './retouchModel'
 import type { Point } from './layoutInteraction'
 
-export function isHistoryShortcut(event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey'>) {
-  return (event.metaKey || event.ctrlKey) && !event.altKey
+export function isHistoryShortcut(event: KeyboardEvent) {
+  return matchesShortcut(
+    event,
+    'Control+z Meta+z Control+Shift+z Meta+Shift+z Control+y Meta+y',
+  )
 }
 
-export function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
+export function isEditableTarget(target: EventTarget | Event | null) {
+  if (isKeyboardEditableTarget(target)) {
+    return true
+  }
+
+  const deepTarget = target instanceof Event ? getDeepTarget(target) : target
+
+  if (!(deepTarget instanceof HTMLElement)) {
     return false
   }
 
-  return Boolean(target.closest('[contenteditable], textarea, input, select'))
+  return Boolean(deepTarget.closest('select'))
 }
 
-export function isControlTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
+export function isControlTarget(target: EventTarget | Event | null) {
+  const deepTarget = target instanceof Event ? getDeepTarget(target) : target
+
+  if (!(deepTarget instanceof HTMLElement)) {
     return false
   }
 
-  return Boolean(target.closest('button, [role="tab"], [role="toolbar"]'))
+  return Boolean(deepTarget.closest('button, [role="tab"], [role="toolbar"]'))
 }
 
 export function arrowKeyDelta(key: string, largeStep: boolean): Point | null {

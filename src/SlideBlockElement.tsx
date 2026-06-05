@@ -18,20 +18,34 @@ import {
 import {
   applyAutoHeightStyle,
   autoHeightRect,
-  insertTextAtSelection,
-  isSelectionAtTextEnd,
-  normalizeEditableText,
   placeCaretAtEnd,
   placeCaretFromPoint,
   rememberStageScroll,
   restoreStageScroll,
 } from './editableTextDom'
-import { isHistoryShortcut } from './editorKeyboard'
+import {
+  HTML_SLIDE_CLASSES,
+  htmlSlideBlockAttributes,
+} from './htmlSlideContract'
 import type { Point } from './layoutInteraction'
+import {
+  insertPlainTextBlockEditorLineBreak,
+  insertPlainTextBlockEditorText,
+  isPlainTextBlockEditorCancelShortcut,
+  isPlainTextBlockEditorCommitShortcut,
+  isPlainTextBlockEditorKeySafe,
+  isPlainTextBlockEditorLineBreakKey,
+  isPlainTextBlockEditorPrintableKey,
+  isPlainTextBlockEditorUndoShortcut,
+  normalizePlainTextBlockEditorText,
+  plainTextBlockEditorAttributes,
+  readPlainTextBlockEditorBeforeInput,
+} from './plainTextBlockEditor'
 import { usePendingTrailingLineBreakInput } from './usePendingTrailingLineBreakInput'
 
 type SlideBlockElementProps = {
   block: SlideBlock
+  blockIndex: number
   className: string
   editing: boolean
   initialClientPoint?: Point
@@ -47,6 +61,7 @@ type SlideBlockElementProps = {
 
 export function SlideBlockElement({
   block,
+  blockIndex,
   className,
   editing,
   initialClientPoint,
@@ -147,7 +162,10 @@ export function SlideBlockElement({
 
     committedRef.current = true
     element?.blur()
-    onCommit(normalizeEditableText(element?.textContent ?? text), nextRect)
+    onCommit(
+      normalizePlainTextBlockEditorText(element?.textContent ?? text),
+      nextRect,
+    )
   }, [editing, onCommit, syncAutoHeight, text])
 
   function resetDraft() {
@@ -175,22 +193,18 @@ export function SlideBlockElement({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.nativeEvent.isComposing) {
+    if (!isPlainTextBlockEditorKeySafe(event)) {
       return
     }
 
-    if (
-      isHistoryShortcut(event.nativeEvent) &&
-      event.key.toLowerCase() === 'z' &&
-      !event.shiftKey
-    ) {
+    if (isPlainTextBlockEditorUndoShortcut(event)) {
       event.preventDefault()
       event.stopPropagation()
       undoDraft()
       return
     }
 
-    if (event.key === 'Escape') {
+    if (isPlainTextBlockEditorCancelShortcut(event)) {
       event.preventDefault()
       event.stopPropagation()
       resetDraft()
@@ -198,75 +212,66 @@ export function SlideBlockElement({
       return
     }
 
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    if (isPlainTextBlockEditorCommitShortcut(event)) {
       event.preventDefault()
       event.stopPropagation()
       commit()
       return
     }
 
-    if (event.key === 'Enter') {
+    if (isPlainTextBlockEditorLineBreakKey(event)) {
       event.preventDefault()
       event.stopPropagation()
-      const beforeText = event.currentTarget.textContent ?? ''
-      const lineBreakAtEnd = isSelectionAtTextEnd(event.currentTarget)
+      const lineBreak = insertPlainTextBlockEditorLineBreak(event.currentTarget)
 
-      insertTextAtSelection(event.currentTarget, '\n')
-      rememberTrailingLineBreak(lineBreakAtEnd, beforeText)
+      rememberTrailingLineBreak(
+        lineBreak.lineBreakAtEnd,
+        lineBreak.beforeText,
+      )
       syncAutoHeight(event.currentTarget)
       return
     }
 
-    if (
-      event.key.length === 1 &&
-      !event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey
-    ) {
+    if (isPlainTextBlockEditorPrintableKey(event)) {
       event.preventDefault()
       event.stopPropagation()
       if (!insertAfterPendingTrailingLineBreak(event.currentTarget, event.key)) {
-        insertTextAtSelection(event.currentTarget, event.key)
+        insertPlainTextBlockEditorText(event.currentTarget, event.key)
       }
       syncAutoHeight(event.currentTarget)
     }
   }
 
   function handleBeforeInput(event: ReactFormEvent<HTMLElement>) {
-    const nativeEvent = event.nativeEvent as InputEvent
+    const input = readPlainTextBlockEditorBeforeInput(
+      event.nativeEvent as InputEvent,
+    )
 
-    if (nativeEvent.isComposing) {
+    if (!input) {
       return
     }
 
-    if (nativeEvent.inputType === 'insertText' && nativeEvent.data !== null) {
+    if (input.kind === 'text') {
       event.preventDefault()
       event.stopPropagation()
       if (
         !insertAfterPendingTrailingLineBreak(
           event.currentTarget,
-          nativeEvent.data,
+          input.text,
         )
       ) {
-        insertTextAtSelection(event.currentTarget, nativeEvent.data)
+        insertPlainTextBlockEditorText(event.currentTarget, input.text)
       }
       syncAutoHeight(event.currentTarget)
       return
     }
 
-    if (
-      nativeEvent.inputType === 'insertLineBreak' ||
-      nativeEvent.inputType === 'insertParagraph'
-    ) {
-      event.preventDefault()
-      event.stopPropagation()
-      const beforeText = event.currentTarget.textContent ?? ''
-      const lineBreakAtEnd = isSelectionAtTextEnd(event.currentTarget)
+    event.preventDefault()
+    event.stopPropagation()
+    const lineBreak = insertPlainTextBlockEditorLineBreak(event.currentTarget)
 
-      insertTextAtSelection(event.currentTarget, '\n')
-      rememberTrailingLineBreak(lineBreakAtEnd, beforeText)
-      syncAutoHeight(event.currentTarget)
-    }
+    rememberTrailingLineBreak(lineBreak.lineBreakAtEnd, lineBreak.beforeText)
+    syncAutoHeight(event.currentTarget)
   }
 
   function handlePaste(event: ReactClipboardEvent<HTMLElement>) {
@@ -275,7 +280,7 @@ export function SlideBlockElement({
     const text = event.clipboardData.getData('text/plain')
 
     if (!insertAfterPendingTrailingLineBreak(event.currentTarget, text)) {
-      insertTextAtSelection(event.currentTarget, text)
+      insertPlainTextBlockEditorText(event.currentTarget, text)
     }
     syncAutoHeight(event.currentTarget)
   }
@@ -287,10 +292,11 @@ export function SlideBlockElement({
 
   const textContent = (
     <span
-      className="slide-block-text"
-      contentEditable={editing ? ('plaintext-only' as const) : undefined}
-      data-editing={editing ? 'true' : undefined}
-      data-editing-block={editing ? block.id : undefined}
+      className={HTML_SLIDE_CLASSES.blockText}
+      {...plainTextBlockEditorAttributes({
+        blockId: block.id,
+        editing,
+      })}
       onBeforeInput={editing ? handleBeforeInput : undefined}
       onBlur={editing ? commit : undefined}
       onClick={(event: ReactMouseEvent<HTMLElement>) => {
@@ -309,17 +315,14 @@ export function SlideBlockElement({
       ref={(element: HTMLElement | null) => {
         editorRef.current = element
       }}
-      spellCheck={editing ? false : undefined}
-      suppressContentEditableWarning={editing ? true : undefined}
     >
       {editing ? null : text}
     </span>
   )
 
   const sharedProps = {
-    'data-block': block.id,
+    ...htmlSlideBlockAttributes(block, blockIndex),
     'data-empty': text.length === 0 ? 'true' : undefined,
-    'data-role': block.role,
     'data-selected': selected ? 'true' : 'false',
     className,
     onClick: (event: ReactMouseEvent<HTMLElement>) => {

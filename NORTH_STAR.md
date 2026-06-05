@@ -176,6 +176,37 @@ App
 
 ## References To Follow
 
+## Shared Package Rule
+
+이 프로젝트의 목표는 독립 앱을 완성하는 것이 아니라 PPT 리터칭에 필요한 부품 경계를 찾는 것이다.
+
+PPT가 직접 소유한다:
+
+- AI 생성 HTML/CSS PPT의 DOM contract
+- Text Mode와 Layout Mode의 제품 규칙
+- retouch patch manifest와 export 조립
+
+공유 패키지로 맡긴다:
+
+- `zod-crud`: JSON document, history, public selection snapshot
+- `@zod-crud/layer-order`: sibling-array z-order patch planning
+- `@interactive-os/aria`: APG pattern 상태와 aria props
+- `@interactive-os/object-surface`: 2D object selection, marquee, bounds
+- `@interactive-os/keyboard`: IME-safe key predicates, editable target gate, aria-keyshortcuts matching
+
+다음 후보:
+
+- `@interactive-os/preview-surface`: HTML/CSS preview를 editable object snapshot으로 색인
+- `@interactive-os/anyeditable`: PPT 단일 block autoheight editor에 맞는 Adapter 설계 후 IME-safe text input 처리
+- `../canvas/core`: Point, ResizeHandle, bounds/viewport primitive 중 PPT semantics와 맞는 것만 부분 재사용
+
+금지:
+
+- 이미 공유 패키지가 가진 headless primitive를 PPT 내부에 다시 만들지 않는다.
+- 공유 패키지 semantics와 다르면 억지로 끼우지 않는다. 먼저 Adapter seam을 둔다.
+
+표준화 후보와 승격 순서는 `docs/standardization/`에 기록한다.
+
 ### ../nano-edit
 
 본받을 것:

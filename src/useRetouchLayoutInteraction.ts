@@ -6,7 +6,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionAction } from 'zod-crud'
+import { pointDistance } from 'canvas/core'
+import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
@@ -25,7 +26,7 @@ import {
   getCurrentRect,
   guidesForInteraction,
   hasSelectionModifier,
-  selectionActionForPointers,
+  selectionSnapForPointers,
   type DraftLayout,
   type DraftLayoutRect,
   type Interaction,
@@ -36,15 +37,14 @@ import {
 const DRAG_THRESHOLD = 8
 
 const hasMeaningfulPointerDelta = (start: Point, next: Point) =>
-  Math.abs(next.x - start.x) >= DRAG_THRESHOLD ||
-  Math.abs(next.y - start.y) >= DRAG_THRESHOLD
+  pointDistance(start, next) >= DRAG_THRESHOLD
 
 type CommitPatch = (
   patch: JSONPatchOperation[],
   pointer: Pointer,
   label: string,
   mergeKey?: string,
-  selection?: SelectionAction,
+  selection?: SelectionSnap,
 ) => void
 
 export function useRetouchLayoutInteraction({
@@ -213,7 +213,7 @@ export function useRetouchLayoutInteraction({
       }, 0)
       const selection =
         currentInteraction.kind === 'move'
-          ? selectionActionForPointers(
+          ? selectionSnapForPointers(
               currentInteraction.pointers,
               currentInteraction.pointer,
             )
