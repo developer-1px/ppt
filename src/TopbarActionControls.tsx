@@ -63,6 +63,31 @@ export function TopbarActionControls({
   resetScope,
   resetTitle,
 }: TopbarActionControlsProps) {
+  const actionViews = ACTION_TOOLBAR_ACTIONS.map(({
+    action,
+    icon: DefaultIcon,
+    label: defaultLabel,
+  }) => {
+    const label = action === 'reset' ? resetTitle : defaultLabel
+    const Icon =
+      (action === 'copy-html' && exportCopied) ||
+      (action === 'download-html' && exportDownloaded)
+        ? Check
+        : DefaultIcon
+    const title =
+      action === 'copy-html'
+        ? copyTitle
+        : action === 'download-html' && exportDownloaded
+          ? 'Downloaded'
+          : label
+
+    return {
+      action,
+      Icon,
+      label,
+      title,
+    }
+  })
   const actionCommands = {
     'add-text': onInsertTextBlock,
     'copy-html': onCopyExport,
@@ -82,9 +107,9 @@ export function TopbarActionControls({
     undo: !canUndo,
   } satisfies Record<ActionToolbarKey, boolean>
   const actionToolbar = useActionToolbarPattern<ActionToolbarKey>({
-    actions: ACTION_TOOLBAR_ACTIONS.map(({ action, label }) => ({
+    actions: actionViews.map(({ action, label }) => ({
       action,
-      label: action === 'reset' ? resetTitle : label,
+      label,
     })),
     disabledKeys: disabledToolbarKeys<ActionToolbarKey>(
       ACTION_TOOLBAR_ACTIONS.map(({ action }) => [
@@ -100,46 +125,31 @@ export function TopbarActionControls({
 
   return (
     <div {...actionToolbar.rootProps} className="toolbar">
-      {ACTION_TOOLBAR_ACTIONS.map(({ action, icon: DefaultIcon, label }) => {
-        const Icon =
-          (action === 'copy-html' && exportCopied) ||
-          (action === 'download-html' && exportDownloaded)
-            ? Check
-            : DefaultIcon
-        const actionLabel = action === 'reset' ? resetTitle : label
-        const title =
-          action === 'copy-html'
-            ? copyTitle
-            : action === 'download-html' && exportDownloaded
-              ? 'Downloaded'
-              : actionLabel
-
-        return (
-          <button
-            {...actionToolbarProps[action]}
-            aria-label={actionLabel}
-            aria-pressed={actionPressed(action, exportCopied, exportDownloaded)}
-            data-action={action}
-            data-copy-state={action === 'copy-html' ? copyState : undefined}
-            data-download-state={
-              action === 'download-html'
-                ? exportDownloaded ? 'downloaded' : 'idle'
-                : undefined
-            }
-            data-reset-scope={action === 'reset' ? resetScope : undefined}
-            disabled={actionDisabled[action]}
-            key={action}
-            title={title}
-            type="button"
-          >
-            <Icon
-              aria-hidden="true"
-              size={16}
-              strokeWidth={Icon === Check ? 2.4 : 2.2}
-            />
-          </button>
-        )
-      })}
+      {actionViews.map(({ action, Icon, label, title }) => (
+        <button
+          {...actionToolbarProps[action]}
+          aria-label={label}
+          aria-pressed={actionPressed(action, exportCopied, exportDownloaded)}
+          data-action={action}
+          data-copy-state={action === 'copy-html' ? copyState : undefined}
+          data-download-state={
+            action === 'download-html'
+              ? exportDownloaded ? 'downloaded' : 'idle'
+              : undefined
+          }
+          data-reset-scope={action === 'reset' ? resetScope : undefined}
+          disabled={actionDisabled[action]}
+          key={action}
+          title={title}
+          type="button"
+        >
+          <Icon
+            aria-hidden="true"
+            size={16}
+            strokeWidth={Icon === Check ? 2.4 : 2.2}
+          />
+        </button>
+      ))}
     </div>
   )
 }
