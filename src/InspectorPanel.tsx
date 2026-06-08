@@ -17,14 +17,13 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { Rect, SlideBlock } from './retouchModel'
+import type { RectField } from './inspectorGeometry'
 import type {
   AlignSelectionAction,
   DistributeSelectionAction,
 } from './selectionAlignment'
 import type { LayerOrderAction } from './selectionLayerOrder'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
-
-type RectField = keyof Rect
 
 type InspectorPanelProps = {
   activeSlideAccent: string

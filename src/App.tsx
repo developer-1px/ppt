@@ -2,22 +2,17 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
-  MIN_BLOCK_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
-  SLIDE_HEIGHT,
-  SLIDE_WIDTH,
   RetouchDeckSchema,
   blockLocationFromPointer,
   blockPointer,
-  clamp,
   getRect,
   rectEquals,
   slideAccentPointer,
   slideNamePointer,
   slidePointer,
   setLayoutPatch,
-  snap,
   type Rect,
   type SlideBlock,
 } from './retouchModel'
@@ -60,10 +55,13 @@ import {
   useCanvasViewTabs,
   type CanvasView,
 } from './useCanvasViewTabs'
+import {
+  normalizeInspectorRect,
+  type RectField,
+} from './inspectorGeometry'
 import './App.css'
 
 type Mode = 'text' | 'layout'
-type RectField = keyof Rect
 type CanvasZoom = 'fit' | number
 
 const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -71,52 +69,6 @@ const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 type EditingState = {
   clientPoint?: Point
   pointer: Pointer
-}
-
-function finiteNumber(value: number, fallback: number) {
-  return Number.isFinite(value) ? value : fallback
-}
-
-function normalizeInspectorRect(
-  rect: Rect,
-  currentRect: Rect,
-  changedField?: RectField,
-): Rect {
-  const nextRect = { ...currentRect }
-
-  if (changedField === 'x') {
-    nextRect.x = clamp(
-      snap(finiteNumber(rect.x, currentRect.x)),
-      0,
-      SLIDE_WIDTH - currentRect.width,
-    )
-  }
-
-  if (changedField === 'y') {
-    nextRect.y = clamp(
-      snap(finiteNumber(rect.y, currentRect.y)),
-      0,
-      SLIDE_HEIGHT - currentRect.height,
-    )
-  }
-
-  if (changedField === 'width') {
-    nextRect.width = clamp(
-      snap(finiteNumber(rect.width, currentRect.width)),
-      MIN_BLOCK_SIZE,
-      SLIDE_WIDTH - currentRect.x,
-    )
-  }
-
-  if (changedField === 'height') {
-    nextRect.height = clamp(
-      snap(finiteNumber(rect.height, currentRect.height)),
-      MIN_BLOCK_SIZE,
-      SLIDE_HEIGHT - currentRect.y,
-    )
-  }
-
-  return nextRect
 }
 
 function App() {
