@@ -111,12 +111,7 @@ export function TopbarActionControls({
       action,
       label,
     })),
-    disabledKeys: disabledToolbarKeys<ActionToolbarKey>(
-      ACTION_TOOLBAR_ACTIONS.map(({ action }) => [
-        action,
-        actionDisabled[action],
-      ] as const),
-    ),
+    disabledKeys: disabledToolbarKeys<ActionToolbarKey>(actionDisabled),
     elementIdPrefix: 'action-tool-',
     label: 'Actions',
     onSelect: (action) => actionCommands[action](),

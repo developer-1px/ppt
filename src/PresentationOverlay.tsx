@@ -56,10 +56,7 @@ export function PresentationOverlay({
     actions: PRESENTATION_CONTROL_ACTIONS,
     activeKey: 'close',
     disabledKeys: disabledToolbarKeys<PresentationControlKey>(
-      PRESENTATION_CONTROL_ACTIONS.map(({ action }) => [
-        action,
-        presentationControlDisabled[action],
-      ] as const),
+      presentationControlDisabled,
     ),
     elementIdPrefix: 'presentation-control-',
     label: 'Presentation',

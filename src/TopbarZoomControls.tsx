@@ -44,12 +44,7 @@ export function TopbarZoomControls({
   } satisfies Record<ZoomToolbarKey, boolean>
   const zoomToolbar = useActionToolbarPattern<ZoomToolbarKey>({
     actions: ZOOM_TOOLBAR_ACTIONS,
-    disabledKeys: disabledToolbarKeys<ZoomToolbarKey>(
-      ZOOM_TOOLBAR_ACTIONS.map(({ action }) => [
-        action,
-        zoomDisabled[action],
-      ] as const),
-    ),
+    disabledKeys: disabledToolbarKeys<ZoomToolbarKey>(zoomDisabled),
     elementIdPrefix: 'zoom-tool-',
     label: 'Canvas zoom',
     onSelect: (action) => zoomCommands[action](),

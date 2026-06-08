@@ -119,12 +119,7 @@ export function SlideRail({
   } satisfies Record<SlideRailActionKey, boolean>
   const railActionToolbar = useActionToolbarPattern<SlideRailActionKey>({
     actions: SLIDE_RAIL_ACTIONS,
-    disabledKeys: disabledToolbarKeys<SlideRailActionKey>(
-      SLIDE_RAIL_ACTIONS.map(({ action }) => [
-        action,
-        railActionDisabled[action],
-      ]),
-    ),
+    disabledKeys: disabledToolbarKeys<SlideRailActionKey>(railActionDisabled),
     elementIdPrefix: 'slide-action-',
     label: 'Slide actions',
     onSelect: (action) => railActionCommands[action](),

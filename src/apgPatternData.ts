@@ -113,9 +113,11 @@ export function nextToolbarActiveKey<TKey extends string>(
 }
 
 export function disabledToolbarKeys<TKey extends string>(
-  candidates: readonly (readonly [key: TKey, disabled: boolean])[],
+  disabledByKey: Partial<Record<TKey, boolean>>,
 ) {
-  return candidates.flatMap(([key, disabled]) => (disabled ? [key] : []))
+  return Object.entries(disabledByKey).flatMap(([key, disabled]) =>
+    disabled ? [key as TKey] : [],
+  )
 }
 
 export function handleToolbarSelection<TKey extends string>(
