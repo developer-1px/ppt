@@ -20,9 +20,10 @@ import {
 } from '@interactive-os/aria/react'
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 import {
-  firstEnabledToolbarKey,
+  disabledToolbarKeys,
+  handleToolbarSelection,
   patternButtonProps,
-  selectedToolbarKeys,
+  toolbarPatternData,
   toolbarItemPropsByKey,
 } from './apgPatternAdapter'
 import { cssVariables } from './cssVariables'
@@ -131,50 +132,35 @@ export function SlideRail({
       typeaheadEnabled: true,
     },
   )
-  const railActionDisabledKeys = useMemo(() => [
-    ...(!canMoveSlideUp ? ['move-up' as const] : []),
-    ...(!canMoveSlideDown ? ['move-down' as const] : []),
-    ...(!canDeleteSlide ? ['delete' as const] : []),
-  ], [canDeleteSlide, canMoveSlideDown, canMoveSlideUp])
-  const railActionData = useMemo<PatternData>(() => ({
-    items: {
-      add: { label: 'Add slide' },
-      delete: { label: 'Delete slide' },
-      duplicate: { label: 'Duplicate slide' },
-      'move-down': { label: 'Move slide down' },
-      'move-up': { label: 'Move slide up' },
-    },
-    relations: { rootKeys: SLIDE_RAIL_ACTION_KEYS },
-    refs: { label: 'Slide actions' },
-    state: {
-      activeKey: firstEnabledToolbarKey(
-        SLIDE_RAIL_ACTION_KEYS,
-        railActionDisabledKeys,
-      ),
+  const railActionDisabledKeys = useMemo(() =>
+    disabledToolbarKeys<SlideRailActionKey>([
+      ['move-up', !canMoveSlideUp],
+      ['move-down', !canMoveSlideDown],
+      ['delete', !canDeleteSlide],
+    ]), [canDeleteSlide, canMoveSlideDown, canMoveSlideUp])
+  const railActionData = useMemo(() =>
+    toolbarPatternData<SlideRailActionKey>({
       disabledKeys: railActionDisabledKeys,
-    },
-  }), [railActionDisabledKeys])
+      items: {
+        add: { label: 'Add slide' },
+        delete: { label: 'Delete slide' },
+        duplicate: { label: 'Duplicate slide' },
+        'move-down': { label: 'Move slide down' },
+        'move-up': { label: 'Move slide up' },
+      },
+      label: 'Slide actions',
+      rootKeys: SLIDE_RAIL_ACTION_KEYS,
+    }), [railActionDisabledKeys])
   const railActionToolbar = useToolbarPattern(
     railActionData,
-    (event) => {
-      for (const key of selectedToolbarKeys(event)) {
-        if (key === 'add') {
-          onAddSlide()
-        }
-        if (key === 'duplicate') {
-          onDuplicateSlide()
-        }
-        if (key === 'move-up') {
-          onMoveSlideUp()
-        }
-        if (key === 'move-down') {
-          onMoveSlideDown()
-        }
-        if (key === 'delete') {
-          onDeleteSlide()
-        }
-      }
-    },
+    (event) =>
+      handleToolbarSelection<SlideRailActionKey>(event, {
+        add: onAddSlide,
+        delete: onDeleteSlide,
+        duplicate: onDuplicateSlide,
+        'move-down': onMoveSlideDown,
+        'move-up': onMoveSlideUp,
+      }),
     {
       elementIdPrefix: 'slide-action-',
       orientation: 'horizontal',
