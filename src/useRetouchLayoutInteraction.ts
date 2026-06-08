@@ -286,24 +286,19 @@ export function useRetouchLayoutInteraction({
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
   ) {
-    const currentSelectedRect =
-      selectedPointer && selectedBlock
-        ? readBlockVisualRect(
-            selectedBlock.id,
-            getCurrentRect(selectedPointer, selectedBlock, draftLayout),
-          )
-        : null
-
     if (
       selectedPointers.length !== 1 ||
       !selectedBlock ||
       !selectedPointer ||
-      !currentSelectedRect ||
       mode !== 'layout'
     ) {
       return
     }
 
+    const currentSelectedRect = readBlockVisualRect(
+      selectedBlock.id,
+      getCurrentRect(selectedPointer, selectedBlock, draftLayout),
+    )
     const point = readSlidePoint(slideRef.current, event)
 
     if (!point) {
