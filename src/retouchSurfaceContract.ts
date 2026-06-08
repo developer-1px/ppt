@@ -15,7 +15,7 @@ import {
 export const RETOUCH_SURFACE_CONTRACT =
   'interactive-os.retouch-surface.v1' as const
 
-export const RETOUCH_SURFACE_POINTER_TEMPLATES = {
+const RETOUCH_SURFACE_POINTER_TEMPLATES = {
   root: '',
   slides: '/slides',
   slide: '/slides/{slideIndex}',
@@ -25,7 +25,7 @@ export const RETOUCH_SURFACE_POINTER_TEMPLATES = {
   blockText: '/text',
 } as const
 
-export const RETOUCH_SURFACE_CAPABILITIES = [
+const RETOUCH_SURFACE_CAPABILITIES = [
   'text-edit',
   'autoheight',
   'object-selection',
@@ -125,8 +125,4 @@ export const PPT_RETOUCH_SURFACE: RetouchSurfaceDescriptor = {
     height: SLIDE_HEIGHT,
     width: SLIDE_WIDTH,
   },
-}
-
-export function retouchSurfaceBlockIdentity(block: RetouchSurfaceBlock) {
-  return block.id
 }

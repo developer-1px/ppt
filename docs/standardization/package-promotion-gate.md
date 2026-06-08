@@ -54,12 +54,12 @@ repo로 보내는 것이다.
   `data-block-index`를 붙인다.
 - target repo/package: 새 `@interactive-os/html-slide-contract` 후보.
 - PPT에 남길 것: 현재 slide theme, print CSS, patch manifest export shape.
-- 공유 후보: DOM attribute names, root/block attr helpers, snapshot reader,
-  validator.
+- 공유 후보: DOM attribute names, root/block attr helpers. Snapshot reader와
+  validator는 fixture 기반 검증이 생길 때 함께 추가한다.
 - 승격 조건: fixture HTML을 package 단위에서 parse/validate하고, PPT export와
   다른 reader가 같은 index 결과를 써야 한다.
-- 다음 조치: generated HTML fixture 기반 validator 테스트를 추가하고,
-  `../viewer` 또는 focused lab에서 읽기 전용 소비자를 검증한다.
+- 다음 조치: generated HTML fixture 기반 snapshot reader와 validator 테스트를
+  추가하고, `../viewer` 또는 focused lab에서 읽기 전용 소비자를 검증한다.
 
 ### Block Text Editor Adapter
 
