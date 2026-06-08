@@ -77,11 +77,7 @@ export function useRetouchKeyboardShortcuts({
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
+    return listenWindowKeyDown(handleKeyDown)
   }, [history])
 
   useEffect(() => {
@@ -119,11 +115,7 @@ export function useRetouchKeyboardShortcuts({
       setEditing({ pointer: location.pointer })
     }
 
-    window.addEventListener('keydown', handleFocusedBlockEditKey)
-
-    return () => {
-      window.removeEventListener('keydown', handleFocusedBlockEditKey)
-    }
+    return listenWindowKeyDown(handleFocusedBlockEditKey)
   }, [activeSlideId, deckValue, mode, selection, setEditing])
 
   useEffect(() => {
@@ -144,11 +136,7 @@ export function useRetouchKeyboardShortcuts({
       selection?.empty?.()
     }
 
-    window.addEventListener('keydown', handleTextSelectionKey)
-
-    return () => {
-      window.removeEventListener('keydown', handleTextSelectionKey)
-    }
+    return listenWindowKeyDown(handleTextSelectionKey)
   }, [editing, mode, selectedPointer, selection])
 
   useEffect(() => {
@@ -201,11 +189,7 @@ export function useRetouchKeyboardShortcuts({
       }
     }
 
-    window.addEventListener('keydown', handleLayoutCommandKey)
-
-    return () => {
-      window.removeEventListener('keydown', handleLayoutCommandKey)
-    }
+    return listenWindowKeyDown(handleLayoutCommandKey)
   }, [
     canPasteSelection,
     editing,
@@ -267,11 +251,7 @@ export function useRetouchKeyboardShortcuts({
       )
     }
 
-    window.addEventListener('keydown', handleLayoutKey)
-
-    return () => {
-      window.removeEventListener('keydown', handleLayoutKey)
-    }
+    return listenWindowKeyDown(handleLayoutKey)
   }, [
     activeSlideId,
     commitPatch,
@@ -283,6 +263,14 @@ export function useRetouchKeyboardShortcuts({
     selectedPointers,
     selection,
   ])
+}
+
+function listenWindowKeyDown(handler: (event: KeyboardEvent) => void) {
+  window.addEventListener('keydown', handler)
+
+  return () => {
+    window.removeEventListener('keydown', handler)
+  }
 }
 
 function consumeShortcutEvent(event: KeyboardEvent) {
