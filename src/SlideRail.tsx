@@ -46,6 +46,12 @@ const SLIDE_RAIL_ACTIONS = [
 
 type SlideRailActionKey = (typeof SLIDE_RAIL_ACTIONS)[number]['action']
 
+type SlideRailItem = {
+  ariaLabel: string
+  changed: boolean
+  slide: RetouchSlide
+}
+
 export function SlideRail({
   activeSlideId,
   canDeleteSlide,
@@ -62,29 +68,40 @@ export function SlideRail({
   onSelectSlide,
   slides,
 }: SlideRailProps) {
-  const slideRailKeys = useMemo(() => slides.map((slide) => slide.id), [slides])
-  const slideRailItems = useMemo(() => Object.fromEntries(
-    slides.map((slide) => [
-      slide.id,
-      {
-        label: changedSlideIds.has(slide.id)
-          ? `${slide.name}, modified`
-          : slide.name,
+  const slideRailData = useMemo(() => {
+    const items: Record<string, { label: string; textValue: string }> = {}
+    const itemsById = new Map<string, SlideRailItem>()
+    const rootKeys: string[] = []
+
+    for (const slide of slides) {
+      const changed = changedSlideIds.has(slide.id)
+      const label = changed ? `${slide.name}, modified` : slide.name
+
+      rootKeys.push(slide.id)
+      items[slide.id] = {
+        label,
         textValue: slide.name,
-      },
-    ]),
-  ), [changedSlideIds, slides])
-  const slidesById = useMemo(
-    () => new Map(slides.map((slide) => [slide.id, slide])),
-    [slides],
-  )
+      }
+      itemsById.set(slide.id, {
+        ariaLabel: label,
+        changed,
+        slide,
+      })
+    }
+
+    return {
+      items,
+      itemsById,
+      rootKeys,
+    }
+  }, [changedSlideIds, slides])
   const slideRailListbox = useManagedListboxPattern<string>({
     activeKey: activeSlideId,
     elementIdPrefix: 'slide-thumb-',
-    items: slideRailItems,
+    items: slideRailData.items,
     label: 'Slides',
     onSelect: onSelectSlide,
-    rootKeys: slideRailKeys,
+    rootKeys: slideRailData.rootKeys,
   })
   const railActionCommands = {
     add: onAddSlide,
@@ -148,19 +165,19 @@ export function SlideRail({
 
       <div {...slideRailListbox.rootProps} className="slide-list">
         {slideRailListbox.renderItems.map((item, index) => {
-          const slide = slidesById.get(item.key)
+          const railItem = slideRailData.itemsById.get(item.key)
 
-          if (!slide) {
+          if (!railItem) {
             return null
           }
 
-          const changed = changedSlideIds.has(slide.id)
+          const { ariaLabel, changed, slide } = railItem
 
           return (
             <button
               {...item.optionProps}
               aria-current={slide.id === activeSlideId ? 'page' : undefined}
-              aria-label={changed ? `${slide.name}, modified` : slide.name}
+              aria-label={ariaLabel}
               className="slide-thumb"
               data-changed={changed ? 'true' : 'false'}
               key={slide.id}
