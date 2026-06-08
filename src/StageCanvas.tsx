@@ -35,6 +35,7 @@ import {
 } from './retouchCanvasScene'
 import { cssVariables } from './cssVariables'
 import type { EditingState, RetouchMode } from './retouchViewState'
+import './StageCanvas.css'
 
 type StageCanvasProps = {
   activeSlide: RetouchSlide
