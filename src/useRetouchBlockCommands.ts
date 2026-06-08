@@ -275,17 +275,20 @@ export function useRetouchBlockCommands({
     }
 
     const selectedIds = locations.map((location) => location.block.id)
+    const selectedLocationPointers = locations.map((location) => location.pointer)
     const layerOrderPatch = createLayerOrderPatch({
       action,
       activeSlideIndex,
       doc,
       selectedIds,
-      selectedPointers: locations.map((location) => location.pointer),
+      selectedPointers: selectedLocationPointers,
     })
 
     if (!layerOrderPatch) {
       return
     }
+
+    const nextPrimaryPointer = layerOrderPatch.nextSelectedPointers.at(-1)
 
     commitActiveTextEdit()
     commitRetouchPatch(
@@ -294,7 +297,7 @@ export function useRetouchBlockCommands({
         label: 'reorder layers',
         selection: selectionSnapForPointers(
           layerOrderPatch.nextSelectedPointers,
-          layerOrderPatch.nextSelectedPointers.at(-1),
+          nextPrimaryPointer,
         ),
       },
     )
