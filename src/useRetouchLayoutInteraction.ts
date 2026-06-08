@@ -29,12 +29,12 @@ import {
   draftRectsEqual,
   getCurrentRect,
   guidesForInteraction,
-  selectionSnapForPointers,
   type DraftLayout,
   type DraftLayoutRect,
   type Interaction,
   type SnapGuides,
 } from './layoutInteraction'
+import { selectionSnapForPointers } from './retouchSelectionSnap'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { RetouchMode } from './retouchViewState'
 

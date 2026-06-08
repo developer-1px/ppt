@@ -27,8 +27,8 @@ import { useRetouchBlockCommands } from './useRetouchBlockCommands'
 import { useRetouchPresentationCommands } from './useRetouchPresentationCommands'
 import {
   getCurrentRect,
-  selectionSnapForPointers,
 } from './layoutInteraction'
+import { selectionSnapForPointers } from './retouchSelectionSnap'
 import { useRetouchViewCommands } from './useRetouchViewCommands'
 import {
   canDecreaseCanvasZoom,

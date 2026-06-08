@@ -29,7 +29,7 @@ import {
 } from './selectionLayerOrder'
 import {
   selectionSnapForPointers,
-} from './layoutInteraction'
+} from './retouchSelectionSnap'
 import {
   normalizeInspectorRect,
   type RectField,

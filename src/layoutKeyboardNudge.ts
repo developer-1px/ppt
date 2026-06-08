@@ -7,7 +7,7 @@ import {
   setArrangePatch,
   type RetouchDeck,
 } from './retouchModel'
-import { selectionSnapForPointers } from './layoutInteraction'
+import { selectionSnapForPointers } from './retouchSelectionSnap'
 
 type KeyboardNudgeDelta = {
   x: number
