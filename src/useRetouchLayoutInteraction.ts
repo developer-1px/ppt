@@ -41,6 +41,19 @@ const DRAG_THRESHOLD = 8
 const hasMeaningfulPointerDelta = (start: Point, next: Point) =>
   pointDistance(start, next) >= DRAG_THRESHOLD
 
+const eventClientPoint = (event: PointerEvent): Point => ({
+  x: event.clientX,
+  y: event.clientY,
+})
+
+const hasMeaningfulInteractionDelta = (
+  interaction: Interaction,
+  event: PointerEvent,
+) => hasMeaningfulPointerDelta(
+  interaction.startClientPoint,
+  eventClientPoint(event),
+)
+
 export function useRetouchLayoutInteraction({
   activeSlideBlocks,
   activeSlideId,
@@ -126,6 +139,11 @@ export function useRetouchLayoutInteraction({
 
     const currentInteraction = interaction
 
+    function finishPointerInteraction() {
+      suppressStageClickRef.current = true
+      clearLayoutInteraction()
+    }
+
     function handlePointerMove(event: PointerEvent) {
       const point = readSlidePoint(slideRef.current, event)
 
@@ -133,12 +151,7 @@ export function useRetouchLayoutInteraction({
         return
       }
 
-      if (
-        !hasMeaningfulPointerDelta(currentInteraction.startClientPoint, {
-          x: event.clientX,
-          y: event.clientY,
-        })
-      ) {
+      if (!hasMeaningfulInteractionDelta(currentInteraction, event)) {
         return
       }
 
@@ -154,21 +167,16 @@ export function useRetouchLayoutInteraction({
 
       if (
         !point ||
-        !hasMeaningfulPointerDelta(currentInteraction.startClientPoint, {
-          x: event.clientX,
-          y: event.clientY,
-        })
+        !hasMeaningfulInteractionDelta(currentInteraction, event)
       ) {
-        suppressStageClickRef.current = true
-        clearLayoutInteraction()
+        finishPointerInteraction()
         return
       }
 
       const { rects } = calculateInteractionState(point, currentInteraction)
 
       if (draftRectsEqual(rects, currentInteraction.startRects)) {
-        suppressStageClickRef.current = true
-        clearLayoutInteraction()
+        finishPointerInteraction()
         return
       }
 
@@ -184,7 +192,6 @@ export function useRetouchLayoutInteraction({
             )
           : undefined
 
-      suppressStageClickRef.current = true
       commitPatch(
         rects.flatMap(({ pointer, rect }) =>
           setArrangePatch(pointer, rect, {
@@ -196,7 +203,7 @@ export function useRetouchLayoutInteraction({
         undefined,
         selection,
       )
-      clearLayoutInteraction()
+      finishPointerInteraction()
     }
 
     window.addEventListener('pointermove', handlePointerMove)
