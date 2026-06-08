@@ -25,10 +25,6 @@ export function historyShortcutAction(
   return null
 }
 
-export function isHistoryShortcut(event: KeyboardEvent) {
-  return historyShortcutAction(event) !== null
-}
-
 export function isUndoHistoryShortcut(event: KeyboardEvent) {
   return historyShortcutAction(event) === 'undo'
 }
