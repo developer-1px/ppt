@@ -10,6 +10,16 @@ let appUrl = EXTERNAL_APP_URL ?? DEFAULT_APP_URL
 const CHROME_BIN =
   process.env.CHROME_BIN ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const SELECTOR = {
+  copyButton: 'button[aria-label="Copy HTML"]',
+  downloadButton: 'button[aria-label="Download HTML"]',
+  editor: '[data-editing="true"]',
+  editorEditable: '[data-editing="true"][contenteditable]',
+  modeButton: '.mode-button',
+  slideCanvas: '.slide-canvas',
+  slideThumb: '.slide-thumb',
+  stageShell: '.stage-shell',
+}
 
 const checks = []
 const browserErrors = []
@@ -265,7 +275,7 @@ async function openPage(cdpPort, url, viewport = null) {
     `Timed out loading page: ${url}`,
     15000,
   )
-  await page.waitFor("!!document.querySelector('[data-block=\"s1-title\"]')")
+  await page.waitFor(presentSelectorExpression(blockSelector('s1-title')))
 
   return page
 }
@@ -277,10 +287,10 @@ async function runFirstScreenScenario(page) {
     changedSlideCount: document.querySelectorAll('.slide-thumb[data-changed="true"]').length,
     hasTextMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Text'),
     hasArrangeMode: !!Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Arrange'),
-    canvasBackgroundImage: getComputedStyle(document.querySelector('.slide-canvas')).backgroundImage,
+    canvasBackgroundImage: getComputedStyle(document.querySelector(${JSON.stringify(SELECTOR.slideCanvas)})).backgroundImage,
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
     hasStoredDeck: localStorage.getItem('ppt-retouch:v3:deck') !== null,
-    hasMainSlideBlock: !!document.querySelector('[data-block="s1-title"]'),
+    hasMainSlideBlock: !!document.querySelector(${JSON.stringify(blockSelector('s1-title'))}),
     ...(() => {
       const viewTabs = Array.from(document.querySelectorAll('.view-toggle [role="tab"]'))
       const selectedViewTabs = viewTabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')
@@ -381,11 +391,11 @@ async function runEditSurfaceParityScenario(page) {
     for (const blockId of blockIds) {
       const preview = await textRangeMetrics(page, `[data-block="${blockId}"]`)
       await page.eval(`document.querySelector('[data-block="${blockId}"]').click()`)
-      await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+      await waitForEditor(page)
       const blockAfter = await textRangeMetrics(page, `[data-block="${blockId}"]`)
-      const editor = await textRangeMetrics(page, '[data-editing=\"true\"]')
+      const editor = await textRangeMetrics(page, SELECTOR.editor)
       const editorChrome = await page.eval(`(() => {
-        const style = getComputedStyle(document.querySelector('[data-editing=\"true\"]'))
+        const style = getComputedStyle(document.querySelector(${JSON.stringify(SELECTOR.editor)}))
 
         return {
           outlineOffset: style.outlineOffset,
@@ -517,7 +527,7 @@ async function runTextScenario(page) {
   await movePointerAway(page)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await commitTextEditor(page)
   const titleNoOp = await blockState(page, 's1-title')
   check('no-op text edit does not create history', titleNoOp.text === titleBefore.text && titleNoOp.undoDisabled === true, titleNoOp)
@@ -527,7 +537,7 @@ async function runTextScenario(page) {
     x: titleClickText.textLeft + 2,
     y: titleClickText.textTop + titleClickText.textHeight / 2,
   })
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, 'Q')
   const clickCaretText = await page.eval("document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''")
   const clickCaretIndex = clickCaretText.indexOf('Q')
@@ -546,7 +556,7 @@ async function runTextScenario(page) {
   await movePointerAway(page)
 
   await focusBlockAndPress(page, 's1-title', 'Enter')
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const keyboardEditState = await page.eval(`(() => ({
     editorOpen: !!document.querySelector('[data-editing=\"true\"]'),
     editorText: document.querySelector('[data-editing=\"true\"]')?.textContent ?? null,
@@ -555,7 +565,7 @@ async function runTextScenario(page) {
   await cancelTextEditor(page)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const titleEditorText = await textRangeMetrics(page, '[data-editing=\"true\"]')
   const titleEditorBox = await editorMetrics(page)
   const editingTitle = await page.eval(`(() => ({
@@ -621,7 +631,7 @@ async function runTextScenario(page) {
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(titleBefore.text)}`)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' Approved')
   await commitTextEditor(page)
   await movePointerAway(page)
@@ -686,7 +696,7 @@ async function runTextScenario(page) {
   await clickSlide(page, 'Overview')
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' ToolbarUndo')
   await clickToolbar(page, 'Undo')
   await page.waitFor(`!document.querySelector('[data-editing=\"true\"]') && document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
@@ -749,7 +759,7 @@ async function runTextScenario(page) {
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' SlideSwitch')
   await clickSlide(page, 'Agenda')
   await clickSlide(page, 'Overview')
@@ -764,7 +774,7 @@ async function runTextScenario(page) {
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === ${JSON.stringify(`${titleBefore.text} Approved`)}`)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' ModeSwitch')
   await clickMode(page, 'Arrange')
   const modeSwitchCommit = await blockState(page, 's1-title')
@@ -782,7 +792,7 @@ async function runTextScenario(page) {
 
   const subtitleBefore = await blockState(page, 's1-subtitle')
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const editBefore = await editorMetrics(page)
   await typeEditorText(
     page,
@@ -827,7 +837,7 @@ async function runTextScenario(page) {
   await clickMode(page, 'Text')
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const grownEditHeight = await editorHeight(page)
   await replaceEditorText(page, 'Short follow-up.')
   await page.waitFor(`(() => {
@@ -842,7 +852,7 @@ async function runTextScenario(page) {
   check('autoheight shrink persists after commit', subtitleShrunk.text === 'Short follow-up.' && subtitleShrunk.height < subtitleGrown.height - 10, { before: subtitleGrown, after: subtitleShrunk })
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await replaceEditorText(
     page,
     'enterprise-renewal-risk-account-owner-review-decision-path-follow-up-needed-before-month-close',
@@ -854,7 +864,7 @@ async function runTextScenario(page) {
   check('preview wraps long unbroken text after commit', longPreviewFit.fits, longPreviewFit)
 
   await page.eval(`document.querySelector('[data-block="s1-subtitle"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await setEditorText(page, '')
   await commitTextEditor(page)
   const emptySubtitle = await page.eval(`(() => {
@@ -869,13 +879,13 @@ async function runTextScenario(page) {
   })()`)
   check('empty text block remains findable', emptySubtitle.text === '' && emptySubtitle.empty === 'true' && emptySubtitle.width > 0 && emptySubtitle.height > 0, emptySubtitle)
   await focusBlockAndPress(page, 's1-subtitle', 'Enter')
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const emptyReopen = await page.eval(`document.querySelector('[data-editing=\"true\"]')?.textContent ?? null`)
   check('empty text block can be reopened from keyboard', emptyReopen === '', { emptyReopen })
   await cancelTextEditor(page)
 
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const noteBeforeCancel = await page.eval(`document.querySelector('[data-editing=\"true\"]')?.textContent ?? ''`)
   await typeEditorText(page, ' Cancelled draft')
   await cancelTextEditor(page)
@@ -883,7 +893,7 @@ async function runTextScenario(page) {
   check('Escape cancels text draft', noteAfterCancel.text === noteBeforeCancel, noteAfterCancel)
 
   await page.eval(`document.querySelector('[data-block="s1-note"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' Mistyped')
   await pressHistoryShortcut(page, 'z')
   const noteAfterLiveUndo = await page.eval(`(() => {
@@ -929,7 +939,7 @@ async function runTextScenario(page) {
   await clickSlide(page, 'Decision')
   const bottomNoteBefore = await blockState(page, 's3-note')
   await page.eval(`document.querySelector('[data-block="s3-note"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   const bottomNoteDraftText =
     'Decision needed: approve the retention sprint with owner, timing, customer impact, renewal coverage, executive sponsor, next action, weekly check-in, risk review, onboarding help, and discount guidance visible in the slide.'
   await replaceEditorText(
@@ -1243,7 +1253,7 @@ async function runExportScenario(page, cdpPort) {
   const titleBefore = await blockState(page, 's1-title')
   const expectedTitle = `${titleBefore.text} Export`
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' Export')
   await commitTextEditor(page)
 
@@ -1419,9 +1429,9 @@ async function runExportScenario(page, cdpPort) {
   await page.eval(`navigator.clipboard.writeText = async (value) => {
     window.__pptRetouchCopiedHtml = value
   }`)
-  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
-  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
-  const copied = await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.getAttribute('aria-pressed') === 'true'`)
+  await clickSelector(page, SELECTOR.copyButton)
+  await page.waitFor(`${querySelectorExpression(SELECTOR.copyButton)}?.getAttribute('aria-pressed') === 'true'`)
+  const copied = await page.eval(`${querySelectorExpression(SELECTOR.copyButton)}?.getAttribute('aria-pressed') === 'true'`)
   check('copy action gives completion feedback', copied, null)
   const copiedState = await page.eval(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
@@ -1435,7 +1445,7 @@ async function runExportScenario(page, cdpPort) {
 
   await clickMode(page, 'Text')
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' LiveDraft')
   const liveDraftExportFeedback = await page.eval(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
@@ -1482,8 +1492,8 @@ async function runExportScenario(page, cdpPort) {
     }
     document.execCommand = () => false
   })()`)
-  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
-  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.dataset.copyState === 'failed'`)
+  await clickSelector(page, SELECTOR.copyButton)
+  await page.waitFor(`${querySelectorExpression(SELECTOR.copyButton)}?.dataset.copyState === 'failed'`)
   const failedCopyFeedback = await page.eval(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
     const style = getComputedStyle(copyButton)
@@ -1523,7 +1533,7 @@ async function runExportScenario(page, cdpPort) {
       HTMLAnchorElement.prototype.click = originalClick
     }
   })()`)
-  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
+  await clickSelector(page, SELECTOR.downloadButton)
   await page.waitFor(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
     const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
@@ -1559,12 +1569,12 @@ async function runExportScenario(page, cdpPort) {
     }
     document.execCommand = () => false
   })()`)
-  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
-  await page.waitFor(`document.querySelector('button[aria-label="Copy HTML"]')?.dataset.copyState === 'failed'`)
+  await clickSelector(page, SELECTOR.copyButton)
+  await page.waitFor(`${querySelectorExpression(SELECTOR.copyButton)}?.dataset.copyState === 'failed'`)
   await page.eval(`document.execCommand = window.__pptRetouchOriginalExecCommand`)
 
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' AfterFail')
   const failedDuringDraft = await page.eval(`(() => {
     const copyButton = document.querySelector('button[aria-label="Copy HTML"]')
@@ -1619,8 +1629,8 @@ async function runExportScenario(page, cdpPort) {
       HTMLAnchorElement.prototype.click = originalClick
     }
   })()`)
-  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
-  await page.waitFor(`document.querySelector('button[aria-label="Download HTML"]')?.getAttribute('aria-pressed') === 'true'`)
+  await clickSelector(page, SELECTOR.downloadButton)
+  await page.waitFor(`${querySelectorExpression(SELECTOR.downloadButton)}?.getAttribute('aria-pressed') === 'true'`)
   const downloadState = await page.eval(`(() => {
     const downloadButton = document.querySelector('button[aria-label="Download HTML"]')
 
@@ -1644,10 +1654,10 @@ async function runExportScenario(page, cdpPort) {
     window.__pptRetouchCopiedHtml = value
   }`)
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' DraftCopy')
-  await page.eval(`document.querySelector('button[aria-label="Copy HTML"]')?.click()`)
-  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+  await clickSelector(page, SELECTOR.copyButton)
+  await waitForNoEditor(page)
   const immediateCopy = await page.eval(`(() => {
     const copied = window.__pptRetouchCopiedHtml ?? ''
     const parsed = new DOMParser().parseFromString(copied, 'text/html')
@@ -1682,9 +1692,9 @@ async function runExportScenario(page, cdpPort) {
     }
   })()`)
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' DraftDownload')
-  await page.eval(`document.querySelector('button[aria-label="Download HTML"]')?.click()`)
+  await clickSelector(page, SELECTOR.downloadButton)
   await page.waitFor("!document.querySelector('[data-editing=\"true\"]') && window.__pptRetouchBlobText !== null")
   const immediateDownload = await page.eval(`(() => {
     const html = window.__pptRetouchBlobText ?? ''
@@ -1749,7 +1759,7 @@ async function runPersistenceScenario(page) {
   const resetDraftTitle = `${beforeReload.text} DraftReset`
   const noteBeforeTextReset = await blockState(page, 's1-note')
   await page.eval(`document.querySelector('[data-block="s1-title"]').click()`)
-  await page.waitFor("!!document.querySelector('[data-editing=\"true\"][contenteditable]')")
+  await waitForEditor(page)
   await typeEditorText(page, ' DraftReset')
   const textResetReady = await page.eval(`(() => {
     const reset = document.querySelector('button[data-action="reset"]')
@@ -1772,7 +1782,7 @@ async function runPersistenceScenario(page) {
   await clickToolbar(page, 'Reset')
   await page.waitFor(`document.querySelector('[data-block="s1-title"]')?.textContent === 'PPT Retouch'`)
   await page.waitFor(`document.querySelector('button[data-action="reset"]')?.disabled === true`)
-  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+  await waitForNoEditor(page)
   await page.waitFor(`(() => {
     const raw = localStorage.getItem('ppt-retouch:v3:deck')
     const parsed = raw ? JSON.parse(raw) : null
@@ -2149,7 +2159,7 @@ function exportedBlockMetricsMatch(exported, preview) {
 }
 
 async function editorHeight(page) {
-  return page.eval("document.querySelector('[data-editing=\"true\"]')?.getBoundingClientRect().height ?? 0")
+  return page.eval(`${querySelectorExpression(SELECTOR.editor)}?.getBoundingClientRect().height ?? 0`)
 }
 
 async function textRangeMetrics(page, selector) {
@@ -2163,8 +2173,8 @@ async function textRangeMetrics(page, selector) {
     range.selectNodeContents(textElement)
     const textRect = range.getBoundingClientRect()
     const boxRect = element.getBoundingClientRect()
-    const canvasRect = document.querySelector('.slide-canvas')?.getBoundingClientRect()
-    const stage = document.querySelector('.stage-shell')
+    const canvasRect = document.querySelector(${JSON.stringify(SELECTOR.slideCanvas)})?.getBoundingClientRect()
+    const stage = document.querySelector(${JSON.stringify(SELECTOR.stageShell)})
 
     return {
       boxTop: boxRect.top,
@@ -2194,7 +2204,7 @@ async function textRangeMetrics(page, selector) {
 
 async function editorMetrics(page) {
   return page.eval(`(() => {
-    const wrapper = document.querySelector('[data-editing=\"true\"]')
+    const wrapper = document.querySelector(${JSON.stringify(SELECTOR.editor)})
     const wrapperRect = wrapper?.getBoundingClientRect()
 
     return {
@@ -2212,7 +2222,7 @@ async function editorMetrics(page) {
 }
 
 async function clickMode(page, label) {
-  await page.eval(`Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === '${label}')?.click()`)
+  await page.eval(`Array.from(document.querySelectorAll(${JSON.stringify(SELECTOR.modeButton)})).find((button) => button.textContent?.trim() === ${JSON.stringify(label)})?.click()`)
   await delay(100)
 }
 
@@ -2229,19 +2239,49 @@ async function clickToolbar(page, label) {
     ? `button[data-action="${action}"]`
     : `button[aria-label="${label}"]`
 
-  await page.eval(`document.querySelector(${JSON.stringify(selector)})?.click()`)
+  await clickSelector(page, selector)
 }
 
 async function clickSlide(page, label) {
-  await page.eval(`Array.from(document.querySelectorAll('.slide-thumb')).find((button) => button.textContent?.includes('${label}'))?.click()`)
-  await page.waitFor(`document.querySelector('.slide-thumb[aria-current="page"]')?.textContent?.includes('${label}')`)
+  const activeSlideThumbSelector = `${SELECTOR.slideThumb}[aria-current="page"]`
+
+  await page.eval(`Array.from(document.querySelectorAll(${JSON.stringify(SELECTOR.slideThumb)})).find((button) => button.textContent?.includes(${JSON.stringify(label)}))?.click()`)
+  await page.waitFor(`${querySelectorExpression(activeSlideThumbSelector)}?.textContent?.includes(${JSON.stringify(label)})`)
   await delay(100)
 }
 
 async function slideBlockOrder(page) {
   return page.eval(
-    `Array.from(document.querySelectorAll('.slide-canvas [data-block]')).map((block) => block.dataset.block)`,
+    `Array.from(document.querySelectorAll(${JSON.stringify(`${SELECTOR.slideCanvas} [data-block]`)})).map((block) => block.dataset.block)`,
   )
+}
+
+function blockSelector(blockId) {
+  return `[data-block="${blockId}"]`
+}
+
+function querySelectorExpression(selector) {
+  return `document.querySelector(${JSON.stringify(selector)})`
+}
+
+function presentSelectorExpression(selector) {
+  return `!!${querySelectorExpression(selector)}`
+}
+
+async function waitForEditor(page) {
+  await page.waitFor(presentSelectorExpression(SELECTOR.editorEditable))
+}
+
+async function waitForNoEditor(page) {
+  await page.waitFor(`!${querySelectorExpression(SELECTOR.editor)}`)
+}
+
+async function focusEditor(page) {
+  await page.eval(`${querySelectorExpression(SELECTOR.editor)}?.focus()`)
+}
+
+async function clickSelector(page, selector) {
+  await page.eval(`${querySelectorExpression(selector)}?.click()`)
 }
 
 function sameArray(a, b) {
@@ -2262,7 +2302,7 @@ async function slideThumbState(page, label) {
 }
 
 async function focusBlockAndPress(page, blockId, key) {
-  await page.eval(`document.querySelector('[data-block="${blockId}"]')?.focus()`)
+  await page.eval(`${querySelectorExpression(blockSelector(blockId))}?.focus()`)
   await pressKey(page, key)
 }
 
@@ -2320,7 +2360,7 @@ async function pressHistoryShortcut(page, key) {
 }
 
 async function commitTextEditor(page) {
-  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+  await focusEditor(page)
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Enter',
@@ -2337,11 +2377,11 @@ async function commitTextEditor(page) {
     nativeVirtualKeyCode: 13,
     modifiers: 2,
   })
-  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+  await waitForNoEditor(page)
 }
 
 async function pressEditorEnter(page) {
-  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+  await focusEditor(page)
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Enter',
@@ -2359,7 +2399,7 @@ async function pressEditorEnter(page) {
 }
 
 async function cancelTextEditor(page) {
-  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+  await focusEditor(page)
   await page.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key: 'Escape',
@@ -2374,12 +2414,12 @@ async function cancelTextEditor(page) {
     windowsVirtualKeyCode: 27,
     nativeVirtualKeyCode: 27,
   })
-  await page.waitFor("!document.querySelector('[data-editing=\"true\"]')")
+  await waitForNoEditor(page)
 }
 
 async function replaceEditorText(page, text) {
   await page.eval(`(() => {
-    const editor = document.querySelector('[data-editing=\"true\"]')
+    const editor = document.querySelector(${JSON.stringify(SELECTOR.editor)})
     editor.focus()
     const selection = window.getSelection()
     const range = document.createRange()
@@ -2391,7 +2431,7 @@ async function replaceEditorText(page, text) {
 }
 
 async function typeEditorText(page, text) {
-  await page.eval("document.querySelector('[data-editing=\"true\"]')?.focus()")
+  await focusEditor(page)
 
   for (const char of text) {
     if (char === '\n') {
@@ -2422,7 +2462,7 @@ async function typeEditorText(page, text) {
 
 async function insertEditorTextCommand(page, text) {
   const before = await page.eval(`(() => {
-    const editor = document.querySelector('[data-editing=\"true\"]')
+    const editor = document.querySelector(${JSON.stringify(SELECTOR.editor)})
 
     if (!editor) {
       return null
@@ -2441,7 +2481,7 @@ async function insertEditorTextCommand(page, text) {
   })()`)
   await page.send('Input.insertText', { text })
   const after = await page.eval(
-    `document.querySelector('[data-editing=\"true\"]')?.textContent ?? null`,
+    `${querySelectorExpression(SELECTOR.editor)}?.textContent ?? null`,
   )
 
   return { before, after }
@@ -2475,7 +2515,7 @@ function keyDescriptorForChar(char) {
 
 async function setEditorText(page, text) {
   await page.eval(`(() => {
-    const editor = document.querySelector('[data-editing=\"true\"]')
+    const editor = document.querySelector(${JSON.stringify(SELECTOR.editor)})
     editor.focus()
     editor.textContent = ${JSON.stringify(text)}
     editor.dispatchEvent(new InputEvent('input', {
