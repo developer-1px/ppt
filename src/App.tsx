@@ -29,7 +29,7 @@ import {
   getCurrentRect,
   selectionSnapForPointers,
 } from './layoutInteraction'
-import { useCanvasViewTabs } from './useCanvasViewTabs'
+import { useRetouchViewCommands } from './useRetouchViewCommands'
 import {
   canDecreaseCanvasZoom,
   canIncreaseCanvasZoom,
@@ -247,42 +247,20 @@ function App() {
     clearMarqueeSelection()
   }
 
-  function enterLayoutMode() {
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
-  }
-
-  function changeMode(nextMode: RetouchMode) {
-    if (mode === 'text') {
-      commitActiveTextEdit()
-    }
-
-    if (mode !== 'text' && nextMode === 'text') {
-      doc.selection?.empty()
-    }
-
-    setMode(nextMode)
-    clearTransientState()
-  }
-
-  function changeCanvasView(nextView: CanvasView) {
-    if (nextView === 'grid') {
-      commitActiveTextEdit()
-      doc.selection?.empty()
-      clearTransientState()
-    }
-
-    setCanvasView(nextView)
-  }
-
   const {
     canvasViewPanelProps,
     canvasViewTabProps,
     canvasViewTablistProps,
-  } = useCanvasViewTabs({
+    changeMode,
+    enterLayoutMode,
+  } = useRetouchViewCommands({
     canvasView,
-    onChange: changeCanvasView,
+    clearSelection: () => doc.selection?.empty(),
+    clearTransientState,
+    commitActiveTextEdit,
+    mode,
+    setCanvasView,
+    setMode,
   })
 
   const {
