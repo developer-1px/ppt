@@ -34,6 +34,7 @@ import type {
   ResetScope,
   RetouchMode,
 } from './retouchViewState'
+import { isRetouchStageBackgroundIgnoredTarget } from './retouchSlideDom'
 
 type RetouchWorkspaceProps = {
   activeSlide: RetouchSlide
@@ -233,13 +234,7 @@ export function RetouchWorkspace({
               return
             }
 
-            const target = event.target instanceof HTMLElement ? event.target : null
-
-            if (
-              target?.closest(
-                '[data-block], .selection-overlay, .resize-handle, .marquee-selection',
-              )
-            ) {
+            if (isRetouchStageBackgroundIgnoredTarget(event.target)) {
               return
             }
 

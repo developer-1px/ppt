@@ -20,6 +20,7 @@ import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
+import { closestSlideBlockElement } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -109,7 +110,7 @@ export function useRetouchResetActions({
             PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
           )
         : null
-    const blockElement = element?.closest<HTMLElement>('[data-block]')
+    const blockElement = closestSlideBlockElement(element ?? null)
     const liveText = normalizePlainTextBlockEditorText(
       element?.textContent ?? location.block.text,
     )

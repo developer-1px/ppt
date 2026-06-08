@@ -23,7 +23,10 @@ import {
   retouchSurfaceAdapter,
   retouchSurfaceItems,
 } from './retouchObjectSurface'
-import { readSlidePoint } from './retouchSlideDom'
+import {
+  isRetouchMarqueeStartIgnoredTarget,
+  readSlidePoint,
+} from './retouchSlideDom'
 import type { RetouchMode } from './retouchViewState'
 
 const MARQUEE_THRESHOLD = 6
@@ -60,9 +63,7 @@ export function useRetouchMarqueeSelection({
         return
       }
 
-      const target = event.target instanceof HTMLElement ? event.target : null
-
-      if (target?.closest('[data-block], .selection-overlay, .resize-handle')) {
+      if (isRetouchMarqueeStartIgnoredTarget(event.target)) {
         return
       }
 

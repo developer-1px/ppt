@@ -12,6 +12,7 @@ import {
 } from './editorKeyboard'
 import type { Interaction } from './layoutInteraction'
 import { createLayoutKeyboardNudgePatch } from './layoutKeyboardNudge'
+import { closestSlideBlockElement } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -100,7 +101,7 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
-      const blockElement = activeElement.closest<HTMLElement>('[data-block]')
+      const blockElement = closestSlideBlockElement(activeElement)
       const blockId = blockElement?.dataset.block
 
       if (!blockId) {

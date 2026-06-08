@@ -19,6 +19,7 @@ import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
+import { closestSlideBlockElement } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -71,7 +72,7 @@ export function useRetouchTextEditing({
     const element = slideRef.current?.querySelector<HTMLElement>(
       PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
     )
-    const blockElement = element?.closest<HTMLElement>('[data-block]')
+    const blockElement = closestSlideBlockElement(element ?? null)
 
     setEditing(null)
     clearLayoutInteraction()
