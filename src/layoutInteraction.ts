@@ -1,4 +1,4 @@
-import type { Point } from 'canvas/core'
+import { clamp, type Point } from 'canvas/core'
 import type { Pointer, SelectionSnap } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
@@ -287,10 +287,6 @@ function alignedGuideFor(start: number, center: number, end: number, containerSi
   }
 
   return null
-}
-
-export function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
 }
 
 export function rectClose(a: Rect, b: Rect) {

@@ -6,7 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { pointDistance } from 'canvas/core'
+import { clamp, pointDistance } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
@@ -21,7 +21,6 @@ import {
 } from './retouchModel'
 import {
   calculateMoveInteractionState,
-  clamp,
   draftRectsEqual,
   getCurrentRect,
   guidesForInteraction,
