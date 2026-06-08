@@ -68,72 +68,6 @@ button {
   color: #111827;
 }
 
-.deck-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-
-.grid-slide-card {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #334155;
-  cursor: pointer;
-  text-align: left;
-}
-
-.grid-slide-card:hover,
-.grid-slide-card[aria-current='page'] {
-  border-color: #2563eb;
-  background: #ffffff;
-}
-
-.grid-slide-index,
-.grid-slide-name {
-  color: #475569;
-  font: 700 12px/1 var(--sans);
-}
-
-.grid-slide-card[data-changed='true'] .grid-slide-name::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  display: inline-block;
-  margin-left: 6px;
-  border-radius: 999px;
-  background: #2563eb;
-  vertical-align: 1px;
-}
-
-.grid-slide-canvas {
-  --accent: #2563eb;
-
-  position: relative;
-  container-type: inline-size;
-  display: block;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
-}
-
-.grid-slide-block {
-  position: absolute;
-  box-sizing: border-box;
-  margin: 0;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
 .retouch-app[data-mode='layout'] .slide-canvas {
   background:
     linear-gradient(90deg, rgba(148, 163, 184, 0.14) 1px, transparent 1px) 0 0 / 5% 8.8889%,
@@ -378,12 +312,6 @@ button {
 
   .stage-shell-grid {
     padding: 10px;
-  }
-
-  .deck-grid {
-    grid-template-columns: repeat(2, minmax(180px, 1fr));
-    gap: 10px;
-    min-width: 380px;
   }
 
   .slide-frame {

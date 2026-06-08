@@ -7,6 +7,7 @@ import {
   htmlSlideRootAttributes,
 } from './htmlSlideContract'
 import { cssVariables } from './cssVariables'
+import './DeckGrid.css'
 
 type DeckGridProps = {
   activeSlideId: string
