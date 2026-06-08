@@ -1,4 +1,4 @@
-import type { JSONPatchOperation } from 'zod-crud'
+import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
@@ -19,6 +19,11 @@ type BlockInsertInput = {
   blocks: readonly SlideBlock[]
   insertIndex: number
   slideIndex: number
+}
+
+type BlockInsertPatch = {
+  insertedPointers: Pointer[]
+  operations: JSONPatchOperation[]
 }
 
 export function createTextBlock(slide: RetouchSlide): SlideBlock {
@@ -69,22 +74,22 @@ export function duplicateBlocks(
   return duplicatedBlocks
 }
 
-export function blockInsertPointers({
+export function createBlockInsertPatch({
   blocks,
   insertIndex,
   slideIndex,
-}: BlockInsertInput) {
-  return blocks.map((_, offset) => blockPointer(slideIndex, insertIndex + offset))
-}
-
-export function addBlocksPatch({
-  blocks,
-  insertIndex,
-  slideIndex,
-}: BlockInsertInput): JSONPatchOperation[] {
-  return blocks.map((block, offset) => ({
-    op: 'add',
-    path: blockPointer(slideIndex, insertIndex + offset),
-    value: block,
+}: BlockInsertInput): BlockInsertPatch {
+  const inserts = blocks.map((block, offset) => ({
+    block,
+    pointer: blockPointer(slideIndex, insertIndex + offset),
   }))
+
+  return {
+    insertedPointers: inserts.map((insert) => insert.pointer),
+    operations: inserts.map((insert) => ({
+      op: 'add',
+      path: insert.pointer,
+      value: insert.block,
+    })),
+  }
 }

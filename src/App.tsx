@@ -17,8 +17,7 @@ import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
 import {
-  addBlocksPatch,
-  blockInsertPointers,
+  createBlockInsertPatch,
   createTextBlock,
   duplicateBlocks,
 } from './slideBlockOperations'
@@ -436,13 +435,18 @@ function App() {
     commitActiveTextEdit()
     const nextBlock = createTextBlock(activeSlide)
     const blockIndex = activeSlide.blocks.length
-    const pointer = blockPointer(activeSlideIndex, blockIndex)
-
-    doc.commit(addBlocksPatch({
+    const insertPatch = createBlockInsertPatch({
       blocks: [nextBlock],
       insertIndex: blockIndex,
       slideIndex: activeSlideIndex,
-    }), {
+    })
+    const pointer = insertPatch.insertedPointers[0]
+
+    if (!pointer) {
+      return
+    }
+
+    doc.commit(insertPatch.operations, {
       label: 'add text block',
       origin: 'ppt-retouch',
       selection: selectionSnapForPointers([pointer]),
@@ -478,20 +482,16 @@ function App() {
     commitActiveTextEdit()
     const pastedBlocks = duplicateBlocks(blockClipboard, activeSlide)
     const insertIndex = activeSlide.blocks.length
-    const pastedPointers = blockInsertPointers({
+    const insertPatch = createBlockInsertPatch({
       blocks: pastedBlocks,
       insertIndex,
       slideIndex: activeSlideIndex,
     })
 
-    doc.commit(addBlocksPatch({
-      blocks: pastedBlocks,
-      insertIndex,
-      slideIndex: activeSlideIndex,
-    }), {
+    doc.commit(insertPatch.operations, {
       label: 'paste blocks',
       origin: 'ppt-retouch',
-      selection: selectionSnapForPointers(pastedPointers),
+      selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
     setBlockClipboard(pastedBlocks)
     setCanvasView('slide')
@@ -513,20 +513,16 @@ function App() {
       activeSlide,
     )
     const insertIndex = locations.at(-1)!.blockIndex + 1
-    const duplicatePointers = blockInsertPointers({
+    const insertPatch = createBlockInsertPatch({
       blocks: duplicatedBlocks,
       insertIndex,
       slideIndex: activeSlideIndex,
     })
 
-    doc.commit(addBlocksPatch({
-      blocks: duplicatedBlocks,
-      insertIndex,
-      slideIndex: activeSlideIndex,
-    }), {
+    doc.commit(insertPatch.operations, {
       label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
       origin: 'ppt-retouch',
-      selection: selectionSnapForPointers(duplicatePointers),
+      selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
     setCanvasView('slide')
     setMode('layout')
