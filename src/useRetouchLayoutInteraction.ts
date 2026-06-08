@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import { pointDistance } from 'canvas/core'
-import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
+import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
@@ -33,20 +33,13 @@ import {
   type Point,
   type SnapGuides,
 } from './layoutInteraction'
+import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { RetouchMode } from './retouchViewState'
 
 const DRAG_THRESHOLD = 8
 
 const hasMeaningfulPointerDelta = (start: Point, next: Point) =>
   pointDistance(start, next) >= DRAG_THRESHOLD
-
-type CommitPatch = (
-  patch: JSONPatchOperation[],
-  pointer: Pointer,
-  label: string,
-  mergeKey?: string,
-  selection?: SelectionSnap,
-) => void
 
 export function useRetouchLayoutInteraction({
   activeSlideBlocks,
@@ -67,7 +60,7 @@ export function useRetouchLayoutInteraction({
   activeSlideBlocks: SlideBlock[]
   activeSlideId: string
   activeSlideIndex: number
-  commitPatch: CommitPatch
+  commitPatch: RetouchSurfaceCommitPatch
   deckValue: RetouchDeck
   mode: RetouchMode
   selectedBlock: SlideBlock | null

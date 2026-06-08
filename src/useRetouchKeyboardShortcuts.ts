@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
+import type { Pointer } from 'zod-crud'
 import {
   blockLocationFromPointer,
   findBlockLocation,
@@ -17,15 +17,8 @@ import {
   isHistoryShortcut,
 } from './editorKeyboard'
 import { selectionSnapForPointers, type Interaction } from './layoutInteraction'
+import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
-
-type CommitPatch = (
-  patch: JSONPatchOperation[],
-  pointer: Pointer,
-  label: string,
-  mergeKey?: string,
-  selection?: SelectionSnap,
-) => void
 
 type HistoryApi = {
   canRedo: boolean
@@ -59,7 +52,7 @@ export function useRetouchKeyboardShortcuts({
   setEditing,
 }: {
   activeSlideId: string
-  commitPatch: CommitPatch
+  commitPatch: RetouchSurfaceCommitPatch
   deckValue: RetouchDeck
   editing: EditingState | null
   history: HistoryApi

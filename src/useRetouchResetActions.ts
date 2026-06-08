@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
+import type { Pointer } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
   SAMPLE_DECK,
@@ -21,15 +21,8 @@ import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
+import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
-
-type CommitPatch = (
-  patch: JSONPatchOperation[],
-  pointer: Pointer,
-  label: string,
-  mergeKey?: string,
-  selection?: SelectionSnap,
-) => void
 
 type HistoryApi = {
   redo: () => void
@@ -67,7 +60,7 @@ export function useRetouchResetActions({
   commitDeckReset: () => void
   clearTransientState: () => void
   commitActiveTextEdit: () => RetouchDeck
-  commitPatch: CommitPatch
+  commitPatch: RetouchSurfaceCommitPatch
   commitTextPatch: (pointer: Pointer, text: string, rect: Rect) => RetouchDeck
   deckValue: RetouchDeck
   editing: EditingState | null

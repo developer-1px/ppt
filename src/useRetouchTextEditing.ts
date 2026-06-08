@@ -1,10 +1,5 @@
 import type { RefObject } from 'react'
-import {
-  applyPatch,
-  type JSONPatchOperation,
-  type Pointer,
-  type SelectionSnap,
-} from 'zod-crud'
+import { applyPatch, type Pointer } from 'zod-crud'
 import {
   SAMPLE_DECK,
   RetouchDeckSchema,
@@ -23,15 +18,8 @@ import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
+import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
-
-type CommitPatch = (
-  patch: JSONPatchOperation[],
-  pointer: Pointer,
-  label: string,
-  mergeKey?: string,
-  selection?: SelectionSnap,
-) => void
 
 export function useRetouchTextEditing({
   clearLayoutInteraction,
@@ -44,7 +32,7 @@ export function useRetouchTextEditing({
   slideRef,
 }: {
   clearLayoutInteraction: () => void
-  commitPatch: CommitPatch
+  commitPatch: RetouchSurfaceCommitPatch
   deckValue: RetouchDeck
   editing: EditingState | null
   mode: RetouchMode

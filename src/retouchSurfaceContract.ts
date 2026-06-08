@@ -87,6 +87,14 @@ export type RetouchSurfaceRuntimeChange = {
   selection?: SelectionSnap
 }
 
+export type RetouchSurfaceCommitPatch = (
+  patch: JSONPatchOperation[],
+  pointer: Pointer,
+  label: string,
+  mergeKey?: string,
+  selection?: SelectionSnap,
+) => void
+
 export const PPT_RETOUCH_SURFACE: RetouchSurfaceDescriptor = {
   blockIdentity: {
     field: 'id',
