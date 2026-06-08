@@ -2,8 +2,6 @@ import {
   createCanvasSceneAdapter,
   type Bounds,
   type CanvasSceneEntry,
-  type CanvasTransformAdapter,
-  type CanvasTransformItem,
 } from 'canvas/foundation'
 import type { Pointer } from 'zod-crud'
 import type { Rect } from './retouchModel'
@@ -12,52 +10,6 @@ import type { RetouchSurfaceItem } from './retouchObjectSurface'
 export type RetouchCanvasSceneEntry = CanvasSceneEntry & {
   blockId: string
   pointer: Pointer
-}
-
-export type RetouchCanvasTransformItem = CanvasTransformItem & {
-  pointer: Pointer
-  rect: Rect
-}
-
-export const retouchCanvasTransformAdapter: CanvasTransformAdapter<RetouchCanvasTransformItem> = {
-  resizeSelection: ({ from, items, selection, to }) => {
-    const selected = new Set(selection)
-    const scaleX = from.w === 0 ? 1 : to.w / from.w
-    const scaleY = from.h === 0 ? 1 : to.h / from.h
-
-    return items.map((item) => {
-      if (!selected.has(item.id)) {
-        return item
-      }
-
-      return {
-        ...item,
-        rect: {
-          x: to.x + (item.rect.x - from.x) * scaleX,
-          y: to.y + (item.rect.y - from.y) * scaleY,
-          width: item.rect.width * scaleX,
-          height: item.rect.height * scaleY,
-        },
-      }
-    })
-  },
-
-  translateSelection: ({ dx, dy, items, selection }) => {
-    const selected = new Set(selection)
-
-    return items.map((item) =>
-      selected.has(item.id)
-        ? {
-            ...item,
-            rect: {
-              ...item.rect,
-              x: item.rect.x + dx,
-              y: item.rect.y + dy,
-            },
-          }
-        : item,
-    )
-  },
 }
 
 export function retouchCanvasSceneEntries(
@@ -72,16 +24,6 @@ export function retouchCanvasSceneEntries(
     parentId: null,
     path: [index],
     pointer: item.pointer,
-  }))
-}
-
-export function retouchCanvasTransformItems(
-  items: readonly RetouchSurfaceItem[],
-): RetouchCanvasTransformItem[] {
-  return items.map((item) => ({
-    id: item.block.id,
-    pointer: item.pointer,
-    rect: item.rect,
   }))
 }
 

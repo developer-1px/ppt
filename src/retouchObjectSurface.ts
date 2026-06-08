@@ -1,6 +1,5 @@
 import {
   createObjectSurfaceSelection,
-  getSurfaceSelectionBounds,
   type ObjectSurfaceAdapter,
   type ObjectSurfaceSelection,
 } from '@interactive-os/object-surface'
@@ -45,15 +44,4 @@ export function pointersFromObjectSurfaceSelection(
   selection: ObjectSurfaceSelection,
 ): Pointer[] {
   return [...selection.ids]
-}
-
-export function retouchSurfaceSelectionBounds(
-  items: readonly RetouchSurfaceItem[],
-  pointers: readonly Pointer[],
-) {
-  return getSurfaceSelectionBounds(
-    items,
-    retouchSurfaceAdapter,
-    pointers,
-  )
 }
