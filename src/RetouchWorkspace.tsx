@@ -181,6 +181,19 @@ export function RetouchWorkspace({
   visualSelectionRect,
   zoomLabel,
 }: RetouchWorkspaceProps) {
+  function handleStageShellClick(event: ReactMouseEvent<HTMLDivElement>) {
+    if (suppressStageClickRef.current) {
+      suppressStageClickRef.current = false
+      return
+    }
+
+    if (isRetouchStageBackgroundIgnoredTarget(event.target)) {
+      return
+    }
+
+    onStageBackgroundClick()
+  }
+
   return (
     <section className="retouch-workspace">
       <Topbar
@@ -228,18 +241,7 @@ export function RetouchWorkspace({
           {...canvasViewPanelProps}
           className="stage-shell"
           data-zoom-mode={canvasZoom === 'fit' ? 'fit' : 'manual'}
-          onClick={(event) => {
-            if (suppressStageClickRef.current) {
-              suppressStageClickRef.current = false
-              return
-            }
-
-            if (isRetouchStageBackgroundIgnoredTarget(event.target)) {
-              return
-            }
-
-            onStageBackgroundClick()
-          }}
+          onClick={handleStageShellClick}
           ref={stageRef}
           style={
             canvasZoom === 'fit'
