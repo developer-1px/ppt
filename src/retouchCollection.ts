@@ -26,3 +26,5 @@ export function createRetouchCollection(doc: JSONDocument<RetouchDeck>) {
 
   }
 }
+
+export type RetouchCollection = ReturnType<typeof createRetouchCollection>

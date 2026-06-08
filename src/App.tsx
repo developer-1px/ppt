@@ -22,13 +22,6 @@ import {
   duplicateBlocks,
 } from './slideBlockOperations'
 import {
-  addSlidePatch,
-  createBlankSlide,
-  duplicateSlide,
-  setSlideAccentPatch,
-  setSlideNamePatch,
-} from './slideDeckOperations'
-import {
   alignBlockLocations,
   distributeBlockLocations,
   type AlignSelectionAction,
@@ -51,6 +44,7 @@ import { useRetouchDraftPersistence } from './retouchPersistence'
 import { changedSlideIdsFromBaseline } from './retouchDirtyState'
 import { createRetouchCollection } from './retouchCollection'
 import { createRetouchIdResolver } from './retouchIdResolver'
+import { useRetouchSlideCommands } from './useRetouchSlideCommands'
 import {
   getCurrentRect,
   selectionSnapForPointers,
@@ -90,7 +84,6 @@ function App() {
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
   const [blockClipboard, setBlockClipboard] = useState<SlideBlock[]>([])
-  const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
   const [presenting, setPresenting] = useState(false)
 
   const retouchIds = useMemo(() => createRetouchIdResolver(doc), [doc])
@@ -338,105 +331,28 @@ function App() {
     onChange: changeCanvasView,
   })
 
-  function activateSlide(slideId: string) {
-    setActiveSlideId(slideId)
-    setCanvasView('slide')
-    doc.selection?.empty()
-    stageRef.current?.scrollTo({ left: 0, top: 0 })
-    clearTransientState()
-  }
-
-  function selectSlide(slideId: string) {
-    commitActiveTextEdit()
-    activateSlide(slideId)
-  }
-
-  function addSlide() {
-    commitActiveTextEdit()
-    const nextSlide = createBlankSlide(doc.value.slides)
-    const insertIndex = activeSlideIndex + 1
-
-    commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'add slide')
-    activateSlide(nextSlide.id)
-  }
-
-  function copySlide() {
-    commitActiveTextEdit()
-    const nextSlide = duplicateSlide(activeSlide, doc.value.slides)
-    const insertIndex = activeSlideIndex + 1
-
-    commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'duplicate slide')
-    setNotesBySlideId((current) => ({
-      ...current,
-      [nextSlide.id]: current[activeSlide.id] ?? '',
-    }))
-    activateSlide(nextSlide.id)
-  }
-
-  function deleteSlide() {
-    if (doc.value.slides.length <= 1) {
-      return
-    }
-
-    commitActiveTextEdit()
-    const nextSlide =
-      doc.value.slides[activeSlideIndex + 1] ??
-      doc.value.slides[activeSlideIndex - 1] ??
-      doc.value.slides[0]
-
-    const deleted = retouchCollection.deleteSlide(activeSlideIndex)
-    if (!deleted.ok) {
-      return
-    }
-
-    setNotesBySlideId((current) => {
-      const next = { ...current }
-      delete next[activeSlide.id]
-      return next
-    })
-    activateSlide(nextSlide.id)
-  }
-
-  function moveSlide(direction: -1 | 1) {
-    const nextIndex = activeSlideIndex + direction
-
-    if (nextIndex < 0 || nextIndex >= doc.value.slides.length) {
-      return
-    }
-
-    commitActiveTextEdit()
-    const moved = retouchCollection.moveSlide(activeSlideIndex, direction)
-    if (!moved.ok) {
-      return
-    }
-
-    setActiveSlideId(activeSlide.id)
-    setCanvasView('slide')
-    doc.selection?.empty()
-    clearTransientState()
-  }
-
-  function changeSlideName(name: string) {
-    const nextName = name.trim() || 'Untitled'
-
-    if (nextName === activeSlide.name) {
-      return
-    }
-
-    commitActiveTextEdit()
-    commitRetouchPatch(setSlideNamePatch(activeSlideIndex, nextName), 'rename slide')
-    clearTransientState()
-  }
-
-  function changeSlideAccent(accent: string) {
-    if (accent === activeSlide.accent) {
-      return
-    }
-
-    commitActiveTextEdit()
-    commitRetouchPatch(setSlideAccentPatch(activeSlideIndex, accent), 'change slide accent')
-    clearTransientState()
-  }
+  const {
+    activeSlideNotes,
+    addSlide,
+    changeActiveSlideNotes,
+    changeSlideAccent,
+    changeSlideName,
+    copySlide,
+    deleteSlide,
+    moveSlide,
+    selectSlide,
+  } = useRetouchSlideCommands({
+    activeSlide,
+    activeSlideIndex,
+    clearTransientState,
+    commitActiveTextEdit,
+    commitRetouchPatch,
+    doc,
+    retouchCollection,
+    setActiveSlideId,
+    setCanvasView,
+    stageRef,
+  })
 
   function insertTextBlock() {
     commitActiveTextEdit()
@@ -744,7 +660,7 @@ function App() {
         interaction={interaction}
         mode={mode}
         marqueeRect={marqueeRect}
-        notes={notesBySlideId[activeSlide.id] ?? ''}
+        notes={activeSlideNotes}
         onBlockClick={(event, pointer) => {
           if (suppressBlockClickRef.current) {
             suppressBlockClickRef.current = false
@@ -778,12 +694,7 @@ function App() {
         onZoomOut={() => setCanvasZoom((zoom) => nextCanvasZoom(zoom, -1))}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}
-        onNotesChange={(notes) =>
-          setNotesBySlideId((current) => ({
-            ...current,
-            [activeSlide.id]: notes,
-          }))
-        }
+        onNotesChange={changeActiveSlideNotes}
         onOpenSlide={selectSlide}
         onPresent={startPresentation}
         onRedo={redoDocumentChange}
@@ -816,7 +727,7 @@ function App() {
         <PresentationOverlay
           activeSlide={activeSlide}
           activeSlideIndex={activeSlideIndex}
-          notes={notesBySlideId[activeSlide.id] ?? ''}
+          notes={activeSlideNotes}
           onClose={closePresentation}
           onNext={() => navigatePresentation(1)}
           onPrevious={() => navigatePresentation(-1)}
