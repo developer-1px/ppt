@@ -3,23 +3,18 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react'
-import {
-  RESIZE_HANDLES,
-  type ResizeHandle,
-} from 'canvas/core'
+import type { ResizeHandle } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import {
-  SLIDE_HEIGHT,
-  SLIDE_WIDTH,
   blockPointer,
   findBlockLocation,
-  rectToStyle,
   type Rect,
   type RetouchSlide,
   type SlideBlock,
 } from './retouchModel'
 import { SAMPLE_DECK } from './sampleDeck'
 import { SlideBlockElement } from './SlideBlockElement'
+import { StageLayoutChrome } from './StageLayoutChrome'
 import { htmlSlideRootAttributes } from './htmlSlideContract'
 import {
   getCurrentRect,
@@ -29,10 +24,6 @@ import {
   type Interaction,
   type SnapGuides,
 } from './layoutInteraction'
-import {
-  retouchCanvasSceneEntries,
-  retouchCanvasSelectionBounds,
-} from './retouchCanvasScene'
 import { cssVariables } from './cssVariables'
 import type { EditingState, RetouchMode } from './retouchViewState'
 import './StageCanvas.css'
@@ -106,14 +97,6 @@ export function StageCanvas({
     pointer,
     rect,
   }))
-  const selectedBounds = retouchCanvasSelectionBounds(
-    retouchCanvasSceneEntries(surfaceItems),
-    selectedPointers,
-  )
-  const overlayRect =
-    selectedPointers.length === 1 && selectedRect
-      ? (visualSelectionRect ?? selectedRect)
-      : selectedBounds
 
   return (
     <div className="slide-frame">
@@ -169,66 +152,18 @@ export function StageCanvas({
           )
         })}
 
-        {mode === 'layout' && overlayRect ? (
-          <SelectionOverlay
+        {mode === 'layout' ? (
+          <StageLayoutChrome
+            marqueeRect={marqueeRect}
             onResizePointerDown={onResizePointerDown}
-            rect={overlayRect}
-            resizable={selectedPointers.length === 1}
-          />
-        ) : null}
-
-        {mode === 'layout' && marqueeRect ? (
-          <div className="marquee-selection" style={rectToStyle(marqueeRect)} />
-        ) : null}
-
-        {mode === 'layout' && snapGuides.x !== null ? (
-          <div
-            className="snap-guide snap-guide-x"
-            style={{ left: `${(snapGuides.x / SLIDE_WIDTH) * 100}%` }}
-          />
-        ) : null}
-        {mode === 'layout' && snapGuides.y !== null ? (
-          <div
-            className="snap-guide snap-guide-y"
-            style={{ top: `${(snapGuides.y / SLIDE_HEIGHT) * 100}%` }}
+            selectedPointers={selectedPointers}
+            selectedRect={selectedRect}
+            snapGuides={snapGuides}
+            surfaceItems={surfaceItems}
+            visualSelectionRect={visualSelectionRect}
           />
         ) : null}
       </div>
-    </div>
-  )
-}
-
-function SelectionOverlay({
-  onResizePointerDown,
-  rect,
-  resizable,
-}: {
-  onResizePointerDown: (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    handle: ResizeHandle,
-  ) => void
-  rect: Rect
-  resizable: boolean
-}) {
-  return (
-    <div
-      className="selection-overlay"
-      data-resizable={resizable ? 'true' : 'false'}
-      style={rectToStyle(rect)}
-    >
-      {resizable
-        ? RESIZE_HANDLES.map((handle) => (
-            <button
-              aria-label={`Resize ${handle}`}
-              className="resize-handle"
-              data-handle={handle}
-              key={handle}
-              onClick={(event) => event.stopPropagation()}
-              onPointerDown={(event) => onResizePointerDown(event, handle)}
-              type="button"
-            />
-          ))
-        : null}
     </div>
   )
 }
