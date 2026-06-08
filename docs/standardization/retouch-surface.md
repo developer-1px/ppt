@@ -157,11 +157,13 @@ Direction:
    place.
 4. Add a Canvas scene Adapter for PPT blocks, then compare current move/snap
    behavior against `canvas/foundation`. Current adapter:
-   `src/retouchCanvasScene.ts` maps PPT blocks to Canvas Foundation scene and
-   transform contracts while keeping slide projection and autoheight in PPT.
+   `src/retouchCanvasScene.ts` maps PPT blocks to the Canvas Foundation scene
+   contract while keeping transform, slide projection, and autoheight policy in
+   PPT until the semantics match.
 5. Split block text editing into a plain-text editor Adapter and a PPT
    autoheight policy.
-6. Expand APG usage from tabs to toolbar and slide rail selection.
+6. Keep APG tabs, toolbar, radio group, and slide rail adapters centralized in
+   `src/apgPatternAdapter.ts`.
 7. Promote only after the gate in `package-promotion-gate.md` is satisfied by
    two hosts or one host plus a focused lab proving the same contract.
 
