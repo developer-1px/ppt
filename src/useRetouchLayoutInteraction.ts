@@ -6,7 +6,11 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { clamp, pointDistance } from 'canvas/core'
+import {
+  clamp,
+  pointDistance,
+  type ResizeHandle,
+} from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
@@ -16,7 +20,6 @@ import {
   setArrangePatch,
   type Rect,
   type RetouchDeck,
-  type ResizeHandle,
   type SlideBlock,
 } from './retouchModel'
 import {

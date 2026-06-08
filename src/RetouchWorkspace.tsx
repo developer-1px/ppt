@@ -5,6 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react'
+import type { ResizeHandle } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import { DeckGrid } from './DeckGrid'
 import { InspectorPanel } from './InspectorPanel'
@@ -12,7 +13,6 @@ import { StageCanvas } from './StageCanvas'
 import { Topbar } from './Topbar'
 import type {
   Rect,
-  ResizeHandle,
   RetouchSlide,
   SlideBlock,
 } from './retouchModel'

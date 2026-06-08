@@ -5,11 +5,7 @@ import {
   type JSONPatchOperation,
   type Pointer,
 } from 'zod-crud'
-import {
-  RESIZE_HANDLES as CANVAS_RESIZE_HANDLES,
-  clamp,
-  type ResizeHandle as CanvasResizeHandle,
-} from 'canvas/core'
+import { clamp, type ResizeHandle } from 'canvas/core'
 import { z } from 'zod'
 
 export const SLIDE_WIDTH = 1280
@@ -82,10 +78,6 @@ export type SlideBlock = z.infer<typeof SlideBlockSchema>
 export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
 export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
-
-export type ResizeHandle = CanvasResizeHandle
-
-export const RESIZE_HANDLES = CANVAS_RESIZE_HANDLES
 
 export type BlockLocation = {
   pointer: Pointer

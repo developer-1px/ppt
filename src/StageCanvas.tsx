@@ -3,16 +3,18 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react'
-import type { Pointer } from 'zod-crud'
 import {
   RESIZE_HANDLES,
+  type ResizeHandle,
+} from 'canvas/core'
+import type { Pointer } from 'zod-crud'
+import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   blockPointer,
   findBlockLocation,
   rectToStyle,
   type Rect,
-  type ResizeHandle,
   type RetouchSlide,
   type SlideBlock,
 } from './retouchModel'

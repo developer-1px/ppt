@@ -1,4 +1,8 @@
-import { clamp, type Point } from 'canvas/core'
+import {
+  clamp,
+  type Point,
+  type ResizeHandle,
+} from 'canvas/core'
 import type { Pointer, SelectionSnap } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
@@ -10,7 +14,6 @@ import {
   moveRect,
   rectEquals,
   type Rect,
-  type ResizeHandle,
   type SlideBlock,
 } from './retouchModel'
 
