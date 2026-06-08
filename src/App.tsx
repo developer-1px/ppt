@@ -287,6 +287,12 @@ function App() {
     clearMarqueeSelection()
   }
 
+  function enterLayoutMode() {
+    setCanvasView('slide')
+    setMode('layout')
+    clearTransientState()
+  }
+
   function changeMode(nextMode: RetouchMode) {
     if (mode === 'text') {
       commitActiveTextEdit()
@@ -494,10 +500,7 @@ function App() {
       selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
     setBlockClipboard(pastedBlocks)
-    setCanvasView('slide')
-    setMode('layout')
-    setEditing(null)
-    clearLayoutInteraction()
+    enterLayoutMode()
   }
 
   function duplicateSelectedBlock() {
@@ -524,10 +527,7 @@ function App() {
       origin: 'ppt-retouch',
       selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
-    setCanvasView('slide')
-    setMode('layout')
-    setEditing(null)
-    clearLayoutInteraction()
+    enterLayoutMode()
   }
 
   function deleteSelectedBlock() {
@@ -550,10 +550,7 @@ function App() {
       return
     }
 
-    setCanvasView('slide')
-    setMode('layout')
-    setEditing(null)
-    clearLayoutInteraction()
+    enterLayoutMode()
 
     if (nextSelectionIndex >= 0) {
       doc.selection?.selectRanges?.([blockPointer(activeSlideIndex, nextSelectionIndex)])
@@ -567,9 +564,7 @@ function App() {
     label: string,
   ) {
     commitActiveTextEdit()
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
+    enterLayoutMode()
     commitPatch(
       targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
       targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
@@ -634,9 +629,7 @@ function App() {
         ),
       },
     )
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
+    enterLayoutMode()
   }
 
   function changeSelectedBlockRect(rect: Rect, changedField?: RectField) {
@@ -651,9 +644,7 @@ function App() {
     }
 
     commitActiveTextEdit()
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
+    enterLayoutMode()
     commitPatch(
       setLayoutPatch(selectedPointer, nextRect),
       selectedPointer,
@@ -705,9 +696,7 @@ function App() {
       return
     }
 
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
+    enterLayoutMode()
     doc.selection?.selectRanges(
       activeSlide.blocks.map((_, blockIndex) =>
         blockPointer(activeSlideIndex, blockIndex),
