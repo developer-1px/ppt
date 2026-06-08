@@ -7,7 +7,7 @@ import type { Pointer } from 'zod-crud'
 import type { Rect } from './retouchModel'
 import type { RetouchSurfaceItem } from './retouchObjectSurface'
 
-export type RetouchCanvasSceneEntry = CanvasSceneEntry & {
+type RetouchCanvasSceneEntry = CanvasSceneEntry & {
   blockId: string
   pointer: Pointer
 }
@@ -38,7 +38,7 @@ export function retouchCanvasSelectionBounds(
   return bounds ? canvasBoundsToRect(bounds) : null
 }
 
-export function canvasSelectionIdsFromPointers(
+function canvasSelectionIdsFromPointers(
   entries: readonly RetouchCanvasSceneEntry[],
   pointers: readonly Pointer[],
 ) {
