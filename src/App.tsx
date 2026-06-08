@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { isAdditivePointerInput } from 'canvas/foundation'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
@@ -52,7 +53,6 @@ import { createRetouchCollection } from './retouchCollection'
 import { createRetouchIdResolver } from './retouchIdResolver'
 import {
   getCurrentRect,
-  hasSelectionModifier,
   selectionSnapForPointers,
 } from './layoutInteraction'
 import { useCanvasViewTabs } from './useCanvasViewTabs'
@@ -752,7 +752,7 @@ function App() {
           }
 
           if (mode === 'layout') {
-            selectBlock(pointer, hasSelectionModifier(event))
+            selectBlock(pointer, isAdditivePointerInput(event))
           } else {
             startTextEdit(pointer, {
               x: event.clientX,

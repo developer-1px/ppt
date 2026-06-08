@@ -51,12 +51,6 @@ export type SnapGuides = {
   y: number | null
 }
 
-type SelectionModifierEvent = {
-  ctrlKey: boolean
-  metaKey: boolean
-  shiftKey: boolean
-}
-
 export function getCurrentRect(
   pointer: Pointer,
   block: SlideBlock,
@@ -147,10 +141,6 @@ export function selectionSnapForPointers(
       focus: pointer,
     })),
   }
-}
-
-export function hasSelectionModifier(event: SelectionModifierEvent) {
-  return event.shiftKey || event.metaKey || event.ctrlKey
 }
 
 function snapMoveRectToSlideBlocks(

@@ -2,6 +2,7 @@ import {
   rectFromPoints,
   selectSurfaceObjectsInMarquee,
 } from '@interactive-os/object-surface'
+import { isAdditivePointerInput } from 'canvas/foundation'
 import { clamp, type Point } from 'canvas/core'
 import {
   useCallback,
@@ -18,7 +19,6 @@ import {
   type Rect,
   type RetouchSlide,
 } from './retouchModel'
-import { hasSelectionModifier } from './layoutInteraction'
 import {
   objectSurfaceSelectionFromPointers,
   pointersFromObjectSurfaceSelection,
@@ -89,7 +89,7 @@ export function useRetouchMarqueeSelection({
       event.preventDefault()
       event.stopPropagation()
       setMarquee({
-        additive: hasSelectionModifier(event),
+        additive: isAdditivePointerInput(event),
         rect: null,
         startClientPoint: {
           x: event.clientX,

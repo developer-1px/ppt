@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
+import { isAdditivePointerInput } from 'canvas/foundation'
 import {
   clamp,
   pointDistance,
@@ -28,7 +29,6 @@ import {
   draftRectsEqual,
   getCurrentRect,
   guidesForInteraction,
-  hasSelectionModifier,
   selectionSnapForPointers,
   type DraftLayout,
   type DraftLayoutRect,
@@ -264,7 +264,7 @@ export function useRetouchLayoutInteraction({
       return
     }
 
-    if (hasSelectionModifier(event)) {
+    if (isAdditivePointerInput(event)) {
       return
     }
 
