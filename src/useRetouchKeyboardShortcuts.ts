@@ -1,13 +1,7 @@
 import { useEffect } from 'react'
 import type { JSONDocumentHistory, Pointer, SelectionState } from 'zod-crud'
 import {
-  blockLocationFromPointer,
   findBlockLocation,
-  getRect,
-  moveRect,
-  rectEquals,
-  setArrangePatch,
-  type Rect,
   type RetouchDeck,
 } from './retouchModel'
 import {
@@ -16,7 +10,8 @@ import {
   isControlTarget,
   isEditableTarget,
 } from './editorKeyboard'
-import { selectionSnapForPointers, type Interaction } from './layoutInteraction'
+import type { Interaction } from './layoutInteraction'
+import { createLayoutKeyboardNudgePatch } from './layoutKeyboardNudge'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -257,45 +252,26 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
-      const targets = selectedPointers
-        .map((pointer) => {
-          const location = blockLocationFromPointer(deckValue, pointer)
+      const nudgePatch = createLayoutKeyboardNudgePatch({
+        activeSlideId,
+        deckValue,
+        delta,
+        selectedPointer,
+        selectedPointers,
+      })
 
-          if (!location || location.slide.id !== activeSlideId) {
-            return null
-          }
-
-          return {
-            pointer,
-            rect: moveRect(getRect(location.block), delta.x, delta.y),
-            startRect: getRect(location.block),
-          }
-        })
-        .filter(
-          (
-            target,
-          ): target is { pointer: Pointer; rect: Rect; startRect: Rect } =>
-            target !== null,
-        )
-
-      if (
-        targets.length === 0 ||
-        targets.every((target) => rectEquals(target.rect, target.startRect))
-      ) {
+      if (!nudgePatch) {
         return
       }
 
       event.preventDefault()
       event.stopPropagation()
       commitPatch(
-        targets.flatMap((target) => setArrangePatch(target.pointer, target.rect)),
-        targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
-        'nudge layout',
-        `layout:nudge:${targets.map((target) => target.pointer).join('|')}`,
-        selectionSnapForPointers(
-          targets.map((target) => target.pointer),
-          targets.at(-1)?.pointer,
-        ),
+        nudgePatch.operations,
+        nudgePatch.pointer,
+        nudgePatch.label,
+        nudgePatch.mergeKey,
+        nudgePatch.selection,
       )
     }
 
