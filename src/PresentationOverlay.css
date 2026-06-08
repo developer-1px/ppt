@@ -1,0 +1,153 @@
+.presentation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  overflow: hidden;
+  background: #111827;
+  color: #f8fafc;
+}
+
+.presentation-stage {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  overflow: auto;
+}
+
+.presentation-slide-frame {
+  width: min(100%, calc((100svh - 56px) * 16 / 9));
+  max-width: 1280px;
+  aspect-ratio: 16 / 9;
+  background: #ffffff;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.34);
+}
+
+.presentation-slide {
+  --accent: #2563eb;
+
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  color: #111827;
+}
+
+.presentation-block {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.presentation-notes {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border-left: 1px solid #263143;
+  background: #151e2b;
+}
+
+.presentation-meta {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.presentation-meta span {
+  color: #94a3b8;
+  font: 700 12px/1 var(--sans);
+}
+
+.presentation-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  font: 760 14px/1.25 var(--sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presentation-notes textarea {
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #dbe4ef;
+  font: 500 13px/1.45 var(--sans);
+}
+
+.presentation-controls {
+  position: fixed;
+  right: 302px;
+  bottom: 18px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #151e2b;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+}
+
+.presentation-controls button {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.presentation-controls button:hover:not(:disabled) {
+  border-color: #475569;
+  background: #1f2937;
+}
+
+.presentation-controls button:disabled {
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+@media (max-width: 820px) {
+  .presentation-overlay {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(136px, 28svh);
+  }
+
+  .presentation-stage {
+    padding: 12px;
+  }
+
+  .presentation-slide-frame {
+    width: min(100%, calc((72svh - 24px) * 16 / 9));
+  }
+
+  .presentation-notes {
+    border-top: 1px solid #263143;
+    border-left: 0;
+  }
+
+  .presentation-controls {
+    right: 12px;
+    bottom: calc(28svh + 12px);
+  }
+}

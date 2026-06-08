@@ -11,6 +11,7 @@ import {
   disabledToolbarKeys,
   useActionToolbarPattern,
 } from './apgPatternAdapter'
+import './PresentationOverlay.css'
 
 type PresentationOverlayProps = {
   activeSlide: RetouchSlide
