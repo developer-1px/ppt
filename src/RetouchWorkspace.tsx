@@ -1,5 +1,4 @@
 import type {
-  CSSProperties,
   HTMLAttributes,
   MouseEvent as ReactMouseEvent,
   MutableRefObject,
@@ -28,6 +27,7 @@ import type {
   Point,
   SnapGuides,
 } from './layoutInteraction'
+import { cssVariables } from './cssVariables'
 
 type Mode = 'text' | 'layout'
 type CanvasZoom = 'fit' | number
@@ -251,7 +251,7 @@ export function RetouchWorkspace({
           style={
             canvasZoom === 'fit'
               ? undefined
-              : ({ '--canvas-zoom': canvasZoom } as CSSProperties)
+              : cssVariables({ '--canvas-zoom': canvasZoom })
           }
         >
           <StageCanvas

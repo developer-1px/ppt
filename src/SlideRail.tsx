@@ -1,6 +1,5 @@
 import {
   type ButtonHTMLAttributes,
-  type CSSProperties,
   type HTMLAttributes,
   useMemo,
 } from 'react'
@@ -25,6 +24,7 @@ import {
   selectedToolbarKeys,
   toolbarItemPropsByKey,
 } from './toolbarPatternAdapter'
+import { cssVariables } from './cssVariables'
 
 type SlideRailProps = {
   activeSlideId: string
@@ -283,7 +283,7 @@ export function SlideRail({
 
 function MiniSlide({ slide }: { slide: RetouchSlide }) {
   return (
-    <span className="mini-slide" style={{ '--accent': slide.accent } as CSSProperties}>
+    <span className="mini-slide" style={cssVariables({ '--accent': slide.accent })}>
       {slide.blocks.map((block) => (
         <span
           className={`mini-block ${block.role}`}

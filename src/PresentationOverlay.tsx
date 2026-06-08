@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { matchesShortcut } from '@interactive-os/keyboard'
 import { rectToStyle, type RetouchSlide } from './retouchModel'
@@ -6,6 +6,7 @@ import {
   htmlSlideBlockAttributes,
   htmlSlideRootAttributes,
 } from './htmlSlideContract'
+import { cssVariables } from './cssVariables'
 
 type PresentationOverlayProps = {
   activeSlide: RetouchSlide
@@ -63,7 +64,7 @@ export function PresentationOverlay({
           <div
             className="presentation-slide"
             {...htmlSlideRootAttributes(activeSlide.id)}
-            style={{ '--accent': activeSlide.accent } as CSSProperties}
+            style={cssVariables({ '--accent': activeSlide.accent })}
           >
             {activeSlide.blocks.map((block, blockIndex) => (
               <div

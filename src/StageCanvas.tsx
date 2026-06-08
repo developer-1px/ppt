@@ -1,5 +1,4 @@
 import type {
-  CSSProperties,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
   RefObject,
@@ -33,6 +32,7 @@ import {
   retouchCanvasSceneEntries,
   retouchCanvasSelectionBounds,
 } from './retouchCanvasScene'
+import { cssVariables } from './cssVariables'
 
 type EditingState = {
   clientPoint?: Point
@@ -124,7 +124,7 @@ export function StageCanvas({
         {...htmlSlideRootAttributes(activeSlide.id)}
         onPointerDown={onCanvasPointerDown}
         ref={slideRef}
-        style={{ '--accent': activeSlide.accent } as CSSProperties}
+        style={cssVariables({ '--accent': activeSlide.accent })}
       >
         {blockEntries.map(({ block, blockIndex, pointer, rect, selected }) => {
           const baseBlock = findBlockLocation(

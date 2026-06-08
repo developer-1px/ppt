@@ -1,4 +1,3 @@
-import { type CSSProperties } from 'react'
 import {
   rectToStyle,
   type RetouchSlide,
@@ -7,6 +6,7 @@ import {
   htmlSlideBlockAttributes,
   htmlSlideRootAttributes,
 } from './htmlSlideContract'
+import { cssVariables } from './cssVariables'
 
 type DeckGridProps = {
   activeSlideId: string
@@ -36,7 +36,7 @@ export function DeckGrid({
           <span
             className="grid-slide-canvas"
             {...htmlSlideRootAttributes(slide.id)}
-            style={{ '--accent': slide.accent } as CSSProperties}
+            style={cssVariables({ '--accent': slide.accent })}
           >
             {slide.blocks.map((block, blockIndex) => (
               <span
