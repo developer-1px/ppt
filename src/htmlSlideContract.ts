@@ -1,5 +1,5 @@
 import type { SlideBlock } from './retouchModel'
-import { RETOUCH_SURFACE_CONTRACT } from './retouchSurfaceContract'
+import { PPT_RETOUCH_SURFACE } from './retouchSurfaceContract'
 
 const HTML_SLIDE_CONTRACT = 'interactive-os.html-slide-contract.v1' as const
 
@@ -19,7 +19,7 @@ export const HTML_SLIDE_CLASSES = {
 export type HtmlSlideRootAttributes = {
   [HTML_SLIDE_ATTRIBUTES.contract]: typeof HTML_SLIDE_CONTRACT
   [HTML_SLIDE_ATTRIBUTES.slide]: string
-  [HTML_SLIDE_ATTRIBUTES.surfaceContract]: typeof RETOUCH_SURFACE_CONTRACT
+  [HTML_SLIDE_ATTRIBUTES.surfaceContract]: typeof PPT_RETOUCH_SURFACE.contract
 }
 
 export type HtmlSlideBlockAttributes = {
@@ -32,7 +32,7 @@ export function htmlSlideRootAttributes(slideId: string): HtmlSlideRootAttribute
   return {
     [HTML_SLIDE_ATTRIBUTES.contract]: HTML_SLIDE_CONTRACT,
     [HTML_SLIDE_ATTRIBUTES.slide]: slideId,
-    [HTML_SLIDE_ATTRIBUTES.surfaceContract]: RETOUCH_SURFACE_CONTRACT,
+    [HTML_SLIDE_ATTRIBUTES.surfaceContract]: PPT_RETOUCH_SURFACE.contract,
   }
 }
 

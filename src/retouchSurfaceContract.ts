@@ -12,7 +12,7 @@ import {
   type SlideBlock,
 } from './retouchModel'
 
-export const RETOUCH_SURFACE_CONTRACT =
+const RETOUCH_SURFACE_CONTRACT =
   'interactive-os.retouch-surface.v1' as const
 
 const RETOUCH_SURFACE_POINTER_TEMPLATES = {
