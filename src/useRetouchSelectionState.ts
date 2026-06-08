@@ -57,19 +57,17 @@ export function useRetouchSelectionState({
       ? findBlockLocation(SAMPLE_DECK, activeSlide.id, selectedBlock.id)
       : null
   const baseSelectedBlock = baseSelectedLocation?.block ?? null
-  const canResetSelectedLayout = Boolean(
-    selectedPointer &&
-      selectedBlock &&
-      baseSelectedBlock &&
-      !arrangeResetEquals(selectedBlock, baseSelectedBlock),
-  )
-  const canResetSelectedText = Boolean(
-    selectedPointer &&
-      selectedBlock &&
-      baseSelectedBlock &&
+  const canResetSelectedLayout =
+    selectedPointer !== null &&
+    selectedBlock !== null &&
+    baseSelectedBlock !== null &&
+    !arrangeResetEquals(selectedBlock, baseSelectedBlock)
+  const canResetSelectedText =
+    selectedPointer !== null &&
+    selectedBlock !== null &&
+    baseSelectedBlock !== null &&
       (!textResetEquals(selectedBlock, baseSelectedBlock) ||
-        editing?.pointer === selectedPointer),
-  )
+        editing?.pointer === selectedPointer)
   const canResetDeck = !selectedPointer && hasDeckChanges
   const canReset =
     mode === 'layout'
