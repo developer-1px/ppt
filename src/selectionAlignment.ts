@@ -1,8 +1,12 @@
 import { unionRects } from '@interactive-os/object-surface'
+import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   clamp,
+  getRect,
+  rectEquals,
+  type BlockLocation,
   type Rect,
 } from './retouchModel'
 
@@ -16,12 +20,18 @@ export type AlignSelectionAction =
 
 export type DistributeSelectionAction = 'horizontal' | 'vertical'
 
-export type DistributionTarget<T> = {
+type DistributionTarget<T> = {
   item: T
   rect: Rect
 }
 
-export function alignRectToBounds(
+export type SelectionLayoutTarget = {
+  pointer: Pointer
+  rect: Rect
+  startRect: Rect
+}
+
+function alignRectToBounds(
   rect: Rect,
   bounds: Rect,
   action: AlignSelectionAction,
@@ -60,7 +70,27 @@ export function alignRectToBounds(
   }
 }
 
-export function distributeRects<T>(
+export function alignBlockLocations(
+  locations: readonly BlockLocation[],
+  action: AlignSelectionAction,
+): SelectionLayoutTarget[] | null {
+  const bounds = alignmentBounds(locations.map((location) => getRect(location.block)))
+
+  if (!bounds) {
+    return null
+  }
+
+  return layoutTargetsOrNull(
+    locations.map((location) =>
+      selectionLayoutTarget(
+        location,
+        alignRectToBounds(getRect(location.block), bounds, action),
+      ),
+    ),
+  )
+}
+
+function distributeRects<T>(
   targets: DistributionTarget<T>[],
   action: DistributeSelectionAction,
 ) {
@@ -110,7 +140,26 @@ export function distributeRects<T>(
   })
 }
 
-export function alignmentBounds(rects: Rect[]) {
+export function distributeBlockLocations(
+  locations: readonly BlockLocation[],
+  action: DistributeSelectionAction,
+): SelectionLayoutTarget[] | null {
+  if (locations.length < 3) {
+    return null
+  }
+
+  return layoutTargetsOrNull(
+    distributeRects(
+      locations.map((location) => ({
+        item: location,
+        rect: getRect(location.block),
+      })),
+      action,
+    ).map(({ item: location, rect }) => selectionLayoutTarget(location, rect)),
+  )
+}
+
+function alignmentBounds(rects: Rect[]) {
   if (rects.length === 0) {
     return null
   }
@@ -127,6 +176,23 @@ export function alignmentBounds(rects: Rect[]) {
   return rectBounds(rects)
 }
 
-export function rectBounds(rects: Rect[]) {
+function rectBounds(rects: Rect[]) {
   return unionRects(rects)
+}
+
+function selectionLayoutTarget(
+  location: BlockLocation,
+  rect: Rect,
+): SelectionLayoutTarget {
+  return {
+    pointer: location.pointer,
+    rect,
+    startRect: getRect(location.block),
+  }
+}
+
+function layoutTargetsOrNull(targets: SelectionLayoutTarget[]) {
+  return targets.every((target) => rectEquals(target.rect, target.startRect))
+    ? null
+    : targets
 }

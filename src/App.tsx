@@ -7,7 +7,6 @@ import {
   RetouchDeckSchema,
   blockLocationsFromPointers,
   blockPointer,
-  getRect,
   rectEquals,
   setLayoutPatch,
   type Rect,
@@ -31,11 +30,11 @@ import {
   setSlideNamePatch,
 } from './slideDeckOperations'
 import {
-  alignRectToBounds,
-  alignmentBounds,
-  distributeRects,
+  alignBlockLocations,
+  distributeBlockLocations,
   type AlignSelectionAction,
   type DistributeSelectionAction,
+  type SelectionLayoutTarget,
 } from './selectionAlignment'
 import {
   createLayerOrderPatch,
@@ -567,29 +566,10 @@ function App() {
     }
   }
 
-  function alignSelectedBlocks(action: AlignSelectionAction) {
-    const locations = selectedActiveBlockLocations()
-
-    if (locations.length === 0) {
-      return
-    }
-
-    const bounds = alignmentBounds(locations.map((location) => getRect(location.block)))
-
-    if (!bounds) {
-      return
-    }
-
-    const targets = locations.map((location) => ({
-      pointer: location.pointer,
-      rect: alignRectToBounds(getRect(location.block), bounds, action),
-      startRect: getRect(location.block),
-    }))
-
-    if (targets.every((target) => rectEquals(target.rect, target.startRect))) {
-      return
-    }
-
+  function commitSelectedLayoutTargets(
+    targets: SelectionLayoutTarget[],
+    label: string,
+  ) {
     commitActiveTextEdit()
     setCanvasView('slide')
     setMode('layout')
@@ -597,7 +577,7 @@ function App() {
     commitPatch(
       targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
       targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
-      'align selection',
+      label,
       undefined,
       selectionSnapForPointers(
         targets.map((target) => target.pointer),
@@ -606,43 +586,24 @@ function App() {
     )
   }
 
+  function alignSelectedBlocks(action: AlignSelectionAction) {
+    const targets = alignBlockLocations(selectedActiveBlockLocations(), action)
+
+    if (!targets) {
+      return
+    }
+
+    commitSelectedLayoutTargets(targets, 'align selection')
+  }
+
   function distributeSelectedBlocks(action: DistributeSelectionAction) {
-    const locations = selectedActiveBlockLocations()
+    const targets = distributeBlockLocations(selectedActiveBlockLocations(), action)
 
-    if (locations.length < 3) {
+    if (!targets) {
       return
     }
 
-    const targets = distributeRects(
-      locations.map((location) => ({
-        item: location,
-        rect: getRect(location.block),
-      })),
-      action,
-    ).map(({ item: location, rect }) => ({
-      pointer: location.pointer,
-      rect,
-      startRect: getRect(location.block),
-    }))
-
-    if (targets.every((target) => rectEquals(target.rect, target.startRect))) {
-      return
-    }
-
-    commitActiveTextEdit()
-    setCanvasView('slide')
-    setMode('layout')
-    clearTransientState()
-    commitPatch(
-      targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
-      targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
-      'distribute selection',
-      undefined,
-      selectionSnapForPointers(
-        targets.map((target) => target.pointer),
-        selectedPointer ?? targets.at(-1)?.pointer,
-      ),
-    )
+    commitSelectedLayoutTargets(targets, 'distribute selection')
   }
 
   function changeSelectedLayerOrder(action: LayerOrderAction) {
