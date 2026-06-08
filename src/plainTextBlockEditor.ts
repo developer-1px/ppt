@@ -5,7 +5,7 @@ import {
   isSelectionAtTextEnd,
   normalizeEditableText,
 } from './editableTextDom'
-import { isHistoryShortcut } from './editorKeyboard'
+import { isUndoHistoryShortcut } from './editorKeyboard'
 
 export const PLAIN_TEXT_BLOCK_EDITOR_SELECTOR =
   '[data-editing="true"][contenteditable]' as const
@@ -42,11 +42,7 @@ export function isPlainTextBlockEditorKeySafe(
 export function isPlainTextBlockEditorUndoShortcut(
   event: ReactKeyboardEvent<HTMLElement>,
 ) {
-  return (
-    isHistoryShortcut(event.nativeEvent) &&
-    event.key.toLowerCase() === 'z' &&
-    !event.shiftKey
-  )
+  return isUndoHistoryShortcut(event.nativeEvent)
 }
 
 export function isPlainTextBlockEditorCancelShortcut(

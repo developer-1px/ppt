@@ -12,9 +12,9 @@ import {
 } from './retouchModel'
 import {
   arrowKeyDelta,
+  historyShortcutAction,
   isControlTarget,
   isEditableTarget,
-  isHistoryShortcut,
 } from './editorKeyboard'
 import { selectionSnapForPointers, type Interaction } from './layoutInteraction'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
@@ -59,31 +59,25 @@ export function useRetouchKeyboardShortcuts({
 }) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      const historyAction = historyShortcutAction(event)
+
       if (
         event.defaultPrevented ||
-        !isHistoryShortcut(event) ||
+        !historyAction ||
         isEditableTarget(event)
       ) {
         return
       }
 
-      const key = event.key.toLowerCase()
-
-      if (key === 'z' && event.shiftKey && history.canRedo) {
+      if (historyAction === 'redo' && history.canRedo) {
         event.preventDefault()
         history.redo()
         return
       }
 
-      if (key === 'z' && history.canUndo) {
+      if (historyAction === 'undo' && history.canUndo) {
         event.preventDefault()
         history.undo()
-        return
-      }
-
-      if (key === 'y' && history.canRedo) {
-        event.preventDefault()
-        history.redo()
       }
     }
 

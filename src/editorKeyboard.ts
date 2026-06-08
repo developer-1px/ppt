@@ -6,11 +6,31 @@ import {
 import { GRID_SIZE } from './retouchModel'
 import type { Point } from './layoutInteraction'
 
+export type HistoryShortcutAction = 'redo' | 'undo'
+
+const REDO_HISTORY_SHORTCUTS = 'Control+Shift+z Meta+Shift+z Control+y Meta+y'
+const UNDO_HISTORY_SHORTCUTS = 'Control+z Meta+z'
+
+export function historyShortcutAction(
+  event: KeyboardEvent,
+): HistoryShortcutAction | null {
+  if (matchesShortcut(event, REDO_HISTORY_SHORTCUTS)) {
+    return 'redo'
+  }
+
+  if (matchesShortcut(event, UNDO_HISTORY_SHORTCUTS)) {
+    return 'undo'
+  }
+
+  return null
+}
+
 export function isHistoryShortcut(event: KeyboardEvent) {
-  return matchesShortcut(
-    event,
-    'Control+z Meta+z Control+Shift+z Meta+Shift+z Control+y Meta+y',
-  )
+  return historyShortcutAction(event) !== null
+}
+
+export function isUndoHistoryShortcut(event: KeyboardEvent) {
+  return historyShortcutAction(event) === 'undo'
 }
 
 export function isEditableTarget(target: EventTarget | Event | null) {
