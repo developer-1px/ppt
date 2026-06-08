@@ -41,11 +41,16 @@ export function useRetouchSlideCommands({
 }: UseRetouchSlideCommandsParams) {
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
 
-  function activateSlide(slideId: string) {
+  function activateSlide(
+    slideId: string,
+    { resetStageScroll = true }: { resetStageScroll?: boolean } = {},
+  ) {
     setActiveSlideId(slideId)
     setCanvasView('slide')
     doc.selection?.empty()
-    stageRef.current?.scrollTo({ left: 0, top: 0 })
+    if (resetStageScroll) {
+      stageRef.current?.scrollTo({ left: 0, top: 0 })
+    }
     clearTransientState()
   }
 
@@ -113,10 +118,7 @@ export function useRetouchSlideCommands({
       return
     }
 
-    setActiveSlideId(activeSlide.id)
-    setCanvasView('slide')
-    doc.selection?.empty()
-    clearTransientState()
+    activateSlide(activeSlide.id, { resetStageScroll: false })
   }
 
   function changeSlideName(name: string) {
