@@ -85,25 +85,42 @@ export function useRetouchBlockCommands({
 }: UseRetouchBlockCommandsParams) {
   const [blockClipboard, setBlockClipboard] = useState<SlideBlock[]>([])
 
+  function commitInsertedBlocks(
+    blocks: readonly SlideBlock[],
+    insertIndex: number,
+    label: string,
+  ) {
+    const insertPatch = createBlockInsertPatch({
+      blocks,
+      insertIndex,
+      slideIndex: activeSlideIndex,
+    })
+    const primaryPointer = insertPatch.insertedPointers[0]
+
+    if (!primaryPointer) {
+      return null
+    }
+
+    commitRetouchPatch(insertPatch.operations, {
+      label,
+      selection: selectionSnapForPointers(insertPatch.insertedPointers),
+    })
+
+    return primaryPointer
+  }
+
   function insertTextBlock() {
     commitActiveTextEdit()
     const nextBlock = createTextBlock(activeSlide)
-    const blockIndex = activeSlide.blocks.length
-    const insertPatch = createBlockInsertPatch({
-      blocks: [nextBlock],
-      insertIndex: blockIndex,
-      slideIndex: activeSlideIndex,
-    })
-    const pointer = insertPatch.insertedPointers[0]
+    const pointer = commitInsertedBlocks(
+      [nextBlock],
+      activeSlide.blocks.length,
+      'add text block',
+    )
 
     if (!pointer) {
       return
     }
-
-    commitRetouchPatch(insertPatch.operations, {
-      label: 'add text block',
-      selection: selectionSnapForPointers([pointer]),
-    })
     setCanvasView('slide')
     setMode('text')
     clearLayoutInteraction()
@@ -134,17 +151,15 @@ export function useRetouchBlockCommands({
 
     commitActiveTextEdit()
     const pastedBlocks = duplicateBlocks(blockClipboard, activeSlide)
-    const insertIndex = activeSlide.blocks.length
-    const insertPatch = createBlockInsertPatch({
-      blocks: pastedBlocks,
-      insertIndex,
-      slideIndex: activeSlideIndex,
-    })
 
-    commitRetouchPatch(insertPatch.operations, {
-      label: 'paste blocks',
-      selection: selectionSnapForPointers(insertPatch.insertedPointers),
-    })
+    if (!commitInsertedBlocks(
+      pastedBlocks,
+      activeSlide.blocks.length,
+      'paste blocks',
+    )) {
+      return
+    }
+
     setBlockClipboard(pastedBlocks)
     enterLayoutMode()
   }
@@ -161,17 +176,15 @@ export function useRetouchBlockCommands({
       locations.map((location) => location.block),
       activeSlide,
     )
-    const insertIndex = locations.at(-1)!.blockIndex + 1
-    const insertPatch = createBlockInsertPatch({
-      blocks: duplicatedBlocks,
-      insertIndex,
-      slideIndex: activeSlideIndex,
-    })
 
-    commitRetouchPatch(insertPatch.operations, {
-      label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
-      selection: selectionSnapForPointers(insertPatch.insertedPointers),
-    })
+    if (!commitInsertedBlocks(
+      duplicatedBlocks,
+      locations.at(-1)!.blockIndex + 1,
+      locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
+    )) {
+      return
+    }
+
     enterLayoutMode()
   }
 
