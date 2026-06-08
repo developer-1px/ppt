@@ -17,7 +17,7 @@ import {
 
 export type LayerOrderAction = 'front' | 'forward' | 'backward' | 'back'
 
-export type LayerOrderPatch = {
+type LayerOrderPatch = {
   operations: JSONPatchOperation[]
   nextSelectedPointers: Pointer[]
 }
