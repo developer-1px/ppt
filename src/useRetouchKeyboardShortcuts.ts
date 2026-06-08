@@ -114,8 +114,7 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
-      event.preventDefault()
-      event.stopPropagation()
+      consumeShortcutEvent(event)
       selection?.selectRanges?.([location.pointer])
       setEditing({ pointer: location.pointer })
     }
@@ -141,8 +140,7 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
-      event.preventDefault()
-      event.stopPropagation()
+      consumeShortcutEvent(event)
       selection?.empty?.()
     }
 
@@ -170,29 +168,25 @@ export function useRetouchKeyboardShortcuts({
       const commandKey = event.metaKey || event.ctrlKey
 
       if (commandKey && key === 'a') {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         onSelectAllBlocks()
         return
       }
 
       if (commandKey && key === 'd' && selectedPointers.length > 0) {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         onDuplicateSelection()
         return
       }
 
       if (commandKey && key === 'c' && selectedPointers.length > 0) {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         onCopySelection()
         return
       }
 
       if (commandKey && key === 'v' && canPasteSelection) {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         onPasteSelection()
         return
       }
@@ -202,8 +196,7 @@ export function useRetouchKeyboardShortcuts({
         (event.key === 'Delete' || event.key === 'Backspace') &&
         selectedPointers.length > 0
       ) {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         onDeleteSelection()
       }
     }
@@ -241,8 +234,7 @@ export function useRetouchKeyboardShortcuts({
       }
 
       if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
+        consumeShortcutEvent(event)
         selection?.empty?.()
         return
       }
@@ -265,8 +257,7 @@ export function useRetouchKeyboardShortcuts({
         return
       }
 
-      event.preventDefault()
-      event.stopPropagation()
+      consumeShortcutEvent(event)
       commitPatch(
         nudgePatch.operations,
         nudgePatch.pointer,
@@ -292,4 +283,9 @@ export function useRetouchKeyboardShortcuts({
     selectedPointers,
     selection,
   ])
+}
+
+function consumeShortcutEvent(event: KeyboardEvent) {
+  event.preventDefault()
+  event.stopPropagation()
 }
