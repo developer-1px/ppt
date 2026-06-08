@@ -40,6 +40,7 @@ try {
   })
 
   await runFirstScreenScenario(page)
+  await runPresentationOverlayScenario(page)
   await runEditSurfaceParityScenario(page)
   await runCompactEditSurfaceScenario(cdpPort)
   await runTextScenario(page)
@@ -377,6 +378,48 @@ async function runFirstScreenScenario(page) {
   )
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
+}
+
+async function runPresentationOverlayScenario(page) {
+  await clickToolbar(page, 'Present')
+  await page.waitFor(presentSelectorExpression('.presentation-overlay'))
+
+  const initial = await presentationOverlayState(page)
+
+  await page.eval("document.querySelector('.presentation-controls button[aria-label=\"Close presentation\"]')?.focus()")
+  await pressKey(page, 'ArrowRight')
+  await delay(100)
+
+  const afterToolbarArrow = await presentationOverlayState(page)
+
+  await page.eval("document.querySelector('.presentation-controls button[aria-label=\"Next slide\"]')?.click()")
+  await page.waitFor("document.querySelector('.presentation-meta span')?.textContent?.trim().startsWith('2 /')")
+
+  const afterNext = await presentationOverlayState(page)
+
+  await page.eval("document.querySelector('.presentation-controls button[aria-label=\"Close presentation\"]')?.click()")
+  await page.waitFor("!document.querySelector('.presentation-overlay')")
+
+  check(
+    'presentation controls follow APG toolbar semantics',
+    initial.controlCount === 3 &&
+      initial.controlPressedLeaks.length === 0 &&
+      initial.toolbarLabel === 'Presentation' &&
+      initial.toolbarRole === 'toolbar',
+    initial,
+  )
+  check(
+    'presentation toolbar arrow focus does not advance slide',
+    initial.meta === afterToolbarArrow.meta &&
+      afterToolbarArrow.activeControlLabel === 'Next slide',
+    { before: initial, after: afterToolbarArrow },
+  )
+  check(
+    'presentation toolbar command advances slide',
+    afterNext.meta?.startsWith('2 /') &&
+      afterNext.slideName === 'Agenda',
+    afterNext,
+  )
 }
 
 async function runEditSurfaceParityScenario(page) {
@@ -2224,6 +2267,24 @@ async function editorMetrics(page) {
 async function clickMode(page, label) {
   await page.eval(`Array.from(document.querySelectorAll(${JSON.stringify(SELECTOR.modeButton)})).find((button) => button.textContent?.trim() === ${JSON.stringify(label)})?.click()`)
   await delay(100)
+}
+
+async function presentationOverlayState(page) {
+  return page.eval(`(() => {
+    const controls = Array.from(document.querySelectorAll('.presentation-controls button'))
+
+    return {
+      activeControlLabel: document.activeElement?.getAttribute('aria-label') ?? null,
+      controlCount: controls.length,
+      controlPressedLeaks: controls
+        .filter((button) => button.hasAttribute('aria-pressed'))
+        .map((button) => button.getAttribute('aria-label') ?? ''),
+      meta: document.querySelector('.presentation-meta span')?.textContent?.trim() ?? null,
+      slideName: document.querySelector('.presentation-meta strong')?.textContent?.trim() ?? null,
+      toolbarLabel: document.querySelector('.presentation-controls')?.getAttribute('aria-label') ?? null,
+      toolbarRole: document.querySelector('.presentation-controls')?.getAttribute('role') ?? null,
+    }
+  })()`)
 }
 
 async function clickToolbar(page, label) {
