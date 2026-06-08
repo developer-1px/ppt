@@ -8,7 +8,12 @@ import {
   type JSONPatchOperation,
   type Pointer,
 } from 'zod-crud'
-import { slideBlocksPointer, type RetouchDeck, type SlideBlock } from './retouchModel'
+import {
+  SlideBlockSchema,
+  slideBlocksPointer,
+  type RetouchDeck,
+  type SlideBlock,
+} from './retouchModel'
 
 export type LayerOrderAction = 'front' | 'forward' | 'backward' | 'back'
 
@@ -23,6 +28,8 @@ const LAYER_ORDER_ACTIONS: Record<LayerOrderAction, SharedLayerOrderAction> = {
   backward: 'sendBackward',
   back: 'sendToBack',
 }
+
+const LayerOrderBlocksSchema = SlideBlockSchema.array()
 
 export function createLayerOrderPatch({
   action,
@@ -50,13 +57,17 @@ export function createLayerOrderPatch({
     change.operations.length !== 1 ||
     !operation ||
     operation.op !== 'replace' ||
-    operation.path !== blocksPath ||
-    !Array.isArray(operation.value)
+    operation.path !== blocksPath
   ) {
     return null
   }
 
-  const nextBlocks = operation.value as SlideBlock[]
+  const nextBlocks = readLayerOrderBlocks(operation.value)
+
+  if (!nextBlocks) {
+    return null
+  }
+
   const selectedIdSet = new Set(selectedIds)
 
   const nextSelectedPointers = nextBlocks
@@ -69,4 +80,10 @@ export function createLayerOrderPatch({
     operations: [...change.operations],
     nextSelectedPointers,
   }
+}
+
+function readLayerOrderBlocks(value: unknown): SlideBlock[] | null {
+  const result = LayerOrderBlocksSchema.safeParse(value)
+
+  return result.success ? result.data : null
 }
