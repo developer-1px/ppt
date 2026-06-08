@@ -9,9 +9,6 @@ import {
   blockPointer,
   getRect,
   rectEquals,
-  slideAccentPointer,
-  slideNamePointer,
-  slidePointer,
   setLayoutPatch,
   type Rect,
   type SlideBlock,
@@ -26,7 +23,13 @@ import {
   createTextBlock,
   duplicateBlocks,
 } from './slideBlockOperations'
-import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
+import {
+  addSlidePatch,
+  createBlankSlide,
+  duplicateSlide,
+  setSlideAccentPatch,
+  setSlideNamePatch,
+} from './slideDeckOperations'
 import {
   alignRectToBounds,
   alignmentBounds,
@@ -336,7 +339,7 @@ function App() {
     const nextSlide = createBlankSlide(doc.value.slides)
     const insertIndex = activeSlideIndex + 1
 
-    doc.commit([{ op: 'add', path: slidePointer(insertIndex), value: nextSlide }], {
+    doc.commit(addSlidePatch(nextSlide, insertIndex), {
       label: 'add slide',
       origin: 'ppt-retouch',
     })
@@ -348,7 +351,7 @@ function App() {
     const nextSlide = duplicateSlide(activeSlide, doc.value.slides)
     const insertIndex = activeSlideIndex + 1
 
-    doc.commit([{ op: 'add', path: slidePointer(insertIndex), value: nextSlide }], {
+    doc.commit(addSlidePatch(nextSlide, insertIndex), {
       label: 'duplicate slide',
       origin: 'ppt-retouch',
     })
@@ -410,19 +413,10 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(
-      [
-        {
-          op: 'replace',
-          path: slideNamePointer(activeSlideIndex),
-          value: nextName,
-        },
-      ],
-      {
-        label: 'rename slide',
-        origin: 'ppt-retouch',
-      },
-    )
+    doc.commit(setSlideNamePatch(activeSlideIndex, nextName), {
+      label: 'rename slide',
+      origin: 'ppt-retouch',
+    })
     clearTransientState()
   }
 
@@ -432,19 +426,10 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(
-      [
-        {
-          op: 'replace',
-          path: slideAccentPointer(activeSlideIndex),
-          value: accent,
-        },
-      ],
-      {
-        label: 'change slide accent',
-        origin: 'ppt-retouch',
-      },
-    )
+    doc.commit(setSlideAccentPatch(activeSlideIndex, accent), {
+      label: 'change slide accent',
+      origin: 'ppt-retouch',
+    })
     clearTransientState()
   }
 
