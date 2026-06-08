@@ -16,18 +16,6 @@ export const HTML_SLIDE_CLASSES = {
   blockText: 'slide-block-text',
 } as const
 
-export const HTML_SLIDE_REQUIRED_ROOT_ATTRIBUTES = [
-  HTML_SLIDE_ATTRIBUTES.contract,
-  HTML_SLIDE_ATTRIBUTES.slide,
-  HTML_SLIDE_ATTRIBUTES.surfaceContract,
-] as const
-
-export const HTML_SLIDE_REQUIRED_BLOCK_ATTRIBUTES = [
-  HTML_SLIDE_ATTRIBUTES.block,
-  HTML_SLIDE_ATTRIBUTES.blockIndex,
-  HTML_SLIDE_ATTRIBUTES.role,
-] as const
-
 export type HtmlSlideRootAttributes = {
   [HTML_SLIDE_ATTRIBUTES.contract]: typeof HTML_SLIDE_CONTRACT
   [HTML_SLIDE_ATTRIBUTES.slide]: string
