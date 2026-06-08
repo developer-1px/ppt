@@ -1,0 +1,98 @@
+import { useRef, useState } from 'react'
+import type { Rect } from './retouchModel'
+import type { RectField } from './inspectorGeometry'
+
+const GEOMETRY_FIELDS: { field: RectField; label: string }[] = [
+  { field: 'x', label: 'X' },
+  { field: 'y', label: 'Y' },
+  { field: 'width', label: 'W' },
+  { field: 'height', label: 'H' },
+]
+
+function rectDraft(rect: Rect): Record<RectField, string> {
+  return {
+    x: String(rect.x),
+    y: String(rect.y),
+    width: String(rect.width),
+    height: String(rect.height),
+  }
+}
+
+export function GeometryEditor({
+  onRectChange,
+  rect,
+}: {
+  onRectChange: (rect: Rect, changedField?: RectField) => void
+  rect: Rect
+}) {
+  const [draft, setDraft] = useState(() => rectDraft(rect))
+  const draftRef = useRef(draft)
+  const skipNextCommitRef = useRef<RectField | null>(null)
+
+  function updateDraftField(field: RectField, value: string) {
+    const nextDraft = {
+      ...draftRef.current,
+      [field]: value,
+    }
+
+    draftRef.current = nextDraft
+    setDraft(nextDraft)
+  }
+
+  function commitField(field: RectField) {
+    if (skipNextCommitRef.current === field) {
+      skipNextCommitRef.current = null
+      return
+    }
+
+    const value = Number(draftRef.current[field])
+
+    if (!Number.isFinite(value)) {
+      updateDraftField(field, String(rect[field]))
+      return
+    }
+
+    if (value === rect[field]) {
+      return
+    }
+
+    onRectChange({ ...rect, [field]: value }, field)
+  }
+
+  return (
+    <div aria-label="Geometry" className="geometry-editor" role="group">
+      {GEOMETRY_FIELDS.map(({ field, label }) => (
+        <label className="geometry-field" key={field}>
+          <span>{label}</span>
+          <input
+            aria-label={label}
+            inputMode="numeric"
+            min={field === 'width' || field === 'height' ? 72 : 0}
+            onBlur={() => commitField(field)}
+            onChange={(event) => {
+              const value =
+                event.target instanceof HTMLInputElement ? event.target.value : ''
+
+              updateDraftField(field, value)
+            }}
+            onFocus={(event) => event.currentTarget.select()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.currentTarget.blur()
+              }
+
+              if (event.key === 'Escape') {
+                skipNextCommitRef.current = field
+                updateDraftField(field, String(rect[field]))
+                event.currentTarget.blur()
+              }
+            }}
+            step={8}
+            type="number"
+            value={draft[field]}
+          />
+        </label>
+      ))}
+    </div>
+  )
+}
