@@ -1,5 +1,5 @@
+import type { Point } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
-import type { Point } from './layoutInteraction'
 
 export type CanvasView = 'slide' | 'grid'
 export type RetouchMode = 'text' | 'layout'

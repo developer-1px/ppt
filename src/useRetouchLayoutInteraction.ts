@@ -9,6 +9,7 @@ import {
 import {
   clamp,
   pointDistance,
+  type Point,
   type ResizeHandle,
 } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
@@ -32,7 +33,6 @@ import {
   type DraftLayout,
   type DraftLayoutRect,
   type Interaction,
-  type Point,
   type SnapGuides,
 } from './layoutInteraction'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'

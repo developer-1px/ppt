@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import type { Point } from 'canvas/core'
 import { applyPatch, type Pointer } from 'zod-crud'
 import {
   RetouchDeckSchema,
@@ -13,7 +14,7 @@ import {
 } from './retouchModel'
 import { SAMPLE_DECK } from './sampleDeck'
 import { autoHeightRect } from './editableTextDom'
-import { minimumHeightForBlock, type Point } from './layoutInteraction'
+import { minimumHeightForBlock } from './layoutInteraction'
 import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,

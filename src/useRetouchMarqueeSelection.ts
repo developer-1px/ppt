@@ -2,7 +2,7 @@ import {
   rectFromPoints,
   selectSurfaceObjectsInMarquee,
 } from '@interactive-os/object-surface'
-import { clamp } from 'canvas/core'
+import { clamp, type Point } from 'canvas/core'
 import {
   useCallback,
   useEffect,
@@ -18,7 +18,7 @@ import {
   type Rect,
   type RetouchSlide,
 } from './retouchModel'
-import { hasSelectionModifier, type Point } from './layoutInteraction'
+import { hasSelectionModifier } from './layoutInteraction'
 import {
   objectSurfaceSelectionFromPointers,
   pointersFromObjectSurfaceSelection,

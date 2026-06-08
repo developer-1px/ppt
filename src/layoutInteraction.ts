@@ -37,8 +37,6 @@ export type Interaction =
       startRects: DraftLayoutRect[]
     }
 
-export type { Point }
-
 export type DraftLayout = {
   rects: DraftLayoutRect[]
 }

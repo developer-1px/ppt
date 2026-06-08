@@ -3,8 +3,8 @@ import {
   isEditableTarget as isKeyboardEditableTarget,
   matchesShortcut,
 } from '@interactive-os/keyboard'
+import type { Point } from 'canvas/core'
 import { GRID_SIZE } from './retouchModel'
-import type { Point } from './layoutInteraction'
 
 export type HistoryShortcutAction = 'redo' | 'undo'
 

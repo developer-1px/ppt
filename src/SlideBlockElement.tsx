@@ -9,6 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import type { Point } from 'canvas/core'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
   rectToAutoHeightStyle,
@@ -27,7 +28,6 @@ import {
   HTML_SLIDE_CLASSES,
   htmlSlideBlockAttributes,
 } from './htmlSlideContract'
-import type { Point } from './layoutInteraction'
 import {
   insertPlainTextBlockEditorLineBreak,
   insertPlainTextBlockEditorText,
