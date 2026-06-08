@@ -18,9 +18,13 @@ import {
   useToolbarPattern,
   type PatternData,
   type PatternEvent,
-  type ReactToolbarRenderItem,
 } from '@interactive-os/aria/react'
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
+import {
+  firstEnabledToolbarKey,
+  selectedToolbarKeys,
+  toolbarItemPropsByKey,
+} from './toolbarPatternAdapter'
 
 type SlideRailProps = {
   activeSlideId: string
@@ -177,6 +181,7 @@ export function SlideRail({
   )
   const railActionProps = toolbarItemPropsByKey<SlideRailActionKey>(
     railActionToolbar.renderItems,
+    { omitPressed: true },
   )
 
   return (
@@ -274,28 +279,6 @@ export function SlideRail({
       </div>
     </aside>
   )
-}
-
-function selectedToolbarKeys(event: PatternEvent) {
-  return event.type === 'select' ? event.keys : []
-}
-
-function toolbarItemPropsByKey<TKey extends string>(
-  items: readonly ReactToolbarRenderItem[],
-) {
-  return Object.fromEntries(
-    items.map((item) => [
-      item.key,
-      item.itemProps as ButtonHTMLAttributes<HTMLButtonElement>,
-    ]),
-  ) as Record<TKey, ButtonHTMLAttributes<HTMLButtonElement>>
-}
-
-function firstEnabledToolbarKey<TKey extends string>(
-  keys: readonly TKey[],
-  disabledKeys: readonly string[],
-) {
-  return keys.find((key) => !disabledKeys.includes(key)) ?? keys[0] ?? null
 }
 
 function MiniSlide({ slide }: { slide: RetouchSlide }) {

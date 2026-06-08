@@ -298,6 +298,36 @@ async function runFirstScreenScenario(page) {
         viewTablistRole: document.querySelector('.view-toggle')?.getAttribute('role') ?? null,
       }
     })(),
+    ...(() => {
+      const commandButtons = Array.from(document.querySelectorAll([
+        '.zoom-controls button',
+        '.toolbar button[data-action="undo"]',
+        '.toolbar button[data-action="redo"]',
+        '.toolbar button[data-action="reset"]',
+        '.toolbar button[data-action="add-text"]',
+        '.toolbar button[data-action="present"]',
+        '.rail-actions button',
+      ].join(',')))
+      const pressedLeaks = commandButtons
+        .filter((button) => button.hasAttribute('aria-pressed'))
+        .map((button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '')
+
+      return {
+        actionToolbarLabel: document.querySelector('.toolbar')?.getAttribute('aria-label') ?? null,
+        actionToolbarRole: document.querySelector('.toolbar')?.getAttribute('role') ?? null,
+        commandPressedLeaks: pressedLeaks,
+        copyPressed: document.querySelector('button[data-action="copy-html"]')?.getAttribute('aria-pressed') ?? null,
+        downloadPressed: document.querySelector('button[data-action="download-html"]')?.getAttribute('aria-pressed') ?? null,
+        modePressedValues: Array.from(document.querySelectorAll('.mode-button'))
+          .map((button) => button.getAttribute('aria-pressed')),
+        modeToolbarLabel: document.querySelector('.mode-toggle')?.getAttribute('aria-label') ?? null,
+        modeToolbarRole: document.querySelector('.mode-toggle')?.getAttribute('role') ?? null,
+        railActionToolbarLabel: document.querySelector('.rail-actions')?.getAttribute('aria-label') ?? null,
+        railActionToolbarRole: document.querySelector('.rail-actions')?.getAttribute('role') ?? null,
+        zoomToolbarLabel: document.querySelector('.zoom-controls')?.getAttribute('aria-label') ?? null,
+        zoomToolbarRole: document.querySelector('.zoom-controls')?.getAttribute('role') ?? null,
+      }
+    })(),
   }))()`)
 
   check('first screen is retouch editor', state.hasEditorShell && state.hasMainSlideBlock, state)
@@ -312,6 +342,27 @@ async function runFirstScreenScenario(page) {
       state.selectedViewTabCount === 1 &&
       state.viewPanelRole === 'tabpanel' &&
       state.viewPanelLabelledBy === state.selectedViewTabId,
+    state,
+  )
+  check(
+    'toolbar groups follow APG toolbar semantics',
+    state.modeToolbarRole === 'toolbar' &&
+      state.modeToolbarLabel === 'Mode' &&
+      state.zoomToolbarRole === 'toolbar' &&
+      state.zoomToolbarLabel === 'Canvas zoom' &&
+      state.actionToolbarRole === 'toolbar' &&
+      state.actionToolbarLabel === 'Actions' &&
+      state.railActionToolbarRole === 'toolbar' &&
+      state.railActionToolbarLabel === 'Slide actions',
+    state,
+  )
+  check(
+    'command toolbar buttons do not expose toggle state',
+    state.commandPressedLeaks.length === 0 &&
+      state.modePressedValues.includes('true') &&
+      state.modePressedValues.includes('false') &&
+      state.copyPressed === 'false' &&
+      state.downloadPressed === 'false',
     state,
   )
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)

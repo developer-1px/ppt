@@ -1,9 +1,7 @@
-import { useMemo, type ButtonHTMLAttributes } from 'react'
+import { useMemo } from 'react'
 import {
   useToolbarPattern,
   type PatternData,
-  type PatternEvent,
-  type ReactToolbarRenderItem,
 } from '@interactive-os/aria/react'
 import {
   Check,
@@ -18,6 +16,11 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
+import {
+  firstEnabledToolbarKey,
+  selectedToolbarKeys,
+  toolbarItemPropsByKey,
+} from './toolbarPatternAdapter'
 
 type Mode = 'text' | 'layout'
 type ModeToolbarKey = Mode
@@ -164,6 +167,7 @@ export function Topbar({
   )
   const zoomToolbarProps = toolbarItemPropsByKey<ZoomToolbarKey>(
     zoomToolbar.renderItems,
+    { omitPressed: true },
   )
   const actionDisabledKeys = useMemo(() => [
     ...(!canUndo ? ['undo' as const] : []),
@@ -221,6 +225,7 @@ export function Topbar({
   )
   const actionToolbarProps = toolbarItemPropsByKey<ActionToolbarKey>(
     actionToolbar.renderItems,
+    { omitPressed: true },
   )
 
   return (
@@ -357,28 +362,6 @@ export function Topbar({
       </div>
     </header>
   )
-}
-
-function selectedToolbarKeys(event: PatternEvent) {
-  return event.type === 'select' ? event.keys : []
-}
-
-function toolbarItemPropsByKey<TKey extends string>(
-  items: readonly ReactToolbarRenderItem[],
-) {
-  return Object.fromEntries(
-    items.map((item) => [
-      item.key,
-      item.itemProps as ButtonHTMLAttributes<HTMLButtonElement>,
-    ]),
-  ) as Record<TKey, ButtonHTMLAttributes<HTMLButtonElement>>
-}
-
-function firstEnabledToolbarKey<TKey extends string>(
-  keys: readonly TKey[],
-  disabledKeys: readonly string[],
-) {
-  return keys.find((key) => !disabledKeys.includes(key)) ?? keys[0] ?? null
 }
 
 function isModeToolbarKey(key: string): key is ModeToolbarKey {

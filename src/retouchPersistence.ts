@@ -3,11 +3,8 @@ import { createDirtyState } from '@zod-crud/dirty-state'
 import { createDocumentPersistence } from '@zod-crud/persist-web'
 import type { DocumentPersistenceCodec } from '@zod-crud/persist-web'
 import type { JSONDocument } from 'zod-crud'
-import {
-  SAMPLE_DECK,
-  RetouchDeckSchema,
-  type RetouchDeck,
-} from './retouchModel'
+import type { RetouchDeck } from './retouchModel'
+import { retouchDeckEquals } from './retouchDirtyState'
 
 const STORAGE_KEY = 'ppt-retouch:v3:deck'
 const STORAGE_VERSION = 1
@@ -53,17 +50,6 @@ const retouchDraftCodec: DocumentPersistenceCodec = {
   },
 }
 
-function deckEquals(a: unknown, b: unknown) {
-  const parsedA = RetouchDeckSchema.safeParse(a)
-  const parsedB = RetouchDeckSchema.safeParse(b)
-
-  if (!parsedA.success || !parsedB.success) {
-    return false
-  }
-
-  return JSON.stringify(parsedA.data) === JSON.stringify(parsedB.data)
-}
-
 export function createRetouchDocumentPersistence(doc: JSONDocument<RetouchDeck>) {
   return createDocumentPersistence(doc, {
     codec: retouchDraftCodec,
@@ -73,7 +59,7 @@ export function createRetouchDocumentPersistence(doc: JSONDocument<RetouchDeck>)
 
 export function createRetouchDirtyState(doc: JSONDocument<RetouchDeck>) {
   return createDirtyState(doc, {
-    equals: deckEquals,
+    equals: retouchDeckEquals,
   })
 }
 
@@ -126,29 +112,4 @@ export function useRetouchDraftPersistence(doc: JSONDocument<RetouchDeck>) {
     hasDeckChanges,
     persistenceReady,
   }
-}
-
-export function changedSlides(deck: unknown) {
-  const parsed = RetouchDeckSchema.safeParse(deck)
-  const parsedBase = RetouchDeckSchema.safeParse(SAMPLE_DECK)
-
-  if (!parsed.success || !parsedBase.success) {
-    return new Set<string>()
-  }
-
-  return new Set(
-    parsed.data.slides
-      .filter((slide) => {
-        const baseSlide = parsedBase.data.slides.find(
-          (candidate) => candidate.id === slide.id,
-        )
-
-        return !baseSlide || JSON.stringify(slide) !== JSON.stringify(baseSlide)
-      })
-      .map((slide) => slide.id),
-  )
-}
-
-export function readInitialDeck() {
-  return SAMPLE_DECK
 }

@@ -60,11 +60,8 @@ import { useRetouchResetActions } from './useRetouchResetActions'
 import { useRetouchSelectionState } from './useRetouchSelectionState'
 import { useRetouchTextEditing } from './useRetouchTextEditing'
 import { useVisualSelectionRect } from './useVisualSelectionRect'
-import {
-  changedSlides,
-  readInitialDeck,
-  useRetouchDraftPersistence,
-} from './retouchPersistence'
+import { useRetouchDraftPersistence } from './retouchPersistence'
+import { changedSlideIdsFromBaseline } from './retouchDirtyState'
 import { createRetouchCollection } from './retouchCollection'
 import { createRetouchIdResolver } from './retouchIdResolver'
 import {
@@ -168,8 +165,7 @@ function normalizeInspectorRect(
 }
 
 function App() {
-  const initialDeck = useMemo(() => readInitialDeck(), [])
-  const doc = useJSONDocument(RetouchDeckSchema, initialDeck, {
+  const doc = useJSONDocument(RetouchDeckSchema, SAMPLE_DECK, {
     history: 200,
     selection: { mode: 'extended' },
   })
@@ -195,7 +191,10 @@ function App() {
   )
   const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
   const { hasDeckChanges } = useRetouchDraftPersistence(doc)
-  const changedSlideIds = useMemo(() => changedSlides(doc.value), [doc.value])
+  const changedSlideIds = useMemo(
+    () => changedSlideIdsFromBaseline(doc.value),
+    [doc.value],
+  )
   const {
     baseSelectedLocation,
     canReset,
