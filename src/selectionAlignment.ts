@@ -74,17 +74,19 @@ export function alignBlockLocations(
   locations: readonly BlockLocation[],
   action: AlignSelectionAction,
 ): SelectionLayoutTarget[] | null {
-  const bounds = alignmentBounds(locations.map((location) => getRect(location.block)))
+  const targets = blockLayoutSources(locations)
+  const bounds = alignmentBounds(targets.map((target) => target.startRect))
 
   if (!bounds) {
     return null
   }
 
   return layoutTargetsOrNull(
-    locations.map((location) =>
+    targets.map(({ location, startRect }) =>
       selectionLayoutTarget(
         location,
-        alignRectToBounds(getRect(location.block), bounds, action),
+        alignRectToBounds(startRect, bounds, action),
+        startRect,
       ),
     ),
   )
@@ -148,14 +150,18 @@ export function distributeBlockLocations(
     return null
   }
 
+  const targets = blockLayoutSources(locations)
+
   return layoutTargetsOrNull(
     distributeRects(
-      locations.map((location) => ({
-        item: location,
-        rect: getRect(location.block),
+      targets.map((target) => ({
+        item: target,
+        rect: target.startRect,
       })),
       action,
-    ).map(({ item: location, rect }) => selectionLayoutTarget(location, rect)),
+    ).map(({ item, rect }) =>
+      selectionLayoutTarget(item.location, rect, item.startRect),
+    ),
   )
 }
 
@@ -180,14 +186,22 @@ function rectBounds(rects: Rect[]) {
   return unionRects(rects)
 }
 
+function blockLayoutSources(locations: readonly BlockLocation[]) {
+  return locations.map((location) => ({
+    location,
+    startRect: getRect(location.block),
+  }))
+}
+
 function selectionLayoutTarget(
   location: BlockLocation,
   rect: Rect,
+  startRect: Rect,
 ): SelectionLayoutTarget {
   return {
     pointer: location.pointer,
     rect,
-    startRect: getRect(location.block),
+    startRect,
   }
 }
 
