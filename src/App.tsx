@@ -1,11 +1,4 @@
-import {
-  type ButtonHTMLAttributes,
-  type HTMLAttributes,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
@@ -70,6 +63,10 @@ import {
   selectionSnapForPointers,
   type Point,
 } from './layoutInteraction'
+import {
+  patternButtonProps,
+  patternDivProps,
+} from './apgPatternAdapter'
 import './App.css'
 
 type Mode = 'text' | 'layout'
@@ -440,19 +437,20 @@ function App() {
       orientation: 'horizontal',
     },
   )
-  const canvasViewPanelProps = canvasViewTabs.getTabPanelProps(
-    canvasViewTab(canvasView).panelKey,
-  ) as HTMLAttributes<HTMLDivElement>
+  const canvasViewPanelProps = patternDivProps(
+    canvasViewTabs.getTabPanelProps(canvasViewTab(canvasView).panelKey),
+  )
   const canvasViewTabProps = {
-    grid: canvasViewTabs.getTabProps(
-      canvasViewTab('grid').tabKey,
-    ) as ButtonHTMLAttributes<HTMLButtonElement>,
-    slide: canvasViewTabs.getTabProps(
-      canvasViewTab('slide').tabKey,
-    ) as ButtonHTMLAttributes<HTMLButtonElement>,
+    grid: patternButtonProps(
+      canvasViewTabs.getTabProps(canvasViewTab('grid').tabKey),
+    ),
+    slide: patternButtonProps(
+      canvasViewTabs.getTabProps(canvasViewTab('slide').tabKey),
+    ),
   }
-  const canvasViewTablistProps =
-    canvasViewTabs.getTablistProps() as HTMLAttributes<HTMLDivElement>
+  const canvasViewTablistProps = patternDivProps(
+    canvasViewTabs.getTablistProps(),
+  )
 
   function zoomStep(direction: -1 | 1) {
     const currentZoom = canvasZoom === 'fit' ? 1 : canvasZoom

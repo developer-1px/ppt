@@ -21,9 +21,10 @@ import {
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 import {
   firstEnabledToolbarKey,
+  patternButtonProps,
   selectedToolbarKeys,
   toolbarItemPropsByKey,
-} from './toolbarPatternAdapter'
+} from './apgPatternAdapter'
 import { cssVariables } from './cssVariables'
 
 type SlideRailProps = {
@@ -256,8 +257,7 @@ export function SlideRail({
           }
 
           const changed = changedSlideIds.has(slide.id)
-          const optionProps =
-            item.optionProps as ButtonHTMLAttributes<HTMLButtonElement>
+          const optionProps = patternButtonProps(item.optionProps)
 
           return (
             <button

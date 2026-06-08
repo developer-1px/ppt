@@ -20,7 +20,7 @@ import {
   firstEnabledToolbarKey,
   selectedToolbarKeys,
   toolbarItemPropsByKey,
-} from './toolbarPatternAdapter'
+} from './apgPatternAdapter'
 
 type Mode = 'text' | 'layout'
 type ModeToolbarKey = Mode
