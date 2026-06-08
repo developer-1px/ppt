@@ -1,7 +1,7 @@
 import type { Pointer, SelectionSnap } from 'zod-crud'
 
 export function selectionSnapForPointers(
-  pointers: Pointer[],
+  pointers: readonly Pointer[],
   primaryPointer = pointers.at(-1),
 ): SelectionSnap {
   const selectedPointers = [...new Set(pointers)]
