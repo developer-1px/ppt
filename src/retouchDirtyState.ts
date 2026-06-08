@@ -14,7 +14,11 @@ export function retouchDeckEquals(a: unknown, b: unknown) {
   const parsedA = parseRetouchDeck(a)
   const parsedB = parseRetouchDeck(b)
 
-  return Boolean(parsedA && parsedB && jsonEquals(parsedA, parsedB))
+  if (!parsedA || !parsedB) {
+    return false
+  }
+
+  return jsonEquals(parsedA, parsedB)
 }
 
 export function changedSlideIdsFromBaseline(deck: unknown) {
@@ -41,7 +45,11 @@ function retouchSlideEquals(
   slide: RetouchSlide,
   baselineSlide: RetouchSlide | undefined,
 ) {
-  return Boolean(baselineSlide && jsonEquals(slide, baselineSlide))
+  if (!baselineSlide) {
+    return false
+  }
+
+  return jsonEquals(slide, baselineSlide)
 }
 
 function jsonEquals(a: unknown, b: unknown) {
