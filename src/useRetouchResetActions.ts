@@ -16,11 +16,8 @@ import {
 import { SAMPLE_DECK, SAMPLE_SLIDES } from './sampleDeck'
 import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock } from './layoutInteraction'
-import {
-  PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
-  normalizePlainTextBlockEditorText,
-} from './plainTextBlockEditor'
-import { closestSlideBlockElement } from './retouchSlideDom'
+import { normalizePlainTextBlockEditorText } from './plainTextBlockEditor'
+import { readPlainTextBlockEditorElements } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -104,15 +101,12 @@ export function useRetouchResetActions({
       return
     }
 
-    const element =
+    const editorElements =
       editing?.pointer === pointer
-        ? slideRef.current?.querySelector<HTMLElement>(
-            PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
-          )
+        ? readPlainTextBlockEditorElements(slideRef.current)
         : null
-    const blockElement = closestSlideBlockElement(element ?? null)
     const liveText = normalizePlainTextBlockEditorText(
-      element?.textContent ?? location.block.text,
+      editorElements?.editorElement.textContent ?? location.block.text,
     )
     const liveMinimumHeight =
       liveText.length === 0
@@ -122,15 +116,19 @@ export function useRetouchResetActions({
             baseLocation.block,
             getRect(location.block),
           )
-    const liveRect = element && blockElement
-      ? autoHeightRect(blockElement, getRect(location.block), liveMinimumHeight)
+    const liveRect = editorElements
+      ? autoHeightRect(
+          editorElements.blockElement,
+          getRect(location.block),
+          liveMinimumHeight,
+        )
       : getRect(location.block)
     const resetRect = {
       ...liveRect,
       height: baseLocation.block.height,
     }
 
-    if (element && liveText !== location.block.text) {
+    if (editorElements && liveText !== location.block.text) {
       commitTextPatch(pointer, liveText, liveRect)
     }
 

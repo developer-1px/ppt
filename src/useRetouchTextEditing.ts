@@ -15,11 +15,8 @@ import {
 import { SAMPLE_DECK } from './sampleDeck'
 import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock } from './layoutInteraction'
-import {
-  PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
-  normalizePlainTextBlockEditorText,
-} from './plainTextBlockEditor'
-import { closestSlideBlockElement } from './retouchSlideDom'
+import { normalizePlainTextBlockEditorText } from './plainTextBlockEditor'
+import { readPlainTextBlockEditorElements } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
 
@@ -69,19 +66,18 @@ export function useRetouchTextEditing({
 
     const activeEditing = editing
     const location = blockLocationFromPointer(deckValue, activeEditing.pointer)
-    const element = slideRef.current?.querySelector<HTMLElement>(
-      PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
-    )
-    const blockElement = closestSlideBlockElement(element ?? null)
+    const editorElements = readPlainTextBlockEditorElements(slideRef.current)
 
     setEditing(null)
     clearLayoutInteraction()
 
-    if (!location || !element || !blockElement) {
+    if (!location || !editorElements) {
       return deckValue
     }
 
-    const text = normalizePlainTextBlockEditorText(element.textContent ?? '')
+    const text = normalizePlainTextBlockEditorText(
+      editorElements.editorElement.textContent ?? '',
+    )
     const baseBlock = findBlockLocation(
       SAMPLE_DECK,
       location.slide.id,
@@ -92,7 +88,11 @@ export function useRetouchTextEditing({
       baseBlock,
       getRect(location.block),
     )
-    const rect = autoHeightRect(blockElement, getRect(location.block), minimumHeight)
+    const rect = autoHeightRect(
+      editorElements.blockElement,
+      getRect(location.block),
+      minimumHeight,
+    )
 
     return commitTextPatch(activeEditing.pointer, text, rect)
   }

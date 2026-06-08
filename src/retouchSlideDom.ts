@@ -1,8 +1,14 @@
 import { clamp, type Point } from 'canvas/core'
 import { HTML_SLIDE_ATTRIBUTES } from './htmlSlideContract'
+import { PLAIN_TEXT_BLOCK_EDITOR_SELECTOR } from './plainTextBlockEditor'
 import { SLIDE_HEIGHT, SLIDE_WIDTH, type Rect } from './retouchModel'
 
 type ClientPointInput = Pick<PointerEvent, 'clientX' | 'clientY'>
+
+type PlainTextBlockEditorElements = {
+  blockElement: HTMLElement
+  editorElement: HTMLElement
+}
 
 const SLIDE_BLOCK_SELECTOR = `[${HTML_SLIDE_ATTRIBUTES.block}]`
 const RETOUCH_SELECTION_CONTROL_SELECTOR = '.selection-overlay, .resize-handle'
@@ -28,6 +34,24 @@ export function isRetouchStageBackgroundIgnoredTarget(
   target: EventTarget | null,
 ) {
   return Boolean(closestElement(target, RETOUCH_STAGE_BACKGROUND_IGNORE_SELECTOR))
+}
+
+export function readPlainTextBlockEditorElements(
+  slideElement: HTMLElement | null,
+): PlainTextBlockEditorElements | null {
+  const editorElement = slideElement?.querySelector<HTMLElement>(
+    PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
+  )
+  const blockElement = closestSlideBlockElement(editorElement ?? null)
+
+  if (!editorElement || !blockElement) {
+    return null
+  }
+
+  return {
+    blockElement,
+    editorElement,
+  }
 }
 
 export function readSlidePoint(
