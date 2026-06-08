@@ -40,6 +40,7 @@ try {
   })
 
   await runFirstScreenScenario(page)
+  await runToolbarRovingFocusScenario(page)
   await runPresentationOverlayScenario(page)
   await runEditSurfaceParityScenario(page)
   await runCompactEditSurfaceScenario(cdpPort)
@@ -378,6 +379,41 @@ async function runFirstScreenScenario(page) {
   )
   check('Text Mode starts as clean slide preview', state.canvasBackgroundImage === 'none', state)
   check('Vite starter copy is removed', !state.hasStarterCopy, state)
+}
+
+async function runToolbarRovingFocusScenario(page) {
+  await page.eval("Array.from(document.querySelectorAll('.mode-button')).find((button) => button.textContent?.trim() === 'Text')?.focus()")
+  await pressKey(page, 'ArrowRight')
+  await delay(100)
+
+  const modeToolbarFocus = await page.eval(`(() => ({
+    activeText: document.activeElement?.textContent?.trim() ?? null,
+    mode: document.querySelector('.retouch-app')?.dataset.mode ?? null,
+  }))()`)
+
+  const railSlideCountBefore = await page.eval("document.querySelectorAll('.slide-thumb').length")
+
+  await page.eval("document.querySelector('.rail-actions button[aria-label=\"Add slide\"]')?.focus()")
+  await pressKey(page, 'ArrowRight')
+  await delay(100)
+
+  const railToolbarFocus = await page.eval(`(() => ({
+    activeLabel: document.activeElement?.getAttribute('aria-label') ?? null,
+    slideCount: document.querySelectorAll('.slide-thumb').length,
+  }))()`)
+
+  check(
+    'mode toolbar arrow moves focus without switching mode',
+    modeToolbarFocus.activeText === 'Arrange' &&
+      modeToolbarFocus.mode === 'text',
+    modeToolbarFocus,
+  )
+  check(
+    'slide action toolbar arrow moves focus without adding a slide',
+    railToolbarFocus.activeLabel === 'Duplicate slide' &&
+      railToolbarFocus.slideCount === railSlideCountBefore,
+    { before: railSlideCountBefore, after: railToolbarFocus },
+  )
 }
 
 async function runPresentationOverlayScenario(page) {

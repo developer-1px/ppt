@@ -1,5 +1,3 @@
-import { useMemo } from 'react'
-import { useToolbarPattern } from '@interactive-os/aria/react'
 import {
   Check,
   Code2,
@@ -15,9 +13,7 @@ import {
 } from 'lucide-react'
 import {
   disabledToolbarKeys,
-  handleToolbarSelection,
-  toolbarPatternData,
-  toolbarItemPropsByKey,
+  useManagedToolbarPattern,
 } from './apgPatternAdapter'
 import type { ResetScope, RetouchMode } from './retouchViewState'
 
@@ -97,107 +93,73 @@ export function Topbar({
   resetTitle,
   zoomLabel,
 }: TopbarProps) {
-  const modeToolbarData = useMemo(() =>
-    toolbarPatternData<ModeToolbarKey>({
-      activeKey: mode,
-      items: {
-        layout: { label: 'Arrange' },
-        text: { label: 'Text' },
-      },
-      label: 'Mode',
-      rootKeys: MODE_TOOLBAR_KEYS,
-      selectedKeys: [mode],
-    }), [mode])
-  const modeToolbar = useToolbarPattern(
-    modeToolbarData,
-    (event) =>
-      handleToolbarSelection<ModeToolbarKey>(event, {
-        layout: () => onChangeMode('layout'),
-        text: () => onChangeMode('text'),
-      }),
-    {
-      elementIdPrefix: 'mode-tool-',
-      orientation: 'horizontal',
+  const modeToolbar = useManagedToolbarPattern<ModeToolbarKey>({
+    activeKey: mode,
+    elementIdPrefix: 'mode-tool-',
+    handlers: {
+      layout: () => onChangeMode('layout'),
+      text: () => onChangeMode('text'),
     },
-  )
-  const modeToolbarProps = toolbarItemPropsByKey<ModeToolbarKey>(
-    modeToolbar.renderItems,
-  )
-  const zoomDisabledKeys = useMemo(() =>
-    disabledToolbarKeys<ZoomToolbarKey>([
+    items: {
+      layout: { label: 'Arrange' },
+      text: { label: 'Text' },
+    },
+    label: 'Mode',
+    rootKeys: MODE_TOOLBAR_KEYS,
+    selectedKeys: [mode],
+  })
+  const modeToolbarProps = modeToolbar.itemProps
+  const zoomToolbar = useManagedToolbarPattern<ZoomToolbarKey>({
+    disabledKeys: disabledToolbarKeys<ZoomToolbarKey>([
       ['out', !canZoomOut],
       ['in', !canZoomIn],
-    ]), [canZoomIn, canZoomOut])
-  const zoomToolbarData = useMemo(() =>
-    toolbarPatternData<ZoomToolbarKey>({
-      disabledKeys: zoomDisabledKeys,
-      items: {
-        fit: { label: 'Fit canvas' },
-        in: { label: 'Zoom in' },
-        out: { label: 'Zoom out' },
-      },
-      label: 'Canvas zoom',
-      rootKeys: ZOOM_TOOLBAR_KEYS,
-    }), [zoomDisabledKeys])
-  const zoomToolbar = useToolbarPattern(
-    zoomToolbarData,
-    (event) =>
-      handleToolbarSelection<ZoomToolbarKey>(event, {
-        fit: onZoomFit,
-        in: onZoomIn,
-        out: onZoomOut,
-      }),
-    {
-      elementIdPrefix: 'zoom-tool-',
-      orientation: 'horizontal',
+    ]),
+    elementIdPrefix: 'zoom-tool-',
+    handlers: {
+      fit: onZoomFit,
+      in: onZoomIn,
+      out: onZoomOut,
     },
-  )
-  const zoomToolbarProps = toolbarItemPropsByKey<ZoomToolbarKey>(
-    zoomToolbar.renderItems,
-    { omitPressed: true },
-  )
-  const actionDisabledKeys = useMemo(() =>
-    disabledToolbarKeys<ActionToolbarKey>([
+    items: {
+      fit: { label: 'Fit canvas' },
+      in: { label: 'Zoom in' },
+      out: { label: 'Zoom out' },
+    },
+    label: 'Canvas zoom',
+    omitPressed: true,
+    rootKeys: ZOOM_TOOLBAR_KEYS,
+  })
+  const zoomToolbarProps = zoomToolbar.itemProps
+  const actionToolbar = useManagedToolbarPattern<ActionToolbarKey>({
+    disabledKeys: disabledToolbarKeys<ActionToolbarKey>([
       ['undo', !canUndo],
       ['redo', !canRedo],
       ['reset', !canReset],
-    ]), [canRedo, canReset, canUndo])
-  const actionToolbarData = useMemo(() =>
-    toolbarPatternData<ActionToolbarKey>({
-      disabledKeys: actionDisabledKeys,
-      items: {
-        'add-text': { label: 'Add text box' },
-        'copy-html': { label: 'Copy HTML' },
-        'download-html': { label: 'Download HTML' },
-        present: { label: 'Present' },
-        redo: { label: 'Redo' },
-        reset: { label: resetTitle },
-        undo: { label: 'Undo' },
-      },
-      label: 'Actions',
-      rootKeys: ACTION_TOOLBAR_KEYS,
-    }), [actionDisabledKeys, resetTitle])
-  const actionToolbar = useToolbarPattern(
-    actionToolbarData,
-    (event) =>
-      handleToolbarSelection<ActionToolbarKey>(event, {
-        'add-text': onInsertTextBlock,
-        'copy-html': onCopyExport,
-        'download-html': onDownloadExport,
-        present: onPresent,
-        redo: onRedo,
-        reset: onReset,
-        undo: onUndo,
-      }),
-    {
-      elementIdPrefix: 'action-tool-',
-      orientation: 'horizontal',
+    ]),
+    elementIdPrefix: 'action-tool-',
+    handlers: {
+      'add-text': onInsertTextBlock,
+      'copy-html': onCopyExport,
+      'download-html': onDownloadExport,
+      present: onPresent,
+      redo: onRedo,
+      reset: onReset,
+      undo: onUndo,
     },
-  )
-  const actionToolbarProps = toolbarItemPropsByKey<ActionToolbarKey>(
-    actionToolbar.renderItems,
-    { omitPressed: true },
-  )
+    items: {
+      'add-text': { label: 'Add text box' },
+      'copy-html': { label: 'Copy HTML' },
+      'download-html': { label: 'Download HTML' },
+      present: { label: 'Present' },
+      redo: { label: 'Redo' },
+      reset: { label: resetTitle },
+      undo: { label: 'Undo' },
+    },
+    label: 'Actions',
+    omitPressed: true,
+    rootKeys: ACTION_TOOLBAR_KEYS,
+  })
+  const actionToolbarProps = actionToolbar.itemProps
 
   return (
     <header className="topbar">

@@ -1,9 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  reducePatternData,
-  toolbarDefinition,
-  useToolbarPattern,
-} from '@interactive-os/aria/react'
+import { useEffect } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { matchesShortcut } from '@interactive-os/keyboard'
 import { rectToStyle, type RetouchSlide } from './retouchModel'
@@ -14,9 +9,7 @@ import {
 import { cssVariables } from './cssVariables'
 import {
   disabledToolbarKeys,
-  handleToolbarSelection,
-  toolbarPatternData,
-  toolbarItemPropsByKey,
+  useActionToolbarPattern,
 } from './apgPatternAdapter'
 
 type PresentationOverlayProps = {
@@ -31,7 +24,14 @@ type PresentationOverlayProps = {
 
 type PresentationControlKey = 'close' | 'next' | 'previous'
 
-const PRESENTATION_CONTROL_KEYS = ['previous', 'close', 'next'] as const
+const PRESENTATION_CONTROL_ACTIONS: {
+  action: PresentationControlKey
+  label: string
+}[] = [
+  { action: 'previous', label: 'Previous slide' },
+  { action: 'close', label: 'Close presentation' },
+  { action: 'next', label: 'Next slide' },
+]
 
 export function PresentationOverlay({
   activeSlide,
@@ -42,56 +42,21 @@ export function PresentationOverlay({
   onPrevious,
   slideCount,
 }: PresentationOverlayProps) {
-  const [activeControlKey, setActiveControlKey] = useState<PresentationControlKey>('close')
-  const controlDisabledKeys = useMemo(() =>
-    disabledToolbarKeys<PresentationControlKey>([
+  const controlToolbar = useActionToolbarPattern<PresentationControlKey>({
+    actions: PRESENTATION_CONTROL_ACTIONS,
+    activeKey: 'close',
+    disabledKeys: disabledToolbarKeys<PresentationControlKey>([
       ['previous', activeSlideIndex === 0],
       ['next', activeSlideIndex === slideCount - 1],
-    ]), [activeSlideIndex, slideCount])
-  const controlToolbarData = useMemo(() =>
-    toolbarPatternData<PresentationControlKey>({
-      disabledKeys: controlDisabledKeys,
-      items: {
-        close: { label: 'Close presentation' },
-        next: { label: 'Next slide' },
-        previous: { label: 'Previous slide' },
-      },
-      label: 'Presentation',
-      rootKeys: PRESENTATION_CONTROL_KEYS,
-      activeKey: controlDisabledKeys.includes(activeControlKey)
-        ? null
-        : activeControlKey,
-    }), [activeControlKey, controlDisabledKeys])
-  const controlToolbar = useToolbarPattern(
-    controlToolbarData,
-    (event) => {
-      if (event.type === 'navigate') {
-        const nextActiveKey = reducePatternData(
-          toolbarDefinition,
-          controlToolbarData,
-          event,
-        ).state?.activeKey as PresentationControlKey | undefined
-
-        if (nextActiveKey) {
-          setActiveControlKey(nextActiveKey)
-        }
-      }
-
-      handleToolbarSelection<PresentationControlKey>(event, {
-        close: onClose,
-        next: onNext,
-        previous: onPrevious,
-      })
+    ]),
+    elementIdPrefix: 'presentation-control-',
+    label: 'Presentation',
+    onSelect: (action) => {
+      if (action === 'close') onClose()
+      if (action === 'next') onNext()
+      if (action === 'previous') onPrevious()
     },
-    {
-      elementIdPrefix: 'presentation-control-',
-      orientation: 'horizontal',
-    },
-  )
-  const controlProps = toolbarItemPropsByKey<PresentationControlKey>(
-    controlToolbar.renderItems,
-    { omitPressed: true },
-  )
+  })
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -160,7 +125,7 @@ export function PresentationOverlay({
 
       <div {...controlToolbar.rootProps} className="presentation-controls">
         <button
-          {...controlProps.previous}
+          {...controlToolbar.itemProps.previous}
           aria-label="Previous slide"
           disabled={activeSlideIndex === 0}
           type="button"
@@ -168,14 +133,14 @@ export function PresentationOverlay({
           <ChevronLeft aria-hidden="true" size={18} />
         </button>
         <button
-          {...controlProps.close}
+          {...controlToolbar.itemProps.close}
           aria-label="Close presentation"
           type="button"
         >
           <X aria-hidden="true" size={18} />
         </button>
         <button
-          {...controlProps.next}
+          {...controlToolbar.itemProps.next}
           aria-label="Next slide"
           disabled={activeSlideIndex === slideCount - 1}
           type="button"
