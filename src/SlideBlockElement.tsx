@@ -198,30 +198,26 @@ export function SlideBlockElement({
     }
 
     if (isPlainTextBlockEditorUndoShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       undoDraft()
       return
     }
 
     if (isPlainTextBlockEditorCancelShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       resetDraft()
       onCancel()
       return
     }
 
     if (isPlainTextBlockEditorCommitShortcut(event)) {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       commit()
       return
     }
 
     if (isPlainTextBlockEditorLineBreakKey(event)) {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       const lineBreak = insertPlainTextBlockEditorLineBreak(event.currentTarget)
 
       rememberTrailingLineBreak(
@@ -233,8 +229,7 @@ export function SlideBlockElement({
     }
 
     if (isPlainTextBlockEditorPrintableKey(event)) {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       if (!insertAfterPendingTrailingLineBreak(event.currentTarget, event.key)) {
         insertPlainTextBlockEditorText(event.currentTarget, event.key)
       }
@@ -250,8 +245,7 @@ export function SlideBlockElement({
     }
 
     if (input.kind === 'text') {
-      event.preventDefault()
-      event.stopPropagation()
+      consumeEditorEvent(event)
       if (
         !insertAfterPendingTrailingLineBreak(
           event.currentTarget,
@@ -264,8 +258,7 @@ export function SlideBlockElement({
       return
     }
 
-    event.preventDefault()
-    event.stopPropagation()
+    consumeEditorEvent(event)
     const lineBreak = insertPlainTextBlockEditorLineBreak(event.currentTarget)
 
     rememberTrailingLineBreak(lineBreak.lineBreakAtEnd, lineBreak.beforeText)
@@ -273,8 +266,7 @@ export function SlideBlockElement({
   }
 
   function handlePaste(event: ReactClipboardEvent<HTMLElement>) {
-    event.preventDefault()
-    event.stopPropagation()
+    consumeEditorEvent(event)
     const text = event.clipboardData.getData('text/plain')
 
     if (!insertAfterPendingTrailingLineBreak(event.currentTarget, text)) {
@@ -353,4 +345,12 @@ export function SlideBlockElement({
   }
 
   return <div {...sharedProps}>{textContent}</div>
+}
+
+function consumeEditorEvent(event: {
+  preventDefault: () => void
+  stopPropagation: () => void
+}) {
+  event.preventDefault()
+  event.stopPropagation()
 }
