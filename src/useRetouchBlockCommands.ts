@@ -180,9 +180,15 @@ export function useRetouchBlockCommands({
       return
     }
 
+    const lastLocation = locations.at(-1)
+
+    if (!lastLocation) {
+      return
+    }
+
     if (!commitDuplicatedBlocks(
       locations.map((location) => location.block),
-      locations.at(-1)!.blockIndex + 1,
+      lastLocation.blockIndex + 1,
       locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
     )) {
       return
@@ -224,16 +230,19 @@ export function useRetouchBlockCommands({
     targets: SelectionLayoutTarget[],
     label: string,
   ) {
+    const targetPointers = targets.map((target) => target.pointer)
+    const lastTargetPointer = targetPointers.at(-1)
+
     commitActiveTextEdit()
     enterLayoutMode()
     commitPatch(
       targets.flatMap((target) => setLayoutPatch(target.pointer, target.rect)),
-      targets.at(-1)?.pointer ?? selectedPointer ?? targets[0].pointer,
+      lastTargetPointer ?? selectedPointer ?? targets[0].pointer,
       label,
       undefined,
       selectionSnapForPointers(
-        targets.map((target) => target.pointer),
-        selectedPointer ?? targets.at(-1)?.pointer,
+        targetPointers,
+        selectedPointer ?? lastTargetPointer,
       ),
     )
   }
