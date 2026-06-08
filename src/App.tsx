@@ -59,12 +59,16 @@ import {
   normalizeInspectorRect,
   type RectField,
 } from './inspectorGeometry'
+import {
+  canDecreaseCanvasZoom,
+  canIncreaseCanvasZoom,
+  canvasZoomLabel,
+  nextCanvasZoom,
+  type CanvasZoom,
+} from './canvasZoom'
 import './App.css'
 
 type Mode = 'text' | 'layout'
-type CanvasZoom = 'fit' | number
-
-const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
 type EditingState = {
   clientPoint?: Point
@@ -314,28 +318,6 @@ function App() {
     canvasView,
     onChange: changeCanvasView,
   })
-
-  function zoomStep(direction: -1 | 1) {
-    const currentZoom = canvasZoom === 'fit' ? 1 : canvasZoom
-    const currentIndex = CANVAS_ZOOM_STEPS.findIndex((step) => step >= currentZoom)
-    const fallbackIndex = CANVAS_ZOOM_STEPS.indexOf(1)
-    const nextIndex =
-      direction > 0
-        ? currentZoom >= CANVAS_ZOOM_STEPS.at(-1)!
-          ? CANVAS_ZOOM_STEPS.length - 1
-          : Math.max(0, currentIndex) + 1
-        : currentZoom <= CANVAS_ZOOM_STEPS[0]
-          ? 0
-          : currentIndex > 0
-            ? currentIndex - 1
-            : fallbackIndex
-
-    setCanvasZoom(CANVAS_ZOOM_STEPS[nextIndex] ?? 1)
-  }
-
-  function fitCanvasZoom() {
-    setCanvasZoom('fit')
-  }
 
   function activateSlide(slideId: string) {
     setActiveSlideId(slideId)
@@ -831,8 +813,8 @@ function App() {
         canRedo={doc.history.canRedo}
         canReset={canReset}
         canUndo={doc.history.canUndo}
-        canZoomIn={canvasZoom === 'fit' || canvasZoom < CANVAS_ZOOM_STEPS.at(-1)!}
-        canZoomOut={canvasZoom === 'fit' || canvasZoom > CANVAS_ZOOM_STEPS[0]}
+        canZoomIn={canIncreaseCanvasZoom(canvasZoom)}
+        canZoomOut={canDecreaseCanvasZoom(canvasZoom)}
         canvasView={canvasView}
         canvasViewPanelProps={canvasViewPanelProps}
         canvasZoom={canvasZoom}
@@ -877,9 +859,9 @@ function App() {
         onDistributeSelection={distributeSelectedBlocks}
         onLayerOrderChange={changeSelectedLayerOrder}
         onInsertTextBlock={insertTextBlock}
-        onZoomFit={fitCanvasZoom}
-        onZoomIn={() => zoomStep(1)}
-        onZoomOut={() => zoomStep(-1)}
+        onZoomFit={() => setCanvasZoom('fit')}
+        onZoomIn={() => setCanvasZoom((zoom) => nextCanvasZoom(zoom, 1))}
+        onZoomOut={() => setCanvasZoom((zoom) => nextCanvasZoom(zoom, -1))}
         onSlideAccentChange={changeSlideAccent}
         onSlideNameChange={changeSlideName}
         onNotesChange={(notes) =>
@@ -913,9 +895,7 @@ function App() {
         stageRef={stageRef}
         suppressStageClickRef={suppressStageClickRef}
         visualSelectionRect={visualSelectionRect}
-        zoomLabel={
-          canvasZoom === 'fit' ? 'Fit' : `${Math.round(canvasZoom * 100)}%`
-        }
+        zoomLabel={canvasZoomLabel(canvasZoom)}
       />
 
       {presenting ? (

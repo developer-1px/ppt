@@ -28,9 +28,9 @@ import type {
   SnapGuides,
 } from './layoutInteraction'
 import { cssVariables } from './cssVariables'
+import type { CanvasZoom } from './canvasZoom'
 
 type Mode = 'text' | 'layout'
-type CanvasZoom = 'fit' | number
 
 type EditingState = {
   clientPoint?: Point
