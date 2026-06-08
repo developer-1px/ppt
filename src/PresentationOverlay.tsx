@@ -23,16 +23,14 @@ type PresentationOverlayProps = {
   slideCount: number
 }
 
-type PresentationControlKey = 'close' | 'next' | 'previous'
+const PRESENTATION_CONTROL_ACTIONS = [
+  { action: 'previous', icon: ChevronLeft, label: 'Previous slide' },
+  { action: 'close', icon: X, label: 'Close presentation' },
+  { action: 'next', icon: ChevronRight, label: 'Next slide' },
+] as const
 
-const PRESENTATION_CONTROL_ACTIONS: {
-  action: PresentationControlKey
-  label: string
-}[] = [
-  { action: 'previous', label: 'Previous slide' },
-  { action: 'close', label: 'Close presentation' },
-  { action: 'next', label: 'Next slide' },
-]
+type PresentationControlKey =
+  (typeof PRESENTATION_CONTROL_ACTIONS)[number]['action']
 
 export function PresentationOverlay({
   activeSlide,
@@ -48,19 +46,21 @@ export function PresentationOverlay({
     next: onNext,
     previous: onPrevious,
   } satisfies Record<PresentationControlKey, () => void>
-
-  function consumePresentationShortcut(event: KeyboardEvent, action: () => void) {
-    event.preventDefault()
-    action()
-  }
+  const presentationControlDisabled = {
+    close: false,
+    next: activeSlideIndex === slideCount - 1,
+    previous: activeSlideIndex === 0,
+  } satisfies Record<PresentationControlKey, boolean>
 
   const controlToolbar = useActionToolbarPattern<PresentationControlKey>({
     actions: PRESENTATION_CONTROL_ACTIONS,
     activeKey: 'close',
-    disabledKeys: disabledToolbarKeys<PresentationControlKey>([
-      ['previous', activeSlideIndex === 0],
-      ['next', activeSlideIndex === slideCount - 1],
-    ]),
+    disabledKeys: disabledToolbarKeys<PresentationControlKey>(
+      PRESENTATION_CONTROL_ACTIONS.map(({ action }) => [
+        action,
+        presentationControlDisabled[action],
+      ] as const),
+    ),
     elementIdPrefix: 'presentation-control-',
     label: 'Presentation',
     onSelect: (action) => presentationControlCommands[action](),
@@ -129,32 +129,25 @@ export function PresentationOverlay({
       </aside>
 
       <div {...controlToolbar.rootProps} className="presentation-controls">
-        <button
-          {...controlToolbar.itemProps.previous}
-          aria-label="Previous slide"
-          disabled={activeSlideIndex === 0}
-          type="button"
-        >
-          <ChevronLeft aria-hidden="true" size={18} />
-        </button>
-        <button
-          {...controlToolbar.itemProps.close}
-          aria-label="Close presentation"
-          type="button"
-        >
-          <X aria-hidden="true" size={18} />
-        </button>
-        <button
-          {...controlToolbar.itemProps.next}
-          aria-label="Next slide"
-          disabled={activeSlideIndex === slideCount - 1}
-          type="button"
-        >
-          <ChevronRight aria-hidden="true" size={18} />
-        </button>
+        {PRESENTATION_CONTROL_ACTIONS.map(({ action, icon: Icon, label }) => (
+          <button
+            {...controlToolbar.itemProps[action]}
+            aria-label={label}
+            disabled={presentationControlDisabled[action]}
+            key={action}
+            type="button"
+          >
+            <Icon aria-hidden="true" size={18} />
+          </button>
+        ))}
       </div>
     </div>
   )
+}
+
+function consumePresentationShortcut(event: KeyboardEvent, action: () => void) {
+  event.preventDefault()
+  action()
 }
 
 function isPresentationControlTarget(target: EventTarget | null) {
