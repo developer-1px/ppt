@@ -25,7 +25,10 @@ import type {
 } from './selectionAlignment'
 import type { LayerOrderAction } from './selectionLayerOrder'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
-import { useActionToolbarPattern } from './apgPatternAdapter'
+import {
+  useActionToolbarPattern,
+  useManagedRadioGroupPattern,
+} from './apgPatternAdapter'
 
 type InspectorPanelProps = {
   activeSlideAccent: string
@@ -96,6 +99,10 @@ const DISTRIBUTION_ACTIONS: {
   },
 ]
 
+const SLIDE_ACCENT_ITEMS = Object.fromEntries(
+  SLIDE_ACCENTS.map((accent) => [accent, { label: accent }]),
+) as Record<string, { label: string }>
+
 export function InspectorPanel({
   activeSlideAccent,
   activeSlideName,
@@ -118,6 +125,14 @@ export function InspectorPanel({
 }: InspectorPanelProps) {
   const hasSelection = selectedCount > 0
   const hasMultiSelection = selectedCount > 1
+  const slideAccentRadio = useManagedRadioGroupPattern<string>({
+    elementIdPrefix: 'slide-accent-',
+    items: SLIDE_ACCENT_ITEMS,
+    label: 'Slide accent',
+    onSelect: onSlideAccentChange,
+    rootKeys: SLIDE_ACCENTS,
+    selectedKey: activeSlideAccent,
+  })
 
   return (
     <aside className="inspector-panel" aria-label="Slide details">
@@ -150,15 +165,13 @@ export function InspectorPanel({
           <div>
             <dt>Accent</dt>
             <dd>
-              <div className="accent-swatches" role="radiogroup" aria-label="Slide accent">
+              <div {...slideAccentRadio.rootProps} className="accent-swatches">
                 {SLIDE_ACCENTS.map((accent) => (
                   <button
+                    {...slideAccentRadio.itemProps[accent]}
                     aria-label={accent}
-                    aria-checked={accent === activeSlideAccent}
                     className="accent-swatch"
                     key={accent}
-                    onClick={() => onSlideAccentChange(accent)}
-                    role="radio"
                     style={{ background: accent }}
                     type="button"
                   />

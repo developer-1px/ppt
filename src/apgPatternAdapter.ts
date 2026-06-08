@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
 import type { ButtonHTMLAttributes, HTMLAttributes } from 'react'
 import {
+  radioGroupDefinition,
   reducePatternData,
   toolbarDefinition,
+  useRadioGroupPattern,
   useToolbarPattern,
 } from '@interactive-os/aria/react'
 import type {
   PatternData,
   PatternEvent,
   PatternOptions,
+  ReactRadioRenderItem,
   ReactToolbarRenderItem,
 } from '@interactive-os/aria/react'
 
@@ -22,6 +25,54 @@ const EMPTY_TOOLBAR_KEYS: readonly never[] = []
 export type ActionToolbarItem<TKey extends string> = {
   action: TKey
   label: string
+}
+
+export function useManagedRadioGroupPattern<TKey extends string>({
+  elementIdPrefix,
+  items,
+  label,
+  onSelect,
+  rootKeys,
+  selectedKey,
+}: {
+  elementIdPrefix: string
+  items: Record<TKey, { label: string }>
+  label: string
+  onSelect: (key: TKey) => void
+  rootKeys: readonly TKey[]
+  selectedKey: TKey
+}) {
+  const [activeRadioKey, setActiveRadioKey] = useState<TKey | null>(selectedKey)
+  const data = useMemo(() =>
+    radioGroupPatternData<TKey>({
+      activeKey: activeRadioKey,
+      items,
+      label,
+      rootKeys,
+      selectedKey,
+    }), [activeRadioKey, items, label, rootKeys, selectedKey])
+  const radio = useRadioGroupPattern(
+    data,
+    (event) => {
+      const nextActiveKey = nextRadioActiveKey<TKey>(data, event)
+
+      if (nextActiveKey) {
+        setActiveRadioKey(nextActiveKey)
+      }
+
+      for (const key of selectedToolbarKeys(event)) {
+        onSelect(key as TKey)
+      }
+    },
+    {
+      elementIdPrefix,
+    },
+  )
+
+  return {
+    itemProps: radioItemPropsByKey<TKey>(radio.renderItems),
+    rootProps: patternDivProps(radio.rootProps),
+  }
 }
 
 export function useManagedToolbarPattern<TKey extends string>({
@@ -139,6 +190,30 @@ export function patternDivProps(props: PatternElementProps): PatternDivProps {
   return props as PatternDivProps
 }
 
+function radioGroupPatternData<TKey extends string>({
+  activeKey,
+  items,
+  label,
+  rootKeys,
+  selectedKey,
+}: {
+  activeKey?: TKey | null
+  items: Record<TKey, { label: string }>
+  label: string
+  rootKeys: readonly TKey[]
+  selectedKey: TKey
+}): PatternData {
+  return {
+    items,
+    relations: { rootKeys },
+    refs: { label },
+    state: {
+      activeKey: activeKey ?? selectedKey,
+      selectedKeys: [selectedKey],
+    },
+  }
+}
+
 export function selectedToolbarKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
@@ -219,6 +294,17 @@ export function toolbarItemPropsByKey<TKey extends string>(
   ) as Record<TKey, PatternButtonProps>
 }
 
+function radioItemPropsByKey<TKey extends string>(
+  items: readonly ReactRadioRenderItem[],
+) {
+  return Object.fromEntries(
+    items.map((item) => [
+      item.key,
+      patternButtonProps(item.radioProps),
+    ]),
+  ) as Record<TKey, PatternButtonProps>
+}
+
 export function firstEnabledToolbarKey<TKey extends string>(
   keys: readonly TKey[],
   disabledKeys: readonly TKey[],
@@ -248,6 +334,29 @@ function nextToolbarEventKey(data: PatternData, event: PatternEvent) {
   }
 
   return selectedToolbarKeys(event)[0] ?? null
+}
+
+function nextRadioActiveKey<TKey extends string>(
+  data: PatternData,
+  event: PatternEvent,
+): TKey | null {
+  if (event.type === 'focus') {
+    return event.key as TKey
+  }
+
+  if (event.type === 'select') {
+    return event.keys[0] as TKey | undefined ?? null
+  }
+
+  if (event.type === 'navigate') {
+    return reducePatternData(
+      radioGroupDefinition,
+      data,
+      event,
+    ).state?.activeKey as TKey | undefined ?? null
+  }
+
+  return null
 }
 
 function actionToolbarKeys<TKey extends string>(

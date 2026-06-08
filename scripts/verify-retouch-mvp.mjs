@@ -311,6 +311,17 @@ async function runFirstScreenScenario(page) {
       }
     })(),
     ...(() => {
+      const accentRadios = Array.from(document.querySelectorAll('.accent-swatches [role="radio"]'))
+      const selectedAccentRadios = accentRadios.filter((radio) => radio.getAttribute('aria-checked') === 'true')
+
+      return {
+        accentRadioCheckedCount: selectedAccentRadios.length,
+        accentRadioCount: accentRadios.length,
+        accentRadioGroupLabel: document.querySelector('.accent-swatches')?.getAttribute('aria-label') ?? null,
+        accentRadioGroupRole: document.querySelector('.accent-swatches')?.getAttribute('role') ?? null,
+      }
+    })(),
+    ...(() => {
       const commandButtons = Array.from(document.querySelectorAll([
         '.zoom-controls button',
         '.toolbar button[data-action="undo"]',
@@ -366,6 +377,14 @@ async function runFirstScreenScenario(page) {
       state.actionToolbarLabel === 'Actions' &&
       state.railActionToolbarRole === 'toolbar' &&
       state.railActionToolbarLabel === 'Slide actions',
+    state,
+  )
+  check(
+    'slide accent picker follows APG radio semantics',
+    state.accentRadioGroupRole === 'radiogroup' &&
+      state.accentRadioGroupLabel === 'Slide accent' &&
+      state.accentRadioCount >= 3 &&
+      state.accentRadioCheckedCount === 1,
     state,
   )
   check(
