@@ -61,7 +61,8 @@ export function createLayoutKeyboardNudgePatch({
   }
 
   const targetPointers = targets.map((target) => target.pointer)
-  const focusPointer = targets.at(-1)?.pointer
+  const focusPointer = targetPointers.at(-1)
+  const primaryPointer = focusPointer ?? selectedPointer ?? targets[0].pointer
 
   return {
     label: 'nudge layout',
@@ -69,7 +70,7 @@ export function createLayoutKeyboardNudgePatch({
     operations: targets.flatMap((target) =>
       setArrangePatch(target.pointer, target.rect),
     ),
-    pointer: focusPointer ?? selectedPointer ?? targets[0].pointer,
+    pointer: primaryPointer,
     selection: selectionSnapForPointers(targetPointers, focusPointer),
   }
 }
