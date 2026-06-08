@@ -3,11 +3,18 @@ import { createDirtyState } from '@zod-crud/dirty-state'
 import { createDocumentPersistence } from '@zod-crud/persist-web'
 import type { DocumentPersistenceCodec } from '@zod-crud/persist-web'
 import type { JSONDocument } from 'zod-crud'
+import { z } from 'zod'
 import type { RetouchDeck } from './retouchModel'
 import { retouchDeckEquals } from './retouchDirtyState'
 
 const STORAGE_KEY = 'ppt-retouch:v3:deck'
 const STORAGE_VERSION = 1
+const RetouchDraftEnvelopeSchema = z.object({
+  deck: z.unknown(),
+  savedAt: z.unknown().optional(),
+  selection: z.unknown().optional(),
+  version: z.literal(STORAGE_VERSION),
+})
 
 const retouchDraftCodec: DocumentPersistenceCodec = {
   encode(input) {
@@ -21,24 +28,14 @@ const retouchDraftCodec: DocumentPersistenceCodec = {
 
   decode(text) {
     const value: unknown = JSON.parse(text)
+    const envelope = RetouchDraftEnvelopeSchema.safeParse(value)
 
-    if (
-      value &&
-      typeof value === 'object' &&
-      'version' in value &&
-      value.version === STORAGE_VERSION &&
-      'deck' in value
-    ) {
-      const candidate = value as {
-        deck: unknown
-        savedAt?: unknown
-        selection?: unknown
-      }
-
+    if (envelope.success) {
       return {
-        value: candidate.deck,
+        value: envelope.data.deck,
         selection: null,
-        savedAt: typeof candidate.savedAt === 'string' ? candidate.savedAt : null,
+        savedAt:
+          typeof envelope.data.savedAt === 'string' ? envelope.data.savedAt : null,
       }
     }
 
