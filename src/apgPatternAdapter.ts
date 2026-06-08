@@ -60,7 +60,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
         setActiveRadioKey(nextActiveKey)
       }
 
-      for (const key of selectedToolbarKeys(event)) {
+      for (const key of selectedPatternKeys(event)) {
         onSelect(key as TKey)
       }
     },
@@ -214,11 +214,11 @@ function radioGroupPatternData<TKey extends string>({
   }
 }
 
-export function selectedToolbarKeys(event: PatternEvent) {
+function selectedPatternKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
 
-export function nextToolbarActiveKey<TKey extends string>(
+function nextToolbarActiveKey<TKey extends string>(
   data: PatternData,
   event: PatternEvent,
   disabledKeys: readonly TKey[] = [],
@@ -238,16 +238,16 @@ export function disabledToolbarKeys<TKey extends string>(
   return candidates.flatMap(([key, disabled]) => (disabled ? [key] : []))
 }
 
-export function handleToolbarSelection<TKey extends string>(
+function handleToolbarSelection<TKey extends string>(
   event: PatternEvent,
   handlers: Partial<Record<TKey, () => void>>,
 ) {
-  for (const key of selectedToolbarKeys(event)) {
+  for (const key of selectedPatternKeys(event)) {
     handlers[key as TKey]?.()
   }
 }
 
-export function toolbarPatternData<TKey extends string>({
+function toolbarPatternData<TKey extends string>({
   activeKey,
   disabledKeys = [],
   items,
@@ -278,7 +278,7 @@ export function toolbarPatternData<TKey extends string>({
   }
 }
 
-export function toolbarItemPropsByKey<TKey extends string>(
+function toolbarItemPropsByKey<TKey extends string>(
   items: readonly ReactToolbarRenderItem[],
   options: { omitPressed?: boolean } = {},
 ) {
@@ -305,7 +305,7 @@ function radioItemPropsByKey<TKey extends string>(
   ) as Record<TKey, PatternButtonProps>
 }
 
-export function firstEnabledToolbarKey<TKey extends string>(
+function firstEnabledToolbarKey<TKey extends string>(
   keys: readonly TKey[],
   disabledKeys: readonly TKey[],
 ) {
@@ -333,7 +333,7 @@ function nextToolbarEventKey(data: PatternData, event: PatternEvent) {
     return reducePatternData(toolbarDefinition, data, event).state?.activeKey ?? null
   }
 
-  return selectedToolbarKeys(event)[0] ?? null
+  return selectedPatternKeys(event)[0] ?? null
 }
 
 function nextRadioActiveKey<TKey extends string>(
