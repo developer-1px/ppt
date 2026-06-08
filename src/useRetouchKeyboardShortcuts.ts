@@ -124,7 +124,7 @@ export function useRetouchKeyboardShortcuts({
         mode !== 'text' ||
         event.defaultPrevented ||
         editing ||
-        !selectedPointer ||
+        selectedPointer === null ||
         isEditableTarget(event) ||
         isControlTarget(event) ||
         event.key !== 'Escape'

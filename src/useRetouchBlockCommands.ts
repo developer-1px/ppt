@@ -95,7 +95,7 @@ export function useRetouchBlockCommands({
     })
     const primaryPointer = insertPatch.insertedPointers[0]
 
-    if (!primaryPointer) {
+    if (primaryPointer === undefined) {
       return null
     }
 
@@ -116,7 +116,7 @@ export function useRetouchBlockCommands({
       'add text block',
     )
 
-    if (!pointer) {
+    if (pointer === null) {
       return
     }
     setCanvasView('slide')
@@ -151,7 +151,7 @@ export function useRetouchBlockCommands({
     const duplicatedBlocks = duplicateBlocks(blocks, activeSlide)
     const primaryPointer = commitInsertedBlocks(duplicatedBlocks, insertIndex, label)
 
-    return primaryPointer ? duplicatedBlocks : null
+    return primaryPointer !== null ? duplicatedBlocks : null
   }
 
   function pasteCopiedBlocks() {
@@ -305,7 +305,11 @@ export function useRetouchBlockCommands({
   }
 
   function changeSelectedBlockRect(rect: Rect, changedField?: RectField) {
-    if (!selectedPointer || !selectedBlock || !selectedRect) {
+    if (
+      selectedPointer === null ||
+      selectedBlock === null ||
+      selectedRect === null
+    ) {
       return
     }
 

@@ -67,9 +67,9 @@ export function useRetouchResetActions({
   function resetSelectedLayout() {
     if (
       mode !== 'layout' ||
-      !selectedPointer ||
-      !selectedBlock ||
-      !baseSelectedLocation ||
+      selectedPointer === null ||
+      selectedBlock === null ||
+      baseSelectedLocation === null ||
       !canResetSelectedLayout
     ) {
       return
@@ -93,12 +93,13 @@ export function useRetouchResetActions({
     }
 
     const pointer = editing?.pointer ?? selectedPointer
-    const location = pointer ? blockLocationFromPointer(deckValue, pointer) : null
+    const location =
+      pointer !== null ? blockLocationFromPointer(deckValue, pointer) : null
     const baseLocation = location
       ? findBlockLocation(SAMPLE_DECK, location.slide.id, location.block.id)
       : null
 
-    if (!pointer || !location || !baseLocation) {
+    if (pointer === null || location === null || baseLocation === null) {
       return
     }
 
@@ -172,7 +173,7 @@ export function useRetouchResetActions({
       return
     }
 
-    if (selectedPointer) {
+    if (selectedPointer !== null) {
       resetSelectedText()
       return
     }

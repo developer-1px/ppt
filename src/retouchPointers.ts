@@ -75,7 +75,7 @@ export function blockLocationFromPointer(
   deck: RetouchDeck,
   pointer: Pointer | null | undefined,
 ): BlockLocation | null {
-  if (!pointer) {
+  if (pointer === null || pointer === undefined) {
     return null
   }
 
