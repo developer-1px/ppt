@@ -29,6 +29,7 @@ import {
   useActionToolbarPattern,
   useManagedRadioGroupPattern,
 } from './apgPatternAdapter'
+import './InspectorPanel.css'
 
 type InspectorPanelProps = {
   activeSlideAccent: string
