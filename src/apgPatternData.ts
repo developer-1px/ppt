@@ -10,7 +10,6 @@ import type {
   PatternEvent,
 } from '@interactive-os/aria/react'
 import type {
-  ActionToolbarItem,
   ManagedTabItem,
 } from './apgPatternTypes'
 
@@ -231,29 +230,6 @@ export function activeManagedTab<TValue extends string>(
   }
 
   return activeTab
-}
-
-export function actionToolbarKeys<TKey extends string>(
-  actions: readonly ActionToolbarItem<TKey>[],
-): readonly TKey[] {
-  return actions.map(({ action }) => action)
-}
-
-export function actionToolbarItems<TKey extends string>(
-  actions: readonly ActionToolbarItem<TKey>[],
-): Record<TKey, { label: string }> {
-  return Object.fromEntries(
-    actions.map(({ action, label }) => [action, { label }]),
-  ) as Record<TKey, { label: string }>
-}
-
-export function actionToolbarHandlers<TKey extends string>(
-  actions: readonly ActionToolbarItem<TKey>[],
-  onSelect: (action: TKey) => void,
-): Partial<Record<TKey, () => void>> {
-  return Object.fromEntries(
-    actions.map(({ action }) => [action, () => onSelect(action)]),
-  ) as Partial<Record<TKey, () => void>>
 }
 
 function firstEnabledToolbarKey<TKey extends string>(

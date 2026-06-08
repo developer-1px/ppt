@@ -6,9 +6,6 @@ import {
   useToolbarPattern,
 } from '@interactive-os/aria/react'
 import {
-  actionToolbarHandlers,
-  actionToolbarItems,
-  actionToolbarKeys,
   activeManagedTab,
   handleToolbarSelection,
   listboxPatternData,
@@ -256,6 +253,27 @@ function useManagedToolbarPattern<TKey extends string>({
   }
 }
 
+function actionToolbarData<TKey extends string>(
+  actions: readonly ActionToolbarItem<TKey>[],
+  onSelect: (action: TKey) => void,
+) {
+  const handlers: Partial<Record<TKey, () => void>> = {}
+  const items = {} as Record<TKey, { label: string }>
+  const rootKeys: TKey[] = []
+
+  for (const { action, label } of actions) {
+    handlers[action] = () => onSelect(action)
+    items[action] = { label }
+    rootKeys.push(action)
+  }
+
+  return {
+    handlers,
+    items,
+    rootKeys,
+  }
+}
+
 export function useActionToolbarPattern<TKey extends string>({
   actions,
   activeKey,
@@ -277,10 +295,8 @@ export function useActionToolbarPattern<TKey extends string>({
   orientation?: ToolbarOrientation
   selectedKeys?: readonly TKey[]
 }) {
-  const rootKeys = useMemo(() => actionToolbarKeys(actions), [actions])
-  const items = useMemo(() => actionToolbarItems(actions), [actions])
-  const handlers = useMemo(
-    () => actionToolbarHandlers(actions, onSelect),
+  const toolbarData = useMemo(
+    () => actionToolbarData(actions, onSelect),
     [actions, onSelect],
   )
 
@@ -288,12 +304,12 @@ export function useActionToolbarPattern<TKey extends string>({
     activeKey,
     disabledKeys,
     elementIdPrefix,
-    handlers,
-    items,
+    handlers: toolbarData.handlers,
+    items: toolbarData.items,
     label,
     omitPressed,
     orientation,
-    rootKeys,
+    rootKeys: toolbarData.rootKeys,
     selectedKeys,
   })
 }
