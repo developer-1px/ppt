@@ -1,4 +1,8 @@
-import { useRef, useState } from 'react'
+import {
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import type { Rect } from './retouchModel'
 import type { RectField } from './inspectorGeometry'
 
@@ -59,6 +63,26 @@ export function GeometryEditor({
     onRectChange({ ...rect, [field]: value }, field)
   }
 
+  function cancelFieldDraft(field: RectField, input: HTMLInputElement) {
+    skipNextCommitRef.current = field
+    updateDraftField(field, String(rect[field]))
+    input.blur()
+  }
+
+  function handleFieldKeyDown(
+    field: RectField,
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      cancelFieldDraft(field, event.currentTarget)
+    }
+  }
+
   return (
     <div aria-label="Geometry" className="geometry-editor" role="group">
       {GEOMETRY_FIELDS.map(({ field, label }) => (
@@ -69,24 +93,9 @@ export function GeometryEditor({
             inputMode="numeric"
             min={field === 'width' || field === 'height' ? 72 : 0}
             onBlur={() => commitField(field)}
-            onChange={(event) => {
-              const value =
-                event.target instanceof HTMLInputElement ? event.target.value : ''
-
-              updateDraftField(field, value)
-            }}
+            onChange={(event) => updateDraftField(field, event.currentTarget.value)}
             onFocus={(event) => event.currentTarget.select()}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.currentTarget.blur()
-              }
-
-              if (event.key === 'Escape') {
-                skipNextCommitRef.current = field
-                updateDraftField(field, String(rect[field]))
-                event.currentTarget.blur()
-              }
-            }}
+            onKeyDown={(event) => handleFieldKeyDown(field, event)}
             step={8}
             type="number"
             value={draft[field]}
