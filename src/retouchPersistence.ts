@@ -47,14 +47,14 @@ const retouchDraftCodec: DocumentPersistenceCodec = {
   },
 }
 
-export function createRetouchDocumentPersistence(doc: JSONDocument<RetouchDeck>) {
+function createRetouchDocumentPersistence(doc: JSONDocument<RetouchDeck>) {
   return createDocumentPersistence(doc, {
     codec: retouchDraftCodec,
     key: STORAGE_KEY,
   })
 }
 
-export function createRetouchDirtyState(doc: JSONDocument<RetouchDeck>) {
+function createRetouchDirtyState(doc: JSONDocument<RetouchDeck>) {
   return createDirtyState(doc, {
     equals: retouchDeckEquals,
   })
