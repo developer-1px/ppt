@@ -11,6 +11,7 @@ import {
   MoveDown,
   MoveUp,
   SendToBack,
+  type LucideIcon,
 } from 'lucide-react'
 import type {
   AlignSelectionAction,
@@ -19,11 +20,13 @@ import type {
 import type { LayerOrderAction } from './selectionLayerOrder'
 import { useActionToolbarPattern } from './apgPatternAdapter'
 
-const ALIGNMENT_ACTIONS: {
-  action: AlignSelectionAction
-  icon: typeof AlignStartVertical
+type SelectionToolAction<TKey extends string> = {
+  action: TKey
+  icon: LucideIcon
   label: string
-}[] = [
+}
+
+const ALIGNMENT_ACTIONS: SelectionToolAction<AlignSelectionAction>[] = [
   { action: 'left', icon: AlignStartVertical, label: 'Align left' },
   { action: 'center-x', icon: AlignCenterVertical, label: 'Align horizontal center' },
   { action: 'right', icon: AlignEndVertical, label: 'Align right' },
@@ -32,22 +35,14 @@ const ALIGNMENT_ACTIONS: {
   { action: 'bottom', icon: AlignEndHorizontal, label: 'Align bottom' },
 ]
 
-const LAYER_ORDER_ACTIONS: {
-  action: LayerOrderAction
-  icon: typeof BringToFront
-  label: string
-}[] = [
+const LAYER_ORDER_ACTIONS: SelectionToolAction<LayerOrderAction>[] = [
   { action: 'front', icon: BringToFront, label: 'Bring to front' },
   { action: 'forward', icon: MoveUp, label: 'Bring forward' },
   { action: 'backward', icon: MoveDown, label: 'Send backward' },
   { action: 'back', icon: SendToBack, label: 'Send to back' },
 ]
 
-const DISTRIBUTION_ACTIONS: {
-  action: DistributeSelectionAction
-  icon: typeof AlignHorizontalSpaceBetween
-  label: string
-}[] = [
+const DISTRIBUTION_ACTIONS: SelectionToolAction<DistributeSelectionAction>[] = [
   {
     action: 'horizontal',
     icon: AlignHorizontalSpaceBetween,
@@ -60,32 +55,60 @@ const DISTRIBUTION_ACTIONS: {
   },
 ]
 
-export function AlignmentTools({
-  onAlignSelection,
+function SelectionToolGroup<TKey extends string>({
+  actions,
+  className,
+  disabled = false,
+  elementIdPrefix,
+  label,
+  onSelect,
 }: {
-  onAlignSelection: (action: AlignSelectionAction) => void
+  actions: readonly SelectionToolAction<TKey>[]
+  className: string
+  disabled?: boolean
+  elementIdPrefix: string
+  label: string
+  onSelect: (action: TKey) => void
 }) {
-  const toolbar = useActionToolbarPattern<AlignSelectionAction>({
-    actions: ALIGNMENT_ACTIONS,
-    elementIdPrefix: 'alignment-tool-',
-    label: 'Alignment',
-    onSelect: onAlignSelection,
+  const toolbar = useActionToolbarPattern<TKey>({
+    actions,
+    disabledKeys: disabled ? actions.map(({ action }) => action) : undefined,
+    elementIdPrefix,
+    label,
+    onSelect,
   })
 
   return (
-    <div {...toolbar.rootProps} className="alignment-tools">
-      {ALIGNMENT_ACTIONS.map(({ action, icon: Icon, label }) => (
+    <div {...toolbar.rootProps} className={className}>
+      {actions.map(({ action, icon: Icon, label: actionLabel }) => (
         <button
           {...toolbar.itemProps[action]}
-          aria-label={label}
+          aria-label={actionLabel}
+          disabled={disabled}
           key={action}
-          title={label}
+          title={actionLabel}
           type="button"
         >
           <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
         </button>
       ))}
     </div>
+  )
+}
+
+export function AlignmentTools({
+  onAlignSelection,
+}: {
+  onAlignSelection: (action: AlignSelectionAction) => void
+}) {
+  return (
+    <SelectionToolGroup
+      actions={ALIGNMENT_ACTIONS}
+      className="alignment-tools"
+      elementIdPrefix="alignment-tool-"
+      label="Alignment"
+      onSelect={onAlignSelection}
+    />
   )
 }
 
@@ -96,29 +119,15 @@ export function DistributionTools({
   disabled: boolean
   onDistributeSelection: (action: DistributeSelectionAction) => void
 }) {
-  const toolbar = useActionToolbarPattern<DistributeSelectionAction>({
-    actions: DISTRIBUTION_ACTIONS,
-    disabledKeys: disabled ? ['horizontal', 'vertical'] : undefined,
-    elementIdPrefix: 'distribution-tool-',
-    label: 'Distribution',
-    onSelect: onDistributeSelection,
-  })
-
   return (
-    <div {...toolbar.rootProps} className="distribution-tools">
-      {DISTRIBUTION_ACTIONS.map(({ action, icon: Icon, label }) => (
-        <button
-          {...toolbar.itemProps[action]}
-          aria-label={label}
-          disabled={disabled}
-          key={action}
-          title={label}
-          type="button"
-        >
-          <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-      ))}
-    </div>
+    <SelectionToolGroup
+      actions={DISTRIBUTION_ACTIONS}
+      className="distribution-tools"
+      disabled={disabled}
+      elementIdPrefix="distribution-tool-"
+      label="Distribution"
+      onSelect={onDistributeSelection}
+    />
   )
 }
 
@@ -127,26 +136,13 @@ export function LayerOrderTools({
 }: {
   onLayerOrderChange: (action: LayerOrderAction) => void
 }) {
-  const toolbar = useActionToolbarPattern<LayerOrderAction>({
-    actions: LAYER_ORDER_ACTIONS,
-    elementIdPrefix: 'layer-tool-',
-    label: 'Layer order',
-    onSelect: onLayerOrderChange,
-  })
-
   return (
-    <div {...toolbar.rootProps} className="layer-tools">
-      {LAYER_ORDER_ACTIONS.map(({ action, icon: Icon, label }) => (
-        <button
-          {...toolbar.itemProps[action]}
-          aria-label={label}
-          key={action}
-          title={label}
-          type="button"
-        >
-          <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-      ))}
-    </div>
+    <SelectionToolGroup
+      actions={LAYER_ORDER_ACTIONS}
+      className="layer-tools"
+      elementIdPrefix="layer-tool-"
+      label="Layer order"
+      onSelect={onLayerOrderChange}
+    />
   )
 }
