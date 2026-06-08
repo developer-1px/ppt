@@ -25,7 +25,6 @@ import {
   resizeHandleAffectsHeight,
   type DraftLayout,
   type Interaction,
-  type Point,
   type SnapGuides,
 } from './layoutInteraction'
 import {
@@ -33,11 +32,7 @@ import {
   retouchCanvasSelectionBounds,
 } from './retouchCanvasScene'
 import { cssVariables } from './cssVariables'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import type { EditingState, RetouchMode } from './retouchViewState'
 
 type StageCanvasProps = {
   activeSlide: RetouchSlide
@@ -46,7 +41,7 @@ type StageCanvasProps = {
   editing: EditingState | null
   interaction: Interaction | null
   marqueeRect: Rect | null
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   onBlockClick: (
     event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
     pointer: Pointer,

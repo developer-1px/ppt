@@ -24,18 +24,16 @@ import type { LayerOrderAction } from './selectionLayerOrder'
 import type {
   DraftLayout,
   Interaction,
-  Point,
   SnapGuides,
 } from './layoutInteraction'
 import { cssVariables } from './cssVariables'
 import type { CanvasZoom } from './canvasZoom'
-
-type Mode = 'text' | 'layout'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import type {
+  CanvasView,
+  EditingState,
+  ResetScope,
+  RetouchMode,
+} from './retouchViewState'
 
 type RetouchWorkspaceProps = {
   activeSlide: RetouchSlide
@@ -46,7 +44,7 @@ type RetouchWorkspaceProps = {
   canUndo: boolean
   canZoomIn: boolean
   canZoomOut: boolean
-  canvasView: 'slide' | 'grid'
+  canvasView: CanvasView
   canvasViewPanelProps: HTMLAttributes<HTMLDivElement>
   canvasZoom: CanvasZoom
   copyState: 'copied' | 'failed' | 'idle'
@@ -59,7 +57,7 @@ type RetouchWorkspaceProps = {
   exportTextareaRef: RefObject<HTMLTextAreaElement | null>
   interaction: Interaction | null
   marqueeRect: Rect | null
-  mode: Mode
+  mode: RetouchMode
   notes: string
   onBlockClick: (
     event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
@@ -73,7 +71,7 @@ type RetouchWorkspaceProps = {
   onAlignSelection: (action: AlignSelectionAction) => void
   onCancelTextEdit: () => void
   onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
-  onChangeMode: (mode: Mode) => void
+  onChangeMode: (mode: RetouchMode) => void
   onCommitTextEdit: (pointer: Pointer, text: string, rect: Rect) => void
   onCopyExport: () => void
   onDeleteBlock: () => void
@@ -99,7 +97,7 @@ type RetouchWorkspaceProps = {
   onZoomFit: () => void
   onZoomIn: () => void
   onZoomOut: () => void
-  resetScope: 'deck' | 'layout' | 'text'
+  resetScope: ResetScope
   resetTitle: string
   selectedPointerSet: Set<Pointer>
   selectedBlock: SlideBlock | null

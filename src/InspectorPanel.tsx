@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { Rect, SlideBlock } from './retouchModel'
 import type { RectField } from './inspectorGeometry'
+import type { CanvasView, RetouchMode } from './retouchViewState'
 import type {
   AlignSelectionAction,
   DistributeSelectionAction,
@@ -28,8 +29,8 @@ import { SLIDE_ACCENTS } from './slideDeckOperations'
 type InspectorPanelProps = {
   activeSlideAccent: string
   activeSlideName: string
-  canvasView: 'slide' | 'grid'
-  mode: 'text' | 'layout'
+  canvasView: CanvasView
+  mode: RetouchMode
   notes: string
   onAlignSelection: (action: AlignSelectionAction) => void
   onDeleteBlock: () => void

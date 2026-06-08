@@ -23,11 +23,7 @@ import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import type { EditingState, RetouchMode } from './retouchViewState'
 
 type CommitPatch = (
   patch: JSONPatchOperation[],
@@ -51,7 +47,7 @@ export function useRetouchTextEditing({
   commitPatch: CommitPatch
   deckValue: RetouchDeck
   editing: EditingState | null
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   selectBlock: (pointer: Pointer) => void
   setEditing: (editing: EditingState | null) => void
   slideRef: RefObject<HTMLDivElement | null>

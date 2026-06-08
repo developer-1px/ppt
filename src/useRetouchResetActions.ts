@@ -16,16 +16,12 @@ import {
   type SlideBlock,
 } from './retouchModel'
 import { autoHeightRect } from './editableTextDom'
-import { minimumHeightForBlock, type Point } from './layoutInteraction'
+import { minimumHeightForBlock } from './layoutInteraction'
 import {
   PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   normalizePlainTextBlockEditorText,
 } from './plainTextBlockEditor'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import type { EditingState, RetouchMode } from './retouchViewState'
 
 type CommitPatch = (
   patch: JSONPatchOperation[],
@@ -77,7 +73,7 @@ export function useRetouchResetActions({
   editing: EditingState | null
   hasDeckChanges: boolean
   history: HistoryApi
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   resetExportFeedback: () => void
   selectedBlock: SlideBlock | null
   selectedPointer: Pointer | null

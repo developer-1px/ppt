@@ -16,12 +16,8 @@ import {
   isEditableTarget,
   isHistoryShortcut,
 } from './editorKeyboard'
-import { selectionSnapForPointers, type Interaction, type Point } from './layoutInteraction'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import { selectionSnapForPointers, type Interaction } from './layoutInteraction'
+import type { EditingState, RetouchMode } from './retouchViewState'
 
 type CommitPatch = (
   patch: JSONPatchOperation[],
@@ -68,7 +64,7 @@ export function useRetouchKeyboardShortcuts({
   editing: EditingState | null
   history: HistoryApi
   interaction: Interaction | null
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   canPasteSelection: boolean
   onCopySelection: () => void
   onDeleteSelection: () => void

@@ -49,12 +49,8 @@ import {
   getCurrentRect,
   hasSelectionModifier,
   selectionSnapForPointers,
-  type Point,
 } from './layoutInteraction'
-import {
-  useCanvasViewTabs,
-  type CanvasView,
-} from './useCanvasViewTabs'
+import { useCanvasViewTabs } from './useCanvasViewTabs'
 import {
   normalizeInspectorRect,
   type RectField,
@@ -66,14 +62,12 @@ import {
   nextCanvasZoom,
   type CanvasZoom,
 } from './canvasZoom'
+import type {
+  CanvasView,
+  EditingState,
+  RetouchMode,
+} from './retouchViewState'
 import './App.css'
-
-type Mode = 'text' | 'layout'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
 
 function App() {
   const doc = useJSONDocument(RetouchDeckSchema, SAMPLE_DECK, {
@@ -85,7 +79,7 @@ function App() {
   const suppressBlockClickRef = useRef(false)
   const suppressStageClickRef = useRef(false)
 
-  const [mode, setMode] = useState<Mode>('text')
+  const [mode, setMode] = useState<RetouchMode>('text')
   const [canvasView, setCanvasView] = useState<CanvasView>('slide')
   const [canvasZoom, setCanvasZoom] = useState<CanvasZoom>('fit')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
@@ -287,7 +281,7 @@ function App() {
     clearMarqueeSelection()
   }
 
-  function changeMode(nextMode: Mode) {
+  function changeMode(nextMode: RetouchMode) {
     if (mode === 'text') {
       commitActiveTextEdit()
     }

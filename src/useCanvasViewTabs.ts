@@ -14,8 +14,7 @@ import {
   patternButtonProps,
   patternDivProps,
 } from './apgPatternAdapter'
-
-export type CanvasView = 'slide' | 'grid'
+import type { CanvasView } from './retouchViewState'
 
 type CanvasViewTabProps = Record<
   CanvasView,

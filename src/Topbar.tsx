@@ -21,9 +21,9 @@ import {
   selectedToolbarKeys,
   toolbarItemPropsByKey,
 } from './apgPatternAdapter'
+import type { ResetScope, RetouchMode } from './retouchViewState'
 
-type Mode = 'text' | 'layout'
-type ModeToolbarKey = Mode
+type ModeToolbarKey = RetouchMode
 type ZoomToolbarKey = 'fit' | 'in' | 'out'
 type ActionToolbarKey =
   | 'add-text'
@@ -56,8 +56,8 @@ type TopbarProps = {
   copyTitle: string
   exportCopied: boolean
   exportDownloaded: boolean
-  mode: Mode
-  onChangeMode: (mode: Mode) => void
+  mode: RetouchMode
+  onChangeMode: (mode: RetouchMode) => void
   onCopyExport: () => void
   onDownloadExport: () => void
   onInsertTextBlock: () => void
@@ -68,7 +68,7 @@ type TopbarProps = {
   onZoomFit: () => void
   onZoomIn: () => void
   onZoomOut: () => void
-  resetScope: 'deck' | 'layout' | 'text'
+  resetScope: ResetScope
   resetTitle: string
   zoomLabel: string
 }

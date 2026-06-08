@@ -24,6 +24,7 @@ import {
   retouchSurfaceAdapter,
   retouchSurfaceItems,
 } from './retouchObjectSurface'
+import type { RetouchMode } from './retouchViewState'
 
 const MARQUEE_THRESHOLD = 6
 
@@ -50,7 +51,7 @@ export function useRetouchMarqueeSelection({
 }: {
   activeSlide: RetouchSlide
   activeSlideIndex: number
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   selectedPointers: Pointer[]
   selection: SelectionApi | null | undefined
   slideRef: RefObject<HTMLDivElement | null>

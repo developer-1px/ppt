@@ -6,6 +6,7 @@ import {
   type SlideBlock,
 } from './retouchModel'
 import { rectClose, type DraftLayout } from './layoutInteraction'
+import type { RetouchMode } from './retouchViewState'
 
 export function useVisualSelectionRect({
   activeSlideId,
@@ -19,7 +20,7 @@ export function useVisualSelectionRect({
   activeSlideId: string
   deckValue: unknown
   draftLayout: DraftLayout | null
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   selectedBlock: SlideBlock | null
   selectedPointerCount: number
   slideRef: RefObject<HTMLDivElement | null>

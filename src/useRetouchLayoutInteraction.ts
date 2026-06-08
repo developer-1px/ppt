@@ -33,6 +33,7 @@ import {
   type Point,
   type SnapGuides,
 } from './layoutInteraction'
+import type { RetouchMode } from './retouchViewState'
 
 const DRAG_THRESHOLD = 8
 
@@ -68,7 +69,7 @@ export function useRetouchLayoutInteraction({
   activeSlideIndex: number
   commitPatch: CommitPatch
   deckValue: RetouchDeck
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   selectedBlock: SlideBlock | null
   selectedPointer: Pointer | null
   selectedPointerSet: Set<Pointer>

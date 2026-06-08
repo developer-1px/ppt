@@ -10,13 +10,12 @@ import {
 import {
   arrangeResetEquals,
   textResetEquals,
-  type Point,
 } from './layoutInteraction'
-
-type EditingState = {
-  clientPoint?: Point
-  pointer: Pointer
-}
+import type {
+  EditingState,
+  ResetScope,
+  RetouchMode,
+} from './retouchViewState'
 
 export function useRetouchSelectionState({
   activeSlide,
@@ -32,7 +31,7 @@ export function useRetouchSelectionState({
   editing: EditingState | null
   focusPointer: Pointer | null
   hasDeckChanges: boolean
-  mode: 'text' | 'layout'
+  mode: RetouchMode
   selectedPointersFromDocument: readonly Pointer[]
 }) {
   const selectedPointers = selectedPointersFromDocument.filter((pointer) => {
@@ -75,7 +74,7 @@ export function useRetouchSelectionState({
     mode === 'layout'
       ? canResetSelectedLayout
       : canResetSelectedText || canResetDeck
-  const resetScope: 'deck' | 'layout' | 'text' =
+  const resetScope: ResetScope =
     mode === 'layout' ? 'layout' : selectedPointer ? 'text' : 'deck'
   const resetTitle =
     resetScope === 'layout'
