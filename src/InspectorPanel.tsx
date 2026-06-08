@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useToolbarPattern } from '@interactive-os/aria/react'
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -25,6 +26,11 @@ import type {
 } from './selectionAlignment'
 import type { LayerOrderAction } from './selectionLayerOrder'
 import { SLIDE_ACCENTS } from './slideDeckOperations'
+import {
+  handleToolbarSelection,
+  toolbarPatternData,
+  toolbarItemPropsByKey,
+} from './apgPatternAdapter'
 
 type InspectorPanelProps = {
   activeSlideAccent: string
@@ -45,6 +51,11 @@ type InspectorPanelProps = {
   selectedBlock: SlideBlock | null
   selectedCount: number
   selectedRect: Rect | null
+}
+
+type InspectorToolbarAction<TKey extends string> = {
+  action: TKey
+  label: string
 }
 
 const GEOMETRY_FIELDS: { field: RectField; label: string }[] = [
@@ -94,6 +105,9 @@ const DISTRIBUTION_ACTIONS: {
     label: 'Distribute vertical spacing',
   },
 ]
+
+const DISTRIBUTION_TOOLBAR_KEYS = toolbarActionKeys(DISTRIBUTION_ACTIONS)
+const EMPTY_TOOLBAR_KEYS: readonly string[] = []
 
 export function InspectorPanel({
   activeSlideAccent,
@@ -256,14 +270,22 @@ function DistributionTools({
   disabled: boolean
   onDistributeSelection: (action: DistributeSelectionAction) => void
 }) {
+  const toolbar = useInspectorToolbar<DistributeSelectionAction>({
+    actions: DISTRIBUTION_ACTIONS,
+    disabledKeys: disabled ? DISTRIBUTION_TOOLBAR_KEYS : undefined,
+    elementIdPrefix: 'distribution-tool-',
+    label: 'Distribution',
+    onSelect: onDistributeSelection,
+  })
+
   return (
-    <div aria-label="Distribution" className="distribution-tools" role="toolbar">
+    <div {...toolbar.rootProps} className="distribution-tools">
       {DISTRIBUTION_ACTIONS.map(({ action, icon: Icon, label }) => (
         <button
+          {...toolbar.itemProps[action]}
           aria-label={label}
           disabled={disabled}
           key={action}
-          onClick={() => onDistributeSelection(action)}
           title={label}
           type="button"
         >
@@ -279,13 +301,20 @@ function LayerOrderTools({
 }: {
   onLayerOrderChange: (action: LayerOrderAction) => void
 }) {
+  const toolbar = useInspectorToolbar<LayerOrderAction>({
+    actions: LAYER_ORDER_ACTIONS,
+    elementIdPrefix: 'layer-tool-',
+    label: 'Layer order',
+    onSelect: onLayerOrderChange,
+  })
+
   return (
-    <div aria-label="Layer order" className="layer-tools" role="toolbar">
+    <div {...toolbar.rootProps} className="layer-tools">
       {LAYER_ORDER_ACTIONS.map(({ action, icon: Icon, label }) => (
         <button
+          {...toolbar.itemProps[action]}
           aria-label={label}
           key={action}
-          onClick={() => onLayerOrderChange(action)}
           title={label}
           type="button"
         >
@@ -301,13 +330,20 @@ function AlignmentTools({
 }: {
   onAlignSelection: (action: AlignSelectionAction) => void
 }) {
+  const toolbar = useInspectorToolbar<AlignSelectionAction>({
+    actions: ALIGNMENT_ACTIONS,
+    elementIdPrefix: 'alignment-tool-',
+    label: 'Alignment',
+    onSelect: onAlignSelection,
+  })
+
   return (
-    <div aria-label="Alignment" className="alignment-tools" role="toolbar">
+    <div {...toolbar.rootProps} className="alignment-tools">
       {ALIGNMENT_ACTIONS.map(({ action, icon: Icon, label }) => (
         <button
+          {...toolbar.itemProps[action]}
           aria-label={label}
           key={action}
-          onClick={() => onAlignSelection(action)}
           title={label}
           type="button"
         >
@@ -316,6 +352,70 @@ function AlignmentTools({
       ))}
     </div>
   )
+}
+
+function useInspectorToolbar<TKey extends string>({
+  actions,
+  disabledKeys = EMPTY_TOOLBAR_KEYS as readonly TKey[],
+  elementIdPrefix,
+  label,
+  onSelect,
+}: {
+  actions: readonly InspectorToolbarAction<TKey>[]
+  disabledKeys?: readonly TKey[]
+  elementIdPrefix: string
+  label: string
+  onSelect: (action: TKey) => void
+}) {
+  const rootKeys = useMemo(() => toolbarActionKeys(actions), [actions])
+  const items = useMemo(() => toolbarActionItems(actions), [actions])
+  const data = useMemo(() =>
+    toolbarPatternData<TKey>({
+      disabledKeys,
+      items,
+      label,
+      rootKeys,
+    }), [disabledKeys, items, label, rootKeys])
+  const handlers = useMemo(() =>
+    toolbarSelectionHandlers(actions, onSelect), [actions, onSelect])
+  const toolbar = useToolbarPattern(
+    data,
+    (event) => handleToolbarSelection<TKey>(event, handlers),
+    {
+      elementIdPrefix,
+      orientation: 'horizontal',
+    },
+  )
+
+  return {
+    itemProps: toolbarItemPropsByKey<TKey>(toolbar.renderItems, {
+      omitPressed: true,
+    }),
+    rootProps: toolbar.rootProps,
+  }
+}
+
+function toolbarActionKeys<TKey extends string>(
+  actions: readonly InspectorToolbarAction<TKey>[],
+): readonly TKey[] {
+  return actions.map(({ action }) => action)
+}
+
+function toolbarActionItems<TKey extends string>(
+  actions: readonly InspectorToolbarAction<TKey>[],
+): Record<TKey, { label: string }> {
+  return Object.fromEntries(
+    actions.map(({ action, label }) => [action, { label }]),
+  ) as Record<TKey, { label: string }>
+}
+
+function toolbarSelectionHandlers<TKey extends string>(
+  actions: readonly InspectorToolbarAction<TKey>[],
+  onSelect: (action: TKey) => void,
+): Partial<Record<TKey, () => void>> {
+  return Object.fromEntries(
+    actions.map(({ action }) => [action, () => onSelect(action)]),
+  ) as Partial<Record<TKey, () => void>>
 }
 
 function rectDraft(rect: Rect): Record<RectField, string> {
