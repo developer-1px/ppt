@@ -439,7 +439,11 @@ function App() {
     const blockIndex = activeSlide.blocks.length
     const pointer = blockPointer(activeSlideIndex, blockIndex)
 
-    doc.commit([{ op: 'add', path: pointer, value: nextBlock }], {
+    doc.commit(addBlocksPatch({
+      blocks: [nextBlock],
+      insertIndex: blockIndex,
+      slideIndex: activeSlideIndex,
+    }), {
       label: 'add text block',
       origin: 'ppt-retouch',
       selection: selectionSnapForPointers([pointer]),
