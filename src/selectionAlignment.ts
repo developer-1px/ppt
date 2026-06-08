@@ -1,9 +1,9 @@
 import { unionRects } from '@interactive-os/object-surface'
+import { clamp } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
-  clamp,
   getRect,
   rectEquals,
   type BlockLocation,

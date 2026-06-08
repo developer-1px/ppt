@@ -86,7 +86,6 @@ export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
 export type ResizeHandle = CanvasResizeHandle
 
 export const RESIZE_HANDLES = CANVAS_RESIZE_HANDLES
-export { clamp }
 
 export type BlockLocation = {
   pointer: Pointer

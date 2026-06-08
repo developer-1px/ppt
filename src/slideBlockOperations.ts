@@ -1,9 +1,9 @@
+import { clamp } from 'canvas/core'
 import type { JSONPatchOperation, Pointer } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   blockPointer,
-  clamp,
   type RetouchSlide,
   type SlideBlock,
 } from './retouchModel'

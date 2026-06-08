@@ -1,8 +1,8 @@
+import { clamp } from 'canvas/core'
 import {
   MIN_BLOCK_SIZE,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
-  clamp,
   snap,
   type Rect,
 } from './retouchModel'
