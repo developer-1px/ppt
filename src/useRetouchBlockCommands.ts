@@ -140,19 +140,30 @@ export function useRetouchBlockCommands({
     setBlockClipboard(locations.map((location) => ({ ...location.block })))
   }
 
+  function commitDuplicatedBlocks(
+    blocks: readonly SlideBlock[],
+    insertIndex: number,
+    label: string,
+  ) {
+    commitActiveTextEdit()
+    const duplicatedBlocks = duplicateBlocks(blocks, activeSlide)
+    const primaryPointer = commitInsertedBlocks(duplicatedBlocks, insertIndex, label)
+
+    return primaryPointer ? duplicatedBlocks : null
+  }
+
   function pasteCopiedBlocks() {
     if (blockClipboard.length === 0) {
       return
     }
 
-    commitActiveTextEdit()
-    const pastedBlocks = duplicateBlocks(blockClipboard, activeSlide)
-
-    if (!commitInsertedBlocks(
-      pastedBlocks,
+    const pastedBlocks = commitDuplicatedBlocks(
+      blockClipboard,
       activeSlide.blocks.length,
       'paste blocks',
-    )) {
+    )
+
+    if (!pastedBlocks) {
       return
     }
 
@@ -167,14 +178,8 @@ export function useRetouchBlockCommands({
       return
     }
 
-    commitActiveTextEdit()
-    const duplicatedBlocks = duplicateBlocks(
+    if (!commitDuplicatedBlocks(
       locations.map((location) => location.block),
-      activeSlide,
-    )
-
-    if (!commitInsertedBlocks(
-      duplicatedBlocks,
       locations.at(-1)!.blockIndex + 1,
       locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
     )) {
