@@ -7,7 +7,7 @@ import {
 } from 'zod-crud'
 import {
   RESIZE_HANDLES as CANVAS_RESIZE_HANDLES,
-  clamp as clampNumber,
+  clamp,
   type ResizeHandle as CanvasResizeHandle,
 } from 'canvas/core'
 import { z } from 'zod'
@@ -86,6 +86,7 @@ export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
 export type ResizeHandle = CanvasResizeHandle
 
 export const RESIZE_HANDLES = CANVAS_RESIZE_HANDLES
+export { clamp }
 
 export { SAMPLE_DECK, SAMPLE_SLIDES } from './sampleDeck'
 
@@ -273,10 +274,6 @@ export function rectToAutoHeightStyle(rect: Rect, minimumHeight: number) {
         ? `${(minimumHeight / SLIDE_HEIGHT) * 100}%`
         : undefined,
   }
-}
-
-export function clamp(value: number, min: number, max: number) {
-  return clampNumber(value, min, max)
 }
 
 export function snap(value: number) {
