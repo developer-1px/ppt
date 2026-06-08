@@ -39,7 +39,7 @@ export function createLayoutKeyboardNudgePatch({
     .map((pointer) => {
       const location = blockLocationFromPointer(deckValue, pointer)
 
-      if (!location || location.slide.id !== activeSlideId) {
+      if (location === null || location.slide.id !== activeSlideId) {
         return null
       }
 

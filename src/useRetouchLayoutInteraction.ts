@@ -253,7 +253,7 @@ export function useRetouchLayoutInteraction({
       .map((activePointer) => {
         const location = blockLocationFromPointer(deckValue, activePointer)
 
-        if (!location || location.slide.id !== activeSlideId) {
+        if (location === null || location.slide.id !== activeSlideId) {
           return null
         }
 

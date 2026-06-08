@@ -99,7 +99,7 @@ export function blockLocationFromPointer(
   const slide = deck.slides[slideIndex]
   const block = slide?.blocks[blockIndex]
 
-  if (!slide || !block) {
+  if (slide === undefined || block === undefined) {
     return null
   }
 

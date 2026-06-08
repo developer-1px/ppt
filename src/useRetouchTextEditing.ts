@@ -102,7 +102,7 @@ export function useRetouchTextEditing({
   function commitTextPatch(pointer: Pointer, text: string, rect: Rect) {
     const location = blockLocationFromPointer(deckValue, pointer)
 
-    if (!location) {
+    if (location === null) {
       return deckValue
     }
 

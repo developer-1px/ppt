@@ -100,13 +100,13 @@ export function useRetouchKeyboardShortcuts({
       const blockElement = closestSlideBlockElement(activeElement)
       const blockId = blockElement?.dataset.block
 
-      if (!blockId) {
+      if (blockId === undefined) {
         return
       }
 
       const location = findBlockLocation(deckValue, activeSlideId, blockId)
 
-      if (!location) {
+      if (location === null) {
         return
       }
 
