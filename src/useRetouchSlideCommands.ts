@@ -38,6 +38,7 @@ export function useRetouchSlideCommands({
   stageRef,
 }: UseRetouchSlideCommandsParams) {
   const [notesBySlideId, setNotesBySlideId] = useState<Record<string, string>>({})
+  const slides = doc.value.slides
 
   function activateSlide(
     slideId: string,
@@ -59,7 +60,7 @@ export function useRetouchSlideCommands({
 
   function addSlide() {
     commitActiveTextEdit()
-    const nextSlide = createBlankSlide(doc.value.slides)
+    const nextSlide = createBlankSlide(slides)
     const insertIndex = activeSlideIndex + 1
 
     commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'add slide')
@@ -68,7 +69,7 @@ export function useRetouchSlideCommands({
 
   function copySlide() {
     commitActiveTextEdit()
-    const nextSlide = duplicateSlide(activeSlide, doc.value.slides)
+    const nextSlide = duplicateSlide(activeSlide, slides)
     const insertIndex = activeSlideIndex + 1
 
     commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'duplicate slide')
@@ -80,15 +81,15 @@ export function useRetouchSlideCommands({
   }
 
   function deleteSlide() {
-    if (doc.value.slides.length <= 1) {
+    if (slides.length <= 1) {
       return
     }
 
     commitActiveTextEdit()
     const nextSlide =
-      doc.value.slides[activeSlideIndex + 1] ??
-      doc.value.slides[activeSlideIndex - 1] ??
-      doc.value.slides[0]
+      slides[activeSlideIndex + 1] ??
+      slides[activeSlideIndex - 1] ??
+      slides[0]
 
     const deleted = retouchCollection.deleteSlide(activeSlideIndex)
     if (!deleted.ok) {
@@ -106,7 +107,7 @@ export function useRetouchSlideCommands({
   function moveSlide(direction: -1 | 1) {
     const nextIndex = activeSlideIndex + direction
 
-    if (nextIndex < 0 || nextIndex >= doc.value.slides.length) {
+    if (nextIndex < 0 || nextIndex >= slides.length) {
       return
     }
 
