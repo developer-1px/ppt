@@ -280,6 +280,38 @@ export function SlideBlockElement({
     syncAutoHeight(event.currentTarget)
   }
 
+  function handleTextEventPropagation(event: {
+    stopPropagation: () => void
+  }) {
+    if (editing) {
+      event.stopPropagation()
+    }
+  }
+
+  function handleBlockClick(event: ReactMouseEvent<HTMLElement>) {
+    event.stopPropagation()
+    if (!editing) {
+      onClick(event)
+    }
+  }
+
+  function handleBlockPointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (editing) {
+      event.stopPropagation()
+      return
+    }
+
+    onPointerDown(event)
+  }
+
+  function setEditorElement(element: HTMLElement | null) {
+    editorRef.current = element
+  }
+
+  function setBlockElement(element: HTMLElement | null) {
+    blockRef.current = element
+  }
+
   const textContent = (
     <span
       className={HTML_SLIDE_CLASSES.blockText}
@@ -289,22 +321,12 @@ export function SlideBlockElement({
       })}
       onBeforeInput={editing ? handleBeforeInput : undefined}
       onBlur={editing ? commit : undefined}
-      onClick={(event: ReactMouseEvent<HTMLElement>) => {
-        if (editing) {
-          event.stopPropagation()
-        }
-      }}
+      onClick={handleTextEventPropagation}
       onInput={editing ? handleInput : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
       onPaste={editing ? handlePaste : undefined}
-      onPointerDown={(event: ReactPointerEvent<HTMLElement>) => {
-        if (editing) {
-          event.stopPropagation()
-        }
-      }}
-      ref={(element: HTMLElement | null) => {
-        editorRef.current = element
-      }}
+      onPointerDown={handleTextEventPropagation}
+      ref={setEditorElement}
     >
       {editing ? null : text}
     </span>
@@ -315,23 +337,9 @@ export function SlideBlockElement({
     'data-empty': text.length === 0 ? 'true' : undefined,
     'data-selected': selected ? 'true' : 'false',
     className,
-    onClick: (event: ReactMouseEvent<HTMLElement>) => {
-      event.stopPropagation()
-      if (!editing) {
-        onClick(event)
-      }
-    },
-    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-      if (editing) {
-        event.stopPropagation()
-        return
-      }
-
-      onPointerDown(event)
-    },
-    ref: (element: HTMLElement | null) => {
-      blockRef.current = element
-    },
+    onClick: handleBlockClick,
+    onPointerDown: handleBlockPointerDown,
+    ref: setBlockElement,
     style: rectToAutoHeightStyle(rect, minimumHeight),
     tabIndex: 0,
   }
