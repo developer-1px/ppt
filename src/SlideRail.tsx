@@ -13,8 +13,8 @@ import {
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 import {
   disabledToolbarKeys,
+  useActionToolbarPattern,
   useManagedListboxPattern,
-  useManagedToolbarPattern,
 } from './apgPatternAdapter'
 import { cssVariables } from './cssVariables'
 import './SlideRail.css'
@@ -36,20 +36,15 @@ type SlideRailProps = {
   slides: RetouchSlide[]
 }
 
-type SlideRailActionKey =
-  | 'add'
-  | 'delete'
-  | 'duplicate'
-  | 'move-down'
-  | 'move-up'
-
-const SLIDE_RAIL_ACTION_KEYS = [
-  'add',
-  'duplicate',
-  'move-up',
-  'move-down',
-  'delete',
+const SLIDE_RAIL_ACTIONS = [
+  { action: 'add', icon: Plus, label: 'Add slide' },
+  { action: 'duplicate', icon: Copy, label: 'Duplicate slide' },
+  { action: 'move-up', icon: ArrowUp, label: 'Move slide up' },
+  { action: 'move-down', icon: ArrowDown, label: 'Move slide down' },
+  { action: 'delete', icon: Trash2, label: 'Delete slide' },
 ] as const
+
+type SlideRailActionKey = (typeof SLIDE_RAIL_ACTIONS)[number]['action']
 
 export function SlideRail({
   activeSlideId,
@@ -91,30 +86,31 @@ export function SlideRail({
     onSelect: onSelectSlide,
     rootKeys: slideRailKeys,
   })
-  const railActionToolbar = useManagedToolbarPattern<SlideRailActionKey>({
-    disabledKeys: disabledToolbarKeys<SlideRailActionKey>([
-      ['move-up', !canMoveSlideUp],
-      ['move-down', !canMoveSlideDown],
-      ['delete', !canDeleteSlide],
-    ]),
+  const railActionCommands = {
+    add: onAddSlide,
+    delete: onDeleteSlide,
+    duplicate: onDuplicateSlide,
+    'move-down': onMoveSlideDown,
+    'move-up': onMoveSlideUp,
+  } satisfies Record<SlideRailActionKey, () => void>
+  const railActionDisabled = {
+    add: false,
+    delete: !canDeleteSlide,
+    duplicate: false,
+    'move-down': !canMoveSlideDown,
+    'move-up': !canMoveSlideUp,
+  } satisfies Record<SlideRailActionKey, boolean>
+  const railActionToolbar = useActionToolbarPattern<SlideRailActionKey>({
+    actions: SLIDE_RAIL_ACTIONS,
+    disabledKeys: disabledToolbarKeys<SlideRailActionKey>(
+      SLIDE_RAIL_ACTIONS.map(({ action }) => [
+        action,
+        railActionDisabled[action],
+      ]),
+    ),
     elementIdPrefix: 'slide-action-',
-    handlers: {
-      add: onAddSlide,
-      delete: onDeleteSlide,
-      duplicate: onDuplicateSlide,
-      'move-down': onMoveSlideDown,
-      'move-up': onMoveSlideUp,
-    },
-    items: {
-      add: { label: 'Add slide' },
-      delete: { label: 'Delete slide' },
-      duplicate: { label: 'Duplicate slide' },
-      'move-down': { label: 'Move slide down' },
-      'move-up': { label: 'Move slide up' },
-    },
     label: 'Slide actions',
-    omitPressed: true,
-    rootKeys: SLIDE_RAIL_ACTION_KEYS,
+    onSelect: (action) => railActionCommands[action](),
   })
   const railActionProps = railActionToolbar.itemProps
 
@@ -136,49 +132,18 @@ export function SlideRail({
       </div>
 
       <div {...railActionToolbar.rootProps} className="rail-actions">
-        <button
-          {...railActionProps.add}
-          aria-label="Add slide"
-          title="Add slide"
-          type="button"
-        >
-          <Plus aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-        <button
-          {...railActionProps.duplicate}
-          aria-label="Duplicate slide"
-          title="Duplicate slide"
-          type="button"
-        >
-          <Copy aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-        <button
-          {...railActionProps['move-up']}
-          aria-label="Move slide up"
-          disabled={!canMoveSlideUp}
-          title="Move slide up"
-          type="button"
-        >
-          <ArrowUp aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-        <button
-          {...railActionProps['move-down']}
-          aria-label="Move slide down"
-          disabled={!canMoveSlideDown}
-          title="Move slide down"
-          type="button"
-        >
-          <ArrowDown aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
-        <button
-          {...railActionProps.delete}
-          aria-label="Delete slide"
-          disabled={!canDeleteSlide}
-          title="Delete slide"
-          type="button"
-        >
-          <Trash2 aria-hidden="true" size={15} strokeWidth={2.2} />
-        </button>
+        {SLIDE_RAIL_ACTIONS.map(({ action, icon: Icon, label }) => (
+          <button
+            {...railActionProps[action]}
+            aria-label={label}
+            disabled={railActionDisabled[action]}
+            key={action}
+            title={label}
+            type="button"
+          >
+            <Icon aria-hidden="true" size={15} strokeWidth={2.2} />
+          </button>
+        ))}
       </div>
 
       <div {...slideRailListbox.rootProps} className="slide-list">
