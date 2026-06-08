@@ -75,11 +75,12 @@ export function useRetouchResetActions({
       return
     }
 
+    const baseBlock = baseSelectedLocation.block
     commitPatch(
-      setArrangePatch(selectedPointer, getRect(baseSelectedLocation.block), {
+      setArrangePatch(selectedPointer, getRect(baseBlock), {
         includeHeight:
-          selectedBlock.text === baseSelectedLocation.block.text &&
-          selectedBlock.height !== baseSelectedLocation.block.height,
+          selectedBlock.text === baseBlock.text &&
+          selectedBlock.height !== baseBlock.height,
       }),
       selectedPointer,
       'reset layout',
