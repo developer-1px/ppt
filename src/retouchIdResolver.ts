@@ -9,12 +9,12 @@ import {
   type SlideBlock,
 } from './retouchModel'
 
-export const RETOUCH_ID_SCOPES = {
+const RETOUCH_ID_SCOPES = {
   block: 'block',
   slide: 'slide',
 } as const
 
-export type RetouchIdScope =
+type RetouchIdScope =
   (typeof RETOUCH_ID_SCOPES)[keyof typeof RETOUCH_ID_SCOPES]
 
 export function createRetouchIdResolver(doc: JSONDocument<RetouchDeck>) {
@@ -115,7 +115,7 @@ export function createRetouchDuplicatedSlideBlockId(
   return `${slideId}-block-${blockIndex + 1}`
 }
 
-export function uniqueRetouchBlockId(slide: RetouchSlide, baseId: string) {
+function uniqueRetouchBlockId(slide: RetouchSlide, baseId: string) {
   return uniqueId(
     slide.blocks.map((block) => block.id),
     baseId,
