@@ -188,7 +188,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
   }
 }
 
-export function useManagedToolbarPattern<TKey extends string>({
+function useManagedToolbarPattern<TKey extends string>({
   activeKey,
   disabledKeys = EMPTY_TOOLBAR_KEYS,
   elementIdPrefix,

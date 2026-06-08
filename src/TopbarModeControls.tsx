@@ -1,9 +1,12 @@
-import { useManagedToolbarPattern } from './apgPatternAdapter'
+import { useActionToolbarPattern } from './apgPatternAdapter'
 import type { RetouchMode } from './retouchViewState'
 
-type ModeToolbarKey = RetouchMode
+const MODE_TOOLBAR_ACTIONS = [
+  { action: 'text', label: 'Text' },
+  { action: 'layout', label: 'Arrange' },
+] as const
 
-const MODE_TOOLBAR_KEYS = ['text', 'layout'] as const
+type ModeToolbarKey = (typeof MODE_TOOLBAR_ACTIONS)[number]['action']
 
 export function TopbarModeControls({
   mode,
@@ -12,39 +15,29 @@ export function TopbarModeControls({
   mode: RetouchMode
   onChangeMode: (mode: RetouchMode) => void
 }) {
-  const modeToolbar = useManagedToolbarPattern<ModeToolbarKey>({
+  const modeToolbar = useActionToolbarPattern<ModeToolbarKey>({
     activeKey: mode,
+    actions: MODE_TOOLBAR_ACTIONS,
     elementIdPrefix: 'mode-tool-',
-    handlers: {
-      layout: () => onChangeMode('layout'),
-      text: () => onChangeMode('text'),
-    },
-    items: {
-      layout: { label: 'Arrange' },
-      text: { label: 'Text' },
-    },
     label: 'Mode',
-    rootKeys: MODE_TOOLBAR_KEYS,
+    onSelect: onChangeMode,
+    omitPressed: false,
     selectedKeys: [mode],
   })
   const modeToolbarProps = modeToolbar.itemProps
 
   return (
     <div {...modeToolbar.rootProps} className="mode-toggle">
-      <button
-        {...modeToolbarProps.text}
-        className="mode-button"
-        type="button"
-      >
-        Text
-      </button>
-      <button
-        {...modeToolbarProps.layout}
-        className="mode-button"
-        type="button"
-      >
-        Arrange
-      </button>
+      {MODE_TOOLBAR_ACTIONS.map(({ action, label }) => (
+        <button
+          {...modeToolbarProps[action]}
+          className="mode-button"
+          key={action}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
