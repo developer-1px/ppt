@@ -80,6 +80,8 @@ export function useRetouchBlockCommands({
   stageRef,
 }: UseRetouchBlockCommandsParams) {
   const [blockClipboard, setBlockClipboard] = useState<SlideBlock[]>([])
+  const activeBlocks = activeSlide.blocks
+  const activeBlockCount = activeBlocks.length
 
   function commitInsertedBlocks(
     blocks: readonly SlideBlock[],
@@ -110,7 +112,7 @@ export function useRetouchBlockCommands({
     const nextBlock = createTextBlock(activeSlide)
     const pointer = commitInsertedBlocks(
       [nextBlock],
-      activeSlide.blocks.length,
+      activeBlockCount,
       'add text block',
     )
 
@@ -159,7 +161,7 @@ export function useRetouchBlockCommands({
 
     const pastedBlocks = commitDuplicatedBlocks(
       blockClipboard,
-      activeSlide.blocks.length,
+      activeBlockCount,
       'paste blocks',
     )
 
@@ -199,7 +201,7 @@ export function useRetouchBlockCommands({
     commitActiveTextEdit()
     const nextSelectionIndex = Math.min(
       locations[0].blockIndex,
-      activeSlide.blocks.length - locations.length - 1,
+      activeBlockCount - locations.length - 1,
     )
 
     const deleted = retouchCollection.deleteBlocks(
@@ -312,14 +314,14 @@ export function useRetouchBlockCommands({
   }
 
   function selectAllBlocks() {
-    if (activeSlide.blocks.length === 0) {
+    if (activeBlockCount === 0) {
       doc.selection?.empty()
       return
     }
 
     enterLayoutMode()
     doc.selection?.selectRanges(
-      activeSlide.blocks.map((_, blockIndex) =>
+      activeBlocks.map((_, blockIndex) =>
         blockPointer(activeSlideIndex, blockIndex),
       ),
     )
