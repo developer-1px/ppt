@@ -43,6 +43,17 @@ export function PresentationOverlay({
   onPrevious,
   slideCount,
 }: PresentationOverlayProps) {
+  const presentationControlCommands = {
+    close: onClose,
+    next: onNext,
+    previous: onPrevious,
+  } satisfies Record<PresentationControlKey, () => void>
+
+  function consumePresentationShortcut(event: KeyboardEvent, action: () => void) {
+    event.preventDefault()
+    action()
+  }
+
   const controlToolbar = useActionToolbarPattern<PresentationControlKey>({
     actions: PRESENTATION_CONTROL_ACTIONS,
     activeKey: 'close',
@@ -52,18 +63,13 @@ export function PresentationOverlay({
     ]),
     elementIdPrefix: 'presentation-control-',
     label: 'Presentation',
-    onSelect: (action) => {
-      if (action === 'close') onClose()
-      if (action === 'next') onNext()
-      if (action === 'previous') onPrevious()
-    },
+    onSelect: (action) => presentationControlCommands[action](),
   })
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (matchesShortcut(event, 'Escape')) {
-        event.preventDefault()
-        onClose()
+        consumePresentationShortcut(event, onClose)
         return
       }
 
@@ -72,14 +78,12 @@ export function PresentationOverlay({
       }
 
       if (matchesShortcut(event, 'ArrowRight PageDown Space')) {
-        event.preventDefault()
-        onNext()
+        consumePresentationShortcut(event, onNext)
         return
       }
 
       if (matchesShortcut(event, 'ArrowLeft PageUp')) {
-        event.preventDefault()
-        onPrevious()
+        consumePresentationShortcut(event, onPrevious)
       }
     }
 
