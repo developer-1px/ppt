@@ -87,6 +87,15 @@ export type RetouchSurfaceRuntimeChange = {
   selection?: SelectionSnap
 }
 
+export type RetouchPatchCommitOptions =
+  | string
+  | { label: string; mergeKey?: string; selection?: SelectionSnap }
+
+export type RetouchPatchCommit = (
+  patch: readonly JSONPatchOperation[],
+  options: RetouchPatchCommitOptions,
+) => void
+
 export type RetouchSurfaceCommitPatch = (
   patch: JSONPatchOperation[],
   pointer: Pointer,

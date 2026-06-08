@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import type { JSONDocument, JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
+import type { JSONDocument, Pointer } from 'zod-crud'
 import type { RetouchCollection } from './retouchCollection'
 import {
   blockLocationsFromPointers,
@@ -34,15 +34,11 @@ import {
   normalizeInspectorRect,
   type RectField,
 } from './inspectorGeometry'
-import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
+import type {
+  RetouchPatchCommit,
+  RetouchSurfaceCommitPatch,
+} from './retouchSurfaceContract'
 import type { CanvasView, EditingState, RetouchMode } from './retouchViewState'
-
-type CommitRetouchPatch = (
-  patch: readonly JSONPatchOperation[],
-  options:
-    | string
-    | { label: string; mergeKey?: string; selection?: SelectionSnap },
-) => void
 
 type UseRetouchBlockCommandsParams = {
   activeSlide: RetouchSlide
@@ -50,7 +46,7 @@ type UseRetouchBlockCommandsParams = {
   clearLayoutInteraction: () => void
   commitActiveTextEdit: () => RetouchDeck
   commitPatch: RetouchSurfaceCommitPatch
-  commitRetouchPatch: CommitRetouchPatch
+  commitRetouchPatch: RetouchPatchCommit
   doc: JSONDocument<RetouchDeck>
   enterLayoutMode: () => void
   retouchCollection: RetouchCollection

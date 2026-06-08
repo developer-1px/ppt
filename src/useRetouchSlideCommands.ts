@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import type { JSONDocument, JSONPatchOperation } from 'zod-crud'
+import type { JSONDocument } from 'zod-crud'
 import type { RetouchCollection } from './retouchCollection'
 import type { RetouchDeck, RetouchSlide } from './retouchModel'
 import {
@@ -9,6 +9,7 @@ import {
   setSlideAccentPatch,
   setSlideNamePatch,
 } from './slideDeckOperations'
+import type { RetouchPatchCommit } from './retouchSurfaceContract'
 import type { CanvasView } from './retouchViewState'
 
 type UseRetouchSlideCommandsParams = {
@@ -16,10 +17,7 @@ type UseRetouchSlideCommandsParams = {
   activeSlideIndex: number
   clearTransientState: () => void
   commitActiveTextEdit: () => RetouchDeck
-  commitRetouchPatch: (
-    patch: readonly JSONPatchOperation[],
-    label: string,
-  ) => void
+  commitRetouchPatch: RetouchPatchCommit
   doc: JSONDocument<RetouchDeck>
   retouchCollection: RetouchCollection
   setActiveSlideId: (slideId: string) => void

@@ -37,6 +37,7 @@ import {
   nextCanvasZoom,
   type CanvasZoom,
 } from './canvasZoom'
+import type { RetouchPatchCommit } from './retouchSurfaceContract'
 import type {
   CanvasView,
   EditingState,
@@ -92,13 +93,8 @@ function App() {
     selectedPointersFromDocument: doc.selection?.selectedPointers ?? [],
   })
 
-  const commitRetouchPatch = useCallback(
-    (
-      patch: readonly JSONPatchOperation[],
-      options:
-        | string
-        | { label: string; mergeKey?: string; selection?: SelectionSnap },
-    ) => {
+  const commitRetouchPatch = useCallback<RetouchPatchCommit>(
+    (patch, options) => {
       if (patch.length === 0) {
         return
       }
