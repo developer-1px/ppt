@@ -10,28 +10,21 @@ import {
 } from 'lucide-react'
 import {
   disabledToolbarKeys,
-  useManagedToolbarPattern,
+  useActionToolbarPattern,
 } from './apgPatternAdapter'
 import type { ResetScope } from './retouchViewState'
 
-type ActionToolbarKey =
-  | 'add-text'
-  | 'copy-html'
-  | 'download-html'
-  | 'present'
-  | 'redo'
-  | 'reset'
-  | 'undo'
-
-const ACTION_TOOLBAR_KEYS = [
-  'undo',
-  'redo',
-  'reset',
-  'add-text',
-  'present',
-  'copy-html',
-  'download-html',
+const ACTION_TOOLBAR_ACTIONS = [
+  { action: 'undo', icon: Undo2, label: 'Undo' },
+  { action: 'redo', icon: Redo2, label: 'Redo' },
+  { action: 'reset', icon: RotateCcw, label: 'Reset' },
+  { action: 'add-text', icon: Type, label: 'Add text box' },
+  { action: 'present', icon: Play, label: 'Present' },
+  { action: 'copy-html', icon: Code2, label: 'Copy HTML' },
+  { action: 'download-html', icon: Download, label: 'Download HTML' },
 ] as const
+
+type ActionToolbarKey = (typeof ACTION_TOOLBAR_ACTIONS)[number]['action']
 
 type TopbarActionControlsProps = {
   canRedo: boolean
@@ -70,118 +63,99 @@ export function TopbarActionControls({
   resetScope,
   resetTitle,
 }: TopbarActionControlsProps) {
-  const actionToolbar = useManagedToolbarPattern<ActionToolbarKey>({
-    disabledKeys: disabledToolbarKeys<ActionToolbarKey>([
-      ['undo', !canUndo],
-      ['redo', !canRedo],
-      ['reset', !canReset],
-    ]),
+  const actionCommands = {
+    'add-text': onInsertTextBlock,
+    'copy-html': onCopyExport,
+    'download-html': onDownloadExport,
+    present: onPresent,
+    redo: onRedo,
+    reset: onReset,
+    undo: onUndo,
+  } satisfies Record<ActionToolbarKey, () => void>
+  const actionDisabled = {
+    'add-text': false,
+    'copy-html': false,
+    'download-html': false,
+    present: false,
+    redo: !canRedo,
+    reset: !canReset,
+    undo: !canUndo,
+  } satisfies Record<ActionToolbarKey, boolean>
+  const actionToolbar = useActionToolbarPattern<ActionToolbarKey>({
+    actions: ACTION_TOOLBAR_ACTIONS.map(({ action, label }) => ({
+      action,
+      label: action === 'reset' ? resetTitle : label,
+    })),
+    disabledKeys: disabledToolbarKeys<ActionToolbarKey>(
+      ACTION_TOOLBAR_ACTIONS.map(({ action }) => [
+        action,
+        actionDisabled[action],
+      ] as const),
+    ),
     elementIdPrefix: 'action-tool-',
-    handlers: {
-      'add-text': onInsertTextBlock,
-      'copy-html': onCopyExport,
-      'download-html': onDownloadExport,
-      present: onPresent,
-      redo: onRedo,
-      reset: onReset,
-      undo: onUndo,
-    },
-    items: {
-      'add-text': { label: 'Add text box' },
-      'copy-html': { label: 'Copy HTML' },
-      'download-html': { label: 'Download HTML' },
-      present: { label: 'Present' },
-      redo: { label: 'Redo' },
-      reset: { label: resetTitle },
-      undo: { label: 'Undo' },
-    },
     label: 'Actions',
-    omitPressed: true,
-    rootKeys: ACTION_TOOLBAR_KEYS,
+    onSelect: (action) => actionCommands[action](),
   })
   const actionToolbarProps = actionToolbar.itemProps
 
   return (
     <div {...actionToolbar.rootProps} className="toolbar">
-      <button
-        {...actionToolbarProps.undo}
-        aria-label="Undo"
-        data-action="undo"
-        disabled={!canUndo}
-        title="Undo"
-        type="button"
-      >
-        <Undo2 aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...actionToolbarProps.redo}
-        aria-label="Redo"
-        data-action="redo"
-        disabled={!canRedo}
-        title="Redo"
-        type="button"
-      >
-        <Redo2 aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...actionToolbarProps.reset}
-        aria-label={resetTitle}
-        data-action="reset"
-        data-reset-scope={resetScope}
-        disabled={!canReset}
-        title={resetTitle}
-        type="button"
-      >
-        <RotateCcw aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...actionToolbarProps['add-text']}
-        aria-label="Add text box"
-        data-action="add-text"
-        title="Add text box"
-        type="button"
-      >
-        <Type aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...actionToolbarProps.present}
-        aria-label="Present"
-        data-action="present"
-        title="Present"
-        type="button"
-      >
-        <Play aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...actionToolbarProps['copy-html']}
-        aria-label="Copy HTML"
-        aria-pressed={exportCopied}
-        data-action="copy-html"
-        data-copy-state={copyState}
-        title={copyTitle}
-        type="button"
-      >
-        {exportCopied ? (
-          <Check aria-hidden="true" size={16} strokeWidth={2.4} />
-        ) : (
-          <Code2 aria-hidden="true" size={16} strokeWidth={2.2} />
-        )}
-      </button>
-      <button
-        {...actionToolbarProps['download-html']}
-        aria-label="Download HTML"
-        aria-pressed={exportDownloaded}
-        data-action="download-html"
-        data-download-state={exportDownloaded ? 'downloaded' : 'idle'}
-        title={exportDownloaded ? 'Downloaded' : 'Download HTML'}
-        type="button"
-      >
-        {exportDownloaded ? (
-          <Check aria-hidden="true" size={16} strokeWidth={2.4} />
-        ) : (
-          <Download aria-hidden="true" size={16} strokeWidth={2.2} />
-        )}
-      </button>
+      {ACTION_TOOLBAR_ACTIONS.map(({ action, icon: DefaultIcon, label }) => {
+        const Icon =
+          (action === 'copy-html' && exportCopied) ||
+          (action === 'download-html' && exportDownloaded)
+            ? Check
+            : DefaultIcon
+        const actionLabel = action === 'reset' ? resetTitle : label
+        const title =
+          action === 'copy-html'
+            ? copyTitle
+            : action === 'download-html' && exportDownloaded
+              ? 'Downloaded'
+              : actionLabel
+
+        return (
+          <button
+            {...actionToolbarProps[action]}
+            aria-label={actionLabel}
+            aria-pressed={actionPressed(action, exportCopied, exportDownloaded)}
+            data-action={action}
+            data-copy-state={action === 'copy-html' ? copyState : undefined}
+            data-download-state={
+              action === 'download-html'
+                ? exportDownloaded ? 'downloaded' : 'idle'
+                : undefined
+            }
+            data-reset-scope={action === 'reset' ? resetScope : undefined}
+            disabled={actionDisabled[action]}
+            key={action}
+            title={title}
+            type="button"
+          >
+            <Icon
+              aria-hidden="true"
+              size={16}
+              strokeWidth={Icon === Check ? 2.4 : 2.2}
+            />
+          </button>
+        )
+      })}
     </div>
   )
+}
+
+function actionPressed(
+  action: ActionToolbarKey,
+  exportCopied: boolean,
+  exportDownloaded: boolean,
+) {
+  if (action === 'copy-html') {
+    return exportCopied
+  }
+
+  if (action === 'download-html') {
+    return exportDownloaded
+  }
+
+  return undefined
 }
