@@ -6,7 +6,7 @@ import {
 import type { Point } from 'canvas/core'
 import { GRID_SIZE } from './retouchModel'
 
-export type HistoryShortcutAction = 'redo' | 'undo'
+type HistoryShortcutAction = 'redo' | 'undo'
 
 const REDO_HISTORY_SHORTCUTS = 'Control+Shift+z Meta+Shift+z Control+y Meta+y'
 const UNDO_HISTORY_SHORTCUTS = 'Control+z Meta+z'
