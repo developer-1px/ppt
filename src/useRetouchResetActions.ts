@@ -101,34 +101,37 @@ export function useRetouchResetActions({
       return
     }
 
+    const block = location.block
+    const baseBlock = baseLocation.block
+    const blockRect = getRect(block)
     const editorElements =
       editing?.pointer === pointer
         ? readPlainTextBlockEditorElements(slideRef.current)
         : null
     const liveText = normalizePlainTextBlockEditorText(
-      editorElements?.editorElement.textContent ?? location.block.text,
+      editorElements?.editorElement.textContent ?? block.text,
     )
     const liveMinimumHeight =
       liveText.length === 0
         ? EMPTY_TEXT_BOX_HEIGHT
         : minimumHeightForBlock(
-            location.block,
-            baseLocation.block,
-            getRect(location.block),
+            block,
+            baseBlock,
+            blockRect,
           )
     const liveRect = editorElements
       ? autoHeightRect(
           editorElements.blockElement,
-          getRect(location.block),
+          blockRect,
           liveMinimumHeight,
         )
-      : getRect(location.block)
+      : blockRect
     const resetRect = {
       ...liveRect,
-      height: baseLocation.block.height,
+      height: baseBlock.height,
     }
 
-    if (editorElements && liveText !== location.block.text) {
+    if (editorElements && liveText !== block.text) {
       commitTextPatch(pointer, liveText, liveRect)
     }
 
@@ -136,9 +139,9 @@ export function useRetouchResetActions({
     clearTransientState()
 
     const patch = [
-      ...(liveText !== baseLocation.block.text ||
-      location.block.text !== baseLocation.block.text
-        ? setTextPatch(pointer, baseLocation.block.text)
+      ...(liveText !== baseBlock.text ||
+      block.text !== baseBlock.text
+        ? setTextPatch(pointer, baseBlock.text)
         : []),
       ...(liveRect.height !== resetRect.height
         ? setLayoutPatch(pointer, resetRect)
