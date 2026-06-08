@@ -16,6 +16,7 @@ import {
   useManagedToolbarPattern,
 } from './apgPatternAdapter'
 import type { ResetScope, RetouchMode } from './retouchViewState'
+import './Topbar.css'
 
 type ModeToolbarKey = RetouchMode
 type ZoomToolbarKey = 'fit' | 'in' | 'out'

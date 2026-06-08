@@ -18,103 +18,8 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.topbar {
-  grid-column: 1 / -1;
-  min-width: 0;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #d7dbe3;
-  background: rgba(255, 255, 255, 0.94);
-}
-
-.mode-toggle,
-.zoom-controls,
-.toolbar {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.toolbar {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.zoom-controls {
-  flex: 0 0 auto;
-}
-
 button {
   font: inherit;
-}
-
-.mode-button,
-.zoom-controls button,
-.toolbar button {
-  height: 30px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: #334155;
-  font: 700 13px/1 var(--sans);
-  cursor: pointer;
-}
-
-.mode-button {
-  min-width: 64px;
-  padding: 0 12px;
-}
-
-.toolbar button,
-.zoom-controls button {
-  width: 30px;
-  min-width: 30px;
-  padding: 0;
-}
-
-.mode-button:hover,
-.zoom-controls button:hover:not(:disabled),
-.toolbar button:hover:not(:disabled) {
-  border-color: #cbd5e1;
-  background: #ffffff;
-}
-
-.mode-button[aria-selected='true'],
-.mode-button[aria-pressed='true'],
-.toolbar button[aria-pressed='true'] {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.zoom-value {
-  width: 44px;
-  display: inline-grid;
-  place-items: center;
-  color: #334155;
-  font: 760 12px/1 var(--sans);
-}
-
-.toolbar button[data-copy-state='failed'] {
-  border-color: #dc2626;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.toolbar button:disabled,
-.zoom-controls button:disabled {
-  color: #a1a1aa;
-  cursor: not-allowed;
 }
 
 .stage-shell {
@@ -687,33 +592,6 @@ button {
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-  }
-
-  .topbar {
-    min-height: 44px;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-  }
-
-  .mode-toggle {
-    flex: 1 1 auto;
-    width: auto;
-  }
-
-  .toolbar {
-    flex: 0 0 auto;
-    width: auto;
-  }
-
-  .mode-button {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 0 8px;
-  }
-
-  .toolbar button {
-    flex: 0 0 30px;
   }
 
   .stage-shell {
