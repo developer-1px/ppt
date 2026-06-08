@@ -17,6 +17,7 @@ import {
   useManagedToolbarPattern,
 } from './apgPatternAdapter'
 import { cssVariables } from './cssVariables'
+import './SlideRail.css'
 
 type SlideRailProps = {
   activeSlideId: string
