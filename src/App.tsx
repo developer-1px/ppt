@@ -68,17 +68,20 @@ function App() {
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
 
+  const deckValue = doc.value
+  const slides = deckValue.slides
+  const slideCount = slides.length
   const retouchIds = useMemo(() => createRetouchIdResolver(doc), [doc])
   const retouchCollection = useMemo(() => createRetouchCollection(doc), [doc])
   const activeSlideIndex = Math.max(
     0,
     retouchIds.resolveSlideIndex(activeSlideId) ?? 0,
   )
-  const activeSlide = doc.value.slides[activeSlideIndex] ?? doc.value.slides[0]
+  const activeSlide = slides[activeSlideIndex] ?? slides[0]
   const { hasDeckChanges } = useRetouchDraftPersistence(doc)
   const changedSlideIds = useMemo(
-    () => changedSlideIdsFromBaseline(doc.value),
-    [doc.value],
+    () => changedSlideIdsFromBaseline(deckValue),
+    [deckValue],
   )
   const {
     baseSelectedLocation,
@@ -92,7 +95,7 @@ function App() {
     selectedPointers,
   } = useRetouchSelectionState({
     activeSlide,
-    deckValue: doc.value,
+    deckValue,
     editing,
     focusPointer: doc.selection?.focusPointer ?? null,
     hasDeckChanges,
@@ -146,7 +149,7 @@ function App() {
     activeSlideId: activeSlide.id,
     activeSlideIndex,
     commitPatch,
-    deckValue: doc.value,
+    deckValue,
     mode,
     selectedBlock,
     selectedPointer,
@@ -166,7 +169,7 @@ function App() {
   } = useRetouchTextEditing({
     clearLayoutInteraction,
     commitPatch,
-    deckValue: doc.value,
+    deckValue,
     editing,
     mode,
     selectBlock,
@@ -190,7 +193,7 @@ function App() {
     selectedPointer && selectedBlock
       ? getCurrentRect(selectedPointer, selectedBlock, draftLayout)
       : null
-  const exportCode = useMemo(() => exportRetouchDeck(doc.value), [doc.value])
+  const exportCode = useMemo(() => exportRetouchDeck(deckValue), [deckValue])
   const exportStatusMatchesVisibleSlide = !editing && !interaction && !draftLayout
   const {
     copyExportCode,
@@ -220,7 +223,7 @@ function App() {
     },
     commitPatch,
     commitTextPatch,
-    deckValue: doc.value,
+    deckValue,
     editing,
     hasDeckChanges,
     history: doc.history,
@@ -236,7 +239,7 @@ function App() {
   })
   const visualSelectionRect = useVisualSelectionRect({
     activeSlideId: activeSlide.id,
-    deckValue: doc.value,
+    deckValue,
     draftLayout,
     mode,
     selectedBlock,
@@ -324,7 +327,7 @@ function App() {
   useRetouchKeyboardShortcuts({
     activeSlideId: activeSlide.id,
     commitPatch,
-    deckValue: doc.value,
+    deckValue,
     editing,
     history: doc.history,
     interaction,
@@ -396,19 +399,19 @@ function App() {
     <main className="retouch-app" data-mode={mode}>
       <SlideRail
         activeSlideId={activeSlide.id}
-        canMoveSlideDown={activeSlideIndex < doc.value.slides.length - 1}
+        canMoveSlideDown={activeSlideIndex < slideCount - 1}
         canMoveSlideUp={activeSlideIndex > 0}
         canvasViewTablistProps={canvasViewTablistProps}
         canvasViewTabProps={canvasViewTabProps}
         changedSlideIds={changedSlideIds}
-        canDeleteSlide={doc.value.slides.length > 1}
+        canDeleteSlide={slideCount > 1}
         onAddSlide={addSlide}
         onDeleteSlide={deleteSlide}
         onDuplicateSlide={copySlide}
         onMoveSlideDown={() => moveSlide(1)}
         onMoveSlideUp={() => moveSlide(-1)}
         onSelectSlide={selectSlide}
-        slides={doc.value.slides}
+        slides={slides}
       />
 
       <RetouchWorkspace
@@ -470,7 +473,7 @@ function App() {
         selectedPointerSet={selectedPointerSet}
         selectedPointers={selectedPointers}
         selectedRect={selectedRect}
-        slides={doc.value.slides}
+        slides={slides}
         slideRef={slideRef}
         snapGuides={snapGuides}
         stageRef={stageRef}
@@ -487,7 +490,7 @@ function App() {
           onClose={closePresentation}
           onNext={() => navigatePresentation(1)}
           onPrevious={() => navigatePresentation(-1)}
-          slideCount={doc.value.slides.length}
+          slideCount={slideCount}
         />
       ) : null}
     </main>
