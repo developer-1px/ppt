@@ -1,19 +1,8 @@
 import {
   type ButtonHTMLAttributes,
   type HTMLAttributes,
-  useMemo,
 } from 'react'
-import {
-  reducePatternData,
-  tabsDefinition,
-  useTabsPattern,
-  type PatternData,
-  type PatternEvent,
-} from '@interactive-os/aria/react'
-import {
-  patternButtonProps,
-  patternDivProps,
-} from './apgPatternAdapter'
+import { useManagedTabsPattern } from './apgPatternAdapter'
 import type { CanvasView } from './retouchViewState'
 
 type CanvasViewTabProps = Record<
@@ -33,96 +22,33 @@ type UseCanvasViewTabsResult = {
 }
 
 const CANVAS_VIEW_TABS = [
-  { label: 'Slide', panelKey: 'slide-panel', tabKey: 'slide', view: 'slide' },
-  { label: 'Grid', panelKey: 'grid-panel', tabKey: 'grid', view: 'grid' },
+  { label: 'Slide', panelKey: 'slide-panel', tabKey: 'slide', value: 'slide' },
+  { label: 'Grid', panelKey: 'grid-panel', tabKey: 'grid', value: 'grid' },
 ] as const satisfies readonly {
   label: string
   panelKey: string
   tabKey: string
-  view: CanvasView
+  value: CanvasView
 }[]
 
 export function useCanvasViewTabs({
   canvasView,
   onChange,
 }: UseCanvasViewTabsInput): UseCanvasViewTabsResult {
-  const tabData = useMemo<PatternData>(() => {
-    const activeTab = canvasViewTab(canvasView)
-
-    return {
-      items: Object.fromEntries(
-        CANVAS_VIEW_TABS.flatMap((tab) => [
-          [tab.tabKey, { label: tab.label }],
-          [tab.panelKey, { label: `${tab.label} view` }],
-        ]),
-      ),
-      relations: {
-        controlsByKey: Object.fromEntries(
-          CANVAS_VIEW_TABS.map((tab) => [tab.tabKey, [tab.panelKey]]),
-        ),
-        ownerByKey: Object.fromEntries(
-          CANVAS_VIEW_TABS.map((tab) => [tab.panelKey, tab.tabKey]),
-        ),
-        rootKeys: CANVAS_VIEW_TABS.map((tab) => tab.tabKey),
-      },
-      refs: { label: 'Canvas view' },
-      state: {
-        activeKey: activeTab.tabKey,
-        selectedKeys: [activeTab.tabKey],
-      },
-    }
-  }, [canvasView])
-  const tabs = useTabsPattern(
-    tabData,
-    (event: PatternEvent) => {
-      const nextView = canvasViewFromTabsEvent(tabData, event)
-
-      if (nextView) {
-        onChange(nextView)
-      }
-    },
-    {
-      activationMode: 'automatic',
-      elementIdPrefix: 'canvas-view-',
-      orientation: 'horizontal',
-    },
-  )
+  const tabs = useManagedTabsPattern<CanvasView>({
+    activeValue: canvasView,
+    elementIdPrefix: 'canvas-view-',
+    label: 'Canvas view',
+    onSelect: onChange,
+    tabs: CANVAS_VIEW_TABS,
+  })
 
   return {
-    canvasViewPanelProps: patternDivProps(
-      tabs.getTabPanelProps(canvasViewTab(canvasView).panelKey),
-    ),
-    canvasViewTablistProps: patternDivProps(tabs.getTablistProps()),
+    canvasViewPanelProps: tabs.panelProps,
+    canvasViewTablistProps: tabs.tablistProps,
     canvasViewTabProps: {
-      grid: patternButtonProps(tabs.getTabProps(canvasViewTab('grid').tabKey)),
-      slide: patternButtonProps(tabs.getTabProps(canvasViewTab('slide').tabKey)),
+      grid: tabs.tabPropsByValue.grid,
+      slide: tabs.tabPropsByValue.slide,
     },
   }
-}
-
-function canvasViewTab(view: CanvasView) {
-  return CANVAS_VIEW_TABS.find((tab) => tab.view === view) ?? CANVAS_VIEW_TABS[0]
-}
-
-function canvasViewFromTabKey(
-  tabKey: string | null | undefined,
-): CanvasView | null {
-  return CANVAS_VIEW_TABS.find((tab) => tab.tabKey === tabKey)?.view ?? null
-}
-
-function canvasViewFromTabsEvent(
-  data: PatternData,
-  event: PatternEvent,
-): CanvasView | null {
-  if (event.type === 'select') {
-    return canvasViewFromTabKey(event.keys[0])
-  }
-
-  if (event.type === 'navigate') {
-    const nextData = reducePatternData(tabsDefinition, data, event)
-
-    return canvasViewFromTabKey(nextData.state?.activeKey)
-  }
-
-  return null
 }

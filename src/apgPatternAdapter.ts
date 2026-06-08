@@ -4,9 +4,11 @@ import {
   listboxDefinition,
   radioGroupDefinition,
   reducePatternData,
+  tabsDefinition,
   toolbarDefinition,
   useListboxPattern,
   useRadioGroupPattern,
+  useTabsPattern,
   useToolbarPattern,
 } from '@interactive-os/aria/react'
 import type {
@@ -26,9 +28,60 @@ type ListboxFocusStrategy = NonNullable<PatternOptions['focusStrategy']>
 
 const EMPTY_TOOLBAR_KEYS: readonly never[] = []
 
+type ManagedTabItem<TValue extends string> = {
+  label: string
+  panelKey: string
+  panelLabel?: string
+  tabKey: string
+  value: TValue
+}
+
 export type ActionToolbarItem<TKey extends string> = {
   action: TKey
   label: string
+}
+
+export function useManagedTabsPattern<TValue extends string>({
+  activeValue,
+  elementIdPrefix,
+  label,
+  onSelect,
+  tabs,
+}: {
+  activeValue: TValue
+  elementIdPrefix: string
+  label: string
+  onSelect: (value: TValue) => void
+  tabs: readonly ManagedTabItem<TValue>[]
+}) {
+  const data = useMemo(() =>
+    tabsPatternData<TValue>({
+      activeValue,
+      label,
+      tabs,
+    }), [activeValue, label, tabs])
+  const tabRuntime = useTabsPattern(
+    data,
+    (event) => {
+      const nextValue = nextTabsSelectionValue<TValue>(data, event, tabs)
+
+      if (nextValue) {
+        onSelect(nextValue)
+      }
+    },
+    {
+      activationMode: 'automatic',
+      elementIdPrefix,
+      orientation: 'horizontal',
+    },
+  )
+  const activeTab = activeManagedTab(activeValue, tabs)
+
+  return {
+    panelProps: patternDivProps(tabRuntime.getTabPanelProps(activeTab.panelKey)),
+    tablistProps: patternDivProps(tabRuntime.getTablistProps()),
+    tabPropsByValue: tabsPropsByValue<TValue>(tabRuntime, tabs),
+  }
 }
 
 export function useManagedListboxPattern<TKey extends string>({
@@ -290,6 +343,41 @@ function listboxPatternData<TKey extends string>({
   }
 }
 
+function tabsPatternData<TValue extends string>({
+  activeValue,
+  label,
+  tabs,
+}: {
+  activeValue: TValue
+  label: string
+  tabs: readonly ManagedTabItem<TValue>[]
+}): PatternData {
+  const activeTab = activeManagedTab(activeValue, tabs)
+
+  return {
+    items: Object.fromEntries(
+      tabs.flatMap((tab) => [
+        [tab.tabKey, { label: tab.label }],
+        [tab.panelKey, { label: tab.panelLabel ?? `${tab.label} view` }],
+      ]),
+    ),
+    relations: {
+      controlsByKey: Object.fromEntries(
+        tabs.map((tab) => [tab.tabKey, [tab.panelKey]]),
+      ),
+      ownerByKey: Object.fromEntries(
+        tabs.map((tab) => [tab.panelKey, tab.tabKey]),
+      ),
+      rootKeys: tabs.map((tab) => tab.tabKey),
+    },
+    refs: { label },
+    state: {
+      activeKey: activeTab.tabKey,
+      selectedKeys: [activeTab.tabKey],
+    },
+  }
+}
+
 function selectedPatternKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
@@ -391,6 +479,18 @@ function listboxRenderItems<TKey extends string>(
   }))
 }
 
+function tabsPropsByValue<TValue extends string>(
+  tabRuntime: ReturnType<typeof useTabsPattern>,
+  tabs: readonly ManagedTabItem<TValue>[],
+) {
+  return Object.fromEntries(
+    tabs.map((tab) => [
+      tab.value,
+      patternButtonProps(tabRuntime.getTabProps(tab.tabKey)),
+    ]),
+  ) as Record<TValue, PatternButtonProps>
+}
+
 function firstEnabledToolbarKey<TKey extends string>(
   keys: readonly TKey[],
   disabledKeys: readonly TKey[],
@@ -462,6 +562,45 @@ function nextListboxSelectionKey<TKey extends string>(
   }
 
   return null
+}
+
+function nextTabsSelectionValue<TValue extends string>(
+  data: PatternData,
+  event: PatternEvent,
+  tabs: readonly ManagedTabItem<TValue>[],
+): TValue | null {
+  if (event.type === 'select') {
+    return tabValueFromKey(event.keys[0], tabs)
+  }
+
+  if (event.type === 'navigate') {
+    return tabValueFromKey(
+      reducePatternData(tabsDefinition, data, event).state?.activeKey,
+      tabs,
+    )
+  }
+
+  return null
+}
+
+function tabValueFromKey<TValue extends string>(
+  tabKey: string | null | undefined,
+  tabs: readonly ManagedTabItem<TValue>[],
+): TValue | null {
+  return tabs.find((tab) => tab.tabKey === tabKey)?.value ?? null
+}
+
+function activeManagedTab<TValue extends string>(
+  activeValue: TValue,
+  tabs: readonly ManagedTabItem<TValue>[],
+) {
+  const activeTab = tabs.find((tab) => tab.value === activeValue) ?? tabs[0]
+
+  if (!activeTab) {
+    throw new Error('Managed tabs require at least one tab.')
+  }
+
+  return activeTab
 }
 
 function actionToolbarKeys<TKey extends string>(
