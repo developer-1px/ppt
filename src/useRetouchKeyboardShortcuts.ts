@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { Pointer } from 'zod-crud'
+import type { JSONDocumentHistory, Pointer, SelectionState } from 'zod-crud'
 import {
   blockLocationFromPointer,
   findBlockLocation,
@@ -19,18 +19,6 @@ import {
 import { selectionSnapForPointers, type Interaction } from './layoutInteraction'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
-
-type HistoryApi = {
-  canRedo: boolean
-  canUndo: boolean
-  redo: () => void
-  undo: () => void
-}
-
-type SelectionApi = {
-  empty?: () => void
-  selectRanges?: (pointers: Pointer[]) => void
-}
 
 export function useRetouchKeyboardShortcuts({
   activeSlideId,
@@ -55,7 +43,7 @@ export function useRetouchKeyboardShortcuts({
   commitPatch: RetouchSurfaceCommitPatch
   deckValue: RetouchDeck
   editing: EditingState | null
-  history: HistoryApi
+  history: JSONDocumentHistory
   interaction: Interaction | null
   mode: RetouchMode
   canPasteSelection: boolean
@@ -66,7 +54,7 @@ export function useRetouchKeyboardShortcuts({
   onSelectAllBlocks: () => void
   selectedPointer: Pointer | null
   selectedPointers: Pointer[]
-  selection: SelectionApi | undefined
+  selection: SelectionState | undefined
   setEditing: (editing: EditingState) => void
 }) {
   useEffect(() => {

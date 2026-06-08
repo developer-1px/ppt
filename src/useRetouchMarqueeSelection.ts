@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import type { Pointer } from 'zod-crud'
+import type { Pointer, SelectionState } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
@@ -27,11 +27,6 @@ import {
 import type { RetouchMode } from './retouchViewState'
 
 const MARQUEE_THRESHOLD = 6
-
-type SelectionApi = {
-  empty?: () => void
-  selectRanges?: (pointers: Pointer[]) => void
-}
 
 type MarqueeState = {
   additive: boolean
@@ -53,7 +48,7 @@ export function useRetouchMarqueeSelection({
   activeSlideIndex: number
   mode: RetouchMode
   selectedPointers: Pointer[]
-  selection: SelectionApi | null | undefined
+  selection: SelectionState | null | undefined
   slideRef: RefObject<HTMLDivElement | null>
   suppressStageClickRef: MutableRefObject<boolean>
 }) {

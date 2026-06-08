@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { Pointer } from 'zod-crud'
+import type { JSONDocumentHistory, Pointer, SelectionState } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
   SAMPLE_DECK,
@@ -23,15 +23,6 @@ import {
 } from './plainTextBlockEditor'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { EditingState, RetouchMode } from './retouchViewState'
-
-type HistoryApi = {
-  redo: () => void
-  undo: () => void
-}
-
-type SelectionApi = {
-  empty?: () => void
-}
 
 export function useRetouchResetActions({
   baseSelectedLocation,
@@ -65,12 +56,12 @@ export function useRetouchResetActions({
   deckValue: RetouchDeck
   editing: EditingState | null
   hasDeckChanges: boolean
-  history: HistoryApi
+  history: JSONDocumentHistory
   mode: RetouchMode
   resetExportFeedback: () => void
   selectedBlock: SlideBlock | null
   selectedPointer: Pointer | null
-  selection: SelectionApi | undefined
+  selection: SelectionState | undefined
   setActiveSlideId: (slideId: string) => void
   setEditing: (editing: EditingState | null) => void
   slideRef: RefObject<HTMLDivElement | null>
