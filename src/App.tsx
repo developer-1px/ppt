@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { isAdditivePointerInput } from 'canvas/foundation'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
@@ -358,6 +365,33 @@ function App() {
     doc.selection?.selectRanges([pointer])
   }
 
+  function handleBlockClick(
+    event: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
+    pointer: Pointer,
+  ) {
+    if (suppressBlockClickRef.current) {
+      suppressBlockClickRef.current = false
+      return
+    }
+
+    if (mode === 'layout') {
+      selectBlock(pointer, isAdditivePointerInput(event))
+      return
+    }
+
+    startTextEdit(pointer, {
+      x: event.clientX,
+      y: event.clientY,
+    })
+  }
+
+  function handleStageBackgroundClick() {
+    if (mode === 'text') {
+      commitActiveTextEdit()
+    }
+    doc.selection?.empty()
+  }
+
   return (
     <main className="retouch-app" data-mode={mode}>
       <SlideRail
@@ -402,21 +436,7 @@ function App() {
         mode={mode}
         marqueeRect={marqueeRect}
         notes={activeSlideNotes}
-        onBlockClick={(event, pointer) => {
-          if (suppressBlockClickRef.current) {
-            suppressBlockClickRef.current = false
-            return
-          }
-
-          if (mode === 'layout') {
-            selectBlock(pointer, isAdditivePointerInput(event))
-          } else {
-            startTextEdit(pointer, {
-              x: event.clientX,
-              y: event.clientY,
-            })
-          }
-        }}
+        onBlockClick={handleBlockClick}
         onBlockPointerDown={startMoveInteraction}
         onCancelTextEdit={cancelTextEdit}
         onChangeMode={changeMode}
@@ -442,12 +462,7 @@ function App() {
         onReset={resetCurrentTarget}
         onResizePointerDown={startResizeInteraction}
         onSelectedRectChange={changeSelectedBlockRect}
-        onStageBackgroundClick={() => {
-          if (mode === 'text') {
-            commitActiveTextEdit()
-          }
-          doc.selection?.empty()
-        }}
+        onStageBackgroundClick={handleStageBackgroundClick}
         onUndo={undoDocumentChange}
         resetScope={resetScope}
         resetTitle={resetTitle}
