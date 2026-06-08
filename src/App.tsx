@@ -5,7 +5,7 @@ import {
   SAMPLE_DECK,
   SAMPLE_SLIDES,
   RetouchDeckSchema,
-  blockLocationFromPointer,
+  blockLocationsFromPointers,
   blockPointer,
   getRect,
   rectEquals,
@@ -456,13 +456,9 @@ function App() {
   }
 
   function selectedActiveBlockLocations() {
-    return selectedPointers
-      .map((pointer) => blockLocationFromPointer(doc.value, pointer))
-      .filter(
-        (location): location is NonNullable<typeof location> =>
-          location !== null && location.slide.id === activeSlide.id,
-      )
-      .sort((a, b) => a.blockIndex - b.blockIndex)
+    return blockLocationsFromPointers(doc.value, selectedPointers).filter(
+      (location) => location.slide.id === activeSlide.id,
+    )
   }
 
   function copySelectedBlocks() {

@@ -193,6 +193,16 @@ export function blockLocationFromPointer(
   }
 }
 
+export function blockLocationsFromPointers(
+  deck: RetouchDeck,
+  pointers: readonly Pointer[],
+): BlockLocation[] {
+  return pointers
+    .map((pointer) => blockLocationFromPointer(deck, pointer))
+    .filter((location): location is BlockLocation => location !== null)
+    .sort((a, b) => a.slideIndex - b.slideIndex || a.blockIndex - b.blockIndex)
+}
+
 export function getRect(block: SlideBlock): Rect {
   return {
     x: block.x,
