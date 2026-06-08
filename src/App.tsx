@@ -126,6 +126,28 @@ function App() {
     selectedPointersFromDocument: doc.selection?.selectedPointers ?? [],
   })
 
+  const commitRetouchPatch = useCallback(
+    (
+      patch: readonly JSONPatchOperation[],
+      options:
+        | string
+        | { label: string; mergeKey?: string; selection?: SelectionSnap },
+    ) => {
+      if (patch.length === 0) {
+        return
+      }
+
+      const commitOptions =
+        typeof options === 'string' ? { label: options } : options
+
+      doc.commit(patch, {
+        ...commitOptions,
+        origin: 'ppt-retouch',
+      })
+    },
+    [doc],
+  )
+
   const commitPatch = useCallback(
     (
       patch: JSONPatchOperation[],
@@ -134,18 +156,13 @@ function App() {
       mergeKey?: string,
       selection?: SelectionSnap,
     ) => {
-      if (patch.length === 0) {
-        return
-      }
-
-      doc.commit(patch, {
+      commitRetouchPatch(patch, {
         label,
         mergeKey,
-        origin: 'ppt-retouch',
         selection: selection ?? selectionSnapForPointers([pointer]),
       })
     },
-    [doc],
+    [commitRetouchPatch],
   )
 
   const {
@@ -230,10 +247,7 @@ function App() {
     clearTransientState,
     commitActiveTextEdit,
     commitDeckReset: () => {
-      doc.commit([{ op: 'replace', path: '', value: SAMPLE_DECK }], {
-        label: 'reset deck',
-        origin: 'ppt-retouch',
-      })
+      commitRetouchPatch([{ op: 'replace', path: '', value: SAMPLE_DECK }], 'reset deck')
     },
     commitPatch,
     commitTextPatch,
@@ -343,10 +357,7 @@ function App() {
     const nextSlide = createBlankSlide(doc.value.slides)
     const insertIndex = activeSlideIndex + 1
 
-    doc.commit(addSlidePatch(nextSlide, insertIndex), {
-      label: 'add slide',
-      origin: 'ppt-retouch',
-    })
+    commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'add slide')
     activateSlide(nextSlide.id)
   }
 
@@ -355,10 +366,7 @@ function App() {
     const nextSlide = duplicateSlide(activeSlide, doc.value.slides)
     const insertIndex = activeSlideIndex + 1
 
-    doc.commit(addSlidePatch(nextSlide, insertIndex), {
-      label: 'duplicate slide',
-      origin: 'ppt-retouch',
-    })
+    commitRetouchPatch(addSlidePatch(nextSlide, insertIndex), 'duplicate slide')
     setNotesBySlideId((current) => ({
       ...current,
       [nextSlide.id]: current[activeSlide.id] ?? '',
@@ -417,10 +425,7 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(setSlideNamePatch(activeSlideIndex, nextName), {
-      label: 'rename slide',
-      origin: 'ppt-retouch',
-    })
+    commitRetouchPatch(setSlideNamePatch(activeSlideIndex, nextName), 'rename slide')
     clearTransientState()
   }
 
@@ -430,10 +435,7 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(setSlideAccentPatch(activeSlideIndex, accent), {
-      label: 'change slide accent',
-      origin: 'ppt-retouch',
-    })
+    commitRetouchPatch(setSlideAccentPatch(activeSlideIndex, accent), 'change slide accent')
     clearTransientState()
   }
 
@@ -452,9 +454,8 @@ function App() {
       return
     }
 
-    doc.commit(insertPatch.operations, {
+    commitRetouchPatch(insertPatch.operations, {
       label: 'add text block',
-      origin: 'ppt-retouch',
       selection: selectionSnapForPointers([pointer]),
     })
     setCanvasView('slide')
@@ -494,9 +495,8 @@ function App() {
       slideIndex: activeSlideIndex,
     })
 
-    doc.commit(insertPatch.operations, {
+    commitRetouchPatch(insertPatch.operations, {
       label: 'paste blocks',
-      origin: 'ppt-retouch',
       selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
     setBlockClipboard(pastedBlocks)
@@ -522,9 +522,8 @@ function App() {
       slideIndex: activeSlideIndex,
     })
 
-    doc.commit(insertPatch.operations, {
+    commitRetouchPatch(insertPatch.operations, {
       label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
-      origin: 'ppt-retouch',
       selection: selectionSnapForPointers(insertPatch.insertedPointers),
     })
     enterLayoutMode()
@@ -618,11 +617,10 @@ function App() {
     }
 
     commitActiveTextEdit()
-    doc.commit(
+    commitRetouchPatch(
       layerOrderPatch.operations,
       {
         label: 'reorder layers',
-        origin: 'ppt-retouch',
         selection: selectionSnapForPointers(
           layerOrderPatch.nextSelectedPointers,
           layerOrderPatch.nextSelectedPointers.at(-1),
