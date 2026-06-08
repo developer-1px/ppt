@@ -41,7 +41,7 @@ export function useRetouchSelectionState({
   })
   const selectedPointerSet = new Set(selectedPointers)
   const primaryPointer =
-    focusPointer && selectedPointerSet.has(focusPointer)
+    focusPointer !== null && selectedPointerSet.has(focusPointer)
       ? focusPointer
       : (selectedPointers.at(-1) ?? null)
   const selectedLocation = useMemo(

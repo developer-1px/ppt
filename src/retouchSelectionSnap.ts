@@ -7,10 +7,10 @@ export function selectionSnapForPointers(
   const selectedPointers = [...new Set(pointers)]
   const fallbackPrimary = selectedPointers.at(-1) ?? null
   const primary =
-    primaryPointer && selectedPointers.includes(primaryPointer)
+    primaryPointer !== undefined && selectedPointers.includes(primaryPointer)
       ? primaryPointer
       : fallbackPrimary
-  const primaryIndex = primary ? selectedPointers.indexOf(primary) : -1
+  const primaryIndex = primary !== null ? selectedPointers.indexOf(primary) : -1
 
   return {
     anchor: primary,
