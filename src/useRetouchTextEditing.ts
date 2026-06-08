@@ -78,19 +78,21 @@ export function useRetouchTextEditing({
     const text = normalizePlainTextBlockEditorText(
       editorElements.editorElement.textContent ?? '',
     )
+    const block = location.block
+    const blockRect = getRect(block)
     const baseBlock = findBlockLocation(
       SAMPLE_DECK,
       location.slide.id,
-      location.block.id,
+      block.id,
     )?.block
     const minimumHeight = minimumHeightForBlock(
-      location.block,
+      block,
       baseBlock,
-      getRect(location.block),
+      blockRect,
     )
     const rect = autoHeightRect(
       editorElements.blockElement,
-      getRect(location.block),
+      blockRect,
       minimumHeight,
     )
 
@@ -104,8 +106,9 @@ export function useRetouchTextEditing({
       return deckValue
     }
 
-    const currentRect = getRect(location.block)
-    const textChanged = text !== location.block.text
+    const block = location.block
+    const currentRect = getRect(block)
+    const textChanged = text !== block.text
     const layoutChanged =
       rect.x !== currentRect.x ||
       rect.y !== currentRect.y ||
