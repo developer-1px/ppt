@@ -74,8 +74,12 @@ export function isPlainTextBlockEditorPrintableKey(
 }
 
 export function readPlainTextBlockEditorBeforeInput(
-  event: InputEvent,
+  event: Event,
 ): PlainTextBlockEditorBeforeInput | null {
+  if (!(event instanceof InputEvent)) {
+    return null
+  }
+
   if (event.isComposing) {
     return null
   }

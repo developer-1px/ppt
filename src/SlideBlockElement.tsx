@@ -243,9 +243,7 @@ export function SlideBlockElement({
   }
 
   function handleBeforeInput(event: ReactFormEvent<HTMLElement>) {
-    const input = readPlainTextBlockEditorBeforeInput(
-      event.nativeEvent as InputEvent,
-    )
+    const input = readPlainTextBlockEditorBeforeInput(event.nativeEvent)
 
     if (!input) {
       return
