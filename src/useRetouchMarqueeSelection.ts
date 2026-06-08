@@ -3,7 +3,7 @@ import {
   selectSurfaceObjectsInMarquee,
 } from '@interactive-os/object-surface'
 import { isAdditivePointerInput } from 'canvas/foundation'
-import { clamp, type Point } from 'canvas/core'
+import type { Point } from 'canvas/core'
 import {
   useCallback,
   useEffect,
@@ -14,8 +14,6 @@ import {
 } from 'react'
 import type { Pointer, SelectionState } from 'zod-crud'
 import {
-  SLIDE_HEIGHT,
-  SLIDE_WIDTH,
   type Rect,
   type RetouchSlide,
 } from './retouchModel'
@@ -25,6 +23,7 @@ import {
   retouchSurfaceAdapter,
   retouchSurfaceItems,
 } from './retouchObjectSurface'
+import { readSlidePoint } from './retouchSlideDom'
 import type { RetouchMode } from './retouchViewState'
 
 const MARQUEE_THRESHOLD = 6
@@ -55,19 +54,6 @@ export function useRetouchMarqueeSelection({
 }) {
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
 
-  const readSlidePoint = useCallback((event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
-    const rect = slideRef.current?.getBoundingClientRect()
-
-    if (!rect) {
-      return null
-    }
-
-    return {
-      x: clamp(((event.clientX - rect.left) / rect.width) * SLIDE_WIDTH, 0, SLIDE_WIDTH),
-      y: clamp(((event.clientY - rect.top) / rect.height) * SLIDE_HEIGHT, 0, SLIDE_HEIGHT),
-    }
-  }, [slideRef])
-
   const startMarqueeSelection = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (mode !== 'layout' || event.button !== 0) {
@@ -80,7 +66,7 @@ export function useRetouchMarqueeSelection({
         return
       }
 
-      const point = readSlidePoint(event)
+      const point = readSlidePoint(slideRef.current, event)
 
       if (!point) {
         return
@@ -98,7 +84,7 @@ export function useRetouchMarqueeSelection({
         startPoint: point,
       })
     },
-    [mode, readSlidePoint],
+    [mode, slideRef],
   )
 
   const clearMarqueeSelection = useCallback(() => {
@@ -113,7 +99,7 @@ export function useRetouchMarqueeSelection({
     const currentMarquee = marquee
 
     function handlePointerMove(event: PointerEvent) {
-      const point = readSlidePoint(event)
+      const point = readSlidePoint(slideRef.current, event)
 
       if (!point || !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)) {
         return
@@ -130,7 +116,7 @@ export function useRetouchMarqueeSelection({
     }
 
     function handlePointerUp(event: PointerEvent) {
-      const point = readSlidePoint(event)
+      const point = readSlidePoint(slideRef.current, event)
 
       if (!point || !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)) {
         setMarquee(null)
@@ -171,9 +157,9 @@ export function useRetouchMarqueeSelection({
     activeSlideIndex,
     clearMarqueeSelection,
     marquee,
-    readSlidePoint,
     selectedPointers,
     selection,
+    slideRef,
     suppressStageClickRef,
   ])
 

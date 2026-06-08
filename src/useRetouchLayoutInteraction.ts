@@ -8,15 +8,12 @@ import {
 } from 'react'
 import { isAdditivePointerInput } from 'canvas/foundation'
 import {
-  clamp,
   pointDistance,
   type Point,
   type ResizeHandle,
 } from 'canvas/core'
 import type { Pointer } from 'zod-crud'
 import {
-  SLIDE_HEIGHT,
-  SLIDE_WIDTH,
   blockLocationFromPointer,
   resizeRect,
   setArrangePatch,
@@ -35,6 +32,7 @@ import {
   type SnapGuides,
 } from './layoutInteraction'
 import { selectionSnapForPointers } from './retouchSelectionSnap'
+import { readSlideBlockRect, readSlidePoint } from './retouchSlideDom'
 import type { RetouchSurfaceCommitPatch } from './retouchSurfaceContract'
 import type { RetouchMode } from './retouchViewState'
 
@@ -87,37 +85,8 @@ export function useRetouchLayoutInteraction({
     setSnapGuides({ x: null, y: null })
   }, [])
 
-  const readSlidePoint = useCallback((event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
-    const rect = slideRef.current?.getBoundingClientRect()
-
-    if (!rect) {
-      return null
-    }
-
-    return {
-      x: clamp(((event.clientX - rect.left) / rect.width) * SLIDE_WIDTH, 0, SLIDE_WIDTH),
-      y: clamp(((event.clientY - rect.top) / rect.height) * SLIDE_HEIGHT, 0, SLIDE_HEIGHT),
-    }
-  }, [slideRef])
-
   const readBlockVisualRect = useCallback((blockId: string, fallback: Rect) => {
-    const slideElement = slideRef.current
-    const slideRect = slideElement?.getBoundingClientRect()
-    const blockElement = Array.from(
-      slideElement?.querySelectorAll<HTMLElement>('[data-block]') ?? [],
-    ).find((element) => element.dataset.block === blockId)
-    const blockRect = blockElement?.getBoundingClientRect()
-
-    if (!slideRect || !blockRect || slideRect.width === 0 || slideRect.height === 0) {
-      return fallback
-    }
-
-    return {
-      x: ((blockRect.left - slideRect.left) / slideRect.width) * SLIDE_WIDTH,
-      y: ((blockRect.top - slideRect.top) / slideRect.height) * SLIDE_HEIGHT,
-      width: (blockRect.width / slideRect.width) * SLIDE_WIDTH,
-      height: (blockRect.height / slideRect.height) * SLIDE_HEIGHT,
-    }
+    return readSlideBlockRect(slideRef.current, blockId) ?? fallback
   }, [slideRef])
 
   const calculateInteractionState = useCallback(
@@ -158,7 +127,7 @@ export function useRetouchLayoutInteraction({
     const currentInteraction = interaction
 
     function handlePointerMove(event: PointerEvent) {
-      const point = readSlidePoint(event)
+      const point = readSlidePoint(slideRef.current, event)
 
       if (!point) {
         return
@@ -181,7 +150,7 @@ export function useRetouchLayoutInteraction({
     }
 
     function handlePointerUp(event: PointerEvent) {
-      const point = readSlidePoint(event)
+      const point = readSlidePoint(slideRef.current, event)
 
       if (
         !point ||
@@ -244,7 +213,7 @@ export function useRetouchLayoutInteraction({
     clearLayoutInteraction,
     commitPatch,
     interaction,
-    readSlidePoint,
+    slideRef,
     suppressBlockClickRef,
     suppressStageClickRef,
   ])
@@ -258,7 +227,7 @@ export function useRetouchLayoutInteraction({
       return
     }
 
-    const point = readSlidePoint(event)
+    const point = readSlidePoint(slideRef.current, event)
 
     if (!point) {
       return
@@ -328,7 +297,7 @@ export function useRetouchLayoutInteraction({
       return
     }
 
-    const point = readSlidePoint(event)
+    const point = readSlidePoint(slideRef.current, event)
 
     if (!point) {
       return

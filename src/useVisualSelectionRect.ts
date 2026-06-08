@@ -1,11 +1,10 @@
 import { useLayoutEffect, useState, type RefObject } from 'react'
 import {
-  SLIDE_HEIGHT,
-  SLIDE_WIDTH,
   type Rect,
   type SlideBlock,
 } from './retouchModel'
 import { rectClose, type DraftLayout } from './layoutInteraction'
+import { readSlideBlockRect } from './retouchSlideDom'
 import type { RetouchMode } from './retouchViewState'
 
 export function useVisualSelectionRect({
@@ -38,27 +37,17 @@ export function useVisualSelectionRect({
       return
     }
 
-    const slideBox = slideRef.current.getBoundingClientRect()
-    const block = slideRef.current.querySelector<HTMLElement>(
-      `[data-block="${selectedBlock.id}"]`,
-    )
+    const nextRect = readSlideBlockRect(slideRef.current, selectedBlock.id)
 
-    if (!block || slideBox.width === 0 || slideBox.height === 0) {
-      setVisualSelectionRect(null)
-      return
-    }
+    setVisualSelectionRect((currentRect) => {
+      if (!nextRect) {
+        return null
+      }
 
-    const blockBox = block.getBoundingClientRect()
-    const nextRect = {
-      x: ((blockBox.left - slideBox.left) / slideBox.width) * SLIDE_WIDTH,
-      y: ((blockBox.top - slideBox.top) / slideBox.height) * SLIDE_HEIGHT,
-      width: (blockBox.width / slideBox.width) * SLIDE_WIDTH,
-      height: (blockBox.height / slideBox.height) * SLIDE_HEIGHT,
-    }
-
-    setVisualSelectionRect((currentRect) =>
-      currentRect && rectClose(currentRect, nextRect) ? currentRect : nextRect,
-    )
+      return currentRect && rectClose(currentRect, nextRect)
+        ? currentRect
+        : nextRect
+    })
   }, [
     activeSlideId,
     deckValue,
