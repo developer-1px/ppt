@@ -2,13 +2,6 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
-  reducePatternData,
-  tabsDefinition,
-  useTabsPattern,
-  type PatternData,
-  type PatternEvent,
-} from '@interactive-os/aria/react'
-import {
   MIN_BLOCK_SIZE,
   SAMPLE_DECK,
   SAMPLE_SLIDES,
@@ -64,26 +57,16 @@ import {
   type Point,
 } from './layoutInteraction'
 import {
-  patternButtonProps,
-  patternDivProps,
-} from './apgPatternAdapter'
+  useCanvasViewTabs,
+  type CanvasView,
+} from './useCanvasViewTabs'
 import './App.css'
 
 type Mode = 'text' | 'layout'
-type CanvasView = 'slide' | 'grid'
 type RectField = keyof Rect
 type CanvasZoom = 'fit' | number
 
 const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2]
-const CANVAS_VIEW_TABS = [
-  { label: 'Slide', panelKey: 'slide-panel', tabKey: 'slide', view: 'slide' },
-  { label: 'Grid', panelKey: 'grid-panel', tabKey: 'grid', view: 'grid' },
-] as const satisfies readonly {
-  label: string
-  panelKey: string
-  tabKey: string
-  view: CanvasView
-}[]
 
 type EditingState = {
   clientPoint?: Point
@@ -92,31 +75,6 @@ type EditingState = {
 
 function finiteNumber(value: number, fallback: number) {
   return Number.isFinite(value) ? value : fallback
-}
-
-function canvasViewTab(view: CanvasView) {
-  return CANVAS_VIEW_TABS.find((tab) => tab.view === view) ?? CANVAS_VIEW_TABS[0]
-}
-
-function canvasViewFromTabKey(tabKey: string | null | undefined): CanvasView | null {
-  return CANVAS_VIEW_TABS.find((tab) => tab.tabKey === tabKey)?.view ?? null
-}
-
-function canvasViewFromTabsEvent(
-  data: PatternData,
-  event: PatternEvent,
-): CanvasView | null {
-  if (event.type === 'select') {
-    return canvasViewFromTabKey(event.keys[0])
-  }
-
-  if (event.type === 'navigate') {
-    const nextData = reducePatternData(tabsDefinition, data, event)
-
-    return canvasViewFromTabKey(nextData.state?.activeKey)
-  }
-
-  return null
 }
 
 function normalizeInspectorRect(
@@ -396,61 +354,14 @@ function App() {
     setCanvasView(nextView)
   }
 
-  const canvasViewTabData = useMemo<PatternData>(() => {
-    const activeTab = canvasViewTab(canvasView)
-
-    return {
-      items: Object.fromEntries(
-        CANVAS_VIEW_TABS.flatMap((tab) => [
-          [tab.tabKey, { label: tab.label }],
-          [tab.panelKey, { label: `${tab.label} view` }],
-        ]),
-      ),
-      relations: {
-        controlsByKey: Object.fromEntries(
-          CANVAS_VIEW_TABS.map((tab) => [tab.tabKey, [tab.panelKey]]),
-        ),
-        ownerByKey: Object.fromEntries(
-          CANVAS_VIEW_TABS.map((tab) => [tab.panelKey, tab.tabKey]),
-        ),
-        rootKeys: CANVAS_VIEW_TABS.map((tab) => tab.tabKey),
-      },
-      refs: { label: 'Canvas view' },
-      state: {
-        activeKey: activeTab.tabKey,
-        selectedKeys: [activeTab.tabKey],
-      },
-    }
-  }, [canvasView])
-  const canvasViewTabs = useTabsPattern(
-    canvasViewTabData,
-    (event: PatternEvent) => {
-      const nextView = canvasViewFromTabsEvent(canvasViewTabData, event)
-
-      if (nextView) {
-        changeCanvasView(nextView)
-      }
-    },
-    {
-      activationMode: 'automatic',
-      elementIdPrefix: 'canvas-view-',
-      orientation: 'horizontal',
-    },
-  )
-  const canvasViewPanelProps = patternDivProps(
-    canvasViewTabs.getTabPanelProps(canvasViewTab(canvasView).panelKey),
-  )
-  const canvasViewTabProps = {
-    grid: patternButtonProps(
-      canvasViewTabs.getTabProps(canvasViewTab('grid').tabKey),
-    ),
-    slide: patternButtonProps(
-      canvasViewTabs.getTabProps(canvasViewTab('slide').tabKey),
-    ),
-  }
-  const canvasViewTablistProps = patternDivProps(
-    canvasViewTabs.getTablistProps(),
-  )
+  const {
+    canvasViewPanelProps,
+    canvasViewTabProps,
+    canvasViewTablistProps,
+  } = useCanvasViewTabs({
+    canvasView,
+    onChange: changeCanvasView,
+  })
 
   function zoomStep(direction: -1 | 1) {
     const currentZoom = canvasZoom === 'fit' ? 1 : canvasZoom
