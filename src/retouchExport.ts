@@ -118,6 +118,8 @@ function buildRetouchPatchManifest(
       const baseBlock = baseSlide?.blocks.find(
         (candidate) => candidate.id === block.id,
       )
+      const rect = getRect(block)
+      const baseRect = baseBlock ? getRect(baseBlock) : null
 
       if (!baseBlock || block.text !== baseBlock.text) {
         text.push({
@@ -127,11 +129,11 @@ function buildRetouchPatchManifest(
         })
       }
 
-      if (!baseBlock || !rectEquals(getRect(block), getRect(baseBlock))) {
+      if (!baseRect || !rectEquals(rect, baseRect)) {
         layout.push({
           slideId: slide.id,
           blockId: block.id,
-          rect: getRect(block),
+          rect,
         })
       }
     }
