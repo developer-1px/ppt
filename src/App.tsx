@@ -24,6 +24,7 @@ import { createRetouchCollection } from './retouchCollection'
 import { createRetouchIdResolver } from './retouchIdResolver'
 import { useRetouchSlideCommands } from './useRetouchSlideCommands'
 import { useRetouchBlockCommands } from './useRetouchBlockCommands'
+import { useRetouchPresentationCommands } from './useRetouchPresentationCommands'
 import {
   getCurrentRect,
   selectionSnapForPointers,
@@ -58,7 +59,6 @@ function App() {
   const [canvasZoom, setCanvasZoom] = useState<CanvasZoom>('fit')
   const [activeSlideId, setActiveSlideId] = useState(SAMPLE_SLIDES[0].id)
   const [editing, setEditing] = useState<EditingState | null>(null)
-  const [presenting, setPresenting] = useState(false)
 
   const retouchIds = useMemo(() => createRetouchIdResolver(doc), [doc])
   const retouchCollection = useMemo(() => createRetouchCollection(doc), [doc])
@@ -360,33 +360,20 @@ function App() {
     setEditing,
   })
 
-  function startPresentation() {
-    commitActiveTextEdit()
-    setCanvasView('slide')
-    doc.selection?.empty()
-    clearTransientState()
-    setPresenting(true)
-  }
-
-  function closePresentation() {
-    setPresenting(false)
-  }
-
-  function navigatePresentation(direction: -1 | 1) {
-    const nextIndex = Math.min(
-      doc.value.slides.length - 1,
-      Math.max(0, activeSlideIndex + direction),
-    )
-    const nextSlide = doc.value.slides[nextIndex]
-
-    if (!nextSlide || nextSlide.id === activeSlide.id) {
-      return
-    }
-
-    setActiveSlideId(nextSlide.id)
-    doc.selection?.empty()
-    clearTransientState()
-  }
+  const {
+    closePresentation,
+    navigatePresentation,
+    presenting,
+    startPresentation,
+  } = useRetouchPresentationCommands({
+    activeSlide,
+    activeSlideIndex,
+    clearTransientState,
+    commitActiveTextEdit,
+    doc,
+    setActiveSlideId,
+    setCanvasView,
+  })
 
   function selectBlock(pointer: Pointer, additive = false) {
     if (additive) {
