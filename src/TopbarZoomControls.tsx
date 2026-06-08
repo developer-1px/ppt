@@ -3,14 +3,19 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
+import { Fragment } from 'react'
 import {
   disabledToolbarKeys,
-  useManagedToolbarPattern,
+  useActionToolbarPattern,
 } from './apgPatternAdapter'
 
-type ZoomToolbarKey = 'fit' | 'in' | 'out'
+const ZOOM_TOOLBAR_ACTIONS = [
+  { action: 'out', icon: ZoomOut, label: 'Zoom out' },
+  { action: 'in', icon: ZoomIn, label: 'Zoom in' },
+  { action: 'fit', icon: Maximize2, label: 'Fit canvas' },
+] as const
 
-const ZOOM_TOOLBAR_KEYS = ['out', 'in', 'fit'] as const
+type ZoomToolbarKey = (typeof ZOOM_TOOLBAR_ACTIONS)[number]['action']
 
 export function TopbarZoomControls({
   canZoomIn,
@@ -27,59 +32,50 @@ export function TopbarZoomControls({
   onZoomOut: () => void
   zoomLabel: string
 }) {
-  const zoomToolbar = useManagedToolbarPattern<ZoomToolbarKey>({
-    disabledKeys: disabledToolbarKeys<ZoomToolbarKey>([
-      ['out', !canZoomOut],
-      ['in', !canZoomIn],
-    ]),
+  const zoomCommands = {
+    fit: onZoomFit,
+    in: onZoomIn,
+    out: onZoomOut,
+  } satisfies Record<ZoomToolbarKey, () => void>
+  const zoomDisabled = {
+    fit: false,
+    in: !canZoomIn,
+    out: !canZoomOut,
+  } satisfies Record<ZoomToolbarKey, boolean>
+  const zoomToolbar = useActionToolbarPattern<ZoomToolbarKey>({
+    actions: ZOOM_TOOLBAR_ACTIONS,
+    disabledKeys: disabledToolbarKeys<ZoomToolbarKey>(
+      ZOOM_TOOLBAR_ACTIONS.map(({ action }) => [
+        action,
+        zoomDisabled[action],
+      ] as const),
+    ),
     elementIdPrefix: 'zoom-tool-',
-    handlers: {
-      fit: onZoomFit,
-      in: onZoomIn,
-      out: onZoomOut,
-    },
-    items: {
-      fit: { label: 'Fit canvas' },
-      in: { label: 'Zoom in' },
-      out: { label: 'Zoom out' },
-    },
     label: 'Canvas zoom',
-    omitPressed: true,
-    rootKeys: ZOOM_TOOLBAR_KEYS,
+    onSelect: (action) => zoomCommands[action](),
   })
   const zoomToolbarProps = zoomToolbar.itemProps
 
   return (
     <div {...zoomToolbar.rootProps} className="zoom-controls">
-      <button
-        {...zoomToolbarProps.out}
-        aria-label="Zoom out"
-        disabled={!canZoomOut}
-        title="Zoom out"
-        type="button"
-      >
-        <ZoomOut aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <span aria-live="polite" className="zoom-value">
-        {zoomLabel}
-      </span>
-      <button
-        {...zoomToolbarProps.in}
-        aria-label="Zoom in"
-        disabled={!canZoomIn}
-        title="Zoom in"
-        type="button"
-      >
-        <ZoomIn aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
-      <button
-        {...zoomToolbarProps.fit}
-        aria-label="Fit canvas"
-        title="Fit canvas"
-        type="button"
-      >
-        <Maximize2 aria-hidden="true" size={16} strokeWidth={2.2} />
-      </button>
+      {ZOOM_TOOLBAR_ACTIONS.map(({ action, icon: Icon, label }, index) => (
+        <Fragment key={action}>
+          <button
+            {...zoomToolbarProps[action]}
+            aria-label={label}
+            disabled={zoomDisabled[action]}
+            title={label}
+            type="button"
+          >
+            <Icon aria-hidden="true" size={16} strokeWidth={2.2} />
+          </button>
+          {index === 0 ? (
+            <span aria-live="polite" className="zoom-value">
+              {zoomLabel}
+            </span>
+          ) : null}
+        </Fragment>
+      ))}
     </div>
   )
 }
