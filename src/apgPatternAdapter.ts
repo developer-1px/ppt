@@ -62,7 +62,7 @@ export function useManagedTabsPattern<TValue extends string>({
     (event) => {
       const nextValue = nextTabsSelectionValue<TValue>(data, event, tabs)
 
-      if (nextValue) {
+      if (nextValue !== null) {
         onSelect(nextValue)
       }
     },
@@ -115,7 +115,7 @@ export function useManagedListboxPattern<TKey extends string>({
     (event) => {
       const nextKey = nextListboxSelectionKey<TKey>(data, event)
 
-      if (nextKey) {
+      if (nextKey !== null) {
         onSelect(nextKey)
       }
     },
@@ -166,7 +166,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
     (event) => {
       const nextActiveKey = nextRadioActiveKey<TKey>(data, event)
 
-      if (nextActiveKey) {
+      if (nextActiveKey !== null) {
         setActiveRadioKey(nextActiveKey)
       }
 
@@ -233,7 +233,7 @@ function useManagedToolbarPattern<TKey extends string>({
         disabledKeys,
       )
 
-      if (nextActiveKey) {
+      if (nextActiveKey !== null) {
         setActiveToolbarKey(nextActiveKey)
       }
 

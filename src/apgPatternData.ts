@@ -105,7 +105,7 @@ export function nextToolbarActiveKey<TKey extends string>(
 ) {
   const nextKey = nextToolbarEventKey(data, event)
 
-  if (!nextKey || disabledKeys.includes(nextKey as TKey)) {
+  if (nextKey === null || disabledKeys.includes(nextKey as TKey)) {
     return null
   }
 
@@ -246,7 +246,11 @@ function enabledToolbarActiveKey<TKey extends string>(
   rootKeys: readonly TKey[],
   disabledKeys: readonly TKey[],
 ) {
-  if (activeKey && !disabledKeys.includes(activeKey)) {
+  if (
+    activeKey !== null &&
+    activeKey !== undefined &&
+    !disabledKeys.includes(activeKey)
+  ) {
     return activeKey
   }
 
