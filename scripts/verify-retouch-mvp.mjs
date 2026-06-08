@@ -311,6 +311,17 @@ async function runFirstScreenScenario(page) {
       }
     })(),
     ...(() => {
+      const slideOptions = Array.from(document.querySelectorAll('.slide-list [role="option"]'))
+      const selectedSlideOptions = slideOptions.filter((option) => option.getAttribute('aria-selected') === 'true')
+
+      return {
+        selectedSlideOptionCount: selectedSlideOptions.length,
+        slideListboxLabel: document.querySelector('.slide-list')?.getAttribute('aria-label') ?? null,
+        slideListboxRole: document.querySelector('.slide-list')?.getAttribute('role') ?? null,
+        slideOptionCount: slideOptions.length,
+      }
+    })(),
+    ...(() => {
       const accentRadios = Array.from(document.querySelectorAll('.accent-swatches [role="radio"]'))
       const selectedAccentRadios = accentRadios.filter((radio) => radio.getAttribute('aria-checked') === 'true')
 
@@ -365,6 +376,14 @@ async function runFirstScreenScenario(page) {
       state.selectedViewTabCount === 1 &&
       state.viewPanelRole === 'tabpanel' &&
       state.viewPanelLabelledBy === state.selectedViewTabId,
+    state,
+  )
+  check(
+    'slide rail follows APG listbox semantics',
+    state.slideListboxRole === 'listbox' &&
+      state.slideListboxLabel === 'Slides' &&
+      state.slideOptionCount === state.slideCount &&
+      state.selectedSlideOptionCount === 1,
     state,
   )
   check(

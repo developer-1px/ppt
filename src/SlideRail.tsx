@@ -10,17 +10,10 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
-import {
-  listboxDefinition,
-  reducePatternData,
-  useListboxPattern,
-  type PatternData,
-  type PatternEvent,
-} from '@interactive-os/aria/react'
 import { getRect, rectToStyle, type RetouchSlide } from './retouchModel'
 import {
   disabledToolbarKeys,
-  patternButtonProps,
+  useManagedListboxPattern,
   useManagedToolbarPattern,
 } from './apgPatternAdapter'
 import { cssVariables } from './cssVariables'
@@ -73,62 +66,30 @@ export function SlideRail({
   onSelectSlide,
   slides,
 }: SlideRailProps) {
-  const slideRailData = useMemo<PatternData>(() => {
-    const slideIds = slides.map((slide) => slide.id)
-
-    return {
-      items: Object.fromEntries(
-        slides.map((slide) => [
-          slide.id,
-          {
-            label: changedSlideIds.has(slide.id)
-              ? `${slide.name}, modified`
-              : slide.name,
-            textValue: slide.name,
-          },
-        ]),
-      ),
-      relations: { rootKeys: slideIds },
-      state: {
-        activeKey: activeSlideId,
-        selectedKeys: [activeSlideId],
+  const slideRailKeys = useMemo(() => slides.map((slide) => slide.id), [slides])
+  const slideRailItems = useMemo(() => Object.fromEntries(
+    slides.map((slide) => [
+      slide.id,
+      {
+        label: changedSlideIds.has(slide.id)
+          ? `${slide.name}, modified`
+          : slide.name,
+        textValue: slide.name,
       },
-      refs: { label: 'Slides' },
-    }
-  }, [activeSlideId, changedSlideIds, slides])
-
-  const slideRailListbox = useListboxPattern(
-    slideRailData,
-    (event: PatternEvent) => {
-      if (event.type === 'select') {
-        const selectedSlideId = event.keys[0]
-
-        if (selectedSlideId) {
-          onSelectSlide(selectedSlideId)
-        }
-        return
-      }
-
-      if (event.type === 'navigate') {
-        const nextSlideId = reducePatternData(
-          listboxDefinition,
-          slideRailData,
-          event,
-        ).state?.activeKey
-
-        if (nextSlideId) {
-          onSelectSlide(nextSlideId)
-        }
-      }
-    },
-    {
-      elementIdPrefix: 'slide-thumb-',
-      focusStrategy: 'rovingTabIndex',
-      orientation: 'vertical',
-      selectionMode: 'single',
-      typeaheadEnabled: true,
-    },
+    ]),
+  ), [changedSlideIds, slides])
+  const slidesById = useMemo(
+    () => new Map(slides.map((slide) => [slide.id, slide])),
+    [slides],
   )
+  const slideRailListbox = useManagedListboxPattern<string>({
+    activeKey: activeSlideId,
+    elementIdPrefix: 'slide-thumb-',
+    items: slideRailItems,
+    label: 'Slides',
+    onSelect: onSelectSlide,
+    rootKeys: slideRailKeys,
+  })
   const railActionToolbar = useManagedToolbarPattern<SlideRailActionKey>({
     disabledKeys: disabledToolbarKeys<SlideRailActionKey>([
       ['move-up', !canMoveSlideUp],
@@ -221,18 +182,17 @@ export function SlideRail({
 
       <div {...slideRailListbox.rootProps} className="slide-list">
         {slideRailListbox.renderItems.map((item, index) => {
-          const slide = slides.find((candidate) => candidate.id === item.key)
+          const slide = slidesById.get(item.key)
 
           if (!slide) {
             return null
           }
 
           const changed = changedSlideIds.has(slide.id)
-          const optionProps = patternButtonProps(item.optionProps)
 
           return (
             <button
-              {...optionProps}
+              {...item.optionProps}
               aria-current={slide.id === activeSlideId ? 'page' : undefined}
               aria-label={changed ? `${slide.name}, modified` : slide.name}
               className="slide-thumb"

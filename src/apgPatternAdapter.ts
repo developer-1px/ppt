@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { ButtonHTMLAttributes, HTMLAttributes } from 'react'
 import {
+  listboxDefinition,
   radioGroupDefinition,
   reducePatternData,
   toolbarDefinition,
+  useListboxPattern,
   useRadioGroupPattern,
   useToolbarPattern,
 } from '@interactive-os/aria/react'
@@ -11,6 +13,7 @@ import type {
   PatternData,
   PatternEvent,
   PatternOptions,
+  ReactListboxRenderItem,
   ReactRadioRenderItem,
   ReactToolbarRenderItem,
 } from '@interactive-os/aria/react'
@@ -19,12 +22,63 @@ type PatternButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
 type PatternDivProps = HTMLAttributes<HTMLDivElement>
 type PatternElementProps = HTMLAttributes<HTMLElement>
 type ToolbarOrientation = NonNullable<PatternOptions['orientation']>
+type ListboxFocusStrategy = NonNullable<PatternOptions['focusStrategy']>
 
 const EMPTY_TOOLBAR_KEYS: readonly never[] = []
 
 export type ActionToolbarItem<TKey extends string> = {
   action: TKey
   label: string
+}
+
+export function useManagedListboxPattern<TKey extends string>({
+  activeKey,
+  elementIdPrefix,
+  focusStrategy = 'rovingTabIndex',
+  items,
+  label,
+  onSelect,
+  rootKeys,
+  typeaheadEnabled = true,
+}: {
+  activeKey: TKey
+  elementIdPrefix: string
+  focusStrategy?: ListboxFocusStrategy
+  items: Record<TKey, { label: string; textValue?: string }>
+  label: string
+  onSelect: (key: TKey) => void
+  rootKeys: readonly TKey[]
+  typeaheadEnabled?: boolean
+}) {
+  const data = useMemo(() =>
+    listboxPatternData<TKey>({
+      activeKey,
+      items,
+      label,
+      rootKeys,
+    }), [activeKey, items, label, rootKeys])
+  const listbox = useListboxPattern(
+    data,
+    (event) => {
+      const nextKey = nextListboxSelectionKey<TKey>(data, event)
+
+      if (nextKey) {
+        onSelect(nextKey)
+      }
+    },
+    {
+      elementIdPrefix,
+      focusStrategy,
+      orientation: 'vertical',
+      selectionMode: 'single',
+      typeaheadEnabled,
+    },
+  )
+
+  return {
+    renderItems: listboxRenderItems<TKey>(listbox.renderItems),
+    rootProps: patternDivProps(listbox.rootProps),
+  }
 }
 
 export function useManagedRadioGroupPattern<TKey extends string>({
@@ -214,6 +268,28 @@ function radioGroupPatternData<TKey extends string>({
   }
 }
 
+function listboxPatternData<TKey extends string>({
+  activeKey,
+  items,
+  label,
+  rootKeys,
+}: {
+  activeKey: TKey
+  items: Record<TKey, { label: string; textValue?: string }>
+  label: string
+  rootKeys: readonly TKey[]
+}): PatternData {
+  return {
+    items,
+    relations: { rootKeys },
+    refs: { label },
+    state: {
+      activeKey,
+      selectedKeys: [activeKey],
+    },
+  }
+}
+
 function selectedPatternKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
@@ -305,6 +381,16 @@ function radioItemPropsByKey<TKey extends string>(
   ) as Record<TKey, PatternButtonProps>
 }
 
+function listboxRenderItems<TKey extends string>(
+  items: readonly ReactListboxRenderItem[],
+) {
+  return items.map((item) => ({
+    ...item,
+    key: item.key as TKey,
+    optionProps: patternButtonProps(item.optionProps),
+  }))
+}
+
 function firstEnabledToolbarKey<TKey extends string>(
   keys: readonly TKey[],
   disabledKeys: readonly TKey[],
@@ -351,6 +437,25 @@ function nextRadioActiveKey<TKey extends string>(
   if (event.type === 'navigate') {
     return reducePatternData(
       radioGroupDefinition,
+      data,
+      event,
+    ).state?.activeKey as TKey | undefined ?? null
+  }
+
+  return null
+}
+
+function nextListboxSelectionKey<TKey extends string>(
+  data: PatternData,
+  event: PatternEvent,
+): TKey | null {
+  if (event.type === 'select') {
+    return event.keys[0] as TKey | undefined ?? null
+  }
+
+  if (event.type === 'navigate') {
+    return reducePatternData(
+      listboxDefinition,
       data,
       event,
     ).state?.activeKey as TKey | undefined ?? null
