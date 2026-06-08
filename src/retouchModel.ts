@@ -16,7 +16,7 @@ export const EMPTY_TEXT_BOX_HEIGHT = 32
 
 const ALIGN_SNAP_DISTANCE = GRID_SIZE
 
-export const BlockRoleSchema = z.enum([
+const BlockRoleSchema = z.enum([
   'title',
   'subtitle',
   'body',
@@ -25,9 +25,9 @@ export const BlockRoleSchema = z.enum([
   'chart',
   'note',
 ])
-export const BlockTagSchema = z.enum(['h1', 'p', 'div'])
+const BlockTagSchema = z.enum(['h1', 'p', 'div'])
 
-export const RectSchema = z.object({
+const RectSchema = z.object({
   x: z.number(),
   y: z.number(),
   width: z.number(),
@@ -53,31 +53,23 @@ export const RetouchDeckSchema = z.object({
   slides: z.array(RetouchSlideSchema),
 })
 
-export const RetouchTextPatchSchema = z.object({
-  slideId: z.string(),
-  blockId: z.string(),
-  text: z.string(),
-})
-
-export const RetouchLayoutPatchSchema = z.object({
-  slideId: z.string(),
-  blockId: z.string(),
-  rect: RectSchema,
-})
-
-export const RetouchPatchManifestSchema = z.object({
-  version: z.literal(1),
-  text: z.array(RetouchTextPatchSchema),
-  layout: z.array(RetouchLayoutPatchSchema),
-})
-
-export type BlockRole = z.infer<typeof BlockRoleSchema>
-export type BlockTag = z.infer<typeof BlockTagSchema>
 export type Rect = z.infer<typeof RectSchema>
 export type SlideBlock = z.infer<typeof SlideBlockSchema>
 export type RetouchSlide = z.infer<typeof RetouchSlideSchema>
 export type RetouchDeck = z.infer<typeof RetouchDeckSchema>
-export type RetouchPatchManifest = z.infer<typeof RetouchPatchManifestSchema>
+export type RetouchPatchManifest = {
+  version: 1
+  text: {
+    slideId: string
+    blockId: string
+    text: string
+  }[]
+  layout: {
+    slideId: string
+    blockId: string
+    rect: Rect
+  }[]
+}
 
 export type BlockLocation = {
   pointer: Pointer
@@ -111,7 +103,7 @@ export function blockTextPointer(pointer: Pointer): Pointer {
   return appendSegment(pointer, 'text')
 }
 
-export function findSlideIndex(deck: RetouchDeck, slideId: string) {
+function findSlideIndex(deck: RetouchDeck, slideId: string) {
   return deck.slides.findIndex((slide) => slide.id === slideId)
 }
 
