@@ -1,7 +1,6 @@
 import type { RefObject } from 'react'
 import { applyPatch, type Pointer } from 'zod-crud'
 import {
-  SAMPLE_DECK,
   RetouchDeckSchema,
   blockLocationFromPointer,
   blockTextPointer,
@@ -12,6 +11,7 @@ import {
   type Rect,
   type RetouchDeck,
 } from './retouchModel'
+import { SAMPLE_DECK } from './sampleDeck'
 import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock, type Point } from './layoutInteraction'
 import {

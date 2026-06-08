@@ -2,8 +2,6 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { JSONPatchOperation, Pointer, SelectionSnap } from 'zod-crud'
 import { useJSONDocument } from 'zod-crud/react'
 import {
-  SAMPLE_DECK,
-  SAMPLE_SLIDES,
   RetouchDeckSchema,
   blockLocationsFromPointers,
   blockPointer,
@@ -12,6 +10,7 @@ import {
   type Rect,
   type SlideBlock,
 } from './retouchModel'
+import { SAMPLE_DECK, SAMPLE_SLIDES } from './sampleDeck'
 import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'

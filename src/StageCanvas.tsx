@@ -6,7 +6,6 @@ import type {
 import type { Pointer } from 'zod-crud'
 import {
   RESIZE_HANDLES,
-  SAMPLE_DECK,
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
   blockPointer,
@@ -17,6 +16,7 @@ import {
   type RetouchSlide,
   type SlideBlock,
 } from './retouchModel'
+import { SAMPLE_DECK } from './sampleDeck'
 import { SlideBlockElement } from './SlideBlockElement'
 import { htmlSlideRootAttributes } from './htmlSlideContract'
 import {

@@ -2,8 +2,6 @@ import type { RefObject } from 'react'
 import type { JSONDocumentHistory, Pointer, SelectionState } from 'zod-crud'
 import {
   EMPTY_TEXT_BOX_HEIGHT,
-  SAMPLE_DECK,
-  SAMPLE_SLIDES,
   blockLocationFromPointer,
   findBlockLocation,
   getRect,
@@ -15,6 +13,7 @@ import {
   type RetouchDeck,
   type SlideBlock,
 } from './retouchModel'
+import { SAMPLE_DECK, SAMPLE_SLIDES } from './sampleDeck'
 import { autoHeightRect } from './editableTextDom'
 import { minimumHeightForBlock } from './layoutInteraction'
 import {

@@ -1,9 +1,9 @@
 import {
-  SAMPLE_DECK,
   RetouchDeckSchema,
   type RetouchDeck,
   type RetouchSlide,
 } from './retouchModel'
+import { SAMPLE_DECK } from './sampleDeck'
 
 const BASE_DECK = RetouchDeckSchema.parse(SAMPLE_DECK)
 const BASE_SLIDES_BY_ID = new Map(

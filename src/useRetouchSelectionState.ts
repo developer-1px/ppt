@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import type { Pointer } from 'zod-crud'
 import {
-  SAMPLE_DECK,
   blockLocationFromPointer,
   findBlockLocation,
   type RetouchDeck,
   type RetouchSlide,
 } from './retouchModel'
+import { SAMPLE_DECK } from './sampleDeck'
 import {
   arrangeResetEquals,
   textResetEquals,
