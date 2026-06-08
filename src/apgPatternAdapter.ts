@@ -36,7 +36,7 @@ type ManagedTabItem<TValue extends string> = {
   value: TValue
 }
 
-export type ActionToolbarItem<TKey extends string> = {
+type ActionToolbarItem<TKey extends string> = {
   action: TKey
   label: string
 }
@@ -287,13 +287,13 @@ export function useActionToolbarPattern<TKey extends string>({
   })
 }
 
-export function patternButtonProps(
+function patternButtonProps(
   props: PatternElementProps,
 ): PatternButtonProps {
   return props as PatternButtonProps
 }
 
-export function patternDivProps(props: PatternElementProps): PatternDivProps {
+function patternDivProps(props: PatternElementProps): PatternDivProps {
   return props as PatternDivProps
 }
 
