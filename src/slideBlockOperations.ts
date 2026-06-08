@@ -1,6 +1,8 @@
+import type { JSONPatchOperation } from 'zod-crud'
 import {
   SLIDE_HEIGHT,
   SLIDE_WIDTH,
+  blockPointer,
   clamp,
   type RetouchSlide,
   type SlideBlock,
@@ -12,6 +14,12 @@ import {
 } from './retouchIdResolver'
 
 const DUPLICATE_OFFSET = 32
+
+type BlockInsertInput = {
+  blocks: readonly SlideBlock[]
+  insertIndex: number
+  slideIndex: number
+}
 
 export function createTextBlock(slide: RetouchSlide): SlideBlock {
   const ordinal = nextRetouchTextBlockOrdinal(slide)
@@ -31,7 +39,7 @@ export function createTextBlock(slide: RetouchSlide): SlideBlock {
   }
 }
 
-export function duplicateBlock(
+function duplicateBlock(
   block: SlideBlock,
   slide: RetouchSlide,
 ): SlideBlock {
@@ -41,4 +49,42 @@ export function duplicateBlock(
     x: clamp(block.x + DUPLICATE_OFFSET, 0, SLIDE_WIDTH - block.width),
     y: clamp(block.y + DUPLICATE_OFFSET, 0, SLIDE_HEIGHT - block.height),
   }
+}
+
+export function duplicateBlocks(
+  blocks: readonly SlideBlock[],
+  slide: RetouchSlide,
+): SlideBlock[] {
+  const duplicatedBlocks: SlideBlock[] = []
+
+  for (const block of blocks) {
+    duplicatedBlocks.push(
+      duplicateBlock(block, {
+        ...slide,
+        blocks: [...slide.blocks, ...duplicatedBlocks],
+      }),
+    )
+  }
+
+  return duplicatedBlocks
+}
+
+export function blockInsertPointers({
+  blocks,
+  insertIndex,
+  slideIndex,
+}: BlockInsertInput) {
+  return blocks.map((_, offset) => blockPointer(slideIndex, insertIndex + offset))
+}
+
+export function addBlocksPatch({
+  blocks,
+  insertIndex,
+  slideIndex,
+}: BlockInsertInput): JSONPatchOperation[] {
+  return blocks.map((block, offset) => ({
+    op: 'add',
+    path: blockPointer(slideIndex, insertIndex + offset),
+    value: block,
+  }))
 }

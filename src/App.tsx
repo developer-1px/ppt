@@ -20,7 +20,12 @@ import { exportRetouchDeck } from './retouchExport'
 import { PresentationOverlay } from './PresentationOverlay'
 import { RetouchWorkspace } from './RetouchWorkspace'
 import { SlideRail } from './SlideRail'
-import { createTextBlock, duplicateBlock } from './slideBlockOperations'
+import {
+  addBlocksPatch,
+  blockInsertPointers,
+  createTextBlock,
+  duplicateBlocks,
+} from './slideBlockOperations'
 import { createBlankSlide, duplicateSlide } from './slideDeckOperations'
 import {
   alignRectToBounds,
@@ -487,27 +492,19 @@ function App() {
     }
 
     commitActiveTextEdit()
-    const pastedBlocks: SlideBlock[] = []
-
-    for (const block of blockClipboard) {
-      pastedBlocks.push(
-        duplicateBlock(block, {
-          ...activeSlide,
-          blocks: [...activeSlide.blocks, ...pastedBlocks],
-        }),
-      )
-    }
-
+    const pastedBlocks = duplicateBlocks(blockClipboard, activeSlide)
     const insertIndex = activeSlide.blocks.length
-    const pastedPointers = pastedBlocks.map((_, offset) =>
-      blockPointer(activeSlideIndex, insertIndex + offset),
-    )
+    const pastedPointers = blockInsertPointers({
+      blocks: pastedBlocks,
+      insertIndex,
+      slideIndex: activeSlideIndex,
+    })
 
-    doc.commit(pastedBlocks.map((block, offset) => ({
-      op: 'add',
-      path: blockPointer(activeSlideIndex, insertIndex + offset),
-      value: block,
-    })), {
+    doc.commit(addBlocksPatch({
+      blocks: pastedBlocks,
+      insertIndex,
+      slideIndex: activeSlideIndex,
+    }), {
       label: 'paste blocks',
       origin: 'ppt-retouch',
       selection: selectionSnapForPointers(pastedPointers),
@@ -527,27 +524,22 @@ function App() {
     }
 
     commitActiveTextEdit()
-    const duplicatedBlocks: typeof activeSlide.blocks = []
-
-    for (const location of locations) {
-      duplicatedBlocks.push(
-        duplicateBlock(location.block, {
-          ...activeSlide,
-          blocks: [...activeSlide.blocks, ...duplicatedBlocks],
-        }),
-      )
-    }
-
-    const insertIndex = locations.at(-1)!.blockIndex + 1
-    const duplicatePointers = duplicatedBlocks.map((_, offset) =>
-      blockPointer(activeSlideIndex, insertIndex + offset),
+    const duplicatedBlocks = duplicateBlocks(
+      locations.map((location) => location.block),
+      activeSlide,
     )
+    const insertIndex = locations.at(-1)!.blockIndex + 1
+    const duplicatePointers = blockInsertPointers({
+      blocks: duplicatedBlocks,
+      insertIndex,
+      slideIndex: activeSlideIndex,
+    })
 
-    doc.commit(duplicatedBlocks.map((block, offset) => ({
-      op: 'add',
-      path: blockPointer(activeSlideIndex, insertIndex + offset),
-      value: block,
-    })), {
+    doc.commit(addBlocksPatch({
+      blocks: duplicatedBlocks,
+      insertIndex,
+      slideIndex: activeSlideIndex,
+    }), {
       label: locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
       origin: 'ppt-retouch',
       selection: selectionSnapForPointers(duplicatePointers),
