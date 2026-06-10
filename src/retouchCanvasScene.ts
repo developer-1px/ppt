@@ -7,51 +7,31 @@ import type { Pointer } from 'zod-crud'
 import type { Rect } from './retouchModel'
 import type { RetouchSurfaceItem } from './retouchObjectSurface'
 
-type RetouchCanvasSceneEntry = CanvasSceneEntry & {
-  blockId: string
-  pointer: Pointer
-}
-
 export function retouchCanvasSceneEntries(
   items: readonly RetouchSurfaceItem[],
-): RetouchCanvasSceneEntry[] {
+): CanvasSceneEntry[] {
   return items.map((item, index) => ({
-    blockId: item.block.id,
     bounds: rectToCanvasBounds(item.rect),
     canResize: true,
-    id: item.block.id,
+    id: item.pointer,
     isGroup: false,
     parentId: null,
     path: [index],
-    pointer: item.pointer,
   }))
 }
 
 export function retouchCanvasSelectionBounds(
-  entries: readonly RetouchCanvasSceneEntry[],
+  entries: readonly CanvasSceneEntry[],
   pointers: readonly Pointer[],
 ): Rect | null {
-  const selectedIds = canvasSelectionIdsFromPointers(entries, pointers)
-
-  if (selectedIds.length === 0) {
+  if (pointers.length === 0) {
     return null
   }
 
   const scene = createCanvasSceneAdapter([...entries])
-  const bounds = scene.getBounds(selectedIds)
+  const bounds = scene.getBounds([...pointers])
 
   return bounds === null ? null : canvasBoundsToRect(bounds)
-}
-
-function canvasSelectionIdsFromPointers(
-  entries: readonly RetouchCanvasSceneEntry[],
-  pointers: readonly Pointer[],
-) {
-  const selectedPointers = new Set(pointers)
-
-  return entries
-    .filter((entry) => selectedPointers.has(entry.pointer))
-    .map((entry) => entry.id)
 }
 
 function rectToCanvasBounds(rect: Rect): Bounds {
