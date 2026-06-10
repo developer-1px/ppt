@@ -9,7 +9,6 @@ import {
 } from './retouchModel'
 import {
   createRetouchBlockCopyId,
-  createRetouchTextBlockId,
   nextRetouchTextBlockOrdinal,
 } from './retouchIdResolver'
 
@@ -28,11 +27,10 @@ type BlockInsertPatch = {
 
 export function createTextBlock(slide: RetouchSlide): SlideBlock {
   const ordinal = nextRetouchTextBlockOrdinal(slide)
-  const id = createRetouchTextBlockId(slide)
   const offset = ((ordinal - 1) % 5) * 24
 
   return {
-    id,
+    id: `${slide.id}-text-${ordinal}`,
     role: 'body',
     tag: 'p',
     text: '',

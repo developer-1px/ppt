@@ -80,12 +80,6 @@ export function createRetouchSlideName(
   )
 }
 
-export function createRetouchTextBlockId(slide: RetouchSlide) {
-  const ordinal = nextRetouchTextBlockOrdinal(slide)
-
-  return uniqueRetouchBlockId(slide, `${slide.id}-text-${ordinal}`)
-}
-
 export function nextRetouchTextBlockOrdinal(slide: RetouchSlide) {
   const maxOrdinal = slide.blocks.reduce((max, block) => {
     const match = new RegExp(`^${escapeRegExp(slide.id)}-text-(\\d+)$`).exec(
