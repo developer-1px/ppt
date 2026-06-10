@@ -2,9 +2,11 @@ import type { CSSProperties } from 'react'
 
 type CSSVariableName = `--${string}`
 type CSSVariableValue = string | number | undefined
+type CSSVariableProperties = CSSProperties &
+  Partial<Record<CSSVariableName, CSSVariableValue>>
 
 export function cssVariables(
-  variables: Partial<Record<CSSVariableName, CSSVariableValue>>,
-): CSSProperties {
-  return variables as CSSProperties
+  variables: CSSVariableProperties,
+): CSSVariableProperties {
+  return variables
 }
