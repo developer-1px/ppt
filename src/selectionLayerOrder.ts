@@ -12,7 +12,6 @@ import {
   SlideBlockSchema,
   slideBlocksPointer,
   type RetouchDeck,
-  type SlideBlock,
 } from './retouchModel'
 
 type LayerOrderPatch = {
@@ -62,15 +61,15 @@ export function createLayerOrderPatch({
     return null
   }
 
-  const nextBlocks = readLayerOrderBlocks(operation.value)
+  const nextBlocksResult = LayerOrderBlocksSchema.safeParse(operation.value)
 
-  if (nextBlocks === null) {
+  if (!nextBlocksResult.success) {
     return null
   }
 
   const selectedIdSet = new Set(selectedIds)
 
-  const nextSelectedPointers = nextBlocks
+  const nextSelectedPointers = nextBlocksResult.data
     .map((block, blockIndex) =>
       selectedIdSet.has(block.id) ? appendSegment(blocksPath, blockIndex) : null,
     )
@@ -80,10 +79,4 @@ export function createLayerOrderPatch({
     operations: [...change.operations],
     nextSelectedPointers,
   }
-}
-
-function readLayerOrderBlocks(value: unknown): SlideBlock[] | null {
-  const result = LayerOrderBlocksSchema.safeParse(value)
-
-  return result.success ? result.data : null
 }
