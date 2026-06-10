@@ -1,22 +1,5 @@
 import { useManagedTabsPattern } from './apgPatternAdapter'
-import type { PatternElementProps } from './apgPatternTypes'
 import type { CanvasView } from './retouchViewState'
-
-type CanvasViewTabProps = Record<
-  CanvasView,
-  PatternElementProps
->
-
-type UseCanvasViewTabsInput = {
-  canvasView: CanvasView
-  onChange: (nextView: CanvasView) => void
-}
-
-type UseCanvasViewTabsResult = {
-  canvasViewPanelProps: PatternElementProps
-  canvasViewTablistProps: PatternElementProps
-  canvasViewTabProps: CanvasViewTabProps
-}
 
 const CANVAS_VIEW_TABS = [
   { label: 'Slide', panelKey: 'slide-panel', tabKey: 'slide', value: 'slide' },
@@ -31,7 +14,10 @@ const CANVAS_VIEW_TABS = [
 export function useCanvasViewTabs({
   canvasView,
   onChange,
-}: UseCanvasViewTabsInput): UseCanvasViewTabsResult {
+}: {
+  canvasView: CanvasView
+  onChange: (nextView: CanvasView) => void
+}) {
   const tabs = useManagedTabsPattern<CanvasView>({
     activeValue: canvasView,
     elementIdPrefix: 'canvas-view-',
