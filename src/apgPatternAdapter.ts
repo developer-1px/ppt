@@ -252,27 +252,6 @@ function useManagedToolbarPattern<TKey extends string>({
   }
 }
 
-function actionToolbarData<TKey extends string>(
-  actions: readonly ActionToolbarItem<TKey>[],
-  onSelect: (action: TKey) => void,
-) {
-  const handlers: Partial<Record<TKey, () => void>> = {}
-  const items: Record<string, { label: string }> = {}
-  const rootKeys: TKey[] = []
-
-  for (const { action, label } of actions) {
-    handlers[action] = () => onSelect(action)
-    items[action] = { label }
-    rootKeys.push(action)
-  }
-
-  return {
-    handlers,
-    items,
-    rootKeys,
-  }
-}
-
 export function useActionToolbarPattern<TKey extends string>({
   actions,
   activeKey,
@@ -294,10 +273,23 @@ export function useActionToolbarPattern<TKey extends string>({
   orientation?: ToolbarOrientation
   selectedKeys?: readonly TKey[]
 }) {
-  const toolbarData = useMemo(
-    () => actionToolbarData(actions, onSelect),
-    [actions, onSelect],
-  )
+  const toolbarData = useMemo(() => {
+    const handlers: Partial<Record<TKey, () => void>> = {}
+    const items: Record<string, { label: string }> = {}
+    const rootKeys: TKey[] = []
+
+    for (const { action, label } of actions) {
+      handlers[action] = () => onSelect(action)
+      items[action] = { label }
+      rootKeys.push(action)
+    }
+
+    return {
+      handlers,
+      items,
+      rootKeys,
+    }
+  }, [actions, onSelect])
 
   return useManagedToolbarPattern<TKey>({
     activeKey,
