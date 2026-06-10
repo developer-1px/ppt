@@ -162,7 +162,7 @@ export function SlideRail({
         {slideRailListbox.renderItems.map((item, index) => {
           const railItem = slideRailData.itemsById.get(item.key)
 
-          if (!railItem) {
+          if (railItem === undefined) {
             return null
           }
 
