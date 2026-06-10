@@ -60,7 +60,7 @@ export function useRetouchTextEditing({
   }
 
   function commitActiveTextEdit() {
-    if (!editing) {
+    if (editing === null) {
       return deckValue
     }
 
@@ -71,7 +71,7 @@ export function useRetouchTextEditing({
     setEditing(null)
     clearLayoutInteraction()
 
-    if (!location || !editorElements) {
+    if (location === null || editorElements === null) {
       return deckValue
     }
 
