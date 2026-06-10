@@ -55,7 +55,7 @@ export function createLayerOrderPatch({
 
   if (
     change.operations.length !== 1 ||
-    !operation ||
+    operation === undefined ||
     operation.op !== 'replace' ||
     operation.path !== blocksPath
   ) {
@@ -64,7 +64,7 @@ export function createLayerOrderPatch({
 
   const nextBlocks = readLayerOrderBlocks(operation.value)
 
-  if (!nextBlocks) {
+  if (nextBlocks === null) {
     return null
   }
 
