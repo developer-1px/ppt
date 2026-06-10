@@ -90,7 +90,7 @@ function exportBlockMinimumHeight(block: SlideBlock, baseBlock: SlideBlock | und
   }
 
   if (
-    baseBlock &&
+    baseBlock !== undefined &&
     block.text === baseBlock.text &&
     (block.height !== baseBlock.height || block.width !== baseBlock.width)
   ) {
@@ -119,9 +119,9 @@ function buildRetouchPatchManifest(
         (candidate) => candidate.id === block.id,
       )
       const rect = getRect(block)
-      const baseRect = baseBlock ? getRect(baseBlock) : null
+      const baseRect = baseBlock !== undefined ? getRect(baseBlock) : null
 
-      if (!baseBlock || block.text !== baseBlock.text) {
+      if (baseBlock === undefined || block.text !== baseBlock.text) {
         text.push({
           slideId: slide.id,
           blockId: block.id,
@@ -129,7 +129,7 @@ function buildRetouchPatchManifest(
         })
       }
 
-      if (!baseRect || !rectEquals(rect, baseRect)) {
+      if (baseRect === null || !rectEquals(rect, baseRect)) {
         layout.push({
           slideId: slide.id,
           blockId: block.id,
