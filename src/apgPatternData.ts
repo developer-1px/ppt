@@ -183,16 +183,21 @@ export function toolbarPatternData<TKey extends string>({
   rootKeys: readonly TKey[]
   selectedKeys?: readonly TKey[]
 }): PatternData {
+  const toolbarActiveKey =
+    activeKey !== null &&
+    activeKey !== undefined &&
+    !disabledKeys.includes(activeKey)
+      ? activeKey
+      : (rootKeys.find((key) => !disabledKeys.includes(key)) ??
+        rootKeys[0] ??
+        null)
+
   return {
     items,
     relations: { rootKeys },
     refs: { label },
     state: {
-      activeKey: enabledToolbarActiveKey(
-        activeKey,
-        rootKeys,
-        disabledKeys,
-      ),
+      activeKey: toolbarActiveKey,
       ...(disabledKeys.length > 0 ? { disabledKeys } : {}),
       ...(selectedKeys ? { selectedKeys } : {}),
     },
@@ -279,26 +284,6 @@ export function activeManagedTab<TValue extends string>(
   }
 
   return activeTab
-}
-
-function enabledToolbarActiveKey<TKey extends string>(
-  activeKey: TKey | null | undefined,
-  rootKeys: readonly TKey[],
-  disabledKeys: readonly TKey[],
-) {
-  if (
-    activeKey !== null &&
-    activeKey !== undefined &&
-    !disabledKeys.includes(activeKey)
-  ) {
-    return activeKey
-  }
-
-  return (
-    rootKeys.find((key) => !disabledKeys.includes(key)) ??
-    rootKeys[0] ??
-    null
-  )
 }
 
 function tabValueFromKey<TValue extends string>(
