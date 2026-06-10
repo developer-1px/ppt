@@ -225,7 +225,7 @@ export function useRetouchKeyboardShortcuts({
 
       const delta = arrowKeyDelta(event.key, event.shiftKey)
 
-      if (!delta) {
+      if (delta === null) {
         return
       }
 
@@ -237,7 +237,7 @@ export function useRetouchKeyboardShortcuts({
         selectedPointers,
       })
 
-      if (!nudgePatch) {
+      if (nudgePatch === null) {
         return
       }
 
