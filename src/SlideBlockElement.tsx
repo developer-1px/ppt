@@ -99,14 +99,14 @@ export function SlideBlockElement({
 
     const element = editorRef.current
 
-    if (!element) {
+    if (element === null) {
       return
     }
 
     const editingSession = editingSessionRef.current
 
     if (
-      !editingSession ||
+      editingSession === null ||
       editingSession.blockId !== block.id ||
       editingSession.text !== text
     ) {
@@ -120,7 +120,7 @@ export function SlideBlockElement({
     element.focus({ preventScroll: true })
     restoreStageScroll(scrollPosition)
     if (
-      !initialClientPoint ||
+      initialClientPoint === undefined ||
       !placeCaretFromPoint(element, initialClientPoint.x, initialClientPoint.y)
     ) {
       placeCaretAtEnd(element)
@@ -132,7 +132,7 @@ export function SlideBlockElement({
     (element: HTMLElement) => {
       const blockElement = blockRef.current
 
-      if (!blockElement) {
+      if (blockElement === null) {
         return rectRef.current
       }
 
@@ -158,7 +158,7 @@ export function SlideBlockElement({
     }
 
     const element = editorRef.current
-    const nextRect = element ? syncAutoHeight(element) : rectRef.current
+    const nextRect = element !== null ? syncAutoHeight(element) : rectRef.current
 
     committedRef.current = true
     element?.blur()
@@ -172,7 +172,7 @@ export function SlideBlockElement({
     const element = editorRef.current
     const blockElement = blockRef.current
 
-    if (!element || !blockElement) {
+    if (element === null || blockElement === null) {
       return
     }
 
@@ -187,7 +187,7 @@ export function SlideBlockElement({
   function undoDraft() {
     resetDraft()
 
-    if (editorRef.current) {
+    if (editorRef.current !== null) {
       placeCaretAtEnd(editorRef.current)
     }
   }
@@ -240,7 +240,7 @@ export function SlideBlockElement({
   function handleBeforeInput(event: ReactFormEvent<HTMLElement>) {
     const input = readPlainTextBlockEditorBeforeInput(event.nativeEvent)
 
-    if (!input) {
+    if (input === null) {
       return
     }
 
