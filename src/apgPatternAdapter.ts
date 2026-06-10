@@ -112,7 +112,7 @@ export function useManagedListboxPattern<TKey extends string>({
   const listbox = useListboxPattern(
     data,
     (event) => {
-      const nextKey = nextListboxSelectionKey<TKey>(data, event)
+      const nextKey = nextListboxSelectionKey(data, event, rootKeys)
 
       if (nextKey !== null) {
         onSelect(nextKey)
@@ -163,7 +163,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
   const radio = useRadioGroupPattern(
     data,
     (event) => {
-      const nextActiveKey = nextRadioActiveKey<TKey>(data, event)
+      const nextActiveKey = nextRadioActiveKey(data, event, rootKeys)
 
       if (nextActiveKey !== null) {
         setActiveRadioKey(nextActiveKey)
@@ -226,9 +226,10 @@ function useManagedToolbarPattern<TKey extends string>({
   const toolbar = useToolbarPattern(
     data,
     (event) => {
-      const nextActiveKey = nextToolbarActiveKey<TKey>(
+      const nextActiveKey = nextToolbarActiveKey(
         data,
         event,
+        rootKeys,
         disabledKeys,
       )
 
@@ -236,7 +237,7 @@ function useManagedToolbarPattern<TKey extends string>({
         setActiveToolbarKey(nextActiveKey)
       }
 
-      handleToolbarSelection<TKey>(event, handlers)
+      handleToolbarSelection(event, handlers, rootKeys)
     },
     {
       elementIdPrefix,

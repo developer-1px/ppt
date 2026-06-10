@@ -103,16 +103,27 @@ function selectedPatternKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
 
-function patternKey<TKey extends string>(key: string | null | undefined) {
-  return key === null || key === undefined ? null : (key as TKey)
+function knownPatternKey<TKey extends string>(
+  key: string | null | undefined,
+  keys: readonly TKey[],
+): TKey | null {
+  if (key === null || key === undefined) {
+    return null
+  }
+
+  return keys.find((candidate) => candidate === key) ?? null
 }
 
 export function nextToolbarActiveKey<TKey extends string>(
   data: PatternData,
   event: PatternEvent,
+  rootKeys: readonly TKey[],
   disabledKeys: readonly TKey[] = [],
 ) {
-  const nextKey = patternKey<TKey>(nextToolbarEventKey(data, event))
+  const nextKey = knownPatternKey(
+    nextToolbarEventKey(data, event),
+    rootKeys,
+  )
 
   if (nextKey === null || disabledKeys.includes(nextKey)) {
     return null
@@ -138,9 +149,10 @@ export function disabledToolbarKeys<TKey extends string>(
 export function handleToolbarSelection<TKey extends string>(
   event: PatternEvent,
   handlers: Partial<Record<TKey, () => void>>,
+  rootKeys: readonly TKey[],
 ) {
   for (const key of selectedPatternKeys(event)) {
-    const handlerKey = patternKey<TKey>(key)
+    const handlerKey = knownPatternKey(key, rootKeys)
 
     if (handlerKey !== null) {
       handlers[handlerKey]?.()
@@ -182,22 +194,24 @@ export function toolbarPatternData<TKey extends string>({
 export function nextRadioActiveKey<TKey extends string>(
   data: PatternData,
   event: PatternEvent,
+  rootKeys: readonly TKey[],
 ): TKey | null {
   if (event.type === 'focus') {
-    return patternKey<TKey>(event.key)
+    return knownPatternKey(event.key, rootKeys)
   }
 
   if (event.type === 'select') {
-    return patternKey<TKey>(event.keys[0])
+    return knownPatternKey(event.keys[0], rootKeys)
   }
 
   if (event.type === 'navigate') {
-    return patternKey<TKey>(
+    return knownPatternKey(
       reducePatternData(
         radioGroupDefinition,
         data,
         event,
       ).state?.activeKey,
+      rootKeys,
     )
   }
 
@@ -207,18 +221,20 @@ export function nextRadioActiveKey<TKey extends string>(
 export function nextListboxSelectionKey<TKey extends string>(
   data: PatternData,
   event: PatternEvent,
+  rootKeys: readonly TKey[],
 ): TKey | null {
   if (event.type === 'select') {
-    return patternKey<TKey>(event.keys[0])
+    return knownPatternKey(event.keys[0], rootKeys)
   }
 
   if (event.type === 'navigate') {
-    return patternKey<TKey>(
+    return knownPatternKey(
       reducePatternData(
         listboxDefinition,
         data,
         event,
       ).state?.activeKey,
+      rootKeys,
     )
   }
 
