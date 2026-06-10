@@ -24,7 +24,7 @@ export function usePendingTrailingLineBreakInput() {
     pendingTrailingLineBreakRef.current = null
 
     if (
-      !pendingLineBreak ||
+      pendingLineBreak === null ||
       element.textContent !== `${pendingLineBreak.beforeText}\n`
     ) {
       return false
@@ -42,7 +42,7 @@ export function usePendingTrailingLineBreakInput() {
   function repairPendingTrailingLineBreak(element: HTMLElement) {
     const pendingLineBreak = pendingTrailingLineBreakRef.current
 
-    if (!pendingLineBreak) {
+    if (pendingLineBreak === null) {
       return
     }
 
