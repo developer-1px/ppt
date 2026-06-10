@@ -259,18 +259,18 @@ export function nextTabsSelectionValue<TValue extends string>(
   event: PatternEvent,
   tabs: readonly ManagedTabItem<TValue>[],
 ): TValue | null {
+  let tabKey: string | null
+
   if (event.type === 'select') {
-    return tabValueFromKey(event.keys[0], tabs)
+    tabKey = event.keys[0] ?? null
+  } else if (event.type === 'navigate') {
+    tabKey =
+      reducePatternData(tabsDefinition, data, event).state?.activeKey ?? null
+  } else {
+    return null
   }
 
-  if (event.type === 'navigate') {
-    return tabValueFromKey(
-      reducePatternData(tabsDefinition, data, event).state?.activeKey,
-      tabs,
-    )
-  }
-
-  return null
+  return tabs.find((tab) => tab.tabKey === tabKey)?.value ?? null
 }
 
 export function activeManagedTab<TValue extends string>(
@@ -284,11 +284,4 @@ export function activeManagedTab<TValue extends string>(
   }
 
   return activeTab
-}
-
-function tabValueFromKey<TValue extends string>(
-  tabKey: string | null | undefined,
-  tabs: readonly ManagedTabItem<TValue>[],
-): TValue | null {
-  return tabs.find((tab) => tab.tabKey === tabKey)?.value ?? null
 }
