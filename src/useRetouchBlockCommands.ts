@@ -165,7 +165,7 @@ export function useRetouchBlockCommands({
       'paste blocks',
     )
 
-    if (!pastedBlocks) {
+    if (pastedBlocks === null) {
       return
     }
 
@@ -182,15 +182,17 @@ export function useRetouchBlockCommands({
 
     const lastLocation = locations.at(-1)
 
-    if (!lastLocation) {
+    if (lastLocation === undefined) {
       return
     }
 
-    if (!commitDuplicatedBlocks(
+    const duplicatedBlocks = commitDuplicatedBlocks(
       locations.map((location) => location.block),
       lastLocation.blockIndex + 1,
       locations.length > 1 ? 'duplicate blocks' : 'duplicate block',
-    )) {
+    )
+
+    if (duplicatedBlocks === null) {
       return
     }
 

@@ -43,7 +43,7 @@ export function useRetouchPresentationCommands({
     )
     const nextSlide = doc.value.slides[nextIndex]
 
-    if (!nextSlide || nextSlide.id === activeSlide.id) {
+    if (nextSlide === undefined || nextSlide.id === activeSlide.id) {
       return
     }
 

@@ -30,8 +30,8 @@ export function useVisualSelectionRect({
     if (
       mode !== 'layout' ||
       selectedPointerCount !== 1 ||
-      !selectedBlock ||
-      !slideRef.current
+      selectedBlock === null ||
+      slideRef.current === null
     ) {
       setVisualSelectionRect(null)
       return
@@ -40,11 +40,11 @@ export function useVisualSelectionRect({
     const nextRect = readSlideBlockRect(slideRef.current, selectedBlock.id)
 
     setVisualSelectionRect((currentRect) => {
-      if (!nextRect) {
+      if (nextRect === null) {
         return null
       }
 
-      return currentRect && rectClose(currentRect, nextRect)
+      return currentRect !== null && rectClose(currentRect, nextRect)
         ? currentRect
         : nextRect
     })
