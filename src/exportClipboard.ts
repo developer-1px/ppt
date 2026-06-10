@@ -6,7 +6,7 @@ export async function writeExportToClipboard(
     await navigator.clipboard.writeText(exportCode)
     return true
   } catch {
-    if (!fallbackTextarea) {
+    if (fallbackTextarea === null) {
       return false
     }
 

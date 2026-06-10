@@ -51,7 +51,7 @@ export function useExportControls({
     const nextExportCode = readCommittedExportCode()
     const copied = await writeExportToClipboard(nextExportCode, exportTextareaRef.current)
 
-    if (!copied) {
+    if (copied === false) {
       setCopiedExportCode(null)
       setFailedCopyExportCode(nextExportCode)
       return
