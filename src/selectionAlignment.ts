@@ -100,7 +100,7 @@ function distributeRects<T>(
     return targets
   }
 
-  const bounds = rectBounds(targets.map((target) => target.rect))
+  const bounds = unionRects(targets.map((target) => target.rect))
 
   if (bounds === null) {
     return targets
@@ -179,10 +179,6 @@ function alignmentBounds(rects: Rect[]) {
     }
   }
 
-  return rectBounds(rects)
-}
-
-function rectBounds(rects: Rect[]) {
   return unionRects(rects)
 }
 
