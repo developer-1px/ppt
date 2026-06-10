@@ -31,11 +31,16 @@ export function retouchCanvasSelectionBounds(
   entries: readonly RetouchCanvasSceneEntry[],
   pointers: readonly Pointer[],
 ): Rect | null {
-  const scene = createCanvasSceneAdapter([...entries])
   const selectedIds = canvasSelectionIdsFromPointers(entries, pointers)
+
+  if (selectedIds.length === 0) {
+    return null
+  }
+
+  const scene = createCanvasSceneAdapter([...entries])
   const bounds = scene.getBounds(selectedIds)
 
-  return bounds ? canvasBoundsToRect(bounds) : null
+  return bounds === null ? null : canvasBoundsToRect(bounds)
 }
 
 function canvasSelectionIdsFromPointers(
