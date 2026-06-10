@@ -43,11 +43,9 @@ type InspectorPanelProps = {
   selectedRect: Rect | null
 }
 
-const SLIDE_ACCENT_ITEMS: Record<string, { label: string }> = {}
-
-for (const accent of SLIDE_ACCENTS) {
-  SLIDE_ACCENT_ITEMS[accent] = { label: accent }
-}
+const SLIDE_ACCENT_ITEMS = Object.fromEntries(
+  SLIDE_ACCENTS.map((accent) => [accent, { label: accent }]),
+) satisfies Record<string, { label: string }>
 
 export function InspectorPanel({
   activeSlideAccent,
