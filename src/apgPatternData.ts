@@ -98,18 +98,22 @@ function selectedPatternKeys(event: PatternEvent) {
   return event.type === 'select' ? event.keys : []
 }
 
+function patternKey<TKey extends string>(key: string | null | undefined) {
+  return key === null || key === undefined ? null : (key as TKey)
+}
+
 export function nextToolbarActiveKey<TKey extends string>(
   data: PatternData,
   event: PatternEvent,
   disabledKeys: readonly TKey[] = [],
 ) {
-  const nextKey = nextToolbarEventKey(data, event)
+  const nextKey = patternKey<TKey>(nextToolbarEventKey(data, event))
 
-  if (nextKey === null || disabledKeys.includes(nextKey as TKey)) {
+  if (nextKey === null || disabledKeys.includes(nextKey)) {
     return null
   }
 
-  return nextKey as TKey
+  return nextKey
 }
 
 export function disabledToolbarKeys<TKey extends string>(
@@ -125,7 +129,11 @@ export function handleToolbarSelection<TKey extends string>(
   handlers: Partial<Record<TKey, () => void>>,
 ) {
   for (const key of selectedPatternKeys(event)) {
-    handlers[key as TKey]?.()
+    const handlerKey = patternKey<TKey>(key)
+
+    if (handlerKey !== null) {
+      handlers[handlerKey]?.()
+    }
   }
 }
 
@@ -165,19 +173,21 @@ export function nextRadioActiveKey<TKey extends string>(
   event: PatternEvent,
 ): TKey | null {
   if (event.type === 'focus') {
-    return event.key as TKey
+    return patternKey<TKey>(event.key)
   }
 
   if (event.type === 'select') {
-    return event.keys[0] as TKey | undefined ?? null
+    return patternKey<TKey>(event.keys[0])
   }
 
   if (event.type === 'navigate') {
-    return reducePatternData(
-      radioGroupDefinition,
-      data,
-      event,
-    ).state?.activeKey as TKey | undefined ?? null
+    return patternKey<TKey>(
+      reducePatternData(
+        radioGroupDefinition,
+        data,
+        event,
+      ).state?.activeKey,
+    )
   }
 
   return null
@@ -188,15 +198,17 @@ export function nextListboxSelectionKey<TKey extends string>(
   event: PatternEvent,
 ): TKey | null {
   if (event.type === 'select') {
-    return event.keys[0] as TKey | undefined ?? null
+    return patternKey<TKey>(event.keys[0])
   }
 
   if (event.type === 'navigate') {
-    return reducePatternData(
-      listboxDefinition,
-      data,
-      event,
-    ).state?.activeKey as TKey | undefined ?? null
+    return patternKey<TKey>(
+      reducePatternData(
+        listboxDefinition,
+        data,
+        event,
+      ).state?.activeKey,
+    )
   }
 
   return null
