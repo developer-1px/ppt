@@ -66,7 +66,8 @@ export function PresentationOverlay({
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (matchesShortcut(event, 'Escape')) {
-        consumePresentationShortcut(event, onClose)
+        event.preventDefault()
+        onClose()
         return
       }
 
@@ -78,12 +79,14 @@ export function PresentationOverlay({
       }
 
       if (matchesShortcut(event, 'ArrowRight PageDown Space')) {
-        consumePresentationShortcut(event, onNext)
+        event.preventDefault()
+        onNext()
         return
       }
 
       if (matchesShortcut(event, 'ArrowLeft PageUp')) {
-        consumePresentationShortcut(event, onPrevious)
+        event.preventDefault()
+        onPrevious()
       }
     }
 
@@ -143,9 +146,4 @@ export function PresentationOverlay({
       </div>
     </div>
   )
-}
-
-function consumePresentationShortcut(event: KeyboardEvent, action: () => void) {
-  event.preventDefault()
-  action()
 }
