@@ -5,6 +5,11 @@ import {
   useTabsPattern,
   useToolbarPattern,
 } from '@interactive-os/aria/react'
+import type {
+  ReactRadioRenderItem,
+  ReactTabsRuntime,
+  ReactToolbarRenderItem,
+} from '@interactive-os/aria/react'
 import {
   activeManagedTab,
   handleToolbarSelection,
@@ -17,21 +22,63 @@ import {
   toolbarPatternData,
   tabsPatternData,
 } from './apgPatternData'
-import {
-  radioItemPropsByKey,
-  tabsPropsByValue,
-  toolbarItemPropsByKey,
-} from './apgPatternProps'
 import type {
   ActionToolbarItem,
   ListboxFocusStrategy,
   ManagedTabItem,
+  PatternElementProps,
   ToolbarOrientation,
 } from './apgPatternTypes'
 
 export { disabledToolbarKeys } from './apgPatternData'
 
 const EMPTY_TOOLBAR_KEYS: readonly never[] = []
+
+function toolbarItemPropsByKey(
+  items: readonly ReactToolbarRenderItem[],
+  options: { omitPressed?: boolean } = {},
+) {
+  const propsByKey: Record<string, PatternElementProps> = {}
+
+  for (const item of items) {
+    const props = item.itemProps
+
+    if (options.omitPressed) {
+      const nextProps = { ...props }
+
+      delete nextProps['aria-pressed']
+      propsByKey[item.key] = nextProps
+      continue
+    }
+
+    propsByKey[item.key] = props
+  }
+
+  return propsByKey
+}
+
+function radioItemPropsByKey(items: readonly ReactRadioRenderItem[]) {
+  const propsByKey: Record<string, PatternElementProps> = {}
+
+  for (const item of items) {
+    propsByKey[item.key] = item.radioProps
+  }
+
+  return propsByKey
+}
+
+function tabsPropsByValue<TValue extends string>(
+  tabRuntime: ReactTabsRuntime,
+  tabs: readonly ManagedTabItem<TValue>[],
+) {
+  const propsByValue: Record<string, PatternElementProps> = {}
+
+  for (const tab of tabs) {
+    propsByValue[tab.value] = tabRuntime.getTabProps(tab.tabKey)
+  }
+
+  return propsByValue
+}
 
 export function useManagedTabsPattern<TValue extends string>({
   activeValue,
