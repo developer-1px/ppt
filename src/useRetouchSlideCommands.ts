@@ -1,13 +1,16 @@
 import { useState, type RefObject } from 'react'
 import type { JSONDocument } from 'zod-crud'
 import type { RetouchCollection } from './retouchCollection'
-import type { RetouchDeck, RetouchSlide } from './retouchModel'
+import {
+  slideAccentPointer,
+  slideNamePointer,
+  type RetouchDeck,
+  type RetouchSlide,
+} from './retouchModel'
 import {
   addSlidePatch,
   createBlankSlide,
   duplicateSlide,
-  setSlideAccentPatch,
-  setSlideNamePatch,
 } from './slideDeckOperations'
 import type { RetouchPatchCommit } from './retouchSurfaceContract'
 import type { CanvasView } from './retouchViewState'
@@ -128,7 +131,16 @@ export function useRetouchSlideCommands({
     }
 
     commitActiveTextEdit()
-    commitRetouchPatch(setSlideNamePatch(activeSlideIndex, nextName), 'rename slide')
+    commitRetouchPatch(
+      [
+        {
+          op: 'replace',
+          path: slideNamePointer(activeSlideIndex),
+          value: nextName,
+        },
+      ],
+      'rename slide',
+    )
     clearTransientState()
   }
 
@@ -138,7 +150,16 @@ export function useRetouchSlideCommands({
     }
 
     commitActiveTextEdit()
-    commitRetouchPatch(setSlideAccentPatch(activeSlideIndex, accent), 'change slide accent')
+    commitRetouchPatch(
+      [
+        {
+          op: 'replace',
+          path: slideAccentPointer(activeSlideIndex),
+          value: accent,
+        },
+      ],
+      'change slide accent',
+    )
     clearTransientState()
   }
 

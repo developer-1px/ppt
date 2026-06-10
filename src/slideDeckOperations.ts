@@ -1,7 +1,5 @@
 import type { JSONPatchOperation } from 'zod-crud'
 import {
-  slideAccentPointer,
-  slideNamePointer,
   slidePointer,
   type RetouchSlide,
 } from './retouchModel'
@@ -91,30 +89,4 @@ export function addSlidePatch(
   insertIndex: number,
 ): JSONPatchOperation[] {
   return [{ op: 'add', path: slidePointer(insertIndex), value: slide }]
-}
-
-export function setSlideNamePatch(
-  slideIndex: number,
-  name: string,
-): JSONPatchOperation[] {
-  return [
-    {
-      op: 'replace',
-      path: slideNamePointer(slideIndex),
-      value: name,
-    },
-  ]
-}
-
-export function setSlideAccentPatch(
-  slideIndex: number,
-  accent: string,
-): JSONPatchOperation[] {
-  return [
-    {
-      op: 'replace',
-      path: slideAccentPointer(slideIndex),
-      value: accent,
-    },
-  ]
 }
