@@ -56,7 +56,7 @@ export function placeCaretAtEnd(root: HTMLElement) {
 export function isSelectionAtTextEnd(root: HTMLElement) {
   const selection = window.getSelection()
 
-  if (!selection || selection.rangeCount === 0) {
+  if (selection === null || selection.rangeCount === 0) {
     return true
   }
 
@@ -77,7 +77,7 @@ export function insertTextAtSelection(root: HTMLElement, text: string) {
   const selection = window.getSelection()
   const insertedText = text
 
-  if (!selection || selection.rangeCount === 0) {
+  if (selection === null || selection.rangeCount === 0) {
     root.append(document.createTextNode(insertedText))
     placeCaretAtEnd(root)
     return
@@ -154,7 +154,7 @@ export function normalizeEditableText(text: string) {
 export function placeCaretFromPoint(root: HTMLElement, x: number, y: number) {
   const range = readCaretRangeFromPoint(x, y)
 
-  if (!range || !root.contains(range.startContainer)) {
+  if (range === null || !root.contains(range.startContainer)) {
     return false
   }
 
@@ -169,7 +169,7 @@ function readCaretRangeFromPoint(x: number, y: number) {
   if ('caretPositionFromPoint' in document) {
     const position = document.caretPositionFromPoint(x, y)
 
-    if (position) {
+    if (position !== null) {
       const range = document.createRange()
       range.setStart(position.offsetNode, position.offset)
       range.collapse(true)
@@ -198,7 +198,7 @@ export function rememberStageScroll(element: HTMLElement): StageScrollPosition |
 }
 
 export function restoreStageScroll(position: StageScrollPosition | null) {
-  if (!position) {
+  if (position === null) {
     return
   }
 
