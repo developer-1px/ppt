@@ -156,9 +156,13 @@ function escapeHtml(value: string) {
 }
 
 function htmlAttributes(attributes: Record<string, string>) {
-  return Object.entries(attributes)
-    .map(([name, value]) => `${name}="${escapeHtml(value)}"`)
-    .join(' ')
+  const htmlParts: string[] = []
+
+  for (const name in attributes) {
+    htmlParts.push(`${name}="${escapeHtml(attributes[name])}"`)
+  }
+
+  return htmlParts.join(' ')
 }
 
 function escapeScriptJson(value: string) {
