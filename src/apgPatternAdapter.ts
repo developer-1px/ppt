@@ -170,8 +170,8 @@ export function useManagedRadioGroupPattern<TKey extends string>({
         setActiveRadioKey(nextActiveKey)
       }
 
-      for (const key of event.type === 'select' ? event.keys : []) {
-        onSelect(key as TKey)
+      if (event.type === 'select' && nextActiveKey !== null) {
+        onSelect(nextActiveKey)
       }
     },
     {
