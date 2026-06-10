@@ -1,5 +1,4 @@
 import type {
-  ReactListboxRenderItem,
   ReactRadioRenderItem,
   ReactTabsRuntime,
   ReactToolbarRenderItem,
@@ -36,15 +35,6 @@ export function radioItemPropsByKey(
   }
 
   return propsByKey
-}
-
-export function listboxRenderItems(
-  items: readonly ReactListboxRenderItem[],
-) {
-  return items.map((item) => ({
-    ...item,
-    optionProps: item.optionProps,
-  }))
 }
 
 export function tabsPropsByValue<TValue extends string>(

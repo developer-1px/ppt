@@ -18,7 +18,6 @@ import {
   tabsPatternData,
 } from './apgPatternData'
 import {
-  listboxRenderItems,
   radioItemPropsByKey,
   tabsPropsByValue,
   toolbarItemPropsByKey,
@@ -128,7 +127,7 @@ export function useManagedListboxPattern<TKey extends string>({
   )
 
   return {
-    renderItems: listboxRenderItems(listbox.renderItems),
+    renderItems: listbox.renderItems,
     rootProps: listbox.rootProps,
   }
 }
