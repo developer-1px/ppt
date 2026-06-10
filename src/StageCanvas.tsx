@@ -92,8 +92,7 @@ export function StageCanvas({
       selected: selectedPointerSet.has(pointer),
     }
   })
-  const surfaceItems = blockEntries.map(({ block, pointer, rect }) => ({
-    block,
+  const surfaceItems = blockEntries.map(({ pointer, rect }) => ({
     pointer,
     rect,
   }))
