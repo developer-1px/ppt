@@ -44,13 +44,13 @@ export function StageLayoutChrome({
     selectedPointers,
   )
   const overlayRect =
-    selectedPointers.length === 1 && selectedRect
+    selectedPointers.length === 1 && selectedRect !== null
       ? (visualSelectionRect ?? selectedRect)
       : selectedBounds
 
   return (
     <>
-      {overlayRect ? (
+      {overlayRect !== null ? (
         <SelectionOverlay
           onResizePointerDown={onResizePointerDown}
           rect={overlayRect}
@@ -58,7 +58,7 @@ export function StageLayoutChrome({
         />
       ) : null}
 
-      {marqueeRect ? (
+      {marqueeRect !== null ? (
         <div className="marquee-selection" style={rectToStyle(marqueeRect)} />
       ) : null}
 
