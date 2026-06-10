@@ -133,7 +133,7 @@ export function useRetouchLayoutInteraction({
   )
 
   useEffect(() => {
-    if (!interaction) {
+    if (interaction === null) {
       return
     }
 
@@ -147,7 +147,7 @@ export function useRetouchLayoutInteraction({
     function handlePointerMove(event: PointerEvent) {
       const point = readSlidePoint(slideRef.current, event)
 
-      if (!point) {
+      if (point === null) {
         return
       }
 
@@ -166,7 +166,7 @@ export function useRetouchLayoutInteraction({
       const point = readSlidePoint(slideRef.current, event)
 
       if (
-        !point ||
+        point === null ||
         !hasMeaningfulInteractionDelta(currentInteraction, event)
       ) {
         finishPointerInteraction()
@@ -236,7 +236,7 @@ export function useRetouchLayoutInteraction({
 
     const point = readSlidePoint(slideRef.current, event)
 
-    if (!point) {
+    if (point === null) {
       return
     }
 
@@ -288,8 +288,8 @@ export function useRetouchLayoutInteraction({
   ) {
     if (
       selectedPointers.length !== 1 ||
-      !selectedBlock ||
-      !selectedPointer ||
+      selectedBlock === null ||
+      selectedPointer === null ||
       mode !== 'layout'
     ) {
       return
@@ -301,7 +301,7 @@ export function useRetouchLayoutInteraction({
     )
     const point = readSlidePoint(slideRef.current, event)
 
-    if (!point) {
+    if (point === null) {
       return
     }
 
