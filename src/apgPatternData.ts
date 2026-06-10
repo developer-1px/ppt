@@ -120,10 +120,18 @@ export function nextToolbarActiveKey<TKey extends string>(
   rootKeys: readonly TKey[],
   disabledKeys: readonly TKey[] = [],
 ) {
-  const nextKey = knownPatternKey(
-    nextToolbarEventKey(data, event),
-    rootKeys,
-  )
+  let eventKey: string | null
+
+  if (event.type === 'focus') {
+    eventKey = event.key
+  } else if (event.type === 'navigate') {
+    eventKey =
+      reducePatternData(toolbarDefinition, data, event).state?.activeKey ?? null
+  } else {
+    eventKey = selectedPatternKeys(event)[0] ?? null
+  }
+
+  const nextKey = knownPatternKey(eventKey, rootKeys)
 
   if (nextKey === null || disabledKeys.includes(nextKey)) {
     return null
@@ -294,18 +302,6 @@ function enabledToolbarActiveKey<TKey extends string>(
   }
 
   return firstEnabledToolbarKey(rootKeys, disabledKeys)
-}
-
-function nextToolbarEventKey(data: PatternData, event: PatternEvent) {
-  if (event.type === 'focus') {
-    return event.key
-  }
-
-  if (event.type === 'navigate') {
-    return reducePatternData(toolbarDefinition, data, event).state?.activeKey ?? null
-  }
-
-  return selectedPatternKeys(event)[0] ?? null
 }
 
 function tabValueFromKey<TValue extends string>(
