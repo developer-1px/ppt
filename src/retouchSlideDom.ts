@@ -39,12 +39,21 @@ export function isRetouchStageBackgroundIgnoredTarget(
 export function readPlainTextBlockEditorElements(
   slideElement: HTMLElement | null,
 ): PlainTextBlockEditorElements | null {
-  const editorElement = slideElement?.querySelector<HTMLElement>(
+  if (slideElement === null) {
+    return null
+  }
+
+  const editorElement = slideElement.querySelector<HTMLElement>(
     PLAIN_TEXT_BLOCK_EDITOR_SELECTOR,
   )
-  const blockElement = closestSlideBlockElement(editorElement ?? null)
 
-  if (!editorElement || !blockElement) {
+  if (editorElement === null) {
+    return null
+  }
+
+  const blockElement = closestSlideBlockElement(editorElement)
+
+  if (blockElement === null) {
     return null
   }
 
@@ -58,9 +67,13 @@ export function readSlidePoint(
   slideElement: HTMLElement | null,
   event: ClientPointInput,
 ): Point | null {
-  const rect = slideElement?.getBoundingClientRect()
+  if (slideElement === null) {
+    return null
+  }
 
-  if (!rect || rect.width === 0 || rect.height === 0) {
+  const rect = slideElement.getBoundingClientRect()
+
+  if (rect.width === 0 || rect.height === 0) {
     return null
   }
 
@@ -82,15 +95,24 @@ export function readSlideBlockRect(
   slideElement: HTMLElement | null,
   blockId: string,
 ): Rect | null {
-  const slideRect = slideElement?.getBoundingClientRect()
-  const blockElement = Array.from(
-    slideElement?.querySelectorAll<HTMLElement>(SLIDE_BLOCK_SELECTOR) ?? [],
-  ).find((element) => element.dataset.block === blockId)
-  const blockRect = blockElement?.getBoundingClientRect()
-
-  if (!slideRect || !blockRect || slideRect.width === 0 || slideRect.height === 0) {
+  if (slideElement === null) {
     return null
   }
+
+  const slideRect = slideElement.getBoundingClientRect()
+  const blockElement = Array.from(
+    slideElement.querySelectorAll<HTMLElement>(SLIDE_BLOCK_SELECTOR),
+  ).find((element) => element.dataset.block === blockId)
+
+  if (blockElement === undefined) {
+    return null
+  }
+
+  if (slideRect.width === 0 || slideRect.height === 0) {
+    return null
+  }
+
+  const blockRect = blockElement.getBoundingClientRect()
 
   return {
     x: ((blockRect.left - slideRect.left) / slideRect.width) * SLIDE_WIDTH,
