@@ -188,7 +188,7 @@ function closestAxisSnap(sources: number[], targets: number[]) {
         continue
       }
 
-      if (!closest || distance < closest.distance) {
+      if (closest === null || distance < closest.distance) {
         closest = {
           distance,
           guide: target,
