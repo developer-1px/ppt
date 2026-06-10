@@ -15,7 +15,6 @@ import {
   retouchCanvasSceneEntries,
   retouchCanvasSelectionBounds,
 } from './retouchCanvasScene'
-import type { RetouchSurfaceItem } from './retouchObjectSurface'
 
 type StageLayoutChromeProps = {
   marqueeRect: Rect | null
@@ -26,7 +25,7 @@ type StageLayoutChromeProps = {
   selectedPointers: readonly Pointer[]
   selectedRect: Rect | null
   snapGuides: SnapGuides
-  surfaceItems: readonly RetouchSurfaceItem[]
+  surfaceItems: readonly { pointer: Pointer; rect: Rect }[]
   visualSelectionRect: Rect | null
 }
 
