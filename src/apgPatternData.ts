@@ -69,22 +69,27 @@ export function tabsPatternData<TValue extends string>({
   tabs: readonly ManagedTabItem<TValue>[]
 }): PatternData {
   const activeTab = activeManagedTab(activeValue, tabs)
+  const controlsByKey: Record<string, readonly string[]> = {}
+  const items: PatternData['items'] = {}
+  const ownerByKey: Record<string, string> = {}
+  const rootKeys: string[] = []
+
+  for (const tab of tabs) {
+    items[tab.tabKey] = { label: tab.label }
+    items[tab.panelKey] = {
+      label: tab.panelLabel ?? `${tab.label} view`,
+    }
+    controlsByKey[tab.tabKey] = [tab.panelKey]
+    ownerByKey[tab.panelKey] = tab.tabKey
+    rootKeys.push(tab.tabKey)
+  }
 
   return {
-    items: Object.fromEntries(
-      tabs.flatMap((tab) => [
-        [tab.tabKey, { label: tab.label }],
-        [tab.panelKey, { label: tab.panelLabel ?? `${tab.label} view` }],
-      ]),
-    ),
+    items,
     relations: {
-      controlsByKey: Object.fromEntries(
-        tabs.map((tab) => [tab.tabKey, [tab.panelKey]]),
-      ),
-      ownerByKey: Object.fromEntries(
-        tabs.map((tab) => [tab.panelKey, tab.tabKey]),
-      ),
-      rootKeys: tabs.map((tab) => tab.tabKey),
+      controlsByKey,
+      ownerByKey,
+      rootKeys,
     },
     refs: { label },
     state: {
