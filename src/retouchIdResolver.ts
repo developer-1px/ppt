@@ -1,5 +1,5 @@
 import { createIdResolver } from '@zod-crud/id-resolver'
-import type { IdResolver, ResolveIdResult } from '@zod-crud/id-resolver'
+import type { ResolveIdResult } from '@zod-crud/id-resolver'
 import { parsePointer, type JSONDocument, type Pointer } from 'zod-crud'
 import {
   RetouchSlideSchema,
@@ -13,9 +13,6 @@ const RETOUCH_ID_SCOPES = {
   block: 'block',
   slide: 'slide',
 } as const
-
-type RetouchIdScope =
-  (typeof RETOUCH_ID_SCOPES)[keyof typeof RETOUCH_ID_SCOPES]
 
 export function createRetouchIdResolver(doc: JSONDocument<RetouchDeck>) {
   const resolver = createIdResolver(doc, {
@@ -37,17 +34,17 @@ export function createRetouchIdResolver(doc: JSONDocument<RetouchDeck>) {
     current: resolver.current,
 
     resolveBlockPointer(blockId: string): ResolveIdResult {
-      return resolveRetouchId(resolver, RETOUCH_ID_SCOPES.block, blockId)
+      return resolver.resolve(RETOUCH_ID_SCOPES.block, blockId)
     },
 
     resolveSlideIndex(slideId: string): number | null {
-      const resolved = resolveRetouchId(resolver, RETOUCH_ID_SCOPES.slide, slideId)
+      const resolved = resolver.resolve(RETOUCH_ID_SCOPES.slide, slideId)
 
       return resolved.ok ? slideIndexFromPointer(resolved.pointer) : null
     },
 
     resolveSlidePointer(slideId: string): ResolveIdResult {
-      return resolveRetouchId(resolver, RETOUCH_ID_SCOPES.slide, slideId)
+      return resolver.resolve(RETOUCH_ID_SCOPES.slide, slideId)
     },
   }
 }
@@ -120,14 +117,6 @@ function uniqueRetouchBlockId(slide: RetouchSlide, baseId: string) {
     slide.blocks.map((block) => block.id),
     baseId,
   )
-}
-
-function resolveRetouchId(
-  resolver: IdResolver,
-  scope: RetouchIdScope,
-  id: string,
-) {
-  return resolver.resolve(scope, id)
 }
 
 function slideIndexFromPointer(pointer: Pointer) {
