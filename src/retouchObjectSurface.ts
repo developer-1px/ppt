@@ -1,7 +1,5 @@
 import {
-  createObjectSurfaceSelection,
   type ObjectSurfaceAdapter,
-  type ObjectSurfaceSelection,
 } from '@interactive-os/object-surface'
 import type { Pointer } from 'zod-crud'
 import {
@@ -29,19 +27,4 @@ export function retouchSurfaceItems(slide: RetouchSlide, slideIndex: number) {
     pointer: blockPointer(slideIndex, blockIndex),
     rect: getRect(block),
   }))
-}
-
-export function objectSurfaceSelectionFromPointers(
-  pointers: readonly Pointer[],
-): ObjectSurfaceSelection {
-  return createObjectSurfaceSelection(pointers, {
-    anchorId: pointers[0] ?? null,
-    primaryId: pointers.at(-1) ?? null,
-  })
-}
-
-export function pointersFromObjectSurfaceSelection(
-  selection: ObjectSurfaceSelection,
-): Pointer[] {
-  return [...selection.ids]
 }

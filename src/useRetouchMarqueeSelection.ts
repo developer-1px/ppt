@@ -1,4 +1,5 @@
 import {
+  createObjectSurfaceSelection,
   rectFromPoints,
   selectSurfaceObjectsInMarquee,
 } from '@interactive-os/object-surface'
@@ -18,8 +19,6 @@ import {
   type RetouchSlide,
 } from './retouchModel'
 import {
-  objectSurfaceSelectionFromPointers,
-  pointersFromObjectSurfaceSelection,
   retouchSurfaceAdapter,
   retouchSurfaceItems,
 } from './retouchObjectSurface'
@@ -136,9 +135,9 @@ export function useRetouchMarqueeSelection({
         items: retouchSurfaceItems(activeSlide, activeSlideIndex),
         mode: currentMarquee.additive ? 'add' : 'replace',
         rect,
-        selection: objectSurfaceSelectionFromPointers(selectedPointers),
+        selection: createObjectSurfaceSelection(selectedPointers),
       })
-      const nextPointers = pointersFromObjectSurfaceSelection(nextSurfaceSelection)
+      const nextPointers = [...nextSurfaceSelection.ids]
 
       if (nextPointers.length > 0) {
         selection?.selectRanges?.(nextPointers)
