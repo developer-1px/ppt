@@ -105,13 +105,6 @@ export function createRetouchBlockCopyId(
   return uniqueRetouchBlockId(slide, `${block.id}-copy`)
 }
 
-export function createRetouchDuplicatedSlideBlockId(
-  slideId: string,
-  blockIndex: number,
-) {
-  return `${slideId}-block-${blockIndex + 1}`
-}
-
 function uniqueRetouchBlockId(slide: RetouchSlide, baseId: string) {
   return uniqueId(
     slide.blocks.map((block) => block.id),

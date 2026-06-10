@@ -6,7 +6,6 @@ import {
   type RetouchSlide,
 } from './retouchModel'
 import {
-  createRetouchDuplicatedSlideBlockId,
   createRetouchSlideId,
   createRetouchSlideName,
   nextRetouchSlideOrdinal,
@@ -82,7 +81,7 @@ export function duplicateSlide(
     name: createRetouchSlideName(slides, `${slide.name} copy`),
     blocks: slide.blocks.map((block, index) => ({
       ...block,
-      id: createRetouchDuplicatedSlideBlockId(id, index),
+      id: `${id}-block-${index + 1}`,
     })),
   }
 }
