@@ -5,10 +5,9 @@ import {
 } from 'canvas/foundation'
 import type { Pointer } from 'zod-crud'
 import type { Rect } from './retouchModel'
-import type { RetouchSurfaceItem } from './retouchObjectSurface'
 
 export function retouchCanvasSceneEntries(
-  items: readonly RetouchSurfaceItem[],
+  items: readonly { pointer: Pointer; rect: Rect }[],
 ): CanvasSceneEntry[] {
   return items.map((item, index) => ({
     bounds: rectToCanvasBounds(item.rect),
