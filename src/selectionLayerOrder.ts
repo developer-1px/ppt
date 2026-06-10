@@ -15,19 +15,19 @@ import {
   type SlideBlock,
 } from './retouchModel'
 
-export type LayerOrderAction = 'front' | 'forward' | 'backward' | 'back'
-
 type LayerOrderPatch = {
   operations: JSONPatchOperation[]
   nextSelectedPointers: Pointer[]
 }
 
-const LAYER_ORDER_ACTIONS: Record<LayerOrderAction, SharedLayerOrderAction> = {
+const LAYER_ORDER_ACTIONS = {
   front: 'bringToFront',
   forward: 'bringForward',
   backward: 'sendBackward',
   back: 'sendToBack',
-}
+} satisfies Record<string, SharedLayerOrderAction>
+
+export type LayerOrderAction = keyof typeof LAYER_ORDER_ACTIONS
 
 const LayerOrderBlocksSchema = SlideBlockSchema.array()
 
