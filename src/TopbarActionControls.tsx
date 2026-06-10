@@ -124,7 +124,13 @@ export function TopbarActionControls({
         <button
           {...actionToolbarProps[action]}
           aria-label={label}
-          aria-pressed={actionPressed(action, exportCopied, exportDownloaded)}
+          aria-pressed={
+            action === 'copy-html'
+              ? exportCopied
+              : action === 'download-html'
+                ? exportDownloaded
+                : undefined
+          }
           data-action={action}
           data-copy-state={action === 'copy-html' ? copyState : undefined}
           data-download-state={
@@ -147,20 +153,4 @@ export function TopbarActionControls({
       ))}
     </div>
   )
-}
-
-function actionPressed(
-  action: ActionToolbarKey,
-  exportCopied: boolean,
-  exportDownloaded: boolean,
-) {
-  if (action === 'copy-html') {
-    return exportCopied
-  }
-
-  if (action === 'download-html') {
-    return exportDownloaded
-  }
-
-  return undefined
 }
