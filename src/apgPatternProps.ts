@@ -17,9 +17,15 @@ export function toolbarItemPropsByKey(
   for (const item of items) {
     const props = item.itemProps
 
-    propsByKey[item.key] = options.omitPressed
-      ? omitAriaPressed(props)
-      : props
+    if (options.omitPressed) {
+      const nextProps = { ...props }
+
+      delete nextProps['aria-pressed']
+      propsByKey[item.key] = nextProps
+      continue
+    }
+
+    propsByKey[item.key] = props
   }
 
   return propsByKey
@@ -48,12 +54,4 @@ export function tabsPropsByValue<TValue extends string>(
   }
 
   return propsByValue
-}
-
-function omitAriaPressed(props: PatternElementProps): PatternElementProps {
-  const next = { ...props }
-
-  delete next['aria-pressed']
-
-  return next
 }
