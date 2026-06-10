@@ -281,13 +281,6 @@ export function activeManagedTab<TValue extends string>(
   return activeTab
 }
 
-function firstEnabledToolbarKey<TKey extends string>(
-  keys: readonly TKey[],
-  disabledKeys: readonly TKey[],
-) {
-  return keys.find((key) => !disabledKeys.includes(key)) ?? keys[0] ?? null
-}
-
 function enabledToolbarActiveKey<TKey extends string>(
   activeKey: TKey | null | undefined,
   rootKeys: readonly TKey[],
@@ -301,7 +294,11 @@ function enabledToolbarActiveKey<TKey extends string>(
     return activeKey
   }
 
-  return firstEnabledToolbarKey(rootKeys, disabledKeys)
+  return (
+    rootKeys.find((key) => !disabledKeys.includes(key)) ??
+    rootKeys[0] ??
+    null
+  )
 }
 
 function tabValueFromKey<TValue extends string>(
