@@ -8,8 +8,8 @@ import {
 import { isUndoHistoryShortcut } from './editorKeyboard'
 
 export const PLAIN_TEXT_BLOCK_EDITOR_SELECTOR =
-  '[data-editing="true"][contenteditable]' as const
-const PLAIN_TEXT_BLOCK_EDITOR_CONTENT_EDITABLE = 'plaintext-only' as const
+  '[data-editing="true"][contenteditable]'
+const PLAIN_TEXT_BLOCK_EDITOR_CONTENT_EDITABLE = 'plaintext-only'
 
 type PlainTextBlockEditorBeforeInput =
   | { kind: 'line-break' }

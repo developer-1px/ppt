@@ -1,7 +1,7 @@
 import type { SlideBlock } from './retouchModel'
 import { PPT_RETOUCH_SURFACE } from './retouchSurfaceContract'
 
-const HTML_SLIDE_CONTRACT = 'interactive-os.html-slide-contract.v1' as const
+const HTML_SLIDE_CONTRACT = 'interactive-os.html-slide-contract.v1'
 
 export const HTML_SLIDE_ATTRIBUTES = {
   block: 'data-block',

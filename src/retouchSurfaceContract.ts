@@ -13,7 +13,7 @@ import {
 } from './retouchModel'
 
 const RETOUCH_SURFACE_CONTRACT =
-  'interactive-os.retouch-surface.v1' as const
+  'interactive-os.retouch-surface.v1'
 
 const RETOUCH_SURFACE_POINTER_TEMPLATES = {
   root: '',
