@@ -77,7 +77,7 @@ export function useManagedTabsPattern<TValue extends string>({
   return {
     panelProps: patternDivProps(tabRuntime.getTabPanelProps(activeTab.panelKey)),
     tablistProps: patternDivProps(tabRuntime.getTablistProps()),
-    tabPropsByValue: tabsPropsByValue<TValue>(tabRuntime, tabs),
+    tabPropsByValue: tabsPropsByValue(tabRuntime, tabs),
   }
 }
 
@@ -180,7 +180,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
   )
 
   return {
-    itemProps: radioItemPropsByKey<TKey>(radio.renderItems),
+    itemProps: radioItemPropsByKey(radio.renderItems),
     rootProps: patternDivProps(radio.rootProps),
   }
 }
@@ -246,7 +246,7 @@ function useManagedToolbarPattern<TKey extends string>({
   )
 
   return {
-    itemProps: toolbarItemPropsByKey<TKey>(toolbar.renderItems, {
+    itemProps: toolbarItemPropsByKey(toolbar.renderItems, {
       omitPressed,
     }),
     rootProps: toolbar.rootProps,

@@ -21,31 +21,33 @@ export function patternDivProps(props: PatternElementProps): PatternDivProps {
   return props as PatternDivProps
 }
 
-export function toolbarItemPropsByKey<TKey extends string>(
+export function toolbarItemPropsByKey(
   items: readonly ReactToolbarRenderItem[],
   options: { omitPressed?: boolean } = {},
 ) {
-  return Object.fromEntries(
-    items.map((item) => {
-      const props = patternButtonProps(item.itemProps)
+  const propsByKey: Record<string, PatternButtonProps> = {}
 
-      return [
-        item.key,
-        options.omitPressed ? omitAriaPressed(props) : props,
-      ]
-    }),
-  ) as Record<TKey, PatternButtonProps>
+  for (const item of items) {
+    const props = patternButtonProps(item.itemProps)
+
+    propsByKey[item.key] = options.omitPressed
+      ? omitAriaPressed(props)
+      : props
+  }
+
+  return propsByKey
 }
 
-export function radioItemPropsByKey<TKey extends string>(
+export function radioItemPropsByKey(
   items: readonly ReactRadioRenderItem[],
 ) {
-  return Object.fromEntries(
-    items.map((item) => [
-      item.key,
-      patternButtonProps(item.radioProps),
-    ]),
-  ) as Record<TKey, PatternButtonProps>
+  const propsByKey: Record<string, PatternButtonProps> = {}
+
+  for (const item of items) {
+    propsByKey[item.key] = patternButtonProps(item.radioProps)
+  }
+
+  return propsByKey
 }
 
 export function listboxRenderItems<TKey extends string>(
@@ -62,12 +64,15 @@ export function tabsPropsByValue<TValue extends string>(
   tabRuntime: ReactTabsRuntime,
   tabs: readonly ManagedTabItem<TValue>[],
 ) {
-  return Object.fromEntries(
-    tabs.map((tab) => [
-      tab.value,
-      patternButtonProps(tabRuntime.getTabProps(tab.tabKey)),
-    ]),
-  ) as Record<TValue, PatternButtonProps>
+  const propsByValue: Record<string, PatternButtonProps> = {}
+
+  for (const tab of tabs) {
+    propsByValue[tab.value] = patternButtonProps(
+      tabRuntime.getTabProps(tab.tabKey),
+    )
+  }
+
+  return propsByValue
 }
 
 function omitAriaPressed(props: PatternButtonProps): PatternButtonProps {
