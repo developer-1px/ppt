@@ -47,22 +47,22 @@ const retouchDraftCodec: DocumentPersistenceCodec = {
   },
 }
 
-function createRetouchDocumentPersistence(doc: JSONDocument<RetouchDeck>) {
-  return createDocumentPersistence(doc, {
-    codec: retouchDraftCodec,
-    key: STORAGE_KEY,
-  })
-}
-
-function createRetouchDirtyState(doc: JSONDocument<RetouchDeck>) {
-  return createDirtyState(doc, {
-    equals: retouchDeckEquals,
-  })
-}
-
 export function useRetouchDraftPersistence(doc: JSONDocument<RetouchDeck>) {
-  const persistence = useMemo(() => createRetouchDocumentPersistence(doc), [doc])
-  const dirtyState = useMemo(() => createRetouchDirtyState(doc), [doc])
+  const persistence = useMemo(
+    () =>
+      createDocumentPersistence(doc, {
+        codec: retouchDraftCodec,
+        key: STORAGE_KEY,
+      }),
+    [doc],
+  )
+  const dirtyState = useMemo(
+    () =>
+      createDirtyState(doc, {
+        equals: retouchDeckEquals,
+      }),
+    [doc],
+  )
   const [hasDeckChanges, setHasDeckChanges] = useState(() =>
     dirtyState.isDirty(),
   )
