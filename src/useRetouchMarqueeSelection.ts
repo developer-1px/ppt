@@ -69,7 +69,7 @@ export function useRetouchMarqueeSelection({
 
       const point = readSlidePoint(slideRef.current, event)
 
-      if (!point) {
+      if (point === null) {
         return
       }
 
@@ -93,7 +93,7 @@ export function useRetouchMarqueeSelection({
   }, [])
 
   useEffect(() => {
-    if (!marquee) {
+    if (marquee === null) {
       return
     }
 
@@ -102,7 +102,10 @@ export function useRetouchMarqueeSelection({
     function handlePointerMove(event: PointerEvent) {
       const point = readSlidePoint(slideRef.current, event)
 
-      if (!point || !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)) {
+      if (
+        point === null ||
+        !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)
+      ) {
         return
       }
 
@@ -119,7 +122,10 @@ export function useRetouchMarqueeSelection({
     function handlePointerUp(event: PointerEvent) {
       const point = readSlidePoint(slideRef.current, event)
 
-      if (!point || !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)) {
+      if (
+        point === null ||
+        !hasMeaningfulClientDelta(currentMarquee.startClientPoint, event)
+      ) {
         setMarquee(null)
         return
       }
