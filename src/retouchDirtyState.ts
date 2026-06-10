@@ -1,7 +1,6 @@
 import {
   RetouchDeckSchema,
   type RetouchDeck,
-  type RetouchSlide,
 } from './retouchModel'
 import { SAMPLE_DECK } from './sampleDeck'
 
@@ -30,7 +29,11 @@ export function changedSlideIdsFromBaseline(deck: unknown) {
 
   return new Set(
     parsed.slides
-      .filter((slide) => !retouchSlideEquals(slide, BASE_SLIDES_BY_ID.get(slide.id)))
+      .filter((slide) => {
+        const baselineSlide = BASE_SLIDES_BY_ID.get(slide.id)
+
+        return baselineSlide === undefined || !jsonEquals(slide, baselineSlide)
+      })
       .map((slide) => slide.id),
   )
 }
@@ -39,17 +42,6 @@ function parseRetouchDeck(value: unknown): RetouchDeck | null {
   const parsed = RetouchDeckSchema.safeParse(value)
 
   return parsed.success ? parsed.data : null
-}
-
-function retouchSlideEquals(
-  slide: RetouchSlide,
-  baselineSlide: RetouchSlide | undefined,
-) {
-  if (baselineSlide === undefined) {
-    return false
-  }
-
-  return jsonEquals(slide, baselineSlide)
 }
 
 function jsonEquals(a: unknown, b: unknown) {
