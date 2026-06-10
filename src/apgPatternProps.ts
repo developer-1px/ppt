@@ -6,29 +6,17 @@ import type {
 } from '@interactive-os/aria/react'
 import type {
   ManagedTabItem,
-  PatternButtonProps,
-  PatternDivProps,
   PatternElementProps,
 } from './apgPatternTypes'
-
-function patternButtonProps(
-  props: PatternElementProps,
-): PatternButtonProps {
-  return props as PatternButtonProps
-}
-
-export function patternDivProps(props: PatternElementProps): PatternDivProps {
-  return props as PatternDivProps
-}
 
 export function toolbarItemPropsByKey(
   items: readonly ReactToolbarRenderItem[],
   options: { omitPressed?: boolean } = {},
 ) {
-  const propsByKey: Record<string, PatternButtonProps> = {}
+  const propsByKey: Record<string, PatternElementProps> = {}
 
   for (const item of items) {
-    const props = patternButtonProps(item.itemProps)
+    const props = item.itemProps
 
     propsByKey[item.key] = options.omitPressed
       ? omitAriaPressed(props)
@@ -41,10 +29,10 @@ export function toolbarItemPropsByKey(
 export function radioItemPropsByKey(
   items: readonly ReactRadioRenderItem[],
 ) {
-  const propsByKey: Record<string, PatternButtonProps> = {}
+  const propsByKey: Record<string, PatternElementProps> = {}
 
   for (const item of items) {
-    propsByKey[item.key] = patternButtonProps(item.radioProps)
+    propsByKey[item.key] = item.radioProps
   }
 
   return propsByKey
@@ -56,7 +44,7 @@ export function listboxRenderItems<TKey extends string>(
   return items.map((item) => ({
     ...item,
     key: item.key as TKey,
-    optionProps: patternButtonProps(item.optionProps),
+    optionProps: item.optionProps,
   }))
 }
 
@@ -64,18 +52,16 @@ export function tabsPropsByValue<TValue extends string>(
   tabRuntime: ReactTabsRuntime,
   tabs: readonly ManagedTabItem<TValue>[],
 ) {
-  const propsByValue: Record<string, PatternButtonProps> = {}
+  const propsByValue: Record<string, PatternElementProps> = {}
 
   for (const tab of tabs) {
-    propsByValue[tab.value] = patternButtonProps(
-      tabRuntime.getTabProps(tab.tabKey),
-    )
+    propsByValue[tab.value] = tabRuntime.getTabProps(tab.tabKey)
   }
 
   return propsByValue
 }
 
-function omitAriaPressed(props: PatternButtonProps): PatternButtonProps {
+function omitAriaPressed(props: PatternElementProps): PatternElementProps {
   const next = { ...props }
 
   delete next['aria-pressed']

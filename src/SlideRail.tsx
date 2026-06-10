@@ -1,8 +1,4 @@
-import {
-  type ButtonHTMLAttributes,
-  type HTMLAttributes,
-  useMemo,
-} from 'react'
+import { useMemo } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -16,6 +12,7 @@ import {
   useActionToolbarPattern,
   useManagedListboxPattern,
 } from './apgPatternAdapter'
+import type { PatternElementProps } from './apgPatternTypes'
 import { cssVariables } from './cssVariables'
 import './SlideRail.css'
 
@@ -24,8 +21,8 @@ type SlideRailProps = {
   canDeleteSlide: boolean
   canMoveSlideDown: boolean
   canMoveSlideUp: boolean
-  canvasViewTablistProps: HTMLAttributes<HTMLDivElement>
-  canvasViewTabProps: Record<'slide' | 'grid', ButtonHTMLAttributes<HTMLButtonElement>>
+  canvasViewTablistProps: PatternElementProps
+  canvasViewTabProps: Record<'slide' | 'grid', PatternElementProps>
   changedSlideIds: Set<string>
   onAddSlide: () => void
   onDeleteSlide: () => void

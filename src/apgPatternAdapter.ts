@@ -19,7 +19,6 @@ import {
 } from './apgPatternData'
 import {
   listboxRenderItems,
-  patternDivProps,
   radioItemPropsByKey,
   tabsPropsByValue,
   toolbarItemPropsByKey,
@@ -75,8 +74,8 @@ export function useManagedTabsPattern<TValue extends string>({
   const activeTab = activeManagedTab(activeValue, tabs)
 
   return {
-    panelProps: patternDivProps(tabRuntime.getTabPanelProps(activeTab.panelKey)),
-    tablistProps: patternDivProps(tabRuntime.getTablistProps()),
+    panelProps: tabRuntime.getTabPanelProps(activeTab.panelKey),
+    tablistProps: tabRuntime.getTablistProps(),
     tabPropsByValue: tabsPropsByValue(tabRuntime, tabs),
   }
 }
@@ -130,7 +129,7 @@ export function useManagedListboxPattern<TKey extends string>({
 
   return {
     renderItems: listboxRenderItems<TKey>(listbox.renderItems),
-    rootProps: patternDivProps(listbox.rootProps),
+    rootProps: listbox.rootProps,
   }
 }
 
@@ -181,7 +180,7 @@ export function useManagedRadioGroupPattern<TKey extends string>({
 
   return {
     itemProps: radioItemPropsByKey(radio.renderItems),
-    rootProps: patternDivProps(radio.rootProps),
+    rootProps: radio.rootProps,
   }
 }
 

@@ -1,13 +1,10 @@
-import {
-  type ButtonHTMLAttributes,
-  type HTMLAttributes,
-} from 'react'
 import { useManagedTabsPattern } from './apgPatternAdapter'
+import type { PatternElementProps } from './apgPatternTypes'
 import type { CanvasView } from './retouchViewState'
 
 type CanvasViewTabProps = Record<
   CanvasView,
-  ButtonHTMLAttributes<HTMLButtonElement>
+  PatternElementProps
 >
 
 type UseCanvasViewTabsInput = {
@@ -16,8 +13,8 @@ type UseCanvasViewTabsInput = {
 }
 
 type UseCanvasViewTabsResult = {
-  canvasViewPanelProps: HTMLAttributes<HTMLDivElement>
-  canvasViewTablistProps: HTMLAttributes<HTMLDivElement>
+  canvasViewPanelProps: PatternElementProps
+  canvasViewTablistProps: PatternElementProps
   canvasViewTabProps: CanvasViewTabProps
 }
 
