@@ -11,10 +11,7 @@ import {
   type Rect,
 } from './retouchModel'
 import type { SnapGuides } from './layoutInteraction'
-import {
-  retouchCanvasSceneEntries,
-  retouchCanvasSelectionBounds,
-} from './retouchCanvasScene'
+import { retouchCanvasSelectionBounds } from './retouchCanvasScene'
 
 type StageLayoutChromeProps = {
   marqueeRect: Rect | null
@@ -45,10 +42,7 @@ export function StageLayoutChrome({
   const selectedBounds =
     singleSelectionRect !== null || selectedPointers.length === 0
       ? null
-      : retouchCanvasSelectionBounds(
-          retouchCanvasSceneEntries(surfaceItems),
-          selectedPointers,
-        )
+      : retouchCanvasSelectionBounds(surfaceItems, selectedPointers)
   const overlayRect = singleSelectionRect ?? selectedBounds
 
   return (
