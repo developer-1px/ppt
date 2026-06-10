@@ -39,14 +39,18 @@ export function StageLayoutChrome({
   surfaceItems,
   visualSelectionRect,
 }: StageLayoutChromeProps) {
-  const selectedBounds = retouchCanvasSelectionBounds(
-    retouchCanvasSceneEntries(surfaceItems),
-    selectedPointers,
-  )
-  const overlayRect =
+  const singleSelectionRect =
     selectedPointers.length === 1 && selectedRect !== null
       ? (visualSelectionRect ?? selectedRect)
-      : selectedBounds
+      : null
+  const selectedBounds =
+    singleSelectionRect !== null || selectedPointers.length === 0
+      ? null
+      : retouchCanvasSelectionBounds(
+          retouchCanvasSceneEntries(surfaceItems),
+          selectedPointers,
+        )
+  const overlayRect = singleSelectionRect ?? selectedBounds
 
   return (
     <>
