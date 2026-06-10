@@ -252,7 +252,7 @@ export function useRetouchBlockCommands({
   function alignSelectedBlocks(action: AlignSelectionAction) {
     const targets = alignBlockLocations(selectedActiveBlockLocations(), action)
 
-    if (!targets) {
+    if (targets === null) {
       return
     }
 
@@ -262,7 +262,7 @@ export function useRetouchBlockCommands({
   function distributeSelectedBlocks(action: DistributeSelectionAction) {
     const targets = distributeBlockLocations(selectedActiveBlockLocations(), action)
 
-    if (!targets) {
+    if (targets === null) {
       return
     }
 
@@ -286,7 +286,7 @@ export function useRetouchBlockCommands({
       selectedPointers: selectedLocationPointers,
     })
 
-    if (!layerOrderPatch) {
+    if (layerOrderPatch === null) {
       return
     }
 
