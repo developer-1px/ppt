@@ -70,7 +70,10 @@ export function PresentationOverlay({
         return
       }
 
-      if (isPresentationControlTarget(event.target)) {
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.presentation-controls')
+      ) {
         return
       }
 
@@ -145,8 +148,4 @@ export function PresentationOverlay({
 function consumePresentationShortcut(event: KeyboardEvent, action: () => void) {
   event.preventDefault()
   action()
-}
-
-function isPresentationControlTarget(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest('.presentation-controls'))
 }
