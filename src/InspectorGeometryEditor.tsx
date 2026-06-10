@@ -13,15 +13,6 @@ const GEOMETRY_FIELDS: { field: RectField; label: string }[] = [
   { field: 'height', label: 'H' },
 ]
 
-function rectDraft(rect: Rect): Record<RectField, string> {
-  return {
-    x: String(rect.x),
-    y: String(rect.y),
-    width: String(rect.width),
-    height: String(rect.height),
-  }
-}
-
 export function GeometryEditor({
   onRectChange,
   rect,
@@ -29,7 +20,12 @@ export function GeometryEditor({
   onRectChange: (rect: Rect, changedField?: RectField) => void
   rect: Rect
 }) {
-  const [draft, setDraft] = useState(() => rectDraft(rect))
+  const [draft, setDraft] = useState<Record<RectField, string>>(() => ({
+    x: String(rect.x),
+    y: String(rect.y),
+    width: String(rect.width),
+    height: String(rect.height),
+  }))
   const draftRef = useRef(draft)
   const skipNextCommitRef = useRef<RectField | null>(null)
 
