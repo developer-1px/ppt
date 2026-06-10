@@ -1,6 +1,6 @@
 import { createIdResolver } from '@zod-crud/id-resolver'
 import type { ResolveIdResult } from '@zod-crud/id-resolver'
-import { parsePointer, type JSONDocument, type Pointer } from 'zod-crud'
+import { parsePointer, type JSONDocument } from 'zod-crud'
 import {
   RetouchSlideSchema,
   SlideBlockSchema,
@@ -40,7 +40,19 @@ export function createRetouchIdResolver(doc: JSONDocument<RetouchDeck>) {
     resolveSlideIndex(slideId: string): number | null {
       const resolved = resolver.resolve(RETOUCH_ID_SCOPES.slide, slideId)
 
-      return resolved.ok ? slideIndexFromPointer(resolved.pointer) : null
+      if (!resolved.ok) {
+        return null
+      }
+
+      const segments = parsePointer(resolved.pointer)
+
+      if (segments.length !== 2 || segments[0] !== 'slides') {
+        return null
+      }
+
+      const slideIndex = Number(segments[1])
+
+      return Number.isInteger(slideIndex) ? slideIndex : null
     },
 
     resolveSlidePointer(slideId: string): ResolveIdResult {
@@ -100,18 +112,6 @@ export function createRetouchBlockCopyId(
     slide.blocks.map((block) => block.id),
     `${block.id}-copy`,
   )
-}
-
-function slideIndexFromPointer(pointer: Pointer) {
-  const segments = parsePointer(pointer)
-
-  if (segments.length !== 2 || segments[0] !== 'slides') {
-    return null
-  }
-
-  const slideIndex = Number(segments[1])
-
-  return Number.isInteger(slideIndex) ? slideIndex : null
 }
 
 function uniqueId(
