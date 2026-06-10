@@ -82,13 +82,11 @@ export function alignBlockLocations(
   }
 
   return layoutTargetsOrNull(
-    targets.map(({ location, startRect }) =>
-      selectionLayoutTarget(
-        location,
-        alignRectToBounds(startRect, bounds, action),
-        startRect,
-      ),
-    ),
+    targets.map(({ location, startRect }) => ({
+      pointer: location.pointer,
+      rect: alignRectToBounds(startRect, bounds, action),
+      startRect,
+    })),
   )
 }
 
@@ -159,9 +157,11 @@ export function distributeBlockLocations(
         rect: target.startRect,
       })),
       action,
-    ).map(({ item, rect }) =>
-      selectionLayoutTarget(item.location, rect, item.startRect),
-    ),
+    ).map(({ item, rect }) => ({
+      pointer: item.location.pointer,
+      rect,
+      startRect: item.startRect,
+    })),
   )
 }
 
@@ -187,18 +187,6 @@ function blockLayoutSources(locations: readonly BlockLocation[]) {
     location,
     startRect: getRect(location.block),
   }))
-}
-
-function selectionLayoutTarget(
-  location: BlockLocation,
-  rect: Rect,
-  startRect: Rect,
-): SelectionLayoutTarget {
-  return {
-    pointer: location.pointer,
-    rect,
-    startRect,
-  }
 }
 
 function layoutTargetsOrNull(targets: SelectionLayoutTarget[]) {
