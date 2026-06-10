@@ -227,7 +227,7 @@ export function activeManagedTab<TValue extends string>(
 ) {
   const activeTab = tabs.find((tab) => tab.value === activeValue) ?? tabs[0]
 
-  if (!activeTab) {
+  if (activeTab === undefined) {
     throw new Error('Managed tabs require at least one tab.')
   }
 
