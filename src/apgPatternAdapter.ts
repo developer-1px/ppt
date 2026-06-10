@@ -128,7 +128,7 @@ export function useManagedListboxPattern<TKey extends string>({
   )
 
   return {
-    renderItems: listboxRenderItems<TKey>(listbox.renderItems),
+    renderItems: listboxRenderItems(listbox.renderItems),
     rootProps: listbox.rootProps,
   }
 }

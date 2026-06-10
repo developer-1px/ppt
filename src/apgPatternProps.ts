@@ -38,12 +38,11 @@ export function radioItemPropsByKey(
   return propsByKey
 }
 
-export function listboxRenderItems<TKey extends string>(
+export function listboxRenderItems(
   items: readonly ReactListboxRenderItem[],
 ) {
   return items.map((item) => ({
     ...item,
-    key: item.key as TKey,
     optionProps: item.optionProps,
   }))
 }
