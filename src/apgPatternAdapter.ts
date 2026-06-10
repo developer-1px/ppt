@@ -258,7 +258,7 @@ function actionToolbarData<TKey extends string>(
   onSelect: (action: TKey) => void,
 ) {
   const handlers: Partial<Record<TKey, () => void>> = {}
-  const items = {} as Record<TKey, { label: string }>
+  const items: Record<string, { label: string }> = {}
   const rootKeys: TKey[] = []
 
   for (const { action, label } of actions) {
