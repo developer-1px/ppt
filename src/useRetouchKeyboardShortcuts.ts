@@ -233,7 +233,6 @@ export function useRetouchKeyboardShortcuts({
         activeSlideId,
         deckValue,
         delta,
-        selectedPointer,
         selectedPointers,
       })
 

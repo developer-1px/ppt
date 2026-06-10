@@ -26,13 +26,11 @@ export function createLayoutKeyboardNudgePatch({
   activeSlideId,
   deckValue,
   delta,
-  selectedPointer,
   selectedPointers,
 }: {
   activeSlideId: string
   deckValue: RetouchDeck
   delta: KeyboardNudgeDelta
-  selectedPointer: Pointer | null
   selectedPointers: Pointer[]
 }): LayoutKeyboardNudgePatch | null {
   const targets = selectedPointers
@@ -62,7 +60,10 @@ export function createLayoutKeyboardNudgePatch({
 
   const targetPointers = targets.map((target) => target.pointer)
   const focusPointer = targetPointers.at(-1)
-  const primaryPointer = focusPointer ?? selectedPointer ?? targets[0].pointer
+
+  if (focusPointer === undefined) {
+    return null
+  }
 
   return {
     label: 'nudge layout',
@@ -70,7 +71,7 @@ export function createLayoutKeyboardNudgePatch({
     operations: targets.flatMap((target) =>
       setArrangePatch(target.pointer, target.rect),
     ),
-    pointer: primaryPointer,
+    pointer: focusPointer,
     selection: selectionSnapForPointers(targetPointers, focusPointer),
   }
 }
