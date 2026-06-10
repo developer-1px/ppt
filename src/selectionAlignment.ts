@@ -77,7 +77,7 @@ export function alignBlockLocations(
   const targets = blockLayoutSources(locations)
   const bounds = alignmentBounds(targets.map((target) => target.startRect))
 
-  if (!bounds) {
+  if (bounds === null) {
     return null
   }
 
@@ -102,7 +102,7 @@ function distributeRects<T>(
 
   const bounds = rectBounds(targets.map((target) => target.rect))
 
-  if (!bounds) {
+  if (bounds === null) {
     return targets
   }
 
