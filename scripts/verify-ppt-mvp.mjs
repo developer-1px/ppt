@@ -192,6 +192,7 @@ async function runAffordanceScenario(page) {
       commandCount: document.querySelectorAll('[data-ppt-command]').length,
       frameGuideCount: document.querySelectorAll('.ppt-frame-guide').length,
       geometryInputCount: document.querySelectorAll('[data-ppt-geometry-field]').length,
+      hasRotateHandle: !!document.querySelector('[data-ppt-rotate-handle]'),
       hasSizeCapsule: !!document.querySelector('.ppt-size-capsule'),
       width: parseFloat(element.style.width),
     }
@@ -199,8 +200,9 @@ async function runAffordanceScenario(page) {
 
   record('renders PPT alignment and distribution commands', initial.commandCount >= 8, initial)
   record('renders PPT frame guides for selected object', initial.frameGuideCount >= 6, initial)
-  record('renders PPT geometry inspector fields', initial.geometryInputCount === 4, initial)
+  record('renders PPT geometry inspector fields', initial.geometryInputCount === 5, initial)
   record('renders PPT selection size capsule', initial.hasSizeCapsule, initial)
+  record('renders PPT rotation handle', initial.hasRotateHandle, initial)
 
   const firstResizeHandle = await page.eval(`(() => {
     const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
@@ -271,6 +273,69 @@ async function runAffordanceScenario(page) {
     afterAuto,
     afterResize,
   })
+
+  const rotateHandle = await page.eval(`(() => {
+    const rect = document.querySelector('[data-ppt-rotate-handle]').getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: rotateHandle.x,
+    y: rotateHandle.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: rotateHandle.x + 52,
+    y: rotateHandle.y - 22,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: rotateHandle.x + 52,
+    y: rotateHandle.y - 22,
+  })
+  await delay(50)
+
+  const afterRotateHandle = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      rotation: Number(element.getAttribute('data-rotation')),
+      transform: element.style.transform,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record('rotates selected object from PPT rotation handle', Math.abs(afterRotateHandle.rotation) > 0 && afterRotateHandle.transform.includes('rotate(') && afterRotateHandle.undoEnabled, afterRotateHandle)
+
+  await page.eval(`(() => {
+    const rotation = document.querySelector('[data-ppt-geometry-field="rotation"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(rotation, '45')
+    rotation.dispatchEvent(new Event('input', { bubbles: true }))
+    rotation.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterRotationInput = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      rotation: element.getAttribute('data-rotation'),
+      transform: element.style.transform,
+    }
+  })()`)
+
+  record('updates PPT object rotation from inspector', afterRotationInput.rotation === '45' && afterRotationInput.transform.includes('rotate(45deg)'), afterRotationInput)
 
   await page.eval(`document.querySelector('[data-ppt-command="align-center-x"]').click()`)
   await delay(50)
@@ -492,12 +557,14 @@ async function runExportScenario(page) {
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
+      hasRotationStyle: code.includes('transform:rotate(45deg)'),
     }
   })()`)
 
   record('exports HTML slide markup', state.hasSlideMarkup, state)
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
+  record('exports PPT object rotation style', state.hasRotationStyle, state)
 }
 
 async function runViewAndShapeScenario(page) {

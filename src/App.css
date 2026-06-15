@@ -200,7 +200,7 @@
 }
 
 .ppt-thumb-shape[data-shape='diamond'] {
-  transform: rotate(45deg);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 
 .ppt-thumb-name {
@@ -271,7 +271,7 @@
 }
 
 .ppt-element[data-shape='diamond'] {
-  transform: rotate(45deg);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 
 .ppt-element[data-selected='true'] {
@@ -338,6 +338,22 @@
   border: 1px solid #ffffff;
   background: var(--accent);
   box-shadow: 0 1px 4px rgb(15 23 42 / 24%);
+}
+
+.ppt-rotate-handle {
+  position: absolute;
+  z-index: 3;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 1px 5px rgb(15 23 42 / 26%);
+  cursor: grab;
 }
 
 .ppt-marquee {

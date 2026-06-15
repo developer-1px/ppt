@@ -52,10 +52,16 @@ function renderPPTElementHTML(element: PPTElement) {
     `top:${toPercent(element.geometry.y, PPT_SLIDE_HEIGHT)}`,
     `width:${toPercent(element.geometry.w, PPT_SLIDE_WIDTH)}`,
     `height:${toPercent(element.geometry.h, PPT_SLIDE_HEIGHT)}`,
+    element.geometry.rotation
+      ? `transform:rotate(${element.geometry.rotation}deg)`
+      : '',
+    element.geometry.rotation
+      ? 'transform-origin:center'
+      : '',
   ]
 
   if (element.kind === 'image') {
-    return `    <img class="ppt-element" data-ppt-element="${escapeHtml(element.id)}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${style.join(';')}" />`
+    return `    <img class="ppt-element" data-ppt-element="${escapeHtml(element.id)}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${style.filter(Boolean).join(';')}" />`
   }
 
   const text = escapeHtml(readPPTText(element.textBody))
@@ -81,7 +87,7 @@ function exportCSS() {
     '.ppt-text{align-items:flex-start;padding:0;}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
-    '.ppt-shape-diamond{transform:rotate(45deg);}',
+    '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
     '@media print{body{background:#fff;}.ppt-deck{display:block;padding:0;}.ppt-slide{break-after:page;page-break-after:always;}}',
   ].join('\n')
 }

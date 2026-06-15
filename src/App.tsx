@@ -25,6 +25,7 @@ import {
   MoveDown,
   MoveUp,
   Redo2,
+  RotateCw,
   SendToBack,
   Square,
   Trash2,
@@ -177,6 +178,19 @@ type Interaction =
       selection: string[]
       slideId: string
       startDeck: PPTDeck
+    }
+  | {
+      bounds: Bounds
+      center: Point
+      kind: 'rotate'
+      selection: string[]
+      slideId: string
+      startAngle: number
+      startDeck: PPTDeck
+      startRotations: Array<{
+        elementId: string
+        rotation: number
+      }>
     }
   | {
       additive: boolean
@@ -805,6 +819,18 @@ function App() {
     )
   }
 
+  function updateElementRotation(elementId: string, rotation: number) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
+        ...element,
+        geometry: {
+          ...element.geometry,
+          rotation: normalizePPTElementRotation(rotation),
+        },
+      })),
+    )
+  }
+
   function updateElementTextStyle(
     elementId: string,
     field: keyof PPTTextStyle,
@@ -1050,7 +1076,7 @@ function App() {
 
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    if (!selectedBounds) {
+    if (!selectedBounds || !canResizeSelection) {
       return
     }
 
@@ -1071,6 +1097,33 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     autoSizeSelection(handle)
+  }
+
+  function handleRotatePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    if (!selectedBounds || !canResizeSelection) {
+      return
+    }
+
+    const center = getBoundsCenter(selectedBounds)
+    const point = screenToWorld(event.nativeEvent)
+
+    setInteraction({
+      bounds: selectedBounds,
+      center,
+      kind: 'rotate',
+      selection,
+      slideId: activeSlide.id,
+      startAngle: getPointAngle(center, point),
+      startDeck: deckRef.current,
+      startRotations: selectedElements.map((element) => ({
+        elementId: element.id,
+        rotation: element.geometry.rotation ?? 0,
+      })),
+    })
   }
 
   function autoSizeSelection(handle: ResizeHandle) {
@@ -1178,13 +1231,49 @@ function App() {
       return
     }
 
-    const elements = resizeCanvasSelection({
-      adapter: pptCanvasTransformAdapter,
-      bounds: interaction.bounds,
-      handle: interaction.handle,
-      items: startSlide.elements,
-      point,
-      selection: interaction.selection,
+    if (interaction.kind === 'resize') {
+      const elements = resizeCanvasSelection({
+        adapter: pptCanvasTransformAdapter,
+        bounds: interaction.bounds,
+        handle: interaction.handle,
+        items: startSlide.elements,
+        point,
+        selection: interaction.selection,
+      })
+
+      const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      return
+    }
+
+    const delta = getPointAngle(interaction.center, point) - interaction.startAngle
+    const rotationById = new Map(interaction.startRotations.map((item) => [
+      item.elementId,
+      item.rotation,
+    ]))
+    const elements = startSlide.elements.map((element) => {
+      const startRotation = rotationById.get(element.id)
+
+      if (startRotation === undefined || element.locked === true) {
+        return element
+      }
+
+      const rawRotation = normalizePPTElementRotation(startRotation + delta)
+      const rotation = event.shiftKey
+        ? Math.round(rawRotation / 15) * 15
+        : rawRotation
+
+      return {
+        ...element,
+        geometry: {
+          ...element.geometry,
+          rotation: normalizePPTElementRotation(rotation),
+        },
+      }
     })
 
     const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
@@ -1419,6 +1508,7 @@ function App() {
                 canResize={canResizeSelection}
                 scale={viewport.scale}
                 selectedElements={selectedElements}
+                onRotatePointerDown={handleRotatePointerDown}
                 onResizeHandleDoubleClick={handleResizeHandleDoubleClick}
                 onResizePointerDown={handleResizePointerDown}
               />
@@ -1440,6 +1530,7 @@ function App() {
         onElementGeometryChange={updateElementGeometry}
         onElementLockToggle={toggleElementLocked}
         onElementNameChange={updateElementName}
+        onElementRotationChange={updateElementRotation}
         onElementTextStyleChange={updateElementTextStyle}
         onElementVisibilityToggle={toggleElementVisibility}
         onLayerSelect={(elementId, additive) => {
@@ -1489,6 +1580,9 @@ function SlideThumb({
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
+              transform: element.geometry.rotation
+                ? `rotate(${element.geometry.rotation}deg)`
+                : undefined,
               width: `${(element.geometry.w / PPT_SLIDE_WIDTH) * 100}%`,
             }}
           />
@@ -1541,6 +1635,7 @@ function PPTElementView({
       data-kind={element.kind}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
+      data-rotation={Math.round(element.geometry.rotation ?? 0)}
       data-selected={selected ? 'true' : 'false'}
       data-shape={element.kind === 'shape' ? element.shape : undefined}
       onDoubleClick={onEdit}
@@ -1584,6 +1679,7 @@ function PPTElementView({
 function SelectionOverlay({
   bounds,
   canResize,
+  onRotatePointerDown,
   onResizeHandleDoubleClick,
   onResizePointerDown,
   scale,
@@ -1591,6 +1687,7 @@ function SelectionOverlay({
 }: {
   bounds: Bounds
   canResize: boolean
+  onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
   onResizeHandleDoubleClick: (
     event: ReactMouseEvent<HTMLButtonElement>,
     handle: ResizeHandle,
@@ -1617,6 +1714,22 @@ function SelectionOverlay({
           ? `${Math.round(bounds.w)} x ${Math.round(bounds.h)}`
           : `${selectedElements.length} objects`}
       </div>
+      {canResize ? (
+        <button
+          aria-label="Rotate selection"
+          className="ppt-rotate-handle"
+          data-ppt-rotate-handle
+          onPointerDown={onRotatePointerDown}
+          style={{
+            left: bounds.x + bounds.w / 2,
+            top: bounds.y - 34 / scale,
+            transform: `translate(-50%, -50%) scale(${1 / scale})`,
+          }}
+          type="button"
+        >
+          <RotateCw size={14} />
+        </button>
+      ) : null}
       {canResize ? RESIZE_HANDLES.map((handle) => {
         const point = handlePoint(bounds, handle)
         const size = 10 / scale
@@ -1731,6 +1844,7 @@ function Inspector({
   onElementGeometryChange,
   onElementLockToggle,
   onElementNameChange,
+  onElementRotationChange,
   onElementTextStyleChange,
   onElementVisibilityToggle,
   onLayerSelect,
@@ -1756,6 +1870,7 @@ function Inspector({
   ) => void
   onElementLockToggle: (elementId: string) => void
   onElementNameChange: (elementId: string, name: string) => void
+  onElementRotationChange: (elementId: string, rotation: number) => void
   onElementTextStyleChange: (
     elementId: string,
     field: keyof PPTTextStyle,
@@ -1851,6 +1966,19 @@ function Inspector({
                   />
                 </label>
               ))}
+              <label className="ppt-field">
+                <span>ROT</span>
+                <input
+                  data-ppt-geometry-field="rotation"
+                  type="number"
+                  value={Math.round(selectedElement.geometry.rotation ?? 0)}
+                  onChange={(event) =>
+                    onElementRotationChange(
+                      selectedElement.id,
+                      Number(event.target.value),
+                    )}
+                />
+              </label>
             </div>
             {selectedElement.kind !== 'image' ? (
               <>
@@ -2074,6 +2202,10 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     height: element.geometry.h,
     left: element.geometry.x,
     top: element.geometry.y,
+    transform: element.geometry.rotation
+      ? `rotate(${element.geometry.rotation}deg)`
+      : undefined,
+    transformOrigin: 'center',
     width: element.geometry.w,
   }
 
@@ -2144,6 +2276,23 @@ function getArrowNudgeDelta(key: string, distance: number) {
   }
 
   return { dx: 0, dy: distance }
+}
+
+function getBoundsCenter(bounds: Bounds): Point {
+  return {
+    x: bounds.x + bounds.w / 2,
+    y: bounds.y + bounds.h / 2,
+  }
+}
+
+function getPointAngle(center: Point, point: Point) {
+  return Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI
+}
+
+function normalizePPTElementRotation(rotation: number) {
+  const normalized = ((rotation % 360) + 360) % 360
+
+  return Math.abs(normalized) < 0.001 ? 0 : Number(normalized.toFixed(3))
 }
 
 function measurePPTElementAutoSize(element: PPTElement) {
