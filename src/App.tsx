@@ -592,6 +592,7 @@ function App() {
   const canResizeSelection = selectedBounds
     ? scene.canResizeSelection?.(selection) ?? true
     : false
+  const canFitSelection = selectedBounds !== null
 
   const fitSlide = useCallback(() => {
     const rect = stageRef.current?.getBoundingClientRect()
@@ -610,6 +611,20 @@ function App() {
       width: rect.width,
     }))
   }, [])
+
+  const fitSelection = useCallback(() => {
+    const rect = stageRef.current?.getBoundingClientRect()
+    const bounds = scene.getBounds(selection)
+
+    if (!rect || !bounds) {
+      return
+    }
+
+    setViewport(fitBoundsIntoViewport(bounds, {
+      height: rect.height,
+      width: rect.width,
+    }))
+  }, [scene, selection])
 
   useLayoutEffect(() => {
     fitSlide()
@@ -2998,6 +3013,12 @@ function App() {
     section: 'View',
     title: 'Fit slide',
   }, {
+    disabled: !canFitSelection,
+    id: 'view:fit-selection',
+    run: fitSelection,
+    section: 'View',
+    title: 'Fit selection',
+  }, {
     id: 'view:zoom-in',
     run: () => zoom('in'),
     section: 'View',
@@ -3205,7 +3226,10 @@ function App() {
           <button className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
             <ZoomOut size={17} />
           </button>
-          <button className="ppt-icon-button" onClick={fitSlide} title="Fit slide" type="button">
+          <button className="ppt-icon-button" data-ppt-view-fit-slide onClick={fitSlide} title="Fit slide" type="button">
+            <Maximize2 size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-view-fit-selection disabled={!canFitSelection} onClick={fitSelection} title="Fit selection" type="button">
             <Maximize2 size={17} />
           </button>
           <button className="ppt-icon-button" onClick={() => zoom('in')} title="Zoom in" type="button">

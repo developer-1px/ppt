@@ -40,6 +40,7 @@ try {
   await runCommandSurfaceScenario(page)
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
+  await runFitSelectionScenario(page)
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
@@ -1493,7 +1494,9 @@ async function runCommandPaletteScenario(page) {
     hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
     hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
     hasReorder: frontIds.includes('command:bring-to-front') && backIds.includes('command:send-to-back'),
-    hasView: fitIds.includes('view:fit-slide') && gridIds.includes('view:toggle-grid'),
+    hasView: fitIds.includes('view:fit-slide') &&
+      fitIds.includes('view:fit-selection') &&
+      gridIds.includes('view:toggle-grid'),
     visibleCounts: {
       align: alignIds.length,
       back: backIds.length,
@@ -1551,6 +1554,125 @@ async function runCommandPaletteScenario(page) {
   await delay(50)
 }
 
+async function runFitSelectionScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+
+  const afterFitSlide = await readViewportState(page)
+  const point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+
+  const beforeToolbarFit = await page.eval(`(() => ({
+    fitSelectionDisabled: document.querySelector('[data-ppt-view-fit-selection]')?.disabled ?? true,
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  await page.eval(`document.querySelector('[data-ppt-view-fit-selection]')?.click()`)
+  await delay(120)
+
+  const afterToolbarFit = await readViewportState(page)
+
+  record('fits PPT viewport to selected object from toolbar', beforeToolbarFit.selectedCount === 1 && !beforeToolbarFit.fitSelectionDisabled && afterToolbarFit.scale > afterFitSlide.scale, {
+    afterFitSlide,
+    afterToolbarFit,
+    beforeToolbarFit,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'fit selection' })
+  await delay(80)
+
+  const paletteDisabled = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="view:fit-selection"]')?.disabled ?? false,
+    fitIds: [...document.querySelectorAll('[data-ppt-command-palette-item]')]
+      .map((item) => item.getAttribute('data-ppt-command-palette-item')),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('disables PPT fit selection command palette item without selection', paletteDisabled.open && paletteDisabled.selectedCount === 0 && paletteDisabled.fitIds.includes('view:fit-selection') && paletteDisabled.disabled, paletteDisabled)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+
+  const cardPoint = await getElementCenter(page, 's1-card-1')
+  const panelPoint = await getElementCenter(page, 's1-side-panel')
+  await clickMouse(page, cardPoint.x, cardPoint.y, 1)
+  await delay(40)
+  await clickMouse(page, panelPoint.x, panelPoint.y, 1, 8)
+  await delay(80)
+
+  const beforePaletteFit = await readViewportState(page)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  const fitQueryIds = await readCommandPaletteIds(page, 'fit')
+  await readCommandPaletteIds(page, 'fit selection')
+
+  const paletteEnabled = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="view:fit-selection"]')?.disabled ?? true,
+    fitIds: [...document.querySelectorAll('[data-ppt-command-palette-item]')]
+      .map((item) => item.getAttribute('data-ppt-command-palette-item')),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(120)
+
+  const afterPaletteFit = await readViewportState(page)
+
+  record('fits PPT viewport to multi-selection from command palette', fitQueryIds.includes('view:fit-slide') && fitQueryIds.includes('view:fit-selection') && paletteEnabled.fitIds.includes('view:fit-selection') && !paletteEnabled.disabled && paletteEnabled.selectedCount >= 2 && afterPaletteFit.scale > beforePaletteFit.scale && !afterPaletteFit.paletteOpen, {
+    afterPaletteFit,
+    beforePaletteFit,
+    fitQueryIds,
+    paletteEnabled,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+
+  const afterRestoreFitSlide = await readViewportState(page)
+
+  record('keeps PPT fit slide command on full slide bounds', afterRestoreFitSlide.scale < afterPaletteFit.scale && afterRestoreFitSlide.label !== afterPaletteFit.label, {
+    afterPaletteFit,
+    afterRestoreFitSlide,
+  })
+}
+
 async function readCommandPaletteIds(page, query) {
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-command-palette-query]')
@@ -1565,6 +1687,23 @@ async function readCommandPaletteIds(page, query) {
   return page.eval(`(() => [...document.querySelectorAll('[data-ppt-command-palette-item]')]
     .map((item) => item.getAttribute('data-ppt-command-palette-item'))
   )()`)
+}
+
+async function readViewportState(page) {
+  return page.eval(`(() => {
+    const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
+    const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
+    const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
+
+    return {
+      label: document.querySelector('.ppt-zoom-label')?.textContent ?? '',
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      scale,
+      transform,
+      x: Number(translate?.[1] ?? 0),
+      y: Number(translate?.[2] ?? 0),
+    }
+  })()`)
 }
 
 async function runTextQuickFormatScenario(page) {
