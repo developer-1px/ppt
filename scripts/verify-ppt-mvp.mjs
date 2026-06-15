@@ -3336,6 +3336,8 @@ async function runExportScenario(page) {
       hasLineRouteModel: code.includes('"route": "elbow"') && code.includes('"routeBend"'),
       hasLayoutMarkup: code.includes('data-ppt-layout-id="ppt-layout-split"'),
       hasLayoutModel: code.includes('"layoutId": "ppt-layout-split"'),
+      hasPlaceholderVisibilityMarkup: code.includes('data-ppt-hidden-placeholders="media"'),
+      hasPlaceholderVisibilityModel: code.includes('"hiddenPlaceholderIds"') && code.includes('"media"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
       hasSpeakerNotesMarkup: code.includes('class="ppt-notes"') && code.includes('data-ppt-notes-for="slide-1"') && code.includes('Presenter cue: review image crop and final CTA.'),
@@ -3380,6 +3382,7 @@ async function runExportScenario(page) {
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
   record('exports PPT layout/theme metadata', state.hasLayoutMarkup && state.hasLayoutModel && state.hasThemeMarkup && state.hasThemeModel, state)
+  record('exports PPT placeholder visibility metadata', state.hasPlaceholderVisibilityMarkup && state.hasPlaceholderVisibilityModel, state)
   record('exports PPT slide transition metadata', state.hasTransitionMarkup && state.hasTransitionModel, state)
   record('exports inserted PPT table markup and model data', state.hasTableMarkup && state.hasTableModel, state)
   record('exports PPT text auto-fit markup and model data', state.hasTextAutoFitMarkup && state.hasTextAutoFitModel, state)
@@ -3415,6 +3418,7 @@ async function runExportScenario(page) {
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
       hasLayout: text.includes('data-ppt-svg-layout-id="ppt-layout-split"'),
       hasLine: text.includes('data-ppt-kind="line"') && (text.includes('<line ') || text.includes('data-ppt-line-path')),
+      hasPlaceholderVisibility: text.includes('data-ppt-svg-hidden-placeholders="media"'),
       hasScope: text.includes('data-ppt-svg-scope="slide"'),
       hasShape: text.includes('data-ppt-kind="shape"'),
       hasSlide: text.includes('data-ppt-svg-slide="slide-1"'),
@@ -3444,6 +3448,7 @@ async function runExportScenario(page) {
   record('exports PPT text vertical alignment metadata into slide SVG', slideSvgState.hasTextVerticalAlign, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
+  record('exports PPT placeholder visibility metadata into slide SVG', slideSvgState.hasPlaceholderVisibility, slideSvgState)
   record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
@@ -4240,6 +4245,112 @@ async function runViewAndShapeScenario(page) {
     {
       afterLayout,
       beforeLayout,
+    },
+  )
+
+  const placeholderSelectionId = await page.eval(`document.querySelector('.ppt-slide [data-ppt-element]')?.getAttribute('data-ppt-element') ?? ''`)
+
+  if (placeholderSelectionId) {
+    const point = await getElementCenter(page, placeholderSelectionId)
+    await clickMouse(page, point.x, point.y, 1)
+    await delay(50)
+  }
+
+  const beforePlaceholderVisibility = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'renders PPT placeholder visibility metadata in inspector',
+    beforePlaceholderVisibility.count >= 3 &&
+      beforePlaceholderVisibility.placeholderId === 'media' &&
+      beforePlaceholderVisibility.role === 'media' &&
+      beforePlaceholderVisibility.bounds.length > 0 &&
+      beforePlaceholderVisibility.layout === 'ppt-layout-split' &&
+      beforePlaceholderVisibility.master === 'ppt-master-default' &&
+      beforePlaceholderVisibility.locked === 'false' &&
+      beforePlaceholderVisibility.visible === 'true' &&
+      beforePlaceholderVisibility.toggleDisabled === false,
+    beforePlaceholderVisibility,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-placeholder-visibility-toggle="media"]')?.click()`)
+  await delay(80)
+
+  const afterPlaceholderHide = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'hides PPT layout placeholder from inspector',
+    afterPlaceholderHide.visible === 'false' &&
+      afterPlaceholderHide.hiddenCount === beforePlaceholderVisibility.hiddenCount + 1 &&
+      afterPlaceholderHide.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterPlaceholderHide.selectedIds === beforePlaceholderVisibility.selectedIds &&
+      afterPlaceholderHide.command === 'update-placeholder-visibility' &&
+      afterPlaceholderHide.commandPlaceholder === 'media' &&
+      afterPlaceholderHide.commandSlide === beforePlaceholderVisibility.slideId &&
+      afterPlaceholderHide.commandType === 'slide-command-effect' &&
+      afterPlaceholderHide.commandVisible === 'false',
+    {
+      afterPlaceholderHide,
+      beforePlaceholderVisibility,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterPlaceholderUndo = await getPPTPlaceholderVisibilityState(page)
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(80)
+
+  const afterPlaceholderRedo = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'undoes and redoes PPT placeholder visibility as one history step',
+    afterPlaceholderUndo.visible === 'true' &&
+      !afterPlaceholderUndo.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterPlaceholderUndo.selectedIds === beforePlaceholderVisibility.selectedIds &&
+      afterPlaceholderRedo.visible === 'false' &&
+      afterPlaceholderRedo.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterPlaceholderRedo.selectedIds === beforePlaceholderVisibility.selectedIds,
+    {
+      afterPlaceholderRedo,
+      afterPlaceholderUndo,
+      beforePlaceholderVisibility,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-placeholder-visibility-toggle="media"]')?.click()`)
+  await delay(80)
+
+  const afterPlaceholderShow = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'shows PPT layout placeholder from inspector',
+    afterPlaceholderShow.visible === 'true' &&
+      !afterPlaceholderShow.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterPlaceholderShow.selectedIds === beforePlaceholderVisibility.selectedIds &&
+      afterPlaceholderShow.command === 'update-placeholder-visibility' &&
+      afterPlaceholderShow.commandPlaceholder === 'media' &&
+      afterPlaceholderShow.commandVisible === 'true',
+    {
+      afterPlaceholderShow,
+      beforePlaceholderVisibility,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-placeholder-visibility-toggle="media"]')?.click()`)
+  await delay(80)
+
+  const afterPlaceholderRehide = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'rehides PPT layout placeholder for export metadata',
+    afterPlaceholderRehide.visible === 'false' &&
+      afterPlaceholderRehide.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterPlaceholderRehide.selectedIds === beforePlaceholderVisibility.selectedIds,
+    {
+      afterPlaceholderRehide,
+      beforePlaceholderVisibility,
     },
   )
 
@@ -7669,6 +7780,41 @@ function getSlideRailState(page) {
       selectedIds: selectedIds.join(','),
     }
   })()`)
+}
+
+function getPPTPlaceholderVisibilityState(page, placeholderId = 'media') {
+  return page.eval(`((placeholderId) => {
+    const list = document.querySelector('[data-ppt-layout-placeholder-count]')
+    const placeholder = document.querySelector(\`[data-ppt-layout-placeholder="\${placeholderId}"]\`)
+    const stage = document.querySelector('.ppt-stage-shell')
+    const slide = document.querySelector('.ppt-slide')
+    const toggle = document.querySelector(\`[data-ppt-placeholder-visibility-toggle="\${placeholderId}"]\`)
+    const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element'))
+      .filter(Boolean)
+
+    return {
+      bounds: placeholder?.getAttribute('data-ppt-placeholder-bounds') ?? '',
+      command: stage?.getAttribute('data-ppt-placeholder-visibility-command') ?? '',
+      commandPlaceholder: stage?.getAttribute('data-ppt-placeholder-visibility-command-placeholder') ?? '',
+      commandSelection: stage?.getAttribute('data-ppt-placeholder-visibility-command-selection') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-placeholder-visibility-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-placeholder-visibility-command-type') ?? '',
+      commandVisible: stage?.getAttribute('data-ppt-placeholder-visibility-command-visible') ?? '',
+      count: Number(list?.getAttribute('data-ppt-layout-placeholder-count') ?? 0),
+      hiddenCount: Number(list?.getAttribute('data-ppt-layout-placeholder-hidden-count') ?? 0),
+      layout: placeholder?.getAttribute('data-ppt-placeholder-layout') ?? '',
+      locked: placeholder?.getAttribute('data-ppt-placeholder-locked') ?? '',
+      master: placeholder?.getAttribute('data-ppt-placeholder-master') ?? '',
+      placeholderId: placeholder?.getAttribute('data-ppt-layout-placeholder') ?? '',
+      role: placeholder?.getAttribute('data-ppt-placeholder-role') ?? '',
+      selectedIds: selectedIds.join(','),
+      slideHiddenPlaceholders: slide?.getAttribute('data-ppt-hidden-placeholders') ?? '',
+      slideId: placeholder?.getAttribute('data-ppt-placeholder-slide') ?? '',
+      toggleDisabled: toggle?.disabled ?? null,
+      visible: placeholder?.getAttribute('data-ppt-placeholder-visible') ?? '',
+    }
+  })(${JSON.stringify(placeholderId)})`)
 }
 
 function dragPPTSlideThumbnail(page, {

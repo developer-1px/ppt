@@ -207,6 +207,7 @@ export const PPTElementSchema = z.discriminatedUnion('kind', [
 export const PPTSlideSchema = z.object({
   background: PPTFillSchema.optional(),
   elements: z.array(PPTElementSchema),
+  hiddenPlaceholderIds: z.array(z.string()).optional(),
   id: z.string(),
   layoutId: z.string().optional(),
   name: z.string(),

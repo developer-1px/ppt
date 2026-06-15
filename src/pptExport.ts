@@ -103,10 +103,14 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     const themeAttr = slide.themeId
       ? ` data-ppt-theme-id="${escapeHtml(slide.themeId)}"`
       : ''
+    const placeholderVisibilityAttr = getPPTSlideHiddenPlaceholderAttr(
+      slide,
+      'data-ppt-hidden-placeholders',
+    )
     const transitionAttrs = getPPTSlideTransitionAttrs(slide, 'data-ppt-transition')
 
     return [
-      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
+      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${placeholderVisibilityAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
       elements,
       '  </section>',
       renderPPTSlideNotesHTML(slide.id, slide.notes),
@@ -217,10 +221,19 @@ function getPPTSlideLayoutThemeSvgAttrs(slide: PPTSlide) {
   const attrs = [
     slide.layoutId ? `data-ppt-svg-layout-id="${escapeHtml(slide.layoutId)}"` : '',
     slide.themeId ? `data-ppt-svg-theme-id="${escapeHtml(slide.themeId)}"` : '',
+    getPPTSlideHiddenPlaceholderAttr(slide, 'data-ppt-svg-hidden-placeholders').trim(),
     getPPTSlideTransitionAttrs(slide, 'data-ppt-svg-transition').trim(),
   ].filter(Boolean)
 
   return attrs.length > 0 ? ` ${attrs.join(' ')}` : ''
+}
+
+function getPPTSlideHiddenPlaceholderAttr(slide: PPTSlide, attributeName: string) {
+  const ids = (slide.hiddenPlaceholderIds ?? []).filter(Boolean)
+
+  return ids.length > 0
+    ? ` ${attributeName}="${escapeHtml(ids.join(' '))}"`
+    : ''
 }
 
 function getPPTSlideTransitionAttrs(slide: PPTSlide, prefix: string) {

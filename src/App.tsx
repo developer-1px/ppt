@@ -88,12 +88,14 @@ import {
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditPlaceholderDescriptor,
   type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditThemeColorToken,
@@ -448,14 +450,51 @@ function getPPTLayoutDescriptor(layoutId: string | null | undefined) {
 
 function getPPTLayoutPlaceholders(
   layout: SlideEditLayoutDescriptor,
+  slide: PPTSlide,
 ): SlideEditResolvedLayoutPlaceholder[] {
+  const hiddenPlaceholderIds = getPPTHiddenPlaceholderIdSet(slide)
+
   return layout.placeholders.map((placeholder) =>
-    getSlideEditResolvedLayoutPlaceholder({
+    withPPTSlidePlaceholderVisibilityOverride(getSlideEditResolvedLayoutPlaceholder({
       layout,
       master: PPT_MASTER_DESCRIPTOR,
       placeholder,
       theme: PPT_THEME_DESCRIPTOR,
-    }))
+    }), hiddenPlaceholderIds))
+}
+
+function getPPTLayoutPlaceholderVisibilityDescriptors(
+  layout: SlideEditLayoutDescriptor,
+  slide: PPTSlide,
+): SlideEditPlaceholderDescriptor<string, string>[] {
+  const hiddenPlaceholderIds = getPPTHiddenPlaceholderIdSet(slide)
+
+  return layout.placeholders.map((placeholder) =>
+    withPPTSlidePlaceholderVisibilityOverride(
+      getSlideEditLayoutPlaceholderVisibilityDescriptor({
+        placeholder,
+        slideId: slide.id,
+      }),
+      hiddenPlaceholderIds,
+    ))
+}
+
+function withPPTSlidePlaceholderVisibilityOverride<
+  TPlaceholder extends { isVisible: boolean; placeholderId: string },
+>(
+  placeholder: TPlaceholder,
+  hiddenPlaceholderIds: ReadonlySet<string>,
+): TPlaceholder {
+  return hiddenPlaceholderIds.has(placeholder.placeholderId)
+    ? {
+        ...placeholder,
+        isVisible: false,
+      }
+    : placeholder
+}
+
+function getPPTHiddenPlaceholderIdSet(slide: PPTSlide) {
+  return new Set(slide.hiddenPlaceholderIds ?? [])
 }
 
 const canvasAlignModeAvailabilityKey = {
@@ -747,6 +786,20 @@ type PPTSlideMetadataUpdateCommand =
     }
 type PPTSlideMetadataHostCommandEffect = {
   payload: PPTSlideMetadataUpdateCommand
+  selection: {
+    objectIds: readonly string[]
+    slideId: string
+  }
+  type: 'slide-command-effect'
+}
+type PPTLayoutPlaceholderVisibilityCommand = {
+  id: 'update-placeholder-visibility'
+  isVisible: boolean
+  placeholderId: string
+  slideId: string
+}
+type PPTLayoutPlaceholderVisibilityHostCommandEffect = {
+  payload: PPTLayoutPlaceholderVisibilityCommand
   selection: {
     objectIds: readonly string[]
     slideId: string
@@ -1399,6 +1452,7 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
+  const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
@@ -1494,8 +1548,12 @@ function App() {
     [activeSlide],
   )
   const activeLayoutPlaceholders = useMemo(
-    () => getPPTLayoutPlaceholders(activeLayout),
-    [activeLayout],
+    () => getPPTLayoutPlaceholders(activeLayout, activeSlide),
+    [activeLayout, activeSlide],
+  )
+  const activeLayoutPlaceholderVisibilityDescriptors = useMemo(
+    () => getPPTLayoutPlaceholderVisibilityDescriptors(activeLayout, activeSlide),
+    [activeLayout, activeSlide],
   )
   const slideMetadataDescriptor = useMemo(
     () => createPPTSlideMetadataInspectorDescriptor({
@@ -3776,6 +3834,23 @@ function App() {
     })))
   }
 
+  function updateLayoutPlaceholderVisibility(
+    placeholderId: string,
+    isVisible: boolean,
+  ) {
+    const effect = toPPTLayoutPlaceholderVisibilityHostCommandEffect({
+      id: 'update-placeholder-visibility',
+      isVisible,
+      placeholderId,
+      slideId: activeSlide.id,
+    }, selection)
+
+    setLastPlaceholderVisibilityEffect(effect)
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) =>
+        applyPPTLayoutPlaceholderVisibilityHostCommandEffect(slide, effect)))
+  }
+
   function updateSlideNotes(notes: string) {
     const effect = toPPTSlideMetadataHostCommandEffect({
       fieldId: 'notes',
@@ -5527,6 +5602,14 @@ function App() {
         data-ppt-style-clipboard-source-id={styleClipboard?.sourceId ?? undefined}
         data-ppt-style-clipboard-source-kind={styleClipboard?.sourceKind ?? undefined}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
+        data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
+        data-ppt-placeholder-visibility-command-selection={lastPlaceholderVisibilityEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.payload.slideId}
+        data-ppt-placeholder-visibility-command-type={lastPlaceholderVisibilityEffect?.type}
+        data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
+          ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
+          : undefined}
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
@@ -5550,6 +5633,7 @@ function App() {
         >
           <div
             className="ppt-slide"
+            data-ppt-hidden-placeholders={(activeSlide.hiddenPlaceholderIds ?? []).join(' ')}
             data-ppt-layout-id={activeLayout.layoutId}
             data-ppt-slide={activeSlide.id}
             data-ppt-theme-id={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
@@ -5650,7 +5734,9 @@ function App() {
         exportCode={exportCode}
         inspectorSurface={inspectorSurface}
         layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
+        layoutPlaceholderVisibilityDescriptors={activeLayoutPlaceholderVisibilityDescriptors}
         layoutPlaceholders={activeLayoutPlaceholders}
+        lastPlaceholderVisibilityEffect={lastPlaceholderVisibilityEffect}
         recentColors={recentColors}
         selection={selection}
         selectedElement={selectedElement}
@@ -5684,6 +5770,7 @@ function App() {
         onElementTextStyleChange={updateElementTextStyle}
         onTextAutoFit={autoFitTextElement}
         onLayerPaneCommandEffect={applyLayerPaneCommandEffect}
+        onLayoutPlaceholderVisibilityChange={updateLayoutPlaceholderVisibility}
         onParagraphAlignChange={updateParagraphAlign}
         onShapeCornerRadiusChange={updateShapeCornerRadius}
         onShapeKindChange={updateShapeKind}
@@ -6642,6 +6729,38 @@ function applyPPTSlideMetadataHostCommandEffect(
     case 'orientation':
     case 'size':
       return slide
+  }
+}
+
+function toPPTLayoutPlaceholderVisibilityHostCommandEffect(
+  command: PPTLayoutPlaceholderVisibilityCommand,
+  selectedObjectIds: readonly string[],
+): PPTLayoutPlaceholderVisibilityHostCommandEffect {
+  return {
+    payload: command,
+    selection: {
+      objectIds: selectedObjectIds,
+      slideId: command.slideId,
+    },
+    type: 'slide-command-effect',
+  }
+}
+
+function applyPPTLayoutPlaceholderVisibilityHostCommandEffect(
+  slide: PPTSlide,
+  effect: PPTLayoutPlaceholderVisibilityHostCommandEffect,
+): PPTSlide {
+  const hiddenPlaceholderIds = new Set(slide.hiddenPlaceholderIds ?? [])
+
+  if (effect.payload.isVisible) {
+    hiddenPlaceholderIds.delete(effect.payload.placeholderId)
+  } else {
+    hiddenPlaceholderIds.add(effect.payload.placeholderId)
+  }
+
+  return {
+    ...slide,
+    hiddenPlaceholderIds: [...hiddenPlaceholderIds],
   }
 }
 
@@ -8721,7 +8840,9 @@ function Inspector({
   exportCode,
   inspectorSurface,
   layoutDescriptors,
+  layoutPlaceholderVisibilityDescriptors,
   layoutPlaceholders,
+  lastPlaceholderVisibilityEffect,
   onCommentBodyChange,
   onCommentResolvedChange,
   onCommitText,
@@ -8741,6 +8862,7 @@ function Inspector({
   onImageCropChange,
   onImageFitChange,
   onLayerPaneCommandEffect,
+  onLayoutPlaceholderVisibilityChange,
   onLineMarkerChange,
   onLineRouteChange,
   onParagraphBulletChange,
@@ -8771,7 +8893,9 @@ function Inspector({
   exportCode: string
   inspectorSurface: PPTInspectorSurfaceId
   layoutDescriptors: readonly SlideEditLayoutDescriptor[]
+  layoutPlaceholderVisibilityDescriptors: readonly SlideEditPlaceholderDescriptor<string, string>[]
   layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
+  lastPlaceholderVisibilityEffect: PPTLayoutPlaceholderVisibilityHostCommandEffect | null
   onCommentBodyChange: (elementId: string, value: string) => void
   onCommentResolvedChange: (elementId: string, resolved: boolean) => void
   onCommitText: (elementId: string, text: string) => void
@@ -8822,6 +8946,10 @@ function Inspector({
     fit: PPTImageFit,
   ) => void
   onLayerPaneCommandEffect: (effect: PPTLayerPaneHostCommandEffect) => void
+  onLayoutPlaceholderVisibilityChange: (
+    placeholderId: string,
+    isVisible: boolean,
+  ) => void
   onLineMarkerChange: (
     elementId: string,
     field: 'endMarker' | 'startMarker',
@@ -8914,6 +9042,12 @@ function Inspector({
     slide,
   })
   const layerPaneCommandIds = PPT_LAYER_PANE_COMMANDS.map((command) => command.id).join(' ')
+  const layoutPlaceholderById = new Map(layoutPlaceholders.map((placeholder) => [
+    placeholder.placeholderId,
+    placeholder,
+  ]))
+  const hiddenPlaceholderCount = layoutPlaceholderVisibilityDescriptors
+    .filter((placeholder) => !placeholder.isVisible).length
 
   function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
     const effect = getPPTLayerPaneCommandEffect(layerPaneDescriptor, intent)
@@ -8990,18 +9124,49 @@ function Inspector({
         <div
           className="ppt-layout-placeholder-list"
           data-ppt-layout-placeholder-count={layoutPlaceholders.length}
+          data-ppt-layout-placeholder-hidden-count={hiddenPlaceholderCount}
+          data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
+          data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
+          data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.payload.slideId}
+          data-ppt-placeholder-visibility-command-type={lastPlaceholderVisibilityEffect?.type}
+          data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
+            ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
+            : undefined}
         >
-          {layoutPlaceholders.map((placeholder) => (
-            <span
-              className="ppt-layout-placeholder"
-              data-ppt-layout-placeholder={placeholder.placeholderId}
-              data-ppt-placeholder-bounds={`${placeholder.bounds.x},${placeholder.bounds.y},${placeholder.bounds.w},${placeholder.bounds.h}`}
-              data-ppt-placeholder-role={placeholder.role}
-              key={placeholder.placeholderId}
-            >
-              {placeholder.title}
-            </span>
-          ))}
+          {layoutPlaceholderVisibilityDescriptors.map((placeholder) => {
+            const resolvedPlaceholder = layoutPlaceholderById.get(placeholder.placeholderId)
+
+            return (
+              <div
+                className="ppt-layout-placeholder"
+                data-ppt-layout-placeholder={placeholder.placeholderId}
+                data-ppt-placeholder-bounds={`${placeholder.bounds.x},${placeholder.bounds.y},${placeholder.bounds.w},${placeholder.bounds.h}`}
+                data-ppt-placeholder-layout={resolvedPlaceholder?.layoutId}
+                data-ppt-placeholder-locked={placeholder.isLocked ? 'true' : 'false'}
+                data-ppt-placeholder-master={resolvedPlaceholder?.masterId}
+                data-ppt-placeholder-role={placeholder.role}
+                data-ppt-placeholder-slide={placeholder.slideId}
+                data-ppt-placeholder-visible={placeholder.isVisible ? 'true' : 'false'}
+                key={placeholder.placeholderId}
+              >
+                <span>{placeholder.title}</span>
+                <button
+                  aria-label={`${placeholder.isVisible ? 'Hide' : 'Show'} ${placeholder.title}`}
+                  className="ppt-placeholder-visibility-toggle"
+                  data-ppt-placeholder-visibility-toggle={placeholder.placeholderId}
+                  disabled={placeholder.isLocked}
+                  title={placeholder.isVisible ? 'Hide placeholder' : 'Show placeholder'}
+                  type="button"
+                  onClick={() => onLayoutPlaceholderVisibilityChange(
+                    placeholder.placeholderId,
+                    !placeholder.isVisible,
+                  )}
+                >
+                  {placeholder.isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+              </div>
+            )
+          })}
         </div>
         <label className="ppt-field">
           <span>Notes</span>

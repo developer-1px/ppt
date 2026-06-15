@@ -1439,6 +1439,9 @@
 }
 
 .ppt-layout-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   max-width: 100%;
   overflow: hidden;
   padding: 3px 6px;
@@ -1450,6 +1453,25 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ppt-layout-placeholder[data-ppt-placeholder-visible='false'] {
+  opacity: 0.58;
+}
+
+.ppt-placeholder-visibility-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.ppt-placeholder-visibility-toggle:disabled {
+  color: var(--control-disabled);
 }
 
 .ppt-slide-transition-fields {
