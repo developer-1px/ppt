@@ -41,6 +41,7 @@ export function createPPTImportedImageElement({
       x: clamp(center.x - size.w / 2, 0, PPT_SLIDE_WIDTH - size.w),
       y: clamp(center.y - size.h / 2, 0, PPT_SLIDE_HEIGHT - size.h),
     },
+    fit: 'cover',
     id: createId('image'),
     kind: 'image',
     name,

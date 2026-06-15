@@ -1182,6 +1182,8 @@ async function runExportScenario(page) {
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
+      hasImageFitMarkup: code.includes('data-ppt-image-fit="contain"') && code.includes('object-fit:contain'),
+      hasImageFitModel: code.includes('"fit": "contain"'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
       hasLineConnectionMarkup: code.includes('data-ppt-start-connection="'),
       hasLineConnectionModel: code.includes('"startConnection"') && code.includes('"anchor"'),
@@ -1202,6 +1204,7 @@ async function runExportScenario(page) {
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
+  record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
@@ -1454,6 +1457,20 @@ async function runImageImportScenario(page) {
   record('drops image file onto PPT stage at pointer position', afterDrop.imageCount === afterPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
     afterPaste,
+  })
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="image-fit"]')
+    input.value = 'contain'
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterFit = await getPPTImageImportState(page)
+
+  record('changes selected PPT image fit in inspector', afterFit.selectedImageFit === 'contain' && afterFit.inspectorImageFit === 'contain' && afterFit.thumbContainCount > 0, {
+    afterDrop,
+    afterFit,
   })
 
   const beforeResize = await page.eval(`(() => {
@@ -1962,14 +1979,17 @@ function getPPTImageImportState(page) {
     const selectedImage = selected?.querySelector('img') ?? null
 
     return {
+      inspectorImageFit: document.querySelector('[data-ppt-style-field="image-fit"]')?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedImageFit: selectedImage?.style.objectFit ?? '',
       selectedImageSrc: selectedImage?.getAttribute('src') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      thumbContainCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-fit="contain"]').length,
       thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
     }
   })()`)

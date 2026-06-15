@@ -130,6 +130,8 @@ import {
   updatePPTDeckSlide,
   type PPTDeck,
   type PPTElement,
+  type PPTImage,
+  type PPTImageFit,
   type PPTLine,
   type PPTLineConnection,
   type PPTLineMarker,
@@ -1715,6 +1717,24 @@ function App() {
     )
   }
 
+  function updateImageFit(
+    elementId: string,
+    fit: PPTImageFit,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'image') {
+          return element
+        }
+
+        return {
+          ...element,
+          fit,
+        }
+      }),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -2925,6 +2945,7 @@ function App() {
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
         onElementGeometryChange={updateElementGeometry}
+        onImageFitChange={updateImageFit}
         onElementLockToggle={toggleElementLocked}
         onElementNameChange={updateElementName}
         onElementRotationChange={updateElementRotation}
@@ -3448,6 +3469,9 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-image-fit={element.kind === 'image'
+              ? getPPTImageFit(element)
+              : undefined}
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
               : undefined}
@@ -3463,6 +3487,9 @@ function SlideThumb({
                     : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
+                : undefined,
+              backgroundSize: element.kind === 'image'
+                ? getPPTImageFit(element)
                 : undefined,
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
@@ -3548,6 +3575,9 @@ function PPTElementView({
         ? element.startConnection?.elementId
         : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
+      data-ppt-image-fit={element.kind === 'image'
+        ? getPPTImageFit(element)
+        : undefined}
       data-ppt-bullet-list={textBody && hasPPTTextBodyBullet(textBody) ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
@@ -3562,7 +3592,12 @@ function PPTElementView({
       style={style}
     >
       {element.kind === 'image' ? (
-        <img alt={element.alt} draggable={false} src={element.src} />
+        <img
+          alt={element.alt}
+          draggable={false}
+          src={element.src}
+          style={{ objectFit: getPPTImageFit(element) }}
+        />
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
       ) : (
@@ -3917,6 +3952,7 @@ function Inspector({
   onElementStrokeChange,
   onElementTextStyleChange,
   onElementVisibilityToggle,
+  onImageFitChange,
   onLayerSelect,
   onLineMarkerChange,
   onLineRouteChange,
@@ -3954,6 +3990,10 @@ function Inspector({
     value: string | number,
   ) => void
   onElementVisibilityToggle: (elementId: string) => void
+  onImageFitChange: (
+    elementId: string,
+    fit: PPTImageFit,
+  ) => void
   onLayerSelect: (elementId: string, additive: boolean) => void
   onLineMarkerChange: (
     elementId: string,
@@ -4210,6 +4250,23 @@ function Inspector({
                   />
                 </label>
               </>
+            ) : null}
+            {selectedElement.kind === 'image' ? (
+              <label className="ppt-field">
+                <span>Fit</span>
+                <select
+                  data-ppt-style-field="image-fit"
+                  value={getPPTImageFit(selectedElement)}
+                  onChange={(event) => {
+                    if (isPPTImageFit(event.target.value)) {
+                      onImageFitChange(selectedElement.id, event.target.value)
+                    }
+                  }}
+                >
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                </select>
+              </label>
             ) : null}
             {selectedElement.kind === 'line' ? (
               <>
@@ -4522,6 +4579,10 @@ function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
     ...getDefaultPPTTextStyle(),
     ...element.style,
   }
+}
+
+function getPPTImageFit(element: PPTImage): PPTImageFit {
+  return element.fit ?? 'cover'
 }
 
 function getDefaultPPTTextStyle(): PPTTextStyle {
@@ -5604,6 +5665,10 @@ function getPPTThumbElementClassName(element: PPTElement) {
 
 function isPPTShapeKind(value: string): value is PPTShapeKind {
   return value === 'rect' || value === 'ellipse' || value === 'diamond'
+}
+
+function isPPTImageFit(value: string): value is PPTImageFit {
+  return value === 'cover' || value === 'contain'
 }
 
 function isPPTLineMarker(value: string): value is PPTLineMarker {
