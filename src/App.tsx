@@ -269,6 +269,11 @@ const canvasReorderModeAvailabilityKey = {
 >
 
 type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
+type PPTClipboard = {
+  elements: PPTElement[]
+  selection: string[]
+  sourceSlideId: string
+}
 type PPTSurfaceCommand =
   | 'alignCenter'
   | 'alignLeft'
@@ -611,7 +616,7 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
-  const [clipboard, setClipboard] = useState<PPTElement[]>([])
+  const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -729,7 +734,7 @@ function App() {
     : null
   const commandAvailability = useMemo<PPTCommandAvailability>(() => ({
     ...getPPTCanvasCommandAvailability({
-      canPaste: clipboard.length > 0,
+      canPaste: (clipboard?.elements.length ?? 0) > 0,
       canRedo: future.length > 0,
       canUndo: past.length > 0,
       hasGroupedSelection,
@@ -743,7 +748,7 @@ function App() {
     tidySelection: canTidySelection,
   }), [
     canFlipSelection,
-    clipboard.length,
+    clipboard?.elements.length,
     canSelectSameType,
     canTidySelection,
     future.length,
@@ -1638,9 +1643,15 @@ function App() {
       return
     }
 
-    setClipboard(selected)
+    setClipboard({
+      elements: selected,
+      selection: selected.map((element) => element.id),
+      sourceSlideId: activeSlide.id,
+    })
     void navigator.clipboard?.writeText(JSON.stringify({
       elements: selected,
+      elementIds: selected.map((element) => element.id),
+      sourceSlideId: activeSlide.id,
       type: 'application/ppt-elements+json',
     })).catch(() => undefined)
   }
@@ -1661,7 +1672,7 @@ function App() {
 
     commitElementCommand((slide) => {
       const pasted = commandAdapter.pasteItems({
-        clipboard,
+        clipboard: clipboard?.elements ?? [],
         createId: createPPTElementIdFactory(slide),
         offset: { x: 28, y: 28 },
       })
@@ -3977,6 +3988,9 @@ function App() {
 
       <section
         className="ppt-stage-shell"
+        data-ppt-clipboard-count={clipboard?.elements.length ?? 0}
+        data-ppt-clipboard-selection={clipboard?.selection.join(' ') ?? undefined}
+        data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}

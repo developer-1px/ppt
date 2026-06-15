@@ -41,6 +41,7 @@ try {
   await runAltDragDuplicateScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
+  await runCrossSlideClipboardScenario(page)
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
   await runThemeScenario(page)
@@ -1191,6 +1192,147 @@ async function runCommandSurfaceScenario(page) {
   }))()`)
 
   record('unlocks locked PPT object from context menu', afterUnlock.locked === 'false', afterUnlock)
+}
+
+async function runCrossSlideClipboardScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await page.eval(`document.querySelectorAll('.ppt-thumb')[0]?.click()`)
+  await delay(80)
+
+  const sourcePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, sourcePoint.x, sourcePoint.y, 1)
+  await delay(80)
+
+  const sourceBefore = await getPPTCrossSlideClipboardState(page)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(50)
+
+  const afterCopy = await getPPTCrossSlideClipboardState(page)
+
+  record('stores PPT clipboard source slide metadata', afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title', {
+    afterCopy,
+    sourceBefore,
+  })
+
+  await page.eval(`document.querySelectorAll('.ppt-thumb')[1]?.click()`)
+  await delay(80)
+
+  const targetBefore = await getPPTCrossSlideClipboardState(page)
+
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    modifiers: 2,
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(80)
+
+  const afterKeyboardPaste = await getPPTCrossSlideClipboardState(page)
+
+  record('pastes copied PPT object onto another slide with target slide ids', afterKeyboardPaste.activeSlide === 'slide-2' && afterKeyboardPaste.stageCount === targetBefore.stageCount + 1 && afterKeyboardPaste.selectedCount === 1 && afterKeyboardPaste.selectedId.startsWith('slide-2-') && afterKeyboardPaste.selectedName.includes('Copy'), {
+    afterKeyboardPaste,
+    targetBefore,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTCrossSlideClipboardState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTCrossSlideClipboardState(page)
+
+  record('undoes and redoes PPT cross-slide paste as one history step', afterUndo.stageCount === targetBefore.stageCount && afterRedo.stageCount === afterKeyboardPaste.stageCount && afterRedo.selectedId.startsWith('slide-2-'), {
+    afterKeyboardPaste,
+    afterRedo,
+    afterUndo,
+    targetBefore,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'paste' })
+  await delay(80)
+
+  const beforePalettePaste = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="command:paste"]')?.disabled ?? true,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:paste"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const afterPalettePaste = await getPPTCrossSlideClipboardState(page)
+
+  record('runs PPT cross-slide paste from command palette', beforePalettePaste.open && beforePalettePaste.itemPresent && !beforePalettePaste.disabled && afterPalettePaste.stageCount === afterRedo.stageCount + 1 && afterPalettePaste.selectedId.startsWith('slide-2-'), {
+    afterPalettePaste,
+    afterRedo,
+    beforePalettePaste,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCleanup = await getPPTCrossSlideClipboardState(page)
+
+  await page.eval(`document.querySelectorAll('.ppt-thumb')[0]?.click()`)
+  await delay(80)
+
+  const sourceAfter = await getPPTCrossSlideClipboardState(page)
+
+  record('keeps source PPT slide unchanged after cross-slide paste', afterCleanup.stageCount === afterRedo.stageCount && sourceAfter.activeSlide === 'slide-1' && sourceAfter.stageCount === sourceBefore.stageCount && sourceAfter.thumbCounts[0] === sourceBefore.thumbCounts[0], {
+    afterCleanup,
+    afterRedo,
+    sourceAfter,
+    sourceBefore,
+    targetBefore,
+  })
 }
 
 async function runSelectSameTypeScenario(page) {
@@ -4413,6 +4555,28 @@ function getSlideRailState(page) {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       count: thumbs.length,
       names: thumbs.map((thumb) => thumb.querySelector('.ppt-thumb-name')?.textContent ?? ''),
+    }
+  })()`)
+}
+
+function getPPTCrossSlideClipboardState(page) {
+  return page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const slide = document.querySelector('.ppt-slide')
+    const selected = document.querySelector('[data-selected="true"]')
+    const thumbs = [...document.querySelectorAll('.ppt-thumb')]
+
+    return {
+      activeSlide: slide?.getAttribute('data-ppt-slide') ?? '',
+      clipboardCount: Number(stage?.getAttribute('data-ppt-clipboard-count') ?? 0),
+      clipboardSelection: stage?.getAttribute('data-ppt-clipboard-selection') ?? '',
+      clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      stageCount: document.querySelectorAll('[data-ppt-element]').length,
+      thumbCounts: thumbs.map((thumb) => thumb.querySelectorAll('.ppt-thumb-preview > span').length),
     }
   })()`)
 }
