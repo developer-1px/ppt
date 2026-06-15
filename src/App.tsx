@@ -643,6 +643,105 @@ type PPTSlideMetadataHostCommandEffect = {
   }
   type: 'slide-command-effect'
 }
+type PPTLayerPaneAriaContract = {
+  containerRole: 'tree'
+  keyboardModel: 'roving-tabindex'
+  rowRole: 'treeitem'
+  selectionModel: 'host-controlled-multi-select'
+}
+type PPTLayerPaneRowDescriptor = {
+  ariaLevel: number
+  ariaPosInSet: number
+  ariaSetSize: number
+  displayName: string
+  groupId: string | null
+  isGrouped: boolean
+  isGroup: boolean
+  isHidden: boolean
+  isLocked: boolean
+  isRenamable: boolean
+  isReorderable: boolean
+  isSelectable: boolean
+  isSelected: boolean
+  kindLabel: string
+  objectId: string
+  order: number
+  parentObjectId: string | null
+  slideId: string
+}
+type PPTLayerPaneDescriptor = {
+  activeObjectId: string | null
+  aria: PPTLayerPaneAriaContract
+  rows: readonly PPTLayerPaneRowDescriptor[]
+  selectedObjectIds: readonly string[]
+  slideId: string
+}
+type PPTLayerPaneCommandId =
+  | 'hide-objects'
+  | 'lock-objects'
+  | 'rename-object'
+  | 'reorder-object'
+  | 'select-objects'
+  | 'show-objects'
+  | 'unlock-objects'
+type PPTLayerPaneCommandDescriptor = {
+  id: PPTLayerPaneCommandId
+  requiredAdapterSlot: 'command-effect'
+}
+type PPTLayerPaneCommand =
+  | {
+      id: 'hide-objects' | 'lock-objects' | 'show-objects' | 'unlock-objects'
+      objectIds: readonly string[]
+    }
+  | {
+      id: 'rename-object'
+      name: string
+      objectId: string
+    }
+  | {
+      fromIndex: number
+      id: 'reorder-object'
+      objectId: string
+      toIndex: number
+    }
+  | {
+      id: 'select-objects'
+      mode: 'additive' | 'range' | 'replace'
+      objectIds: readonly string[]
+    }
+type PPTLayerPaneHostCommandEffect = {
+  payload: PPTLayerPaneCommand
+  selection: {
+    objectIds: readonly string[]
+    slideId: string
+  }
+  type: 'slide-command-effect'
+}
+type PPTLayerPaneIntent =
+  | {
+      additive?: boolean
+      objectId: string
+      rangeAnchorObjectId?: string | null
+      type: 'row-press'
+    }
+  | {
+      name: string
+      objectId: string
+      type: 'rename-submit'
+    }
+  | {
+      objectId: string
+      type: 'visibility-toggle'
+    }
+  | {
+      objectId: string
+      type: 'lock-toggle'
+    }
+  | {
+      objectId: string
+      toIndex: number
+      type: 'row-drop'
+    }
 type PPTMinimapSize = {
   h: number
   w: number
@@ -888,6 +987,21 @@ const PPT_SLIDE_METADATA_FIELDS = Object.freeze([
     requiredAdapterSlot: 'command-effect',
   },
 ] as const satisfies readonly PPTSlideMetadataFieldDescriptor[])
+const PPT_LAYER_PANE_ARIA_CONTRACT = Object.freeze({
+  containerRole: 'tree',
+  keyboardModel: 'roving-tabindex',
+  rowRole: 'treeitem',
+  selectionModel: 'host-controlled-multi-select',
+} as const satisfies PPTLayerPaneAriaContract)
+const PPT_LAYER_PANE_COMMANDS = Object.freeze([
+  { id: 'select-objects', requiredAdapterSlot: 'command-effect' },
+  { id: 'rename-object', requiredAdapterSlot: 'command-effect' },
+  { id: 'hide-objects', requiredAdapterSlot: 'command-effect' },
+  { id: 'show-objects', requiredAdapterSlot: 'command-effect' },
+  { id: 'lock-objects', requiredAdapterSlot: 'command-effect' },
+  { id: 'unlock-objects', requiredAdapterSlot: 'command-effect' },
+  { id: 'reorder-object', requiredAdapterSlot: 'command-effect' },
+] as const satisfies readonly PPTLayerPaneCommandDescriptor[])
 const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   h: 112,
   w: 176,
@@ -2726,22 +2840,86 @@ function App() {
     )
   }
 
-  function toggleElementLocked(elementId: string) {
-    commitDeck((current) =>
-      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
-        ...element,
-        locked: element.locked === true ? false : true,
-      })),
-    )
-  }
+  function applyLayerPaneCommandEffect(effect: PPTLayerPaneHostCommandEffect) {
+    const payload = effect.payload
 
-  function toggleElementVisibility(elementId: string) {
-    commitDeck((current) =>
-      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
-        ...element,
-        visible: element.visible === false,
-      })),
-    )
+    switch (payload.id) {
+      case 'hide-objects':
+      case 'show-objects':
+      case 'lock-objects':
+      case 'unlock-objects': {
+        const objectIds = new Set(payload.objectIds)
+        const visible = payload.id === 'show-objects'
+          ? true
+          : payload.id === 'hide-objects'
+            ? false
+            : null
+        const locked = payload.id === 'lock-objects'
+          ? true
+          : payload.id === 'unlock-objects'
+            ? false
+            : null
+
+        setSelection(effect.selection.objectIds.filter((objectId) => objectIds.has(objectId)))
+        commitDeck((current) =>
+          updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
+            ...slide,
+            elements: slide.elements.map((element) =>
+              objectIds.has(element.id)
+                ? {
+                    ...element,
+                    ...(visible === null ? {} : { visible }),
+                    ...(locked === null ? {} : { locked }),
+                  }
+                : element),
+          })),
+        )
+        return
+      }
+      case 'rename-object':
+        updateElementName(payload.objectId, payload.name)
+        return
+      case 'reorder-object':
+        commitDeck((current) =>
+          updatePPTDeckSlide(current, effect.selection.slideId, (slide) => {
+            const elements = [...slide.elements]
+            const [element] = elements.splice(payload.fromIndex, 1)
+
+            if (!element) {
+              return slide
+            }
+
+            elements.splice(payload.toIndex, 0, element)
+
+            return {
+              ...slide,
+              elements,
+            }
+          }),
+        )
+        setSelection([...effect.selection.objectIds])
+        return
+      case 'select-objects': {
+        const targetObjectId = payload.objectIds.at(-1)
+
+        if (!targetObjectId) {
+          return
+        }
+
+        if (payload.mode === 'range') {
+          setSelection([...payload.objectIds])
+          return
+        }
+
+        setSelection((current) =>
+          getPPTLayerSelection(
+            current,
+            targetObjectId,
+            payload.mode === 'additive',
+            activeSlide,
+          ))
+      }
+    }
   }
 
   function updateElementStroke(
@@ -4671,19 +4849,14 @@ function App() {
         onElementGeometryChange={updateElementGeometry}
         onImageCropChange={updateImageCrop}
         onImageFitChange={updateImageFit}
-        onElementLockToggle={toggleElementLocked}
         onElementNameChange={updateElementName}
         onElementRotationChange={updateElementRotation}
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
         onElementTextStyleChange={updateElementTextStyle}
-        onElementVisibilityToggle={toggleElementVisibility}
         onTextAutoFit={autoFitTextElement}
-        onLayerSelect={(elementId, additive) => {
-          setSelection((current) =>
-            getPPTLayerSelection(current, elementId, additive, activeSlide))
-        }}
+        onLayerPaneCommandEffect={applyLayerPaneCommandEffect}
         onParagraphAlignChange={updateParagraphAlign}
         onShapeKindChange={updateShapeKind}
         onSlideBackgroundChange={updateSlideBackground}
@@ -5410,6 +5583,245 @@ function applyPPTSlideMetadataHostCommandEffect(
     case 'size':
       return slide
   }
+}
+
+function createPPTLayerPaneDescriptor({
+  activeObjectId = null,
+  selectedObjectIds,
+  slide,
+}: {
+  activeObjectId?: string | null
+  selectedObjectIds: readonly string[]
+  slide: PPTSlide
+}): PPTLayerPaneDescriptor {
+  const selected = new Set(selectedObjectIds)
+  const rowCount = slide.elements.length
+
+  return {
+    activeObjectId,
+    aria: PPT_LAYER_PANE_ARIA_CONTRACT,
+    rows: slide.elements.map((element, index) => ({
+      ariaLevel: 1,
+      ariaPosInSet: index + 1,
+      ariaSetSize: rowCount,
+      displayName: element.name,
+      groupId: element.groupId ?? null,
+      isGrouped: Boolean(element.groupId),
+      isGroup: false,
+      isHidden: element.visible === false,
+      isLocked: element.locked === true,
+      isRenamable: true,
+      isReorderable: element.locked !== true,
+      isSelectable: true,
+      isSelected: selected.has(element.id),
+      kindLabel: getPPTElementKindLabel(element),
+      objectId: element.id,
+      order: index,
+      parentObjectId: null,
+      slideId: slide.id,
+    })),
+    selectedObjectIds,
+    slideId: slide.id,
+  }
+}
+
+function getPPTLayerPaneCommandEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  intent: PPTLayerPaneIntent,
+): PPTLayerPaneHostCommandEffect | null {
+  switch (intent.type) {
+    case 'lock-toggle':
+      return getPPTLayerPaneLockEffect(descriptor, intent.objectId)
+    case 'rename-submit':
+      return getPPTLayerPaneRenameEffect(descriptor, intent)
+    case 'row-drop':
+      return getPPTLayerPaneReorderEffect(descriptor, intent)
+    case 'row-press':
+      return getPPTLayerPaneSelectEffect(descriptor, intent)
+    case 'visibility-toggle':
+      return getPPTLayerPaneVisibilityEffect(descriptor, intent.objectId)
+  }
+}
+
+function getPPTLayerPaneSelectEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  intent: Extract<PPTLayerPaneIntent, { type: 'row-press' }>,
+): PPTLayerPaneHostCommandEffect | null {
+  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
+
+  if (!row?.isSelectable) {
+    return null
+  }
+
+  const objectIds = intent.rangeAnchorObjectId
+    ? getPPTLayerPaneRangeSelection(
+        descriptor,
+        intent.rangeAnchorObjectId,
+        intent.objectId,
+      )
+    : intent.additive === true
+      ? togglePPTLayerPaneSelection(
+          descriptor.selectedObjectIds,
+          intent.objectId,
+        )
+      : [intent.objectId]
+  const mode = intent.rangeAnchorObjectId
+    ? 'range'
+    : intent.additive === true
+      ? 'additive'
+      : 'replace'
+
+  return toPPTLayerPaneHostCommandEffect({
+    descriptor,
+    payload: {
+      id: 'select-objects',
+      mode,
+      objectIds,
+    },
+    selectionObjectIds: objectIds,
+  })
+}
+
+function getPPTLayerPaneRenameEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  intent: Extract<PPTLayerPaneIntent, { type: 'rename-submit' }>,
+): PPTLayerPaneHostCommandEffect | null {
+  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
+  const name = intent.name.trim()
+
+  if (!row?.isRenamable || name.length === 0) {
+    return null
+  }
+
+  return toPPTLayerPaneHostCommandEffect({
+    descriptor,
+    payload: {
+      id: 'rename-object',
+      name,
+      objectId: intent.objectId,
+    },
+    selectionObjectIds: [intent.objectId],
+  })
+}
+
+function getPPTLayerPaneVisibilityEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  objectId: string,
+): PPTLayerPaneHostCommandEffect | null {
+  const row = findPPTLayerPaneRow(descriptor, objectId)
+
+  if (!row || row.isLocked) {
+    return null
+  }
+
+  return toPPTLayerPaneHostCommandEffect({
+    descriptor,
+    payload: {
+      id: row.isHidden ? 'show-objects' : 'hide-objects',
+      objectIds: [objectId],
+    },
+    selectionObjectIds: [objectId],
+  })
+}
+
+function getPPTLayerPaneLockEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  objectId: string,
+): PPTLayerPaneHostCommandEffect | null {
+  const row = findPPTLayerPaneRow(descriptor, objectId)
+
+  if (!row) {
+    return null
+  }
+
+  return toPPTLayerPaneHostCommandEffect({
+    descriptor,
+    payload: {
+      id: row.isLocked ? 'unlock-objects' : 'lock-objects',
+      objectIds: [objectId],
+    },
+    selectionObjectIds: [objectId],
+  })
+}
+
+function getPPTLayerPaneReorderEffect(
+  descriptor: PPTLayerPaneDescriptor,
+  intent: Extract<PPTLayerPaneIntent, { type: 'row-drop' }>,
+): PPTLayerPaneHostCommandEffect | null {
+  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
+  const fromIndex = descriptor.rows.findIndex((row) => row.objectId === intent.objectId)
+  const toIndex = Math.max(0, Math.min(intent.toIndex, Math.max(0, descriptor.rows.length - 1)))
+
+  if (!row?.isReorderable || fromIndex < 0 || fromIndex === toIndex) {
+    return null
+  }
+
+  return toPPTLayerPaneHostCommandEffect({
+    descriptor,
+    payload: {
+      fromIndex,
+      id: 'reorder-object',
+      objectId: intent.objectId,
+      toIndex,
+    },
+    selectionObjectIds: [intent.objectId],
+  })
+}
+
+function toPPTLayerPaneHostCommandEffect({
+  descriptor,
+  payload,
+  selectionObjectIds,
+}: {
+  descriptor: PPTLayerPaneDescriptor
+  payload: PPTLayerPaneCommand
+  selectionObjectIds: readonly string[]
+}): PPTLayerPaneHostCommandEffect {
+  return {
+    payload,
+    selection: {
+      objectIds: selectionObjectIds,
+      slideId: descriptor.slideId,
+    },
+    type: 'slide-command-effect',
+  }
+}
+
+function findPPTLayerPaneRow(
+  descriptor: PPTLayerPaneDescriptor,
+  objectId: string,
+) {
+  return descriptor.rows.find((row) => row.objectId === objectId) ?? null
+}
+
+function togglePPTLayerPaneSelection(
+  selectedObjectIds: readonly string[],
+  objectId: string,
+) {
+  return selectedObjectIds.includes(objectId)
+    ? selectedObjectIds.filter((selectedId) => selectedId !== objectId)
+    : [...selectedObjectIds, objectId]
+}
+
+function getPPTLayerPaneRangeSelection(
+  descriptor: PPTLayerPaneDescriptor,
+  anchorObjectId: string,
+  objectId: string,
+) {
+  const anchorIndex = descriptor.rows.findIndex((row) => row.objectId === anchorObjectId)
+  const targetIndex = descriptor.rows.findIndex((row) => row.objectId === objectId)
+
+  if (anchorIndex < 0 || targetIndex < 0) {
+    return [objectId]
+  }
+
+  const start = Math.min(anchorIndex, targetIndex)
+  const end = Math.max(anchorIndex, targetIndex)
+
+  return descriptor.rows
+    .slice(start, end + 1)
+    .filter((row) => row.isSelectable)
+    .map((row) => row.objectId)
 }
 
 function getPPTMinimapReadModel({
@@ -6818,15 +7230,13 @@ function Inspector({
   onCopyHTML,
   onDownloadHTML,
   onElementGeometryChange,
-  onElementLockToggle,
   onElementNameChange,
   onElementRotationChange,
   onElementStrokeChange,
   onElementTextStyleChange,
-  onElementVisibilityToggle,
   onImageCropChange,
   onImageFitChange,
-  onLayerSelect,
+  onLayerPaneCommandEffect,
   onLineMarkerChange,
   onLineRouteChange,
   onParagraphBulletChange,
@@ -6862,7 +7272,6 @@ function Inspector({
     field: 'h' | 'w' | 'x' | 'y',
     value: number,
   ) => void
-  onElementLockToggle: (elementId: string) => void
   onElementNameChange: (elementId: string, name: string) => void
   onElementRotationChange: (elementId: string, rotation: number) => void
   onElementStrokeChange: (
@@ -6875,7 +7284,6 @@ function Inspector({
     field: keyof PPTTextStyle,
     value: string | number,
   ) => void
-  onElementVisibilityToggle: (elementId: string) => void
   onImageCropChange: (
     elementId: string,
     field: keyof PPTImageCrop,
@@ -6885,7 +7293,7 @@ function Inspector({
     elementId: string,
     fit: PPTImageFit,
   ) => void
-  onLayerSelect: (elementId: string, additive: boolean) => void
+  onLayerPaneCommandEffect: (effect: PPTLayerPaneHostCommandEffect) => void
   onLineMarkerChange: (
     elementId: string,
     field: 'endMarker' | 'startMarker',
@@ -6934,6 +7342,20 @@ function Inspector({
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
   const sizeMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'size')
   const orientationMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'orientation')
+  const layerPaneDescriptor = createPPTLayerPaneDescriptor({
+    activeObjectId: selectedElement?.id ?? null,
+    selectedObjectIds: selection,
+    slide,
+  })
+  const layerPaneCommandIds = PPT_LAYER_PANE_COMMANDS.map((command) => command.id).join(' ')
+
+  function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
+    const effect = getPPTLayerPaneCommandEffect(layerPaneDescriptor, intent)
+
+    if (effect) {
+      onLayerPaneCommandEffect(effect)
+    }
+  }
 
   return (
     <aside className="ppt-inspector" aria-label="Inspector">
@@ -7438,56 +7860,101 @@ function Inspector({
       <div className="ppt-panel-header">
         <h2>Objects</h2>
       </div>
-      <section className="ppt-panel-section">
-        <div className="ppt-layer-list" aria-label="Selection pane">
-          {slide.elements.map((element) => (
+      <section
+        className="ppt-panel-section"
+        data-ppt-layer-pane
+        data-ppt-layer-pane-active-object-id={layerPaneDescriptor.activeObjectId ?? ''}
+        data-ppt-layer-pane-command-count={PPT_LAYER_PANE_COMMANDS.length}
+        data-ppt-layer-pane-commands={layerPaneCommandIds}
+        data-ppt-layer-pane-command-slot="command-effect"
+        data-ppt-layer-pane-row-count={layerPaneDescriptor.rows.length}
+        data-ppt-layer-pane-slide-id={layerPaneDescriptor.slideId}
+      >
+        <div
+          aria-label="Selection pane"
+          className="ppt-layer-list"
+          data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
+          data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
+          data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
+          data-ppt-layer-pane-selection-model={layerPaneDescriptor.aria.selectionModel}
+          role={layerPaneDescriptor.aria.containerRole}
+        >
+          {layerPaneDescriptor.rows.map((row) => (
             <div
-              aria-selected={selection.includes(element.id)}
+              aria-disabled={!row.isSelectable}
+              aria-level={row.ariaLevel}
+              aria-posinset={row.ariaPosInSet}
+              aria-selected={row.isSelected}
+              aria-setsize={row.ariaSetSize}
               className="ppt-layer-row"
-              data-grouped={element.groupId ? 'true' : 'false'}
-              data-hidden={element.visible === false ? 'true' : 'false'}
-              data-locked={element.locked === true ? 'true' : 'false'}
-              data-ppt-layer-row={element.id}
-              key={element.id}
+              data-grouped={row.isGrouped ? 'true' : 'false'}
+              data-hidden={row.isHidden ? 'true' : 'false'}
+              data-locked={row.isLocked ? 'true' : 'false'}
+              data-ppt-layer-pane-grouped={row.isGrouped ? 'true' : 'false'}
+              data-ppt-layer-pane-hidden={row.isHidden ? 'true' : 'false'}
+              data-ppt-layer-pane-kind={row.kindLabel}
+              data-ppt-layer-pane-locked={row.isLocked ? 'true' : 'false'}
+              data-ppt-layer-pane-order={row.order}
+              data-ppt-layer-pane-renamable={row.isRenamable ? 'true' : 'false'}
+              data-ppt-layer-pane-reorderable={row.isReorderable ? 'true' : 'false'}
+              data-ppt-layer-pane-row={row.objectId}
+              data-ppt-layer-pane-selected={row.isSelected ? 'true' : 'false'}
+              data-ppt-layer-row={row.objectId}
+              key={row.objectId}
+              role={layerPaneDescriptor.aria.rowRole}
+              tabIndex={row.isSelected ? 0 : -1}
             >
               <button
                 className="ppt-layer-select"
-                data-ppt-layer-select={element.id}
+                data-ppt-layer-pane-intent="row-press"
+                data-ppt-layer-select={row.objectId}
                 type="button"
                 onClick={(event) =>
-                  onLayerSelect(element.id, event.metaKey || event.ctrlKey || event.shiftKey)}
+                  runLayerPaneIntent({
+                    additive: event.metaKey || event.ctrlKey || event.shiftKey,
+                    objectId: row.objectId,
+                    type: 'row-press',
+                  })}
               >
                 <span className="ppt-layer-kind">
                   <Layers size={14} />
                 </span>
-                <span className="ppt-layer-name">{element.name}</span>
+                <span className="ppt-layer-name">{row.displayName}</span>
               </button>
               <div className="ppt-layer-actions">
                 <button
-                  aria-label={element.visible === false ? 'Show object' : 'Hide object'}
+                  aria-label={row.isHidden ? 'Show object' : 'Hide object'}
                   className="ppt-layer-icon-button"
-                  data-ppt-layer-visibility={element.id}
-                  title={element.visible === false ? 'Show object' : 'Hide object'}
+                  data-ppt-layer-pane-intent="visibility-toggle"
+                  data-ppt-layer-visibility={row.objectId}
+                  title={row.isHidden ? 'Show object' : 'Hide object'}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation()
-                    onElementVisibilityToggle(element.id)
+                    runLayerPaneIntent({
+                      objectId: row.objectId,
+                      type: 'visibility-toggle',
+                    })
                   }}
                 >
-                  {element.visible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {row.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
                 <button
-                  aria-label={element.locked === true ? 'Unlock object' : 'Lock object'}
+                  aria-label={row.isLocked ? 'Unlock object' : 'Lock object'}
                   className="ppt-layer-icon-button"
-                  data-ppt-layer-lock={element.id}
-                  title={element.locked === true ? 'Unlock object' : 'Lock object'}
+                  data-ppt-layer-lock={row.objectId}
+                  data-ppt-layer-pane-intent="lock-toggle"
+                  title={row.isLocked ? 'Unlock object' : 'Lock object'}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation()
-                    onElementLockToggle(element.id)
+                    runLayerPaneIntent({
+                      objectId: row.objectId,
+                      type: 'lock-toggle',
+                    })
                   }}
                 >
-                  {element.locked === true ? <Lock size={14} /> : <Unlock size={14} />}
+                  {row.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
                 </button>
               </div>
             </div>
@@ -7636,7 +8103,7 @@ function getPPTElementTypeKey(element: PPTElement) {
     return `shape:${element.shape}`
   }
 
-  return element.kind
+  return 'Object'
 }
 
 function canFlipPPTSelection(
@@ -9208,6 +9675,38 @@ function createPPTSlideElementId(
   const suffix = name || element.kind
 
   return `${slideId}-${suffix}-${index + 1}`
+}
+
+function getPPTElementKindLabel(element: PPTElement) {
+  if (element.kind === 'shape') {
+    return getPPTShapeLabel(element.shape)
+  }
+
+  if (element.kind === 'textBox') {
+    return 'Text'
+  }
+
+  if (element.kind === 'image') {
+    return 'Image'
+  }
+
+  if (element.kind === 'line') {
+    return 'Line'
+  }
+
+  if (element.kind === 'freeform') {
+    return 'Freeform'
+  }
+
+  if (element.kind === 'table') {
+    return 'Table'
+  }
+
+  if (element.kind === 'comment') {
+    return 'Comment'
+  }
+
+  return 'Object'
 }
 
 function getPPTShapeLabel(shape: PPTShapeKind) {
