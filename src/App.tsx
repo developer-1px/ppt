@@ -45,6 +45,7 @@ import {
   Moon,
   MoveDown,
   MoveUp,
+  Paintbrush,
   PenLine,
   Play,
   Plus,
@@ -550,18 +551,48 @@ type PPTClipboardPasteHostCommandEffect = {
   }
   type: 'slide-command-effect'
 }
+type PPTStyleClipboardCategory =
+  | 'object'
+  | 'paragraph'
+  | 'shape'
+  | 'stroke'
+  | 'text'
+type PPTStyleClipboardParagraph = Pick<
+  PPTParagraph,
+  'align' | 'bullet' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
+>
+type PPTStyleClipboard = {
+  categories: readonly PPTStyleClipboardCategory[]
+  object: {
+    opacity: number
+    shadow: PPTElementShadow | null
+  }
+  paragraph?: PPTStyleClipboardParagraph
+  shape?: {
+    cornerRadius?: number
+    fill: PPTFill
+    stroke?: PPTStroke
+  }
+  sourceId: string
+  sourceKind: PPTElement['kind']
+  stroke?: PPTStroke
+  text?: PPTTextStyle
+  type: 'slide-style-clipboard'
+}
 type PPTSurfaceCommand =
   | 'alignCenter'
   | 'alignLeft'
   | 'alignRight'
   | 'bringForward'
   | 'bringToFront'
+  | 'copyFormatting'
   | 'delete'
   | 'duplicate'
   | 'flipHorizontal'
   | 'flipVertical'
   | 'group'
   | 'lockSelection'
+  | 'pasteFormatting'
   | 'selectSameType'
   | 'sendBackward'
   | 'sendToBack'
@@ -569,7 +600,9 @@ type PPTSurfaceCommand =
   | 'ungroup'
   | 'unlockAll'
 type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
+  copyFormatting: boolean
   flipSelection: boolean
+  pasteFormatting: boolean
   selectSameType: boolean
   tidySelection: boolean
 }
@@ -884,6 +917,20 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     label: 'Duplicate',
     surfaces: ['context-menu', 'selection-floating-bar'],
     title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+  }, {
+    availability: 'copyFormatting',
+    command: 'copyFormatting',
+    dataCommand: 'copy-formatting',
+    label: 'Copy formatting',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: 'Copy formatting',
+  }, {
+    availability: 'pasteFormatting',
+    command: 'pasteFormatting',
+    dataCommand: 'paste-formatting',
+    label: 'Paste formatting',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: 'Paste formatting',
   }, {
     availability: 'selectSameType',
     command: 'selectSameType',
@@ -1336,6 +1383,7 @@ function App() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
+  const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
@@ -1494,6 +1542,11 @@ function App() {
     () => canFlipPPTSelection(activeSlide.elements, selection),
     [activeSlide.elements, selection],
   )
+  const canCopyFormatting = selectedElements.length === 1 &&
+    canCopyPPTElementFormatting(selectedElements[0])
+  const canPasteFormatting = styleClipboard !== null &&
+    selectedElements.some((element) =>
+      canApplyPPTStyleClipboard(element, styleClipboard))
   const canFormatSelectedText = selectedTextElements.length > 0 &&
     selectedTextElements.length === selectedElements.length &&
     !hasLockedSelection &&
@@ -1512,11 +1565,15 @@ function App() {
       hasLockedSelection,
       selection,
     }),
+    copyFormatting: canCopyFormatting,
     flipSelection: canFlipSelection,
+    pasteFormatting: canPasteFormatting,
     selectSameType: canSelectSameType,
     tidySelection: canTidySelection,
   }), [
+    canCopyFormatting,
     canFlipSelection,
+    canPasteFormatting,
     clipboard?.objects.length,
     canSelectSameType,
     canTidySelection,
@@ -1750,6 +1807,18 @@ function App() {
         return
       }
 
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'c'
+      ) {
+        if (commandAvailability.copyFormatting) {
+          event.preventDefault()
+          copyFormatting()
+        }
+        return
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
         event.preventDefault()
         copySelection()
@@ -1759,6 +1828,18 @@ function App() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'x') {
         event.preventDefault()
         cutSelection()
+        return
+      }
+
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'v'
+      ) {
+        if (commandAvailability.pasteFormatting) {
+          event.preventDefault()
+          pasteFormatting()
+        }
         return
       }
 
@@ -2452,6 +2533,39 @@ function App() {
       }))
   }
 
+  function copyFormatting() {
+    if (!commandAvailability.copyFormatting) {
+      return
+    }
+
+    const source = selectedElements[0]
+    const next = source ? createPPTStyleClipboard(source) : null
+
+    if (!next) {
+      return
+    }
+
+    setStyleClipboard(next)
+  }
+
+  function pasteFormatting() {
+    if (!commandAvailability.pasteFormatting || !styleClipboard) {
+      return
+    }
+
+    const selectedIds = new Set(selection)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) =>
+          selectedIds.has(element.id)
+            ? applyPPTStyleClipboardToElement(element, styleClipboard)
+            : element),
+      })),
+    )
+  }
+
   function copySelection(operation: PPTClipboardOperation = 'copy') {
     const selected = activeSlide.elements.filter((element) => selection.includes(element.id))
 
@@ -2601,6 +2715,9 @@ function App() {
       case 'bringToFront':
         reorderSelection('bringToFront')
         break
+      case 'copyFormatting':
+        copyFormatting()
+        break
       case 'delete':
         deleteSelection()
         break
@@ -2618,6 +2735,9 @@ function App() {
         break
       case 'lockSelection':
         lockSelectedElements()
+        break
+      case 'pasteFormatting':
+        pasteFormatting()
         break
       case 'selectSameType':
         selectSameTypeElements()
@@ -4442,7 +4562,7 @@ function App() {
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_CANVAS_SNAP_GUIDES
-  const selectionCommandBarWidth = textQuickFormatState ? 452 : 268
+  const selectionCommandBarWidth = textQuickFormatState ? 516 : 332
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
     !interaction &&
@@ -4519,6 +4639,20 @@ function App() {
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+V',
     title: CANVAS_COMMAND_AFFORDANCES.paste.title,
+  }, {
+    disabled: !commandAvailability.copyFormatting,
+    id: 'command:copy-formatting',
+    run: copyFormatting,
+    section: 'Edit',
+    shortcut: 'Shift+Cmd/Ctrl+C',
+    title: 'Copy formatting',
+  }, {
+    disabled: !commandAvailability.pasteFormatting,
+    id: 'command:paste-formatting',
+    run: pasteFormatting,
+    section: 'Edit',
+    shortcut: 'Shift+Cmd/Ctrl+V',
+    title: 'Paste formatting',
   }, {
     id: 'command:select-all',
     run: selectAllElements,
@@ -4865,6 +4999,12 @@ function App() {
           <button className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
             <Command size={17} />
           </button>
+          <button className="ppt-icon-button" data-ppt-command="copy-formatting" disabled={!commandAvailability.copyFormatting} onClick={copyFormatting} title="Copy formatting" type="button">
+            <Paintbrush size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} onClick={pasteFormatting} title="Paste formatting" type="button">
+            <Paintbrush size={17} />
+          </button>
           <button className="ppt-icon-button" data-ppt-shortcut-help-open onClick={openShortcutHelp} title="Keyboard shortcuts" type="button">
             <Keyboard size={17} />
           </button>
@@ -5157,6 +5297,10 @@ function App() {
         data-ppt-clipboard-selection={clipboard?.selection.join(' ') ?? undefined}
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-ppt-clipboard-type={clipboard?.type ?? undefined}
+        data-ppt-style-clipboard-categories={styleClipboard?.categories.join(' ') ?? undefined}
+        data-ppt-style-clipboard-source-id={styleClipboard?.sourceId ?? undefined}
+        data-ppt-style-clipboard-source-kind={styleClipboard?.sourceKind ?? undefined}
+        data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}
@@ -7403,6 +7547,8 @@ function PPTSurfaceCommandIcon({
       return <MoveUp size={size} />
     case 'bringToFront':
       return <BringToFront size={size} />
+    case 'copyFormatting':
+      return <Paintbrush size={size} />
     case 'delete':
       return <Trash2 size={size} />
     case 'duplicate':
@@ -7415,6 +7561,8 @@ function PPTSurfaceCommandIcon({
       return <Group size={size} />
     case 'lockSelection':
       return <Lock size={size} />
+    case 'pasteFormatting':
+      return <Paintbrush size={size} />
     case 'selectSameType':
       return <Layers size={size} />
     case 'sendBackward':
@@ -9908,6 +10056,208 @@ function getPPTCommandSurfaceGroups({
   })
 }
 
+function canCopyPPTElementFormatting(element: PPTElement | undefined) {
+  return element !== undefined &&
+    element.locked !== true &&
+    element.visible !== false &&
+    createPPTStyleClipboard(element) !== null
+}
+
+function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null {
+  if (element.locked === true || element.visible === false) {
+    return null
+  }
+
+  const categories: PPTStyleClipboardCategory[] = ['object']
+  const stroke = getPPTElementStroke(element)
+  const clipboard: PPTStyleClipboard = {
+    categories,
+    object: {
+      opacity: getPPTElementOpacity(element),
+      shadow: hasPPTElementShadow(element)
+        ? clonePPTElementShadow(getPPTElementShadow(element))
+        : null,
+    },
+    sourceId: element.id,
+    sourceKind: element.kind,
+    type: 'slide-style-clipboard',
+  }
+
+  if (element.kind === 'shape') {
+    categories.push('shape')
+    clipboard.shape = {
+      fill: clonePPTFill(element.fill),
+      ...(element.shape === 'rect'
+        ? { cornerRadius: getPPTShapeCornerRadius(element) }
+        : {}),
+      ...(element.stroke ? { stroke: clonePPTStroke(element.stroke) } : {}),
+    }
+  }
+
+  if (stroke) {
+    categories.push('stroke')
+    clipboard.stroke = clonePPTStroke(stroke)
+  }
+
+  if (isPPTTextElement(element)) {
+    const paragraph = element.textBody.paragraphs[0]
+
+    categories.push('text')
+    clipboard.text = clonePPTTextStyle(getPPTTextElementStyle(element))
+
+    if (paragraph) {
+      categories.push('paragraph')
+      clipboard.paragraph = {
+        align: paragraph.align ?? 'left',
+        bullet: paragraph.bullet,
+        lineHeight: getPPTParagraphLineHeight(paragraph),
+        spacingAfter: getPPTParagraphSpacingAfter(paragraph),
+        spacingBefore: getPPTParagraphSpacingBefore(paragraph),
+      }
+    }
+  }
+
+  return clipboard
+}
+
+function canApplyPPTStyleClipboard(
+  element: PPTElement,
+  clipboard: PPTStyleClipboard,
+) {
+  return getPPTStyleClipboardTargetCategories(element, clipboard).length > 0
+}
+
+function getPPTStyleClipboardTargetCategories(
+  element: PPTElement,
+  clipboard: PPTStyleClipboard,
+) {
+  if (element.locked === true || element.visible === false) {
+    return []
+  }
+
+  const categories: PPTStyleClipboardCategory[] = ['object']
+
+  if (element.kind === 'shape' && clipboard.shape) {
+    categories.push('shape')
+  }
+
+  if (
+    (element.kind === 'shape' ||
+      element.kind === 'line' ||
+      element.kind === 'freeform') &&
+    clipboard.stroke
+  ) {
+    categories.push('stroke')
+  }
+
+  if (isPPTTextElement(element) && clipboard.text) {
+    categories.push('text')
+  }
+
+  if (isPPTTextElement(element) && clipboard.paragraph) {
+    categories.push('paragraph')
+  }
+
+  return categories
+}
+
+function applyPPTStyleClipboardToElement(
+  element: PPTElement,
+  clipboard: PPTStyleClipboard,
+): PPTElement {
+  if (!canApplyPPTStyleClipboard(element, clipboard)) {
+    return element
+  }
+
+  let next: PPTElement = {
+    ...element,
+    opacity: clipboard.object.opacity === 1
+      ? undefined
+      : clipboard.object.opacity,
+    shadow: clipboard.object.shadow
+      ? clonePPTElementShadow(clipboard.object.shadow)
+      : undefined,
+  }
+
+  if (next.kind === 'shape') {
+    if (clipboard.shape) {
+      const cornerRadius = clipboard.shape.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT
+      next = {
+        ...next,
+        cornerRadius: next.shape === 'rect'
+          ? getPPTShapeCornerRadiusModelValue(cornerRadius)
+          : undefined,
+        fill: clonePPTFill(clipboard.shape.fill),
+        stroke: clipboard.shape.stroke
+          ? clonePPTStroke(clipboard.shape.stroke)
+          : undefined,
+      }
+    } else if (clipboard.stroke) {
+      next = {
+        ...next,
+        stroke: clonePPTStroke(clipboard.stroke),
+      }
+    }
+  } else if (
+    (next.kind === 'line' || next.kind === 'freeform') &&
+    clipboard.stroke
+  ) {
+    next = {
+      ...next,
+      stroke: clonePPTStroke(clipboard.stroke),
+    }
+  }
+
+  if (isPPTTextElement(next)) {
+    const textElement = next
+
+    if (clipboard.text) {
+      next = {
+        ...textElement,
+        style: clonePPTTextStyle(clipboard.text),
+      }
+    }
+
+    if (clipboard.paragraph) {
+      next = {
+        ...next,
+        textBody: {
+          paragraphs: textElement.textBody.paragraphs.map((paragraph) => ({
+            ...paragraph,
+            align: clipboard.paragraph?.align,
+            bullet: clipboard.paragraph?.bullet,
+            lineHeight: clipboard.paragraph?.lineHeight,
+            spacingAfter: clipboard.paragraph?.spacingAfter,
+            spacingBefore: clipboard.paragraph?.spacingBefore,
+          })),
+        },
+      }
+    }
+  }
+
+  return next
+}
+
+function clonePPTFill(fill: PPTFill): PPTFill {
+  return normalizePPTFill(fill)
+}
+
+function clonePPTStroke(stroke: PPTStroke): PPTStroke {
+  return normalizePPTStroke(stroke)
+}
+
+function clonePPTElementShadow(shadow: PPTElementShadow): PPTElementShadow {
+  return normalizePPTElementShadow(shadow)
+}
+
+function clonePPTTextStyle(style: PPTTextStyle): PPTTextStyle {
+  return {
+    ...getDefaultPPTTextStyle(),
+    ...style,
+    ...(style.textInset ? { textInset: { ...style.textInset } } : {}),
+  }
+}
+
 function getPPTTextQuickFormatState(
   elements: readonly PPTTextElement[],
 ): PPTTextQuickFormatState {
@@ -10099,6 +10449,14 @@ function getPPTShapeCornerRadius(element: PPTShape) {
   return element.shape === 'rect'
     ? normalizePPTShapeCornerRadius(element.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT)
     : 0
+}
+
+function getPPTShapeCornerRadiusModelValue(value: number) {
+  const normalized = normalizePPTShapeCornerRadius(value)
+
+  return normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
+    ? undefined
+    : normalized
 }
 
 function getPPTThumbShapeCornerRadiusCSS(element: PPTShape) {

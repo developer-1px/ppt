@@ -2488,6 +2488,31 @@ async function selectPPTLayerRows(page, ids) {
   })()`)
 }
 
+function getPPTTextFormatPainterState(page, elementId) {
+  return page.eval(`((id) => {
+    const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const layerName = document.querySelector(\`[data-ppt-layer-row="\${id}"] .ppt-layer-name\`)
+    const paragraph = element?.querySelector('.ppt-text-paragraph')
+
+    return {
+      bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
+      color: element?.style.color ?? '',
+      fontSize: element?.style.fontSize ?? '',
+      height: element?.style.height ?? '',
+      left: element?.style.left ?? '',
+      name: layerName?.textContent ?? '',
+      paragraphBullet: paragraph?.getAttribute('data-ppt-bullet') === 'true'
+        ? paragraph.textContent ?? ''
+        : '',
+      selected: element?.getAttribute('data-selected') ?? '',
+      text: element?.textContent ?? '',
+      textAlign: element?.style.textAlign ?? '',
+      top: element?.style.top ?? '',
+      width: element?.style.width ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
 async function readViewportState(page) {
   return page.eval(`(() => {
     const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
@@ -2596,6 +2621,47 @@ async function runTextQuickFormatScenario(page) {
     afterSingleFormat,
     initial,
   })
+
+  await page.eval(`document.querySelector('[data-ppt-command="copy-formatting"]')?.click()`)
+  await delay(80)
+
+  const summaryBeforeFormatPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+  const summaryFormatPoint = await getElementCenter(page, 's1-summary')
+
+  await clickMouse(page, summaryFormatPoint.x, summaryFormatPoint.y, 1)
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-command="paste-formatting"]')?.click()`)
+  await delay(100)
+
+  const summaryAfterFormatPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text formatting into text target without changing content geometry or name',
+    summaryBeforeFormatPaste.text === summaryAfterFormatPaste.text &&
+      summaryBeforeFormatPaste.name === summaryAfterFormatPaste.name &&
+      summaryBeforeFormatPaste.left === summaryAfterFormatPaste.left &&
+      summaryBeforeFormatPaste.top === summaryAfterFormatPaste.top &&
+      summaryBeforeFormatPaste.width === summaryAfterFormatPaste.width &&
+      summaryBeforeFormatPaste.height === summaryAfterFormatPaste.height &&
+      summaryAfterFormatPaste.color === 'rgb(0, 85, 255)' &&
+      summaryAfterFormatPaste.fontSize === `${afterSingleFormat.fontSize}px` &&
+      summaryAfterFormatPaste.textAlign === 'right' &&
+      summaryAfterFormatPaste.bulletList === 'true' &&
+      summaryAfterFormatPaste.paragraphBullet.length > 0,
+    {
+      afterSingleFormat,
+      summaryAfterFormatPaste,
+      summaryBeforeFormatPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 
   await pressKey(page, {
     code: 'Escape',
@@ -3683,6 +3749,243 @@ async function runViewAndShapeScenario(page) {
 
   await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
   await delay(80)
+
+  await page.eval(`(() => {
+    const opacity = document.querySelector('[data-ppt-style-field="opacity"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(opacity, '0.42')
+    opacity.dispatchEvent(new Event('input', { bubbles: true }))
+    opacity.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  await page.eval(`document.querySelector('[data-ppt-shadow-field="enabled"]')?.click()`)
+  await delay(80)
+
+  await page.eval(`document.querySelector('[data-ppt-command="copy-formatting"]')?.click()`)
+  await delay(80)
+
+  const afterCopyFormatting = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      categories: shell?.getAttribute('data-ppt-style-clipboard-categories') ?? '',
+      copyDisabled: document.querySelector('[data-ppt-command="copy-formatting"]')?.disabled ?? true,
+      pasteDisabled: document.querySelector('[data-ppt-command="paste-formatting"]')?.disabled ?? true,
+      sourceId: shell?.getAttribute('data-ppt-style-clipboard-source-id') ?? '',
+      sourceKind: shell?.getAttribute('data-ppt-style-clipboard-source-kind') ?? '',
+      type: shell?.getAttribute('data-ppt-style-clipboard-type') ?? '',
+    }
+  })()`)
+
+  record(
+    'copies PPT formatting into style clipboard from toolbar',
+    !afterCopyFormatting.copyDisabled &&
+      !afterCopyFormatting.pasteDisabled &&
+      afterCopyFormatting.type === 'slide-style-clipboard' &&
+      afterCopyFormatting.sourceId === afterCornerRadius.selectedId &&
+      afterCopyFormatting.sourceKind === 'shape' &&
+      afterCopyFormatting.categories.includes('shape') &&
+      afterCopyFormatting.categories.includes('stroke'),
+    afterCopyFormatting,
+  )
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(20)
+
+  const firstFormatTargetDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.82,
+      endY: slide.top + slide.height * 0.28,
+      startX: slide.left + slide.width * 0.66,
+      startY: slide.top + slide.height * 0.14,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: firstFormatTargetDrag.startX,
+    y: firstFormatTargetDrag.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: firstFormatTargetDrag.endX,
+    y: firstFormatTargetDrag.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: firstFormatTargetDrag.endX,
+    y: firstFormatTargetDrag.endY,
+  })
+  await delay(100)
+
+  const beforeShortcutPasteFormatting = await getPPTFormatPainterSelectedShapeState(page)
+
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    modifiers: 10,
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(100)
+
+  const afterShortcutPasteFormatting = await getPPTFormatPainterSelectedShapeState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterShortcutPasteFormattingUndo = await getPPTFormatPainterSelectedShapeState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterShortcutPasteFormattingRedo = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'pastes PPT shape formatting from keyboard without changing content geometry or name',
+    beforeShortcutPasteFormatting.selectedKind === 'shape' &&
+      beforeShortcutPasteFormatting.shape === 'rect' &&
+      beforeShortcutPasteFormatting.fillOpacity === '1' &&
+      beforeShortcutPasteFormatting.objectOpacity === '1' &&
+      beforeShortcutPasteFormatting.shadow === '' &&
+      beforeShortcutPasteFormatting.borderStyle === 'solid' &&
+      afterShortcutPasteFormatting.selectedId === beforeShortcutPasteFormatting.selectedId &&
+      afterShortcutPasteFormatting.name === beforeShortcutPasteFormatting.name &&
+      afterShortcutPasteFormatting.left === beforeShortcutPasteFormatting.left &&
+      afterShortcutPasteFormatting.top === beforeShortcutPasteFormatting.top &&
+      afterShortcutPasteFormatting.width === beforeShortcutPasteFormatting.width &&
+      afterShortcutPasteFormatting.height === beforeShortcutPasteFormatting.height &&
+      afterShortcutPasteFormatting.fillOpacity === '0.35' &&
+      afterShortcutPasteFormatting.background.includes('0.35') &&
+      afterShortcutPasteFormatting.objectOpacity === '0.42' &&
+      afterShortcutPasteFormatting.styleOpacity === '0.42' &&
+      afterShortcutPasteFormatting.shadow === 'true' &&
+      afterShortcutPasteFormatting.shadowOpacity === '0.22' &&
+      afterShortcutPasteFormatting.filter.includes('drop-shadow') &&
+      afterShortcutPasteFormatting.borderStyle === 'dashed' &&
+      afterShortcutPasteFormatting.strokeDash === 'dash' &&
+      afterShortcutPasteFormatting.cornerRadius === '36' &&
+      afterShortcutPasteFormatting.borderRadius === '36px' &&
+      afterShortcutPasteFormattingUndo.fillOpacity === '1' &&
+      afterShortcutPasteFormattingUndo.objectOpacity === '1' &&
+      afterShortcutPasteFormattingUndo.shadow === '' &&
+      afterShortcutPasteFormattingUndo.cornerRadius === '24' &&
+      afterShortcutPasteFormattingRedo.fillOpacity === '0.35' &&
+      afterShortcutPasteFormattingRedo.objectOpacity === '0.42' &&
+      afterShortcutPasteFormattingRedo.shadow === 'true' &&
+      afterShortcutPasteFormattingRedo.cornerRadius === '36',
+    {
+      afterShortcutPasteFormatting,
+      afterShortcutPasteFormattingRedo,
+      afterShortcutPasteFormattingUndo,
+      beforeShortcutPasteFormatting,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(20)
+
+  const secondFormatTargetDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.82,
+      endY: slide.top + slide.height * 0.48,
+      startX: slide.left + slide.width * 0.66,
+      startY: slide.top + slide.height * 0.34,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: secondFormatTargetDrag.startX,
+    y: secondFormatTargetDrag.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: secondFormatTargetDrag.endX,
+    y: secondFormatTargetDrag.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: secondFormatTargetDrag.endX,
+    y: secondFormatTargetDrag.endY,
+  })
+  await delay(100)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+
+  await page.send('Input.insertText', { text: 'paste formatting' })
+  await delay(80)
+
+  const beforePalettePasteFormatting = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="command:paste-formatting"]')?.disabled ?? true,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:paste-formatting"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPalettePasteFormatting = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'pastes PPT shape formatting from command palette',
+    beforePalettePasteFormatting.open &&
+      beforePalettePasteFormatting.itemPresent &&
+      !beforePalettePasteFormatting.disabled &&
+      !afterPalettePasteFormatting.paletteOpen &&
+      afterPalettePasteFormatting.fillOpacity === '0.35' &&
+      afterPalettePasteFormatting.objectOpacity === '0.42' &&
+      afterPalettePasteFormatting.shadow === 'true' &&
+      afterPalettePasteFormatting.strokeDash === 'dash' &&
+      afterPalettePasteFormatting.cornerRadius === '36',
+    {
+      afterPalettePasteFormatting,
+      beforePalettePasteFormatting,
+    },
+  )
 
   await pressKey(page, {
     code: 'KeyT',
@@ -5243,6 +5546,79 @@ async function runLineAffordanceScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
   await delay(80)
 
+  await page.eval(`document.querySelector('[data-ppt-command="copy-formatting"]')?.click()`)
+  await delay(80)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-line="line"]').click()`)
+  await delay(20)
+
+  const formatTargetLine = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.34,
+      endY: slide.top + slide.height * 0.82,
+      startX: slide.left + slide.width * 0.14,
+      startY: slide.top + slide.height * 0.74,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: formatTargetLine.startX,
+    y: formatTargetLine.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: formatTargetLine.endX,
+    y: formatTargetLine.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: formatTargetLine.endX,
+    y: formatTargetLine.endY,
+  })
+  await delay(80)
+
+  const beforeLineFormatPaste = await getPPTLineState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-command="paste-formatting"]')?.click()`)
+  await delay(80)
+
+  const afterLineFormatPaste = await getPPTLineState(page)
+
+  record(
+    'pastes PPT line formatting into line target',
+    beforeLineFormatPaste.selectedKind === 'line' &&
+      beforeLineFormatPaste.strokeWidth !== '7' &&
+      beforeLineFormatPaste.selectedDash === 'solid' &&
+      afterLineFormatPaste.selectedId === beforeLineFormatPaste.selectedId &&
+      afterLineFormatPaste.selectedName === beforeLineFormatPaste.selectedName &&
+      afterLineFormatPaste.stroke === '#dc2626' &&
+      afterLineFormatPaste.strokeWidth === '7' &&
+      afterLineFormatPaste.selectedDash === 'dot' &&
+      afterLineFormatPaste.strokeDasharray !== '',
+    {
+      afterLineFormatPaste,
+      beforeLineFormatPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Delete',
+    key: 'Delete',
+    windowsVirtualKeyCode: 46,
+  })
+  await delay(80)
+
+  await page.eval(`document.querySelector(${JSON.stringify(`[data-ppt-layer-select="${lineId}"]`)})?.click()`)
+  await delay(50)
+
   await page.eval(`(() => {
     const route = document.querySelector('[data-ppt-style-field="line-route"]')
     route.value = 'elbow'
@@ -5487,6 +5863,31 @@ async function runFreeformScenario(page) {
   })
 
   const freeformId = afterCreate.selectedId
+  const beforeFreeformFormatPaste = await getPPTFreeformState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-command="paste-formatting"]')?.click()`)
+  await delay(80)
+
+  const afterFreeformFormatPaste = await getPPTFreeformState(page)
+
+  record(
+    'pastes PPT line formatting into freeform target',
+    beforeFreeformFormatPaste.selectedKind === 'freeform' &&
+      beforeFreeformFormatPaste.strokeWidth !== '7' &&
+      beforeFreeformFormatPaste.selectedDash === 'solid' &&
+      !beforeFreeformFormatPaste.pasteDisabled &&
+      afterFreeformFormatPaste.selectedId === beforeFreeformFormatPaste.selectedId &&
+      afterFreeformFormatPaste.selectedName === beforeFreeformFormatPaste.selectedName &&
+      afterFreeformFormatPaste.stroke === '#dc2626' &&
+      afterFreeformFormatPaste.strokeWidth === '7' &&
+      afterFreeformFormatPaste.selectedDash === 'dot' &&
+      afterFreeformFormatPaste.strokeDasharray !== '',
+    {
+      afterFreeformFormatPaste,
+      beforeFreeformFormatPaste,
+    },
+  )
+
   const beforeMovePoint = await getElementCenter(page, freeformId)
 
   await page.send('Input.dispatchMouseEvent', {
@@ -6537,25 +6938,66 @@ function getPPTShapeCornerRadiusState(page) {
   })()`)
 }
 
+function getPPTFormatPainterSelectedShapeState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = selected?.getAttribute('data-ppt-element') ?? ''
+    const layerName = document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')
+
+    return {
+      background: selected?.style.background ?? '',
+      borderRadius: selected?.style.borderRadius ?? '',
+      borderStyle: selected?.style.borderStyle ?? '',
+      cornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
+      fillOpacity: selected?.getAttribute('data-ppt-fill-opacity') ?? '',
+      filter: selected?.style.filter ?? '',
+      height: selected?.style.height ?? '',
+      left: selected?.style.left ?? '',
+      name: layerName?.textContent ?? '',
+      objectOpacity: selected?.getAttribute('data-ppt-opacity') ?? '',
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      selectedId: targetId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      shadow: selected?.getAttribute('data-ppt-shadow') ?? '',
+      shadowOpacity: selected?.getAttribute('data-ppt-shadow-opacity') ?? '',
+      shape: selected?.getAttribute('data-shape') ?? '',
+      styleOpacity: selected?.style.opacity ?? '',
+      strokeDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
+      top: selected?.style.top ?? '',
+      width: selected?.style.width ?? '',
+    }
+  })()`)
+}
+
 function getPPTFreeformState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const selectedId = selected?.getAttribute('data-ppt-element') ?? ''
     const selectedPath = selected?.querySelector('[data-ppt-freeform-path]') ?? null
+    const layerName = selectedId
+      ? document.querySelector(\`[data-ppt-layer-row="\${selectedId}"] .ppt-layer-name\`)
+      : null
 
     return {
       creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
       freeformCount: document.querySelectorAll('[data-kind="freeform"]').length,
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       palettePen: !!document.querySelector('[data-ppt-command-palette-item="tool:pen"]'),
+      pasteDisabled: document.querySelector('[data-ppt-command="paste-formatting"]')?.disabled ?? true,
       pathD: selectedPath?.getAttribute('d') ?? '',
       pointCount: Number(selected?.getAttribute('data-ppt-freeform-points') ?? 0),
-      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
+      selectedId,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: layerName?.textContent ?? '',
       selectedRotation: selected?.getAttribute('data-rotation') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedTransform: selected?.style.transform ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      stroke: selectedPath?.getAttribute('stroke') ?? '',
+      strokeDasharray: selectedPath?.getAttribute('stroke-dasharray') ?? '',
+      strokeWidth: selectedPath?.getAttribute('stroke-width') ?? '',
       thumbFreeformCount: document.querySelectorAll('.ppt-thumb-freeform').length,
       toolbarPressed: document.querySelector('[data-ppt-insert-tool="pen"]')?.getAttribute('aria-pressed') ?? '',
     }
