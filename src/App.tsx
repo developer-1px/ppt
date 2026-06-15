@@ -720,6 +720,10 @@ type PPTElementAnimationUpdateField =
   | 'order'
   | 'trigger'
   | 'type'
+type PPTParagraphSpacingField =
+  | 'lineHeight'
+  | 'spacingAfter'
+  | 'spacingBefore'
 type PPTLayerPaneAriaContract = {
   containerRole: 'tree'
   keyboardModel: 'roving-tabindex'
@@ -1040,6 +1044,10 @@ const PPT_DEFAULT_ELEMENT_ANIMATION = Object.freeze({
   type: 'none',
 } as const satisfies PPTElementAnimation)
 const PPT_ELEMENT_ANIMATION_TIME_MAX = 10000
+const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
+const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
+const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
+const PPT_PARAGRAPH_SPACING_MAX = 240
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -1145,7 +1153,10 @@ type PPTTextToken = {
   align?: PPTParagraph['align']
   bullet?: PPTParagraph['bullet']
   char: string
+  lineHeight?: PPTParagraph['lineHeight']
   runStyle: PPTTextRunStyle
+  spacingAfter?: PPTParagraph['spacingAfter']
+  spacingBefore?: PPTParagraph['spacingBefore']
 }
 
 type Interaction =
@@ -3151,6 +3162,32 @@ function App() {
     )
   }
 
+  function updateParagraphSpacing(
+    elementId: string,
+    field: PPTParagraphSpacingField,
+    value: number,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (!isPPTTextElement(element) || element.locked === true) {
+          return element
+        }
+
+        return {
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              [field]: field === 'lineHeight'
+                ? normalizePPTParagraphLineHeight(value)
+                : normalizePPTParagraphSpacing(value),
+            })),
+          },
+        }
+      }),
+    )
+  }
+
   function updateSlideName(name: string) {
     const effect = toPPTSlideMetadataHostCommandEffect({
       fieldId: 'name',
@@ -5048,6 +5085,7 @@ function App() {
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
+        onParagraphSpacingChange={updateParagraphSpacing}
         onElementTextStyleChange={updateElementTextStyle}
         onTextAutoFit={autoFitTextElement}
         onLayerPaneCommandEffect={applyLayerPaneCommandEffect}
@@ -5781,6 +5819,76 @@ function parsePPTElementAnimationTime(value: string) {
 
 function parsePPTElementAnimationOrder(value: string, elementCount: number) {
   return clampPPTElementAnimationOrder(Number(value), elementCount)
+}
+
+function getDefaultPPTParagraphSpacing() {
+  return {
+    lineHeight: PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+    spacingAfter: 0,
+    spacingBefore: 0,
+  }
+}
+
+function getPPTTextElementParagraphSpacing(element: PPTTextElement) {
+  const paragraph = element.textBody.paragraphs[0]
+
+  if (!paragraph) {
+    return getDefaultPPTParagraphSpacing()
+  }
+
+  return {
+    lineHeight: getPPTParagraphLineHeight(paragraph),
+    spacingAfter: getPPTParagraphSpacingAfter(paragraph),
+    spacingBefore: getPPTParagraphSpacingBefore(paragraph),
+  }
+}
+
+function normalizePPTParagraphLineHeight(value: number) {
+  const next = clamp(
+    Number.isFinite(value) ? value : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+    PPT_PARAGRAPH_LINE_HEIGHT_MIN,
+    PPT_PARAGRAPH_LINE_HEIGHT_MAX,
+  )
+
+  return Math.round(next * 100) / 100
+}
+
+function normalizePPTParagraphSpacing(value: number) {
+  return clamp(
+    Number.isFinite(value) ? Math.round(value) : 0,
+    0,
+    PPT_PARAGRAPH_SPACING_MAX,
+  )
+}
+
+function parsePPTParagraphLineHeight(value: string) {
+  return normalizePPTParagraphLineHeight(Number(value))
+}
+
+function parsePPTParagraphSpacing(value: string) {
+  return normalizePPTParagraphSpacing(Number(value))
+}
+
+function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
+  return normalizePPTParagraphLineHeight(
+    paragraph.lineHeight ?? PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+  )
+}
+
+function getPPTParagraphSpacingAfter(paragraph: PPTParagraph) {
+  return normalizePPTParagraphSpacing(paragraph.spacingAfter ?? 0)
+}
+
+function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
+  return normalizePPTParagraphSpacing(paragraph.spacingBefore ?? 0)
+}
+
+function getPPTParagraphStyle(paragraph: PPTParagraph): CSSProperties {
+  return {
+    lineHeight: getPPTParagraphLineHeight(paragraph),
+    marginBottom: getPPTParagraphSpacingAfter(paragraph),
+    marginTop: getPPTParagraphSpacingBefore(paragraph),
+  }
 }
 
 function getPPTElementAnimationStyle(animation: PPTElementAnimation): CSSProperties {
@@ -7452,7 +7560,11 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
         <span
           className="ppt-text-paragraph"
           data-ppt-bullet={paragraph.bullet === 'bullet' ? 'true' : undefined}
+          data-ppt-line-height={getPPTParagraphLineHeight(paragraph)}
+          data-ppt-spacing-after={getPPTParagraphSpacingAfter(paragraph)}
+          data-ppt-spacing-before={getPPTParagraphSpacingBefore(paragraph)}
           key={index}
+          style={getPPTParagraphStyle(paragraph)}
         >
           {paragraph.runs.map((run, runIndex) => (
             <span
@@ -7838,6 +7950,7 @@ function Inspector({
   onLineRouteChange,
   onParagraphBulletChange,
   onParagraphAlignChange,
+  onParagraphSpacingChange,
   onShapeFillChange,
   onShapeKindChange,
   onSlideBackgroundChange,
@@ -7916,6 +8029,11 @@ function Inspector({
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
   ) => void
+  onParagraphSpacingChange: (
+    elementId: string,
+    field: PPTParagraphSpacingField,
+    value: number,
+  ) => void
   onShapeFillChange: (elementId: string, color: string) => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onSlideBackgroundChange: (color: string) => void
@@ -7948,6 +8066,9 @@ function Inspector({
   const paragraphBullet = selectedElement && isPPTTextElement(selectedElement)
     ? hasPPTTextBodyBullet(selectedElement.textBody)
     : false
+  const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextElementParagraphSpacing(selectedElement)
+    : getDefaultPPTParagraphSpacing()
   const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
   const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
@@ -8372,6 +8493,65 @@ function Inspector({
                       </button>
                     ))}
                   </div>
+                </div>
+                <div
+                  className="ppt-paragraph-spacing-grid"
+                  data-ppt-paragraph-spacing-inspector
+                  data-ppt-paragraph-line-height={paragraphSpacing.lineHeight}
+                  data-ppt-paragraph-spacing-after={paragraphSpacing.spacingAfter}
+                  data-ppt-paragraph-spacing-before={paragraphSpacing.spacingBefore}
+                >
+                  <label className="ppt-field">
+                    <span>Line height</span>
+                    <input
+                      data-ppt-paragraph-field="lineHeight"
+                      max={PPT_PARAGRAPH_LINE_HEIGHT_MAX}
+                      min={PPT_PARAGRAPH_LINE_HEIGHT_MIN}
+                      step={0.05}
+                      type="number"
+                      value={paragraphSpacing.lineHeight}
+                      onChange={(event) =>
+                        onParagraphSpacingChange(
+                          selectedElement.id,
+                          'lineHeight',
+                          parsePPTParagraphLineHeight(event.target.value),
+                        )}
+                    />
+                  </label>
+                  <label className="ppt-field">
+                    <span>Before</span>
+                    <input
+                      data-ppt-paragraph-field="spacingBefore"
+                      max={PPT_PARAGRAPH_SPACING_MAX}
+                      min={0}
+                      step={2}
+                      type="number"
+                      value={paragraphSpacing.spacingBefore}
+                      onChange={(event) =>
+                        onParagraphSpacingChange(
+                          selectedElement.id,
+                          'spacingBefore',
+                          parsePPTParagraphSpacing(event.target.value),
+                        )}
+                    />
+                  </label>
+                  <label className="ppt-field">
+                    <span>After</span>
+                    <input
+                      data-ppt-paragraph-field="spacingAfter"
+                      max={PPT_PARAGRAPH_SPACING_MAX}
+                      min={0}
+                      step={2}
+                      type="number"
+                      value={paragraphSpacing.spacingAfter}
+                      onChange={(event) =>
+                        onParagraphSpacingChange(
+                          selectedElement.id,
+                          'spacingAfter',
+                          parsePPTParagraphSpacing(event.target.value),
+                        )}
+                    />
+                  </label>
                 </div>
                 <div
                   className="ppt-text-overflow-control"
@@ -8806,7 +8986,7 @@ function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
       : style.fontWeight === 'semibold'
         ? 600
         : 400,
-    lineHeight: 1.14,
+    lineHeight: PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
   }
 }
 
@@ -9578,13 +9758,22 @@ function replacePPTTextBodyRange(
     anchor?.runStyle ?? {},
     anchor?.align ?? body.paragraphs[0]?.align,
     anchor?.bullet ?? body.paragraphs[0]?.bullet,
+    anchor?.lineHeight ?? body.paragraphs[0]?.lineHeight,
+    anchor?.spacingBefore ?? body.paragraphs[0]?.spacingBefore,
+    anchor?.spacingAfter ?? body.paragraphs[0]?.spacingAfter,
   )
 
   return buildPPTTextBodyFromTokens([
     ...tokens.slice(0, safeStart),
     ...replacementTokens,
     ...tokens.slice(safeEnd),
-  ], body.paragraphs[0]?.align, body.paragraphs[0]?.bullet)
+  ], {
+    align: body.paragraphs[0]?.align,
+    bullet: body.paragraphs[0]?.bullet,
+    lineHeight: body.paragraphs[0]?.lineHeight,
+    spacingAfter: body.paragraphs[0]?.spacingAfter,
+    spacingBefore: body.paragraphs[0]?.spacingBefore,
+  })
 }
 
 function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
@@ -9599,7 +9788,10 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
           align: paragraph.align,
           bullet: paragraph.bullet,
           char: text[index],
+          lineHeight: paragraph.lineHeight,
           runStyle,
+          spacingAfter: paragraph.spacingAfter,
+          spacingBefore: paragraph.spacingBefore,
         })
       }
     })
@@ -9609,7 +9801,10 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
         align: paragraph.align,
         bullet: paragraph.bullet,
         char: '\n',
+        lineHeight: paragraph.lineHeight,
         runStyle: getPPTParagraphFallbackRunStyle(paragraph),
+        spacingAfter: paragraph.spacingAfter,
+        spacingBefore: paragraph.spacingBefore,
       })
     }
   })
@@ -9622,6 +9817,9 @@ function createPPTTextTokens(
   runStyle: PPTTextRunStyle,
   align: PPTParagraph['align'] | undefined,
   bullet: PPTParagraph['bullet'] | undefined,
+  lineHeight: PPTParagraph['lineHeight'] | undefined,
+  spacingBefore: PPTParagraph['spacingBefore'] | undefined,
+  spacingAfter: PPTParagraph['spacingAfter'] | undefined,
 ): PPTTextToken[] {
   const tokens: PPTTextToken[] = []
 
@@ -9630,7 +9828,10 @@ function createPPTTextTokens(
       align,
       bullet,
       char: text[index],
+      lineHeight,
       runStyle,
+      spacingAfter,
+      spacingBefore,
     })
   }
 
@@ -9639,12 +9840,17 @@ function createPPTTextTokens(
 
 function buildPPTTextBodyFromTokens(
   tokens: PPTTextToken[],
-  fallbackAlign: PPTParagraph['align'] | undefined,
-  fallbackBullet: PPTParagraph['bullet'] | undefined,
+  fallback: Pick<
+    PPTParagraph,
+    'align' | 'bullet' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
+  >,
 ): PPTTextBody {
   const paragraphs: PPTParagraph[] = []
-  let currentAlign = fallbackAlign
-  let currentBullet = fallbackBullet
+  let currentAlign = fallback.align
+  let currentBullet = fallback.bullet
+  let currentLineHeight = fallback.lineHeight
+  let currentSpacingAfter = fallback.spacingAfter
+  let currentSpacingBefore = fallback.spacingBefore
   let currentRuns: PPTRun[] = []
   let currentRunStyle: PPTTextRunStyle | null = null
   let currentText = ''
@@ -9664,25 +9870,38 @@ function buildPPTTextBodyFromTokens(
 
   function flushParagraph() {
     flushRun()
-    paragraphs.push(createPPTParagraph(currentRuns, currentAlign, currentBullet))
+    paragraphs.push(createPPTParagraph(currentRuns, currentAlign, currentBullet, {
+      lineHeight: currentLineHeight,
+      spacingAfter: currentSpacingAfter,
+      spacingBefore: currentSpacingBefore,
+    }))
     currentRuns = []
     currentRunStyle = null
     currentText = ''
-    currentAlign = fallbackAlign
-    currentBullet = fallbackBullet
+    currentAlign = fallback.align
+    currentBullet = fallback.bullet
+    currentLineHeight = fallback.lineHeight
+    currentSpacingAfter = fallback.spacingAfter
+    currentSpacingBefore = fallback.spacingBefore
   }
 
   tokens.forEach((token) => {
     if (token.char === '\n') {
       flushParagraph()
-      currentAlign = token.align ?? fallbackAlign
-      currentBullet = token.bullet ?? fallbackBullet
+      currentAlign = token.align ?? fallback.align
+      currentBullet = token.bullet ?? fallback.bullet
+      currentLineHeight = token.lineHeight ?? fallback.lineHeight
+      currentSpacingAfter = token.spacingAfter ?? fallback.spacingAfter
+      currentSpacingBefore = token.spacingBefore ?? fallback.spacingBefore
       return
     }
 
     if (!currentRunStyle && currentText.length === 0 && currentRuns.length === 0) {
-      currentAlign = token.align ?? fallbackAlign
-      currentBullet = token.bullet ?? fallbackBullet
+      currentAlign = token.align ?? fallback.align
+      currentBullet = token.bullet ?? fallback.bullet
+      currentLineHeight = token.lineHeight ?? fallback.lineHeight
+      currentSpacingAfter = token.spacingAfter ?? fallback.spacingAfter
+      currentSpacingBefore = token.spacingBefore ?? fallback.spacingBefore
     }
 
     if (!currentRunStyle || !arePPTTextRunStylesEqual(currentRunStyle, token.runStyle)) {
@@ -9704,10 +9923,14 @@ function createPPTParagraph(
   runs: PPTRun[],
   align: PPTParagraph['align'] | undefined,
   bullet: PPTParagraph['bullet'] | undefined,
+  spacing: Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> = {},
 ): PPTParagraph {
   return {
     ...(align ? { align } : {}),
     ...(bullet ? { bullet } : {}),
+    ...(spacing.lineHeight === undefined ? {} : { lineHeight: spacing.lineHeight }),
+    ...(spacing.spacingAfter === undefined ? {} : { spacingAfter: spacing.spacingAfter }),
+    ...(spacing.spacingBefore === undefined ? {} : { spacingBefore: spacing.spacingBefore }),
     runs: runs.length > 0 ? runs : [{ text: '' }],
   }
 }
@@ -10310,7 +10533,6 @@ function measurePPTTextContentSize(
     width: string
   },
 ) {
-  const text = readPPTText(element.textBody) || ' '
   const style = element.style
   const measurer = document.createElement('div')
 
@@ -10327,8 +10549,17 @@ function measurePPTTextContentSize(
     : style?.fontWeight === 'semibold'
       ? '600'
       : '400'
-  measurer.style.lineHeight = '1.14'
-  measurer.textContent = text
+  element.textBody.paragraphs.forEach((paragraph) => {
+    const line = document.createElement('span')
+    line.style.display = 'block'
+    line.style.lineHeight = String(getPPTParagraphLineHeight(paragraph))
+    line.style.marginBottom = `${getPPTParagraphSpacingAfter(paragraph)}px`
+    line.style.marginTop = `${getPPTParagraphSpacingBefore(paragraph)}px`
+    line.textContent = `${paragraph.bullet === 'bullet' ? '\u2022 ' : ''}${
+      paragraph.runs.map((run) => run.text).join('') || ' '
+    }`
+    measurer.appendChild(line)
+  })
   document.body.appendChild(measurer)
 
   const rect = measurer.getBoundingClientRect()

@@ -53,6 +53,7 @@ try {
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
   await runTextQuickFormatScenario(page)
+  await runTextParagraphSpacingScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
@@ -2665,6 +2666,108 @@ async function runTextQuickFormatScenario(page) {
   await delay(50)
 }
 
+async function runTextParagraphSpacingScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'renders PPT paragraph spacing controls in text inspector',
+    initial.inspector &&
+      initial.selectedId === 's1-title' &&
+      initial.lineHeight === '1.14' &&
+      initial.spacingBefore === '0' &&
+      initial.spacingAfter === '0' &&
+      initial.selectedLineHeight === '1.14',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const lineHeight = document.querySelector('[data-ppt-paragraph-field="lineHeight"]')
+    const spacingBefore = document.querySelector('[data-ppt-paragraph-field="spacingBefore"]')
+    const spacingAfter = document.querySelector('[data-ppt-paragraph-field="spacingAfter"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(lineHeight, '1.4')
+    lineHeight.dispatchEvent(new Event('input', { bubbles: true }))
+    lineHeight.dispatchEvent(new Event('change', { bubbles: true }))
+
+    setter.call(spacingBefore, '6')
+    spacingBefore.dispatchEvent(new Event('input', { bubbles: true }))
+    spacingBefore.dispatchEvent(new Event('change', { bubbles: true }))
+
+    setter.call(spacingAfter, '12')
+    spacingAfter.dispatchEvent(new Event('input', { bubbles: true }))
+    spacingAfter.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterSpacing = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'updates PPT paragraph line height and spacing metadata from inspector',
+    afterSpacing.lineHeight === '1.4' &&
+      afterSpacing.spacingBefore === '6' &&
+      afterSpacing.spacingAfter === '12' &&
+      afterSpacing.selectedLineHeight === '1.4' &&
+      afterSpacing.selectedSpacingBefore === '6' &&
+      afterSpacing.selectedSpacingAfter === '12' &&
+      afterSpacing.selectedStyleLineHeight === '1.4' &&
+      afterSpacing.selectedStyleMarginTop === '6px' &&
+      afterSpacing.selectedStyleMarginBottom === '12px',
+    {
+      afterSpacing,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTTextParagraphSpacingState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'undoes and redoes PPT paragraph spacing field as one history step',
+    afterUndo.lineHeight === '1.4' &&
+      afterUndo.spacingBefore === '6' &&
+      afterUndo.spacingAfter === '0' &&
+      afterRedo.lineHeight === '1.4' &&
+      afterRedo.spacingBefore === '6' &&
+      afterRedo.spacingAfter === '12',
+    {
+      afterRedo,
+      afterSpacing,
+      afterUndo,
+    },
+  )
+}
+
 async function runExportScenario(page) {
   await installPPTDownloadCapture(page)
 
@@ -2682,6 +2785,8 @@ async function runExportScenario(page) {
       hasCommentModel: code.includes('"kind": "comment"') && code.includes('"resolved": true') && code.includes('"body": "Review CTA wording"'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
+      hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
+      hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageFitMarkup: code.includes('data-ppt-image-fit="contain"') && code.includes('object-fit:contain'),
       hasImageFitModel: code.includes('"fit": "contain"'),
@@ -2722,6 +2827,7 @@ async function runExportScenario(page) {
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
+  record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
@@ -2751,6 +2857,7 @@ async function runExportScenario(page) {
       download: download.download ?? '',
       hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
+      hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
@@ -2772,6 +2879,7 @@ async function runExportScenario(page) {
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
+  record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
   record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
@@ -5275,6 +5383,31 @@ function getPPTObjectAnimationPreviewState(page, elementId) {
       type: element?.getAttribute('data-ppt-animation-type') ?? '',
     }
   })(${JSON.stringify(elementId)})`)
+}
+
+function getPPTTextParagraphSpacingState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('[data-ppt-paragraph-spacing-inspector]')
+    const selected = document.querySelector('[data-selected="true"]')
+    const paragraph = selected?.querySelector('.ppt-text-paragraph')
+
+    return {
+      inspector: !!inspector,
+      inspectorLineHeight: inspector?.getAttribute('data-ppt-paragraph-line-height') ?? '',
+      inspectorSpacingAfter: inspector?.getAttribute('data-ppt-paragraph-spacing-after') ?? '',
+      inspectorSpacingBefore: inspector?.getAttribute('data-ppt-paragraph-spacing-before') ?? '',
+      lineHeight: document.querySelector('[data-ppt-paragraph-field="lineHeight"]')?.value ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedLineHeight: paragraph?.getAttribute('data-ppt-line-height') ?? '',
+      selectedSpacingAfter: paragraph?.getAttribute('data-ppt-spacing-after') ?? '',
+      selectedSpacingBefore: paragraph?.getAttribute('data-ppt-spacing-before') ?? '',
+      selectedStyleLineHeight: paragraph?.style.lineHeight ?? '',
+      selectedStyleMarginBottom: paragraph?.style.marginBottom ?? '',
+      selectedStyleMarginTop: paragraph?.style.marginTop ?? '',
+      spacingAfter: document.querySelector('[data-ppt-paragraph-field="spacingAfter"]')?.value ?? '',
+      spacingBefore: document.querySelector('[data-ppt-paragraph-field="spacingBefore"]')?.value ?? '',
+    }
+  })()`)
 }
 
 async function clickMouse(page, x, y, clickCount, modifiers = 0) {

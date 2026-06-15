@@ -8,6 +8,7 @@ import {
   type PPTImage,
   type PPTLine,
   type PPTLinePoint,
+  type PPTParagraph,
   type PPTRun,
   type PPTShape,
   type PPTSlide,
@@ -17,6 +18,10 @@ import {
 } from './pptModel'
 
 const PPT_SELECTION_EXPORT_PADDING = 24
+const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
+const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
+const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
+const PPT_PARAGRAPH_SPACING_MAX = 240
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -358,29 +363,38 @@ function renderPPTTextBodySVG({
   }
 
   const fontSize = style?.fontSize ?? 24
-  const textAnchor = getPPTSvgTextAnchor(body.paragraphs[0]?.align)
-  const x = getPPTSvgTextX({
-    align: body.paragraphs[0]?.align,
-    geometry,
-    inset,
-  })
-  const y = geometry.y + inset + fontSize
+  let y = geometry.y + inset
 
-  return body.paragraphs.map((paragraph, index) => {
+  return body.paragraphs.map((paragraph) => {
     const bullet = paragraph.bullet === 'bullet'
     const runs = paragraph.runs.map(renderPPTTextRunSVG).join('')
     const bulletPrefix = bullet ? '<tspan data-ppt-bullet="true">&#8226; </tspan>' : ''
+    const lineHeight = getPPTParagraphLineHeight(paragraph)
+    const spacingBefore = getPPTParagraphSpacingBefore(paragraph)
+    const spacingAfter = getPPTParagraphSpacingAfter(paragraph)
+    const textAnchor = getPPTSvgTextAnchor(paragraph.align)
+    const x = getPPTSvgTextX({
+      align: paragraph.align,
+      geometry,
+      inset,
+    })
+    y += spacingBefore + fontSize
     const attrs = [
       'class="ppt-svg-text-paragraph"',
       bullet ? 'data-ppt-bullet="true"' : '',
+      `data-ppt-line-height="${formatNumber(lineHeight)}"`,
+      `data-ppt-spacing-after="${formatNumber(spacingAfter)}"`,
+      `data-ppt-spacing-before="${formatNumber(spacingBefore)}"`,
       `x="${formatNumber(x)}"`,
-      `y="${formatNumber(y + index * fontSize * 1.25)}"`,
+      `y="${formatNumber(y)}"`,
       `fill="${escapeHtml(style?.color ?? '#111827')}"`,
       'font-family="Inter, Arial, sans-serif"',
       `font-size="${formatNumber(fontSize)}"`,
       `font-weight="${getPPTSvgFontWeight(style)}"`,
       `text-anchor="${textAnchor}"`,
     ].filter(Boolean).join(' ')
+
+    y += fontSize * lineHeight + spacingAfter
 
     return `<text ${attrs}>${bulletPrefix}${runs}</text>`
   }).join('')
@@ -454,8 +468,10 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
     const bulletAttr = paragraph.bullet === 'bullet'
       ? ' data-ppt-bullet="true"'
       : ''
+    const paragraphAttrs = getPPTParagraphHTMLAttrs(paragraph)
+    const paragraphStyleAttr = getPPTParagraphStyleAttr(paragraph)
 
-    return `<span class="ppt-text-paragraph"${bulletAttr}>${runs}</span>`
+    return `<span class="ppt-text-paragraph"${bulletAttr}${paragraphAttrs}${paragraphStyleAttr}>${runs}</span>`
   }).join('')
 }
 
@@ -827,8 +843,57 @@ function exportTextStyle(style: PPTTextStyle) {
     `color:${style.color}`,
     `font-size:${style.fontSize}px`,
     `font-weight:${fontWeight}`,
-    'line-height:1.14',
+    `line-height:${PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT}`,
   ].join(';')
+}
+
+function getPPTParagraphHTMLAttrs(paragraph: PPTParagraph) {
+  return [
+    ` data-ppt-line-height="${formatNumber(getPPTParagraphLineHeight(paragraph))}"`,
+    ` data-ppt-spacing-after="${formatNumber(getPPTParagraphSpacingAfter(paragraph))}"`,
+    ` data-ppt-spacing-before="${formatNumber(getPPTParagraphSpacingBefore(paragraph))}"`,
+  ].join('')
+}
+
+function getPPTParagraphStyleAttr(paragraph: PPTParagraph) {
+  return ` style="${[
+    `line-height:${formatNumber(getPPTParagraphLineHeight(paragraph))}`,
+    `margin-bottom:${formatNumber(getPPTParagraphSpacingAfter(paragraph))}px`,
+    `margin-top:${formatNumber(getPPTParagraphSpacingBefore(paragraph))}px`,
+  ].join(';')}"`
+}
+
+function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
+  return normalizePPTParagraphLineHeight(
+    paragraph.lineHeight ?? PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+  )
+}
+
+function getPPTParagraphSpacingAfter(paragraph: PPTParagraph) {
+  return normalizePPTParagraphSpacing(paragraph.spacingAfter ?? 0)
+}
+
+function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
+  return normalizePPTParagraphSpacing(paragraph.spacingBefore ?? 0)
+}
+
+function normalizePPTParagraphLineHeight(value: number) {
+  const next = Math.min(
+    PPT_PARAGRAPH_LINE_HEIGHT_MAX,
+    Math.max(
+      PPT_PARAGRAPH_LINE_HEIGHT_MIN,
+      Number.isFinite(value) ? value : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+    ),
+  )
+
+  return Math.round(next * 100) / 100
+}
+
+function normalizePPTParagraphSpacing(value: number) {
+  return Math.min(
+    PPT_PARAGRAPH_SPACING_MAX,
+    Math.max(0, Number.isFinite(value) ? Math.round(value) : 0),
+  )
 }
 
 function exportShapeStyle(element: PPTShape) {
