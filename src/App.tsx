@@ -219,12 +219,15 @@ type PPTSurfaceCommand =
   | 'duplicate'
   | 'group'
   | 'lockSelection'
+  | 'selectSameType'
   | 'sendBackward'
   | 'sendToBack'
   | 'ungroup'
   | 'unlockAll'
-type PPTCommandAvailabilityKey =
-  keyof ReturnType<typeof getPPTCanvasCommandAvailability>
+type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
+  selectSameType: boolean
+}
+type PPTCommandAvailabilityKey = keyof PPTCommandAvailability
 type PPTSurfaceCommandDescriptor = {
   availability: PPTCommandAvailabilityKey
   command: PPTSurfaceCommand
@@ -277,6 +280,13 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     label: 'Duplicate',
     surfaces: ['context-menu', 'selection-floating-bar'],
     title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+  }, {
+    availability: 'selectSameType',
+    command: 'selectSameType',
+    dataCommand: 'select-same-type',
+    label: 'Select same type',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: 'Select same type',
   }, {
     availability: 'delete',
     command: 'delete',
@@ -542,6 +552,10 @@ function App() {
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
   const hasHiddenSelection = selectedElements.some((element) => element.visible === false)
   const hasGroupedSelection = selectedElements.some((element) => Boolean(element.groupId))
+  const canSelectSameType = useMemo(
+    () => canSelectSameTypePPTSelection(activeSlide.elements, selection),
+    [activeSlide.elements, selection],
+  )
   const canFormatSelectedText = selectedTextElements.length > 0 &&
     selectedTextElements.length === selectedElements.length &&
     !hasLockedSelection &&
@@ -549,17 +563,21 @@ function App() {
   const textQuickFormatState = canFormatSelectedText
     ? getPPTTextQuickFormatState(selectedTextElements)
     : null
-  const commandAvailability = useMemo(() => getPPTCanvasCommandAvailability({
-    canPaste: clipboard.length > 0,
-    canRedo: future.length > 0,
-    canUndo: past.length > 0,
-    hasGroupedSelection,
-    hasHiddenSelection,
-    hasLockedItems,
-    hasLockedSelection,
-    selection,
+  const commandAvailability = useMemo<PPTCommandAvailability>(() => ({
+    ...getPPTCanvasCommandAvailability({
+      canPaste: clipboard.length > 0,
+      canRedo: future.length > 0,
+      canUndo: past.length > 0,
+      hasGroupedSelection,
+      hasHiddenSelection,
+      hasLockedItems,
+      hasLockedSelection,
+      selection,
+    }),
+    selectSameType: canSelectSameType,
   }), [
     clipboard.length,
+    canSelectSameType,
     future.length,
     hasGroupedSelection,
     hasHiddenSelection,
@@ -1393,6 +1411,16 @@ function App() {
     }
   }
 
+  function selectSameTypeElements() {
+    if (!commandAvailability.selectSameType) {
+      return
+    }
+
+    setSelection(selectSameTypePPTSelection(activeSlide.elements, selection))
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
   function activateSelectTool() {
     setCreationTool(null)
     setLineCreationMode(null)
@@ -1428,6 +1456,9 @@ function App() {
         break
       case 'lockSelection':
         lockSelectedElements()
+        break
+      case 'selectSameType':
+        selectSameTypeElements()
         break
       case 'sendBackward':
         reorderSelection('sendBackward')
@@ -2700,7 +2731,7 @@ function App() {
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_CANVAS_SNAP_GUIDES
-  const selectionCommandBarWidth = textQuickFormatState ? 420 : 236
+  const selectionCommandBarWidth = textQuickFormatState ? 452 : 268
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
     !interaction &&
@@ -2777,6 +2808,12 @@ function App() {
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+A',
     title: CANVAS_COMMAND_AFFORDANCES.selectAll.title,
+  }, {
+    disabled: !commandAvailability.selectSameType,
+    id: 'command:select-same-type',
+    run: selectSameTypeElements,
+    section: 'Edit',
+    title: 'Select same type',
   }, {
     disabled: !commandAvailability.alignLeft,
     id: 'command:align-left',
@@ -3999,6 +4036,8 @@ function PPTSurfaceCommandIcon({
       return <Group size={size} />
     case 'lockSelection':
       return <Lock size={size} />
+    case 'selectSameType':
+      return <Layers size={size} />
     case 'sendBackward':
       return <MoveDown size={size} />
     case 'sendToBack':
@@ -5115,11 +5154,55 @@ function isEditableTarget(target: EventTarget | null) {
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 }
 
+function selectSameTypePPTSelection(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+): string[] {
+  const selected = new Set(selection)
+  const selectedTypes = new Set(
+    elements
+      .filter((element) =>
+        selected.has(element.id) && element.visible !== false)
+      .map(getPPTElementTypeKey),
+  )
+
+  if (selectedTypes.size === 0) {
+    return [...selection]
+  }
+
+  return elements
+    .filter((element) =>
+      element.visible !== false && selectedTypes.has(getPPTElementTypeKey(element)))
+    .map((element) => element.id)
+}
+
+function canSelectSameTypePPTSelection(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+) {
+  if (selection.length === 0) {
+    return false
+  }
+
+  const selected = new Set(selection)
+  const nextSelection = selectSameTypePPTSelection(elements, selection)
+
+  return nextSelection.some((id) => !selected.has(id))
+}
+
+function getPPTElementTypeKey(element: PPTElement) {
+  if (element.kind === 'shape') {
+    return `shape:${element.shape}`
+  }
+
+  return element.kind
+}
+
 function getPPTCommandSurfaceGroups({
   availability,
   surface,
 }: {
-  availability: ReturnType<typeof getPPTCanvasCommandAvailability>
+  availability: PPTCommandAvailability
   surface: PPTCommandSurface
 }): PPTSurfaceCommandViewGroup[] {
   return PPT_COMMAND_SURFACE_GROUPS.flatMap((group) => {

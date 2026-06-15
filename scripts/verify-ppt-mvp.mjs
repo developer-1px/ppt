@@ -38,6 +38,7 @@ try {
   await runAltDragDuplicateScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
+  await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
@@ -1168,6 +1169,175 @@ async function runCommandSurfaceScenario(page) {
   }))()`)
 
   record('unlocks locked PPT object from context menu', afterUnlock.locked === 'false', afterUnlock)
+}
+
+async function runSelectSameTypeScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  let point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+
+  const initialSurface = await page.eval(`(() => ({
+    floatingDisabled: document.querySelector('[data-ppt-floating-command="select-same-type"]')?.disabled ?? true,
+    floatingVisible: !!document.querySelector('[data-ppt-selection-floating-bar]'),
+    selectedKind: document.querySelector('[data-selected="true"]')?.getAttribute('data-kind') ?? '',
+    selectedShape: document.querySelector('[data-selected="true"]')?.getAttribute('data-shape') ?? '',
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('enables PPT select same type on selection floating bar', initialSurface.floatingVisible && initialSurface.selectedKind === 'shape' && initialSurface.selectedShape === 'rect' && !initialSurface.floatingDisabled, initialSurface)
+
+  await page.eval(`document.querySelector('[data-ppt-floating-command="select-same-type"]')?.click()`)
+  await delay(80)
+
+  const afterFloatingSelect = await page.eval(`(() => {
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+
+    return {
+      selectedIds: selected.map((element) => element.getAttribute('data-ppt-element')),
+      selectedKinds: selected.map((element) => element.getAttribute('data-kind')),
+      selectedShapes: selected.map((element) => element.getAttribute('data-shape')),
+    }
+  })()`)
+
+  record('selects same PPT shape type from floating bar', afterFloatingSelect.selectedIds.includes('s1-card-1') && afterFloatingSelect.selectedIds.includes('s1-card-2') && afterFloatingSelect.selectedIds.includes('s1-side-panel') && afterFloatingSelect.selectedIds.length >= 3 && afterFloatingSelect.selectedKinds.every((kind) => kind === 'shape') && afterFloatingSelect.selectedShapes.every((shape) => shape === 'rect'), afterFloatingSelect)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row="s1-card-2"] [data-ppt-layer-visibility]')?.click()`)
+  await delay(80)
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(60)
+  await rightClickMouse(page, point.x, point.y)
+  await delay(80)
+
+  const contextSurface = await page.eval(`(() => ({
+    contextDisabled: document.querySelector('[data-ppt-context-command="select-same-type"]')?.disabled ?? true,
+    menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+  }))()`)
+
+  record('enables PPT select same type in context menu', contextSurface.menuOpen && !contextSurface.contextDisabled, contextSurface)
+
+  await page.eval(`document.querySelector('[data-ppt-context-command="select-same-type"]')?.click()`)
+  await delay(80)
+
+  const afterHiddenSelect = await page.eval(`(() => ({
+    card2Hidden: document.querySelector('[data-ppt-layer-row="s1-card-2"]')?.getAttribute('data-hidden') ?? '',
+    card2OnStage: !!document.querySelector('[data-ppt-element="s1-card-2"]'),
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record('excludes hidden PPT objects from select same type', afterHiddenSelect.card2Hidden === 'true' && !afterHiddenSelect.card2OnStage && afterHiddenSelect.selectedIds.includes('s1-card-1') && afterHiddenSelect.selectedIds.includes('s1-side-panel') && !afterHiddenSelect.selectedIds.includes('s1-card-2'), afterHiddenSelect)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row="s1-card-2"] [data-ppt-layer-visibility]')?.click()`)
+  await delay(80)
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row="s1-card-2"] [data-ppt-layer-lock]')?.click()`)
+  await delay(80)
+  point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(60)
+  await page.eval(`document.querySelector('[data-ppt-floating-command="select-same-type"]')?.click()`)
+  await delay(80)
+
+  const afterLockedSelect = await page.eval(`(() => ({
+    card2Locked: document.querySelector('[data-ppt-layer-row="s1-card-2"]')?.getAttribute('data-locked') ?? '',
+    deleteDisabled: document.querySelector('button[title="Delete"]')?.disabled ?? false,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record('includes locked visible PPT objects in select same type while preserving transform guards', afterLockedSelect.card2Locked === 'true' && afterLockedSelect.selectedIds.includes('s1-card-2') && afterLockedSelect.deleteDisabled, afterLockedSelect)
+
+  await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]')?.click()`)
+  await delay(80)
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'same type' })
+  await delay(80)
+
+  const paletteDisabled = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="command:select-same-type"]')?.disabled ?? false,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:select-same-type"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('disables PPT select same type palette item without selection', paletteDisabled.itemPresent && paletteDisabled.open && paletteDisabled.selectedCount === 0 && paletteDisabled.disabled, paletteDisabled)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(60)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'same type' })
+  await delay(80)
+
+  const paletteEnabled = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="command:select-same-type"]')?.disabled ?? true,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:select-same-type"]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPaletteSelect = await page.eval(`(() => ({
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record('runs PPT select same type from command palette', paletteEnabled.itemPresent && !paletteEnabled.disabled && !afterPaletteSelect.open && afterPaletteSelect.selectedIds.includes('s1-card-1') && afterPaletteSelect.selectedIds.includes('s1-card-2') && afterPaletteSelect.selectedIds.includes('s1-side-panel'), {
+    afterPaletteSelect,
+    paletteEnabled,
+  })
 }
 
 async function runCommandPaletteScenario(page) {
