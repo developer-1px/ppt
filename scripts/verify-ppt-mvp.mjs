@@ -16,6 +16,7 @@ const PPT_SLIDE_HEIGHT = 720
 const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
+const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
 
 const checks = []
 const browserErrors = []
@@ -64,6 +65,7 @@ try {
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
   await runImageImportScenario(page)
+  await runObjectAltTextScenario(page)
   await runTableImportScenario(page)
   await runCommentReviewScenario(page)
   await runFlipSelectionScenario(page)
@@ -3121,6 +3123,8 @@ async function runExportScenario(page) {
 
   const state = await page.eval(`(() => {
     const code = document.querySelector('.ppt-export-code')?.value ?? ''
+    const objectAltText = ${JSON.stringify(PPT_OBJECT_ALT_TEXT)}
+
     return {
       hasDeckJson: code.includes('data-ppt-deck'),
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
@@ -3139,6 +3143,8 @@ async function runExportScenario(page) {
       hasObjectShadowModel: code.includes('"shadow"') && code.includes('"color": "#334155"') && code.includes('"opacity": 0.36') && code.includes('"blur": 18') && code.includes('"distance": 12') && code.includes('"angle": 60'),
       hasObjectHyperlinkMarkup: code.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
       hasObjectHyperlinkModel: code.includes('"hyperlink"') && code.includes('"url": "https://example.com/ppt"'),
+      hasObjectAltTextMarkup: code.includes('data-ppt-alt-text="' + objectAltText + '"') && code.includes('alt="' + objectAltText + '"'),
+      hasObjectAltTextModel: code.includes('"accessibility"') && code.includes('"altText": "' + objectAltText + '"'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
@@ -3189,6 +3195,7 @@ async function runExportScenario(page) {
   record('exports PPT object opacity metadata', state.hasObjectOpacityMarkup && state.hasObjectOpacityModel, state)
   record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
   record('exports PPT object hyperlink metadata', state.hasObjectHyperlinkMarkup && state.hasObjectHyperlinkModel, state)
+  record('exports PPT object alt text metadata', state.hasObjectAltTextMarkup && state.hasObjectAltTextModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
@@ -3218,6 +3225,7 @@ async function runExportScenario(page) {
     const download = (window.__pptDownloads ?? [])
       .find((entry) => entry.download === 'slide-1.svg') ?? {}
     const text = download.text ?? ''
+    const objectAltText = ${JSON.stringify(PPT_OBJECT_ALT_TEXT)}
 
     return {
       download: download.download ?? '',
@@ -3226,6 +3234,7 @@ async function runExportScenario(page) {
       hasObjectOpacity: text.includes('data-ppt-opacity="0.42"') && text.includes('opacity="0.42"'),
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
       hasObjectHyperlink: text.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
+      hasObjectAltText: text.includes('data-ppt-alt-text="' + objectAltText + '"') && text.includes('<title>' + objectAltText + '</title>'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
@@ -3254,6 +3263,7 @@ async function runExportScenario(page) {
   record('exports PPT object opacity metadata into slide SVG', slideSvgState.hasObjectOpacity, slideSvgState)
   record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
   record('exports PPT object hyperlink metadata into slide SVG', slideSvgState.hasObjectHyperlink, slideSvgState)
+  record('exports PPT object alt text metadata into slide SVG', slideSvgState.hasObjectAltText, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
@@ -4447,6 +4457,174 @@ async function runImageImportScenario(page) {
     afterResize,
     beforeResize,
   })
+}
+
+async function runObjectAltTextScenario(page) {
+  const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
+  await selectPPTLayerRows(page, [imageId])
+  await delay(80)
+
+  const initial = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'renders PPT object alt text control in inspector',
+    imageId.length > 0 &&
+      initial.selectedId === imageId &&
+      initial.selectedKind === 'image' &&
+      initial.altText === '' &&
+      initial.selectedAltText === '' &&
+      initial.thumbAltText === '' &&
+      initial.imageAlt.length > 0,
+    initial,
+  )
+
+  await page.eval(`((altText) => {
+    const textarea = document.querySelector('[data-ppt-style-field="alt-text"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    setter.call(textarea, altText)
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+    textarea.blur()
+  })(${JSON.stringify(PPT_OBJECT_ALT_TEXT)})`)
+  await delay(120)
+
+  const afterAltText = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'updates PPT object alt text metadata from inspector',
+    afterAltText.altText === PPT_OBJECT_ALT_TEXT &&
+      afterAltText.selectedAltText === PPT_OBJECT_ALT_TEXT &&
+      afterAltText.thumbAltText === PPT_OBJECT_ALT_TEXT &&
+      afterAltText.imageAlt === PPT_OBJECT_ALT_TEXT,
+    {
+      afterAltText,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTObjectAltTextState(page, imageId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'undoes and redoes PPT object alt text as one history step',
+    afterUndo.altText === '' &&
+      afterUndo.selectedAltText === '' &&
+      afterUndo.imageAlt === initial.imageAlt &&
+      afterRedo.altText === PPT_OBJECT_ALT_TEXT &&
+      afterRedo.selectedAltText === PPT_OBJECT_ALT_TEXT &&
+      afterRedo.imageAlt === PPT_OBJECT_ALT_TEXT,
+    {
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const textarea = document.querySelector('[data-ppt-style-field="alt-text"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    setter.call(textarea, '')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+    textarea.blur()
+  })()`)
+  await delay(120)
+
+  const afterClear = await getPPTObjectAltTextState(page, imageId)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterClearUndo = await getPPTObjectAltTextState(page, imageId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterClearRedo = await getPPTObjectAltTextState(page, imageId)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterRestore = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'removes and restores PPT object alt text as one history step',
+    afterClear.altText === '' &&
+      afterClear.selectedAltText === '' &&
+      afterClear.imageAlt === initial.imageAlt &&
+      afterClearUndo.altText === PPT_OBJECT_ALT_TEXT &&
+      afterClearUndo.selectedAltText === PPT_OBJECT_ALT_TEXT &&
+      afterClearRedo.altText === '' &&
+      afterClearRedo.selectedAltText === '' &&
+      afterRestore.altText === PPT_OBJECT_ALT_TEXT &&
+      afterRestore.selectedAltText === PPT_OBJECT_ALT_TEXT &&
+      afterRestore.imageAlt === PPT_OBJECT_ALT_TEXT,
+    {
+      afterClear,
+      afterClearRedo,
+      afterClearUndo,
+      afterRestore,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`((id) => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const image = element?.querySelector('img')
+
+    return {
+      altText: element?.getAttribute('data-ppt-alt-text') ?? '',
+      imageAlt: image?.getAttribute('alt') ?? '',
+      open: !!overlay,
+    }
+  })(${JSON.stringify(imageId)})`)
+
+  record(
+    'keeps PPT object alt text metadata in presentation preview',
+    preview.open &&
+      preview.altText === PPT_OBJECT_ALT_TEXT &&
+      preview.imageAlt === PPT_OBJECT_ALT_TEXT,
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
 }
 
 async function runTableImportScenario(page) {
@@ -6284,6 +6462,27 @@ function getPPTObjectHyperlinkState(page, elementId) {
       selectedUrl: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
       thumbUrl: thumb?.getAttribute('data-ppt-thumb-hyperlink-url') ?? '',
       url: document.querySelector('[data-ppt-style-field="hyperlink"]')?.value ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
+function getPPTObjectAltTextState(page, elementId) {
+  return page.eval(`((id) => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = id || selected?.getAttribute('data-ppt-element') || ''
+    const target = targetId
+      ? document.querySelector(\`[data-ppt-element="\${targetId}"]\`)
+      : selected
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const image = target?.querySelector('img') ?? null
+
+    return {
+      altText: document.querySelector('[data-ppt-style-field="alt-text"]')?.value ?? '',
+      imageAlt: image?.getAttribute('alt') ?? '',
+      selectedAltText: target?.getAttribute('data-ppt-alt-text') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      thumbAltText: thumb?.getAttribute('data-ppt-thumb-alt-text') ?? '',
     }
   })(${JSON.stringify(elementId)})`)
 }

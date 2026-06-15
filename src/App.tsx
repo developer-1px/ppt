@@ -161,6 +161,7 @@ import {
   type PPTDeck,
   type PPTComment,
   type PPTElement,
+  type PPTElementAccessibility,
   type PPTElementAnimation,
   type PPTElementHyperlink,
   type PPTElementShadow,
@@ -1082,6 +1083,7 @@ const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
 const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
+const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
@@ -2703,6 +2705,19 @@ function App() {
         return {
           ...element,
           hyperlink: hyperlink ?? undefined,
+        }
+      }),
+    )
+  }
+
+  function updateElementAltText(elementId: string, altText: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        const accessibility = normalizePPTElementAccessibility({ altText })
+
+        return {
+          ...element,
+          accessibility: accessibility ?? undefined,
         }
       }),
     )
@@ -5226,6 +5241,7 @@ function App() {
         onCommitText={commitText}
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
+        onElementAltTextChange={updateElementAltText}
         onElementAnimationChange={updateElementAnimation}
         onElementGeometryChange={updateElementGeometry}
         onElementHyperlinkChange={updateElementHyperlink}
@@ -7411,6 +7427,7 @@ function SlideThumb({
               : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+            data-ppt-thumb-alt-text={getPPTElementAltText(element)}
             data-ppt-thumb-hyperlink-url={getPPTElementHyperlink(element)?.url}
             data-ppt-thumb-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
             data-ppt-thumb-shadow-angle={hasPPTElementShadow(element)
@@ -7617,6 +7634,7 @@ function PPTElementView({
       data-ppt-animation-order={animation.order}
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
+      data-ppt-alt-text={getPPTElementAltText(element)}
       data-ppt-hyperlink-url={getPPTElementHyperlink(element)?.url}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
       data-ppt-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
@@ -7676,7 +7694,7 @@ function PPTElementView({
     >
       {element.kind === 'image' ? (
         <img
-          alt={element.alt}
+          alt={getPPTImageAltText(element)}
           draggable={false}
           src={element.src}
           style={{
@@ -8154,6 +8172,7 @@ function Inspector({
   onCommitText,
   onCopyHTML,
   onDownloadHTML,
+  onElementAltTextChange,
   onElementAnimationChange,
   onElementGeometryChange,
   onElementHyperlinkChange,
@@ -8201,6 +8220,7 @@ function Inspector({
   onCommitText: (elementId: string, text: string) => void
   onCopyHTML: () => void
   onDownloadHTML: () => void
+  onElementAltTextChange: (elementId: string, altText: string) => void
   onElementAnimationChange: (
     elementId: string,
     field: PPTElementAnimationUpdateField,
@@ -8305,6 +8325,9 @@ function Inspector({
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
+  const elementAltText = selectedElement
+    ? getPPTElementAltText(selectedElement) ?? ''
+    : ''
   const elementShadow = selectedElement
     ? getPPTElementShadow(selectedElement)
     : PPT_DEFAULT_ELEMENT_SHADOW
@@ -8551,6 +8574,19 @@ function Inspector({
                 value={elementHyperlink?.url ?? ''}
                 onChange={(event) =>
                   onElementHyperlinkChange(
+                    selectedElement.id,
+                    event.target.value,
+                  )}
+              />
+            </label>
+            <label className="ppt-field">
+              <span>Alt text</span>
+              <textarea
+                data-ppt-style-field="alt-text"
+                maxLength={PPT_ALT_TEXT_MAX_LENGTH}
+                value={elementAltText}
+                onChange={(event) =>
+                  onElementAltTextChange(
                     selectedElement.id,
                     event.target.value,
                   )}
@@ -9867,6 +9903,34 @@ function formatPPTElementOpacity(value: number) {
 
 function getPPTElementHyperlink(element: PPTElement) {
   return element.hyperlink ? normalizePPTElementHyperlink(element.hyperlink) : null
+}
+
+function getPPTElementAltText(element: PPTElement) {
+  return element.accessibility
+    ? normalizePPTElementAccessibility(element.accessibility)?.altText
+    : undefined
+}
+
+function getPPTImageAltText(element: PPTImage) {
+  return getPPTElementAltText(element) ?? element.alt
+}
+
+function normalizePPTElementAccessibility(
+  accessibility: Partial<PPTElementAccessibility>,
+): PPTElementAccessibility | null {
+  const altText = normalizePPTAltText(accessibility.altText ?? '')
+
+  return altText ? { altText } : null
+}
+
+function normalizePPTAltText(value: string) {
+  const normalized = value.trim().slice(0, PPT_ALT_TEXT_MAX_LENGTH)
+
+  if (!normalized || hasPPTControlCharacter(normalized)) {
+    return ''
+  }
+
+  return normalized
 }
 
 function normalizePPTElementHyperlink(

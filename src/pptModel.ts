@@ -90,7 +90,12 @@ const PPTElementHyperlinkSchema = z.object({
   url: z.string(),
 })
 
+const PPTElementAccessibilitySchema = z.object({
+  altText: z.string(),
+})
+
 const PPTElementBaseSchema = z.object({
+  accessibility: PPTElementAccessibilitySchema.optional(),
   animation: PPTElementAnimationSchema.optional(),
   flipH: z.boolean().optional(),
   flipV: z.boolean().optional(),
@@ -226,6 +231,7 @@ export type PPTTextBody = z.infer<typeof PPTTextBodySchema>
 export type PPTTextStyle = z.infer<typeof PPTTextStyleSchema>
 export type PPTTextAutoFit = z.infer<typeof PPTTextAutoFitSchema>
 export type PPTSlideTransition = z.infer<typeof PPTSlideTransitionSchema>
+export type PPTElementAccessibility = z.infer<typeof PPTElementAccessibilitySchema>
 export type PPTElementAnimation = z.infer<typeof PPTElementAnimationSchema>
 export type PPTElementShadow = z.infer<typeof PPTElementShadowSchema>
 export type PPTElementHyperlink = z.infer<typeof PPTElementHyperlinkSchema>
