@@ -36,6 +36,7 @@ try {
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runViewAndShapeScenario(page)
+  await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
   await runSelectionPaneScenario(page)
   await runExportScenario(page)
@@ -688,6 +689,8 @@ async function runExportScenario(page) {
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
+      hasLineMarkup: code.includes('class="ppt-element ppt-line"') && code.includes('<line '),
+      hasLineModel: code.includes('"kind": "line"') && code.includes('"endMarker": "arrow"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
     }
@@ -697,6 +700,7 @@ async function runExportScenario(page) {
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
+  record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 }
 
@@ -868,6 +872,139 @@ async function runImageImportScenario(page) {
   record('resizes inserted PPT image with existing selection handles', afterResize.selectedWidth > beforeResize.width && afterResize.selectedKind === 'image', {
     afterResize,
     beforeResize,
+  })
+}
+
+async function runLineAffordanceScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const before = await getPPTLineState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-line="line"]').click()`)
+  await delay(50)
+
+  const afterLine = await getPPTLineState(page)
+
+  record('inserts PPT line element from toolbar', afterLine.lineCount === before.lineCount + 1 && afterLine.selectedKind === 'line' && afterLine.thumbLineCount === before.thumbLineCount + 1, {
+    afterLine,
+    before,
+  })
+
+  await page.eval(`(() => {
+    const color = document.querySelector('[data-ppt-style-field="line-stroke-color"]')
+    const width = document.querySelector('[data-ppt-style-field="line-stroke-width"]')
+    const marker = document.querySelector('[data-ppt-style-field="line-end-marker"]')
+    const colorSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    const widthSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    colorSetter.call(color, '#dc2626')
+    color.dispatchEvent(new Event('input', { bubbles: true }))
+    color.dispatchEvent(new Event('change', { bubbles: true }))
+    widthSetter.call(width, '7')
+    width.dispatchEvent(new Event('input', { bubbles: true }))
+    width.dispatchEvent(new Event('change', { bubbles: true }))
+    marker.value = 'arrow'
+    marker.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterStyle = await getPPTLineState(page)
+
+  record('updates PPT line stroke and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.markerEnd.includes('url('), afterStyle)
+
+  const beforeEndpoint = await page.eval(`(() => {
+    const handle = document.querySelector('[data-ppt-line-endpoint="end"]').getBoundingClientRect()
+    const line = document.querySelector('[data-selected="true"] line')
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+      x2: Number(line.getAttribute('x2')),
+      y2: Number(line.getAttribute('y2')),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeEndpoint.handleX,
+    y: beforeEndpoint.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeEndpoint.handleX + 40,
+    y: beforeEndpoint.handleY + 32,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeEndpoint.handleX + 40,
+    y: beforeEndpoint.handleY + 32,
+  })
+  await delay(50)
+
+  const afterEndpoint = await getPPTLineState(page)
+
+  record('moves PPT line endpoint with endpoint handle', afterEndpoint.endpointHandleCount === 2 && afterEndpoint.x2 !== beforeEndpoint.x2 && afterEndpoint.y2 !== beforeEndpoint.y2, {
+    afterEndpoint,
+    beforeEndpoint,
+  })
+
+  const beforeResize = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+      width: parseFloat(selected.style.width),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeResize.handleX,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeResize.handleX + 48,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeResize.handleX + 48,
+    y: beforeResize.handleY,
+  })
+  await delay(50)
+
+  const afterResize = await getPPTLineState(page)
+
+  record('resizes PPT line with existing selection handles', afterResize.selectedWidth > beforeResize.width && afterResize.selectedKind === 'line', {
+    afterResize,
+    beforeResize,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-insert-line="arrow"]').click()`)
+  await delay(50)
+
+  const afterArrow = await getPPTLineState(page)
+
+  record('inserts PPT arrow element from toolbar', afterArrow.lineCount === afterLine.lineCount + 1 && afterArrow.selectedKind === 'line' && afterArrow.markerEnd.includes('url(') && afterArrow.selectedName === 'Arrow', {
+    afterArrow,
+    afterLine,
   })
 }
 
@@ -1058,6 +1195,29 @@ function getPPTImageImportState(page) {
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
+    }
+  })()`)
+}
+
+function getPPTLineState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedLine = selected?.querySelector('line') ?? null
+
+    return {
+      lineCount: document.querySelectorAll('[data-kind="line"]').length,
+      markerEnd: selectedLine?.getAttribute('marker-end') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      stroke: selectedLine?.getAttribute('stroke') ?? '',
+      strokeWidth: selectedLine?.getAttribute('stroke-width') ?? '',
+      thumbLineCount: document.querySelectorAll('.ppt-thumb-line').length,
+      endpointHandleCount: document.querySelectorAll('[data-ppt-line-endpoint]').length,
+      x1: Number(selectedLine?.getAttribute('x1') ?? 0),
+      x2: Number(selectedLine?.getAttribute('x2') ?? 0),
+      y1: Number(selectedLine?.getAttribute('y1') ?? 0),
+      y2: Number(selectedLine?.getAttribute('y2') ?? 0),
     }
   })()`)
 }

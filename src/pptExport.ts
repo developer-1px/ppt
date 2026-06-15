@@ -4,6 +4,7 @@ import {
   readPPTText,
   type PPTDeck,
   type PPTElement,
+  type PPTLine,
   type PPTShape,
   type PPTTextStyle,
 } from './pptModel'
@@ -64,6 +65,10 @@ function renderPPTElementHTML(element: PPTElement) {
     return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${style.filter(Boolean).join(';')}" />`
   }
 
+  if (element.kind === 'line') {
+    return renderPPTLineHTML(element, style)
+  }
+
   const text = escapeHtml(readPPTText(element.textBody))
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
@@ -85,12 +90,28 @@ function exportCSS() {
     `.ppt-slide{position:relative;width:${PPT_SLIDE_WIDTH}px;height:${PPT_SLIDE_HEIGHT}px;overflow:hidden;background:#fff;break-after:page;}`,
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
+    '.ppt-line{display:block;overflow:visible;padding:0;}',
     '.ppt-text{align-items:flex-start;padding:0;}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
     '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
     '@media print{body{background:#fff;}.ppt-deck{display:block;padding:0;}.ppt-slide{break-after:page;page-break-after:always;}}',
   ].join('\n')
+}
+
+function renderPPTLineHTML(element: PPTLine, style: string[]) {
+  const markerId = `ppt-line-marker-${escapeHtml(element.id)}`
+  const marker = element.startMarker === 'arrow' || element.endMarker === 'arrow'
+    ? `<defs><marker id="${markerId}" markerHeight="8" markerUnits="strokeWidth" markerWidth="8" orient="auto-start-reverse" refX="7" refY="4" viewBox="0 0 8 8"><path d="M 0 0 L 8 4 L 0 8 z" fill="${escapeHtml(element.stroke.color)}"></path></marker></defs>`
+    : ''
+  const markerStart = element.startMarker === 'arrow'
+    ? ` marker-start="url(#${markerId})"`
+    : ''
+  const markerEnd = element.endMarker === 'arrow'
+    ? ` marker-end="url(#${markerId})"`
+    : ''
+
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line></svg>`
 }
 
 function exportTextStyle(style: PPTTextStyle) {

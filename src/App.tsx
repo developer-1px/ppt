@@ -7,6 +7,7 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
+  ArrowRight,
   BringToFront,
   ChevronDown,
   ChevronUp,
@@ -24,6 +25,7 @@ import {
   Layers,
   Lock,
   Maximize2,
+  Minus,
   MoveDown,
   MoveUp,
   Redo2,
@@ -54,6 +56,7 @@ import {
 } from 'react'
 import {
   RESIZE_HANDLES,
+  clamp,
   fitBoundsIntoViewport,
   getCanvasViewportWorldPoint,
   getCanvasViewportZoomStepMultiplier,
@@ -108,6 +111,8 @@ import {
   updatePPTDeckSlide,
   type PPTDeck,
   type PPTElement,
+  type PPTLine,
+  type PPTLineMarker,
   type PPTParagraph,
   type PPTShape,
   type PPTShapeKind,
@@ -207,6 +212,13 @@ type Interaction =
       }>
     }
   | {
+      endpoint: 'end' | 'start'
+      kind: 'line-endpoint'
+      lineId: string
+      slideId: string
+      startDeck: PPTDeck
+    }
+  | {
       additive: boolean
       baseSelection: string[]
       currentPoint: Point
@@ -249,6 +261,9 @@ function App() {
     () => activeSlide.elements.filter((element) => selection.includes(element.id)),
     [activeSlide.elements, selection],
   )
+  const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
+    ? selectedElement
+    : null
   const exportCode = useMemo(() => exportPPTDeckHTML(deck), [deck])
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
@@ -655,6 +670,29 @@ function App() {
     }))
   }
 
+  function addLine(endMarker: PPTLineMarker = 'none') {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const id = createPPTElementId(slide, 'line')
+      const element: PPTLine = {
+        end: { x: 280, y: 18 },
+        endMarker,
+        geometry: { h: 36, w: 280, x: 184, y: 326 },
+        id,
+        kind: 'line',
+        name: endMarker === 'arrow' ? 'Arrow' : 'Line',
+        start: { x: 0, y: 18 },
+        stroke: { color: '#111827', width: 4 },
+      }
+
+      setSelection([id])
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
+  }
+
   function insertPPTImageSource(
     source: PPTImageImportSource,
     center = getPPTViewportCenter(),
@@ -963,7 +1001,7 @@ function App() {
   ) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind === 'image') {
+        if (!isPPTTextElement(element)) {
           return element
         }
 
@@ -1011,6 +1049,25 @@ function App() {
     )
   }
 
+  function updateLineMarker(
+    elementId: string,
+    field: 'endMarker' | 'startMarker',
+    value: PPTLineMarker,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'line') {
+          return element
+        }
+
+        return {
+          ...element,
+          [field]: value,
+        }
+      }),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -1029,20 +1086,20 @@ function App() {
     )
   }
 
-  function updateShapeStroke(
+  function updateElementStroke(
     elementId: string,
     field: 'color' | 'width',
     value: string | number,
   ) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind !== 'shape') {
+        if (element.kind !== 'shape' && element.kind !== 'line') {
           return element
         }
 
         const stroke = {
           color: '#111827',
-          width: 1,
+          width: 2,
           ...element.stroke,
         }
 
@@ -1063,7 +1120,7 @@ function App() {
   ) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind === 'image' || !element.textBody) {
+        if (!isPPTTextElement(element)) {
           return element
         }
 
@@ -1291,6 +1348,27 @@ function App() {
     })
   }
 
+  function handleLineEndpointPointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    endpoint: 'end' | 'start',
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    if (!selectedLineElement || !canResizeSelection) {
+      return
+    }
+
+    setInteraction({
+      endpoint,
+      kind: 'line-endpoint',
+      lineId: selectedLineElement.id,
+      slideId: activeSlide.id,
+      startDeck: deckRef.current,
+    })
+  }
+
   function autoSizeSelection(handle: ResizeHandle) {
     if (selection.length === 0) {
       return
@@ -1416,6 +1494,21 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'line-endpoint') {
+      const elements = startSlide.elements.map((element) =>
+        element.id === interaction.lineId && element.kind === 'line'
+          ? updatePPTLineEndpoint(element, interaction.endpoint, point)
+          : element)
+
+      const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      return
+    }
+
     const delta = getPointAngle(interaction.center, point) - interaction.startAngle
     const rotationById = new Map(interaction.startRotations.map((item) => [
       item.elementId,
@@ -1511,6 +1604,12 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-insert-shape="diamond" onClick={() => addShape('diamond')} title="Add diamond" type="button">
             <Diamond size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => addLine()} title="Add line" type="button">
+            <Minus size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => addLine('arrow')} title="Add arrow" type="button">
+            <ArrowRight size={17} />
           </button>
           <button className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
             <ImagePlus size={17} />
@@ -1699,6 +1798,13 @@ function App() {
                 onResizePointerDown={handleResizePointerDown}
               />
             ) : null}
+            {selectedLineElement && !editingId && canResizeSelection ? (
+              <LineEndpointOverlay
+                line={selectedLineElement}
+                scale={viewport.scale}
+                onPointerDown={handleLineEndpointPointerDown}
+              />
+            ) : null}
             {marqueeBounds ? <Box className="ppt-marquee" bounds={marqueeBounds} /> : null}
             <Guides guides={snapGuides} scale={viewport.scale} />
           </div>
@@ -1717,6 +1823,7 @@ function App() {
         onElementLockToggle={toggleElementLocked}
         onElementNameChange={updateElementName}
         onElementRotationChange={updateElementRotation}
+        onLineMarkerChange={updateLineMarker}
         onElementTextStyleChange={updateElementTextStyle}
         onElementVisibilityToggle={toggleElementVisibility}
         onLayerSelect={(elementId, additive) => {
@@ -1727,7 +1834,7 @@ function App() {
         onShapeKindChange={updateShapeKind}
         onSlideBackgroundChange={updateSlideBackground}
         onShapeFillChange={updateShapeFill}
-        onShapeStrokeChange={updateShapeStroke}
+        onElementStrokeChange={updateElementStroke}
         onSlideNameChange={updateSlideName}
         onSlideNotesChange={updateSlideNotes}
       />
@@ -1759,6 +1866,8 @@ function SlideThumb({
         {slide.elements.map((element) => (
           <span
             className={getPPTThumbElementClassName(element)}
+            data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
+            data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
             data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
@@ -1766,7 +1875,9 @@ function SlideThumb({
                 ? element.fill.color
                 : element.kind === 'image'
                   ? undefined
-                  : '#cbd5e1',
+                  : element.kind === 'textBox'
+                    ? '#cbd5e1'
+                    : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
                 : undefined,
@@ -1810,7 +1921,7 @@ function PPTElementView({
   selected: boolean
 }) {
   const style = pptElementStyle(element)
-  const text = element.kind === 'image' ? '' : readPPTText(element.textBody)
+  const text = isPPTTextElement(element) ? readPPTText(element.textBody) : ''
   const editorRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -1840,6 +1951,8 @@ function PPTElementView({
     >
       {element.kind === 'image' ? (
         <img alt={element.alt} draggable={false} src={element.src} />
+      ) : element.kind === 'line' ? (
+        <PPTLineSvg element={element} />
       ) : (
         <div
           className="ppt-element-editor"
@@ -1867,6 +1980,47 @@ function PPTElementView({
         </div>
       )}
     </div>
+  )
+}
+
+function PPTLineSvg({ element }: { element: PPTLine }) {
+  const markerId = `${element.id}-arrow-marker`
+
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${element.geometry.w} ${element.geometry.h}`}
+    >
+      {(element.startMarker === 'arrow' || element.endMarker === 'arrow') ? (
+        <defs>
+          <marker
+            id={markerId}
+            markerHeight="8"
+            markerUnits="strokeWidth"
+            markerWidth="8"
+            orient="auto-start-reverse"
+            refX="7"
+            refY="4"
+            viewBox="0 0 8 8"
+          >
+            <path d="M 0 0 L 8 4 L 0 8 z" fill={element.stroke.color} />
+          </marker>
+        </defs>
+      ) : null}
+      <line
+        markerEnd={element.endMarker === 'arrow' ? `url(#${markerId})` : undefined}
+        markerStart={element.startMarker === 'arrow' ? `url(#${markerId})` : undefined}
+        stroke={element.stroke.color}
+        strokeLinecap="round"
+        strokeWidth={element.stroke.width}
+        x1={element.start.x}
+        x2={element.end.x}
+        y1={element.start.y}
+        y2={element.end.y}
+      />
+    </svg>
   )
 }
 
@@ -1946,6 +2100,45 @@ function SelectionOverlay({
           />
         )
       }) : null}
+    </>
+  )
+}
+
+function LineEndpointOverlay({
+  line,
+  onPointerDown,
+  scale,
+}: {
+  line: PPTLine
+  onPointerDown: (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    endpoint: 'end' | 'start',
+  ) => void
+  scale: number
+}) {
+  return (
+    <>
+      {(['start', 'end'] as const).map((endpoint) => {
+        const point = getPPTLineEndpointPoint(line, endpoint)
+        const size = 13 / scale
+
+        return (
+          <button
+            aria-label={`Move line ${endpoint}`}
+            className="ppt-line-endpoint-handle"
+            data-ppt-line-endpoint={endpoint}
+            key={endpoint}
+            onPointerDown={(event) => onPointerDown(event, endpoint)}
+            style={{
+              height: size,
+              left: point.x - size / 2,
+              top: point.y - size / 2,
+              width: size,
+            }}
+            type="button"
+          />
+        )
+      })}
     </>
   )
 }
@@ -2039,13 +2232,14 @@ function Inspector({
   onElementLockToggle,
   onElementNameChange,
   onElementRotationChange,
+  onElementStrokeChange,
   onElementTextStyleChange,
   onElementVisibilityToggle,
   onLayerSelect,
+  onLineMarkerChange,
   onParagraphAlignChange,
   onShapeFillChange,
   onShapeKindChange,
-  onShapeStrokeChange,
   onSlideBackgroundChange,
   onSlideNameChange,
   onSlideNotesChange,
@@ -2065,6 +2259,11 @@ function Inspector({
   onElementLockToggle: (elementId: string) => void
   onElementNameChange: (elementId: string, name: string) => void
   onElementRotationChange: (elementId: string, rotation: number) => void
+  onElementStrokeChange: (
+    elementId: string,
+    field: 'color' | 'width',
+    value: string | number,
+  ) => void
   onElementTextStyleChange: (
     elementId: string,
     field: keyof PPTTextStyle,
@@ -2072,17 +2271,17 @@ function Inspector({
   ) => void
   onElementVisibilityToggle: (elementId: string) => void
   onLayerSelect: (elementId: string, additive: boolean) => void
+  onLineMarkerChange: (
+    elementId: string,
+    field: 'endMarker' | 'startMarker',
+    value: PPTLineMarker,
+  ) => void
   onParagraphAlignChange: (
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
   ) => void
   onShapeFillChange: (elementId: string, color: string) => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
-  onShapeStrokeChange: (
-    elementId: string,
-    field: 'color' | 'width',
-    value: string | number,
-  ) => void
   onSlideBackgroundChange: (color: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
@@ -2090,10 +2289,10 @@ function Inspector({
   selectedElement: PPTElement | null
   slide: PPTSlide
 }) {
-  const textStyle = selectedElement && selectedElement.kind !== 'image'
+  const textStyle = selectedElement && isPPTTextElement(selectedElement)
     ? selectedElement.style
     : null
-  const paragraphAlign = selectedElement && selectedElement.kind !== 'image'
+  const paragraphAlign = selectedElement && isPPTTextElement(selectedElement)
     ? selectedElement.textBody?.paragraphs[0]?.align ?? 'left'
     : 'left'
 
@@ -2174,7 +2373,7 @@ function Inspector({
                 />
               </label>
             </div>
-            {selectedElement.kind !== 'image' ? (
+            {isPPTTextElement(selectedElement) ? (
               <>
                 <label className="ppt-field">
                   <span>Text</span>
@@ -2284,7 +2483,7 @@ function Inspector({
                       type="color"
                       value={selectedElement.stroke?.color ?? '#111827'}
                       onChange={(event) =>
-                        onShapeStrokeChange(
+                        onElementStrokeChange(
                           selectedElement.id,
                           'color',
                           event.target.value,
@@ -2299,13 +2498,87 @@ function Inspector({
                     type="number"
                     value={selectedElement.stroke?.width ?? 0}
                     onChange={(event) =>
-                      onShapeStrokeChange(
+                      onElementStrokeChange(
                         selectedElement.id,
                         'width',
                         Number(event.target.value),
                       )}
                   />
                 </label>
+              </>
+            ) : null}
+            {selectedElement.kind === 'line' ? (
+              <>
+                <div className="ppt-geometry-grid">
+                  <label className="ppt-field">
+                    <span>Stroke</span>
+                    <input
+                      data-ppt-style-field="line-stroke-color"
+                      type="color"
+                      value={selectedElement.stroke.color}
+                      onChange={(event) =>
+                        onElementStrokeChange(
+                          selectedElement.id,
+                          'color',
+                          event.target.value,
+                        )}
+                    />
+                  </label>
+                  <label className="ppt-field">
+                    <span>Width</span>
+                    <input
+                      data-ppt-style-field="line-stroke-width"
+                      type="number"
+                      value={selectedElement.stroke.width}
+                      onChange={(event) =>
+                        onElementStrokeChange(
+                          selectedElement.id,
+                          'width',
+                          Number(event.target.value),
+                        )}
+                    />
+                  </label>
+                </div>
+                <div className="ppt-geometry-grid">
+                  <label className="ppt-field">
+                    <span>Start</span>
+                    <select
+                      data-ppt-style-field="line-start-marker"
+                      value={selectedElement.startMarker ?? 'none'}
+                      onChange={(event) => {
+                        if (isPPTLineMarker(event.target.value)) {
+                          onLineMarkerChange(
+                            selectedElement.id,
+                            'startMarker',
+                            event.target.value,
+                          )
+                        }
+                      }}
+                    >
+                      <option value="none">None</option>
+                      <option value="arrow">Arrow</option>
+                    </select>
+                  </label>
+                  <label className="ppt-field">
+                    <span>End</span>
+                    <select
+                      data-ppt-style-field="line-end-marker"
+                      value={selectedElement.endMarker ?? 'none'}
+                      onChange={(event) => {
+                        if (isPPTLineMarker(event.target.value)) {
+                          onLineMarkerChange(
+                            selectedElement.id,
+                            'endMarker',
+                            event.target.value,
+                          )
+                        }
+                      }}
+                    >
+                      <option value="none">None</option>
+                      <option value="arrow">Arrow</option>
+                    </select>
+                  </label>
+                </div>
               </>
             ) : null}
           </>
@@ -2404,7 +2677,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     width: element.geometry.w,
   }
 
-  if (element.kind === 'image') {
+  if (element.kind === 'image' || element.kind === 'line') {
     return base
   }
 
@@ -2443,7 +2716,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 function getPPTElementParagraphAlign(element: PPTElement) {
-  if (element.kind === 'image') {
+  if (!isPPTTextElement(element)) {
     return undefined
   }
 
@@ -2480,6 +2753,68 @@ function getBoundsCenter(bounds: Bounds): Point {
   }
 }
 
+function getPPTLineEndpointPoint(
+  line: PPTLine,
+  endpoint: 'end' | 'start',
+): Point {
+  const local = endpoint === 'start' ? line.start : line.end
+
+  return {
+    x: line.geometry.x + local.x,
+    y: line.geometry.y + local.y,
+  }
+}
+
+function updatePPTLineEndpoint(
+  line: PPTLine,
+  endpoint: 'end' | 'start',
+  point: Point,
+): PPTLine {
+  const currentStart = getPPTLineEndpointPoint(line, 'start')
+  const currentEnd = getPPTLineEndpointPoint(line, 'end')
+  const nextPoint = {
+    x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
+    y: clamp(point.y, 0, PPT_SLIDE_HEIGHT),
+  }
+  const start = endpoint === 'start' ? nextPoint : currentStart
+  const end = endpoint === 'end' ? nextPoint : currentEnd
+  const rawLeft = Math.min(start.x, end.x)
+  const rawTop = Math.min(start.y, end.y)
+  const rawWidth = Math.abs(end.x - start.x)
+  const rawHeight = Math.abs(end.y - start.y)
+  const width = Math.max(24, rawWidth)
+  const height = Math.max(24, rawHeight)
+  const x = clamp(
+    rawLeft - Math.max(0, width - rawWidth) / 2,
+    0,
+    PPT_SLIDE_WIDTH - width,
+  )
+  const y = clamp(
+    rawTop - Math.max(0, height - rawHeight) / 2,
+    0,
+    PPT_SLIDE_HEIGHT - height,
+  )
+
+  return {
+    ...line,
+    end: {
+      x: end.x - x,
+      y: end.y - y,
+    },
+    geometry: {
+      ...line.geometry,
+      h: height,
+      w: width,
+      x,
+      y,
+    },
+    start: {
+      x: start.x - x,
+      y: start.y - y,
+    },
+  }
+}
+
 function getPointAngle(center: Point, point: Point) {
   return Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI
 }
@@ -2491,7 +2826,7 @@ function normalizePPTElementRotation(rotation: number) {
 }
 
 function measurePPTElementAutoSize(element: PPTElement) {
-  if (element.kind === 'image') {
+  if (!isPPTTextElement(element)) {
     return null
   }
 
@@ -2618,11 +2953,19 @@ function getPPTThumbElementClassName(element: PPTElement) {
     return 'ppt-thumb-image'
   }
 
+  if (element.kind === 'line') {
+    return 'ppt-thumb-line'
+  }
+
   return 'ppt-thumb-shape'
 }
 
 function isPPTShapeKind(value: string): value is PPTShapeKind {
   return value === 'rect' || value === 'ellipse' || value === 'diamond'
+}
+
+function isPPTLineMarker(value: string): value is PPTLineMarker {
+  return value === 'none' || value === 'arrow'
 }
 
 function getPPTLayerSelection(

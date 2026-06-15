@@ -73,10 +73,27 @@ const PPTImageSchema = PPTElementBaseSchema.extend({
   src: z.string(),
 })
 
+const PPTLineMarkerSchema = z.enum(['none', 'arrow'])
+
+const PPTLinePointSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+})
+
+const PPTLineSchema = PPTElementBaseSchema.extend({
+  end: PPTLinePointSchema,
+  endMarker: PPTLineMarkerSchema.optional(),
+  kind: z.literal('line'),
+  start: PPTLinePointSchema,
+  startMarker: PPTLineMarkerSchema.optional(),
+  stroke: PPTStrokeSchema,
+})
+
 export const PPTElementSchema = z.discriminatedUnion('kind', [
   PPTTextBoxSchema,
   PPTShapeSchema,
   PPTImageSchema,
+  PPTLineSchema,
 ])
 
 export const PPTSlideSchema = z.object({
@@ -108,7 +125,11 @@ export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
+export type PPTLine = z.infer<typeof PPTLineSchema>
+export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
+export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
+export type PPTTextElement = PPTTextBox | (PPTShape & { textBody: PPTTextBody })
 export type PPTSlide = z.infer<typeof PPTSlideSchema>
 export type PPTDeck = z.infer<typeof PPTDeckSchema>
 
@@ -132,7 +153,7 @@ export function readPPTText(body: PPTTextBody | undefined) {
 
 export function isPPTTextElement(
   element: PPTElement,
-): element is PPTTextBox | PPTShape {
+): element is PPTTextElement {
   return element.kind === 'textBox' ||
     (element.kind === 'shape' && element.textBody !== undefined)
 }
@@ -141,7 +162,7 @@ export function replacePPTElementText(
   element: PPTElement,
   text: string,
 ): PPTElement {
-  if (element.kind === 'image') {
+  if (!isPPTTextElement(element)) {
     return element
   }
 
@@ -155,6 +176,24 @@ export function updatePPTElementGeometry(
   element: PPTElement,
   geometry: PPTGeometry,
 ): PPTElement {
+  if (element.kind === 'line') {
+    const scaleX = element.geometry.w === 0 ? 1 : geometry.w / element.geometry.w
+    const scaleY = element.geometry.h === 0 ? 1 : geometry.h / element.geometry.h
+
+    return {
+      ...element,
+      end: {
+        x: element.end.x * scaleX,
+        y: element.end.y * scaleY,
+      },
+      geometry,
+      start: {
+        x: element.start.x * scaleX,
+        y: element.start.y * scaleY,
+      },
+    }
+  }
+
   return {
     ...element,
     geometry,
