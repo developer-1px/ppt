@@ -174,6 +174,7 @@ import {
   type PPTShape,
   type PPTShapeKind,
   type PPTSlide,
+  type PPTSlideTransition,
   type PPTTable,
   type PPTTextBody,
   type PPTTextAutoFit,
@@ -704,6 +705,12 @@ type PPTSlideMetadataHostCommandEffect = {
   }
   type: 'slide-command-effect'
 }
+type PPTSlideTransitionType = PPTSlideTransition['type']
+type PPTSlideTransitionUpdateField =
+  | 'advanceAfterMs'
+  | 'advanceOnClick'
+  | 'durationMs'
+  | 'type'
 type PPTLayerPaneAriaContract = {
   containerRole: 'tree'
   keyboardModel: 'roving-tabindex'
@@ -995,6 +1002,18 @@ const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
+const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
+  'none',
+  'fade',
+  'push',
+] as const satisfies readonly PPTSlideTransitionType[])
+const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
+  advanceAfterMs: null,
+  advanceOnClick: true,
+  durationMs: 0,
+  type: 'none',
+} as const satisfies PPTSlideTransition)
+const PPT_SLIDE_TRANSITION_DURATION_MAX = 10000
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -1259,6 +1278,10 @@ function App() {
   const activeLayout = useMemo(
     () => getPPTLayoutDescriptor(activeSlide.layoutId),
     [activeSlide.layoutId],
+  )
+  const activeSlideTransition = useMemo(
+    () => getPPTSlideTransition(activeSlide),
+    [activeSlide],
   )
   const activeLayoutPlaceholders = useMemo(
     () => getPPTLayoutPlaceholders(activeLayout),
@@ -3132,6 +3155,24 @@ function App() {
         applyPPTSlideMetadataHostCommandEffect(slide, effect)))
   }
 
+  function updateSlideTransition(
+    field: PPTSlideTransitionUpdateField,
+    value: PPTSlideTransition[PPTSlideTransitionUpdateField],
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+        const transition = getPPTSlideTransition(slide)
+
+        return {
+          ...slide,
+          transition: normalizePPTSlideTransition({
+            ...transition,
+            [field]: value,
+          }),
+        }
+      }))
+  }
+
   function copyHTML() {
     void navigator.clipboard.writeText(exportCode).catch(() => undefined)
   }
@@ -4832,6 +4873,10 @@ function App() {
             data-ppt-layout-id={activeLayout.layoutId}
             data-ppt-slide={activeSlide.id}
             data-ppt-theme-id={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
+            data-ppt-transition-advance-after={activeSlideTransition.advanceAfterMs ?? ''}
+            data-ppt-transition-advance-on-click={activeSlideTransition.advanceOnClick ? 'true' : 'false'}
+            data-ppt-transition-duration={activeSlideTransition.durationMs}
+            data-ppt-transition-type={activeSlideTransition.type}
             style={{ background: activeSlide.background?.color ?? '#ffffff' }}
           >
             {activeSlide.elements.filter((element) => element.visible !== false).map((element) => (
@@ -4932,6 +4977,7 @@ function App() {
         slideMetadataDescriptor={slideMetadataDescriptor}
         slideLayoutId={activeLayout.layoutId}
         slideThemeId={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
+        slideTransition={activeSlideTransition}
         themeColorTokens={PPT_THEME_DESCRIPTOR.colorTokens}
         onCommentBodyChange={updateCommentBody}
         onCommentResolvedChange={updateCommentResolved}
@@ -4957,6 +5003,7 @@ function App() {
         onElementStrokeChange={updateElementStroke}
         onSlideNameChange={updateSlideName}
         onSlideNotesChange={updateSlideNotes}
+        onSlideTransitionChange={updateSlideTransition}
         onTableRowsChange={updateTableRows}
         selectedTextOverflow={selectedTextOverflow}
       />
@@ -5229,6 +5276,8 @@ function PPTPresentationOverlay({
   }
 
   const readableIndex = slideIndex + 1
+  const transition = getPPTSlideTransition(slide)
+  const transitionDuration = Math.max(1, transition.durationMs)
 
   return (
     <div
@@ -5236,8 +5285,12 @@ function PPTPresentationOverlay({
       aria-modal="true"
       className="ppt-presentation"
       data-ppt-presentation
+      data-ppt-presentation-advance-after={transition.advanceAfterMs ?? ''}
+      data-ppt-presentation-advance-on-click={transition.advanceOnClick ? 'true' : 'false'}
       data-ppt-presentation-index={`${readableIndex}/${slideCount}`}
       data-ppt-presentation-slide={slide.id}
+      data-ppt-presentation-transition={transition.type}
+      data-ppt-presentation-transition-duration={transition.durationMs}
       role="dialog"
     >
       <div className="ppt-presentation-header">
@@ -5262,12 +5315,19 @@ function PPTPresentationOverlay({
           }}
         >
           <div
+            key={slide.id}
             className="ppt-slide ppt-presentation-slide"
             data-ppt-presentation-slide-frame
+            data-ppt-transition-advance-after={transition.advanceAfterMs ?? ''}
+            data-ppt-transition-advance-on-click={transition.advanceOnClick ? 'true' : 'false'}
+            data-ppt-transition-duration={transition.durationMs}
+            data-ppt-transition-type={transition.type}
             style={{
+              '--ppt-presentation-scale': String(scale),
+              '--ppt-transition-duration': `${transitionDuration}ms`,
               background: slide.background?.color ?? '#ffffff',
               transform: `scale(${scale})`,
-            }}
+            } as CSSProperties}
           >
             {slide.elements.filter((element) => element.visible !== false).map((element) => (
               <PPTElementView
@@ -5544,6 +5604,54 @@ function groupPPTShortcutHelpItems(
       ? [{ items: sectionItems, section }]
       : []
   })
+}
+
+function getPPTSlideTransition(slide: PPTSlide): PPTSlideTransition {
+  return normalizePPTSlideTransition(slide.transition ?? PPT_DEFAULT_SLIDE_TRANSITION)
+}
+
+function normalizePPTSlideTransition(
+  transition: PPTSlideTransition,
+): PPTSlideTransition {
+  return {
+    advanceAfterMs: transition.advanceAfterMs === null || transition.advanceAfterMs === undefined
+      ? null
+      : clampPPTSlideTransitionDuration(transition.advanceAfterMs),
+    advanceOnClick: transition.advanceOnClick ?? true,
+    durationMs: clampPPTSlideTransitionDuration(transition.durationMs),
+    type: PPT_SLIDE_TRANSITION_TYPES.includes(transition.type)
+      ? transition.type
+      : 'none',
+  }
+}
+
+function clampPPTSlideTransitionDuration(value: number) {
+  return clamp(
+    Number.isFinite(value) ? Math.round(value) : 0,
+    0,
+    PPT_SLIDE_TRANSITION_DURATION_MAX,
+  )
+}
+
+function parsePPTSlideTransitionDuration(value: string) {
+  return clampPPTSlideTransitionDuration(Number(value))
+}
+
+function parsePPTSlideTransitionAdvanceAfter(value: string) {
+  return value.trim() === ''
+    ? null
+    : clampPPTSlideTransitionDuration(Number(value))
+}
+
+function formatPPTSlideTransitionType(type: PPTSlideTransitionType) {
+  switch (type) {
+    case 'fade':
+      return 'Fade'
+    case 'push':
+      return 'Push'
+    case 'none':
+      return 'None'
+  }
 }
 
 function createPPTSlideMetadataInspectorDescriptor({
@@ -7570,6 +7678,7 @@ function Inspector({
   onSlideLayoutChange,
   onSlideNameChange,
   onSlideNotesChange,
+  onSlideTransitionChange,
   onTableRowsChange,
   onTextAutoFit,
   selection,
@@ -7579,6 +7688,7 @@ function Inspector({
   slideMetadataDescriptor,
   slideLayoutId,
   slideThemeId,
+  slideTransition,
   themeColorTokens,
 }: {
   exportCode: string
@@ -7640,6 +7750,10 @@ function Inspector({
   onSlideLayoutChange: (layoutId: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
+  onSlideTransitionChange: (
+    field: PPTSlideTransitionUpdateField,
+    value: PPTSlideTransition[PPTSlideTransitionUpdateField],
+  ) => void
   onTableRowsChange: (elementId: string, value: string) => void
   onTextAutoFit: (elementId: string) => void
   selection: string[]
@@ -7649,6 +7763,7 @@ function Inspector({
   slideMetadataDescriptor: PPTSlideMetadataInspectorDescriptor
   slideLayoutId: string
   slideThemeId: string
+  slideTransition: PPTSlideTransition
   themeColorTokens: readonly SlideEditThemeColorToken[]
 }) {
   const textStyle = selectedElement && isPPTTextElement(selectedElement)
@@ -7768,6 +7883,67 @@ function Inspector({
             onChange={(event) => onSlideNotesChange(event.target.value)}
           />
         </label>
+        <div
+          className="ppt-slide-transition-fields"
+          data-ppt-slide-transition
+          data-ppt-transition-advance-after={slideTransition.advanceAfterMs ?? ''}
+          data-ppt-transition-advance-on-click={slideTransition.advanceOnClick ? 'true' : 'false'}
+          data-ppt-transition-duration={slideTransition.durationMs}
+          data-ppt-transition-type={slideTransition.type}
+        >
+          <label className="ppt-field">
+            <span>Transition</span>
+            <select
+              data-ppt-slide-transition-field="type"
+              value={slideTransition.type}
+              onChange={(event) =>
+                onSlideTransitionChange('type', event.target.value as PPTSlideTransitionType)}
+            >
+              {PPT_SLIDE_TRANSITION_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {formatPPTSlideTransitionType(type)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ppt-field">
+            <span>Duration</span>
+            <input
+              data-ppt-slide-transition-field="durationMs"
+              max={PPT_SLIDE_TRANSITION_DURATION_MAX}
+              min={0}
+              step={100}
+              type="number"
+              value={slideTransition.durationMs}
+              onChange={(event) =>
+                onSlideTransitionChange('durationMs', parsePPTSlideTransitionDuration(event.target.value))}
+            />
+          </label>
+          <label className="ppt-checkbox-field">
+            <input
+              checked={slideTransition.advanceOnClick}
+              data-ppt-slide-transition-field="advanceOnClick"
+              type="checkbox"
+              onChange={(event) =>
+                onSlideTransitionChange('advanceOnClick', event.target.checked)}
+            />
+            <span>On click</span>
+          </label>
+          <label className="ppt-field">
+            <span>After</span>
+            <input
+              data-ppt-slide-transition-field="advanceAfterMs"
+              max={PPT_SLIDE_TRANSITION_DURATION_MAX}
+              min={0}
+              placeholder="none"
+              step={500}
+              type="number"
+              value={slideTransition.advanceAfterMs ?? ''}
+              onChange={(event) =>
+                onSlideTransitionChange('advanceAfterMs', parsePPTSlideTransitionAdvanceAfter(event.target.value))}
+            />
+          </label>
+        </div>
         <div className="ppt-slide-metadata-readouts">
           <span
             className="ppt-slide-metadata-readout"

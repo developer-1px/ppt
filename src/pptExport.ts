@@ -31,9 +31,10 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     const themeAttr = slide.themeId
       ? ` data-ppt-theme-id="${escapeHtml(slide.themeId)}"`
       : ''
+    const transitionAttrs = getPPTSlideTransitionAttrs(slide, 'data-ppt-transition')
 
     return [
-      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
+      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
       elements,
       '  </section>',
       renderPPTSlideNotesHTML(slide.id, slide.notes),
@@ -144,9 +145,28 @@ function getPPTSlideLayoutThemeSvgAttrs(slide: PPTSlide) {
   const attrs = [
     slide.layoutId ? `data-ppt-svg-layout-id="${escapeHtml(slide.layoutId)}"` : '',
     slide.themeId ? `data-ppt-svg-theme-id="${escapeHtml(slide.themeId)}"` : '',
+    getPPTSlideTransitionAttrs(slide, 'data-ppt-svg-transition').trim(),
   ].filter(Boolean)
 
   return attrs.length > 0 ? ` ${attrs.join(' ')}` : ''
+}
+
+function getPPTSlideTransitionAttrs(slide: PPTSlide, prefix: string) {
+  if (!slide.transition) {
+    return ''
+  }
+
+  const attrs = [
+    `${prefix}-type="${escapeHtml(slide.transition.type)}"`,
+    `${prefix}-duration="${slide.transition.durationMs}"`,
+    `${prefix}-advance-on-click="${slide.transition.advanceOnClick === false ? 'false' : 'true'}"`,
+  ]
+
+  if (slide.transition.advanceAfterMs !== null && slide.transition.advanceAfterMs !== undefined) {
+    attrs.push(`${prefix}-advance-after="${slide.transition.advanceAfterMs}"`)
+  }
+
+  return ` ${attrs.join(' ')}`
 }
 
 function renderPPTElementHTML(element: PPTElement) {

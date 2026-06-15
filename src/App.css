@@ -585,6 +585,14 @@
   box-shadow: 0 28px 80px rgb(0 0 0 / 42%);
 }
 
+.ppt-presentation-slide[data-ppt-transition-type='fade'] {
+  animation: ppt-presentation-fade var(--ppt-transition-duration, 160ms) ease-out;
+}
+
+.ppt-presentation-slide[data-ppt-transition-type='push'] {
+  animation: ppt-presentation-push var(--ppt-transition-duration, 160ms) ease-out;
+}
+
 .ppt-presentation-slide .ppt-element {
   pointer-events: none;
 }
@@ -592,6 +600,19 @@
 .ppt-presentation-controls {
   justify-content: center;
   border-top: 1px solid rgb(148 163 184 / 24%);
+}
+
+@keyframes ppt-presentation-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ppt-presentation-push {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(var(--ppt-presentation-scale, 1));
+  }
 }
 
 .ppt-zoom-label {
@@ -1346,6 +1367,12 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ppt-slide-transition-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(72px, 0.9fr);
+  gap: 8px;
 }
 
 .ppt-slide-metadata-readouts {

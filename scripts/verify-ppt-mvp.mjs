@@ -47,6 +47,7 @@ try {
   await runShortcutHelpScenario(page)
   await runSlideMetadataScenario(page)
   await runThemeScenario(page)
+  await runSlideTransitionScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
@@ -2706,6 +2707,8 @@ async function runExportScenario(page) {
       hasTextAutoFitModel: code.includes('"textAutoFit": "resizeShapeToFitText"'),
       hasThemeMarkup: code.includes('data-ppt-theme-id="ppt-theme-default"'),
       hasThemeModel: code.includes('"themeId": "ppt-theme-default"'),
+      hasTransitionMarkup: code.includes('data-ppt-transition-type="push"') && code.includes('data-ppt-transition-duration="650"') && code.includes('data-ppt-transition-advance-on-click="false"') && code.includes('data-ppt-transition-advance-after="3000"'),
+      hasTransitionModel: code.includes('"transition"') && code.includes('"type": "push"') && code.includes('"durationMs": 650') && code.includes('"advanceOnClick": false') && code.includes('"advanceAfterMs": 3000'),
       hasUnderlineMarkup: code.includes('data-ppt-run-underline="true"') && code.includes('text-decoration:underline'),
       hasUnderlineModel: code.includes('"underline": true'),
     }
@@ -2726,6 +2729,7 @@ async function runExportScenario(page) {
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
   record('exports PPT layout/theme metadata', state.hasLayoutMarkup && state.hasLayoutModel && state.hasThemeMarkup && state.hasThemeModel, state)
+  record('exports PPT slide transition metadata', state.hasTransitionMarkup && state.hasTransitionModel, state)
   record('exports inserted PPT table markup and model data', state.hasTableMarkup && state.hasTableModel, state)
   record('exports PPT text auto-fit markup and model data', state.hasTextAutoFitMarkup && state.hasTextAutoFitModel, state)
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
@@ -2755,6 +2759,7 @@ async function runExportScenario(page) {
       hasText: text.includes('data-ppt-kind="textBox"') && text.includes('<text '),
       hasTextAutoFit: text.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
       hasTheme: text.includes('data-ppt-svg-theme-id="ppt-theme-default"'),
+      hasTransition: text.includes('data-ppt-svg-transition-type="push"') && text.includes('data-ppt-svg-transition-duration="650"') && text.includes('data-ppt-svg-transition-advance-on-click="false"') && text.includes('data-ppt-svg-transition-advance-after="3000"'),
       type: download.type ?? '',
     }
   })()`)
@@ -2763,6 +2768,7 @@ async function runExportScenario(page) {
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
+  record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
   await selectPPTLayerRows(page, [imageId])
@@ -3098,6 +3104,116 @@ async function runViewAndShapeScenario(page) {
   }))()`)
 
   record('updates PPT speaker notes in inspector', afterNotes.notes === 'Presenter cue: review image crop and final CTA.', afterNotes)
+}
+
+async function runSlideTransitionScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const initial = await getPPTSlideTransitionState(page)
+
+  record(
+    'renders PPT slide transition/timing controls in inspector',
+    initial.inspector &&
+      initial.type === 'none' &&
+      initial.duration === '0' &&
+      initial.advanceOnClick === 'true' &&
+      initial.advanceAfter === '' &&
+      initial.stageType === 'none',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const type = document.querySelector('[data-ppt-slide-transition-field="type"]')
+    const duration = document.querySelector('[data-ppt-slide-transition-field="durationMs"]')
+    const advanceOnClick = document.querySelector('[data-ppt-slide-transition-field="advanceOnClick"]')
+    const advanceAfter = document.querySelector('[data-ppt-slide-transition-field="advanceAfterMs"]')
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    selectSetter.call(type, 'fade')
+    type.dispatchEvent(new Event('input', { bubbles: true }))
+    type.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(duration, '650')
+    duration.dispatchEvent(new Event('input', { bubbles: true }))
+    duration.dispatchEvent(new Event('change', { bubbles: true }))
+
+    if (advanceOnClick.checked) {
+      advanceOnClick.click()
+    }
+
+    inputSetter.call(advanceAfter, '3000')
+    advanceAfter.dispatchEvent(new Event('input', { bubbles: true }))
+    advanceAfter.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterFade = await getPPTSlideTransitionState(page)
+
+  record(
+    'updates PPT slide transition/timing metadata from inspector',
+    afterFade.type === 'fade' &&
+      afterFade.duration === '650' &&
+      afterFade.advanceOnClick === 'false' &&
+      afterFade.advanceAfter === '3000' &&
+      afterFade.stageType === 'fade' &&
+      afterFade.stageDuration === '650' &&
+      afterFade.stageAdvanceOnClick === 'false' &&
+      afterFade.stageAdvanceAfter === '3000',
+    {
+      afterFade,
+      initial,
+    },
+  )
+
+  await page.eval(`(() => {
+    const type = document.querySelector('[data-ppt-slide-transition-field="type"]')
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+
+    selectSetter.call(type, 'push')
+    type.dispatchEvent(new Event('input', { bubbles: true }))
+    type.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterPush = await getPPTSlideTransitionState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTSlideTransitionState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTSlideTransitionState(page)
+
+  record(
+    'undoes and redoes PPT slide transition type as one history step',
+    afterPush.type === 'push' &&
+      afterUndo.type === 'fade' &&
+      afterRedo.type === 'push' &&
+      afterRedo.duration === '650' &&
+      afterRedo.advanceOnClick === 'false' &&
+      afterRedo.advanceAfter === '3000',
+    {
+      afterFade,
+      afterPush,
+      afterRedo,
+      afterUndo,
+    },
+  )
 }
 
 async function runImageImportScenario(page) {
@@ -4518,12 +4634,16 @@ async function runPresentationScenario(page) {
     before,
   })
 
+  record('applies PPT slide transition metadata in presentation preview', afterToolbarStart.transitionType === 'push' && afterToolbarStart.transitionDuration === '650' && afterToolbarStart.advanceOnClick === 'false' && afterToolbarStart.advanceAfter === '3000', {
+    afterToolbarStart,
+  })
+
   await page.eval(`document.querySelector('[data-ppt-present-next]')?.click()`)
   await delay(80)
 
   const afterNext = await getPPTPresentationState(page)
 
-  record('moves PPT presentation preview to next slide button', afterNext.open && afterNext.slideId === 'slide-2' && afterNext.index === '2/2' && afterNext.activeSlide === before.activeSlide && afterNext.selectedIds === before.selectedIds, {
+  record('moves PPT presentation preview to next slide button', afterNext.open && afterNext.slideId === 'slide-2' && afterNext.index === '2/2' && afterNext.activeSlide === before.activeSlide && afterNext.selectedIds === before.selectedIds && afterNext.transitionType === 'none', {
     afterNext,
     before,
   })
@@ -4633,6 +4753,8 @@ async function getPPTPresentationState(page) {
 
     return {
       activeSlide: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-name')?.textContent ?? '',
+      advanceAfter: overlay?.getAttribute('data-ppt-presentation-advance-after') ?? '',
+      advanceOnClick: overlay?.getAttribute('data-ppt-presentation-advance-on-click') ?? '',
       index: overlay?.getAttribute('data-ppt-presentation-index') ?? '',
       open: !!overlay,
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
@@ -4643,6 +4765,8 @@ async function getPPTPresentationState(page) {
         .join(','),
       slideId: overlay?.getAttribute('data-ppt-presentation-slide') ?? '',
       title: overlay?.querySelector('[data-ppt-presentation-title]')?.textContent ?? '',
+      transitionDuration: overlay?.getAttribute('data-ppt-presentation-transition-duration') ?? '',
+      transitionType: overlay?.getAttribute('data-ppt-presentation-transition') ?? '',
       visibleElementCount: overlay?.querySelectorAll('[data-ppt-element]').length ?? 0,
     }
   })()`)
@@ -4933,6 +5057,29 @@ function getPPTSlideMetadataState(page) {
       slidePriority: inspector?.getAttribute('data-ppt-slide-inspector-priority') ?? '',
       surface: inspector?.getAttribute('data-ppt-slide-metadata-surface') ?? '',
       thumbName: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-name')?.textContent ?? '',
+    }
+  })()`)
+}
+
+function getPPTSlideTransitionState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('[data-ppt-slide-transition]')
+    const stage = document.querySelector('.ppt-stage-world .ppt-slide')
+
+    return {
+      advanceAfter: document.querySelector('[data-ppt-slide-transition-field="advanceAfterMs"]')?.value ?? '',
+      advanceOnClick: document.querySelector('[data-ppt-slide-transition-field="advanceOnClick"]')?.checked ? 'true' : 'false',
+      duration: document.querySelector('[data-ppt-slide-transition-field="durationMs"]')?.value ?? '',
+      inspector: !!inspector,
+      inspectorAdvanceAfter: inspector?.getAttribute('data-ppt-transition-advance-after') ?? '',
+      inspectorAdvanceOnClick: inspector?.getAttribute('data-ppt-transition-advance-on-click') ?? '',
+      inspectorDuration: inspector?.getAttribute('data-ppt-transition-duration') ?? '',
+      inspectorType: inspector?.getAttribute('data-ppt-transition-type') ?? '',
+      stageAdvanceAfter: stage?.getAttribute('data-ppt-transition-advance-after') ?? '',
+      stageAdvanceOnClick: stage?.getAttribute('data-ppt-transition-advance-on-click') ?? '',
+      stageDuration: stage?.getAttribute('data-ppt-transition-duration') ?? '',
+      stageType: stage?.getAttribute('data-ppt-transition-type') ?? '',
+      type: document.querySelector('[data-ppt-slide-transition-field="type"]')?.value ?? '',
     }
   })()`)
 }
