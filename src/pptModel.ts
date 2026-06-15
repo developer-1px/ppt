@@ -87,6 +87,7 @@ const PPTElementBaseSchema = z.object({
   id: z.string(),
   locked: z.boolean().optional(),
   name: z.string(),
+  opacity: z.number().optional(),
   visible: z.boolean().optional(),
 })
 
@@ -146,7 +147,6 @@ const PPTLineSchema = PPTElementBaseSchema.extend({
 
 const PPTFreeformSchema = PPTElementBaseSchema.extend({
   kind: z.literal('freeform'),
-  opacity: z.number().optional(),
   points: z.array(PPTLinePointSchema).min(1),
   stroke: PPTStrokeSchema,
 })

@@ -1056,6 +1056,9 @@ const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
 } as const satisfies PPTTextInset)
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
+const PPT_ELEMENT_OPACITY_MIN = 0
+const PPT_ELEMENT_OPACITY_MAX = 1
+const PPT_ELEMENT_OPACITY_STEP = 0.05
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
   'fade',
@@ -2655,6 +2658,15 @@ function App() {
           ...element.geometry,
           rotation: normalizePPTElementRotation(rotation),
         },
+      })),
+    )
+  }
+
+  function updateElementOpacity(elementId: string, opacity: number) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
+        ...element,
+        opacity: normalizePPTElementOpacity(opacity),
       })),
     )
   }
@@ -5157,6 +5169,7 @@ function App() {
         onImageCropChange={updateImageCrop}
         onImageFitChange={updateImageFit}
         onElementNameChange={updateElementName}
+        onElementOpacityChange={updateElementOpacity}
         onElementRotationChange={updateElementRotation}
         onElementTextInsetChange={updateElementTextInset}
         onLineMarkerChange={updateLineMarker}
@@ -7334,6 +7347,7 @@ function SlideThumb({
               : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+            data-ppt-thumb-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
               : undefined}
@@ -7377,6 +7391,7 @@ function SlideThumb({
                 ? getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))
                 : undefined,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
+              opacity: getPPTElementOpacity(element),
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
               transform: getPPTElementTransform(element),
               width: `${(element.geometry.w / PPT_SLIDE_WIDTH) * 100}%`,
@@ -7520,6 +7535,7 @@ function PPTElementView({
       data-ppt-animation-order={animation.order}
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
+      data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
       data-ppt-font-family={isPPTTextElement(element)
         ? normalizePPTTextFontFamily(textStyle?.fontFamily)
         : undefined}
@@ -8042,6 +8058,7 @@ function Inspector({
   onElementAnimationChange,
   onElementGeometryChange,
   onElementNameChange,
+  onElementOpacityChange,
   onElementRotationChange,
   onElementStrokeChange,
   onElementTextInsetChange,
@@ -8094,6 +8111,7 @@ function Inspector({
     value: number,
   ) => void
   onElementNameChange: (elementId: string, name: string) => void
+  onElementOpacityChange: (elementId: string, opacity: number) => void
   onElementRotationChange: (elementId: string, rotation: number) => void
   onElementStrokeChange: (
     elementId: string,
@@ -8390,6 +8408,22 @@ function Inspector({
                 value={selectedElement.name}
                 onChange={(event) =>
                   onElementNameChange(selectedElement.id, event.target.value)}
+              />
+            </label>
+            <label className="ppt-field">
+              <span>Opacity</span>
+              <input
+                data-ppt-style-field="opacity"
+                max={PPT_ELEMENT_OPACITY_MAX}
+                min={PPT_ELEMENT_OPACITY_MIN}
+                step={PPT_ELEMENT_OPACITY_STEP}
+                type="number"
+                value={getPPTElementOpacity(selectedElement)}
+                onChange={(event) =>
+                  onElementOpacityChange(
+                    selectedElement.id,
+                    parsePPTElementOpacity(event.target.value),
+                  )}
               />
             </label>
             <div className="ppt-geometry-grid">
@@ -9113,6 +9147,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
   const base: CSSProperties = {
     height: element.geometry.h,
     left: element.geometry.x,
+    opacity: getPPTElementOpacity(element),
     top: element.geometry.y,
     transform: getPPTElementTransform(element),
     transformOrigin: 'center',
@@ -9566,6 +9601,25 @@ function getPPTTextInsetCSS(inset: PPTTextInset) {
 
 function formatPPTTextInsetData(inset: PPTTextInset) {
   return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
+}
+
+function getPPTElementOpacity(element: PPTElement) {
+  return normalizePPTElementOpacity(element.opacity ?? 1)
+}
+
+function parsePPTElementOpacity(value: string) {
+  return normalizePPTElementOpacity(Number(value))
+}
+
+function normalizePPTElementOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 1
+  const clamped = clamp(finiteValue, PPT_ELEMENT_OPACITY_MIN, PPT_ELEMENT_OPACITY_MAX)
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTElementOpacity(value: number) {
+  return String(normalizePPTElementOpacity(value))
 }
 
 function getPPTSelectionCommandAnchor({

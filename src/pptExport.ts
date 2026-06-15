@@ -60,6 +60,8 @@ const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
   right: 18,
   top: 18,
 } as const satisfies PPTTextInset)
+const PPT_ELEMENT_OPACITY_MIN = 0
+const PPT_ELEMENT_OPACITY_MAX = 1
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -215,11 +217,14 @@ function getPPTSlideTransitionAttrs(slide: PPTSlide, prefix: string) {
 function renderPPTElementHTML(element: PPTElement) {
   const transform = getPPTElementTransform(element)
   const transformAttrs = getPPTElementTransformAttrs(element)
+  const opacity = getPPTElementOpacity(element)
+  const opacityAttr = ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(opacity))}"`
   const style = [
     `left:${toPercent(element.geometry.x, PPT_SLIDE_WIDTH)}`,
     `top:${toPercent(element.geometry.y, PPT_SLIDE_HEIGHT)}`,
     `width:${toPercent(element.geometry.w, PPT_SLIDE_WIDTH)}`,
     `height:${toPercent(element.geometry.h, PPT_SLIDE_HEIGHT)}`,
+    `opacity:${formatPPTElementOpacity(opacity)}`,
     transform
       ? `transform:${transform}`
       : '',
@@ -232,7 +237,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -269,10 +274,10 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -588,7 +593,7 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
       : '',
   ].filter(Boolean).join(' ')
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementOpacityHTMLAttr(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
 }
 
 function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
@@ -596,9 +601,10 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     `data-ppt-element="${escapeHtml(element.id)}"`,
     `data-ppt-kind="freeform"`,
     `data-ppt-freeform-points="${element.points.length}"`,
+    getPPTElementOpacityHTMLAttr(element).trim(),
   ].join(' ')
 
-  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${formatNumber(element.opacity ?? 1)}"></path></svg>`
+  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"></path></svg>`
 }
 
 function renderPPTFreeformSVG(element: PPTFreeform) {
@@ -607,7 +613,7 @@ function renderPPTFreeformSVG(element: PPTFreeform) {
     `data-ppt-freeform-points="${element.points.length}"`,
   ].join(' ')
 
-  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${formatNumber(element.opacity ?? 1)}"></path></g>`
+  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"></path></g>`
 }
 
 function renderPPTCommentHTML(
@@ -621,7 +627,7 @@ function renderPPTCommentHTML(
     ? ' data-ppt-comment-resolved="true"'
     : ''
 
-  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
+  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementOpacityHTMLAttr(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
 }
 
 function renderPPTCommentSVG(element: PPTComment) {
@@ -664,6 +670,7 @@ function renderPPTTableHTML(
     `class="ppt-element ppt-table"`,
     `data-ppt-element="${escapeHtml(element.id)}"`,
     transformAttrs.trim(),
+    getPPTElementOpacityHTMLAttr(element).trim(),
     `data-ppt-table-rows="${rowCount}"`,
     `data-ppt-table-cols="${columnCount}"`,
     `style="${style.filter(Boolean).join(';')}"`,
@@ -731,6 +738,10 @@ function getPPTElementTransformAttrs(element: PPTElement) {
   ].join('')
 }
 
+function getPPTElementOpacityHTMLAttr(element: PPTElement) {
+  return ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`
+}
+
 function getPPTElementAnimationHTMLAttrs(element: PPTElement) {
   return getPPTElementAnimationAttrEntries(element)
     .map((attr) => ` ${attr}`)
@@ -779,6 +790,8 @@ function getPPTElementSVGAttrs(element: PPTElement) {
   return [
     `data-ppt-element="${escapeHtml(element.id)}"`,
     `data-ppt-kind="${element.kind}"`,
+    `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
+    `opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     element.kind === 'shape'
       ? `data-ppt-shape="${element.shape}"`
       : '',
@@ -993,6 +1006,21 @@ function getPPTTextInsetCSS(inset: PPTTextInset) {
 
 function formatPPTTextInsetData(inset: PPTTextInset) {
   return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
+}
+
+function getPPTElementOpacity(element: PPTElement) {
+  return normalizePPTElementOpacity(element.opacity ?? 1)
+}
+
+function normalizePPTElementOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 1
+  const clamped = Math.min(PPT_ELEMENT_OPACITY_MAX, Math.max(PPT_ELEMENT_OPACITY_MIN, finiteValue))
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTElementOpacity(value: number) {
+  return String(normalizePPTElementOpacity(value))
 }
 
 function getPPTTextVerticalAlignOffset({

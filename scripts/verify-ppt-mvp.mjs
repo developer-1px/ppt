@@ -49,6 +49,7 @@ try {
   await runThemeScenario(page)
   await runSlideTransitionScenario(page)
   await runObjectAnimationScenario(page)
+  await runObjectOpacityScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
@@ -3130,6 +3131,8 @@ async function runExportScenario(page) {
       hasCommentModel: code.includes('"kind": "comment"') && code.includes('"resolved": true') && code.includes('"body": "Review CTA wording"'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
+      hasObjectOpacityMarkup: code.includes('data-ppt-opacity="0.42"') && code.includes('opacity:0.42'),
+      hasObjectOpacityModel: code.includes('"opacity": 0.42'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
@@ -3177,6 +3180,7 @@ async function runExportScenario(page) {
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
+  record('exports PPT object opacity metadata', state.hasObjectOpacityMarkup && state.hasObjectOpacityModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
@@ -3211,6 +3215,7 @@ async function runExportScenario(page) {
       download: download.download ?? '',
       hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
+      hasObjectOpacity: text.includes('data-ppt-opacity="0.42"') && text.includes('opacity="0.42"'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
@@ -3236,6 +3241,7 @@ async function runExportScenario(page) {
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
+  record('exports PPT object opacity metadata into slide SVG', slideSvgState.hasObjectOpacity, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
@@ -3826,6 +3832,116 @@ async function runObjectAnimationScenario(page) {
       preview.duration === '800' &&
       preview.delay === '200' &&
       preview.order === '2',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
+async function runObjectOpacityScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const cardPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, cardPoint.x, cardPoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTObjectOpacityState(page)
+  const targetId = initial.selectedId
+
+  record(
+    'renders PPT object opacity control in inspector',
+    targetId.length > 0 &&
+      initial.opacity === '1' &&
+      initial.selectedOpacity === '1' &&
+      initial.thumbOpacity === '1',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const opacity = document.querySelector('[data-ppt-style-field="opacity"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(opacity, '0.42')
+    opacity.dispatchEvent(new Event('input', { bubbles: true }))
+    opacity.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterOpacity = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'updates PPT object opacity metadata from inspector',
+    afterOpacity.opacity === '0.42' &&
+      afterOpacity.selectedOpacity === '0.42' &&
+      afterOpacity.selectedStyleOpacity === '0.42' &&
+      afterOpacity.thumbOpacity === '0.42' &&
+      afterOpacity.thumbStyleOpacity === '0.42',
+    {
+      afterOpacity,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTObjectOpacityState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'undoes and redoes PPT object opacity as one history step',
+    afterUndo.opacity === '1' &&
+      afterUndo.selectedOpacity === '1' &&
+      afterRedo.opacity === '0.42' &&
+      afterRedo.selectedOpacity === '0.42',
+    {
+      afterOpacity,
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(${JSON.stringify(`[data-ppt-element="${targetId}"]`)})
+
+    return {
+      opacity: element?.getAttribute('data-ppt-opacity') ?? '',
+      open: !!overlay,
+      styleOpacity: element?.style.opacity ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT object opacity metadata in presentation preview',
+    preview.open &&
+      preview.opacity === '0.42' &&
+      preview.styleOpacity === '0.42',
     preview,
   )
 
@@ -5741,6 +5857,23 @@ function getPPTObjectAnimationPreviewState(page, elementId) {
       order: element?.getAttribute('data-ppt-animation-order') ?? '',
       trigger: element?.getAttribute('data-ppt-animation-trigger') ?? '',
       type: element?.getAttribute('data-ppt-animation-type') ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
+function getPPTObjectOpacityState(page, elementId) {
+  return page.eval(`((id) => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = id || selected?.getAttribute('data-ppt-element') || ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+
+    return {
+      opacity: document.querySelector('[data-ppt-style-field="opacity"]')?.value ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedOpacity: selected?.getAttribute('data-ppt-opacity') ?? '',
+      selectedStyleOpacity: selected?.style.opacity ?? '',
+      thumbOpacity: thumb?.getAttribute('data-ppt-thumb-opacity') ?? '',
+      thumbStyleOpacity: thumb?.style.opacity ?? '',
     }
   })(${JSON.stringify(elementId)})`)
 }
