@@ -3145,6 +3145,8 @@ async function runExportScenario(page) {
       hasObjectHyperlinkModel: code.includes('"hyperlink"') && code.includes('"url": "https://example.com/ppt"'),
       hasObjectAltTextMarkup: code.includes('data-ppt-alt-text="' + objectAltText + '"') && code.includes('alt="' + objectAltText + '"'),
       hasObjectAltTextModel: code.includes('"accessibility"') && code.includes('"altText": "' + objectAltText + '"'),
+      hasStrokeDashMarkup: code.includes('data-ppt-stroke-dash="dash"') && code.includes('border-style:dashed') && code.includes('data-ppt-stroke-dash="dot"') && code.includes('stroke-dasharray='),
+      hasStrokeDashModel: code.includes('"dash": "dash"') && code.includes('"dash": "dot"'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
@@ -3196,6 +3198,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
   record('exports PPT object hyperlink metadata', state.hasObjectHyperlinkMarkup && state.hasObjectHyperlinkModel, state)
   record('exports PPT object alt text metadata', state.hasObjectAltTextMarkup && state.hasObjectAltTextModel, state)
+  record('exports PPT stroke dash style metadata', state.hasStrokeDashMarkup && state.hasStrokeDashModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
@@ -3235,6 +3238,7 @@ async function runExportScenario(page) {
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
       hasObjectHyperlink: text.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
       hasObjectAltText: text.includes('data-ppt-alt-text="' + objectAltText + '"') && text.includes('<title>' + objectAltText + '</title>'),
+      hasStrokeDash: text.includes('data-ppt-stroke-dash="dash"') && text.includes('data-ppt-stroke-dash="dot"') && text.includes('stroke-dasharray='),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
@@ -3264,6 +3268,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
   record('exports PPT object hyperlink metadata into slide SVG', slideSvgState.hasObjectHyperlink, slideSvgState)
   record('exports PPT object alt text metadata into slide SVG', slideSvgState.hasObjectAltText, slideSvgState)
+  record('exports PPT stroke dash style metadata into slide SVG', slideSvgState.hasStrokeDash, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
@@ -3482,6 +3487,53 @@ async function runViewAndShapeScenario(page) {
     afterDragRect,
     dragRect,
   })
+
+  await page.eval(`(() => {
+    const dash = document.querySelector('[data-ppt-style-field="stroke-dash"]')
+    dash.value = 'dash'
+    dash.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterShapeDash = await getPPTShapeStrokeDashState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterShapeDashUndo = await getPPTShapeStrokeDashState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterShapeDashRedo = await getPPTShapeStrokeDashState(page)
+
+  record(
+    'updates and restores PPT shape outline dash style from inspector',
+    afterShapeDash.inspectorDash === 'dash' &&
+      afterShapeDash.selectedDash === 'dash' &&
+      afterShapeDash.selectedBorderStyle === 'dashed' &&
+      afterShapeDash.thumbDash === 'dash' &&
+      afterShapeDash.thumbBorderStyle === 'dashed' &&
+      afterShapeDashUndo.inspectorDash === 'solid' &&
+      afterShapeDashUndo.selectedDash === 'solid' &&
+      afterShapeDashRedo.inspectorDash === 'dash' &&
+      afterShapeDashRedo.selectedDash === 'dash',
+    {
+      afterShapeDash,
+      afterShapeDashRedo,
+      afterShapeDashUndo,
+    },
+  )
 
   await pressKey(page, {
     code: 'KeyT',
@@ -4997,6 +5049,7 @@ async function runLineAffordanceScenario(page) {
   await page.eval(`(() => {
     const color = document.querySelector('[data-ppt-style-field="line-stroke-color"]')
     const width = document.querySelector('[data-ppt-style-field="line-stroke-width"]')
+    const dash = document.querySelector('[data-ppt-style-field="line-stroke-dash"]')
     const marker = document.querySelector('[data-ppt-style-field="line-end-marker"]')
     const colorSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     const widthSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
@@ -5006,6 +5059,8 @@ async function runLineAffordanceScenario(page) {
     widthSetter.call(width, '7')
     width.dispatchEvent(new Event('input', { bubbles: true }))
     width.dispatchEvent(new Event('change', { bubbles: true }))
+    dash.value = 'dot'
+    dash.dispatchEvent(new Event('change', { bubbles: true }))
     marker.value = 'arrow'
     marker.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
@@ -5013,7 +5068,31 @@ async function runLineAffordanceScenario(page) {
 
   const afterStyle = await getPPTLineState(page)
 
-  record('updates PPT line stroke and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.markerEnd.includes('url('), afterStyle)
+  record('updates PPT line stroke, dash style, and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.inspectorDash === 'dot' && afterStyle.selectedDash === 'dot' && afterStyle.strokeDasharray !== '' && afterStyle.thumbDash === 'dot' && afterStyle.markerEnd.includes('url('), afterStyle)
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`((id) => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const stroke = element?.querySelector('line, [data-ppt-line-path]')
+
+    return {
+      dash: element?.getAttribute('data-ppt-stroke-dash') ?? '',
+      dasharray: stroke?.getAttribute('stroke-dasharray') ?? '',
+      open: !!overlay,
+    }
+  })(${JSON.stringify(lineId)})`)
+
+  record(
+    'keeps PPT line dash style in presentation preview',
+    preview.open && preview.dash === 'dot' && preview.dasharray !== '',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
 
   await page.eval(`(() => {
     const route = document.querySelector('[data-ppt-style-field="line-route"]')
@@ -6224,17 +6303,21 @@ function getPPTLineState(page, elementId = null) {
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
       hasPath: !!selectedPath,
+      inspectorDash: document.querySelector('[data-ppt-style-field="line-stroke-dash"]')?.value ?? '',
       markerEnd: selectedStrokeElement?.getAttribute('marker-end') ?? '',
       pathD: selectedPath?.getAttribute('d') ?? '',
       route: selected?.getAttribute('data-line-route') ?? '',
       routeHandleCount: document.querySelectorAll('[data-ppt-line-route-handle]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       startConnection: selected?.getAttribute('data-line-start-connection') ?? '',
       stroke: selectedStrokeElement?.getAttribute('stroke') ?? '',
+      strokeDasharray: selectedStrokeElement?.getAttribute('stroke-dasharray') ?? '',
       strokeWidth: selectedStrokeElement?.getAttribute('stroke-width') ?? '',
+      thumbDash: document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${selected?.getAttribute('data-ppt-element') ?? ''}"]\`)?.getAttribute('data-ppt-thumb-stroke-dash') ?? '',
       thumbLineCount: document.querySelectorAll('.ppt-thumb-line').length,
       endpointHandleCount: document.querySelectorAll('[data-ppt-line-endpoint]').length,
       x1,
@@ -6245,6 +6328,24 @@ function getPPTLineState(page, elementId = null) {
       worldX2: left + x2,
       worldY1: top + y1,
       worldY2: top + y2,
+    }
+  })()`)
+}
+
+function getPPTShapeStrokeDashState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = selected?.getAttribute('data-ppt-element') ?? ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+
+    return {
+      inspectorDash: document.querySelector('[data-ppt-style-field="stroke-dash"]')?.value ?? '',
+      selectedBorderStyle: selected?.style.borderStyle ?? '',
+      selectedDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
+      selectedId: targetId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      thumbBorderStyle: thumb?.style.borderStyle ?? '',
+      thumbDash: thumb?.getAttribute('data-ppt-thumb-stroke-dash') ?? '',
     }
   })()`)
 }

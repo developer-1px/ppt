@@ -12,6 +12,7 @@ const PPTFillSchema = z.object({
 
 const PPTStrokeSchema = z.object({
   color: z.string(),
+  dash: z.enum(['solid', 'dash', 'dot']).optional(),
   width: z.number(),
 })
 
@@ -224,6 +225,7 @@ export const PPTDeckSchema = z.object({
 
 export type PPTFill = z.infer<typeof PPTFillSchema>
 export type PPTStroke = z.infer<typeof PPTStrokeSchema>
+export type PPTStrokeDash = NonNullable<PPTStroke['dash']>
 export type PPTGeometry = z.infer<typeof PPTGeometrySchema>
 export type PPTRun = z.infer<typeof PPTRunSchema>
 export type PPTParagraph = z.infer<typeof PPTParagraphSchema>

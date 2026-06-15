@@ -15,6 +15,8 @@ import {
   type PPTRun,
   type PPTShape,
   type PPTSlide,
+  type PPTStroke,
+  type PPTStrokeDash,
   type PPTTable,
   type PPTTextBody,
   type PPTTextStyle,
@@ -80,6 +82,7 @@ const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
+const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(['solid', 'dash', 'dot'])
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -237,6 +240,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const transformAttrs = getPPTElementTransformAttrs(element)
   const altTextAttr = getPPTElementAltTextHTMLAttr(element)
   const hyperlinkAttr = getPPTElementHyperlinkHTMLAttr(element)
+  const strokeDashAttr = getPPTElementStrokeDashHTMLAttr(element)
   const opacity = getPPTElementOpacity(element)
   const opacityAttr = ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(opacity))}"`
   const shadowAttrs = getPPTElementShadowHTMLAttrs(element)
@@ -296,7 +300,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
   return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
@@ -356,7 +360,7 @@ function renderPPTImageSVG(element: PPTImage) {
 function renderPPTShapeSVG(element: PPTShape) {
   const fill = element.fill.color
   const stroke = element.stroke
-    ? ` stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"`
+    ? ` stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)}`
     : ' stroke="none"'
 
   if (element.shape === 'ellipse') {
@@ -396,7 +400,7 @@ function renderPPTLineSVG(element: PPTLine) {
     : ''
   const route = element.route ?? 'straight'
   const lineMarkup = route === 'elbow'
-    ? `<path data-ppt-line-path d="${getPPTLineSVGPath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
+    ? `<path data-ppt-line-path d="${getPPTLineSVGPath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
     : renderPPTStraightLineSVG(element, markerStart, markerEnd)
   const connectionAttrs = [
     `data-ppt-line-route="${route}"`,
@@ -419,7 +423,7 @@ function renderPPTStraightLineSVG(
   const start = getPPTLineWorldPoint(element, element.start)
   const end = getPPTLineWorldPoint(element, element.end)
 
-  return `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round"${markerStart}${markerEnd}></line>`
+  return `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round"${markerStart}${markerEnd}></line>`
 }
 
 function renderPPTTextBodySVG({
@@ -602,8 +606,8 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
     : ''
   const route = element.route ?? 'straight'
   const lineMarkup = route === 'elbow'
-    ? `<path data-ppt-line-path d="${getPPTLinePath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
-    : `<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line>`
+    ? `<path data-ppt-line-path d="${getPPTLinePath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
+    : `<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round"${markerStart}${markerEnd}></line>`
 
   const connectionAttrs = [
     `data-ppt-line-route="${route}"`,
@@ -615,7 +619,7 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
       : '',
   ].filter(Boolean).join(' ')
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementAltTextHTMLAttr(element)}${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementAltTextHTMLAttr(element)}${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementStrokeDashHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
 }
 
 function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
@@ -625,11 +629,12 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     `data-ppt-freeform-points="${element.points.length}"`,
     getPPTElementAltTextHTMLAttr(element).trim(),
     getPPTElementHyperlinkHTMLAttr(element).trim(),
+    getPPTElementStrokeDashHTMLAttr(element).trim(),
     getPPTElementOpacityHTMLAttr(element).trim(),
     getPPTElementShadowHTMLAttrs(element).trim(),
   ].join(' ')
 
-  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"></path></svg>`
+  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></svg>`
 }
 
 function renderPPTFreeformSVG(element: PPTFreeform) {
@@ -638,7 +643,7 @@ function renderPPTFreeformSVG(element: PPTFreeform) {
     `data-ppt-freeform-points="${element.points.length}"`,
   ].join(' ')
 
-  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"></path></g>`
+  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></g>`
 }
 
 function renderPPTCommentHTML(
@@ -786,6 +791,22 @@ function getPPTElementAltTextSvgAttr(element: PPTElement) {
     : ''
 }
 
+function getPPTElementStrokeDashHTMLAttr(element: PPTElement) {
+  const dash = getPPTElementStrokeDash(element)
+
+  return dash
+    ? ` data-ppt-stroke-dash="${escapeHtml(dash)}"`
+    : ''
+}
+
+function getPPTElementStrokeDashSvgAttr(element: PPTElement) {
+  const dash = getPPTElementStrokeDash(element)
+
+  return dash
+    ? `data-ppt-stroke-dash="${escapeHtml(dash)}"`
+    : ''
+}
+
 function getPPTElementHyperlinkHTMLAttr(element: PPTElement) {
   const hyperlink = getPPTElementHyperlink(element)
 
@@ -891,6 +912,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     `data-ppt-kind="${element.kind}"`,
     getPPTElementAltTextSvgAttr(element),
     getPPTElementHyperlinkSvgAttr(element),
+    getPPTElementStrokeDashSvgAttr(element),
     `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     `opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     ...getPPTElementShadowAttrEntries(element),
@@ -1136,6 +1158,89 @@ function getPPTElementAltText(element: PPTElement) {
     : undefined
 }
 
+function getPPTElementStrokeDash(element: PPTElement) {
+  const stroke = getPPTElementStroke(element)
+
+  return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function getPPTElementStroke(element: PPTElement): PPTStroke | null {
+  if (element.kind === 'shape') {
+    return element.stroke ? normalizePPTStroke(element.stroke) : null
+  }
+
+  if (element.kind === 'line' || element.kind === 'freeform') {
+    return normalizePPTStroke(element.stroke)
+  }
+
+  return null
+}
+
+function normalizePPTStroke(stroke: Partial<PPTStroke>): PPTStroke {
+  const dash = normalizePPTStrokeDash(stroke.dash)
+  const normalized = {
+    color: typeof stroke.color === 'string' && stroke.color
+      ? stroke.color
+      : '#111827',
+    width: normalizePPTStrokeWidth(stroke.width ?? 2),
+  }
+
+  return dash === 'solid'
+    ? normalized
+    : { ...normalized, dash }
+}
+
+function normalizePPTStrokeWidth(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 2
+
+  return Math.max(0, Math.min(40, finiteValue))
+}
+
+function getPPTStrokeDash(stroke: PPTStroke | undefined): PPTStrokeDash {
+  return normalizePPTStrokeDash(stroke?.dash)
+}
+
+function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
+  return typeof value === 'string' && PPT_STROKE_DASH_VALUES.has(value as PPTStrokeDash)
+    ? value as PPTStrokeDash
+    : 'solid'
+}
+
+function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
+  const dash = getPPTStrokeDash(stroke)
+
+  if (dash === 'dash') {
+    return 'dashed'
+  }
+
+  if (dash === 'dot') {
+    return 'dotted'
+  }
+
+  return 'solid'
+}
+
+function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
+  const width = normalizePPTStrokeWidth(stroke?.width ?? 2)
+  const dash = getPPTStrokeDash(stroke)
+
+  if (dash === 'dash') {
+    return `${formatNumber(Math.max(4, width * 3))} ${formatNumber(Math.max(3, width * 2))}`
+  }
+
+  if (dash === 'dot') {
+    return `1 ${formatNumber(Math.max(3, width * 2))}`
+  }
+
+  return ''
+}
+
+function getPPTStrokeDashArraySvgAttr(stroke: PPTStroke | undefined) {
+  const dashArray = getPPTStrokeDashArray(stroke)
+
+  return dashArray ? ` stroke-dasharray="${escapeHtml(dashArray)}"` : ''
+}
+
 function getPPTImageAltText(element: PPTImage) {
   return getPPTElementAltText(element) ?? element.alt
 }
@@ -1353,6 +1458,9 @@ function exportShapeStyle(element: PPTShape) {
     `background:${element.fill.color}`,
     element.stroke
       ? `border:${element.stroke.width}px solid ${element.stroke.color}`
+      : '',
+    element.stroke
+      ? `border-style:${getPPTStrokeDashBorderStyle(element.stroke)}`
       : '',
   ].filter(Boolean).join(';')
 }

@@ -179,6 +179,8 @@ import {
   type PPTShapeKind,
   type PPTSlide,
   type PPTSlideTransition,
+  type PPTStroke,
+  type PPTStrokeDash,
   type PPTTable,
   type PPTTextBody,
   type PPTTextAutoFit,
@@ -1085,6 +1087,17 @@ const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
+const PPT_STROKE_DASH_OPTIONS = Object.freeze([
+  { label: 'Solid', value: 'solid' },
+  { label: 'Dash', value: 'dash' },
+  { label: 'Dot', value: 'dot' },
+] as const satisfies readonly {
+  label: string
+  value: PPTStrokeDash
+}[])
+const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(
+  PPT_STROKE_DASH_OPTIONS.map((option) => option.value),
+)
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
   'fade',
@@ -3255,7 +3268,7 @@ function App() {
 
   function updateElementStroke(
     elementId: string,
-    field: 'color' | 'width',
+    field: keyof PPTStroke,
     value: string | number,
   ) {
     commitDeck((current) =>
@@ -3264,18 +3277,16 @@ function App() {
           return element
         }
 
-        const stroke = {
+        const stroke = normalizePPTStroke({
           color: '#111827',
           width: 2,
           ...element.stroke,
-        }
+          [field]: value,
+        })
 
         return {
           ...element,
-          stroke: {
-            ...stroke,
-            [field]: value,
-          },
+          stroke,
         }
       }),
     )
@@ -7429,6 +7440,7 @@ function SlideThumb({
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
             data-ppt-thumb-alt-text={getPPTElementAltText(element)}
             data-ppt-thumb-hyperlink-url={getPPTElementHyperlink(element)?.url}
+            data-ppt-thumb-stroke-dash={getPPTElementStrokeDash(element)}
             data-ppt-thumb-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
             data-ppt-thumb-shadow-angle={hasPPTElementShadow(element)
               ? getPPTElementShadow(element).angle
@@ -7471,7 +7483,13 @@ function SlideThumb({
                       ? '#fef3c7'
                       : element.kind === 'textBox'
                         ? '#cbd5e1'
-                        : undefined,
+                      : undefined,
+              border: element.kind === 'shape' && element.stroke
+                ? `${element.stroke.width}px solid ${element.stroke.color}`
+                : undefined,
+              borderStyle: element.kind === 'shape' && element.stroke
+                ? getPPTStrokeDashBorderStyle(element.stroke)
+                : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
                 : undefined,
@@ -7494,6 +7512,7 @@ function SlideThumb({
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
               transform: getPPTElementTransform(element),
               width: `${(element.geometry.w / PPT_SLIDE_WIDTH) * 100}%`,
+              ...getPPTThumbLineDashStyle(element),
             }}
           />
         ))}
@@ -7637,6 +7656,7 @@ function PPTElementView({
       data-ppt-alt-text={getPPTElementAltText(element)}
       data-ppt-hyperlink-url={getPPTElementHyperlink(element)?.url}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
+      data-ppt-stroke-dash={getPPTElementStrokeDash(element)}
       data-ppt-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
       data-ppt-shadow-angle={hasPPTElementShadow(element)
         ? getPPTElementShadow(element).angle
@@ -7853,6 +7873,7 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
           markerEnd={markerEnd}
           markerStart={markerStart}
           stroke={element.stroke.color}
+          strokeDasharray={getPPTStrokeDashArray(element.stroke)}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={element.stroke.width}
@@ -7862,6 +7883,7 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
           markerEnd={markerEnd}
           markerStart={markerStart}
           stroke={element.stroke.color}
+          strokeDasharray={getPPTStrokeDashArray(element.stroke)}
           strokeLinecap="round"
           strokeWidth={element.stroke.width}
           x1={element.start.x}
@@ -7888,6 +7910,7 @@ function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
         fill="none"
         opacity={element.opacity ?? 1}
         stroke={element.stroke.color}
+        strokeDasharray={getPPTStrokeDashArray(element.stroke)}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={element.stroke.width}
@@ -8242,7 +8265,7 @@ function Inspector({
   ) => void
   onElementStrokeChange: (
     elementId: string,
-    field: 'color' | 'width',
+    field: keyof PPTStroke,
     value: string | number,
   ) => void
   onElementTextStyleChange: (
@@ -9119,6 +9142,28 @@ function Inspector({
                       )}
                   />
                 </label>
+                <label className="ppt-field">
+                  <span>Dash</span>
+                  <select
+                    data-ppt-style-field="stroke-dash"
+                    value={getPPTStrokeDash(selectedElement.stroke)}
+                    onChange={(event) => {
+                      if (isPPTStrokeDash(event.target.value)) {
+                        onElementStrokeChange(
+                          selectedElement.id,
+                          'dash',
+                          event.target.value,
+                        )
+                      }
+                    }}
+                  >
+                    {PPT_STROKE_DASH_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </>
             ) : null}
             {selectedElement.kind === 'image' ? (
@@ -9235,6 +9280,28 @@ function Inspector({
                     />
                   </label>
                 </div>
+                <label className="ppt-field">
+                  <span>Dash</span>
+                  <select
+                    data-ppt-style-field="line-stroke-dash"
+                    value={getPPTStrokeDash(selectedElement.stroke)}
+                    onChange={(event) => {
+                      if (isPPTStrokeDash(event.target.value)) {
+                        onElementStrokeChange(
+                          selectedElement.id,
+                          'dash',
+                          event.target.value,
+                        )
+                      }
+                    }}
+                  >
+                    {PPT_STROKE_DASH_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="ppt-field">
                   <span>Route</span>
                   <select
@@ -9448,8 +9515,11 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     ...pptTextStyle(element.style),
     alignItems: getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element)),
     background: element.kind === 'shape' ? element.fill.color : 'transparent',
-    border: element.kind === 'shape' && element.stroke
+        border: element.kind === 'shape' && element.stroke
       ? `${element.stroke.width}px solid ${element.stroke.color}`
+      : undefined,
+    borderStyle: element.kind === 'shape' && element.stroke
+      ? getPPTStrokeDashBorderStyle(element.stroke)
       : undefined,
     padding: getPPTTextInsetCSS(getPPTTextElementInset(element)),
     textAlign: getPPTElementParagraphAlign(element),
@@ -9909,6 +9979,93 @@ function getPPTElementAltText(element: PPTElement) {
   return element.accessibility
     ? normalizePPTElementAccessibility(element.accessibility)?.altText
     : undefined
+}
+
+function getPPTElementStrokeDash(element: PPTElement) {
+  const stroke = getPPTElementStroke(element)
+
+  return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function getPPTElementStroke(element: PPTElement): PPTStroke | null {
+  if (element.kind === 'shape') {
+    return element.stroke ? normalizePPTStroke(element.stroke) : null
+  }
+
+  if (element.kind === 'line' || element.kind === 'freeform') {
+    return normalizePPTStroke(element.stroke)
+  }
+
+  return null
+}
+
+function normalizePPTStroke(stroke: Partial<PPTStroke>): PPTStroke {
+  const dash = normalizePPTStrokeDash(stroke.dash)
+  const normalized = {
+    color: typeof stroke.color === 'string' && stroke.color
+      ? stroke.color
+      : '#111827',
+    width: normalizePPTStrokeWidth(stroke.width ?? 2),
+  }
+
+  return dash === 'solid'
+    ? normalized
+    : { ...normalized, dash }
+}
+
+function normalizePPTStrokeWidth(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 2
+
+  return Math.max(0, Math.min(40, finiteValue))
+}
+
+function getPPTStrokeDash(stroke: PPTStroke | undefined): PPTStrokeDash {
+  return normalizePPTStrokeDash(stroke?.dash)
+}
+
+function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
+  return typeof value === 'string' && isPPTStrokeDash(value)
+    ? value as PPTStrokeDash
+    : 'solid'
+}
+
+function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
+  const dash = getPPTStrokeDash(stroke)
+
+  if (dash === 'dash') {
+    return 'dashed'
+  }
+
+  if (dash === 'dot') {
+    return 'dotted'
+  }
+
+  return 'solid'
+}
+
+function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
+  const width = normalizePPTStrokeWidth(stroke?.width ?? 2)
+  const dash = getPPTStrokeDash(stroke)
+
+  if (dash === 'dash') {
+    return `${Math.max(4, width * 3)} ${Math.max(3, width * 2)}`
+  }
+
+  if (dash === 'dot') {
+    return `1 ${Math.max(3, width * 2)}`
+  }
+
+  return undefined
+}
+
+function getPPTThumbLineDashStyle(element: PPTElement): CSSProperties {
+  if (element.kind !== 'line') {
+    return {}
+  }
+
+  return {
+    '--ppt-thumb-line-dash': getPPTStrokeDashBorderStyle(element.stroke),
+  } as CSSProperties
 }
 
 function getPPTImageAltText(element: PPTImage) {
@@ -11514,6 +11671,10 @@ function isPPTLineMarker(value: string): value is PPTLineMarker {
 
 function isPPTLineRoute(value: string): value is PPTLineRoute {
   return value === 'straight' || value === 'elbow'
+}
+
+function isPPTStrokeDash(value: string): value is PPTStrokeDash {
+  return PPT_STROKE_DASH_VALUES.has(value as PPTStrokeDash)
 }
 
 function getPPTLayerSelection(
