@@ -3,12 +3,17 @@ import {
   PPT_SLIDE_WIDTH,
   type PPTDeck,
   type PPTElement,
+  type PPTImage,
   type PPTLine,
+  type PPTLinePoint,
   type PPTRun,
   type PPTShape,
+  type PPTSlide,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
+
+const PPT_SELECTION_EXPORT_PADDING = 24
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -45,6 +50,82 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     '</script>',
     '</body>',
     '</html>',
+    '',
+  ].join('\n')
+}
+
+export function exportPPTSlideSVG(slide: PPTSlide) {
+  return renderPPTElementsSVG({
+    elements: getVisiblePPTElements(slide.elements),
+    height: PPT_SLIDE_HEIGHT,
+    scope: 'slide',
+    slide,
+    viewBox: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    width: PPT_SLIDE_WIDTH,
+  })
+}
+
+export function exportPPTSelectionSVG(
+  slide: PPTSlide,
+  selection: readonly string[],
+) {
+  if (selection.length === 0) {
+    return null
+  }
+
+  const selected = new Set(selection)
+  const elements = getVisiblePPTElements(slide.elements)
+    .filter((element) => selected.has(element.id))
+  const bounds = getPPTElementsExportBounds(elements)
+
+  if (!bounds) {
+    return null
+  }
+
+  const viewBox = {
+    h: Math.max(1, bounds.h + PPT_SELECTION_EXPORT_PADDING * 2),
+    w: Math.max(1, bounds.w + PPT_SELECTION_EXPORT_PADDING * 2),
+    x: bounds.x - PPT_SELECTION_EXPORT_PADDING,
+    y: bounds.y - PPT_SELECTION_EXPORT_PADDING,
+  }
+
+  return renderPPTElementsSVG({
+    elements,
+    height: Math.ceil(viewBox.h),
+    scope: 'selection',
+    slide,
+    viewBox,
+    width: Math.ceil(viewBox.w),
+  })
+}
+
+function renderPPTElementsSVG({
+  elements,
+  height,
+  scope,
+  slide,
+  viewBox,
+  width,
+}: {
+  elements: PPTElement[]
+  height: number
+  scope: 'selection' | 'slide'
+  slide: PPTSlide
+  viewBox: PPTElement['geometry']
+  width: number
+}) {
+  const background = slide.background?.color ?? '#ffffff'
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${formatNumber(viewBox.x)} ${formatNumber(viewBox.y)} ${formatNumber(viewBox.w)} ${formatNumber(viewBox.h)}" data-ppt-svg-slide="${escapeHtml(slide.id)}" data-ppt-svg-scope="${scope}">`,
+    `<rect data-ppt-svg-background="true" x="${formatNumber(viewBox.x)}" y="${formatNumber(viewBox.y)}" width="${formatNumber(viewBox.w)}" height="${formatNumber(viewBox.h)}" fill="${escapeHtml(background)}" />`,
+    ...elements.map(renderPPTElementSVG),
+    '</svg>',
     '',
   ].join('\n')
 }
@@ -88,6 +169,171 @@ function renderPPTElementHTML(element: PPTElement) {
   }
 
   return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+}
+
+function renderPPTElementSVG(element: PPTElement) {
+  if (element.kind === 'image') {
+    return renderPPTImageSVG(element)
+  }
+
+  if (element.kind === 'line') {
+    return renderPPTLineSVG(element)
+  }
+
+  const attrs = getPPTElementSVGAttrs(element)
+  const text = renderPPTTextBodySVG({
+    body: element.textBody,
+    geometry: element.geometry,
+    inset: element.kind === 'shape' ? 18 : 0,
+    style: element.style,
+  })
+
+  if (element.kind === 'shape') {
+    return `<g ${attrs}>${renderPPTShapeSVG(element)}${text}</g>`
+  }
+
+  return `<g ${attrs}>${text}</g>`
+}
+
+function renderPPTImageSVG(element: PPTImage) {
+  const crop = element.crop ?? { x: 50, y: 50 }
+  const fit = element.fit ?? 'cover'
+  const preserveAspectRatio = `${getPPTSvgImageAlignX(crop.x)}${getPPTSvgImageAlignY(crop.y)} ${fit === 'contain' ? 'meet' : 'slice'}`
+  const attrs = [
+    getPPTElementSVGAttrs(element),
+    `data-ppt-image-fit="${fit}"`,
+    `data-ppt-image-crop-x="${formatNumber(crop.x)}"`,
+    `data-ppt-image-crop-y="${formatNumber(crop.y)}"`,
+  ].join(' ')
+
+  return `<g ${attrs}><image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(element.alt)}</title></image></g>`
+}
+
+function renderPPTShapeSVG(element: PPTShape) {
+  const fill = element.fill.color
+  const stroke = element.stroke
+    ? ` stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"`
+    : ' stroke="none"'
+
+  if (element.shape === 'ellipse') {
+    return `<ellipse cx="${formatNumber(element.geometry.x + element.geometry.w / 2)}" cy="${formatNumber(element.geometry.y + element.geometry.h / 2)}" rx="${formatNumber(element.geometry.w / 2)}" ry="${formatNumber(element.geometry.h / 2)}" fill="${escapeHtml(fill)}"${stroke} />`
+  }
+
+  if (element.shape === 'diamond') {
+    const left = element.geometry.x
+    const top = element.geometry.y
+    const right = element.geometry.x + element.geometry.w
+    const bottom = element.geometry.y + element.geometry.h
+    const centerX = element.geometry.x + element.geometry.w / 2
+    const centerY = element.geometry.y + element.geometry.h / 2
+    const points = [
+      `${formatNumber(centerX)},${formatNumber(top)}`,
+      `${formatNumber(right)},${formatNumber(centerY)}`,
+      `${formatNumber(centerX)},${formatNumber(bottom)}`,
+      `${formatNumber(left)},${formatNumber(centerY)}`,
+    ].join(' ')
+
+    return `<polygon points="${points}" fill="${escapeHtml(fill)}"${stroke} />`
+  }
+
+  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="24" fill="${escapeHtml(fill)}"${stroke} />`
+}
+
+function renderPPTLineSVG(element: PPTLine) {
+  const markerId = `ppt-svg-line-marker-${escapeHtml(element.id)}`
+  const marker = element.startMarker === 'arrow' || element.endMarker === 'arrow'
+    ? `<defs><marker id="${markerId}" markerHeight="8" markerUnits="strokeWidth" markerWidth="8" orient="auto-start-reverse" refX="7" refY="4" viewBox="0 0 8 8"><path d="M 0 0 L 8 4 L 0 8 z" fill="${escapeHtml(element.stroke.color)}"></path></marker></defs>`
+    : ''
+  const markerStart = element.startMarker === 'arrow'
+    ? ` marker-start="url(#${markerId})"`
+    : ''
+  const markerEnd = element.endMarker === 'arrow'
+    ? ` marker-end="url(#${markerId})"`
+    : ''
+  const route = element.route ?? 'straight'
+  const lineMarkup = route === 'elbow'
+    ? `<path data-ppt-line-path d="${getPPTLineSVGPath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
+    : renderPPTStraightLineSVG(element, markerStart, markerEnd)
+  const connectionAttrs = [
+    `data-ppt-line-route="${route}"`,
+    element.startConnection
+      ? `data-ppt-start-connection="${escapeHtml(element.startConnection.elementId)}:${element.startConnection.anchor}"`
+      : '',
+    element.endConnection
+      ? `data-ppt-end-connection="${escapeHtml(element.endConnection.elementId)}:${element.endConnection.anchor}"`
+      : '',
+  ].filter(Boolean).join(' ')
+
+  return `<g ${getPPTElementSVGAttrs(element)} ${connectionAttrs}>${marker}${lineMarkup}</g>`
+}
+
+function renderPPTStraightLineSVG(
+  element: PPTLine,
+  markerStart: string,
+  markerEnd: string,
+) {
+  const start = getPPTLineWorldPoint(element, element.start)
+  const end = getPPTLineWorldPoint(element, element.end)
+
+  return `<line x1="${formatNumber(start.x)}" y1="${formatNumber(start.y)}" x2="${formatNumber(end.x)}" y2="${formatNumber(end.y)}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round"${markerStart}${markerEnd}></line>`
+}
+
+function renderPPTTextBodySVG({
+  body,
+  geometry,
+  inset,
+  style,
+}: {
+  body: PPTTextBody | undefined
+  geometry: PPTElement['geometry']
+  inset: number
+  style: PPTTextStyle | undefined
+}) {
+  if (!body) {
+    return ''
+  }
+
+  const fontSize = style?.fontSize ?? 24
+  const textAnchor = getPPTSvgTextAnchor(body.paragraphs[0]?.align)
+  const x = getPPTSvgTextX({
+    align: body.paragraphs[0]?.align,
+    geometry,
+    inset,
+  })
+  const y = geometry.y + inset + fontSize
+
+  return body.paragraphs.map((paragraph, index) => {
+    const bullet = paragraph.bullet === 'bullet'
+    const runs = paragraph.runs.map(renderPPTTextRunSVG).join('')
+    const bulletPrefix = bullet ? '<tspan data-ppt-bullet="true">&#8226; </tspan>' : ''
+    const attrs = [
+      'class="ppt-svg-text-paragraph"',
+      bullet ? 'data-ppt-bullet="true"' : '',
+      `x="${formatNumber(x)}"`,
+      `y="${formatNumber(y + index * fontSize * 1.25)}"`,
+      `fill="${escapeHtml(style?.color ?? '#111827')}"`,
+      'font-family="Inter, Arial, sans-serif"',
+      `font-size="${formatNumber(fontSize)}"`,
+      `font-weight="${getPPTSvgFontWeight(style)}"`,
+      `text-anchor="${textAnchor}"`,
+    ].filter(Boolean).join(' ')
+
+    return `<text ${attrs}>${bulletPrefix}${runs}</text>`
+  }).join('')
+}
+
+function renderPPTTextRunSVG(run: PPTRun) {
+  const attrs = [
+    run.italic === true ? 'data-ppt-run-italic="true" font-style="italic"' : '',
+    run.underline === true ? 'data-ppt-run-underline="true" text-decoration="underline"' : '',
+    run.bold === true ? 'font-weight="700"' : '',
+    run.color ? `fill="${escapeHtml(run.color)}"` : '',
+    run.size ? `font-size="${formatNumber(run.size)}"` : '',
+  ].filter(Boolean).join(' ')
+
+  return attrs
+    ? `<tspan ${attrs}>${escapeHtml(run.text)}</tspan>`
+    : `<tspan>${escapeHtml(run.text)}</tspan>`
 }
 
 function renderPPTSlideNotesHTML(slideId: string, notes: string | undefined) {
@@ -214,6 +460,42 @@ function getPPTElementTransformAttrs(element: PPTElement) {
   ].join('')
 }
 
+function getPPTElementSVGAttrs(element: PPTElement) {
+  const transform = getPPTElementSVGTransform(element)
+
+  return [
+    `data-ppt-element="${escapeHtml(element.id)}"`,
+    `data-ppt-kind="${element.kind}"`,
+    element.kind === 'shape'
+      ? `data-ppt-shape="${element.shape}"`
+      : '',
+    element.flipH === true ? 'data-ppt-flip-h="true"' : '',
+    element.flipV === true ? 'data-ppt-flip-v="true"' : '',
+    transform ? `transform="${escapeHtml(transform)}"` : '',
+  ].filter(Boolean).join(' ')
+}
+
+function getPPTElementSVGTransform(element: PPTElement) {
+  const scaleX = element.flipH === true ? -1 : 1
+  const scaleY = element.flipV === true ? -1 : 1
+  const rotation = element.geometry.rotation ?? 0
+
+  if (scaleX === 1 && scaleY === 1 && !rotation) {
+    return ''
+  }
+
+  const centerX = element.geometry.x + element.geometry.w / 2
+  const centerY = element.geometry.y + element.geometry.h / 2
+  const transforms = [
+    `translate(${formatNumber(centerX)} ${formatNumber(centerY)})`,
+    rotation ? `rotate(${formatNumber(rotation)})` : '',
+    scaleX !== 1 || scaleY !== 1 ? `scale(${scaleX} ${scaleY})` : '',
+    `translate(${formatNumber(-centerX)} ${formatNumber(-centerY)})`,
+  ].filter(Boolean)
+
+  return transforms.join(' ')
+}
+
 function getPPTLinePath(element: PPTLine) {
   const bend = Math.min(0.92, Math.max(0.08, element.routeBend ?? 0.5))
   const bendX = element.start.x + (element.end.x - element.start.x) * bend
@@ -224,6 +506,31 @@ function getPPTLinePath(element: PPTLine) {
     `L ${bendX} ${element.end.y}`,
     `L ${element.end.x} ${element.end.y}`,
   ].join(' ')
+}
+
+function getPPTLineSVGPath(element: PPTLine) {
+  const bend = Math.min(0.92, Math.max(0.08, element.routeBend ?? 0.5))
+  const bendX = element.start.x + (element.end.x - element.start.x) * bend
+  const points = [
+    { x: element.start.x, y: element.start.y },
+    { x: bendX, y: element.start.y },
+    { x: bendX, y: element.end.y },
+    { x: element.end.x, y: element.end.y },
+  ].map((point) => getPPTLineWorldPoint(element, point))
+
+  return [
+    `M ${formatNumber(points[0].x)} ${formatNumber(points[0].y)}`,
+    `L ${formatNumber(points[1].x)} ${formatNumber(points[1].y)}`,
+    `L ${formatNumber(points[2].x)} ${formatNumber(points[2].y)}`,
+    `L ${formatNumber(points[3].x)} ${formatNumber(points[3].y)}`,
+  ].join(' ')
+}
+
+function getPPTLineWorldPoint(line: PPTLine, point: PPTLinePoint) {
+  return {
+    x: line.geometry.x + point.x,
+    y: line.geometry.y + point.y,
+  }
 }
 
 function exportTextStyle(style: PPTTextStyle) {
@@ -252,6 +559,100 @@ function exportShapeStyle(element: PPTShape) {
 
 function toPercent(value: number, total: number) {
   return `${Number(((value / total) * 100).toFixed(4))}%`
+}
+
+function getVisiblePPTElements(elements: PPTElement[]) {
+  return elements.filter((element) => element.visible !== false)
+}
+
+function getPPTElementsExportBounds(elements: PPTElement[]) {
+  if (elements.length === 0) {
+    return null
+  }
+
+  const minX = Math.min(...elements.map((element) => element.geometry.x))
+  const minY = Math.min(...elements.map((element) => element.geometry.y))
+  const maxX = Math.max(...elements.map((element) => element.geometry.x + element.geometry.w))
+  const maxY = Math.max(...elements.map((element) => element.geometry.y + element.geometry.h))
+
+  return {
+    h: maxY - minY,
+    w: maxX - minX,
+    x: minX,
+    y: minY,
+  }
+}
+
+function getPPTSvgImageAlignX(value: number) {
+  if (value <= 33) {
+    return 'xMin'
+  }
+
+  if (value >= 67) {
+    return 'xMax'
+  }
+
+  return 'xMid'
+}
+
+function getPPTSvgImageAlignY(value: number) {
+  if (value <= 33) {
+    return 'YMin'
+  }
+
+  if (value >= 67) {
+    return 'YMax'
+  }
+
+  return 'YMid'
+}
+
+function getPPTSvgTextX({
+  align,
+  geometry,
+  inset,
+}: {
+  align: 'center' | 'left' | 'right' | undefined
+  geometry: PPTElement['geometry']
+  inset: number
+}) {
+  if (align === 'center') {
+    return geometry.x + geometry.w / 2
+  }
+
+  if (align === 'right') {
+    return geometry.x + geometry.w - inset
+  }
+
+  return geometry.x + inset
+}
+
+function getPPTSvgTextAnchor(align: 'center' | 'left' | 'right' | undefined) {
+  if (align === 'center') {
+    return 'middle'
+  }
+
+  if (align === 'right') {
+    return 'end'
+  }
+
+  return 'start'
+}
+
+function getPPTSvgFontWeight(style: PPTTextStyle | undefined) {
+  if (style?.fontWeight === 'bold') {
+    return '700'
+  }
+
+  if (style?.fontWeight === 'semibold') {
+    return '600'
+  }
+
+  return '400'
+}
+
+function formatNumber(value: number) {
+  return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(3))}`
 }
 
 function escapeHtml(value: string) {

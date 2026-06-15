@@ -162,7 +162,11 @@ import {
   getPPTCanvasCommandAvailability,
   updatePPTElementBounds,
 } from './pptCommandAdapter'
-import { exportPPTDeckHTML } from './pptExport'
+import {
+  exportPPTDeckHTML,
+  exportPPTSelectionSVG,
+  exportPPTSlideSVG,
+} from './pptExport'
 import {
   createPPTImportedImageElement,
   getPPTImageFileFromDataTransfer,
@@ -579,6 +583,12 @@ function App() {
     : Math.min(activeFindIndex, findMatches.length - 1)
   const activeFindMatch = findMatches[clampedFindIndex] ?? null
   const exportCode = useMemo(() => exportPPTDeckHTML(deck), [deck])
+  const slideSvgCode = useMemo(() => exportPPTSlideSVG(activeSlide), [activeSlide])
+  const selectionSvgCode = useMemo(
+    () => exportPPTSelectionSVG(activeSlide, selection),
+    [activeSlide, selection],
+  )
+  const canExportSelectionSVG = selectionSvgCode !== null
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
   const hasHiddenSelection = selectedElements.some((element) => element.visible === false)
@@ -2048,12 +2058,48 @@ function App() {
   }
 
   function downloadHTML() {
-    const url = URL.createObjectURL(new Blob([exportCode], {
+    downloadTextFile({
+      content: exportCode,
+      filename: 'ppt-subset.html',
       type: 'text/html;charset=utf-8',
+    })
+  }
+
+  function downloadSlideSVG() {
+    downloadTextFile({
+      content: slideSvgCode,
+      filename: `${activeSlide.id}.svg`,
+      type: 'image/svg+xml;charset=utf-8',
+    })
+  }
+
+  function downloadSelectionSVG() {
+    if (!selectionSvgCode) {
+      return
+    }
+
+    downloadTextFile({
+      content: selectionSvgCode,
+      filename: `${activeSlide.id}-selection.svg`,
+      type: 'image/svg+xml;charset=utf-8',
+    })
+  }
+
+  function downloadTextFile({
+    content,
+    filename,
+    type,
+  }: {
+    content: string
+    filename: string
+    type: string
+  }) {
+    const url = URL.createObjectURL(new Blob([content], {
+      type,
     }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'ppt-subset.html'
+    anchor.download = filename
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -3107,6 +3153,17 @@ function App() {
     section: 'Slides',
     title: 'Move slide down',
   }, {
+    id: 'export:download-slide-svg',
+    run: downloadSlideSVG,
+    section: 'Export',
+    title: 'Download slide SVG',
+  }, {
+    disabled: !canExportSelectionSVG,
+    id: 'export:download-selection-svg',
+    run: downloadSelectionSVG,
+    section: 'Export',
+    title: 'Download selection SVG',
+  }, {
     id: 'view:find',
     run: openFindStrip,
     section: 'View',
@@ -3360,6 +3417,12 @@ function App() {
           </button>
           <button aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
             <Download size={16} /> HTML
+          </button>
+          <button aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
+            <Download size={16} /> SVG
+          </button>
+          <button aria-label="Download selection SVG" className="ppt-button" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG} type="button">
+            <Download size={16} /> Sel SVG
           </button>
         </div>
         <span className="ppt-selection-label">

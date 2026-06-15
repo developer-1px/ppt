@@ -2048,6 +2048,8 @@ async function runTextQuickFormatScenario(page) {
 }
 
 async function runExportScenario(page) {
+  await installPPTDownloadCapture(page)
+
   const state = await page.eval(`(() => {
     const code = document.querySelector('.ppt-export-code')?.value ?? ''
     return {
@@ -2095,6 +2097,99 @@ async function runExportScenario(page) {
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
+
+  await page.eval(`document.querySelector('[data-ppt-export-svg]')?.click()`)
+  await delay(80)
+
+  const slideSvgState = await page.eval(`(() => {
+    const download = (window.__pptDownloads ?? [])
+      .find((entry) => entry.download === 'slide-1.svg') ?? {}
+    const text = download.text ?? ''
+
+    return {
+      download: download.download ?? '',
+      hasBackground: text.includes('data-ppt-svg-background="true"'),
+      hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
+      hasLine: text.includes('data-ppt-kind="line"') && (text.includes('<line ') || text.includes('data-ppt-line-path')),
+      hasScope: text.includes('data-ppt-svg-scope="slide"'),
+      hasShape: text.includes('data-ppt-kind="shape"'),
+      hasSlide: text.includes('data-ppt-svg-slide="slide-1"'),
+      hasSvg: text.includes('<svg xmlns="http://www.w3.org/2000/svg"'),
+      hasText: text.includes('data-ppt-kind="textBox"') && text.includes('<text '),
+      type: download.type ?? '',
+    }
+  })()`)
+
+  record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
+  record('exports PPT image/shape/text/line into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine, slideSvgState)
+
+  const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
+  await selectPPTLayerRows(page, [imageId])
+  await delay(80)
+
+  const beforeSelectionSvg = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-export-selection-svg]')?.disabled ?? true,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  await page.eval(`document.querySelector('[data-ppt-export-selection-svg]')?.click()`)
+  await delay(80)
+
+  const selectionSvgState = await page.eval(`(() => {
+    const selectedId = document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? ''
+    const download = (window.__pptDownloads ?? [])
+      .find((entry) => entry.download === 'slide-1-selection.svg') ?? {}
+    const text = download.text ?? ''
+
+    return {
+      download: download.download ?? '',
+      hasCrop: text.includes('data-ppt-image-crop-x="25"') && text.includes('data-ppt-image-crop-y="70"'),
+      hasFit: text.includes('data-ppt-image-fit="contain"'),
+      hasFlip: text.includes('data-ppt-flip-h="true"') && text.includes('scale(-1 1)'),
+      hasOnlySelectedImage: text.includes(\`data-ppt-element="\${selectedId}"\`) && !text.includes('data-ppt-element="s1-title"'),
+      hasScope: text.includes('data-ppt-svg-scope="selection"'),
+      hasSvg: text.includes('<svg xmlns="http://www.w3.org/2000/svg"'),
+      selectedId,
+      type: download.type ?? '',
+    }
+  })()`)
+
+  record('enables selected-object PPT SVG export', beforeSelectionSvg.selectedId === imageId && !beforeSelectionSvg.disabled, beforeSelectionSvg)
+  record('downloads selected PPT objects as SVG', selectionSvgState.download === 'slide-1-selection.svg' && selectionSvgState.type.includes('image/svg+xml') && selectionSvgState.hasSvg && selectionSvgState.hasScope && selectionSvgState.hasOnlySelectedImage, selectionSvgState)
+  record('preserves PPT image fit/crop/flip metadata in selection SVG', selectionSvgState.hasFit && selectionSvgState.hasCrop && selectionSvgState.hasFlip, selectionSvgState)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'selection svg' })
+  await delay(80)
+
+  const disabledState = await page.eval(`(() => ({
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="export:download-selection-svg"]'),
+    paletteDisabled: document.querySelector('[data-ppt-command-palette-item="export:download-selection-svg"]')?.disabled ?? false,
+    paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    toolbarDisabled: document.querySelector('[data-ppt-export-selection-svg]')?.disabled ?? false,
+  }))()`)
+
+  record('disables PPT selection SVG export without selection', disabledState.paletteOpen && disabledState.itemPresent && disabledState.selectedCount === 0 && disabledState.toolbarDisabled && disabledState.paletteDisabled, disabledState)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 }
 
 async function runViewAndShapeScenario(page) {
@@ -3144,6 +3239,39 @@ async function clickMouse(page, x, y, clickCount, modifiers = 0) {
     x,
     y,
   })
+}
+
+async function installPPTDownloadCapture(page) {
+  await page.eval(`(() => {
+    window.__pptDownloads = []
+    let downloadIndex = 0
+
+    URL.createObjectURL = (blob) => {
+      const url = \`blob:ppt-download-\${downloadIndex++}\`
+      const entry = {
+        download: '',
+        text: '',
+        type: blob.type,
+        url,
+      }
+
+      window.__pptDownloads.push(entry)
+      void blob.text().then((text) => {
+        entry.text = text
+      })
+
+      return url
+    }
+    URL.revokeObjectURL = () => {}
+    HTMLAnchorElement.prototype.click = function click() {
+      const entry = window.__pptDownloads
+        .find((download) => download.url === this.href)
+
+      if (entry) {
+        entry.download = this.download
+      }
+    }
+  })()`)
 }
 
 async function rightClickMouse(page, x, y) {
