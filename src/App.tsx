@@ -84,7 +84,10 @@ import {
 } from 'canvas/foundation'
 import {
   CANVAS_COMMAND_AFFORDANCES,
+  CANVAS_TOOL_AFFORDANCES,
   alignCanvasCommand,
+  createCanvasShape,
+  createCanvasText,
   createCanvasAffordanceConfig,
   deleteCanvasCommand,
   distributeCanvasCommand,
@@ -98,6 +101,8 @@ import {
   unlockAllCanvasCommand,
   type CanvasAlignMode,
   type CanvasCommandItemsResult,
+  type CanvasCreatedShapeKind,
+  type CanvasCreationAdapter,
   type CanvasDistributeMode,
   type CanvasReorderMode,
 } from 'canvas/engine'
@@ -189,8 +194,20 @@ const canvasReorderModeAvailabilityKey = {
 >
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
+const PPT_DEFAULT_TEXT_BOUNDS = {
+  h: 76,
+  w: 360,
+}
 
 type LineCreationMode = 'arrow' | 'line'
+type PPTCreationTool =
+  | {
+      kind: 'shape'
+      shape: PPTShapeKind
+    }
+  | {
+      kind: 'text'
+    }
 type PPTFindMatch = {
   elementId: string
   elementIndex: number
@@ -239,6 +256,14 @@ type Interaction =
       }>
     }
   | {
+      elementId: string
+      kind: 'element-create'
+      slideId: string
+      startDeck: PPTDeck
+      startPoint: Point
+      tool: PPTCreationTool
+    }
+  | {
       endpoint: 'end' | 'start'
       kind: 'line-endpoint'
       lineId: string
@@ -278,6 +303,7 @@ function App() {
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
+  const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
   const [replaceQuery, setReplaceQuery] = useState('')
@@ -468,6 +494,21 @@ function App() {
         return
       }
 
+      const shortcutTool = getPPTCreationToolForShortcut(event)
+
+      if (shortcutTool) {
+        event.preventDefault()
+        activatePPTCreationTool(shortcutTool)
+        return
+      }
+
+      if (isPPTSelectToolShortcut(event)) {
+        event.preventDefault()
+        setCreationTool(null)
+        setLineCreationMode(null)
+        return
+      }
+
       if (event.key === 'PageUp') {
         event.preventDefault()
         activateRelativeSlide(-1)
@@ -485,6 +526,7 @@ function App() {
         setEditingId(null)
         setInteraction(null)
         setLineCreationMode(null)
+        setCreationTool(null)
         setSelection([])
         return
       }
@@ -803,54 +845,15 @@ function App() {
     })
   }
 
-  function addTextBox() {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const id = createPPTElementId(slide, 'text')
-      const element: PPTElement = {
-        geometry: { h: 76, w: 360, x: 140, y: 150 },
-        id,
-        kind: 'textBox',
-        name: 'Text',
-        style: { color: '#111827', fontSize: 30, fontWeight: 'semibold' },
-        textBody: createPPTTextBody('New text'),
-      }
-
-      setSelection([id])
-
-      return {
-        ...slide,
-        elements: [...slide.elements, element],
-      }
-    }))
-  }
-
-  function addShape(shape: PPTShapeKind = 'rect') {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const id = createPPTElementId(slide, 'shape')
-      const label = getPPTShapeLabel(shape)
-      const element: PPTShape = {
-        fill: { color: '#eef2ff' },
-        geometry: { h: 150, w: 260, x: 160, y: 260 },
-        id,
-        kind: 'shape',
-        name: label,
-        shape,
-        stroke: { color: '#6366f1', width: 2 },
-        style: { color: '#312e81', fontSize: 24, fontWeight: 'semibold' },
-        textBody: createPPTTextBody(label),
-      }
-
-      setSelection([id])
-
-      return {
-        ...slide,
-        elements: [...slide.elements, element],
-      }
-    }))
+  function activatePPTCreationTool(tool: PPTCreationTool) {
+    setCreationTool((current) => arePPTCreationToolsEqual(current, tool) ? null : tool)
+    setLineCreationMode(null)
+    setEditingId(null)
   }
 
   function activateLineCreationMode(mode: LineCreationMode) {
     setLineCreationMode((current) => current === mode ? null : mode)
+    setCreationTool(null)
     setEditingId(null)
   }
 
@@ -1441,6 +1444,51 @@ function App() {
     return true
   }
 
+  function beginElementCreation(
+    event: ReactPointerEvent<HTMLElement>,
+    point: Point,
+  ) {
+    if (!creationTool) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const startDeck = deckRef.current
+    const startSlide = findPPTSlide(startDeck, activeSlide.id)
+    const id = createPPTElementId(
+      startSlide,
+      creationTool.kind === 'text' ? 'text' : creationTool.shape,
+    )
+    const element = createPPTElementFromCreationTool({
+      current: point,
+      id,
+      start: point,
+      tool: creationTool,
+    })
+    const nextDeck = updatePPTDeckSlide(startDeck, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: [...slide.elements, element],
+    }))
+
+    deckRef.current = nextDeck
+    setDeck(nextDeck)
+    setSelection([id])
+    setEditingId(null)
+    setInteraction({
+      elementId: id,
+      kind: 'element-create',
+      slideId: activeSlide.id,
+      startDeck,
+      startPoint: point,
+      tool: creationTool,
+    })
+
+    return true
+  }
+
   function handleElementPointerDown(
     event: ReactPointerEvent<HTMLDivElement>,
     elementId: string,
@@ -1450,6 +1498,10 @@ function App() {
     }
 
     if (lineCreationMode && beginLineCreation(event, screenToWorld(event.nativeEvent))) {
+      return
+    }
+
+    if (creationTool && beginElementCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
 
@@ -1502,6 +1554,10 @@ function App() {
     const point = screenToWorld(event.nativeEvent)
 
     if (lineCreationMode && beginLineCreation(event, point)) {
+      return
+    }
+
+    if (creationTool && beginElementCreation(event, point)) {
       return
     }
 
@@ -1704,6 +1760,27 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'element-create') {
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const elements = currentSlide.elements.map((element) =>
+        element.id === interaction.elementId
+          ? createPPTElementFromCreationTool({
+              current: point,
+              id: interaction.elementId,
+              start: interaction.startPoint,
+              tool: interaction.tool,
+            })
+          : element)
+      const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      return
+    }
+
     if (interaction.kind === 'line-route') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const elements = currentSlide.elements.map((element) =>
@@ -1884,6 +1961,14 @@ function App() {
       setLineCreationMode(null)
     }
 
+    if (interaction.kind === 'element-create') {
+      setCreationTool(null)
+
+      if (interaction.tool.kind === 'text') {
+        setEditingId(interaction.elementId)
+      }
+    }
+
     if (
       interaction.kind !== 'marquee' &&
       JSON.stringify(deckRef.current) !== JSON.stringify(interaction.startDeck)
@@ -1949,16 +2034,51 @@ function App() {
           />
         ) : null}
         <div className="ppt-toolbar-group">
-          <button className="ppt-icon-button" onClick={addTextBox} title="Add text" type="button">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.text.ariaLabel}
+            aria-pressed={creationTool?.kind === 'text'}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="text"
+            onClick={() => activatePPTCreationTool({ kind: 'text' })}
+            title={CANVAS_TOOL_AFFORDANCES.text.title}
+            type="button"
+          >
             <Type size={17} />
           </button>
-          <button className="ppt-icon-button" data-ppt-insert-shape="rect" onClick={() => addShape('rect')} title="Add rectangle" type="button">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.rect.ariaLabel}
+            aria-pressed={isPPTShapeCreationTool(creationTool, 'rect')}
+            className="ppt-icon-button"
+            data-ppt-insert-shape="rect"
+            data-ppt-insert-tool="rect"
+            onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'rect' })}
+            title={CANVAS_TOOL_AFFORDANCES.rect.title}
+            type="button"
+          >
             <Square size={17} />
           </button>
-          <button className="ppt-icon-button" data-ppt-insert-shape="ellipse" onClick={() => addShape('ellipse')} title="Add oval" type="button">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.ellipse.ariaLabel}
+            aria-pressed={isPPTShapeCreationTool(creationTool, 'ellipse')}
+            className="ppt-icon-button"
+            data-ppt-insert-shape="ellipse"
+            data-ppt-insert-tool="ellipse"
+            onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' })}
+            title={CANVAS_TOOL_AFFORDANCES.ellipse.title}
+            type="button"
+          >
             <Circle size={17} />
           </button>
-          <button className="ppt-icon-button" data-ppt-insert-shape="diamond" onClick={() => addShape('diamond')} title="Add diamond" type="button">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.diamond.ariaLabel}
+            aria-pressed={isPPTShapeCreationTool(creationTool, 'diamond')}
+            className="ppt-icon-button"
+            data-ppt-insert-shape="diamond"
+            data-ppt-insert-tool="diamond"
+            onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' })}
+            title={CANVAS_TOOL_AFFORDANCES.diamond.title}
+            type="button"
+          >
             <Diamond size={17} />
           </button>
           <button aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
@@ -2103,6 +2223,7 @@ function App() {
 
       <section
         className="ppt-stage-shell"
+        data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-grid={showGrid ? 'true' : 'false'}
         data-line-tool={lineCreationMode ?? undefined}
         onDragOver={handleStageDragOver}
@@ -3288,6 +3409,221 @@ function getPPTElementParagraphAlign(element: PPTElement) {
   }
 
   return element.textBody?.paragraphs[0]?.align ?? 'left'
+}
+
+const PPT_CANVAS_CREATION_ADAPTER: CanvasCreationAdapter<PPTElement> = {
+  createArrow: () => throwUnsupportedPPTCreationTool(),
+  createHighlight: () => throwUnsupportedPPTCreationTool(),
+  createMarker: () => throwUnsupportedPPTCreationTool(),
+  createShape: ({ bounds, id, shapeType }) =>
+    createPPTShapeElement({
+      bounds,
+      id,
+      shape: toPPTShapeKind(shapeType),
+    }),
+  createText: ({ id, point }) => ({
+    editValue: 'New text',
+    item: createPPTTextElement({
+      bounds: {
+        ...PPT_DEFAULT_TEXT_BOUNDS,
+        x: point.x,
+        y: point.y,
+      },
+      id,
+    }),
+  }),
+}
+
+function throwUnsupportedPPTCreationTool(): never {
+  throw new Error('Unsupported PPT creation tool')
+}
+
+function createPPTElementFromCreationTool({
+  current,
+  id,
+  start,
+  tool,
+}: {
+  current: Point
+  id: string
+  start: Point
+  tool: PPTCreationTool
+}): PPTElement {
+  if (tool.kind === 'text') {
+    const created = createCanvasText({
+      adapter: PPT_CANVAS_CREATION_ADAPTER,
+      createId: () => id,
+      point: start,
+    })
+    const item = created.item
+
+    if (item.kind !== 'textBox') {
+      return item
+    }
+
+    return {
+      ...item,
+      geometry: getPPTCreatedTextBounds({
+        currentWorld: current,
+        startWorld: start,
+      }),
+      textBody: createPPTTextBody(created.editValue),
+    }
+  }
+
+  return createCanvasShape({
+    adapter: PPT_CANVAS_CREATION_ADAPTER,
+    createId: () => id,
+    currentWorld: current,
+    shapeType: tool.shape,
+    startWorld: start,
+  })
+}
+
+function createPPTTextElement({
+  bounds,
+  id,
+}: {
+  bounds: Bounds
+  id: string
+}): PPTElement {
+  return {
+    geometry: clampPPTCreationBounds(bounds),
+    id,
+    kind: 'textBox',
+    name: 'Text',
+    style: { color: '#111827', fontSize: 30, fontWeight: 'semibold' },
+    textBody: createPPTTextBody('New text'),
+  }
+}
+
+function createPPTShapeElement({
+  bounds,
+  id,
+  shape,
+}: {
+  bounds: Bounds
+  id: string
+  shape: PPTShapeKind
+}): PPTShape {
+  const label = getPPTShapeLabel(shape)
+
+  return {
+    fill: { color: '#eef2ff' },
+    geometry: clampPPTCreationBounds(bounds),
+    id,
+    kind: 'shape',
+    name: label,
+    shape,
+    stroke: { color: '#6366f1', width: 2 },
+    style: { color: '#312e81', fontSize: 24, fontWeight: 'semibold' },
+    textBody: createPPTTextBody(label),
+  }
+}
+
+function getPPTCreatedTextBounds({
+  currentWorld,
+  startWorld,
+}: {
+  currentWorld: Point
+  startWorld: Point
+}): Bounds {
+  const bounds = normalizeBounds(startWorld, currentWorld)
+
+  if (bounds.w > 6 && bounds.h > 6) {
+    return clampPPTCreationBounds(bounds)
+  }
+
+  return clampPPTCreationBounds({
+    ...PPT_DEFAULT_TEXT_BOUNDS,
+    x: startWorld.x,
+    y: startWorld.y,
+  })
+}
+
+function clampPPTCreationBounds(bounds: Bounds): Bounds {
+  const w = clamp(bounds.w, 24, PPT_SLIDE_WIDTH)
+  const h = clamp(bounds.h, 24, PPT_SLIDE_HEIGHT)
+
+  return {
+    h,
+    w,
+    x: clamp(bounds.x, 0, PPT_SLIDE_WIDTH - w),
+    y: clamp(bounds.y, 0, PPT_SLIDE_HEIGHT - h),
+  }
+}
+
+function toPPTShapeKind(shape: CanvasCreatedShapeKind): PPTShapeKind {
+  if (shape === 'ellipse' || shape === 'diamond') {
+    return shape
+  }
+
+  return 'rect'
+}
+
+function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return null
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.text.keyboardShortcut)) {
+    return { kind: 'text' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.rect.keyboardShortcut)) {
+    return { kind: 'shape', shape: 'rect' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.ellipse.keyboardShortcut)) {
+    return { kind: 'shape', shape: 'ellipse' }
+  }
+
+  return null
+}
+
+function isPPTSelectToolShortcut(event: KeyboardEvent) {
+  return !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.select.keyboardShortcut)
+}
+
+function doesEventMatchCanvasToolShortcut(
+  event: KeyboardEvent,
+  shortcut: {
+    key: string
+    shiftInsensitive?: boolean
+    shiftKey?: boolean
+  } | undefined,
+) {
+  if (!shortcut || event.key.toLowerCase() !== shortcut.key.toLowerCase()) {
+    return false
+  }
+
+  return shortcut.shiftInsensitive || event.shiftKey === Boolean(shortcut.shiftKey)
+}
+
+function arePPTCreationToolsEqual(
+  left: PPTCreationTool | null,
+  right: PPTCreationTool,
+) {
+  return left?.kind === right.kind &&
+    (left.kind === 'text' || right.kind === 'text' || left.shape === right.shape)
+}
+
+function isPPTShapeCreationTool(
+  tool: PPTCreationTool | null,
+  shape: PPTShapeKind,
+) {
+  return tool?.kind === 'shape' && tool.shape === shape
+}
+
+function getPPTCreationToolDataValue(tool: PPTCreationTool | null) {
+  if (!tool) {
+    return undefined
+  }
+
+  return tool.kind === 'text' ? 'text' : tool.shape
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {

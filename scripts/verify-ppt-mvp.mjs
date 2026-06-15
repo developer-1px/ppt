@@ -914,19 +914,37 @@ async function runViewAndShapeScenario(page) {
   record('shows PPT zoom percentage', /\d+%/.test(afterGridToggle.zoomLabel), afterGridToggle)
 
   await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]').click()`)
-  await delay(50)
+  await delay(20)
+
+  const createEllipse = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      pressed: document.querySelector('[data-ppt-insert-shape="ellipse"]')?.getAttribute('aria-pressed'),
+      x: slide.left + slide.width * 0.18,
+      y: slide.top + slide.height * 0.3,
+    }
+  })()`)
+
+  await clickMouse(page, createEllipse.x, createEllipse.y, 1)
+  await delay(80)
 
   const afterInsertShape = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
 
     return {
+      height: parseFloat(selected?.style.height ?? '0'),
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
       shape: selected?.getAttribute('data-shape') ?? null,
       text: selected?.textContent ?? '',
+      width: parseFloat(selected?.style.width ?? '0'),
     }
   })()`)
 
-  record('inserts PPT oval shape from toolbar', afterInsertShape.selectedCount === 1 && afterInsertShape.shape === 'ellipse', afterInsertShape)
+  record('creates PPT oval shape from canvas tool click', createEllipse.pressed === 'true' && afterInsertShape.selectedCount === 1 && afterInsertShape.shape === 'ellipse' && afterInsertShape.width > 100 && afterInsertShape.height > 80, {
+    afterInsertShape,
+    createEllipse,
+  })
 
   await page.eval(`(() => {
     const shape = document.querySelector('[data-ppt-style-field="shape"]')
@@ -945,6 +963,106 @@ async function runViewAndShapeScenario(page) {
   })()`)
 
   record('changes selected PPT shape kind in inspector', afterShapeChange.shape === 'diamond' && afterShapeChange.thumbDiamondCount > 0, afterShapeChange)
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(20)
+
+  const dragRect = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.58,
+      endY: slide.top + slide.height * 0.38,
+      pressed: document.querySelector('[data-ppt-insert-tool="rect"]')?.getAttribute('aria-pressed'),
+      startX: slide.left + slide.width * 0.42,
+      startY: slide.top + slide.height * 0.24,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: dragRect.startX,
+    y: dragRect.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: dragRect.endX,
+    y: dragRect.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: dragRect.endX,
+    y: dragRect.endY,
+  })
+  await delay(80)
+
+  const afterDragRect = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      height: parseFloat(selected?.style.height ?? '0'),
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      shape: selected?.getAttribute('data-shape') ?? null,
+      width: parseFloat(selected?.style.width ?? '0'),
+    }
+  })()`)
+
+  record('creates PPT rectangle from canvas shortcut drag', dragRect.pressed === 'true' && afterDragRect.selectedKind === 'shape' && afterDragRect.shape === 'rect' && afterDragRect.width > 140 && afterDragRect.height > 90, {
+    afterDragRect,
+    dragRect,
+  })
+
+  await pressKey(page, {
+    code: 'KeyT',
+    key: 't',
+    windowsVirtualKeyCode: 84,
+  })
+  await delay(20)
+
+  const createText = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      pressed: document.querySelector('[data-ppt-insert-tool="text"]')?.getAttribute('aria-pressed'),
+      x: slide.left + slide.width * 0.22,
+      y: slide.top + slide.height * 0.68,
+    }
+  })()`)
+
+  await clickMouse(page, createText.x, createText.y, 1)
+  await delay(100)
+
+  const afterCreateText = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const editor = selected?.querySelector('.ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('creates PPT text from canvas shortcut click and enters inline edit', createText.pressed === 'true' && afterCreateText.selectedKind === 'textBox' && afterCreateText.editing && afterCreateText.text.includes('New text'), {
+    afterCreateText,
+    createText,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 
   await page.eval(`(() => {
     const background = document.querySelector('[data-ppt-slide-field="background"]')

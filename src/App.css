@@ -296,6 +296,7 @@
   background: #e9edf3;
 }
 
+.ppt-stage-shell[data-creation-tool],
 .ppt-stage-shell[data-line-tool] {
   cursor: crosshair;
 }
