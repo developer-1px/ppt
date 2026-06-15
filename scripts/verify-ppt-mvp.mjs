@@ -11,8 +11,11 @@ const CHROME_BIN =
   process.env.CHROME_BIN ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_COMMAND_TIMEOUT_MS = 10000
+const PPT_SLIDE_WIDTH = 1280
+const PPT_SLIDE_HEIGHT = 720
 const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
+const PPT_TIDY_GAP = 24
 
 const checks = []
 const browserErrors = []
@@ -41,6 +44,7 @@ try {
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
   await runFitSelectionScenario(page)
+  await runTidySelectionScenario(page)
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
@@ -1485,6 +1489,7 @@ async function runCommandPaletteScenario(page) {
   const lockIds = await readCommandPaletteIds(page, 'lock')
   const frontIds = await readCommandPaletteIds(page, 'front')
   const backIds = await readCommandPaletteIds(page, 'back')
+  const tidyIds = await readCommandPaletteIds(page, 'tidy')
   const fitIds = await readCommandPaletteIds(page, 'fit')
   const gridIds = await readCommandPaletteIds(page, 'grid')
   const exposed = {
@@ -1494,6 +1499,7 @@ async function runCommandPaletteScenario(page) {
     hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
     hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
     hasReorder: frontIds.includes('command:bring-to-front') && backIds.includes('command:send-to-back'),
+    hasTidy: tidyIds.includes('command:tidy-selection'),
     hasView: fitIds.includes('view:fit-slide') &&
       fitIds.includes('view:fit-selection') &&
       gridIds.includes('view:toggle-grid'),
@@ -1506,11 +1512,12 @@ async function runCommandPaletteScenario(page) {
       grid: gridIds.length,
       group: groupIds.length,
       lock: lockIds.length,
+      tidy: tidyIds.length,
       tool: toolIds.length,
     },
   }
 
-  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasView, exposed)
+  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasTidy && exposed.hasView, exposed)
 
   await pressKey(page, {
     code: 'Escape',
@@ -1673,6 +1680,85 @@ async function runFitSelectionScenario(page) {
   })
 }
 
+async function runTidySelectionScenario(page) {
+  const ids = ['s1-card-1', 's1-card-2', 's1-side-panel']
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+
+  await selectPPTLayerRows(page, ids)
+  await delay(80)
+
+  const beforeTidy = await readPPTTidyState(page, ids)
+
+  record('enables PPT tidy selection for three visible unlocked objects', beforeTidy.selectedCount === 3 && !beforeTidy.toolbarDisabled && !beforeTidy.floatingDisabled, beforeTidy)
+
+  await page.eval(`document.querySelector('[data-ppt-command="tidy-selection"]')?.click()`)
+  await delay(120)
+
+  const afterTidy = await readPPTTidyState(page, ids)
+
+  record('tidies selected PPT objects into canvas-style grid', afterTidy.elementCount === beforeTidy.elementCount && afterTidy.selectedCount === 3 && positionsChanged(beforeTidy.positions, afterTidy.positions, ids) && positionsMatch(afterTidy.positions, beforeTidy.expected, ids), {
+    afterTidy,
+    beforeTidy,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const afterUndo = await readPPTTidyState(page, ids)
+
+  record('undoes PPT tidy selection in one step', afterUndo.selectedCount === 3 && positionsMatch(afterUndo.positions, beforeTidy.positions, ids), {
+    afterUndo,
+    beforeTidy,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await selectPPTLayerRows(page, [ids[0]])
+  await delay(60)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await readCommandPaletteIds(page, 'tidy')
+
+  const paletteDisabled = await page.eval(`(() => ({
+    disabled: document.querySelector('[data-ppt-command-palette-item="command:tidy-selection"]')?.disabled ?? false,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:tidy-selection"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('disables PPT tidy selection palette item below minimum selection', paletteDisabled.itemPresent && paletteDisabled.open && paletteDisabled.selectedCount === 1 && paletteDisabled.disabled, paletteDisabled)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+}
+
 async function readCommandPaletteIds(page, query) {
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-command-palette-query]')
@@ -1687,6 +1773,67 @@ async function readCommandPaletteIds(page, query) {
   return page.eval(`(() => [...document.querySelectorAll('[data-ppt-command-palette-item]')]
     .map((item) => item.getAttribute('data-ppt-command-palette-item'))
   )()`)
+}
+
+async function readPPTTidyState(page, ids) {
+  return page.eval(`(() => {
+    const ids = ${JSON.stringify(ids)}
+    const entries = ids.map((id) => {
+      const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+
+      return {
+        h: parseFloat(element?.style.height ?? '0'),
+        id,
+        w: parseFloat(element?.style.width ?? '0'),
+        x: parseFloat(element?.style.left ?? '0'),
+        y: parseFloat(element?.style.top ?? '0'),
+      }
+    })
+    const minX = Math.min(...entries.map((entry) => entry.x))
+    const minY = Math.min(...entries.map((entry) => entry.y))
+    const columnCount = Math.ceil(Math.sqrt(entries.length))
+    const cellWidth = Math.max(...entries.map((entry) => entry.w)) + ${PPT_TIDY_GAP}
+    const cellHeight = Math.max(...entries.map((entry) => entry.h)) + ${PPT_TIDY_GAP}
+    const expectedEntries = [...entries]
+      .sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+      .map((entry, index) => {
+        const column = index % columnCount
+        const row = Math.floor(index / columnCount)
+        const targetX = minX + column * cellWidth
+        const targetY = minY + row * cellHeight
+
+        return [entry.id, {
+          ...entry,
+          x: Math.min(${PPT_SLIDE_WIDTH} - entry.w, Math.max(0, targetX)),
+          y: Math.min(${PPT_SLIDE_HEIGHT} - entry.h, Math.max(0, targetY)),
+        }]
+      })
+
+    return {
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      expected: Object.fromEntries(expectedEntries),
+      floatingDisabled: document.querySelector('[data-ppt-floating-command="tidy-selection"]')?.disabled ?? true,
+      positions: Object.fromEntries(entries.map((entry) => [entry.id, entry])),
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element')),
+      toolbarDisabled: document.querySelector('[data-ppt-command="tidy-selection"]')?.disabled ?? true,
+    }
+  })()`)
+}
+
+async function selectPPTLayerRows(page, ids) {
+  await page.eval(`(() => {
+    const ids = ${JSON.stringify(ids)}
+
+    ids.forEach((id, index) => {
+      document.querySelector(\`[data-ppt-layer-select="\${id}"]\`)?.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        shiftKey: index > 0,
+      }))
+    })
+  })()`)
 }
 
 async function readViewportState(page) {
@@ -2818,6 +2965,18 @@ function getElementCenter(page, elementId) {
       y: rect.top + rect.height / 2,
     }
   })()`)
+}
+
+function positionsChanged(before, after, ids, tolerance = 0.5) {
+  return ids.some((id) =>
+    Math.abs((before[id]?.x ?? 0) - (after[id]?.x ?? 0)) > tolerance ||
+    Math.abs((before[id]?.y ?? 0) - (after[id]?.y ?? 0)) > tolerance)
+}
+
+function positionsMatch(actual, expected, ids, tolerance = 0.5) {
+  return ids.every((id) =>
+    Math.abs((actual[id]?.x ?? 0) - (expected[id]?.x ?? 0)) <= tolerance &&
+    Math.abs((actual[id]?.y ?? 0) - (expected[id]?.y ?? 0)) <= tolerance)
 }
 
 function selectEditableContents(page, elementId) {

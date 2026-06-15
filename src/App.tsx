@@ -156,6 +156,7 @@ import {
 import {
   createPPTCanvasCommandAdapter,
   createPPTElementIdFactory,
+  getPPTElementsBounds,
   getPPTCanvasCommandAvailability,
   updatePPTElementBounds,
 } from './pptCommandAdapter'
@@ -222,10 +223,12 @@ type PPTSurfaceCommand =
   | 'selectSameType'
   | 'sendBackward'
   | 'sendToBack'
+  | 'tidySelection'
   | 'ungroup'
   | 'unlockAll'
 type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
   selectSameType: boolean
+  tidySelection: boolean
 }
 type PPTCommandAvailabilityKey = keyof PPTCommandAvailability
 type PPTSurfaceCommandDescriptor = {
@@ -287,6 +290,13 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     label: 'Select same type',
     surfaces: ['context-menu', 'selection-floating-bar'],
     title: 'Select same type',
+  }, {
+    availability: 'tidySelection',
+    command: 'tidySelection',
+    dataCommand: 'tidy-selection',
+    label: 'Tidy selection',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: 'Tidy selection',
   }, {
     availability: 'delete',
     command: 'delete',
@@ -388,6 +398,7 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
 }]
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
+const PPT_TIDY_GAP = 24
 const PPT_DEFAULT_TEXT_BOUNDS = {
   h: 76,
   w: 360,
@@ -556,6 +567,10 @@ function App() {
     () => canSelectSameTypePPTSelection(activeSlide.elements, selection),
     [activeSlide.elements, selection],
   )
+  const canTidySelection = useMemo(
+    () => canTidyPPTSelection(activeSlide.elements, selection),
+    [activeSlide.elements, selection],
+  )
   const canFormatSelectedText = selectedTextElements.length > 0 &&
     selectedTextElements.length === selectedElements.length &&
     !hasLockedSelection &&
@@ -575,9 +590,11 @@ function App() {
       selection,
     }),
     selectSameType: canSelectSameType,
+    tidySelection: canTidySelection,
   }), [
     clipboard.length,
     canSelectSameType,
+    canTidySelection,
     future.length,
     hasGroupedSelection,
     hasHiddenSelection,
@@ -1436,6 +1453,21 @@ function App() {
     setContextMenu(null)
   }
 
+  function tidySelection() {
+    if (!commandAvailability.tidySelection) {
+      return
+    }
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: syncPPTLineConnections(
+        tidyPPTSelectionElements(slide.elements, selection),
+      ),
+    })))
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
   function activateSelectTool() {
     setCreationTool(null)
     setLineCreationMode(null)
@@ -1480,6 +1512,9 @@ function App() {
         break
       case 'sendToBack':
         reorderSelection('sendToBack')
+        break
+      case 'tidySelection':
+        tidySelection()
         break
       case 'ungroup':
         ungroupSelection()
@@ -2878,6 +2913,12 @@ function App() {
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.distributeVertical.title,
   }, {
+    disabled: !commandAvailability.tidySelection,
+    id: 'command:tidy-selection',
+    run: tidySelection,
+    section: 'Arrange',
+    title: 'Tidy selection',
+  }, {
     disabled: !commandAvailability.bringForward,
     id: 'command:bring-forward',
     run: () => reorderSelection('bringForward'),
@@ -3192,6 +3233,9 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={CANVAS_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
             <AlignVerticalDistributeCenter size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
+            <Grid2X2 size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
@@ -4066,6 +4110,8 @@ function PPTSurfaceCommandIcon({
       return <MoveDown size={size} />
     case 'sendToBack':
       return <SendToBack size={size} />
+    case 'tidySelection':
+      return <Grid2X2 size={size} />
     case 'ungroup':
       return <Ungroup size={size} />
     case 'unlockAll':
@@ -5220,6 +5266,74 @@ function getPPTElementTypeKey(element: PPTElement) {
   }
 
   return element.kind
+}
+
+function canTidyPPTSelection(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+) {
+  if (selection.length < 3) {
+    return false
+  }
+
+  return getPPTTidySelectionElements(elements, selection).length === selection.length
+}
+
+function tidyPPTSelectionElements(
+  elements: PPTElement[],
+  selection: readonly string[],
+) {
+  if (!canTidyPPTSelection(elements, selection)) {
+    return elements
+  }
+
+  const selected = getPPTTidySelectionElements(elements, selection)
+  const selectionBounds = getPPTElementsBounds(selected)
+
+  if (!selectionBounds) {
+    return elements
+  }
+
+  const columnCount = Math.ceil(Math.sqrt(selected.length))
+  const boundsList = selected.map((element) => pptGeometryToBounds(element.geometry))
+  const cellWidth = Math.max(...boundsList.map((bounds) => bounds.w)) + PPT_TIDY_GAP
+  const cellHeight = Math.max(...boundsList.map((bounds) => bounds.h)) + PPT_TIDY_GAP
+  const sorted = [...selected].sort((a, b) => {
+    const aBounds = pptGeometryToBounds(a.geometry)
+    const bBounds = pptGeometryToBounds(b.geometry)
+
+    return aBounds.y === bBounds.y
+      ? aBounds.x - bBounds.x
+      : aBounds.y - bBounds.y
+  })
+  const tidied = new Map<string, PPTElement>()
+
+  sorted.forEach((element, index) => {
+    const bounds = pptGeometryToBounds(element.geometry)
+    const column = index % columnCount
+    const row = Math.floor(index / columnCount)
+
+    tidied.set(element.id, updatePPTElementBounds(element, {
+      ...bounds,
+      x: selectionBounds.x + column * cellWidth,
+      y: selectionBounds.y + row * cellHeight,
+    }))
+  })
+
+  return elements.map((element) => tidied.get(element.id) ?? element)
+}
+
+function getPPTTidySelectionElements(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+) {
+  const selected = new Set(selection)
+
+  return elements.filter((element) =>
+    selected.has(element.id) &&
+    element.visible !== false &&
+    element.locked !== true &&
+    element.kind !== 'line')
 }
 
 function getPPTCommandSurfaceGroups({
