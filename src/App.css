@@ -90,11 +90,26 @@
   background: var(--control-hover);
 }
 
+.ppt-icon-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: #e0ecff;
+  color: var(--accent-strong);
+}
+
 .ppt-icon-button:disabled,
 .ppt-button:disabled,
 .ppt-slide-action:disabled {
   cursor: not-allowed;
   color: #98a2b3;
+}
+
+.ppt-zoom-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 42px;
+  height: 34px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .ppt-rail {
@@ -114,11 +129,28 @@
   border-bottom: 1px solid var(--panel-border);
 }
 
+.ppt-rail-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .ppt-rail-header h2,
 .ppt-panel-header h2 {
   margin: 0;
   font-size: 13px;
   font-weight: 650;
+}
+
+.ppt-slide-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.ppt-slide-actions .ppt-slide-action {
+  width: 100%;
+  height: 30px;
 }
 
 .ppt-slide-list {
@@ -163,6 +195,14 @@
   background: #cbd5e1;
 }
 
+.ppt-thumb-shape[data-shape='ellipse'] {
+  border-radius: 999px;
+}
+
+.ppt-thumb-shape[data-shape='diamond'] {
+  transform: rotate(45deg);
+}
+
 .ppt-thumb-name {
   min-width: 0;
   overflow: hidden;
@@ -180,6 +220,10 @@
     linear-gradient(#d7dde7 1px, transparent 1px),
     linear-gradient(90deg, #d7dde7 1px, transparent 1px);
   background-size: 32px 32px;
+}
+
+.ppt-stage-shell[data-grid='false'] {
+  background: #e9edf3;
 }
 
 .ppt-stage-world {

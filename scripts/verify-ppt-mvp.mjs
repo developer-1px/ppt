@@ -33,7 +33,9 @@ try {
   await runTextEditingScenario(page)
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
+  await runViewAndShapeScenario(page)
   await runExportScenario(page)
+  await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
 
   await page.close()
@@ -497,6 +499,134 @@ async function runExportScenario(page) {
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
 }
 
+async function runViewAndShapeScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await page.eval(`document.querySelector('[data-ppt-view-grid]').click()`)
+  await delay(50)
+
+  const afterGridToggle = await page.eval(`(() => ({
+    grid: document.querySelector('.ppt-stage-shell')?.getAttribute('data-grid'),
+    pressed: document.querySelector('[data-ppt-view-grid]')?.getAttribute('aria-pressed'),
+    zoomLabel: document.querySelector('.ppt-zoom-label')?.textContent ?? '',
+  }))()`)
+
+  record('toggles PPT editing grid visibility', afterGridToggle.grid === 'false' && afterGridToggle.pressed === 'false', afterGridToggle)
+  record('shows PPT zoom percentage', /\d+%/.test(afterGridToggle.zoomLabel), afterGridToggle)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]').click()`)
+  await delay(50)
+
+  const afterInsertShape = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      shape: selected?.getAttribute('data-shape') ?? null,
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('inserts PPT oval shape from toolbar', afterInsertShape.selectedCount === 1 && afterInsertShape.shape === 'ellipse', afterInsertShape)
+
+  await page.eval(`(() => {
+    const shape = document.querySelector('[data-ppt-style-field="shape"]')
+    shape.value = 'diamond'
+    shape.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterShapeChange = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      shape: selected?.getAttribute('data-shape') ?? null,
+      thumbDiamondCount: document.querySelectorAll('.ppt-thumb-shape[data-shape="diamond"]').length,
+    }
+  })()`)
+
+  record('changes selected PPT shape kind in inspector', afterShapeChange.shape === 'diamond' && afterShapeChange.thumbDiamondCount > 0, afterShapeChange)
+
+  await page.eval(`(() => {
+    const background = document.querySelector('[data-ppt-slide-field="background"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(background, '#fef3c7')
+    background.dispatchEvent(new Event('input', { bubbles: true }))
+    background.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterBackground = await page.eval(`(() => ({
+    slideBackground: document.querySelector('.ppt-slide')?.style.background ?? '',
+    thumbBackground: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-preview')?.style.background ?? '',
+  }))()`)
+
+  record('updates PPT slide background in inspector', afterBackground.slideBackground === 'rgb(254, 243, 199)' && afterBackground.thumbBackground === 'rgb(254, 243, 199)', afterBackground)
+}
+
+async function runSlideManagementScenario(page) {
+  const before = await getSlideRailState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="duplicate"]').click()`)
+  await delay(50)
+
+  const afterDuplicate = await getSlideRailState(page)
+
+  record('duplicates active PPT slide in rail', afterDuplicate.count === before.count + 1 && afterDuplicate.activeName.includes('Copy'), {
+    afterDuplicate,
+    before,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="move-down"]').click()`)
+  await delay(50)
+
+  const afterMoveDown = await getSlideRailState(page)
+
+  record('moves active PPT slide down in rail', afterMoveDown.activeIndex === afterDuplicate.activeIndex + 1 && afterMoveDown.activeName.includes('Copy'), {
+    afterDuplicate,
+    afterMoveDown,
+  })
+
+  await pressKey(page, {
+    code: 'PageUp',
+    key: 'PageUp',
+    windowsVirtualKeyCode: 33,
+  })
+  await delay(50)
+
+  const afterPageUp = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'PageDown',
+    key: 'PageDown',
+    windowsVirtualKeyCode: 34,
+  })
+  await delay(50)
+
+  const afterPageDown = await getSlideRailState(page)
+
+  record('navigates PPT slides with PageUp and PageDown', afterPageUp.activeIndex === afterMoveDown.activeIndex - 1 && afterPageDown.activeIndex === afterMoveDown.activeIndex, {
+    afterMoveDown,
+    afterPageDown,
+    afterPageUp,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await delay(50)
+
+  const afterDelete = await getSlideRailState(page)
+
+  record('deletes active PPT slide without removing final slide', afterDelete.count === before.count && afterDelete.count >= 1, {
+    afterDelete,
+    before,
+  })
+}
+
 async function clickMouse(page, x, y, clickCount, modifiers = 0) {
   await page.send('Input.dispatchMouseEvent', {
     button: 'left',
@@ -536,6 +666,21 @@ function selectEditableContents(page, elementId) {
     range.selectNodeContents(editor)
     selection.removeAllRanges()
     selection.addRange(range)
+  })()`)
+}
+
+function getSlideRailState(page) {
+  return page.eval(`(() => {
+    const thumbs = [...document.querySelectorAll('.ppt-thumb')]
+    const activeIndex = thumbs.findIndex((thumb) => thumb.getAttribute('aria-current') === 'page')
+    const activeThumb = thumbs[activeIndex] ?? null
+
+    return {
+      activeIndex,
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      count: thumbs.length,
+      names: thumbs.map((thumb) => thumb.querySelector('.ppt-thumb-name')?.textContent ?? ''),
+    }
   })()`)
 }
 

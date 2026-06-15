@@ -8,9 +8,15 @@ import {
   AlignStartVertical,
   AlignVerticalDistributeCenter,
   BringToFront,
+  ChevronDown,
+  ChevronUp,
+  Circle,
   Copy,
+  CopyPlus,
+  Diamond,
   Download,
   FilePlus2,
+  Grid2X2,
   Maximize2,
   MoveDown,
   MoveUp,
@@ -89,6 +95,7 @@ import {
   type PPTElement,
   type PPTParagraph,
   type PPTShape,
+  type PPTShapeKind,
   type PPTSlide,
   type PPTTextStyle,
 } from './pptModel'
@@ -152,6 +159,7 @@ function App() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
+  const [showGrid, setShowGrid] = useState(true)
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -166,6 +174,7 @@ function App() {
   }, [])
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
+  const activeSlideIndex = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
   const scene = useMemo(() => createPPTCanvasScene(activeSlide), [activeSlide])
   const commandAdapter = useMemo(() => createPPTCanvasCommandAdapter(), [])
   const selectedBounds = scene.getBounds(selection)
@@ -181,6 +190,9 @@ function App() {
     canUndo: past.length > 0,
     selection,
   }), [clipboard.length, future.length, past.length, selection])
+  const canDeleteSlide = deck.slides.length > 1
+  const canMoveActiveSlideDown = activeSlideIndex >= 0 && activeSlideIndex < deck.slides.length - 1
+  const canMoveActiveSlideUp = activeSlideIndex > 0
 
   const fitSlide = useCallback(() => {
     const rect = stageRef.current?.getBoundingClientRect()
@@ -258,6 +270,18 @@ function App() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
         event.preventDefault()
         duplicateSelection()
+        return
+      }
+
+      if (event.key === 'PageUp') {
+        event.preventDefault()
+        activateRelativeSlide(-1)
+        return
+      }
+
+      if (event.key === 'PageDown') {
+        event.preventDefault()
+        activateRelativeSlide(1)
         return
       }
 
@@ -353,20 +377,37 @@ function App() {
     })
   }
 
+  function selectSlide(slideId: string) {
+    setActiveSlideId(slideId)
+    setSelection([])
+    setEditingId(null)
+    setInteraction(null)
+  }
+
+  function activateRelativeSlide(delta: number) {
+    const index = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
+    const nextSlide = deck.slides[index + delta]
+
+    if (nextSlide) {
+      selectSlide(nextSlide.id)
+    }
+  }
+
   function addSlide() {
     commitDeck((current) => {
       const nextIndex = current.slides.length + 1
+      const id = createPPTSlideId(current)
       const slide: PPTSlide = {
         background: { color: '#ffffff' },
         elements: [{
           geometry: { h: 72, w: 720, x: 84, y: 82 },
-          id: `slide-${nextIndex}-title`,
+          id: `${id}-title`,
           kind: 'textBox',
           name: 'Title',
           style: { color: '#111827', fontSize: 44, fontWeight: 'bold' },
           textBody: createPPTTextBody('Untitled slide'),
         }],
-        id: `slide-${nextIndex}`,
+        id,
         name: `Slide ${nextIndex}`,
         notes: '',
       }
@@ -377,6 +418,74 @@ function App() {
       return {
         ...current,
         slides: [...current.slides, slide],
+      }
+    })
+  }
+
+  function duplicateActiveSlide() {
+    commitDeck((current) => {
+      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
+      const source = current.slides[index]
+
+      if (!source) {
+        return current
+      }
+
+      const id = createPPTSlideId(current)
+      const slide = clonePPTSlide(source, id)
+      const slides = [...current.slides]
+      slides.splice(index + 1, 0, slide)
+      selectSlide(slide.id)
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+  }
+
+  function deleteActiveSlide() {
+    if (deck.slides.length <= 1) {
+      return
+    }
+
+    commitDeck((current) => {
+      if (current.slides.length <= 1) {
+        return current
+      }
+
+      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
+      const slides = current.slides.filter((slide) => slide.id !== activeSlide.id)
+      const nextSlide = slides[Math.min(Math.max(index, 0), slides.length - 1)]
+
+      if (nextSlide) {
+        selectSlide(nextSlide.id)
+      }
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+  }
+
+  function moveActiveSlide(delta: -1 | 1) {
+    commitDeck((current) => {
+      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
+      const targetIndex = index + delta
+
+      if (index < 0 || targetIndex < 0 || targetIndex >= current.slides.length) {
+        return current
+      }
+
+      const slides = [...current.slides]
+      const slide = slides[index]
+      slides[index] = slides[targetIndex]
+      slides[targetIndex] = slide
+
+      return {
+        ...current,
+        slides,
       }
     })
   }
@@ -402,19 +511,20 @@ function App() {
     }))
   }
 
-  function addShape() {
+  function addShape(shape: PPTShapeKind = 'rect') {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const id = createPPTElementId(slide, 'shape')
+      const label = getPPTShapeLabel(shape)
       const element: PPTShape = {
         fill: { color: '#eef2ff' },
         geometry: { h: 150, w: 260, x: 160, y: 260 },
         id,
         kind: 'shape',
-        name: 'Shape',
-        shape: 'rect',
+        name: label,
+        shape,
         stroke: { color: '#6366f1', width: 2 },
         style: { color: '#312e81', fontSize: 24, fontWeight: 'semibold' },
-        textBody: createPPTTextBody('Shape'),
+        textBody: createPPTTextBody(label),
       }
 
       setSelection([id])
@@ -650,6 +760,15 @@ function App() {
     )
   }
 
+  function updateShapeKind(elementId: string, shape: PPTShapeKind) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
+        element.kind === 'shape'
+          ? { ...element, shape }
+          : element),
+    )
+  }
+
   function updateShapeStroke(
     elementId: string,
     field: 'color' | 'width',
@@ -705,6 +824,13 @@ function App() {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
       name,
+    })))
+  }
+
+  function updateSlideBackground(color: string) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+      ...slide,
+      background: { color },
     })))
   }
 
@@ -1011,8 +1137,14 @@ function App() {
           <button className="ppt-icon-button" onClick={addTextBox} title="Add text" type="button">
             <Type size={17} />
           </button>
-          <button className="ppt-icon-button" onClick={addShape} title="Add shape" type="button">
+          <button className="ppt-icon-button" data-ppt-insert-shape="rect" onClick={() => addShape('rect')} title="Add rectangle" type="button">
             <Square size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-insert-shape="ellipse" onClick={() => addShape('ellipse')} title="Add oval" type="button">
+            <Circle size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-insert-shape="diamond" onClick={() => addShape('diamond')} title="Add diamond" type="button">
+            <Diamond size={17} />
           </button>
           <button className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={CANVAS_COMMAND_AFFORDANCES.delete.title} type="button">
             <Trash2 size={17} />
@@ -1068,6 +1200,10 @@ function App() {
           <button className="ppt-icon-button" onClick={() => zoom('in')} title="Zoom in" type="button">
             <ZoomIn size={17} />
           </button>
+          <button aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
+            <Grid2X2 size={17} />
+          </button>
+          <span className="ppt-zoom-label">{Math.round(viewport.scale * 100)}%</span>
         </div>
         <div className="ppt-toolbar-group">
           <button aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
@@ -1085,9 +1221,23 @@ function App() {
       <aside className="ppt-rail" aria-label="Slides">
         <div className="ppt-rail-header">
           <h2>Slides</h2>
-          <button className="ppt-slide-action" onClick={addSlide} title="Add slide" type="button">
-            <FilePlus2 size={16} />
-          </button>
+          <div className="ppt-slide-actions">
+            <button className="ppt-slide-action" data-ppt-slide-action="add" onClick={addSlide} title="Add slide" type="button">
+              <FilePlus2 size={16} />
+            </button>
+            <button className="ppt-slide-action" data-ppt-slide-action="duplicate" onClick={duplicateActiveSlide} title="Duplicate slide" type="button">
+              <CopyPlus size={16} />
+            </button>
+            <button className="ppt-slide-action" data-ppt-slide-action="move-up" disabled={!canMoveActiveSlideUp} onClick={() => moveActiveSlide(-1)} title="Move slide up" type="button">
+              <ChevronUp size={16} />
+            </button>
+            <button className="ppt-slide-action" data-ppt-slide-action="move-down" disabled={!canMoveActiveSlideDown} onClick={() => moveActiveSlide(1)} title="Move slide down" type="button">
+              <ChevronDown size={16} />
+            </button>
+            <button className="ppt-slide-action" data-ppt-slide-action="delete" disabled={!canDeleteSlide} onClick={deleteActiveSlide} title="Delete slide" type="button">
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
         <div className="ppt-slide-list" role="listbox" aria-label="Slides">
           {deck.slides.map((slide, index) => (
@@ -1097,9 +1247,7 @@ function App() {
               key={slide.id}
               slide={slide}
               onSelect={() => {
-                setActiveSlideId(slide.id)
-                setSelection([])
-                setEditingId(null)
+                selectSlide(slide.id)
               }}
             />
           ))}
@@ -1108,6 +1256,7 @@ function App() {
 
       <section
         className="ppt-stage-shell"
+        data-grid={showGrid ? 'true' : 'false'}
         onPointerDown={handleStagePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -1170,6 +1319,8 @@ function App() {
         onElementGeometryChange={updateElementGeometry}
         onElementTextStyleChange={updateElementTextStyle}
         onParagraphAlignChange={updateParagraphAlign}
+        onShapeKindChange={updateShapeKind}
+        onSlideBackgroundChange={updateSlideBackground}
         onShapeFillChange={updateShapeFill}
         onShapeStrokeChange={updateShapeStroke}
         onSlideNameChange={updateSlideName}
@@ -1203,6 +1354,7 @@ function SlideThumb({
         {slide.elements.map((element) => (
           <span
             className={element.kind === 'textBox' ? 'ppt-thumb-text' : 'ppt-thumb-shape'}
+            data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
               background: element.kind === 'shape' ? element.fill.color : '#cbd5e1',
@@ -1449,7 +1601,9 @@ function Inspector({
   onElementTextStyleChange,
   onParagraphAlignChange,
   onShapeFillChange,
+  onShapeKindChange,
   onShapeStrokeChange,
+  onSlideBackgroundChange,
   onSlideNameChange,
   onSlideNotesChange,
   selectedElement,
@@ -1474,11 +1628,13 @@ function Inspector({
     align: NonNullable<PPTParagraph['align']>,
   ) => void
   onShapeFillChange: (elementId: string, color: string) => void
+  onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onShapeStrokeChange: (
     elementId: string,
     field: 'color' | 'width',
     value: string | number,
   ) => void
+  onSlideBackgroundChange: (color: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
   selectedElement: PPTElement | null
@@ -1502,6 +1658,15 @@ function Inspector({
           <input
             value={slide.name}
             onChange={(event) => onSlideNameChange(event.target.value)}
+          />
+        </label>
+        <label className="ppt-field">
+          <span>Background</span>
+          <input
+            data-ppt-slide-field="background"
+            type="color"
+            value={slide.background?.color ?? '#ffffff'}
+            onChange={(event) => onSlideBackgroundChange(event.target.value)}
           />
         </label>
         <label className="ppt-field">
@@ -1613,6 +1778,22 @@ function Inspector({
             ) : null}
             {selectedElement.kind === 'shape' ? (
               <>
+                <label className="ppt-field">
+                  <span>Shape</span>
+                  <select
+                    data-ppt-style-field="shape"
+                    value={selectedElement.shape}
+                    onChange={(event) => {
+                      if (isPPTShapeKind(event.target.value)) {
+                        onShapeKindChange(selectedElement.id, event.target.value)
+                      }
+                    }}
+                  >
+                    <option value="rect">Rectangle</option>
+                    <option value="ellipse">Oval</option>
+                    <option value="diamond">Diamond</option>
+                  </select>
+                </label>
                 <div className="ppt-geometry-grid">
                   <label className="ppt-field">
                     <span>Fill</span>
@@ -1820,6 +2001,63 @@ function getSpacingGuideLabelPoint(guide: CanvasSnapGuides['spacingGuides'][numb
   const y = points.reduce((sum, point) => sum + point.y, 0) / points.length
 
   return { x, y }
+}
+
+function createPPTSlideId(deck: PPTDeck) {
+  const ids = new Set(deck.slides.map((slide) => slide.id))
+  let next = deck.slides.length + 1
+  let id = `slide-${next}`
+
+  while (ids.has(id)) {
+    next += 1
+    id = `slide-${next}`
+  }
+
+  return id
+}
+
+function clonePPTSlide(slide: PPTSlide, id: string): PPTSlide {
+  return {
+    ...slide,
+    elements: slide.elements.map((element, index) => ({
+      ...element,
+      id: createPPTSlideElementId(id, element, index),
+      name: element.name,
+    })),
+    id,
+    name: `${slide.name} Copy`,
+  }
+}
+
+function createPPTSlideElementId(
+  slideId: string,
+  element: PPTElement,
+  index: number,
+) {
+  const name = element.name
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-|-$/g, '')
+  const suffix = name || element.kind
+
+  return `${slideId}-${suffix}-${index + 1}`
+}
+
+function getPPTShapeLabel(shape: PPTShapeKind) {
+  if (shape === 'ellipse') {
+    return 'Oval'
+  }
+
+  if (shape === 'diamond') {
+    return 'Diamond'
+  }
+
+  return 'Rectangle'
+}
+
+function isPPTShapeKind(value: string): value is PPTShapeKind {
+  return value === 'rect' || value === 'ellipse' || value === 'diamond'
 }
 
 export default App

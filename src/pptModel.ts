@@ -103,6 +103,7 @@ export type PPTTextBody = z.infer<typeof PPTTextBodySchema>
 export type PPTTextStyle = z.infer<typeof PPTTextStyleSchema>
 export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
+export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
 export type PPTSlide = z.infer<typeof PPTSlideSchema>
@@ -208,4 +209,3 @@ export function createPPTElementId(slide: PPTSlide, prefix: string) {
 
   return id
 }
-
