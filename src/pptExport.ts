@@ -61,7 +61,7 @@ function renderPPTElementHTML(element: PPTElement) {
   ]
 
   if (element.kind === 'image') {
-    return `    <img class="ppt-element" data-ppt-element="${escapeHtml(element.id)}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${style.filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${style.filter(Boolean).join(';')}" />`
   }
 
   const text = escapeHtml(readPPTText(element.textBody))
@@ -84,6 +84,7 @@ function exportCSS() {
     `.ppt-deck{display:grid;gap:32px;padding:32px;}`,
     `.ppt-slide{position:relative;width:${PPT_SLIDE_WIDTH}px;height:${PPT_SLIDE_HEIGHT}px;overflow:hidden;background:#fff;break-after:page;}`,
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
+    '.ppt-image{display:block;object-fit:cover;padding:0;}',
     '.ppt-text{align-items:flex-start;padding:0;}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',

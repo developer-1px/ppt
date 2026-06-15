@@ -112,6 +112,14 @@
   font-size: 12px;
 }
 
+.ppt-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .ppt-rail {
   min-width: 0;
   overflow: hidden;
@@ -185,10 +193,16 @@
   background: #fff;
 }
 
+.ppt-thumb-image,
 .ppt-thumb-shape,
 .ppt-thumb-text {
   position: absolute;
   border-radius: 3px;
+}
+
+.ppt-thumb-image {
+  background-position: center;
+  background-size: cover;
 }
 
 .ppt-thumb-text {
@@ -272,6 +286,13 @@
 
 .ppt-element[data-shape='diamond'] {
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.ppt-element[data-kind='image'] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .ppt-element[data-selected='true'] {

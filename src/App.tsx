@@ -20,6 +20,7 @@ import {
   FilePlus2,
   Grid2X2,
   Group,
+  ImagePlus,
   Layers,
   Lock,
   Maximize2,
@@ -45,7 +46,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent as ReactChangeEvent,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -124,6 +127,13 @@ import {
   updatePPTElementBounds,
 } from './pptCommandAdapter'
 import { exportPPTDeckHTML } from './pptExport'
+import {
+  createPPTImportedImageElement,
+  getPPTImageFileFromDataTransfer,
+  getPPTImageFileFromList,
+  readPPTImageFileSource,
+  type PPTImageImportSource,
+} from './pptImageImport'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
@@ -218,6 +228,7 @@ function App() {
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
   const deckRef = useRef(deck)
 
   useEffect(() => {
@@ -337,8 +348,10 @@ function App() {
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') {
-        event.preventDefault()
-        pasteSelection()
+        if (commandAvailability.paste) {
+          event.preventDefault()
+          pasteSelection()
+        }
         return
       }
 
@@ -396,6 +409,27 @@ function App() {
     window.addEventListener('keydown', onKeyDown)
 
     return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return
+      }
+
+      const file = getPPTImageFileFromDataTransfer(event.clipboardData)
+
+      if (!file) {
+        return
+      }
+
+      event.preventDefault()
+      void insertPPTImageFile(file)
+    }
+
+    window.addEventListener('paste', onPaste)
+
+    return () => window.removeEventListener('paste', onPaste)
   })
 
   function commitDeck(update: (current: PPTDeck) => PPTDeck) {
@@ -619,6 +653,51 @@ function App() {
         elements: [...slide.elements, element],
       }
     }))
+  }
+
+  function insertPPTImageSource(
+    source: PPTImageImportSource,
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const element = createPPTImportedImageElement({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        source,
+      })
+
+      setSelection([element.id])
+      setEditingId(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
+  }
+
+  async function insertPPTImageFile(
+    file: Blob & { name?: string },
+    center = getPPTViewportCenter(),
+  ) {
+    const source = await readPPTImageFileSource(file)
+
+    if (!source) {
+      return false
+    }
+
+    insertPPTImageSource(source, center)
+    return true
+  }
+
+  function handleImageInputChange(event: ReactChangeEvent<HTMLInputElement>) {
+    const file = getPPTImageFileFromList(event.target.files)
+
+    if (file) {
+      void insertPPTImageFile(file)
+    }
+
+    event.target.value = ''
   }
 
   function deleteSelection() {
@@ -1046,6 +1125,39 @@ function App() {
     })
   }
 
+  function getPPTViewportCenter() {
+    const rect = stageRef.current?.getBoundingClientRect()
+
+    if (!rect) {
+      return {
+        x: PPT_SLIDE_WIDTH / 2,
+        y: PPT_SLIDE_HEIGHT / 2,
+      }
+    }
+
+    return getCanvasViewportWorldPoint(viewport, {
+      x: rect.width / 2,
+      y: rect.height / 2,
+    })
+  }
+
+  function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
+    if (getPPTImageFileFromDataTransfer(event.dataTransfer)) {
+      event.preventDefault()
+    }
+  }
+
+  function handleStageDrop(event: ReactDragEvent<HTMLDivElement>) {
+    const file = getPPTImageFileFromDataTransfer(event.dataTransfer)
+
+    if (!file) {
+      return
+    }
+
+    event.preventDefault()
+    void insertPPTImageFile(file, screenToWorld(event.nativeEvent))
+  }
+
   function handleElementPointerDown(
     event: ReactPointerEvent<HTMLDivElement>,
     elementId: string,
@@ -1400,6 +1512,18 @@ function App() {
           <button className="ppt-icon-button" data-ppt-insert-shape="diamond" onClick={() => addShape('diamond')} title="Add diamond" type="button">
             <Diamond size={17} />
           </button>
+          <button className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
+            <ImagePlus size={17} />
+          </button>
+          <input
+            accept="image/*"
+            className="ppt-file-input"
+            data-ppt-image-upload-input
+            ref={imageInputRef}
+            tabIndex={-1}
+            type="file"
+            onChange={handleImageInputChange}
+          />
           <button className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={CANVAS_COMMAND_AFFORDANCES.delete.title} type="button">
             <Trash2 size={17} />
           </button>
@@ -1525,6 +1649,8 @@ function App() {
       <section
         className="ppt-stage-shell"
         data-grid={showGrid ? 'true' : 'false'}
+        onDragOver={handleStageDragOver}
+        onDrop={handleStageDrop}
         onPointerDown={handleStagePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -1632,11 +1758,18 @@ function SlideThumb({
       <span className="ppt-thumb-preview" style={{ background: slide.background?.color ?? '#fff' }}>
         {slide.elements.map((element) => (
           <span
-            className={element.kind === 'textBox' ? 'ppt-thumb-text' : 'ppt-thumb-shape'}
+            className={getPPTThumbElementClassName(element)}
             data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
-              background: element.kind === 'shape' ? element.fill.color : '#cbd5e1',
+              background: element.kind === 'shape'
+                ? element.fill.color
+                : element.kind === 'image'
+                  ? undefined
+                  : '#cbd5e1',
+              backgroundImage: element.kind === 'image'
+                ? `url(${element.src})`
+                : undefined,
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
@@ -2474,6 +2607,18 @@ function getPPTShapeLabel(shape: PPTShapeKind) {
   }
 
   return 'Rectangle'
+}
+
+function getPPTThumbElementClassName(element: PPTElement) {
+  if (element.kind === 'textBox') {
+    return 'ppt-thumb-text'
+  }
+
+  if (element.kind === 'image') {
+    return 'ppt-thumb-image'
+  }
+
+  return 'ppt-thumb-shape'
 }
 
 function isPPTShapeKind(value: string): value is PPTShapeKind {

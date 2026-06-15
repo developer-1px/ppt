@@ -11,6 +11,8 @@ const CHROME_BIN =
   process.env.CHROME_BIN ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_COMMAND_TIMEOUT_MS = 10000
+const PPT_TEST_IMAGE_WIDTH = 640
+const PPT_TEST_IMAGE_HEIGHT = 360
 
 const checks = []
 const browserErrors = []
@@ -34,6 +36,7 @@ try {
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runViewAndShapeScenario(page)
+  await runImageImportScenario(page)
   await runSelectionPaneScenario(page)
   await runExportScenario(page)
   await runSlideManagementScenario(page)
@@ -683,6 +686,8 @@ async function runExportScenario(page) {
       hasDeckJson: code.includes('data-ppt-deck'),
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
+      hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
+      hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
     }
@@ -691,6 +696,7 @@ async function runExportScenario(page) {
   record('exports HTML slide markup', state.hasSlideMarkup, state)
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
+  record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 }
 
@@ -762,6 +768,107 @@ async function runViewAndShapeScenario(page) {
   }))()`)
 
   record('updates PPT slide background in inspector', afterBackground.slideBackground === 'rgb(254, 243, 199)' && afterBackground.thumbBackground === 'rgb(254, 243, 199)', afterBackground)
+}
+
+async function runImageImportScenario(page) {
+  const before = await getPPTImageImportState(page)
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-image-upload-input]')
+    const filesSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files').set
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(${createPPTTestImageFileExpression('upload.svg', '#2563eb')})
+    filesSetter.call(input, dataTransfer.files)
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(150)
+
+  const afterUpload = await getPPTImageImportState(page)
+
+  record('inserts PPT image from file picker affordance', afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
+    afterUpload,
+    before,
+  })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(${createPPTTestImageFileExpression('paste.svg', '#16a34a')})
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(150)
+
+  const afterPaste = await getPPTImageImportState(page)
+
+  record('pastes image file into PPT slide from clipboard event', afterPaste.imageCount === afterUpload.imageCount + 1 && afterPaste.selectedKind === 'image' && afterPaste.selectedName === 'paste.svg', {
+    afterPaste,
+    afterUpload,
+  })
+
+  await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const rect = stage.getBoundingClientRect()
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(${createPPTTestImageFileExpression('drop.svg', '#dc2626')})
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width * 0.7,
+      clientY: rect.top + rect.height * 0.4,
+      dataTransfer,
+    }))
+  })()`)
+  await delay(150)
+
+  const afterDrop = await getPPTImageImportState(page)
+
+  record('drops image file onto PPT stage at pointer position', afterDrop.imageCount === afterPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+    afterDrop,
+    afterPaste,
+  })
+
+  const beforeResize = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+      width: parseFloat(selected.style.width),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeResize.handleX,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeResize.handleX + 40,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeResize.handleX + 40,
+    y: beforeResize.handleY,
+  })
+  await delay(50)
+
+  const afterResize = await getPPTImageImportState(page)
+
+  record('resizes inserted PPT image with existing selection handles', afterResize.selectedWidth > beforeResize.width && afterResize.selectedKind === 'image', {
+    afterResize,
+    beforeResize,
+  })
 }
 
 async function runSelectionPaneScenario(page) {
@@ -922,6 +1029,37 @@ async function runSlideManagementScenario(page) {
     afterDelete,
     before,
   })
+}
+
+function createPPTTestImageFileExpression(name, color) {
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PPT_TEST_IMAGE_WIDTH}" height="${PPT_TEST_IMAGE_HEIGHT}" viewBox="0 0 ${PPT_TEST_IMAGE_WIDTH} ${PPT_TEST_IMAGE_HEIGHT}">`,
+    `<rect width="${PPT_TEST_IMAGE_WIDTH}" height="${PPT_TEST_IMAGE_HEIGHT}" rx="24" fill="${color}"/>`,
+    '<circle cx="500" cy="110" r="72" fill="white" fill-opacity="0.45"/>',
+    '<path d="M80 270h360" stroke="white" stroke-width="42" stroke-linecap="round" opacity="0.72"/>',
+    '</svg>',
+  ].join('')
+
+  return `new File([${JSON.stringify(svg)}], ${JSON.stringify(name)}, { type: 'image/svg+xml' })`
+}
+
+function getPPTImageImportState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedImage = selected?.querySelector('img') ?? null
+
+    return {
+      imageCount: document.querySelectorAll('[data-kind="image"]').length,
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedImageSrc: selectedImage?.getAttribute('src') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
+    }
+  })()`)
 }
 
 async function clickMouse(page, x, y, clickCount, modifiers = 0) {
