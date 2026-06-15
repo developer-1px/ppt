@@ -4104,6 +4104,7 @@ function Inspector({
         <label className="ppt-field">
           <span>Notes</span>
           <textarea
+            data-ppt-slide-field="notes"
             value={slide.notes ?? ''}
             onChange={(event) => onSlideNotesChange(event.target.value)}
           />

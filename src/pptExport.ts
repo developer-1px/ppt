@@ -21,6 +21,7 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
       `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}" style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
       elements,
       '  </section>',
+      renderPPTSlideNotesHTML(slide.id, slide.notes),
     ].join('\n')
   }).join('\n')
 
@@ -87,6 +88,16 @@ function renderPPTElementHTML(element: PPTElement) {
   return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
+function renderPPTSlideNotesHTML(slideId: string, notes: string | undefined) {
+  const trimmed = notes?.trim()
+
+  if (!trimmed) {
+    return ''
+  }
+
+  return `  <aside class="ppt-notes" data-ppt-notes-for="${escapeHtml(slideId)}">${escapeHtml(notes ?? '')}</aside>`
+}
+
 function exportCSS() {
   return [
     ':root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#e5e7eb;}',
@@ -105,6 +116,7 @@ function exportCSS() {
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
     '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
+    `.ppt-notes{width:${PPT_SLIDE_WIDTH}px;padding:16px 20px;background:#fff;color:#344054;font-size:16px;line-height:1.4;white-space:pre-wrap;}`,
     '@media print{body{background:#fff;}.ppt-deck{display:block;padding:0;}.ppt-slide{break-after:page;page-break-after:always;}}',
   ].join('\n')
 }

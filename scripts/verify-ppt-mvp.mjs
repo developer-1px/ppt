@@ -1195,6 +1195,8 @@ async function runExportScenario(page) {
       hasLineRouteModel: code.includes('"route": "elbow"') && code.includes('"routeBend"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
+      hasSpeakerNotesMarkup: code.includes('class="ppt-notes"') && code.includes('data-ppt-notes-for="slide-1"') && code.includes('Presenter cue: review image crop and final CTA.'),
+      hasSpeakerNotesModel: code.includes('"notes": "Presenter cue: review image crop and final CTA."'),
       hasUnderlineMarkup: code.includes('data-ppt-run-underline="true"') && code.includes('text-decoration:underline'),
       hasUnderlineModel: code.includes('"underline": true'),
     }
@@ -1211,6 +1213,7 @@ async function runExportScenario(page) {
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
+  record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 }
 
@@ -1400,6 +1403,22 @@ async function runViewAndShapeScenario(page) {
   }))()`)
 
   record('updates PPT slide background in inspector', afterBackground.slideBackground === 'rgb(254, 243, 199)' && afterBackground.thumbBackground === 'rgb(254, 243, 199)', afterBackground)
+
+  await page.eval(`(() => {
+    const notes = document.querySelector('[data-ppt-slide-field="notes"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    valueSetter.call(notes, 'Presenter cue: review image crop and final CTA.')
+    notes.dispatchEvent(new Event('input', { bubbles: true }))
+    notes.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterNotes = await page.eval(`(() => ({
+    notes: document.querySelector('[data-ppt-slide-field="notes"]')?.value ?? '',
+  }))()`)
+
+  record('updates PPT speaker notes in inspector', afterNotes.notes === 'Presenter cue: review image crop and final CTA.', afterNotes)
 }
 
 async function runImageImportScenario(page) {
