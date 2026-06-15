@@ -1,15 +1,16 @@
 # Standardization Registry
 
-This directory tracks package candidates discovered while building PPT retouch.
-The app is a dogfood host first; a candidate belongs here only when the same
-responsibility should survive outside this repo.
+This repo now tracks the PPT subset boundary, not the old HTML retouch surface.
 
-Promotion gate: `package-promotion-gate.md`.
-
-| Candidate | Status | Source | Target package |
+| Candidate | Status | Source | Target |
 |---|---|---|---|
-| Retouch surface | Contract seed | `src/retouchSurfaceContract.ts`, `src/retouchModel.ts`, `src/StageCanvas.tsx`, `src/retouchExport.ts` | `@interactive-os/retouch-surface` |
-| HTML slide contract | Contract seed | `src/htmlSlideContract.ts`, `src/sampleDeck.ts`, `src/slideTheme.css`, `src/retouchExport.ts` | `@interactive-os/html-slide-contract` |
-| Block text editor adapter | Pressure point | `src/SlideBlockElement.tsx`, `src/editableTextDom.ts` | `@interactive-os/anyeditable` adapter or `@interactive-os/block-text-editor` |
-| Slide object interaction adapter | Pressure point | `src/layoutInteraction.ts`, `src/useRetouchLayoutInteraction.ts`, `src/retouchObjectSurface.ts` | `canvas/foundation` adapter |
-| ARIA/APG usage | Shared package consumer | `src/Topbar.tsx`, `src/SlideRail.tsx`, `src/App.tsx` | `@interactive-os/aria` |
+| PPT subset model | Seed | `src/pptModel.ts` | future PPTX bridge |
+| PPT canvas adapter | Seed | `src/pptCanvasAdapter.ts` | `canvas/foundation` consumer pattern |
+| PPT HTML export | Seed | `src/pptExport.ts` | temporary output path before PPTX export |
+
+## Rules
+
+- `PPTDeck` is the source of truth.
+- `CanvasItem` is not the product model.
+- `CanvasApp` is optional reference code, not the default app shell.
+- Use `canvas/core` and `canvas/foundation` as headless tools only.

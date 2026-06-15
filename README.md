@@ -1,11 +1,12 @@
-# PPT Retouch
+# PPT
 
-Minimal editor for final retouching of AI-generated HTML/CSS slides.
+Lightweight PPT subset editor for AI-generated decks and final retouching.
 
-Architecture direction:
+## Architecture
 
-- [North Star](NORTH_STAR.md)
-- [Standardization candidates](docs/standardization/README.md)
+- Source of truth: `PPTDeck`, `PPTSlide`, `PPTElement`
+- Canvas usage: optional headless tools from `canvas/core` and `canvas/foundation`
+- Not used as product model: `CanvasItem`, `CanvasApp`
 
 ## Run
 

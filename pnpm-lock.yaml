@@ -8,30 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@interactive-os/aria':
-        specifier: link:../apg-patterns
-        version: link:../apg-patterns
-      '@interactive-os/keyboard':
-        specifier: link:../keyboard/packages/keyboard
-        version: link:../keyboard/packages/keyboard
-      '@interactive-os/object-surface':
-        specifier: link:../object-surface/packages/object-surface
-        version: link:../object-surface/packages/object-surface
-      '@zod-crud/collection':
-        specifier: link:../zod-crud/packages/collection
-        version: link:../zod-crud/packages/collection
-      '@zod-crud/dirty-state':
-        specifier: link:../zod-crud/packages/dirty-state
-        version: link:../zod-crud/packages/dirty-state
-      '@zod-crud/id-resolver':
-        specifier: link:../zod-crud/packages/id-resolver
-        version: link:../zod-crud/packages/id-resolver
-      '@zod-crud/layer-order':
-        specifier: link:../zod-crud/labs/extensions/layer-order
-        version: link:../zod-crud/labs/extensions/layer-order
-      '@zod-crud/persist-web':
-        specifier: link:../zod-crud/packages/persist-web
-        version: link:../zod-crud/packages/persist-web
       canvas:
         specifier: link:../canvas
         version: link:../canvas
@@ -47,9 +23,6 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-      zod-crud:
-        specifier: link:../zod-crud/packages/zod-crud
-        version: link:../zod-crud/packages/zod-crud
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
