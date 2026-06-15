@@ -525,10 +525,19 @@ async function runFindReplaceScenario(page) {
 async function runAffordanceScenario(page) {
   const initial = await page.eval(`(() => {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const frameGuides = document.querySelector('[data-ppt-frame-guides]')
 
     return {
       commandCount: document.querySelectorAll('[data-ppt-command]').length,
       frameGuideCount: document.querySelectorAll('.ppt-frame-guide').length,
+      frameGuideState: {
+        columnCount: document.querySelectorAll('[data-ppt-frame-guide-column]').length,
+        lineCount: Number(frameGuides?.getAttribute('data-ppt-frame-guide-lines') ?? 0),
+        pointerEvents: frameGuides ? getComputedStyle(frameGuides).pointerEvents : '',
+        regionCount: document.querySelectorAll('[data-ppt-frame-guide-region]').length,
+        rulerCount: document.querySelectorAll('[data-ppt-frame-guide-kind="ruler"]').length,
+        safeAreaCount: document.querySelectorAll('[data-ppt-frame-guide-kind="safe-area"]').length,
+      },
       geometryInputCount: document.querySelectorAll('[data-ppt-geometry-field]').length,
       hasRotateHandle: !!document.querySelector('[data-ppt-rotate-handle]'),
       hasSizeCapsule: !!document.querySelector('.ppt-size-capsule'),
@@ -537,7 +546,8 @@ async function runAffordanceScenario(page) {
   })()`)
 
   record('renders PPT alignment and distribution commands', initial.commandCount >= 8, initial)
-  record('renders PPT frame guides for selected object', initial.frameGuideCount >= 6, initial)
+  record('renders PPT frame guides for selected object', initial.frameGuideCount >= 10, initial)
+  record('renders PPT slide-edit frame guide contract geometry', initial.frameGuideState.lineCount >= 10 && initial.frameGuideState.columnCount === 4 && initial.frameGuideState.regionCount === 1 && initial.frameGuideState.safeAreaCount >= 5 && initial.frameGuideState.rulerCount === 2 && initial.frameGuideState.pointerEvents === 'none', initial.frameGuideState)
   record('renders PPT geometry inspector fields', initial.geometryInputCount === 5, initial)
   record('renders PPT selection size capsule', initial.hasSizeCapsule, initial)
   record('renders PPT rotation handle', initial.hasRotateHandle, initial)
@@ -1500,6 +1510,7 @@ async function runCommandPaletteScenario(page) {
   const flipIds = await readCommandPaletteIds(page, 'flip')
   const fitIds = await readCommandPaletteIds(page, 'fit')
   const gridIds = await readCommandPaletteIds(page, 'grid')
+  const guideIds = await readCommandPaletteIds(page, 'guide')
   const presentIds = await readCommandPaletteIds(page, 'present')
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
@@ -1516,6 +1527,7 @@ async function runCommandPaletteScenario(page) {
     hasView: fitIds.includes('view:fit-slide') &&
       fitIds.includes('view:fit-selection') &&
       gridIds.includes('view:toggle-grid') &&
+      guideIds.includes('view:toggle-frame-guides') &&
       presentIds.includes('view:present'),
     visibleCounts: {
       align: alignIds.length,
@@ -1525,6 +1537,7 @@ async function runCommandPaletteScenario(page) {
       flip: flipIds.length,
       front: frontIds.length,
       grid: gridIds.length,
+      guide: guideIds.length,
       group: groupIds.length,
       lock: lockIds.length,
       present: presentIds.length,
@@ -1534,6 +1547,27 @@ async function runCommandPaletteScenario(page) {
   }
 
   record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasTidy && exposed.hasView, exposed)
+
+  const guideToggleIds = await readCommandPaletteIds(page, 'frame guides')
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const afterPaletteGuideToggle = await page.eval(`(() => ({
+    frameGuideAttr: document.querySelector('.ppt-stage-shell')?.getAttribute('data-frame-guides'),
+    frameGuideCount: document.querySelectorAll('[data-ppt-frame-guides]').length,
+    itemPresent: ${JSON.stringify(guideToggleIds.includes('view:toggle-frame-guides'))},
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    pressed: document.querySelector('[data-ppt-view-frame-guides]')?.getAttribute('aria-pressed'),
+  }))()`)
+
+  record('toggles PPT frame guides from command palette', afterPaletteGuideToggle.itemPresent && !afterPaletteGuideToggle.open && afterPaletteGuideToggle.frameGuideAttr === 'false' && afterPaletteGuideToggle.pressed === 'false' && afterPaletteGuideToggle.frameGuideCount === 0, afterPaletteGuideToggle)
+
+  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]')?.click()`)
+  await delay(50)
 
   await pressKey(page, {
     code: 'Escape',
@@ -2315,6 +2349,20 @@ async function runViewAndShapeScenario(page) {
 
   record('toggles PPT editing grid visibility', afterGridToggle.grid === 'false' && afterGridToggle.pressed === 'false', afterGridToggle)
   record('shows PPT zoom percentage', /\d+%/.test(afterGridToggle.zoomLabel), afterGridToggle)
+
+  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]').click()`)
+  await delay(50)
+
+  const afterFrameGuideToggle = await page.eval(`(() => ({
+    frameGuides: document.querySelector('.ppt-stage-shell')?.getAttribute('data-frame-guides'),
+    guideLayerCount: document.querySelectorAll('[data-ppt-frame-guides]').length,
+    pressed: document.querySelector('[data-ppt-view-frame-guides]')?.getAttribute('aria-pressed'),
+  }))()`)
+
+  record('toggles PPT frame guide visibility from toolbar', afterFrameGuideToggle.frameGuides === 'false' && afterFrameGuideToggle.pressed === 'false' && afterFrameGuideToggle.guideLayerCount === 0, afterFrameGuideToggle)
+
+  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]').click()`)
+  await delay(50)
 
   await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]').click()`)
   await delay(20)

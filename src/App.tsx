@@ -48,6 +48,7 @@ import {
   Plus,
   Redo2,
   RotateCw,
+  Ruler,
   Search,
   SendToBack,
   Square,
@@ -79,6 +80,11 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
+import {
+  getSlideEditFrameGuideGeometry,
+  type SlideEditFrameGuideConfig,
+  type SlideEditFrameGuideGeometry,
+} from '@interactive-os/slide-edit-affordance'
 import {
   RESIZE_HANDLES,
   clamp,
@@ -207,6 +213,30 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
     unlockAll: true,
   },
 })
+
+const PPT_FRAME_GUIDE_CONFIG = Object.freeze({
+  columns: {
+    count: 4,
+    gutter: 18,
+    margin: 84,
+  },
+  margin: {
+    bottom: 64,
+    left: 84,
+    right: 84,
+    top: 64,
+  },
+  rulerGuides: [
+    { axis: 'x', id: 'ruler-title-left', offset: 128 },
+    { axis: 'y', id: 'ruler-title-baseline', offset: 122 },
+  ],
+  safeArea: {
+    bottom: 76,
+    left: 92,
+    right: 92,
+    top: 76,
+  },
+} as const satisfies SlideEditFrameGuideConfig)
 
 const canvasAlignModeAvailabilityKey = {
   alignBottom: 'alignBottom',
@@ -592,6 +622,7 @@ function App() {
   const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [presentationSlideId, setPresentationSlideId] = useState<string | null>(null)
   const [showGrid, setShowGrid] = useState(true)
+  const [showFrameGuides, setShowFrameGuides] = useState(true)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
   const [past, setPast] = useState<PPTDeck[]>([])
@@ -659,6 +690,18 @@ function App() {
   const selectionSvgCode = useMemo(
     () => exportPPTSelectionSVG(activeSlide, selection),
     [activeSlide, selection],
+  )
+  const frameGuideGeometry = useMemo(
+    () => getSlideEditFrameGuideGeometry({
+      config: PPT_FRAME_GUIDE_CONFIG,
+      frameBounds: {
+        h: PPT_SLIDE_HEIGHT,
+        w: PPT_SLIDE_WIDTH,
+        x: 0,
+        y: 0,
+      },
+    }),
+    [],
   )
   const canExportSelectionSVG = selectionSvgCode !== null
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
@@ -3599,6 +3642,11 @@ function App() {
     section: 'View',
     title: showGrid ? 'Hide grid' : 'Show grid',
   }, {
+    id: 'view:toggle-frame-guides',
+    run: () => setShowFrameGuides((current) => !current),
+    section: 'View',
+    title: showFrameGuides ? 'Hide frame guides' : 'Show frame guides',
+  }, {
     id: 'view:toggle-theme',
     run: toggleTheme,
     section: 'View',
@@ -3856,6 +3904,9 @@ function App() {
           <button aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
             <Grid2X2 size={17} />
           </button>
+          <button aria-pressed={showFrameGuides} className="ppt-icon-button" data-ppt-view-frame-guides onClick={() => setShowFrameGuides((current) => !current)} title="Toggle frame guides" type="button">
+            <Ruler size={17} />
+          </button>
           <button
             aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             aria-pressed={theme === 'dark'}
@@ -3927,6 +3978,7 @@ function App() {
       <section
         className="ppt-stage-shell"
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
+        data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}
         data-line-tool={lineCreationMode ?? undefined}
         onContextMenu={handleStageContextMenu}
@@ -3973,7 +4025,9 @@ function App() {
                 onTextOverflowChange={updateTextOverflowState}
               />
             ))}
-            {selection.length > 0 && !editingId ? <FrameGuides /> : null}
+            {selection.length > 0 && !editingId && showFrameGuides ? (
+              <FrameGuides geometry={frameGuideGeometry} />
+            ) : null}
             {selectedBounds ? (
               <SelectionOverlay
                 bounds={selectedBounds}
@@ -5461,28 +5515,62 @@ function LineRouteOverlay({
   )
 }
 
-function FrameGuides() {
+function FrameGuides({ geometry }: { geometry: SlideEditFrameGuideGeometry }) {
   return (
-    <>
-      <div
-        className="ppt-frame-guide ppt-frame-guide-vertical ppt-frame-guide-center"
-        style={{ left: PPT_SLIDE_WIDTH / 2 }}
-      />
-      <div
-        className="ppt-frame-guide ppt-frame-guide-horizontal ppt-frame-guide-center"
-        style={{ top: PPT_SLIDE_HEIGHT / 2 }}
-      />
-      <div className="ppt-frame-guide ppt-frame-guide-vertical" style={{ left: 84 }} />
-      <div
-        className="ppt-frame-guide ppt-frame-guide-vertical"
-        style={{ left: PPT_SLIDE_WIDTH - 84 }}
-      />
-      <div className="ppt-frame-guide ppt-frame-guide-horizontal" style={{ top: 64 }} />
-      <div
-        className="ppt-frame-guide ppt-frame-guide-horizontal"
-        style={{ top: PPT_SLIDE_HEIGHT - 64 }}
-      />
-    </>
+    <div
+      className="ppt-slide-frame-guides"
+      data-ppt-frame-guide-columns={geometry.columns.length}
+      data-ppt-frame-guide-lines={geometry.lines.length}
+      data-ppt-frame-guide-regions={geometry.regions.length}
+      data-ppt-frame-guides
+    >
+      {geometry.regions.map((region) => (
+        <div
+          className="ppt-frame-guide-region"
+          data-ppt-frame-guide-kind={region.kind}
+          data-ppt-frame-guide-region={region.id}
+          key={region.id}
+          style={{
+            height: region.h,
+            left: region.x,
+            top: region.y,
+            width: region.w,
+          }}
+        />
+      ))}
+      {geometry.columns.map((column) => (
+        <div
+          className="ppt-frame-guide-column"
+          data-ppt-frame-guide-column={column.id}
+          data-ppt-frame-guide-index={column.index}
+          data-ppt-frame-guide-kind={column.kind}
+          key={column.id}
+          style={{
+            height: column.h,
+            left: column.x,
+            top: column.y,
+            width: column.w,
+          }}
+        />
+      ))}
+      {geometry.lines.map((line) => (
+        <div
+          className={[
+            'ppt-frame-guide',
+            `ppt-frame-guide-${line.orientation}`,
+            `ppt-frame-guide-${line.kind}`,
+          ].join(' ')}
+          data-ppt-frame-guide-axis={line.axis}
+          data-ppt-frame-guide-kind={line.kind}
+          data-ppt-frame-guide-line={line.id}
+          data-ppt-frame-guide-side={line.side}
+          key={line.id}
+          style={line.orientation === 'vertical'
+            ? { height: line.length, left: line.x, top: line.y }
+            : { left: line.x, top: line.y, width: line.length }}
+        />
+      ))}
+    </div>
   )
 }
 

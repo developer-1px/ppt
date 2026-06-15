@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@interactive-os/slide-edit-affordance": "link:../canvas/packages/slide-edit-affordance",
     "canvas": "link:../canvas",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",

@@ -1030,15 +1030,49 @@
   background: #ef4444;
 }
 
-.ppt-frame-guide {
+.ppt-slide-frame-guides {
   position: absolute;
+  inset: 0;
   z-index: 1;
   pointer-events: none;
+}
+
+.ppt-frame-guide,
+.ppt-frame-guide-column,
+.ppt-frame-guide-region {
+  position: absolute;
+  pointer-events: none;
+}
+
+.ppt-frame-guide {
   background: rgb(37 99 235 / 28%);
 }
 
 .ppt-frame-guide-center {
   background: rgb(37 99 235 / 46%);
+}
+
+.ppt-frame-guide-margin {
+  background: rgb(37 99 235 / 32%);
+}
+
+.ppt-frame-guide-safe-area {
+  background: rgb(5 150 105 / 28%);
+}
+
+.ppt-frame-guide-ruler {
+  background: rgb(124 58 237 / 40%);
+}
+
+.ppt-frame-guide-column {
+  border-right: 1px solid rgb(37 99 235 / 18%);
+  border-left: 1px solid rgb(37 99 235 / 18%);
+  background: rgb(37 99 235 / 4%);
+}
+
+.ppt-frame-guide-region {
+  border: 1px dashed rgb(5 150 105 / 36%);
+  background: rgb(5 150 105 / 4%);
 }
 
 .ppt-guide-vertical {
@@ -1050,14 +1084,10 @@
 }
 
 .ppt-frame-guide-vertical {
-  top: 0;
   width: 1px;
-  height: 100%;
 }
 
 .ppt-frame-guide-horizontal {
-  left: 0;
-  width: 100%;
   height: 1px;
 }
 

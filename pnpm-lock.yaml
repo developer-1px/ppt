@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@interactive-os/slide-edit-affordance':
+        specifier: link:../canvas/packages/slide-edit-affordance
+        version: link:../canvas/packages/slide-edit-affordance
       canvas:
         specifier: link:../canvas
         version: link:../canvas
