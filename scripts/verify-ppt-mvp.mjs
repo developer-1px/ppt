@@ -54,6 +54,7 @@ try {
   await runCommentReviewScenario(page)
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
+  await runTextOverflowScenario(page)
   await runExportScenario(page)
   await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
@@ -2161,6 +2162,8 @@ async function runExportScenario(page) {
       hasSpeakerNotesModel: code.includes('"notes": "Presenter cue: review image crop and final CTA."'),
       hasTableMarkup: code.includes('class="ppt-element ppt-table"') && code.includes('data-ppt-table-rows="') && code.includes('<th data-ppt-table-cell="0">'),
       hasTableModel: code.includes('"kind": "table"') && code.includes('"rows"') && code.includes('"Region"'),
+      hasTextAutoFitMarkup: code.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
+      hasTextAutoFitModel: code.includes('"textAutoFit": "resizeShapeToFitText"'),
       hasUnderlineMarkup: code.includes('data-ppt-run-underline="true"') && code.includes('text-decoration:underline'),
       hasUnderlineModel: code.includes('"underline": true'),
     }
@@ -2180,6 +2183,7 @@ async function runExportScenario(page) {
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
   record('exports inserted PPT table markup and model data', state.hasTableMarkup && state.hasTableModel, state)
+  record('exports PPT text auto-fit markup and model data', state.hasTextAutoFitMarkup && state.hasTextAutoFitModel, state)
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 
@@ -2203,12 +2207,14 @@ async function runExportScenario(page) {
       hasSvg: text.includes('<svg xmlns="http://www.w3.org/2000/svg"'),
       hasTable: text.includes('data-ppt-kind="table"') && text.includes('data-ppt-table-cell=') && text.includes('data-ppt-table-text='),
       hasText: text.includes('data-ppt-kind="textBox"') && text.includes('<text '),
+      hasTextAutoFit: text.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
       type: download.type ?? '',
     }
   })()`)
 
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
+  record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
   await selectPPTLayerRows(page, [imageId])
@@ -3440,6 +3446,112 @@ async function runSelectionPaneScenario(page) {
   record('shows hidden PPT object from selection pane', afterShow.hidden === 'false' && afterShow.stageElementExists, afterShow)
 }
 
+async function runTextOverflowScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const before = await getPPTTextOverflowState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-tool="text"]')?.click()`)
+  await delay(40)
+
+  const point = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      x: slide.left + slide.width * 0.12,
+      y: slide.top + slide.height * 0.13,
+    }
+  })()`)
+
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(120)
+  await page.eval(`document.activeElement?.blur()`)
+  await delay(80)
+
+  const afterCreate = await getPPTTextOverflowState(page)
+
+  record('creates selected PPT text box for overflow retouch', afterCreate.textCount === before.textCount + 1 && afterCreate.selectedKind === 'textBox' && afterCreate.selectedText.includes('New text'), {
+    afterCreate,
+    before,
+  })
+
+  await page.eval(`(() => {
+    const text = document.querySelector('[data-ppt-style-field="text"]')
+    const width = document.querySelector('[data-ppt-geometry-field="w"]')
+    const height = document.querySelector('[data-ppt-geometry-field="h"]')
+    const textSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    textSetter.call(text, 'Overflowing AI generated takeaway that needs quick auto fit before PPTX compatible export.')
+    text.dispatchEvent(new Event('input', { bubbles: true }))
+    text.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(width, '132')
+    width.dispatchEvent(new Event('input', { bubbles: true }))
+    width.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(height, '34')
+    height.dispatchEvent(new Event('input', { bubbles: true }))
+    height.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(220)
+
+  const afterOverflow = await getPPTTextOverflowState(page)
+
+  record('detects selected PPT text overflow on stage, capsule, and inspector', afterOverflow.selectedKind === 'textBox' && afterOverflow.selectedOverflow === 'true' && afterOverflow.capsuleOverflow === 'true' && afterOverflow.capsuleText.includes('Overflow') && afterOverflow.inspectorOverflow === 'true' && !afterOverflow.autoFitDisabled, {
+    afterCreate,
+    afterOverflow,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-style-action="text-auto-fit"]')?.click()`)
+  await delay(220)
+
+  const afterAutoFit = await getPPTTextOverflowState(page)
+
+  record('auto-fits overflowing PPT text from inspector', afterAutoFit.selectedKind === 'textBox' && afterAutoFit.selectedOverflow !== 'true' && afterAutoFit.selectedAutoFit === 'resizeShapeToFitText' && afterAutoFit.inspectorAutoFit === 'resizeShapeToFitText' && (afterAutoFit.selectedWidth > afterOverflow.selectedWidth || afterAutoFit.selectedHeight > afterOverflow.selectedHeight), {
+    afterAutoFit,
+    afterOverflow,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(160)
+
+  const afterUndo = await getPPTTextOverflowState(page)
+
+  record('undoes PPT text auto-fit as one history step', afterUndo.selectedId === afterAutoFit.selectedId && afterUndo.selectedOverflow === 'true' && afterUndo.selectedAutoFit === '' && afterUndo.selectedWidth === afterOverflow.selectedWidth && afterUndo.selectedHeight === afterOverflow.selectedHeight, {
+    afterAutoFit,
+    afterOverflow,
+    afterUndo,
+  })
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(160)
+
+  const afterRedo = await getPPTTextOverflowState(page)
+
+  record('redoes PPT text auto-fit with model metadata', afterRedo.selectedId === afterAutoFit.selectedId && afterRedo.selectedOverflow !== 'true' && afterRedo.selectedAutoFit === 'resizeShapeToFitText' && afterRedo.inspectorAutoFit === 'resizeShapeToFitText', {
+    afterAutoFit,
+    afterRedo,
+  })
+}
+
 async function runSlideManagementScenario(page) {
   const before = await getSlideRailState(page)
 
@@ -3639,6 +3751,32 @@ function getPPTLineState(page, elementId = null) {
       worldX2: left + x2,
       worldY1: top + y1,
       worldY2: top + y2,
+    }
+  })()`)
+}
+
+function getPPTTextOverflowState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const capsule = document.querySelector('.ppt-size-capsule')
+    const inspector = document.querySelector('[data-ppt-text-overflow-inspector]')
+    const autoFitButton = document.querySelector('[data-ppt-style-action="text-auto-fit"]')
+
+    return {
+      autoFitDisabled: autoFitButton?.disabled ?? true,
+      capsuleOverflow: capsule?.getAttribute('data-ppt-text-overflow') ?? '',
+      capsuleText: capsule?.textContent ?? '',
+      inspectorAutoFit: inspector?.getAttribute('data-ppt-text-autofit') ?? '',
+      inspectorOverflow: inspector?.getAttribute('data-ppt-text-overflow') ?? '',
+      inspectorText: document.querySelector('[data-ppt-style-field="text"]')?.value ?? '',
+      selectedAutoFit: selected?.getAttribute('data-ppt-text-autofit') ?? '',
+      selectedHeight: parseFloat(selected?.style.height ?? '0'),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedOverflow: selected?.getAttribute('data-ppt-text-overflow') ?? '',
+      selectedText: selected?.querySelector('.ppt-element-editor')?.textContent ?? '',
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      textCount: document.querySelectorAll('[data-kind="textBox"]').length,
     }
   })()`)
 }

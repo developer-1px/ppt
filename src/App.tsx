@@ -152,6 +152,7 @@ import {
   type PPTSlide,
   type PPTTable,
   type PPTTextBody,
+  type PPTTextAutoFit,
   type PPTTextElement,
   type PPTTextStyle,
 } from './pptModel'
@@ -454,6 +455,8 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
+const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
+const PPT_TEXT_OVERFLOW_EPSILON = 1
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
@@ -574,6 +577,7 @@ function App() {
   const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [showGrid, setShowGrid] = useState(true)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
+  const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -587,6 +591,19 @@ function App() {
 
   useEffect(() => {
     globalThis.window?.dispatchEvent(new Event('ppt-ready'))
+  }, [])
+
+  const updateTextOverflowState = useCallback((
+    elementId: string,
+    hasOverflow: boolean,
+  ) => {
+    setTextOverflowById((current) =>
+      current[elementId] === hasOverflow
+        ? current
+        : {
+            ...current,
+            [elementId]: hasOverflow,
+          })
   }, [])
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
@@ -603,6 +620,10 @@ function App() {
     () => selectedElements.filter(isPPTTextElement),
     [selectedElements],
   )
+  const selectedTextOverflow = selectedElement && isPPTTextElement(selectedElement)
+    ? textOverflowById[selectedElement.id] === true
+    : false
+
   const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
     ? selectedElement
     : null
@@ -1671,6 +1692,39 @@ function App() {
         replacePPTElementText(element, text),
       ),
     )
+  }
+
+  function autoFitTextElement(elementId: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (
+          !isPPTTextElement(element) ||
+          element.locked === true ||
+          element.visible === false
+        ) {
+          return element
+        }
+
+        const size = measurePPTTextAutoFitSize(element)
+
+        if (!size) {
+          return element
+        }
+
+        return {
+          ...element,
+          geometry: updatePPTElementBounds(element, {
+            ...pptGeometryToBounds(element.geometry),
+            ...size,
+          }).geometry,
+          textAutoFit: PPT_TEXT_AUTOFIT,
+        }
+      }),
+    )
+    setTextOverflowById((current) => ({
+      ...current,
+      [elementId]: false,
+    }))
   }
 
   function updateElementGeometry(
@@ -3386,6 +3440,16 @@ function App() {
     run: toggleSelectedParagraphBullet,
     section: 'Format',
     title: 'Toggle bullet list',
+  }, {
+    disabled: !selectedElement || !isPPTTextElement(selectedElement) || !selectedTextOverflow,
+    id: 'format:auto-fit-text',
+    run: () => {
+      if (selectedElement && isPPTTextElement(selectedElement)) {
+        autoFitTextElement(selectedElement.id)
+      }
+    },
+    section: 'Format',
+    title: 'Auto fit text',
   }]
 
   return (
@@ -3690,6 +3754,7 @@ function App() {
                 findActive={findOpen && activeFindMatch?.elementId === element.id}
                 key={element.id}
                 selected={selection.includes(element.id)}
+                textOverflow={textOverflowById[element.id] === true}
                 onCommitText={commitText}
                 onEdit={() => {
                   if (isPPTTextElement(element)) {
@@ -3703,6 +3768,7 @@ function App() {
                 onPointerEnter={() => setHoveredId(element.id)}
                 onPointerLeave={() => setHoveredId((current) => current === element.id ? null : current)}
                 onStopEdit={() => setEditingId(null)}
+                onTextOverflowChange={updateTextOverflowState}
               />
             ))}
             {selection.length > 0 && !editingId ? <FrameGuides /> : null}
@@ -3712,6 +3778,7 @@ function App() {
                 canResize={canResizeSelection}
                 scale={viewport.scale}
                 selectedElements={selectedElements}
+                textOverflow={selectedTextOverflow}
                 onRotatePointerDown={handleRotatePointerDown}
                 onResizeHandleDoubleClick={handleResizeHandleDoubleClick}
                 onResizePointerDown={handleResizePointerDown}
@@ -3781,6 +3848,7 @@ function App() {
         onParagraphBulletChange={updateParagraphBullet}
         onElementTextStyleChange={updateElementTextStyle}
         onElementVisibilityToggle={toggleElementVisibility}
+        onTextAutoFit={autoFitTextElement}
         onLayerSelect={(elementId, additive) => {
           setSelection((current) =>
             getPPTLayerSelection(current, elementId, additive, activeSlide))
@@ -3793,6 +3861,7 @@ function App() {
         onSlideNameChange={updateSlideName}
         onSlideNotesChange={updateSlideNotes}
         onTableRowsChange={updateTableRows}
+        selectedTextOverflow={selectedTextOverflow}
       />
       <PPTCommandPalette
         items={commandPaletteItems}
@@ -4549,7 +4618,9 @@ function PPTElementView({
   onPointerEnter,
   onPointerLeave,
   onStopEdit,
+  onTextOverflowChange,
   selected,
+  textOverflow,
 }: {
   editing: boolean
   element: PPTElement
@@ -4562,10 +4633,13 @@ function PPTElementView({
   onPointerEnter: () => void
   onPointerLeave: () => void
   onStopEdit: () => void
+  onTextOverflowChange: (elementId: string, hasOverflow: boolean) => void
   selected: boolean
+  textOverflow: boolean
 }) {
   const style = pptElementStyle(element)
   const textBody = isPPTTextElement(element) ? element.textBody : null
+  const textStyle = isPPTTextElement(element) ? element.style : undefined
   const text = isPPTTextElement(element) ? readPPTText(element.textBody) : ''
   const editorRef = useRef<HTMLDivElement | null>(null)
 
@@ -4576,6 +4650,47 @@ function PPTElementView({
 
     editorRef.current?.focus()
   }, [editing])
+
+  useLayoutEffect(() => {
+    if (!textBody) {
+      return
+    }
+
+    const editor = editorRef.current
+
+    if (!editor) {
+      return
+    }
+
+    const updateOverflow = () => {
+      const container = editor.parentElement
+      const editorRect = editor.getBoundingClientRect()
+      const containerRect = container?.getBoundingClientRect()
+      const hasOverflow =
+        editor.scrollWidth > editor.clientWidth + PPT_TEXT_OVERFLOW_EPSILON ||
+        editor.scrollHeight > editor.clientHeight + PPT_TEXT_OVERFLOW_EPSILON ||
+        (containerRect
+          ? editorRect.width > containerRect.width + PPT_TEXT_OVERFLOW_EPSILON ||
+            editorRect.height > containerRect.height + PPT_TEXT_OVERFLOW_EPSILON
+          : false)
+
+      onTextOverflowChange(element.id, hasOverflow)
+    }
+
+    updateOverflow()
+    const frame = window.requestAnimationFrame(updateOverflow)
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [
+    editing,
+    element.geometry.h,
+    element.geometry.w,
+    element.id,
+    textStyle,
+    onTextOverflowChange,
+    text,
+    textBody,
+  ])
 
   return (
     <div
@@ -4610,6 +4725,8 @@ function PPTElementView({
       data-ppt-find-active={findActive ? 'true' : undefined}
       data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
       data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+      data-ppt-text-autofit={isPPTTextElement(element) ? element.textAutoFit : undefined}
+      data-ppt-text-overflow={textOverflow ? 'true' : undefined}
       data-ppt-image-crop-x={element.kind === 'image'
         ? getPPTImageCrop(element).x
         : undefined}
@@ -4822,6 +4939,7 @@ function SelectionOverlay({
   onResizePointerDown,
   scale,
   selectedElements,
+  textOverflow,
 }: {
   bounds: Bounds
   canResize: boolean
@@ -4836,12 +4954,14 @@ function SelectionOverlay({
   ) => void
   scale: number
   selectedElements: PPTElement[]
+  textOverflow: boolean
 }) {
   return (
     <>
       <Box className="ppt-selection-box" bounds={bounds} />
       <div
         className="ppt-size-capsule"
+        data-ppt-text-overflow={textOverflow ? 'true' : undefined}
         style={{
           left: bounds.x + bounds.w / 2,
           top: bounds.y + bounds.h + 8,
@@ -4851,6 +4971,7 @@ function SelectionOverlay({
         {selectedElements.length === 1
           ? `${Math.round(bounds.w)} x ${Math.round(bounds.h)}`
           : `${selectedElements.length} objects`}
+        {textOverflow ? <span data-ppt-size-capsule-overflow>Overflow</span> : null}
       </div>
       {canResize ? (
         <button
@@ -5069,8 +5190,10 @@ function Inspector({
   onSlideNameChange,
   onSlideNotesChange,
   onTableRowsChange,
+  onTextAutoFit,
   selection,
   selectedElement,
+  selectedTextOverflow,
   slide,
 }: {
   exportCode: string
@@ -5131,8 +5254,10 @@ function Inspector({
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
   onTableRowsChange: (elementId: string, value: string) => void
+  onTextAutoFit: (elementId: string) => void
   selection: string[]
   selectedElement: PPTElement | null
+  selectedTextOverflow: boolean
   slide: PPTSlide
 }) {
   const textStyle = selectedElement && isPPTTextElement(selectedElement)
@@ -5228,6 +5353,7 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Text</span>
                   <textarea
+                    data-ppt-style-field="text"
                     value={readPPTText(selectedElement.textBody)}
                     onChange={(event) => onCommitText(selectedElement.id, event.target.value)}
                   />
@@ -5303,6 +5429,23 @@ function Inspector({
                       </button>
                     ))}
                   </div>
+                </div>
+                <div
+                  className="ppt-text-overflow-control"
+                  data-ppt-text-autofit={selectedElement.textAutoFit}
+                  data-ppt-text-overflow={selectedTextOverflow ? 'true' : 'false'}
+                  data-ppt-text-overflow-inspector
+                >
+                  <span>{selectedTextOverflow ? 'Overflow' : 'Fits'}</span>
+                  <button
+                    className="ppt-button"
+                    data-ppt-style-action="text-auto-fit"
+                    disabled={!selectedTextOverflow}
+                    type="button"
+                    onClick={() => onTextAutoFit(selectedElement.id)}
+                  >
+                    <Maximize2 size={15} /> Auto fit
+                  </button>
                 </div>
               </>
             ) : null}
@@ -6990,6 +7133,50 @@ function measurePPTElementAutoSize(element: PPTElement) {
     return null
   }
 
+  const size = measurePPTTextContentSize(element, {
+    whiteSpace: 'pre',
+    width: 'max-content',
+  })
+  const padding = getPPTTextMeasurementPadding(element)
+
+  return {
+    h: Math.ceil(size.h + padding.y),
+    w: Math.ceil(size.w + padding.x),
+  }
+}
+
+function measurePPTTextAutoFitSize(element: PPTTextElement) {
+  const padding = getPPTTextMeasurementPadding(element)
+  const maxWidth = Math.max(24, PPT_SLIDE_WIDTH - element.geometry.x)
+  const maxHeight = Math.max(24, PPT_SLIDE_HEIGHT - element.geometry.y)
+  const preferred = measurePPTTextContentSize(element, {
+    whiteSpace: 'pre',
+    width: 'max-content',
+  })
+  const width = clamp(
+    Math.ceil(Math.max(element.geometry.w, preferred.w + padding.x + 8)),
+    24,
+    maxWidth,
+  )
+  const contentWidth = Math.max(1, width - padding.x)
+  const wrapped = measurePPTTextContentSize(element, {
+    whiteSpace: 'pre-wrap',
+    width: `${contentWidth}px`,
+  })
+
+  return {
+    h: clamp(Math.ceil(wrapped.h + padding.y + 8), 24, maxHeight),
+    w: width,
+  }
+}
+
+function measurePPTTextContentSize(
+  element: PPTTextElement,
+  options: {
+    whiteSpace: string
+    width: string
+  },
+) {
   const text = readPPTText(element.textBody) || ' '
   const style = element.style
   const measurer = document.createElement('div')
@@ -6997,8 +7184,9 @@ function measurePPTElementAutoSize(element: PPTElement) {
   measurer.style.position = 'fixed'
   measurer.style.left = '-10000px'
   measurer.style.top = '-10000px'
-  measurer.style.width = 'max-content'
-  measurer.style.whiteSpace = 'pre'
+  measurer.style.width = options.width
+  measurer.style.whiteSpace = options.whiteSpace ?? 'pre-wrap'
+  measurer.style.overflowWrap = 'anywhere'
   measurer.style.fontFamily = 'Inter, ui-sans-serif, system-ui, sans-serif'
   measurer.style.fontSize = `${style?.fontSize ?? 24}px`
   measurer.style.fontWeight = style?.fontWeight === 'bold'
@@ -7013,11 +7201,23 @@ function measurePPTElementAutoSize(element: PPTElement) {
   const rect = measurer.getBoundingClientRect()
   measurer.remove()
 
-  const padding = element.kind === 'shape' ? 36 : 4
+  return {
+    h: rect.height,
+    w: rect.width,
+  }
+}
+
+function getPPTTextMeasurementPadding(element: PPTTextElement) {
+  if (element.kind === 'shape') {
+    return {
+      x: 36,
+      y: 36,
+    }
+  }
 
   return {
-    h: Math.ceil(rect.height + padding),
-    w: Math.ceil(rect.width + padding),
+    x: 4,
+    y: 4,
   }
 }
 

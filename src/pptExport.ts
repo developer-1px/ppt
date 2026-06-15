@@ -173,12 +173,13 @@ function renderPPTElementHTML(element: PPTElement) {
   const bulletListAttr = element.textBody && hasPPTTextBodyBullet(element.textBody)
     ? ' data-ppt-bullet-list="true"'
     : ''
+  const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -589,6 +590,30 @@ function getPPTElementTransformAttrs(element: PPTElement) {
   ].join('')
 }
 
+function getPPTTextAutoFitAttr(element: PPTElement) {
+  const autoFit = getPPTTextAutoFit(element)
+
+  return autoFit ? ` data-ppt-text-autofit="${autoFit}"` : ''
+}
+
+function getPPTTextAutoFitSvgAttr(element: PPTElement) {
+  const autoFit = getPPTTextAutoFit(element)
+
+  return autoFit ? `data-ppt-text-autofit="${autoFit}"` : ''
+}
+
+function getPPTTextAutoFit(element: PPTElement) {
+  if (element.kind === 'textBox') {
+    return element.textAutoFit
+  }
+
+  if (element.kind === 'shape' && element.textBody) {
+    return element.textAutoFit
+  }
+
+  return undefined
+}
+
 function getPPTElementSVGAttrs(element: PPTElement) {
   const transform = getPPTElementSVGTransform(element)
 
@@ -598,6 +623,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     element.kind === 'shape'
       ? `data-ppt-shape="${element.shape}"`
       : '',
+    getPPTTextAutoFitSvgAttr(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
     element.flipV === true ? 'data-ppt-flip-v="true"' : '',
     transform ? `transform="${escapeHtml(transform)}"` : '',

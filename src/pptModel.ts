@@ -45,6 +45,8 @@ const PPTTextStyleSchema = z.object({
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
 })
 
+const PPTTextAutoFitSchema = z.enum(['resizeShapeToFitText'])
+
 const PPTElementBaseSchema = z.object({
   flipH: z.boolean().optional(),
   flipV: z.boolean().optional(),
@@ -59,6 +61,7 @@ const PPTElementBaseSchema = z.object({
 const PPTTextBoxSchema = PPTElementBaseSchema.extend({
   kind: z.literal('textBox'),
   style: PPTTextStyleSchema,
+  textAutoFit: PPTTextAutoFitSchema.optional(),
   textBody: PPTTextBodySchema,
 })
 
@@ -68,6 +71,7 @@ const PPTShapeSchema = PPTElementBaseSchema.extend({
   shape: z.enum(['rect', 'ellipse', 'diamond']),
   stroke: PPTStrokeSchema.optional(),
   style: PPTTextStyleSchema.optional(),
+  textAutoFit: PPTTextAutoFitSchema.optional(),
   textBody: PPTTextBodySchema.optional(),
 })
 
@@ -163,6 +167,7 @@ export type PPTRun = z.infer<typeof PPTRunSchema>
 export type PPTParagraph = z.infer<typeof PPTParagraphSchema>
 export type PPTTextBody = z.infer<typeof PPTTextBodySchema>
 export type PPTTextStyle = z.infer<typeof PPTTextStyleSchema>
+export type PPTTextAutoFit = z.infer<typeof PPTTextAutoFitSchema>
 export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
