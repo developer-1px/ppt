@@ -165,6 +165,7 @@ import {
   type PPTElementAnimation,
   type PPTElementHyperlink,
   type PPTElementShadow,
+  type PPTFill,
   type PPTFreeform,
   type PPTImage,
   type PPTImageCrop,
@@ -1086,6 +1087,9 @@ const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
+const PPT_FILL_OPACITY_MIN = 0
+const PPT_FILL_OPACITY_MAX = 1
+const PPT_FILL_OPACITY_STEP = 0.05
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_OPTIONS = Object.freeze([
   { label: 'Solid', value: 'solid' },
@@ -3040,11 +3044,21 @@ function App() {
     )
   }
 
-  function updateShapeFill(elementId: string, color: string) {
+  function updateShapeFill(
+    elementId: string,
+    field: keyof PPTFill,
+    value: number | string,
+  ) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
         element.kind === 'shape'
-          ? { ...element, fill: { color } }
+          ? {
+              ...element,
+              fill: normalizePPTFill({
+                ...element.fill,
+                [field]: value,
+              }),
+            }
           : element),
     )
   }
@@ -7436,6 +7450,9 @@ function SlideThumb({
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
+            data-ppt-thumb-fill-opacity={element.kind === 'shape'
+              ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
+              : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
             data-ppt-thumb-alt-text={getPPTElementAltText(element)}
@@ -7474,7 +7491,7 @@ function SlideThumb({
             key={element.id}
             style={{
               background: element.kind === 'shape'
-                ? element.fill.color
+                ? getPPTFillColorCSS(element.fill)
                 : element.kind === 'image'
                   ? undefined
                   : element.kind === 'table'
@@ -7654,6 +7671,9 @@ function PPTElementView({
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
       data-ppt-alt-text={getPPTElementAltText(element)}
+      data-ppt-fill-opacity={element.kind === 'shape'
+        ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
+        : undefined}
       data-ppt-hyperlink-url={getPPTElementHyperlink(element)?.url}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
       data-ppt-stroke-dash={getPPTElementStrokeDash(element)}
@@ -8310,7 +8330,11 @@ function Inspector({
     field: PPTParagraphSpacingField,
     value: number,
   ) => void
-  onShapeFillChange: (elementId: string, color: string) => void
+  onShapeFillChange: (
+    elementId: string,
+    field: keyof PPTFill,
+    value: number | string,
+  ) => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onSlideBackgroundChange: (color: string) => void
   onSlideLayoutChange: (layoutId: string) => void
@@ -9110,7 +9134,11 @@ function Inspector({
                       type="color"
                       value={selectedElement.fill.color}
                       onChange={(event) =>
-                        onShapeFillChange(selectedElement.id, event.target.value)}
+                        onShapeFillChange(
+                          selectedElement.id,
+                          'color',
+                          event.target.value,
+                        )}
                     />
                   </label>
                   <label className="ppt-field">
@@ -9128,6 +9156,23 @@ function Inspector({
                     />
                   </label>
                 </div>
+                <label className="ppt-field">
+                  <span>Fill opacity</span>
+                  <input
+                    data-ppt-style-field="fill-opacity"
+                    max={PPT_FILL_OPACITY_MAX}
+                    min={PPT_FILL_OPACITY_MIN}
+                    step={PPT_FILL_OPACITY_STEP}
+                    type="number"
+                    value={getPPTFillOpacity(selectedElement.fill)}
+                    onChange={(event) =>
+                      onShapeFillChange(
+                        selectedElement.id,
+                        'opacity',
+                        parsePPTFillOpacity(event.target.value),
+                      )}
+                  />
+                </label>
                 <label className="ppt-field">
                   <span>Stroke width</span>
                   <input
@@ -9514,7 +9559,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     ...base,
     ...pptTextStyle(element.style),
     alignItems: getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element)),
-    background: element.kind === 'shape' ? element.fill.color : 'transparent',
+    background: element.kind === 'shape' ? getPPTFillColorCSS(element.fill) : 'transparent',
         border: element.kind === 'shape' && element.stroke
       ? `${element.stroke.width}px solid ${element.stroke.color}`
       : undefined,
@@ -9985,6 +10030,76 @@ function getPPTElementStrokeDash(element: PPTElement) {
   const stroke = getPPTElementStroke(element)
 
   return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
+  const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
+  const normalized = {
+    color: typeof fill.color === 'string' && fill.color
+      ? fill.color
+      : '#ffffff',
+  }
+
+  return opacity === 1
+    ? normalized
+    : { ...normalized, opacity }
+}
+
+function getPPTFillOpacity(fill: PPTFill) {
+  return normalizePPTFillOpacity(fill.opacity ?? 1)
+}
+
+function parsePPTFillOpacity(value: string) {
+  return normalizePPTFillOpacity(Number(value))
+}
+
+function normalizePPTFillOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 1
+  const clamped = clamp(finiteValue, PPT_FILL_OPACITY_MIN, PPT_FILL_OPACITY_MAX)
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTFillOpacity(value: number) {
+  return String(normalizePPTFillOpacity(value))
+}
+
+function getPPTFillColorCSS(fill: PPTFill) {
+  const opacity = getPPTFillOpacity(fill)
+
+  if (opacity === 1) {
+    return fill.color
+  }
+
+  return getPPTColorWithAlpha(fill.color, opacity)
+}
+
+function getPPTColorWithAlpha(color: string, opacity: number) {
+  const hex = normalizePPTColorHex(color)
+
+  if (!hex) {
+    return color
+  }
+
+  const red = Number.parseInt(hex.slice(0, 2), 16)
+  const green = Number.parseInt(hex.slice(2, 4), 16)
+  const blue = Number.parseInt(hex.slice(4, 6), 16)
+
+  return `rgb(${red} ${green} ${blue} / ${formatPPTFillOpacity(opacity)})`
+}
+
+function normalizePPTColorHex(color: string) {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())
+
+  if (!match) {
+    return ''
+  }
+
+  const value = match[1]
+
+  return value.length === 3
+    ? [...value].map((char) => `${char}${char}`).join('').toLowerCase()
+    : value.toLowerCase()
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {

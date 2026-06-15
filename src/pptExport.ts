@@ -7,6 +7,7 @@ import {
   type PPTElementAccessibility,
   type PPTElementHyperlink,
   type PPTElementShadow,
+  type PPTFill,
   type PPTFreeform,
   type PPTImage,
   type PPTLine,
@@ -81,6 +82,8 @@ const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
 const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
+const PPT_FILL_OPACITY_MIN = 0
+const PPT_FILL_OPACITY_MAX = 1
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(['solid', 'dash', 'dot'])
 
@@ -240,6 +243,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const transformAttrs = getPPTElementTransformAttrs(element)
   const altTextAttr = getPPTElementAltTextHTMLAttr(element)
   const hyperlinkAttr = getPPTElementHyperlinkHTMLAttr(element)
+  const fillOpacityAttr = getPPTElementFillOpacityHTMLAttr(element)
   const strokeDashAttr = getPPTElementStrokeDashHTMLAttr(element)
   const opacity = getPPTElementOpacity(element)
   const opacityAttr = ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(opacity))}"`
@@ -300,7 +304,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${fillOpacityAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
   return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
@@ -359,12 +363,13 @@ function renderPPTImageSVG(element: PPTImage) {
 
 function renderPPTShapeSVG(element: PPTShape) {
   const fill = element.fill.color
+  const fillOpacity = getPPTFillOpacitySvgAttr(element.fill)
   const stroke = element.stroke
     ? ` stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)}`
     : ' stroke="none"'
 
   if (element.shape === 'ellipse') {
-    return `<ellipse cx="${formatNumber(element.geometry.x + element.geometry.w / 2)}" cy="${formatNumber(element.geometry.y + element.geometry.h / 2)}" rx="${formatNumber(element.geometry.w / 2)}" ry="${formatNumber(element.geometry.h / 2)}" fill="${escapeHtml(fill)}"${stroke} />`
+    return `<ellipse cx="${formatNumber(element.geometry.x + element.geometry.w / 2)}" cy="${formatNumber(element.geometry.y + element.geometry.h / 2)}" rx="${formatNumber(element.geometry.w / 2)}" ry="${formatNumber(element.geometry.h / 2)}" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
   }
 
   if (element.shape === 'diamond') {
@@ -381,10 +386,10 @@ function renderPPTShapeSVG(element: PPTShape) {
       `${formatNumber(left)},${formatNumber(centerY)}`,
     ].join(' ')
 
-    return `<polygon points="${points}" fill="${escapeHtml(fill)}"${stroke} />`
+    return `<polygon points="${points}" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
   }
 
-  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="24" fill="${escapeHtml(fill)}"${stroke} />`
+  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="24" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
 }
 
 function renderPPTLineSVG(element: PPTLine) {
@@ -799,6 +804,22 @@ function getPPTElementStrokeDashHTMLAttr(element: PPTElement) {
     : ''
 }
 
+function getPPTElementFillOpacityHTMLAttr(element: PPTElement) {
+  if (element.kind !== 'shape') {
+    return ''
+  }
+
+  return ` data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(element.fill)))}"`
+}
+
+function getPPTElementFillOpacitySvgAttr(element: PPTElement) {
+  if (element.kind !== 'shape') {
+    return ''
+  }
+
+  return `data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(element.fill)))}"`
+}
+
 function getPPTElementStrokeDashSvgAttr(element: PPTElement) {
   const dash = getPPTElementStrokeDash(element)
 
@@ -912,6 +933,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     `data-ppt-kind="${element.kind}"`,
     getPPTElementAltTextSvgAttr(element),
     getPPTElementHyperlinkSvgAttr(element),
+    getPPTElementFillOpacitySvgAttr(element),
     getPPTElementStrokeDashSvgAttr(element),
     `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     `opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
@@ -1162,6 +1184,81 @@ function getPPTElementStrokeDash(element: PPTElement) {
   const stroke = getPPTElementStroke(element)
 
   return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
+  const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
+  const normalized = {
+    color: typeof fill.color === 'string' && fill.color
+      ? fill.color
+      : '#ffffff',
+  }
+
+  return opacity === 1
+    ? normalized
+    : { ...normalized, opacity }
+}
+
+function getPPTFillOpacity(fill: PPTFill) {
+  return normalizePPTFillOpacity(fill.opacity ?? 1)
+}
+
+function normalizePPTFillOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 1
+  const clamped = Math.min(PPT_FILL_OPACITY_MAX, Math.max(PPT_FILL_OPACITY_MIN, finiteValue))
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTFillOpacity(value: number) {
+  return String(normalizePPTFillOpacity(value))
+}
+
+function getPPTFillOpacitySvgAttr(fill: PPTFill) {
+  const opacity = getPPTFillOpacity(fill)
+
+  return opacity === 1
+    ? ''
+    : ` fill-opacity="${escapeHtml(formatPPTFillOpacity(opacity))}"`
+}
+
+function getPPTFillColorCSS(fill: PPTFill) {
+  const normalized = normalizePPTFill(fill)
+  const opacity = getPPTFillOpacity(normalized)
+
+  if (opacity === 1) {
+    return normalized.color
+  }
+
+  return getPPTColorWithAlpha(normalized.color, opacity)
+}
+
+function getPPTColorWithAlpha(color: string, opacity: number) {
+  const hex = normalizePPTColorHex(color)
+
+  if (!hex) {
+    return color
+  }
+
+  const red = Number.parseInt(hex.slice(0, 2), 16)
+  const green = Number.parseInt(hex.slice(2, 4), 16)
+  const blue = Number.parseInt(hex.slice(4, 6), 16)
+
+  return `rgb(${red} ${green} ${blue} / ${formatPPTFillOpacity(opacity)})`
+}
+
+function normalizePPTColorHex(color: string) {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())
+
+  if (!match) {
+    return ''
+  }
+
+  const value = match[1]
+
+  return value.length === 3
+    ? [...value].map((char) => `${char}${char}`).join('').toLowerCase()
+    : value.toLowerCase()
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {
@@ -1455,7 +1552,7 @@ function normalizePPTParagraphSpacing(value: number) {
 
 function exportShapeStyle(element: PPTShape) {
   return [
-    `background:${element.fill.color}`,
+    `background:${getPPTFillColorCSS(element.fill)}`,
     element.stroke
       ? `border:${element.stroke.width}px solid ${element.stroke.color}`
       : '',

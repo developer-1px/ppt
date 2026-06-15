@@ -3145,6 +3145,8 @@ async function runExportScenario(page) {
       hasObjectHyperlinkModel: code.includes('"hyperlink"') && code.includes('"url": "https://example.com/ppt"'),
       hasObjectAltTextMarkup: code.includes('data-ppt-alt-text="' + objectAltText + '"') && code.includes('alt="' + objectAltText + '"'),
       hasObjectAltTextModel: code.includes('"accessibility"') && code.includes('"altText": "' + objectAltText + '"'),
+      hasFillOpacityMarkup: code.includes('data-ppt-fill-opacity="0.35"') && code.includes('background:rgb(') && code.includes('/ 0.35'),
+      hasFillOpacityModel: code.includes('"fill"') && code.includes('"opacity": 0.35'),
       hasStrokeDashMarkup: code.includes('data-ppt-stroke-dash="dash"') && code.includes('border-style:dashed') && code.includes('data-ppt-stroke-dash="dot"') && code.includes('stroke-dasharray='),
       hasStrokeDashModel: code.includes('"dash": "dash"') && code.includes('"dash": "dot"'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
@@ -3198,6 +3200,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
   record('exports PPT object hyperlink metadata', state.hasObjectHyperlinkMarkup && state.hasObjectHyperlinkModel, state)
   record('exports PPT object alt text metadata', state.hasObjectAltTextMarkup && state.hasObjectAltTextModel, state)
+  record('exports PPT shape fill opacity metadata', state.hasFillOpacityMarkup && state.hasFillOpacityModel, state)
   record('exports PPT stroke dash style metadata', state.hasStrokeDashMarkup && state.hasStrokeDashModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
@@ -3238,6 +3241,7 @@ async function runExportScenario(page) {
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
       hasObjectHyperlink: text.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
       hasObjectAltText: text.includes('data-ppt-alt-text="' + objectAltText + '"') && text.includes('<title>' + objectAltText + '</title>'),
+      hasFillOpacity: text.includes('data-ppt-fill-opacity="0.35"') && text.includes('fill-opacity="0.35"'),
       hasStrokeDash: text.includes('data-ppt-stroke-dash="dash"') && text.includes('data-ppt-stroke-dash="dot"') && text.includes('stroke-dasharray='),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
@@ -3268,6 +3272,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
   record('exports PPT object hyperlink metadata into slide SVG', slideSvgState.hasObjectHyperlink, slideSvgState)
   record('exports PPT object alt text metadata into slide SVG', slideSvgState.hasObjectAltText, slideSvgState)
+  record('exports PPT shape fill opacity metadata into slide SVG', slideSvgState.hasFillOpacity, slideSvgState)
   record('exports PPT stroke dash style metadata into slide SVG', slideSvgState.hasStrokeDash, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
@@ -3534,6 +3539,85 @@ async function runViewAndShapeScenario(page) {
       afterShapeDashUndo,
     },
   )
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="fill-opacity"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(input, '0.35')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterFillOpacity = await getPPTShapeFillOpacityState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterFillOpacityUndo = await getPPTShapeFillOpacityState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterFillOpacityRedo = await getPPTShapeFillOpacityState(page)
+
+  record(
+    'updates and restores PPT shape fill opacity without fading object stroke/text',
+    afterFillOpacity.inspectorOpacity === '0.35' &&
+      afterFillOpacity.selectedFillOpacity === '0.35' &&
+      afterFillOpacity.selectedBackground.includes('0.35') &&
+      afterFillOpacity.selectedObjectOpacity === '1' &&
+      afterFillOpacity.selectedBorderStyle === 'dashed' &&
+      afterFillOpacity.thumbFillOpacity === '0.35' &&
+      afterFillOpacity.thumbBackground.includes('0.35') &&
+      afterFillOpacityUndo.inspectorOpacity === '1' &&
+      afterFillOpacityUndo.selectedFillOpacity === '1' &&
+      afterFillOpacityRedo.inspectorOpacity === '0.35' &&
+      afterFillOpacityRedo.selectedFillOpacity === '0.35',
+    {
+      afterFillOpacity,
+      afterFillOpacityRedo,
+      afterFillOpacityUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const fillPreview = await page.eval(`((id) => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(\`[data-ppt-element="\${id}"]\`)
+
+    return {
+      background: element?.style.background ?? '',
+      fillOpacity: element?.getAttribute('data-ppt-fill-opacity') ?? '',
+      objectOpacity: element?.style.opacity ?? '',
+      open: !!overlay,
+    }
+  })(${JSON.stringify(afterFillOpacity.selectedId)})`)
+
+  record(
+    'keeps PPT shape fill opacity in presentation preview',
+    fillPreview.open &&
+      fillPreview.fillOpacity === '0.35' &&
+      fillPreview.background.includes('0.35') &&
+      fillPreview.objectOpacity === '1',
+    fillPreview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
 
   await pressKey(page, {
     code: 'KeyT',
@@ -6346,6 +6430,26 @@ function getPPTShapeStrokeDashState(page) {
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       thumbBorderStyle: thumb?.style.borderStyle ?? '',
       thumbDash: thumb?.getAttribute('data-ppt-thumb-stroke-dash') ?? '',
+    }
+  })()`)
+}
+
+function getPPTShapeFillOpacityState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = selected?.getAttribute('data-ppt-element') ?? ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+
+    return {
+      inspectorOpacity: document.querySelector('[data-ppt-style-field="fill-opacity"]')?.value ?? '',
+      selectedBackground: selected?.style.background ?? '',
+      selectedBorderStyle: selected?.style.borderStyle ?? '',
+      selectedFillOpacity: selected?.getAttribute('data-ppt-fill-opacity') ?? '',
+      selectedId: targetId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedObjectOpacity: selected?.style.opacity ?? '',
+      thumbBackground: thumb?.style.background ?? '',
+      thumbFillOpacity: thumb?.getAttribute('data-ppt-thumb-fill-opacity') ?? '',
     }
   })()`)
 }

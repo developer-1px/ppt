@@ -8,6 +8,7 @@ export const PPT_SPLIT_LAYOUT_ID = 'ppt-layout-split'
 
 const PPTFillSchema = z.object({
   color: z.string(),
+  opacity: z.number().optional(),
 })
 
 const PPTStrokeSchema = z.object({
