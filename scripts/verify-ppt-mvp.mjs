@@ -50,6 +50,7 @@ try {
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
+  await runTableImportScenario(page)
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
   await runExportScenario(page)
@@ -2155,6 +2156,8 @@ async function runExportScenario(page) {
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
       hasSpeakerNotesMarkup: code.includes('class="ppt-notes"') && code.includes('data-ppt-notes-for="slide-1"') && code.includes('Presenter cue: review image crop and final CTA.'),
       hasSpeakerNotesModel: code.includes('"notes": "Presenter cue: review image crop and final CTA."'),
+      hasTableMarkup: code.includes('class="ppt-element ppt-table"') && code.includes('data-ppt-table-rows="') && code.includes('<th data-ppt-table-cell="0">'),
+      hasTableModel: code.includes('"kind": "table"') && code.includes('"rows"') && code.includes('"Region"'),
       hasUnderlineMarkup: code.includes('data-ppt-run-underline="true"') && code.includes('text-decoration:underline'),
       hasUnderlineModel: code.includes('"underline": true'),
     }
@@ -2172,6 +2175,7 @@ async function runExportScenario(page) {
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
+  record('exports inserted PPT table markup and model data', state.hasTableMarkup && state.hasTableModel, state)
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 
@@ -2192,13 +2196,14 @@ async function runExportScenario(page) {
       hasShape: text.includes('data-ppt-kind="shape"'),
       hasSlide: text.includes('data-ppt-svg-slide="slide-1"'),
       hasSvg: text.includes('<svg xmlns="http://www.w3.org/2000/svg"'),
+      hasTable: text.includes('data-ppt-kind="table"') && text.includes('data-ppt-table-cell=') && text.includes('data-ppt-table-text='),
       hasText: text.includes('data-ppt-kind="textBox"') && text.includes('<text '),
       type: download.type ?? '',
     }
   })()`)
 
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
-  record('exports PPT image/shape/text/line into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine, slideSvgState)
+  record('exports PPT image/shape/text/line/table into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasTable, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
   await selectPPTLayerRows(page, [imageId])
@@ -2607,6 +2612,103 @@ async function runImageImportScenario(page) {
   record('resizes inserted PPT image with existing selection handles', afterResize.selectedWidth > beforeResize.width && afterResize.selectedKind === 'image', {
     afterResize,
     beforeResize,
+  })
+}
+
+async function runTableImportScenario(page) {
+  const before = await getPPTTableState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-table]')?.click()`)
+  await delay(80)
+
+  const afterToolbarInsert = await getPPTTableState(page)
+
+  record('inserts PPT table from toolbar affordance', afterToolbarInsert.tableCount === before.tableCount + 1 && afterToolbarInsert.selectedKind === 'table' && afterToolbarInsert.selectedRows === 3 && afterToolbarInsert.selectedCols === 3 && afterToolbarInsert.inspectorValue.includes('Metric'), {
+    afterToolbarInsert,
+    before,
+  })
+
+  await page.eval(`(() => {
+    const textarea = document.querySelector('[data-ppt-style-field="table-data"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    valueSetter.call(textarea, 'Metric\\tQ1\\tQ2\\nRevenue\\t10\\t12\\nMargin\\t42%\\t45%')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+    textarea.blur()
+  })()`)
+  await delay(80)
+
+  const afterInspectorEdit = await getPPTTableState(page)
+
+  record('retouches selected PPT table data in inspector TSV field', afterInspectorEdit.selectedKind === 'table' && afterInspectorEdit.selectedRows === 3 && afterInspectorEdit.selectedCols === 3 && afterInspectorEdit.cellTexts.includes('Revenue') && afterInspectorEdit.cellTexts.includes('45%') && afterInspectorEdit.inspectorSize === '3 x 3' && afterInspectorEdit.thumbTableCount > before.thumbTableCount, {
+    afterInspectorEdit,
+    afterToolbarInsert,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'table' })
+  await delay(80)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPaletteInsert = await getPPTTableState(page)
+
+  record('inserts PPT table from command palette', afterPaletteInsert.tableCount === afterInspectorEdit.tableCount + 1 && afterPaletteInsert.selectedKind === 'table' && afterPaletteInsert.selectedRows === 3 && afterPaletteInsert.selectedCols === 3 && !afterPaletteInsert.paletteOpen, {
+    afterInspectorEdit,
+    afterPaletteInsert,
+  })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('text/tab-separated-values', 'Name\\tValue\\nUsers\\t120\\nARR\\t$1M')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterPaste = await getPPTTableState(page)
+
+  record('pastes TSV clipboard data into PPT table element', afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
+    afterPaletteInsert,
+    afterPaste,
+  })
+
+  await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const rect = stage.getBoundingClientRect()
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.items.add(${createPPTTestTableFileExpression('metrics.csv', 'Region,Score\\nNA,88\\nEU,91')})
+    dataTransfer.setData('text/csv', 'Region,Score\\nNA,88\\nEU,91')
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width * 0.28,
+      clientY: rect.top + rect.height * 0.64,
+      dataTransfer,
+    }))
+  })()`)
+  await delay(180)
+
+  const afterDrop = await getPPTTableState(page)
+
+  record('drops CSV file onto PPT stage as table element', afterDrop.tableCount === afterPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+    afterDrop,
+    afterPaste,
   })
 }
 
@@ -3221,6 +3323,14 @@ function createPPTTestImageFileExpression(name, color) {
   return `new File([${JSON.stringify(svg)}], ${JSON.stringify(name)}, { type: 'image/svg+xml' })`
 }
 
+function createPPTTestTableFileExpression(name, text) {
+  const type = name.toLowerCase().endsWith('.tsv')
+    ? 'text/tab-separated-values'
+    : 'text/csv'
+
+  return `new File([${JSON.stringify(text)}], ${JSON.stringify(name)}, { type: ${JSON.stringify(type)} })`
+}
+
 function getPPTImageImportState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
@@ -3249,6 +3359,29 @@ function getPPTImageImportState(page) {
       thumbFlipVCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-flip-v="true"]').length,
       thumbContainCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-fit="contain"]').length,
       thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
+    }
+  })()`)
+}
+
+function getPPTTableState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const tableCells = [...selected?.querySelectorAll('[data-ppt-table-cell]') ?? []]
+
+    return {
+      cellTexts: tableCells.map((cell) => cell.textContent ?? ''),
+      inspectorSize: document.querySelector('[data-ppt-table-inspector-size]')?.textContent?.trim() ?? '',
+      inspectorValue: document.querySelector('[data-ppt-style-field="table-data"]')?.value ?? '',
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      selectedCols: Number(selected?.getAttribute('data-ppt-table-cols') ?? 0),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedRows: Number(selected?.getAttribute('data-ppt-table-rows') ?? 0),
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      tableCount: document.querySelectorAll('[data-kind="table"]').length,
+      thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,
     }
   })()`)
 }

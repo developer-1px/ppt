@@ -9,6 +9,7 @@ import {
   type PPTRun,
   type PPTShape,
   type PPTSlide,
+  type PPTTable,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
@@ -157,6 +158,10 @@ function renderPPTElementHTML(element: PPTElement) {
     return renderPPTLineHTML(element, style)
   }
 
+  if (element.kind === 'table') {
+    return renderPPTTableHTML(element, style, transformAttrs)
+  }
+
   const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
@@ -178,6 +183,10 @@ function renderPPTElementSVG(element: PPTElement) {
 
   if (element.kind === 'line') {
     return renderPPTLineSVG(element)
+  }
+
+  if (element.kind === 'table') {
+    return renderPPTTableSVG(element)
   }
 
   const attrs = getPPTElementSVGAttrs(element)
@@ -357,6 +366,9 @@ function exportCSS() {
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
     '.ppt-line{display:block;overflow:visible;padding:0;}',
+    '.ppt-table{display:table;table-layout:fixed;border-collapse:collapse;padding:0;background:#fff;color:#111827;font-size:18px;line-height:1.15;}',
+    '.ppt-table th,.ppt-table td{height:1px;padding:8px 10px;overflow:hidden;border:1px solid #dbe3ef;text-align:left;text-overflow:ellipsis;white-space:nowrap;}',
+    '.ppt-table th{background:#eff6ff;font-weight:700;}',
     '.ppt-text{align-items:flex-start;padding:0;}',
     '.ppt-text-paragraph{display:block;min-height:1em;}',
     '.ppt-text-paragraph[data-ppt-bullet="true"]{position:relative;padding-left:1.1em;}',
@@ -441,6 +453,74 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
   ].filter(Boolean).join(' ')
 
   return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+}
+
+function renderPPTTableHTML(
+  element: PPTTable,
+  style: string[],
+  transformAttrs: string,
+) {
+  const columnCount = getPPTTableColumnCount(element.rows)
+  const rowCount = element.rows.length
+  const head = element.rows[0]
+    ? `<thead><tr>${renderPPTTableHTMLRow(element.rows[0], columnCount, 'th')}</tr></thead>`
+    : ''
+  const bodyRows = element.rows
+    .slice(1)
+    .map((row) => `<tr>${renderPPTTableHTMLRow(row, columnCount, 'td')}</tr>`)
+    .join('')
+  const body = `<tbody>${bodyRows}</tbody>`
+  const attrs = [
+    `class="ppt-element ppt-table"`,
+    `data-ppt-element="${escapeHtml(element.id)}"`,
+    transformAttrs.trim(),
+    `data-ppt-table-rows="${rowCount}"`,
+    `data-ppt-table-cols="${columnCount}"`,
+    `style="${style.filter(Boolean).join(';')}"`,
+  ].filter(Boolean).join(' ')
+
+  return `    <table ${attrs}>${head}${body}</table>`
+}
+
+function renderPPTTableHTMLRow(
+  row: readonly string[],
+  columnCount: number,
+  tagName: 'td' | 'th',
+) {
+  return Array.from({ length: columnCount }, (_, index) =>
+    `<${tagName} data-ppt-table-cell="${index}">${escapeHtml(row[index] ?? '')}</${tagName}>`,
+  ).join('')
+}
+
+function renderPPTTableSVG(element: PPTTable) {
+  const columnCount = getPPTTableColumnCount(element.rows)
+  const rowCount = element.rows.length
+  const cellWidth = columnCount > 0 ? element.geometry.w / columnCount : element.geometry.w
+  const cellHeight = rowCount > 0 ? element.geometry.h / rowCount : element.geometry.h
+  const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
+  const cells = element.rows.flatMap((row, rowIndex) =>
+    Array.from({ length: columnCount }, (_, columnIndex) => {
+      const x = element.geometry.x + cellWidth * columnIndex
+      const y = element.geometry.y + cellHeight * rowIndex
+      const textX = x + Math.min(10, cellWidth * 0.12)
+      const textY = y + cellHeight / 2
+      const headerAttrs = rowIndex === 0
+        ? ' data-ppt-table-header="true" font-weight="700"'
+        : ''
+
+      return [
+        `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}" stroke="#dbe3ef" stroke-width="1"></rect>`,
+        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(fontSize)}" dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
+      ].join('')
+    }),
+  ).join('')
+  const attrs = [
+    getPPTElementSVGAttrs(element),
+    `data-ppt-table-rows="${rowCount}"`,
+    `data-ppt-table-cols="${columnCount}"`,
+  ].join(' ')
+
+  return `<g ${attrs}><rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" fill="#ffffff" stroke="#94a3b8" stroke-width="1"></rect>${cells}</g>`
 }
 
 function getPPTElementTransform(element: PPTElement) {
@@ -649,6 +729,10 @@ function getPPTSvgFontWeight(style: PPTTextStyle | undefined) {
   }
 
   return '400'
+}
+
+function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
+  return Math.max(0, ...rows.map((row) => row.length))
 }
 
 function formatNumber(value: number) {

@@ -47,6 +47,7 @@ import {
   SendToBack,
   Square,
   Sun,
+  Table2,
   Trash2,
   Type,
   Undo2,
@@ -147,6 +148,7 @@ import {
   type PPTShape,
   type PPTShapeKind,
   type PPTSlide,
+  type PPTTable,
   type PPTTextBody,
   type PPTTextElement,
   type PPTTextStyle,
@@ -176,6 +178,17 @@ import {
   readPPTImageFileSource,
   type PPTImageImportSource,
 } from './pptImageImport'
+import {
+  PPT_DEFAULT_TABLE_ROWS,
+  createPPTTableElement,
+  getPPTTableColumnCount,
+  getPPTTableFileFromDataTransfer,
+  getPPTTableSourceFromDataTransfer,
+  normalizePPTTableRows,
+  readPPTTableFileSource,
+  stringifyPPTTableRows,
+  type PPTTableImportSource,
+} from './pptTableImport'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
@@ -897,12 +910,18 @@ function App() {
 
       const file = getPPTImageFileFromDataTransfer(event.clipboardData)
 
-      if (!file) {
+      if (file) {
+        event.preventDefault()
+        void insertPPTImageFile(file)
         return
       }
 
-      event.preventDefault()
-      void insertPPTImageFile(file)
+      const tableSource = getPPTTableSourceFromDataTransfer(event.clipboardData)
+
+      if (tableSource) {
+        event.preventDefault()
+        insertPPTTableSource(tableSource)
+      }
     }
 
     window.addEventListener('paste', onPaste)
@@ -1230,6 +1249,9 @@ function App() {
 
       setSelection([element.id])
       setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setContextMenu(null)
 
       return {
         ...slide,
@@ -1249,6 +1271,46 @@ function App() {
     }
 
     insertPPTImageSource(source, center)
+    return true
+  }
+
+  function insertPPTTableSource(
+    source: PPTTableImportSource = { rows: PPT_DEFAULT_TABLE_ROWS },
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const id = createPPTElementId(slide, 'table')
+      const element = createPPTTableElement({
+        id,
+        name: source.name ?? 'Table',
+        point: center,
+        rows: source.rows,
+      })
+
+      setSelection([element.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
+  }
+
+  async function insertPPTTableFile(
+    file: Blob & { name?: string },
+    center = getPPTViewportCenter(),
+  ) {
+    const source = await readPPTTableFileSource(file)
+
+    if (!source) {
+      return false
+    }
+
+    insertPPTTableSource(source, center)
     return true
   }
 
@@ -1943,6 +2005,22 @@ function App() {
     )
   }
 
+  function updateTableRows(
+    elementId: string,
+    value: string,
+  ) {
+    const rows = normalizePPTTableRows(
+      value.split(/\r?\n/).map((row) => row.split('\t')),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
+        element.kind === 'table'
+          ? { ...element, rows }
+          : element),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -2173,20 +2251,42 @@ function App() {
   }
 
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    if (getPPTImageFileFromDataTransfer(event.dataTransfer)) {
+    if (
+      getPPTImageFileFromDataTransfer(event.dataTransfer) ||
+      getPPTTableFileFromDataTransfer(event.dataTransfer) ||
+      getPPTTableSourceFromDataTransfer(event.dataTransfer)
+    ) {
       event.preventDefault()
     }
   }
 
   function handleStageDrop(event: ReactDragEvent<HTMLDivElement>) {
-    const file = getPPTImageFileFromDataTransfer(event.dataTransfer)
+    const imageFile = getPPTImageFileFromDataTransfer(event.dataTransfer)
 
-    if (!file) {
+    if (imageFile) {
+      event.preventDefault()
+      void insertPPTImageFile(imageFile, screenToWorld(event.nativeEvent))
       return
     }
 
-    event.preventDefault()
-    void insertPPTImageFile(file, screenToWorld(event.nativeEvent))
+    const tableFile = getPPTTableFileFromDataTransfer(event.dataTransfer)
+    const tableSource = getPPTTableSourceFromDataTransfer(event.dataTransfer)
+    const point = screenToWorld(event.nativeEvent)
+
+    if (tableFile) {
+      event.preventDefault()
+      void insertPPTTableFile(tableFile, point).then((inserted) => {
+        if (!inserted && tableSource) {
+          insertPPTTableSource(tableSource, point)
+        }
+      })
+      return
+    }
+
+    if (tableSource) {
+      event.preventDefault()
+      insertPPTTableSource(tableSource, point)
+    }
   }
 
   function beginLineCreation(
@@ -3132,6 +3232,11 @@ function App() {
     section: 'Create',
     title: 'Add image',
   }, {
+    id: 'tool:table',
+    run: () => insertPPTTableSource(),
+    section: 'Create',
+    title: 'Add table',
+  }, {
     id: 'slide:add',
     run: addSlide,
     section: 'Slides',
@@ -3328,6 +3433,9 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
             <ImagePlus size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
+            <Table2 size={17} />
           </button>
           <input
             accept="image/*"
@@ -3621,6 +3729,7 @@ function App() {
         onElementStrokeChange={updateElementStroke}
         onSlideNameChange={updateSlideName}
         onSlideNotesChange={updateSlideNotes}
+        onTableRowsChange={updateTableRows}
       />
       <PPTCommandPalette
         items={commandPaletteItems}
@@ -4305,6 +4414,12 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-thumb-table-cols={element.kind === 'table'
+              ? getPPTTableColumnCount(element.rows)
+              : undefined}
+            data-ppt-thumb-table-rows={element.kind === 'table'
+              ? element.rows.length
+              : undefined}
             data-ppt-image-crop-x={element.kind === 'image'
               ? getPPTImageCrop(element).x
               : undefined}
@@ -4326,9 +4441,11 @@ function SlideThumb({
                 ? element.fill.color
                 : element.kind === 'image'
                   ? undefined
-                  : element.kind === 'textBox'
-                    ? '#cbd5e1'
-                    : undefined,
+                  : element.kind === 'table'
+                    ? '#f8fafc'
+                    : element.kind === 'textBox'
+                      ? '#cbd5e1'
+                      : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
                 : undefined,
@@ -4431,6 +4548,12 @@ function PPTElementView({
       data-ppt-image-fit={element.kind === 'image'
         ? getPPTImageFit(element)
         : undefined}
+      data-ppt-table-cols={element.kind === 'table'
+        ? getPPTTableColumnCount(element.rows)
+        : undefined}
+      data-ppt-table-rows={element.kind === 'table'
+        ? element.rows.length
+        : undefined}
       data-ppt-bullet-list={textBody && hasPPTTextBodyBullet(textBody) ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
@@ -4456,6 +4579,8 @@ function PPTElementView({
         />
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
+      ) : element.kind === 'table' ? (
+        <PPTTableView element={element} />
       ) : (
         <div
           className="ppt-element-editor"
@@ -4481,6 +4606,34 @@ function PPTElementView({
         >
           {editing || !textBody ? text : <PPTTextBodyView body={textBody} />}
         </div>
+      )}
+    </div>
+  )
+}
+
+function PPTTableView({ element }: { element: PPTTable }) {
+  const columnCount = getPPTTableColumnCount(element.rows)
+
+  return (
+    <div
+      className="ppt-table-grid"
+      data-ppt-table-cols={columnCount}
+      data-ppt-table-rows={element.rows.length}
+      style={{
+        gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+      }}
+    >
+      {element.rows.flatMap((row, rowIndex) =>
+        row.map((cell, columnIndex) => (
+          <div
+            className="ppt-table-cell"
+            data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
+            data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
+            key={`${rowIndex}:${columnIndex}`}
+          >
+            {cell}
+          </div>
+        )),
       )}
     </div>
   )
@@ -4820,6 +4973,7 @@ function Inspector({
   onSlideBackgroundChange,
   onSlideNameChange,
   onSlideNotesChange,
+  onTableRowsChange,
   selection,
   selectedElement,
   slide,
@@ -4879,6 +5033,7 @@ function Inspector({
   onSlideBackgroundChange: (color: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
+  onTableRowsChange: (elementId: string, value: string) => void
   selection: string[]
   selectedElement: PPTElement | null
   slide: PPTSlide
@@ -5153,6 +5308,25 @@ function Inspector({
                 </div>
               </>
             ) : null}
+            {selectedElement.kind === 'table' ? (
+              <>
+                <label className="ppt-field">
+                  <span>Rows</span>
+                  <textarea
+                    data-ppt-style-field="table-data"
+                    value={stringifyPPTTableRows(selectedElement.rows)}
+                    onChange={(event) =>
+                      onTableRowsChange(selectedElement.id, event.target.value)}
+                  />
+                </label>
+                <span
+                  className="ppt-muted"
+                  data-ppt-table-inspector-size
+                >
+                  {selectedElement.rows.length} x {getPPTTableColumnCount(selectedElement.rows)}
+                </span>
+              </>
+            ) : null}
             {selectedElement.kind === 'line' ? (
               <>
                 <div className="ppt-geometry-grid">
@@ -5336,7 +5510,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     width: element.geometry.w,
   }
 
-  if (element.kind === 'image' || element.kind === 'line') {
+  if (element.kind === 'image' || element.kind === 'line' || element.kind === 'table') {
     return base
   }
 
@@ -6759,6 +6933,10 @@ function getPPTThumbElementClassName(element: PPTElement) {
 
   if (element.kind === 'line') {
     return 'ppt-thumb-line'
+  }
+
+  if (element.kind === 'table') {
+    return 'ppt-thumb-table'
   }
 
   return 'ppt-thumb-shape'

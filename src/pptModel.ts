@@ -108,11 +108,17 @@ const PPTLineSchema = PPTElementBaseSchema.extend({
   stroke: PPTStrokeSchema,
 })
 
+const PPTTableSchema = PPTElementBaseSchema.extend({
+  kind: z.literal('table'),
+  rows: z.array(z.array(z.string())),
+})
+
 export const PPTElementSchema = z.discriminatedUnion('kind', [
   PPTTextBoxSchema,
   PPTShapeSchema,
   PPTImageSchema,
   PPTLineSchema,
+  PPTTableSchema,
 ])
 
 export const PPTSlideSchema = z.object({
@@ -151,6 +157,7 @@ export type PPTLineConnection = z.infer<typeof PPTLineConnectionSchema>
 export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
+export type PPTTable = z.infer<typeof PPTTableSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
 export type PPTTextElement = PPTTextBox | (PPTShape & { textBody: PPTTextBody })
 export type PPTSlide = z.infer<typeof PPTSlideSchema>
