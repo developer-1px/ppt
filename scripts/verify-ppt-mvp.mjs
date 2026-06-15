@@ -56,6 +56,7 @@ try {
   await runTextParagraphSpacingScenario(page)
   await runTextFontFamilyScenario(page)
   await runTextVerticalAlignScenario(page)
+  await runTextFrameInsetScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
@@ -2988,6 +2989,130 @@ async function runTextVerticalAlignScenario(page) {
   await delay(80)
 }
 
+async function runTextFrameInsetScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTTextFrameInsetState(page)
+
+  record(
+    'renders PPT text frame inset controls in text inspector',
+    initial.selectedId === 's1-title' &&
+      initial.top === '0' &&
+      initial.right === '0' &&
+      initial.bottom === '0' &&
+      initial.left === '0' &&
+      initial.selectedTextInset === '0,0,0,0' &&
+      initial.thumbTextInset === '0,0,0,0',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const values = {
+      top: '10',
+      right: '14',
+      bottom: '18',
+      left: '22',
+    }
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    Object.entries(values).forEach(([field, value]) => {
+      const input = document.querySelector(\`[data-ppt-text-inset-field="\${field}"]\`)
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  })()`)
+  await delay(120)
+
+  const afterInset = await getPPTTextFrameInsetState(page)
+
+  record(
+    'updates PPT text frame inset metadata from inspector',
+    afterInset.top === '10' &&
+      afterInset.right === '14' &&
+      afterInset.bottom === '18' &&
+      afterInset.left === '22' &&
+      afterInset.inspectorTextInset === '10,14,18,22' &&
+      afterInset.selectedTextInset === '10,14,18,22' &&
+      afterInset.selectedStylePadding === '10px 14px 18px 22px' &&
+      afterInset.thumbTextInset === '10,14,18,22',
+    {
+      afterInset,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTTextFrameInsetState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTTextFrameInsetState(page)
+
+  record(
+    'undoes and redoes PPT text frame inset field as one history step',
+    afterUndo.top === '10' &&
+      afterUndo.right === '14' &&
+      afterUndo.bottom === '18' &&
+      afterUndo.left === '0' &&
+      afterRedo.selectedTextInset === '10,14,18,22',
+    {
+      afterInset,
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector('[data-ppt-element="s1-title"]')
+
+    return {
+      open: !!overlay,
+      padding: element?.style.padding ?? '',
+      textInset: element?.getAttribute('data-ppt-text-inset') ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT text frame inset metadata in presentation preview',
+    preview.open &&
+      preview.textInset === '10,14,18,22' &&
+      preview.padding === '10px 14px 18px 22px',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
 async function runExportScenario(page) {
   await installPPTDownloadCapture(page)
 
@@ -3009,6 +3134,8 @@ async function runExportScenario(page) {
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
       hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
+      hasTextFrameInsetMarkup: code.includes('data-ppt-text-inset="10,14,18,22"') && code.includes('padding:10px 14px 18px 22px'),
+      hasTextFrameInsetModel: code.includes('"textInset"') && code.includes('"top": 10') && code.includes('"right": 14') && code.includes('"bottom": 18') && code.includes('"left": 22'),
       hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="middle"') && code.includes('align-items:center'),
       hasTextVerticalAlignModel: code.includes('"verticalAlign": "middle"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
@@ -3053,6 +3180,7 @@ async function runExportScenario(page) {
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
+  record('exports PPT text frame inset markup and model data', state.hasTextFrameInsetMarkup && state.hasTextFrameInsetModel, state)
   record('exports PPT text vertical alignment markup and model data', state.hasTextVerticalAlignMarkup && state.hasTextVerticalAlignModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
@@ -3085,6 +3213,7 @@ async function runExportScenario(page) {
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
+      hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
       hasTextVerticalAlign: text.includes('data-ppt-vertical-align="middle"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
@@ -3109,6 +3238,7 @@ async function runExportScenario(page) {
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
+  record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
   record('exports PPT text vertical alignment metadata into slide SVG', slideSvgState.hasTextVerticalAlign, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
@@ -5668,6 +5798,31 @@ function getPPTTextVerticalAlignState(page) {
       thumbStyleAlignItems: thumb?.style.alignItems ?? '',
       thumbVerticalAlign: thumb?.getAttribute('data-ppt-thumb-vertical-align') ?? '',
       verticalAlign: document.querySelector('[data-ppt-style-field="vertical-align"]')?.value ?? '',
+    }
+  })()`)
+}
+
+function getPPTTextFrameInsetState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('[data-ppt-text-inset-inspector]')
+    const selected = document.querySelector('[data-selected="true"]')
+    const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
+
+    return {
+      bottom: document.querySelector('[data-ppt-text-inset-field="bottom"]')?.value ?? '',
+      inspectorTextInset: [
+        inspector?.getAttribute('data-ppt-text-inset-top') ?? '',
+        inspector?.getAttribute('data-ppt-text-inset-right') ?? '',
+        inspector?.getAttribute('data-ppt-text-inset-bottom') ?? '',
+        inspector?.getAttribute('data-ppt-text-inset-left') ?? '',
+      ].join(','),
+      left: document.querySelector('[data-ppt-text-inset-field="left"]')?.value ?? '',
+      right: document.querySelector('[data-ppt-text-inset-field="right"]')?.value ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedStylePadding: selected?.style.padding ?? '',
+      selectedTextInset: selected?.getAttribute('data-ppt-text-inset') ?? '',
+      thumbTextInset: thumb?.getAttribute('data-ppt-thumb-text-inset') ?? '',
+      top: document.querySelector('[data-ppt-text-inset-field="top"]')?.value ?? '',
     }
   })()`)
 }

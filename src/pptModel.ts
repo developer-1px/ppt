@@ -45,11 +45,19 @@ export const PPTTextBodySchema = z.object({
   paragraphs: z.array(PPTParagraphSchema),
 })
 
+const PPTTextInsetSchema = z.object({
+  bottom: z.number(),
+  left: z.number(),
+  right: z.number(),
+  top: z.number(),
+})
+
 const PPTTextStyleSchema = z.object({
   color: z.string(),
   fontFamily: z.string().optional(),
   fontSize: z.number(),
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
+  textInset: PPTTextInsetSchema.optional(),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
 })
 

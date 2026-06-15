@@ -724,6 +724,8 @@ type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
   | 'spacingBefore'
+type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
+type PPTTextInsetField = keyof PPTTextInset
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
 type PPTLayerPaneAriaContract = {
   containerRole: 'tree'
@@ -1037,6 +1039,21 @@ const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
 const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
   PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
 )
+const PPT_TEXT_INSET_MIN = 0
+const PPT_TEXT_INSET_MAX = 120
+const PPT_TEXT_INSET_STEP = 2
+const PPT_DEFAULT_TEXT_BOX_INSET = Object.freeze({
+  bottom: 0,
+  left: 0,
+  right: 0,
+  top: 0,
+} as const satisfies PPTTextInset)
+const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
+  bottom: 18,
+  left: 18,
+  right: 18,
+  top: 18,
+} as const satisfies PPTTextInset)
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
@@ -2697,6 +2714,33 @@ function App() {
           style: {
             ...style,
             [field]: nextValue,
+          },
+        }
+      }),
+    )
+  }
+
+  function updateElementTextInset(
+    elementId: string,
+    field: PPTTextInsetField,
+    value: number,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (!isPPTTextElement(element) || element.locked === true) {
+          return element
+        }
+
+        const inset = getPPTTextElementInset(element)
+
+        return {
+          ...element,
+          style: {
+            ...getPPTTextElementStyle(element),
+            textInset: {
+              ...inset,
+              [field]: normalizePPTTextInset(value),
+            },
           },
         }
       }),
@@ -5114,6 +5158,7 @@ function App() {
         onImageFitChange={updateImageFit}
         onElementNameChange={updateElementName}
         onElementRotationChange={updateElementRotation}
+        onElementTextInsetChange={updateElementTextInset}
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
@@ -7295,6 +7340,9 @@ function SlideThumb({
             data-ppt-thumb-font-family={isPPTTextElement(element)
               ? normalizePPTTextFontFamily(getPPTTextElementStyle(element).fontFamily)
               : undefined}
+            data-ppt-thumb-text-inset={isPPTTextElement(element)
+              ? formatPPTTextInsetData(getPPTTextElementInset(element))
+              : undefined}
             data-ppt-thumb-vertical-align={isPPTTextElement(element)
               ? getPPTTextElementVerticalAlign(element)
               : undefined}
@@ -7474,6 +7522,9 @@ function PPTElementView({
       data-ppt-animation-type={animation.type}
       data-ppt-font-family={isPPTTextElement(element)
         ? normalizePPTTextFontFamily(textStyle?.fontFamily)
+        : undefined}
+      data-ppt-text-inset={isPPTTextElement(element)
+        ? formatPPTTextInsetData(getPPTTextElementInset(element))
         : undefined}
       data-ppt-vertical-align={isPPTTextElement(element)
         ? getPPTTextElementVerticalAlign(element)
@@ -7993,6 +8044,7 @@ function Inspector({
   onElementNameChange,
   onElementRotationChange,
   onElementStrokeChange,
+  onElementTextInsetChange,
   onElementTextStyleChange,
   onImageCropChange,
   onImageFitChange,
@@ -8052,6 +8104,11 @@ function Inspector({
     elementId: string,
     field: keyof PPTTextStyle,
     value: string | number,
+  ) => void
+  onElementTextInsetChange: (
+    elementId: string,
+    field: PPTTextInsetField,
+    value: number,
   ) => void
   onImageCropChange: (
     elementId: string,
@@ -8120,6 +8177,9 @@ function Inspector({
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
+  const textInset = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextElementInset(selectedElement)
+    : PPT_DEFAULT_TEXT_BOX_INSET
   const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
   const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
@@ -8541,6 +8601,34 @@ function Inspector({
                     ))}
                   </select>
                 </label>
+                <div
+                  className="ppt-paragraph-spacing-grid"
+                  data-ppt-text-inset-bottom={textInset.bottom}
+                  data-ppt-text-inset-inspector
+                  data-ppt-text-inset-left={textInset.left}
+                  data-ppt-text-inset-right={textInset.right}
+                  data-ppt-text-inset-top={textInset.top}
+                >
+                  {(['top', 'right', 'bottom', 'left'] as const).map((field) => (
+                    <label className="ppt-field" key={field}>
+                      <span>{field[0].toUpperCase() + field.slice(1)}</span>
+                      <input
+                        data-ppt-text-inset-field={field}
+                        max={PPT_TEXT_INSET_MAX}
+                        min={PPT_TEXT_INSET_MIN}
+                        step={PPT_TEXT_INSET_STEP}
+                        type="number"
+                        value={textInset[field]}
+                        onChange={(event) =>
+                          onElementTextInsetChange(
+                            selectedElement.id,
+                            field,
+                            parsePPTTextInset(event.target.value),
+                          )}
+                      />
+                    </label>
+                  ))}
+                </div>
                 <label className="ppt-field">
                   <span>Weight</span>
                   <select
@@ -9049,6 +9137,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     border: element.kind === 'shape' && element.stroke
       ? `${element.stroke.width}px solid ${element.stroke.color}`
       : undefined,
+    padding: getPPTTextInsetCSS(getPPTTextElementInset(element)),
     textAlign: getPPTElementParagraphAlign(element),
   }
 }
@@ -9445,6 +9534,38 @@ function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
 
   return PPT_TEXT_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === normalized)?.css ??
     PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
+}
+
+function getPPTTextElementInset(element: PPTElement): PPTTextInset {
+  const fallback = element.kind === 'shape'
+    ? PPT_DEFAULT_SHAPE_TEXT_INSET
+    : PPT_DEFAULT_TEXT_BOX_INSET
+  const inset = element.kind === 'shape' || element.kind === 'textBox'
+    ? element.style?.textInset
+    : undefined
+
+  return {
+    bottom: normalizePPTTextInset(inset?.bottom ?? fallback.bottom),
+    left: normalizePPTTextInset(inset?.left ?? fallback.left),
+    right: normalizePPTTextInset(inset?.right ?? fallback.right),
+    top: normalizePPTTextInset(inset?.top ?? fallback.top),
+  }
+}
+
+function parsePPTTextInset(value: string) {
+  return normalizePPTTextInset(Number(value))
+}
+
+function normalizePPTTextInset(value: number) {
+  return clamp(Math.round(Number.isFinite(value) ? value : 0), PPT_TEXT_INSET_MIN, PPT_TEXT_INSET_MAX)
+}
+
+function getPPTTextInsetCSS(inset: PPTTextInset) {
+  return `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`
+}
+
+function formatPPTTextInsetData(inset: PPTTextInset) {
+  return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
 }
 
 function getPPTSelectionCommandAnchor({
@@ -10705,16 +10826,11 @@ function measurePPTTextContentSize(
 }
 
 function getPPTTextMeasurementPadding(element: PPTTextElement) {
-  if (element.kind === 'shape') {
-    return {
-      x: 36,
-      y: 36,
-    }
-  }
+  const inset = getPPTTextElementInset(element)
 
   return {
-    x: 4,
-    y: 4,
+    x: inset.left + inset.right,
+    y: inset.top + inset.bottom,
   }
 }
 

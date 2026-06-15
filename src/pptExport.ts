@@ -45,6 +45,21 @@ const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
 const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
   PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
 )
+type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
+const PPT_TEXT_INSET_MIN = 0
+const PPT_TEXT_INSET_MAX = 120
+const PPT_DEFAULT_TEXT_BOX_INSET = Object.freeze({
+  bottom: 0,
+  left: 0,
+  right: 0,
+  top: 0,
+} as const satisfies PPTTextInset)
+const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
+  bottom: 18,
+  left: 18,
+  right: 18,
+  top: 18,
+} as const satisfies PPTTextInset)
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -239,6 +254,9 @@ function renderPPTElementHTML(element: PPTElement) {
   const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
+  const textInset = getPPTElementTextInset(element)
+  const textInsetAttr = ` data-ppt-text-inset="${escapeHtml(formatPPTTextInsetData(textInset))}"`
+  const textInsetStyle = `padding:${getPPTTextInsetCSS(textInset)}`
   const verticalAlign = getPPTElementTextVerticalAlign(element)
   const verticalAlignAttr = ` data-ppt-vertical-align="${escapeHtml(verticalAlign)}"`
   const verticalAlignStyle = `align-items:${getPPTTextVerticalAlignCSS(verticalAlign)}`
@@ -251,10 +269,10 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -282,7 +300,7 @@ function renderPPTElementSVG(element: PPTElement) {
   const text = renderPPTTextBodySVG({
     body: element.textBody,
     geometry: element.geometry,
-    inset: element.kind === 'shape' ? 18 : 0,
+    inset: getPPTElementTextInset(element),
     style: element.style,
     verticalAlign: getPPTElementTextVerticalAlign(element),
   })
@@ -386,7 +404,7 @@ function renderPPTTextBodySVG({
 }: {
   body: PPTTextBody | undefined
   geometry: PPTElement['geometry']
-  inset: number
+  inset: PPTTextInset
   style: PPTTextStyle | undefined
   verticalAlign: PPTTextVerticalAlign
 }) {
@@ -395,7 +413,7 @@ function renderPPTTextBodySVG({
   }
 
   const fontSize = style?.fontSize ?? 24
-  let y = geometry.y + inset + getPPTTextVerticalAlignOffset({
+  let y = geometry.y + inset.top + getPPTTextVerticalAlignOffset({
     body,
     fontSize,
     geometry,
@@ -423,6 +441,7 @@ function renderPPTTextBodySVG({
       `data-ppt-line-height="${formatNumber(lineHeight)}"`,
       `data-ppt-spacing-after="${formatNumber(spacingAfter)}"`,
       `data-ppt-spacing-before="${formatNumber(spacingBefore)}"`,
+      `data-ppt-text-inset="${escapeHtml(formatPPTTextInsetData(inset))}"`,
       `data-ppt-vertical-align="${escapeHtml(verticalAlign)}"`,
       `x="${formatNumber(x)}"`,
       `y="${formatNumber(y)}"`,
@@ -736,6 +755,12 @@ function getPPTTextVerticalAlignSvgAttr(element: PPTElement) {
     : ''
 }
 
+function getPPTTextInsetSvgAttr(element: PPTElement) {
+  return isPPTElementWithText(element)
+    ? `data-ppt-text-inset="${escapeHtml(formatPPTTextInsetData(getPPTElementTextInset(element)))}"`
+    : ''
+}
+
 function getPPTTextAutoFit(element: PPTElement) {
   if (element.kind === 'textBox') {
     return element.textAutoFit
@@ -758,6 +783,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
       ? `data-ppt-shape="${element.shape}"`
       : '',
     getPPTTextAutoFitSvgAttr(element),
+    getPPTTextInsetSvgAttr(element),
     getPPTTextVerticalAlignSvgAttr(element),
     ...getPPTElementAnimationAttrEntries(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
@@ -939,6 +965,36 @@ function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
     PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
 }
 
+function getPPTElementTextInset(element: PPTElement): PPTTextInset {
+  const fallback = element.kind === 'shape'
+    ? PPT_DEFAULT_SHAPE_TEXT_INSET
+    : PPT_DEFAULT_TEXT_BOX_INSET
+  const inset = element.kind === 'shape' || element.kind === 'textBox'
+    ? element.style?.textInset
+    : undefined
+
+  return {
+    bottom: normalizePPTTextInset(inset?.bottom ?? fallback.bottom),
+    left: normalizePPTTextInset(inset?.left ?? fallback.left),
+    right: normalizePPTTextInset(inset?.right ?? fallback.right),
+    top: normalizePPTTextInset(inset?.top ?? fallback.top),
+  }
+}
+
+function normalizePPTTextInset(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 0
+
+  return Math.min(PPT_TEXT_INSET_MAX, Math.max(PPT_TEXT_INSET_MIN, Math.round(finiteValue)))
+}
+
+function getPPTTextInsetCSS(inset: PPTTextInset) {
+  return `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`
+}
+
+function formatPPTTextInsetData(inset: PPTTextInset) {
+  return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
+}
+
 function getPPTTextVerticalAlignOffset({
   body,
   fontSize,
@@ -949,14 +1005,14 @@ function getPPTTextVerticalAlignOffset({
   body: PPTTextBody
   fontSize: number
   geometry: PPTElement['geometry']
-  inset: number
+  inset: PPTTextInset
   verticalAlign: PPTTextVerticalAlign
 }) {
   if (verticalAlign === 'top') {
     return 0
   }
 
-  const innerHeight = Math.max(0, geometry.h - inset * 2)
+  const innerHeight = Math.max(0, geometry.h - inset.top - inset.bottom)
   const textHeight = getPPTTextBodySVGHeight(body, fontSize)
   const available = Math.max(0, innerHeight - textHeight)
 
@@ -1089,17 +1145,17 @@ function getPPTSvgTextX({
 }: {
   align: 'center' | 'left' | 'right' | undefined
   geometry: PPTElement['geometry']
-  inset: number
+  inset: PPTTextInset
 }) {
   if (align === 'center') {
-    return geometry.x + geometry.w / 2
+    return geometry.x + inset.left + (geometry.w - inset.left - inset.right) / 2
   }
 
   if (align === 'right') {
-    return geometry.x + geometry.w - inset
+    return geometry.x + geometry.w - inset.right
   }
 
-  return geometry.x + inset
+  return geometry.x + inset.left
 }
 
 function getPPTSvgTextAnchor(align: 'center' | 'left' | 'right' | undefined) {
