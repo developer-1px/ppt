@@ -43,6 +43,7 @@ import {
   Moon,
   MoveDown,
   MoveUp,
+  PenLine,
   Play,
   Plus,
   Redo2,
@@ -141,6 +142,7 @@ import {
   type PPTDeck,
   type PPTComment,
   type PPTElement,
+  type PPTFreeform,
   type PPTImage,
   type PPTImageCrop,
   type PPTImageFit,
@@ -474,6 +476,9 @@ type PPTCreationTool =
   | {
       kind: 'comment'
     }
+  | {
+      kind: 'freeform'
+    }
 type PPTFindMatch = {
   elementId: string
   elementIndex: number
@@ -545,6 +550,13 @@ type Interaction =
       slideId: string
       startDeck: PPTDeck
       startPoint: Point
+    }
+  | {
+      elementId: string
+      kind: 'freeform-create'
+      points: Point[]
+      slideId: string
+      startDeck: PPTDeck
     }
   | {
       kind: 'line-route'
@@ -2486,6 +2498,47 @@ function App() {
     return true
   }
 
+  function beginFreeformCreation(
+    event: ReactPointerEvent<HTMLElement>,
+    point: Point,
+  ) {
+    if (creationTool?.kind !== 'freeform') {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const startDeck = deckRef.current
+    const startSlide = findPPTSlide(startDeck, activeSlide.id)
+    const id = createPPTElementId(startSlide, 'freeform')
+    const points = [clampPPTPointToSlide(point)]
+    const element = createPPTFreeformElement({
+      id,
+      name: 'Freeform',
+      points,
+    })
+    const nextDeck = updatePPTDeckSlide(startDeck, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: [...slide.elements, element],
+    }))
+
+    deckRef.current = nextDeck
+    setDeck(nextDeck)
+    setSelection([id])
+    setEditingId(null)
+    setInteraction({
+      elementId: id,
+      kind: 'freeform-create',
+      points,
+      slideId: activeSlide.id,
+      startDeck,
+    })
+
+    return true
+  }
+
   function beginElementCreation(
     event: ReactPointerEvent<HTMLElement>,
     point: Point,
@@ -2540,6 +2593,10 @@ function App() {
     }
 
     if (event.button !== 0) {
+      return
+    }
+
+    if (beginFreeformCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
 
@@ -2663,6 +2720,10 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     const additive = isAdditivePointerInput(event)
     const point = screenToWorld(event.nativeEvent)
+
+    if (beginFreeformCreation(event, point)) {
+      return
+    }
 
     if (lineCreationMode && beginLineCreation(event, point)) {
       return
@@ -2888,6 +2949,32 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'freeform-create') {
+      const points = appendPPTFreeformPoint(interaction.points, point)
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const elements = currentSlide.elements.map((element) =>
+        element.id === interaction.elementId && element.kind === 'freeform'
+          ? createPPTFreeformElement({
+              id: element.id,
+              name: element.name,
+              points,
+              stroke: element.stroke,
+            })
+          : element)
+      const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      setInteraction({
+        ...interaction,
+        points,
+      })
+      return
+    }
+
     if (interaction.kind === 'element-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const elements = currentSlide.elements.map((element) =>
@@ -3089,7 +3176,41 @@ function App() {
       setLineCreationMode(null)
     }
 
-  if (interaction.kind === 'element-create') {
+    if (interaction.kind === 'freeform-create') {
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const created = currentSlide.elements.find((element) =>
+        element.id === interaction.elementId && element.kind === 'freeform')
+
+      if (created?.kind === 'freeform' && getPPTFreeformWorldLength(created) < 8) {
+        const fallbackPoints = [
+          interaction.points[0],
+          {
+            x: Math.min(PPT_SLIDE_WIDTH, interaction.points[0].x + 96),
+            y: Math.min(PPT_SLIDE_HEIGHT, interaction.points[0].y + 36),
+          },
+        ]
+        const elements = currentSlide.elements.map((element) =>
+          element.id === interaction.elementId && element.kind === 'freeform'
+            ? createPPTFreeformElement({
+                id: element.id,
+                name: element.name,
+                points: fallbackPoints,
+                stroke: element.stroke,
+              })
+            : element)
+        const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+          ...slide,
+          elements,
+        }))
+
+        deckRef.current = nextDeck
+        setDeck(nextDeck)
+      }
+
+      setCreationTool(null)
+    }
+
+    if (interaction.kind === 'element-create') {
       setCreationTool(null)
 
       if (interaction.tool.kind === 'text') {
@@ -3386,6 +3507,12 @@ function App() {
     shortcut: CANVAS_TOOL_AFFORDANCES.comment.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.comment.ariaLabel,
   }, {
+    id: 'tool:pen',
+    run: () => activatePPTCreationTool({ kind: 'freeform' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.pen.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.pen.ariaLabel,
+  }, {
     id: 'tool:image',
     run: () => imageInputRef.current?.click(),
     section: 'Create',
@@ -3604,6 +3731,17 @@ function App() {
           </button>
           <button aria-pressed={lineCreationMode === 'arrow'} className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => activateLineCreationMode('arrow')} title="Draw arrow" type="button">
             <ArrowRight size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.pen.ariaLabel}
+            aria-pressed={creationTool?.kind === 'freeform'}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="pen"
+            onClick={() => activatePPTCreationTool({ kind: 'freeform' })}
+            title={CANVAS_TOOL_AFFORDANCES.pen.title}
+            type="button"
+          >
+            <PenLine size={17} />
           </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.comment.ariaLabel}
@@ -4756,6 +4894,9 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-freeform-points={element.kind === 'freeform'
+              ? element.points.length
+              : undefined}
             data-ppt-thumb-comment-resolved={element.kind === 'comment' && element.resolved === true
               ? 'true'
               : undefined}
@@ -4932,6 +5073,9 @@ function PPTElementView({
       data-line-start-connection={element.kind === 'line'
         ? element.startConnection?.elementId
         : undefined}
+      data-ppt-freeform-points={element.kind === 'freeform'
+        ? element.points.length
+        : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
       data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
       data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
@@ -4977,6 +5121,8 @@ function PPTElementView({
         />
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
+      ) : element.kind === 'freeform' ? (
+        <PPTFreeformSvg element={element} />
       ) : element.kind === 'table' ? (
         <PPTTableView element={element} />
       ) : element.kind === 'comment' ? (
@@ -5137,6 +5283,28 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
           y2={element.end.y}
         />
       )}
+    </svg>
+  )
+}
+
+function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${element.geometry.w} ${element.geometry.h}`}
+    >
+      <path
+        data-ppt-freeform-path
+        d={getPPTFreeformPathData(element.points)}
+        fill="none"
+        opacity={element.opacity ?? 1}
+        stroke={element.stroke.color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={element.stroke.width}
+      />
     </svg>
   )
 }
@@ -5986,6 +6154,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
 
   if (
     element.kind === 'comment' ||
+    element.kind === 'freeform' ||
     element.kind === 'image' ||
     element.kind === 'line' ||
     element.kind === 'table'
@@ -6472,6 +6641,14 @@ function createPPTElementFromCreationTool({
     })
   }
 
+  if (tool.kind === 'freeform') {
+    return createPPTFreeformElement({
+      id,
+      name: 'Freeform',
+      points: [start, current],
+    })
+  }
+
   return createCanvasShape({
     adapter: PPT_CANVAS_CREATION_ADAPTER,
     createId: () => id,
@@ -6611,6 +6788,10 @@ function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | 
 
   if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.comment.keyboardShortcut)) {
     return { kind: 'comment' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pen.keyboardShortcut)) {
+    return { kind: 'freeform' }
   }
 
   return null
@@ -7004,6 +7185,130 @@ function getPPTLinePath(line: PPTLine) {
     `L ${bendX} ${line.end.y}`,
     `L ${line.end.x} ${line.end.y}`,
   ].join(' ')
+}
+
+function createPPTFreeformElement({
+  id,
+  name,
+  points,
+  stroke = { color: '#2563eb', width: 5 },
+}: {
+  id: string
+  name: string
+  points: Point[]
+  stroke?: PPTFreeform['stroke']
+}): PPTFreeform {
+  const normalized = normalizePPTFreeformWorldPoints(points)
+
+  return {
+    geometry: normalized.geometry,
+    id,
+    kind: 'freeform',
+    name,
+    opacity: 1,
+    points: normalized.points,
+    stroke,
+  }
+}
+
+function normalizePPTFreeformWorldPoints(points: Point[]) {
+  const safePoints = points.length > 0
+    ? points.map(clampPPTPointToSlide)
+    : [{ x: PPT_SLIDE_WIDTH / 2, y: PPT_SLIDE_HEIGHT / 2 }]
+  const left = Math.min(...safePoints.map((point) => point.x))
+  const top = Math.min(...safePoints.map((point) => point.y))
+  const right = Math.max(...safePoints.map((point) => point.x))
+  const bottom = Math.max(...safePoints.map((point) => point.y))
+  const padding = 8
+  const rawWidth = right - left
+  const rawHeight = bottom - top
+  const width = Math.max(16, rawWidth + padding * 2)
+  const height = Math.max(16, rawHeight + padding * 2)
+  const x = clamp(left - Math.max(padding, (width - rawWidth) / 2), 0, PPT_SLIDE_WIDTH - width)
+  const y = clamp(top - Math.max(padding, (height - rawHeight) / 2), 0, PPT_SLIDE_HEIGHT - height)
+
+  return {
+    geometry: {
+      h: height,
+      w: width,
+      x,
+      y,
+    },
+    points: safePoints.map((point) => ({
+      x: point.x - x,
+      y: point.y - y,
+    })),
+  }
+}
+
+function appendPPTFreeformPoint(points: Point[], point: Point) {
+  const next = clampPPTPointToSlide(point)
+  const last = points.at(-1)
+
+  if (last && getPointDistance(last, next) < 2) {
+    return points
+  }
+
+  return [...points, next]
+}
+
+function clampPPTPointToSlide(point: Point) {
+  return {
+    x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
+    y: clamp(point.y, 0, PPT_SLIDE_HEIGHT),
+  }
+}
+
+function getPPTFreeformWorldLength(element: PPTFreeform) {
+  const points = getPPTFreeformWorldPoints(element)
+
+  return points.slice(1).reduce((length, point, index) =>
+    length + getPointDistance(points[index], point), 0)
+}
+
+function getPPTFreeformWorldPoints(element: PPTFreeform) {
+  return element.points.map((point) => ({
+    x: element.geometry.x + point.x,
+    y: element.geometry.y + point.y,
+  }))
+}
+
+function getPPTFreeformPathData(points: readonly Point[]) {
+  const [first, second, ...rest] = points
+
+  if (!first) {
+    return ''
+  }
+
+  if (!second) {
+    return `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`
+  }
+
+  if (rest.length === 0) {
+    return [
+      `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
+      `L ${formatPPTPathNumber(second.x)} ${formatPPTPathNumber(second.y)}`,
+    ].join(' ')
+  }
+
+  return [
+    `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
+    `Q ${formatPPTPathNumber(second.x)} ${formatPPTPathNumber(second.y)} ${getPPTPathMidpoint(second, rest[0])}`,
+    ...rest.slice(1).map((point, index) => {
+      const control = rest[index]
+
+      return `Q ${formatPPTPathNumber(control.x)} ${formatPPTPathNumber(control.y)} ${getPPTPathMidpoint(control, point)}`
+    }),
+    `L ${formatPPTPathNumber(rest[rest.length - 1].x)} ${formatPPTPathNumber(rest[rest.length - 1].y)}`,
+  ].join(' ')
+}
+
+function getPPTPathMidpoint(a: Point, b: Point) {
+  return `${formatPPTPathNumber((a.x + b.x) / 2)} ${formatPPTPathNumber((a.y + b.y) / 2)}`
+}
+
+function formatPPTPathNumber(value: number) {
+  return Number(value.toFixed(2))
 }
 
 function createPPTLineElement({
@@ -7549,6 +7854,10 @@ function getPPTThumbElementClassName(element: PPTElement) {
 
   if (element.kind === 'line') {
     return 'ppt-thumb-line'
+  }
+
+  if (element.kind === 'freeform') {
+    return 'ppt-thumb-freeform'
   }
 
   if (element.kind === 'table') {

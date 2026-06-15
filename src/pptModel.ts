@@ -112,6 +112,13 @@ const PPTLineSchema = PPTElementBaseSchema.extend({
   stroke: PPTStrokeSchema,
 })
 
+const PPTFreeformSchema = PPTElementBaseSchema.extend({
+  kind: z.literal('freeform'),
+  opacity: z.number().optional(),
+  points: z.array(PPTLinePointSchema).min(1),
+  stroke: PPTStrokeSchema,
+})
+
 const PPTTableSchema = PPTElementBaseSchema.extend({
   kind: z.literal('table'),
   rows: z.array(z.array(z.string())),
@@ -138,6 +145,7 @@ export const PPTElementSchema = z.discriminatedUnion('kind', [
   PPTShapeSchema,
   PPTImageSchema,
   PPTLineSchema,
+  PPTFreeformSchema,
   PPTTableSchema,
   PPTCommentSchema,
 ])
@@ -179,6 +187,7 @@ export type PPTLineConnection = z.infer<typeof PPTLineConnectionSchema>
 export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
+export type PPTFreeform = z.infer<typeof PPTFreeformSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
 export type PPTComment = z.infer<typeof PPTCommentSchema>
 export type PPTCommentThreadMessage = z.infer<typeof PPTCommentThreadMessageSchema>
@@ -257,9 +266,20 @@ export function updatePPTElementGeometry(
   element: PPTElement,
   geometry: PPTGeometry,
 ): PPTElement {
-  if (element.kind === 'line') {
+  if (element.kind === 'line' || element.kind === 'freeform') {
     const scaleX = element.geometry.w === 0 ? 1 : geometry.w / element.geometry.w
     const scaleY = element.geometry.h === 0 ? 1 : geometry.h / element.geometry.h
+
+    if (element.kind === 'freeform') {
+      return {
+        ...element,
+        geometry,
+        points: element.points.map((point) => ({
+          x: point.x * scaleX,
+          y: point.y * scaleY,
+        })),
+      }
+    }
 
     return {
       ...element,

@@ -591,6 +591,7 @@
 
 .ppt-thumb-image,
 .ppt-thumb-comment,
+.ppt-thumb-freeform,
 .ppt-thumb-line,
 .ppt-thumb-shape,
 .ppt-thumb-table,
@@ -667,6 +668,20 @@
   border-left: 7px solid #111827;
   content: '';
   transform: translateY(-3px);
+}
+
+.ppt-thumb-freeform {
+  border: 2px solid transparent;
+}
+
+.ppt-thumb-freeform::before {
+  position: absolute;
+  inset: 18% 4% 24%;
+  border-bottom: 3px solid #2563eb;
+  border-left: 3px solid #2563eb;
+  border-radius: 60% 0 54% 34%;
+  content: '';
+  transform: rotate(-10deg);
 }
 
 .ppt-thumb-name {
@@ -753,10 +768,12 @@
   pointer-events: none;
 }
 
+.ppt-element[data-kind='freeform'],
 .ppt-element[data-kind='line'] {
   overflow: visible;
 }
 
+.ppt-element[data-kind='freeform'] svg,
 .ppt-element[data-kind='line'] svg {
   width: 100%;
   height: 100%;

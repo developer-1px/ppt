@@ -4,6 +4,7 @@ import {
   type PPTComment,
   type PPTDeck,
   type PPTElement,
+  type PPTFreeform,
   type PPTImage,
   type PPTLine,
   type PPTLinePoint,
@@ -159,6 +160,10 @@ function renderPPTElementHTML(element: PPTElement) {
     return renderPPTLineHTML(element, style)
   }
 
+  if (element.kind === 'freeform') {
+    return renderPPTFreeformHTML(element, style)
+  }
+
   if (element.kind === 'table') {
     return renderPPTTableHTML(element, style, transformAttrs)
   }
@@ -189,6 +194,10 @@ function renderPPTElementSVG(element: PPTElement) {
 
   if (element.kind === 'line') {
     return renderPPTLineSVG(element)
+  }
+
+  if (element.kind === 'freeform') {
+    return renderPPTFreeformSVG(element)
   }
 
   if (element.kind === 'table') {
@@ -375,6 +384,7 @@ function exportCSS() {
     `.ppt-slide{position:relative;width:${PPT_SLIDE_WIDTH}px;height:${PPT_SLIDE_HEIGHT}px;overflow:hidden;background:#fff;break-after:page;}`,
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
+    '.ppt-freeform{display:block;overflow:visible;padding:0;}',
     '.ppt-line{display:block;overflow:visible;padding:0;}',
     '.ppt-comment{display:grid;grid-template-rows:auto minmax(0,1fr);padding:0;border:1px solid #d97706;border-radius:8px;background:#fffbeb;color:#78350f;box-shadow:0 10px 22px rgb(120 53 15 / 18%);}',
     '.ppt-comment[data-ppt-comment-resolved="true"]{opacity:.62;}',
@@ -468,6 +478,25 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
   ].filter(Boolean).join(' ')
 
   return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+}
+
+function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
+  const attrs = [
+    `data-ppt-element="${escapeHtml(element.id)}"`,
+    `data-ppt-kind="freeform"`,
+    `data-ppt-freeform-points="${element.points.length}"`,
+  ].join(' ')
+
+  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${formatNumber(element.opacity ?? 1)}"></path></svg>`
+}
+
+function renderPPTFreeformSVG(element: PPTFreeform) {
+  const attrs = [
+    getPPTElementSVGAttrs(element),
+    `data-ppt-freeform-points="${element.points.length}"`,
+  ].join(' ')
+
+  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round" opacity="${formatNumber(element.opacity ?? 1)}"></path></g>`
 }
 
 function renderPPTCommentHTML(
@@ -679,6 +708,47 @@ function getPPTLineSVGPath(element: PPTLine) {
     `L ${formatNumber(points[2].x)} ${formatNumber(points[2].y)}`,
     `L ${formatNumber(points[3].x)} ${formatNumber(points[3].y)}`,
   ].join(' ')
+}
+
+function getPPTFreeformWorldPathData(element: PPTFreeform) {
+  return getPPTFreeformPathData(element.points.map((point) => ({
+    x: element.geometry.x + point.x,
+    y: element.geometry.y + point.y,
+  })))
+}
+
+function getPPTFreeformPathData(points: readonly PPTLinePoint[]) {
+  const [first, second, ...rest] = points
+
+  if (!first) {
+    return ''
+  }
+
+  if (!second) {
+    return `M ${formatNumber(first.x)} ${formatNumber(first.y)}`
+  }
+
+  if (rest.length === 0) {
+    return [
+      `M ${formatNumber(first.x)} ${formatNumber(first.y)}`,
+      `L ${formatNumber(second.x)} ${formatNumber(second.y)}`,
+    ].join(' ')
+  }
+
+  return [
+    `M ${formatNumber(first.x)} ${formatNumber(first.y)}`,
+    `Q ${formatNumber(second.x)} ${formatNumber(second.y)} ${getPPTPathMidpoint(second, rest[0])}`,
+    ...rest.slice(1).map((point, index) => {
+      const control = rest[index]
+
+      return `Q ${formatNumber(control.x)} ${formatNumber(control.y)} ${getPPTPathMidpoint(control, point)}`
+    }),
+    `L ${formatNumber(rest[rest.length - 1].x)} ${formatNumber(rest[rest.length - 1].y)}`,
+  ].join(' ')
+}
+
+function getPPTPathMidpoint(a: PPTLinePoint, b: PPTLinePoint) {
+  return `${formatNumber((a.x + b.x) / 2)} ${formatNumber((a.y + b.y) / 2)}`
 }
 
 function getPPTLineWorldPoint(line: PPTLine, point: PPTLinePoint) {

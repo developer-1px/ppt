@@ -49,6 +49,7 @@ try {
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
+  await runFreeformScenario(page)
   await runImageImportScenario(page)
   await runTableImportScenario(page)
   await runCommentReviewScenario(page)
@@ -1502,7 +1503,9 @@ async function runCommandPaletteScenario(page) {
   const presentIds = await readCommandPaletteIds(page, 'present')
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
-    hasCreate: toolIds.includes('tool:text') && toolIds.includes('tool:arrow'),
+    hasCreate: toolIds.includes('tool:text') &&
+      toolIds.includes('tool:arrow') &&
+      toolIds.includes('tool:pen'),
     hasFind: findIds.includes('view:find'),
     hasFlip: flipIds.includes('command:flip-horizontal') &&
       flipIds.includes('command:flip-vertical'),
@@ -2154,6 +2157,8 @@ async function runExportScenario(page) {
       hasImageFlipMarkup: code.includes('data-ppt-flip-h="true"') && code.includes('scaleX(-1)'),
       hasImageFlipModel: code.includes('"flipH": true'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
+      hasFreeformMarkup: code.includes('class="ppt-element ppt-freeform"') && code.includes('data-ppt-kind="freeform"') && code.includes('data-ppt-freeform-path'),
+      hasFreeformModel: code.includes('"kind": "freeform"') && code.includes('"points"') && code.includes('"stroke"'),
       hasLineConnectionMarkup: code.includes('data-ppt-start-connection="'),
       hasLineConnectionModel: code.includes('"startConnection"') && code.includes('"anchor"'),
       hasLineMarkup: code.includes('class="ppt-element ppt-line"') && code.includes('<line '),
@@ -2183,6 +2188,7 @@ async function runExportScenario(page) {
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
   record('exports PPT image crop position markup and model data', state.hasImageCropMarkup && state.hasImageCropModel, state)
   record('exports PPT image flip markup and model data', state.hasImageFlipMarkup && state.hasImageFlipModel, state)
+  record('exports PPT freeform path markup and model data', state.hasFreeformMarkup && state.hasFreeformModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
@@ -2203,6 +2209,7 @@ async function runExportScenario(page) {
       download: download.download ?? '',
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
+      hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
       hasLine: text.includes('data-ppt-kind="line"') && (text.includes('<line ') || text.includes('data-ppt-line-path')),
       hasScope: text.includes('data-ppt-svg-scope="slide"'),
@@ -2217,7 +2224,7 @@ async function runExportScenario(page) {
   })()`)
 
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
-  record('exports PPT image/shape/text/line/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
+  record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
@@ -3196,6 +3203,272 @@ async function runLineAffordanceScenario(page) {
   })
 }
 
+async function runFreeformScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const before = await getPPTFreeformState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-tool="pen"]')?.click()`)
+  await delay(40)
+
+  const draw = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      midX: slide.left + slide.width * 0.47,
+      midY: slide.top + slide.height * 0.21,
+      pressed: document.querySelector('[data-ppt-insert-tool="pen"]')?.getAttribute('aria-pressed') ?? '',
+      startX: slide.left + slide.width * 0.33,
+      startY: slide.top + slide.height * 0.28,
+      endX: slide.left + slide.width * 0.58,
+      endY: slide.top + slide.height * 0.31,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: draw.startX,
+    y: draw.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: draw.midX,
+    y: draw.midY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: draw.endX,
+    y: draw.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: draw.endX,
+    y: draw.endY,
+  })
+  await delay(100)
+
+  const afterCreate = await getPPTFreeformState(page)
+
+  record('draws PPT freeform path from toolbar pen tool', draw.pressed === 'true' && afterCreate.freeformCount === before.freeformCount + 1 && afterCreate.selectedKind === 'freeform' && afterCreate.pathD.includes('M ') && afterCreate.pointCount >= 2 && afterCreate.thumbFreeformCount === before.thumbFreeformCount + 1, {
+    afterCreate,
+    before,
+    draw,
+  })
+
+  const freeformId = afterCreate.selectedId
+  const beforeMovePoint = await getElementCenter(page, freeformId)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeMovePoint.x,
+    y: beforeMovePoint.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeMovePoint.x + 46,
+    y: beforeMovePoint.y + 28,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeMovePoint.x + 46,
+    y: beforeMovePoint.y + 28,
+  })
+  await delay(100)
+
+  const afterMove = await getPPTFreeformState(page)
+
+  record('moves PPT freeform path with existing selection transform flow', afterMove.selectedId === freeformId && afterMove.selectedKind === 'freeform' && afterMove.selectedLeft !== afterCreate.selectedLeft && afterMove.selectedTop !== afterCreate.selectedTop, {
+    afterCreate,
+    afterMove,
+  })
+
+  const beforeResize = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+      pathD: selected?.querySelector('[data-ppt-freeform-path]')?.getAttribute('d') ?? '',
+      width: parseFloat(selected?.style.width ?? '0'),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeResize.handleX,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeResize.handleX + 52,
+    y: beforeResize.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeResize.handleX + 52,
+    y: beforeResize.handleY,
+  })
+  await delay(100)
+
+  const afterResize = await getPPTFreeformState(page)
+
+  record('resizes PPT freeform path with existing handles', afterResize.selectedKind === 'freeform' && afterResize.selectedWidth > beforeResize.width && afterResize.pathD !== beforeResize.pathD, {
+    afterResize,
+    beforeResize,
+  })
+
+  const beforeRotate = await page.eval(`(() => {
+    const handle = document.querySelector('.ppt-rotate-handle').getBoundingClientRect()
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+      rotation: selected?.getAttribute('data-rotation') ?? '',
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeRotate.handleX,
+    y: beforeRotate.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeRotate.handleX + 42,
+    y: beforeRotate.handleY - 26,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeRotate.handleX + 42,
+    y: beforeRotate.handleY - 26,
+  })
+  await delay(100)
+
+  const afterRotate = await getPPTFreeformState(page)
+
+  record('rotates PPT freeform path with existing rotation handle', afterRotate.selectedKind === 'freeform' && afterRotate.selectedRotation !== beforeRotate.rotation && afterRotate.selectedTransform.includes('rotate'), {
+    afterRotate,
+    beforeRotate,
+  })
+
+  await pressKey(page, {
+    code: 'KeyD',
+    key: 'd',
+    modifiers: 2,
+    windowsVirtualKeyCode: 68,
+  })
+  await delay(120)
+
+  const afterDuplicate = await getPPTFreeformState(page)
+
+  record('duplicates PPT freeform path through existing command flow', afterDuplicate.freeformCount === afterResize.freeformCount + 1 && afterDuplicate.selectedKind === 'freeform' && afterDuplicate.selectedId !== freeformId, {
+    afterDuplicate,
+    afterResize,
+  })
+
+  await pressKey(page, {
+    code: 'Delete',
+    key: 'Delete',
+    windowsVirtualKeyCode: 46,
+  })
+  await delay(120)
+
+  const afterDelete = await getPPTFreeformState(page)
+
+  record('deletes PPT freeform path through existing command flow', afterDelete.freeformCount === afterResize.freeformCount, {
+    afterDelete,
+    afterDuplicate,
+    afterResize,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(60)
+  await pressKey(page, {
+    code: 'KeyP',
+    key: 'P',
+    modifiers: 8,
+    windowsVirtualKeyCode: 80,
+  })
+  await delay(80)
+
+  const afterShortcut = await getPPTFreeformState(page)
+
+  record('starts PPT pen tool from canvas Shift+P shortcut', afterShortcut.creationTool === 'freeform' && afterShortcut.toolbarPressed === 'true', afterShortcut)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(60)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'pen' })
+  await delay(80)
+
+  const beforePalette = await getPPTFreeformState(page)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPalette = await getPPTFreeformState(page)
+
+  record('starts PPT pen tool from command palette', beforePalette.paletteOpen && beforePalette.palettePen && afterPalette.creationTool === 'freeform' && !afterPalette.paletteOpen, {
+    afterPalette,
+    beforePalette,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(60)
+}
+
 async function runFlipSelectionScenario(page) {
   const shapeIds = ['s1-card-1', 's1-card-2']
 
@@ -3907,6 +4180,31 @@ function getPPTLineState(page, elementId = null) {
       worldX2: left + x2,
       worldY1: top + y1,
       worldY2: top + y2,
+    }
+  })()`)
+}
+
+function getPPTFreeformState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedPath = selected?.querySelector('[data-ppt-freeform-path]') ?? null
+
+    return {
+      creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+      freeformCount: document.querySelectorAll('[data-kind="freeform"]').length,
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      palettePen: !!document.querySelector('[data-ppt-command-palette-item="tool:pen"]'),
+      pathD: selectedPath?.getAttribute('d') ?? '',
+      pointCount: Number(selected?.getAttribute('data-ppt-freeform-points') ?? 0),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedRotation: selected?.getAttribute('data-rotation') ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedTransform: selected?.style.transform ?? '',
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      thumbFreeformCount: document.querySelectorAll('.ppt-thumb-freeform').length,
+      toolbarPressed: document.querySelector('[data-ppt-insert-tool="pen"]')?.getAttribute('aria-pressed') ?? '',
     }
   })()`)
 }
