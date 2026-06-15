@@ -36,6 +36,7 @@ import {
   List,
   Lock,
   Maximize2,
+  MessageSquare,
   Minus,
   Moon,
   MoveDown,
@@ -135,6 +136,7 @@ import {
   updatePPTDeckElement,
   updatePPTDeckSlide,
   type PPTDeck,
+  type PPTComment,
   type PPTElement,
   type PPTImage,
   type PPTImageCrop,
@@ -437,6 +439,14 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
 const PPT_TIDY_GAP = 24
+const PPT_COMMENT_DEFAULT_BODY = 'Comment'
+const PPT_COMMENT_DEFAULT_AUTHOR = 'You'
+const PPT_COMMENT_DEFAULT_CREATED_AT = 'Just now'
+const PPT_COMMENT_BODY_MAX_LENGTH = 240
+const PPT_COMMENT_BOUNDS = {
+  h: 132,
+  w: 260,
+}
 const PPT_DEFAULT_TEXT_BOUNDS = {
   h: 76,
   w: 360,
@@ -454,6 +464,9 @@ type PPTCreationTool =
     }
   | {
       kind: 'text'
+    }
+  | {
+      kind: 'comment'
     }
 type PPTFindMatch = {
   elementId: string
@@ -2021,6 +2034,36 @@ function App() {
     )
   }
 
+  function updateCommentBody(
+    elementId: string,
+    value: string,
+  ) {
+    const body = normalizePPTCommentBody(value)
+
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
+        element.kind === 'comment'
+          ? {
+              ...element,
+              body,
+              thread: getPPTCommentThreadWithBody(element, body),
+            }
+          : element),
+    )
+  }
+
+  function updateCommentResolved(
+    elementId: string,
+    resolved: boolean,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
+        element.kind === 'comment'
+          ? { ...element, resolved }
+          : element),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -2349,7 +2392,7 @@ function App() {
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
     const id = createPPTElementId(
       startSlide,
-      creationTool.kind === 'text' ? 'text' : creationTool.shape,
+      getPPTCreationToolIdPrefix(creationTool),
     )
     const element = createPPTElementFromCreationTool({
       current: point,
@@ -2936,7 +2979,7 @@ function App() {
       setLineCreationMode(null)
     }
 
-    if (interaction.kind === 'element-create') {
+  if (interaction.kind === 'element-create') {
       setCreationTool(null)
 
       if (interaction.tool.kind === 'text') {
@@ -3227,6 +3270,12 @@ function App() {
     shortcut: CANVAS_TOOL_AFFORDANCES.arrow.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel,
   }, {
+    id: 'tool:comment',
+    run: () => activatePPTCreationTool({ kind: 'comment' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.comment.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.comment.ariaLabel,
+  }, {
     id: 'tool:image',
     run: () => imageInputRef.current?.click(),
     section: 'Create',
@@ -3430,6 +3479,18 @@ function App() {
           </button>
           <button aria-pressed={lineCreationMode === 'arrow'} className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => activateLineCreationMode('arrow')} title="Draw arrow" type="button">
             <ArrowRight size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.comment.ariaLabel}
+            aria-pressed={creationTool?.kind === 'comment'}
+            className="ppt-icon-button"
+            data-ppt-insert-comment
+            data-ppt-insert-tool="comment"
+            onClick={() => activatePPTCreationTool({ kind: 'comment' })}
+            title={CANVAS_TOOL_AFFORDANCES.comment.title}
+            type="button"
+          >
+            <MessageSquare size={17} />
           </button>
           <button className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
             <ImagePlus size={17} />
@@ -3704,6 +3765,8 @@ function App() {
         selection={selection}
         selectedElement={selectedElement}
         slide={activeSlide}
+        onCommentBodyChange={updateCommentBody}
+        onCommentResolvedChange={updateCommentResolved}
         onCommitText={commitText}
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
@@ -4414,6 +4477,9 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-thumb-comment-resolved={element.kind === 'comment' && element.resolved === true
+              ? 'true'
+              : undefined}
             data-ppt-thumb-table-cols={element.kind === 'table'
               ? getPPTTableColumnCount(element.rows)
               : undefined}
@@ -4443,9 +4509,11 @@ function SlideThumb({
                   ? undefined
                   : element.kind === 'table'
                     ? '#f8fafc'
-                    : element.kind === 'textBox'
-                      ? '#cbd5e1'
-                      : undefined,
+                    : element.kind === 'comment'
+                      ? '#fef3c7'
+                      : element.kind === 'textBox'
+                        ? '#cbd5e1'
+                        : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
                 : undefined,
@@ -4515,6 +4583,9 @@ function PPTElementView({
       data-hovered={hovered ? 'true' : 'false'}
       data-group-id={element.groupId}
       data-kind={element.kind}
+      data-ppt-comment-resolved={element.kind === 'comment' && element.resolved === true
+        ? 'true'
+        : undefined}
       data-line-end-connection={element.kind === 'line'
         ? element.endConnection?.elementId
         : undefined}
@@ -4581,6 +4652,8 @@ function PPTElementView({
         <PPTLineSvg element={element} />
       ) : element.kind === 'table' ? (
         <PPTTableView element={element} />
+      ) : element.kind === 'comment' ? (
+        <PPTCommentView element={element} />
       ) : (
         <div
           className="ppt-element-editor"
@@ -4607,6 +4680,26 @@ function PPTElementView({
           {editing || !textBody ? text : <PPTTextBodyView body={textBody} />}
         </div>
       )}
+    </div>
+  )
+}
+
+function PPTCommentView({ element }: { element: PPTComment }) {
+  const author = element.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR
+  const createdAt = element.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT
+
+  return (
+    <div
+      className="ppt-comment-card"
+      data-ppt-comment-card
+      data-ppt-comment-resolved={element.resolved === true ? 'true' : undefined}
+    >
+      <div className="ppt-comment-meta">
+        <MessageSquare size={15} />
+        <span data-ppt-comment-author>{author}</span>
+        <span data-ppt-comment-created>{createdAt}</span>
+      </div>
+      <p data-ppt-comment-body>{element.body || PPT_COMMENT_DEFAULT_BODY}</p>
     </div>
   )
 }
@@ -4951,6 +5044,8 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
 
 function Inspector({
   exportCode,
+  onCommentBodyChange,
+  onCommentResolvedChange,
   onCommitText,
   onCopyHTML,
   onDownloadHTML,
@@ -4979,6 +5074,8 @@ function Inspector({
   slide,
 }: {
   exportCode: string
+  onCommentBodyChange: (elementId: string, value: string) => void
+  onCommentResolvedChange: (elementId: string, resolved: boolean) => void
   onCommitText: (elementId: string, text: string) => void
   onCopyHTML: () => void
   onDownloadHTML: () => void
@@ -5327,6 +5424,30 @@ function Inspector({
                 </span>
               </>
             ) : null}
+            {selectedElement.kind === 'comment' ? (
+              <>
+                <label className="ppt-field">
+                  <span>Comment</span>
+                  <textarea
+                    data-ppt-style-field="comment-body"
+                    maxLength={PPT_COMMENT_BODY_MAX_LENGTH}
+                    value={selectedElement.body}
+                    onChange={(event) =>
+                      onCommentBodyChange(selectedElement.id, event.target.value)}
+                  />
+                </label>
+                <label className="ppt-checkbox-field">
+                  <input
+                    checked={selectedElement.resolved === true}
+                    data-ppt-style-field="comment-resolved"
+                    type="checkbox"
+                    onChange={(event) =>
+                      onCommentResolvedChange(selectedElement.id, event.target.checked)}
+                  />
+                  <span>Resolved</span>
+                </label>
+              </>
+            ) : null}
             {selectedElement.kind === 'line' ? (
               <>
                 <div className="ppt-geometry-grid">
@@ -5510,7 +5631,12 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     width: element.geometry.w,
   }
 
-  if (element.kind === 'image' || element.kind === 'line' || element.kind === 'table') {
+  if (
+    element.kind === 'comment' ||
+    element.kind === 'image' ||
+    element.kind === 'line' ||
+    element.kind === 'table'
+  ) {
     return base
   }
 
@@ -5986,6 +6112,13 @@ function createPPTElementFromCreationTool({
     }
   }
 
+  if (tool.kind === 'comment') {
+    return createPPTCommentElement({
+      id,
+      point: start,
+    })
+  }
+
   return createCanvasShape({
     adapter: PPT_CANVAS_CREATION_ADAPTER,
     createId: () => id,
@@ -5993,6 +6126,36 @@ function createPPTElementFromCreationTool({
     shapeType: tool.shape,
     startWorld: start,
   })
+}
+
+function createPPTCommentElement({
+  id,
+  point,
+}: {
+  id: string
+  point: Point
+}): PPTComment {
+  const body = PPT_COMMENT_DEFAULT_BODY
+
+  return {
+    authorName: PPT_COMMENT_DEFAULT_AUTHOR,
+    body,
+    createdAt: PPT_COMMENT_DEFAULT_CREATED_AT,
+    geometry: clampPPTCreationBounds({
+      ...PPT_COMMENT_BOUNDS,
+      x: point.x,
+      y: point.y,
+    }),
+    id,
+    kind: 'comment',
+    name: 'Comment',
+    thread: [{
+      authorName: PPT_COMMENT_DEFAULT_AUTHOR,
+      body,
+      createdAt: PPT_COMMENT_DEFAULT_CREATED_AT,
+      id: `${id}:message-1`,
+    }],
+  }
 }
 
 function createPPTTextElement({
@@ -6093,6 +6256,10 @@ function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | 
     return { kind: 'shape', shape: 'ellipse' }
   }
 
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.comment.keyboardShortcut)) {
+    return { kind: 'comment' }
+  }
+
   return null
 }
 
@@ -6122,8 +6289,15 @@ function arePPTCreationToolsEqual(
   left: PPTCreationTool | null,
   right: PPTCreationTool,
 ) {
-  return left?.kind === right.kind &&
-    (left.kind === 'text' || right.kind === 'text' || left.shape === right.shape)
+  if (!left || left.kind !== right.kind) {
+    return false
+  }
+
+  if (left.kind === 'shape' && right.kind === 'shape') {
+    return left.shape === right.shape
+  }
+
+  return true
 }
 
 function isPPTShapeCreationTool(
@@ -6138,7 +6312,15 @@ function getPPTCreationToolDataValue(tool: PPTCreationTool | null) {
     return undefined
   }
 
-  return tool.kind === 'text' ? 'text' : tool.shape
+  return getPPTCreationToolIdPrefix(tool)
+}
+
+function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
+  if (tool.kind === 'shape') {
+    return tool.shape
+  }
+
+  return tool.kind
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {
@@ -6882,6 +7064,30 @@ function createPPTSlideId(deck: PPTDeck) {
   return id
 }
 
+function normalizePPTCommentBody(value: string) {
+  return value.slice(0, PPT_COMMENT_BODY_MAX_LENGTH)
+}
+
+function getPPTCommentThreadWithBody(
+  comment: PPTComment,
+  body: string,
+): PPTComment['thread'] {
+  const thread = comment.thread && comment.thread.length > 0
+    ? comment.thread
+    : [{
+        authorName: comment.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR,
+        body: comment.body,
+        createdAt: comment.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT,
+        id: `${comment.id}:message-1`,
+      }]
+  const [first, ...rest] = thread
+
+  return [{
+    ...first,
+    body,
+  }, ...rest]
+}
+
 function clonePPTSlide(slide: PPTSlide, id: string): PPTSlide {
   return {
     ...slide,
@@ -6937,6 +7143,10 @@ function getPPTThumbElementClassName(element: PPTElement) {
 
   if (element.kind === 'table') {
     return 'ppt-thumb-table'
+  }
+
+  if (element.kind === 'comment') {
+    return 'ppt-thumb-comment'
   }
 
   return 'ppt-thumb-shape'

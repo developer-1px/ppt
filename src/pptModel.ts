@@ -113,12 +113,29 @@ const PPTTableSchema = PPTElementBaseSchema.extend({
   rows: z.array(z.array(z.string())),
 })
 
+const PPTCommentThreadMessageSchema = z.object({
+  authorName: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  id: z.string(),
+})
+
+const PPTCommentSchema = PPTElementBaseSchema.extend({
+  authorName: z.string().optional(),
+  body: z.string(),
+  createdAt: z.string().optional(),
+  kind: z.literal('comment'),
+  resolved: z.boolean().optional(),
+  thread: z.array(PPTCommentThreadMessageSchema).optional(),
+})
+
 export const PPTElementSchema = z.discriminatedUnion('kind', [
   PPTTextBoxSchema,
   PPTShapeSchema,
   PPTImageSchema,
   PPTLineSchema,
   PPTTableSchema,
+  PPTCommentSchema,
 ])
 
 export const PPTSlideSchema = z.object({
@@ -158,6 +175,8 @@ export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
+export type PPTComment = z.infer<typeof PPTCommentSchema>
+export type PPTCommentThreadMessage = z.infer<typeof PPTCommentThreadMessageSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
 export type PPTTextElement = PPTTextBox | (PPTShape & { textBody: PPTTextBody })
 export type PPTSlide = z.infer<typeof PPTSlideSchema>

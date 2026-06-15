@@ -516,6 +516,7 @@
 }
 
 .ppt-thumb-image,
+.ppt-thumb-comment,
 .ppt-thumb-line,
 .ppt-thumb-shape,
 .ppt-thumb-table,
@@ -532,6 +533,15 @@
 
 .ppt-thumb-text {
   background: #cbd5e1;
+}
+
+.ppt-thumb-comment {
+  border: 1px solid #d97706;
+  background: #fef3c7;
+}
+
+.ppt-thumb-comment[data-ppt-thumb-comment-resolved='true'] {
+  opacity: 0.56;
 }
 
 .ppt-thumb-table {
@@ -683,6 +693,60 @@
 .ppt-element[data-kind='table'] {
   border: 1px solid #94a3b8;
   background: #fff;
+}
+
+.ppt-element[data-kind='comment'] {
+  overflow: visible;
+}
+
+.ppt-comment-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #d97706;
+  border-radius: 8px;
+  background: #fffbeb;
+  box-shadow: 0 10px 22px rgb(120 53 15 / 18%);
+  color: #78350f;
+}
+
+.ppt-comment-card[data-ppt-comment-resolved='true'] {
+  opacity: 0.62;
+}
+
+.ppt-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ppt-comment-meta [data-ppt-comment-created] {
+  margin-left: auto;
+  overflow: hidden;
+  color: #b45309;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-comment-card p {
+  min-width: 0;
+  margin: 0;
+  padding: 9px 10px 12px;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.22;
+  white-space: pre-wrap;
 }
 
 .ppt-table-grid {
@@ -956,6 +1020,21 @@
   min-height: 92px;
   padding: 9px;
   resize: vertical;
+}
+
+.ppt-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ppt-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 .ppt-geometry-grid {

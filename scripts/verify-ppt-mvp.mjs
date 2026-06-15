@@ -51,6 +51,7 @@ try {
   await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
   await runTableImportScenario(page)
+  await runCommentReviewScenario(page)
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
   await runExportScenario(page)
@@ -2136,6 +2137,8 @@ async function runExportScenario(page) {
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
       hasBulletMarkup: code.includes('data-ppt-bullet-list="true"') && code.includes('data-ppt-bullet="true"'),
       hasBulletModel: code.includes('"bullet": "bullet"'),
+      hasCommentMarkup: code.includes('class="ppt-element ppt-comment"') && code.includes('data-ppt-comment-resolved="true"') && code.includes('Review CTA wording'),
+      hasCommentModel: code.includes('"kind": "comment"') && code.includes('"resolved": true') && code.includes('"body": "Review CTA wording"'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
@@ -2167,6 +2170,7 @@ async function runExportScenario(page) {
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
+  record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
@@ -2190,6 +2194,7 @@ async function runExportScenario(page) {
     return {
       download: download.download ?? '',
       hasBackground: text.includes('data-ppt-svg-background="true"'),
+      hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
       hasLine: text.includes('data-ppt-kind="line"') && (text.includes('<line ') || text.includes('data-ppt-line-path')),
       hasScope: text.includes('data-ppt-svg-scope="slide"'),
@@ -2203,7 +2208,7 @@ async function runExportScenario(page) {
   })()`)
 
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
-  record('exports PPT image/shape/text/line/table into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasTable, slideSvgState)
+  record('exports PPT image/shape/text/line/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
   await selectPPTLayerRows(page, [imageId])
@@ -2709,6 +2714,188 @@ async function runTableImportScenario(page) {
   record('drops CSV file onto PPT stage as table element', afterDrop.tableCount === afterPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
     afterPaste,
+  })
+}
+
+async function runCommentReviewScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const before = await getPPTCommentState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-insert-comment]')?.click()`)
+  await delay(40)
+
+  const toolbarPoint = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      pressed: document.querySelector('[data-ppt-insert-comment]')?.getAttribute('aria-pressed'),
+      tool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+      x: slide.left + slide.width * 0.72,
+      y: slide.top + slide.height * 0.18,
+    }
+  })()`)
+
+  await clickMouse(page, toolbarPoint.x, toolbarPoint.y, 1)
+  await delay(120)
+
+  const afterToolbarInsert = await getPPTCommentState(page)
+
+  record('creates PPT comment from canvas comment toolbar tool', toolbarPoint.pressed === 'true' && toolbarPoint.tool === 'comment' && afterToolbarInsert.commentCount === before.commentCount + 1 && afterToolbarInsert.selectedKind === 'comment' && afterToolbarInsert.selectedBody === 'Comment' && afterToolbarInsert.thumbCommentCount === before.thumbCommentCount + 1, {
+    afterToolbarInsert,
+    before,
+    toolbarPoint,
+  })
+
+  await page.eval(`(() => {
+    const textarea = document.querySelector('[data-ppt-style-field="comment-body"]')
+    const checkbox = document.querySelector('[data-ppt-style-field="comment-resolved"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    valueSetter.call(textarea, 'Review CTA wording')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+
+    if (!checkbox.checked) {
+      checkbox.click()
+    }
+  })()`)
+  await delay(100)
+
+  const afterInspectorEdit = await getPPTCommentState(page)
+
+  record('retouches PPT comment body and resolved state in inspector', afterInspectorEdit.selectedKind === 'comment' && afterInspectorEdit.selectedBody === 'Review CTA wording' && afterInspectorEdit.inspectorBody === 'Review CTA wording' && afterInspectorEdit.selectedResolved === 'true' && afterInspectorEdit.inspectorResolved, {
+    afterInspectorEdit,
+    afterToolbarInsert,
+  })
+
+  const beforeMove = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const rect = selected.getBoundingClientRect()
+
+    return {
+      left: parseFloat(selected.style.left),
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeMove.x,
+    y: beforeMove.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeMove.x + 42,
+    y: beforeMove.y + 18,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeMove.x + 42,
+    y: beforeMove.y + 18,
+  })
+  await delay(100)
+
+  const afterMove = await getPPTCommentState(page)
+
+  record('moves PPT comment through existing selection transform flow', afterMove.selectedKind === 'comment' && afterMove.selectedLeft !== beforeMove.left, {
+    afterMove,
+    beforeMove,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const afterUndoMove = await getPPTCommentState(page)
+
+  record('undoes PPT comment move as one history step', afterUndoMove.selectedKind === 'comment' && afterUndoMove.selectedLeft === beforeMove.left && afterUndoMove.selectedBody === 'Review CTA wording', {
+    afterUndoMove,
+    beforeMove,
+  })
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(50)
+
+  const shortcutTool = await getPPTCommentState(page)
+
+  record('activates PPT comment tool from canvas C shortcut', shortcutTool.creationTool === 'comment' && shortcutTool.toolbarPressed === 'true', shortcutTool)
+
+  const shortcutPoint = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      x: slide.left + slide.width * 0.62,
+      y: slide.top + slide.height * 0.68,
+    }
+  })()`)
+
+  await clickMouse(page, shortcutPoint.x, shortcutPoint.y, 1)
+  await delay(100)
+
+  const afterShortcutInsert = await getPPTCommentState(page)
+
+  record('creates PPT comment from keyboard shortcut tool', afterShortcutInsert.commentCount === afterUndoMove.commentCount + 1 && afterShortcutInsert.selectedKind === 'comment', {
+    afterShortcutInsert,
+    afterUndoMove,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'comment' })
+  await delay(80)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const paletteTool = await getPPTCommentState(page)
+
+  record('activates PPT comment tool from command palette', paletteTool.creationTool === 'comment' && !paletteTool.paletteOpen, paletteTool)
+
+  const palettePoint = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      x: slide.left + slide.width * 0.16,
+      y: slide.top + slide.height * 0.72,
+    }
+  })()`)
+
+  await clickMouse(page, palettePoint.x, palettePoint.y, 1)
+  await delay(100)
+
+  const afterPaletteInsert = await getPPTCommentState(page)
+
+  record('creates PPT comment from command palette tool', afterPaletteInsert.commentCount === afterShortcutInsert.commentCount + 1 && afterPaletteInsert.selectedKind === 'comment', {
+    afterPaletteInsert,
+    afterShortcutInsert,
   })
 }
 
@@ -3382,6 +3569,30 @@ function getPPTTableState(page) {
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,
+    }
+  })()`)
+}
+
+function getPPTCommentState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedCard = selected?.querySelector('[data-ppt-comment-card]') ?? null
+
+    return {
+      commentCount: document.querySelectorAll('[data-kind="comment"]').length,
+      creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+      inspectorBody: document.querySelector('[data-ppt-style-field="comment-body"]')?.value ?? '',
+      inspectorResolved: document.querySelector('[data-ppt-style-field="comment-resolved"]')?.checked ?? false,
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      selectedBody: selectedCard?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedResolved: selected?.getAttribute('data-ppt-comment-resolved') ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      thumbCommentCount: document.querySelectorAll('.ppt-thumb-comment').length,
+      toolbarPressed: document.querySelector('[data-ppt-insert-comment]')?.getAttribute('aria-pressed') ?? '',
     }
   })()`)
 }

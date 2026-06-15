@@ -1,6 +1,7 @@
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
+  type PPTComment,
   type PPTDeck,
   type PPTElement,
   type PPTImage,
@@ -162,6 +163,10 @@ function renderPPTElementHTML(element: PPTElement) {
     return renderPPTTableHTML(element, style, transformAttrs)
   }
 
+  if (element.kind === 'comment') {
+    return renderPPTCommentHTML(element, style, transformAttrs)
+  }
+
   const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
@@ -187,6 +192,10 @@ function renderPPTElementSVG(element: PPTElement) {
 
   if (element.kind === 'table') {
     return renderPPTTableSVG(element)
+  }
+
+  if (element.kind === 'comment') {
+    return renderPPTCommentSVG(element)
   }
 
   const attrs = getPPTElementSVGAttrs(element)
@@ -366,6 +375,11 @@ function exportCSS() {
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
     '.ppt-line{display:block;overflow:visible;padding:0;}',
+    '.ppt-comment{display:grid;grid-template-rows:auto minmax(0,1fr);padding:0;border:1px solid #d97706;border-radius:8px;background:#fffbeb;color:#78350f;box-shadow:0 10px 22px rgb(120 53 15 / 18%);}',
+    '.ppt-comment[data-ppt-comment-resolved="true"]{opacity:.62;}',
+    '.ppt-comment-meta{display:flex;gap:6px;align-items:center;min-width:0;padding:8px 10px 6px;border-bottom:1px solid #fde68a;color:#92400e;font-size:12px;font-weight:700;line-height:1;}',
+    '.ppt-comment-created{margin-left:auto;color:#b45309;font-weight:600;}',
+    '.ppt-comment-body{margin:0;padding:9px 10px 12px;overflow:hidden;font-size:17px;font-weight:650;line-height:1.22;white-space:pre-wrap;}',
     '.ppt-table{display:table;table-layout:fixed;border-collapse:collapse;padding:0;background:#fff;color:#111827;font-size:18px;line-height:1.15;}',
     '.ppt-table th,.ppt-table td{height:1px;padding:8px 10px;overflow:hidden;border:1px solid #dbe3ef;text-align:left;text-overflow:ellipsis;white-space:nowrap;}',
     '.ppt-table th{background:#eff6ff;font-weight:700;}',
@@ -453,6 +467,41 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
   ].filter(Boolean).join(' ')
 
   return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+}
+
+function renderPPTCommentHTML(
+  element: PPTComment,
+  style: string[],
+  transformAttrs: string,
+) {
+  const author = element.authorName ?? 'You'
+  const createdAt = element.createdAt ?? 'Just now'
+  const resolvedAttr = element.resolved === true
+    ? ' data-ppt-comment-resolved="true"'
+    : ''
+
+  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
+}
+
+function renderPPTCommentSVG(element: PPTComment) {
+  const attrs = [
+    getPPTElementSVGAttrs(element),
+    element.resolved === true ? 'data-ppt-comment-resolved="true"' : '',
+  ].filter(Boolean).join(' ')
+  const x = element.geometry.x
+  const y = element.geometry.y
+  const metaHeight = Math.min(30, element.geometry.h * 0.28)
+  const body = element.body || 'Comment'
+  const author = element.authorName ?? 'You'
+
+  return [
+    `<g ${attrs}>`,
+    `<rect x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="8" fill="#fffbeb" stroke="#d97706" stroke-width="1"></rect>`,
+    `<rect data-ppt-comment-meta="true" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(metaHeight)}" rx="8" fill="#fef3c7"></rect>`,
+    `<text data-ppt-comment-author="true" x="${formatNumber(x + 10)}" y="${formatNumber(y + metaHeight / 2)}" fill="#92400e" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700" dominant-baseline="middle">${escapeHtml(author)}</text>`,
+    `<text data-ppt-comment-body="true" x="${formatNumber(x + 10)}" y="${formatNumber(y + metaHeight + 24)}" fill="#78350f" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="650">${escapeHtml(body)}</text>`,
+    '</g>',
+  ].join('')
 }
 
 function renderPPTTableHTML(
