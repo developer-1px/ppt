@@ -189,6 +189,7 @@ import {
 import {
   createPPTCanvasCommandAdapter,
   createPPTElementIdFactory,
+  getPPTElementIdPrefix,
   getPPTElementsBounds,
   getPPTCanvasCommandAvailability,
   updatePPTElementBounds,
@@ -476,10 +477,70 @@ const canvasReorderModeAvailabilityKey = {
 >
 
 type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
-type PPTClipboard = {
+type PPTClipboardOperation = 'copy' | 'cut'
+type PPTClipboardObjectMetadata = {
+  groupId?: string | null
+  objectId: string
+  placeholderId?: string | null
+}
+type PPTClipboardPayload = {
   elements: PPTElement[]
+  metadata: readonly PPTClipboardObjectMetadata[]
+  objects: PPTElement[]
+  operation: PPTClipboardOperation
+  selectedObjectIds: string[]
   selection: string[]
   sourceSlideId: string
+  type: 'slide-object-clipboard'
+}
+type PPTClipboard = PPTClipboardPayload
+type PPTClipboardPasteTarget =
+  | {
+      kind: 'active-slide'
+      slideId: string
+    }
+  | {
+      kind: 'pointer-position'
+      pointerPosition: Point
+      slideId: string
+    }
+  | {
+      kind: 'slide-frame-offset'
+      offset: Point
+      slideId: string
+    }
+  | {
+      kind: 'viewport-center'
+      slideId: string
+      viewportCenter: Point
+    }
+type PPTClipboardPasteObjectMapping = {
+  sourceGroupId?: string | null
+  sourceObjectId: string
+  sourcePlaceholderId?: string | null
+  targetGroupId?: string | null
+  targetObjectId: string
+  targetPlaceholderId?: string | null
+}
+type PPTClipboardPastePlan = {
+  anchor: Point
+  mappings: readonly PPTClipboardPasteObjectMapping[]
+  operation: PPTClipboardOperation
+  sourceSlideId: string
+  targetSlideId: string
+}
+type PPTClipboardPasteCommand = {
+  id: 'paste-slide-objects'
+  pastePlan: PPTClipboardPastePlan
+  payload: PPTClipboardPayload
+}
+type PPTClipboardPasteHostCommandEffect = {
+  payload: PPTClipboardPasteCommand
+  selection: {
+    objectIds: readonly string[]
+    slideId: string
+  }
+  type: 'slide-command-effect'
 }
 type PPTSurfaceCommand =
   | 'alignCenter'
@@ -1128,6 +1189,7 @@ function App() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
+  const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -1287,7 +1349,7 @@ function App() {
     : null
   const commandAvailability = useMemo<PPTCommandAvailability>(() => ({
     ...getPPTCanvasCommandAvailability({
-      canPaste: (clipboard?.elements.length ?? 0) > 0,
+      canPaste: (clipboard?.objects.length ?? 0) > 0,
       canRedo: future.length > 0,
       canUndo: past.length > 0,
       hasGroupedSelection,
@@ -1301,7 +1363,7 @@ function App() {
     tidySelection: canTidySelection,
   }), [
     canFlipSelection,
-    clipboard?.elements.length,
+    clipboard?.objects.length,
     canSelectSameType,
     canTidySelection,
     future.length,
@@ -2236,23 +2298,29 @@ function App() {
       }))
   }
 
-  function copySelection() {
+  function copySelection(operation: PPTClipboardOperation = 'copy') {
     const selected = activeSlide.elements.filter((element) => selection.includes(element.id))
 
     if (selected.length === 0) {
       return
     }
 
-    setClipboard({
-      elements: selected,
-      selection: selected.map((element) => element.id),
+    const payload = createPPTClipboardPayload({
+      objects: selected,
+      operation,
+      selectedObjectIds: selected.map((element) => element.id),
       sourceSlideId: activeSlide.id,
     })
+
+    setClipboard(payload)
+    setLastClipboardPasteEffect(null)
     void navigator.clipboard?.writeText(JSON.stringify({
-      elements: selected,
-      elementIds: selected.map((element) => element.id),
-      sourceSlideId: activeSlide.id,
-      type: 'application/ppt-elements+json',
+      metadata: payload.metadata,
+      objects: selected,
+      operation: payload.operation,
+      selectedObjectIds: payload.selectedObjectIds,
+      sourceSlideId: payload.sourceSlideId,
+      type: payload.type,
     })).catch(() => undefined)
   }
 
@@ -2261,31 +2329,41 @@ function App() {
       return
     }
 
-    copySelection()
+    copySelection('cut')
     deleteSelection()
   }
 
   function pasteSelection() {
-    if (!commandAvailability.paste) {
+    if (!commandAvailability.paste || !clipboard) {
       return
     }
 
-    commitElementCommand((slide) => {
-      const pasted = commandAdapter.pasteItems({
-        clipboard: clipboard?.elements ?? [],
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const effect = createPPTClipboardPasteCommandEffect({
         createId: createPPTElementIdFactory(slide),
-        offset: { x: 28, y: 28 },
+        payload: clipboard,
+        slideFrame: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+          x: 0,
+          y: 0,
+        },
+        target: {
+          kind: 'slide-frame-offset',
+          offset: { x: 28, y: 28 },
+          slideId: slide.id,
+        },
       })
 
-      if (pasted.length === 0) {
-        return null
+      if (!effect) {
+        return slide
       }
 
-      return {
-        items: [...slide.elements, ...pasted],
-        selection: pasted.map((element) => element.id),
-      }
-    })
+      setLastClipboardPasteEffect(effect)
+      setSelection([...effect.selection.objectIds])
+
+      return applyPPTClipboardPasteHostCommandEffect(slide, effect)
+    }))
   }
 
   function selectAllElements() {
@@ -4713,9 +4791,23 @@ function App() {
 
       <section
         className="ppt-stage-shell"
-        data-ppt-clipboard-count={clipboard?.elements.length ?? 0}
+        data-ppt-clipboard-count={clipboard?.objects.length ?? 0}
+        data-ppt-clipboard-metadata-count={clipboard?.metadata.length ?? 0}
+        data-ppt-clipboard-operation={clipboard?.operation ?? undefined}
+        data-ppt-clipboard-paste-anchor={lastClipboardPasteEffect
+          ? `${lastClipboardPasteEffect.payload.pastePlan.anchor.x},${lastClipboardPasteEffect.payload.pastePlan.anchor.y}`
+          : undefined}
+        data-ppt-clipboard-paste-command={lastClipboardPasteEffect?.payload.id}
+        data-ppt-clipboard-paste-mapping-count={lastClipboardPasteEffect?.payload.pastePlan.mappings.length}
+        data-ppt-clipboard-paste-operation={lastClipboardPasteEffect?.payload.pastePlan.operation}
+        data-ppt-clipboard-paste-selection={lastClipboardPasteEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-clipboard-paste-source-slide={lastClipboardPasteEffect?.payload.pastePlan.sourceSlideId}
+        data-ppt-clipboard-paste-target-slide={lastClipboardPasteEffect?.payload.pastePlan.targetSlideId}
+        data-ppt-clipboard-paste-type={lastClipboardPasteEffect?.type}
+        data-ppt-clipboard-selected-object-ids={clipboard?.selectedObjectIds.join(' ') ?? undefined}
         data-ppt-clipboard-selection={clipboard?.selection.join(' ') ?? undefined}
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
+        data-ppt-clipboard-type={clipboard?.type ?? undefined}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}
@@ -5582,6 +5674,237 @@ function applyPPTSlideMetadataHostCommandEffect(
     case 'orientation':
     case 'size':
       return slide
+  }
+}
+
+function createPPTClipboardPayload({
+  objects,
+  operation = 'copy',
+  selectedObjectIds,
+  sourceSlideId,
+}: {
+  objects: PPTElement[]
+  operation?: PPTClipboardOperation
+  selectedObjectIds: string[]
+  sourceSlideId: string
+}): PPTClipboardPayload {
+  return {
+    elements: objects,
+    metadata: objects.map((object) => ({
+      groupId: object.groupId ?? null,
+      objectId: object.id,
+      placeholderId: null,
+    })),
+    objects,
+    operation,
+    selectedObjectIds,
+    selection: selectedObjectIds,
+    sourceSlideId,
+    type: 'slide-object-clipboard',
+  }
+}
+
+function createPPTClipboardPasteCommandEffect({
+  createId,
+  payload,
+  slideFrame,
+  target,
+}: {
+  createId: (prefix: string) => string
+  payload: PPTClipboardPayload
+  slideFrame: Bounds
+  target: PPTClipboardPasteTarget
+}): PPTClipboardPasteHostCommandEffect | null {
+  const pastePlan = createPPTClipboardPastePlan({
+    createId,
+    payload,
+    slideFrame,
+    target,
+  })
+
+  if (!pastePlan) {
+    return null
+  }
+
+  return {
+    payload: {
+      id: 'paste-slide-objects',
+      pastePlan,
+      payload,
+    },
+    selection: {
+      objectIds: pastePlan.mappings.map((mapping) => mapping.targetObjectId),
+      slideId: pastePlan.targetSlideId,
+    },
+    type: 'slide-command-effect',
+  }
+}
+
+function createPPTClipboardPastePlan({
+  createId,
+  payload,
+  slideFrame,
+  target,
+}: {
+  createId: (prefix: string) => string
+  payload: PPTClipboardPayload
+  slideFrame: Bounds
+  target: PPTClipboardPasteTarget
+}): PPTClipboardPastePlan | null {
+  if (payload.selectedObjectIds.length === 0 || payload.objects.length === 0) {
+    return null
+  }
+
+  const mappings = getPPTClipboardPasteObjectMappings({
+    createId,
+    payload,
+  })
+
+  if (mappings.length === 0) {
+    return null
+  }
+
+  return {
+    anchor: getPPTClipboardPasteAnchor({
+      slideFrame,
+      target,
+    }),
+    mappings,
+    operation: payload.operation,
+    sourceSlideId: payload.sourceSlideId,
+    targetSlideId: target.slideId,
+  }
+}
+
+function getPPTClipboardPasteAnchor({
+  slideFrame,
+  target,
+}: {
+  slideFrame: Bounds
+  target: PPTClipboardPasteTarget
+}): Point {
+  switch (target.kind) {
+    case 'active-slide':
+      return {
+        x: slideFrame.x,
+        y: slideFrame.y,
+      }
+    case 'pointer-position':
+      return target.pointerPosition
+    case 'slide-frame-offset':
+      return {
+        x: slideFrame.x + target.offset.x,
+        y: slideFrame.y + target.offset.y,
+      }
+    case 'viewport-center':
+      return target.viewportCenter
+  }
+}
+
+function getPPTClipboardPasteObjectMappings({
+  createId,
+  payload,
+}: {
+  createId: (prefix: string) => string
+  payload: PPTClipboardPayload
+}): PPTClipboardPasteObjectMapping[] {
+  const objectsById = new Map(payload.objects.map((object) => [object.id, object]))
+  const metadataById = new Map(payload.metadata.map((metadata) => [metadata.objectId, metadata]))
+  const groupIdBySource = new Map<string, string>()
+
+  return payload.selectedObjectIds.flatMap((sourceObjectId) => {
+    const object = objectsById.get(sourceObjectId)
+
+    if (!object) {
+      return []
+    }
+
+    const metadata = metadataById.get(sourceObjectId)
+    const sourceGroupId = metadata?.groupId ?? object.groupId ?? null
+
+    return [{
+      sourceGroupId,
+      sourceObjectId,
+      sourcePlaceholderId: metadata?.placeholderId ?? null,
+      targetGroupId: getPPTClipboardTargetGroupId({
+        createId,
+        groupIdBySource,
+        sourceGroupId,
+      }),
+      targetObjectId: createId(getPPTElementIdPrefix(object)),
+      targetPlaceholderId: null,
+    }]
+  })
+}
+
+function getPPTClipboardTargetGroupId({
+  createId,
+  groupIdBySource,
+  sourceGroupId,
+}: {
+  createId: (prefix: string) => string
+  groupIdBySource: Map<string, string>
+  sourceGroupId: string | null
+}) {
+  if (!sourceGroupId) {
+    return null
+  }
+
+  const existing = groupIdBySource.get(sourceGroupId)
+
+  if (existing) {
+    return existing
+  }
+
+  const targetGroupId = createId('group-copy')
+  groupIdBySource.set(sourceGroupId, targetGroupId)
+
+  return targetGroupId
+}
+
+function applyPPTClipboardPasteHostCommandEffect(
+  slide: PPTSlide,
+  effect: PPTClipboardPasteHostCommandEffect,
+): PPTSlide {
+  const plan = effect.payload.pastePlan
+  const objectById = new Map(effect.payload.payload.objects.map((object) => [object.id, object]))
+  const offset = {
+    x: plan.anchor.x,
+    y: plan.anchor.y,
+  }
+  const pasted = plan.mappings.flatMap((mapping) => {
+    const source = objectById.get(mapping.sourceObjectId)
+
+    return source
+      ? [clonePPTElementFromClipboardMapping(source, mapping, offset)]
+      : []
+  })
+
+  if (pasted.length === 0) {
+    return slide
+  }
+
+  return {
+    ...slide,
+    elements: [...slide.elements, ...pasted],
+  }
+}
+
+function clonePPTElementFromClipboardMapping(
+  source: PPTElement,
+  mapping: PPTClipboardPasteObjectMapping,
+  offset: Point,
+): PPTElement {
+  return {
+    ...source,
+    geometry: {
+      ...source.geometry,
+      x: clamp(source.geometry.x + offset.x, 0, PPT_SLIDE_WIDTH - source.geometry.w),
+      y: clamp(source.geometry.y + offset.y, 0, PPT_SLIDE_HEIGHT - source.geometry.h),
+    },
+    groupId: mapping.targetGroupId ?? undefined,
+    id: mapping.targetObjectId,
+    name: `${source.name} Copy`,
   }
 }
 

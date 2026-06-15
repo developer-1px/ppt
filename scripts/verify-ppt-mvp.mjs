@@ -981,11 +981,13 @@ async function runAffordanceScenario(page) {
   await delay(50)
 
   const afterCutPaste = await page.eval(`(() => ({
+    clipboardOperation: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-clipboard-operation') ?? '',
     elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    pasteOperation: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-clipboard-paste-operation') ?? '',
     selectedCount: document.querySelectorAll('[data-selected="true"]').length,
   }))()`)
 
-  record('cuts and pastes selected PPT object with keyboard commands', afterCutPaste.elementCount === afterPaste.elementCount && afterCutPaste.selectedCount === 1, {
+  record('cuts and pastes selected PPT object with keyboard commands', afterCutPaste.elementCount === afterPaste.elementCount && afterCutPaste.selectedCount === 1 && afterCutPaste.clipboardOperation === 'cut' && afterCutPaste.pasteOperation === 'cut', {
     afterCutPaste,
     afterPaste,
   })
@@ -1224,7 +1226,7 @@ async function runCrossSlideClipboardScenario(page) {
 
   const afterCopy = await getPPTCrossSlideClipboardState(page)
 
-  record('stores PPT clipboard source slide metadata', afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title', {
+  record('stores PPT clipboard source slide metadata', afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
     afterCopy,
     sourceBefore,
   })
@@ -1245,6 +1247,10 @@ async function runCrossSlideClipboardScenario(page) {
   const afterKeyboardPaste = await getPPTCrossSlideClipboardState(page)
 
   record('pastes copied PPT object onto another slide with target slide ids', afterKeyboardPaste.activeSlide === 'slide-2' && afterKeyboardPaste.stageCount === targetBefore.stageCount + 1 && afterKeyboardPaste.selectedCount === 1 && afterKeyboardPaste.selectedId.startsWith('slide-2-') && afterKeyboardPaste.selectedName.includes('Copy'), {
+    afterKeyboardPaste,
+    targetBefore,
+  })
+  record('creates PPT cross-slide paste command effect plan', afterKeyboardPaste.pasteCommand === 'paste-slide-objects' && afterKeyboardPaste.pasteType === 'slide-command-effect' && afterKeyboardPaste.pasteSourceSlide === 'slide-1' && afterKeyboardPaste.pasteTargetSlide === 'slide-2' && afterKeyboardPaste.pasteMappingCount === 1 && afterKeyboardPaste.pasteSelection === afterKeyboardPaste.selectedId && afterKeyboardPaste.pasteAnchor === '28,28' && afterKeyboardPaste.pasteOperation === 'copy', {
     afterKeyboardPaste,
     targetBefore,
   })
@@ -5075,8 +5081,20 @@ function getPPTCrossSlideClipboardState(page) {
     return {
       activeSlide: slide?.getAttribute('data-ppt-slide') ?? '',
       clipboardCount: Number(stage?.getAttribute('data-ppt-clipboard-count') ?? 0),
+      clipboardMetadataCount: Number(stage?.getAttribute('data-ppt-clipboard-metadata-count') ?? 0),
+      clipboardOperation: stage?.getAttribute('data-ppt-clipboard-operation') ?? '',
       clipboardSelection: stage?.getAttribute('data-ppt-clipboard-selection') ?? '',
+      clipboardSelectedObjectIds: stage?.getAttribute('data-ppt-clipboard-selected-object-ids') ?? '',
       clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
+      clipboardType: stage?.getAttribute('data-ppt-clipboard-type') ?? '',
+      pasteAnchor: stage?.getAttribute('data-ppt-clipboard-paste-anchor') ?? '',
+      pasteCommand: stage?.getAttribute('data-ppt-clipboard-paste-command') ?? '',
+      pasteMappingCount: Number(stage?.getAttribute('data-ppt-clipboard-paste-mapping-count') ?? 0),
+      pasteOperation: stage?.getAttribute('data-ppt-clipboard-paste-operation') ?? '',
+      pasteSelection: stage?.getAttribute('data-ppt-clipboard-paste-selection') ?? '',
+      pasteSourceSlide: stage?.getAttribute('data-ppt-clipboard-paste-source-slide') ?? '',
+      pasteTargetSlide: stage?.getAttribute('data-ppt-clipboard-paste-target-slide') ?? '',
+      pasteType: stage?.getAttribute('data-ppt-clipboard-paste-type') ?? '',
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
