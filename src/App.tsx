@@ -28,6 +28,7 @@ import {
   Grid2X2,
   Group,
   ImagePlus,
+  Italic,
   Layers,
   List,
   Lock,
@@ -46,6 +47,7 @@ import {
   Undo2,
   Ungroup,
   Unlock,
+  Underline,
   X,
   ZoomIn,
   ZoomOut,
@@ -251,6 +253,8 @@ type PPTTextQuickFormatState = {
   color: string
   fontSize: number
   isBold: boolean
+  isItalic: boolean
+  isUnderline: boolean
 }
 
 const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
@@ -1563,6 +1567,58 @@ function App() {
     updateSelectedParagraphBullet(enabled)
   }
 
+  function updateSelectedTextRunStyle(
+    field: 'italic' | 'underline',
+    enabled: boolean,
+  ) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    const selectedIds = new Set(selection)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!selectedIds.has(element.id) ||
+            !isPPTTextElement(element) ||
+            element.locked === true ||
+            element.visible === false) {
+            return element
+          }
+
+          return {
+            ...element,
+            textBody: {
+              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                ...paragraph,
+                runs: paragraph.runs.map((run) => ({
+                  ...run,
+                  [field]: enabled ? true : undefined,
+                })),
+              })),
+            },
+          }
+        }),
+      })),
+    )
+  }
+
+  function toggleSelectedTextItalic() {
+    updateSelectedTextRunStyle(
+      'italic',
+      !areAllPPTTextRunsStyled(selectedTextElements, 'italic'),
+    )
+  }
+
+  function toggleSelectedTextUnderline() {
+    updateSelectedTextRunStyle(
+      'underline',
+      !areAllPPTTextRunsStyled(selectedTextElements, 'underline'),
+    )
+  }
+
   function toggleSelectedTextBold() {
     const isBold = selectedTextElements.length > 0 &&
       selectedTextElements.every((element) =>
@@ -2828,6 +2884,8 @@ function App() {
               onParagraphAlign={updateSelectedParagraphAlign}
               onTextBoldToggle={toggleSelectedTextBold}
               onTextColorChange={updateSelectedTextColor}
+              onTextItalicToggle={toggleSelectedTextItalic}
+              onTextUnderlineToggle={toggleSelectedTextUnderline}
             />
             {selectedLineElement && !editingId && canResizeSelection ? (
               <LineEndpointOverlay
@@ -3009,6 +3067,8 @@ function PPTSelectionFloatingBar({
   onParagraphBulletToggle,
   onTextBoldToggle,
   onTextColorChange,
+  onTextItalicToggle,
+  onTextUnderlineToggle,
   scale,
   textFormat,
 }: {
@@ -3020,6 +3080,8 @@ function PPTSelectionFloatingBar({
   onParagraphBulletToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
+  onTextItalicToggle: () => void
+  onTextUnderlineToggle: () => void
   scale: number
   textFormat: PPTTextQuickFormatState | null
 }) {
@@ -3049,6 +3111,8 @@ function PPTSelectionFloatingBar({
           onParagraphBulletToggle={onParagraphBulletToggle}
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
+          onTextItalicToggle={onTextItalicToggle}
+          onTextUnderlineToggle={onTextUnderlineToggle}
         />
       ) : null}
       {textFormat && groups.length > 0 ? <span className="ppt-command-divider" /> : null}
@@ -3075,6 +3139,8 @@ function PPTTextQuickFormatControls({
   onParagraphBulletToggle,
   onTextBoldToggle,
   onTextColorChange,
+  onTextItalicToggle,
+  onTextUnderlineToggle,
   state,
 }: {
   onFontSizeStep: (delta: number) => void
@@ -3082,6 +3148,8 @@ function PPTTextQuickFormatControls({
   onParagraphBulletToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
+  onTextItalicToggle: () => void
+  onTextUnderlineToggle: () => void
   state: PPTTextQuickFormatState
 }) {
   return (
@@ -3100,6 +3168,36 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Bold size={16} />
+      </button>
+      <button
+        aria-label="Italic text"
+        aria-pressed={state.isItalic}
+        className="ppt-floating-command"
+        data-ppt-text-quick="italic"
+        title="Italic text"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onTextItalicToggle()
+        }}
+      >
+        <Italic size={16} />
+      </button>
+      <button
+        aria-label="Underline text"
+        aria-pressed={state.isUnderline}
+        className="ppt-floating-command"
+        data-ppt-text-quick="underline"
+        title="Underline text"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onTextUnderlineToggle()
+        }}
+      >
+        <Underline size={16} />
       </button>
       <button
         aria-label="Decrease font size"
@@ -3507,7 +3605,12 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
           key={index}
         >
           {paragraph.runs.map((run, runIndex) => (
-            <span key={runIndex}>
+            <span
+              data-ppt-run-italic={run.italic === true ? 'true' : undefined}
+              data-ppt-run-underline={run.underline === true ? 'true' : undefined}
+              key={runIndex}
+              style={pptTextRunStyle(run)}
+            >
               {run.text}
             </span>
           ))}
@@ -4325,6 +4428,16 @@ function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
   }
 }
 
+function pptTextRunStyle(run: PPTRun): CSSProperties {
+  return {
+    color: run.color,
+    fontSize: run.size,
+    fontStyle: run.italic === true ? 'italic' : undefined,
+    fontWeight: run.bold === true ? 700 : undefined,
+    textDecoration: run.underline === true ? 'underline' : undefined,
+  }
+}
+
 function isEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement &&
     (target.isContentEditable ||
@@ -4376,6 +4489,8 @@ function getPPTTextQuickFormatState(
       : Math.round(styles.reduce((sum, style) => sum + style.fontSize, 0) / styles.length),
     isBold: styles.length > 0 &&
       styles.every((style) => style.fontWeight === 'bold'),
+    isItalic: areAllPPTTextRunsStyled(elements, 'italic'),
+    isUnderline: areAllPPTTextRunsStyled(elements, 'underline'),
   }
 }
 
@@ -4388,6 +4503,18 @@ function areAllPPTTextElementsBulleted(elements: readonly PPTTextElement[]) {
 
 function hasPPTTextBodyBullet(body: PPTTextBody) {
   return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
+}
+
+function areAllPPTTextRunsStyled(
+  elements: readonly PPTTextElement[],
+  field: 'italic' | 'underline',
+) {
+  return elements.length > 0 &&
+    elements.every((element) =>
+      element.textBody.paragraphs.length > 0 &&
+      element.textBody.paragraphs.every((paragraph) =>
+        paragraph.runs.length > 0 &&
+        paragraph.runs.every((run) => run[field] === true)))
 }
 
 function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
@@ -4927,6 +5054,7 @@ function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunSty
     ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
     ...(firstRun.italic === undefined ? {} : { italic: firstRun.italic }),
     ...(firstRun.size === undefined ? {} : { size: firstRun.size }),
+    ...(firstRun.underline === undefined ? {} : { underline: firstRun.underline }),
   }
 }
 
@@ -4937,7 +5065,8 @@ function arePPTTextRunStylesEqual(
   return left.bold === right.bold &&
     left.color === right.color &&
     left.italic === right.italic &&
-    left.size === right.size
+    left.size === right.size &&
+    left.underline === right.underline
 }
 
 function isArrowKey(key: string) {

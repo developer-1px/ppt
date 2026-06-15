@@ -4,6 +4,7 @@ import {
   type PPTDeck,
   type PPTElement,
   type PPTLine,
+  type PPTRun,
   type PPTShape,
   type PPTTextBody,
   type PPTTextStyle,
@@ -112,7 +113,7 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
 
   return body.paragraphs.map((paragraph) => {
     const runs = paragraph.runs
-      .map((run) => escapeHtml(run.text))
+      .map(renderPPTTextRunHTML)
       .join('')
     const bulletAttr = paragraph.bullet === 'bullet'
       ? ' data-ppt-bullet="true"'
@@ -120,6 +121,30 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
 
     return `<span class="ppt-text-paragraph"${bulletAttr}>${runs}</span>`
   }).join('')
+}
+
+function renderPPTTextRunHTML(run: PPTRun) {
+  const attrs = [
+    run.italic === true ? 'data-ppt-run-italic="true"' : '',
+    run.underline === true ? 'data-ppt-run-underline="true"' : '',
+    renderPPTTextRunStyleAttr(run),
+  ].filter(Boolean).join(' ')
+
+  return attrs
+    ? `<span ${attrs}>${escapeHtml(run.text)}</span>`
+    : escapeHtml(run.text)
+}
+
+function renderPPTTextRunStyleAttr(run: PPTRun) {
+  const styles = [
+    run.bold === true ? 'font-weight:700' : '',
+    run.color ? `color:${escapeHtml(run.color)}` : '',
+    run.italic === true ? 'font-style:italic' : '',
+    run.size ? `font-size:${run.size}px` : '',
+    run.underline === true ? 'text-decoration:underline' : '',
+  ].filter(Boolean).join(';')
+
+  return styles ? `style="${styles}"` : ''
 }
 
 function hasPPTTextBodyBullet(body: PPTTextBody) {

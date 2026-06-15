@@ -26,6 +26,7 @@ const PPTRunSchema = z.object({
   italic: z.boolean().optional(),
   size: z.number().optional(),
   text: z.string(),
+  underline: z.boolean().optional(),
 })
 
 const PPTParagraphSchema = z.object({
