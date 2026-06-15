@@ -37,6 +37,7 @@ try {
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
+  await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
@@ -1033,6 +1034,118 @@ async function runCommandSurfaceScenario(page) {
   record('unlocks locked PPT object from context menu', afterUnlock.locked === 'false', afterUnlock)
 }
 
+async function runTextQuickFormatScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  let titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await page.eval(`(() => ({
+    boldPressed: document.querySelector('[data-ppt-text-quick="bold"]')?.getAttribute('aria-pressed') ?? '',
+    fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
+    quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.fontSize > 0, initial)
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="bold"]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-text-quick="font-size-up"]')?.click()`)
+  await setTextQuickColor(page, '#0055ff')
+  await page.eval(`document.querySelector('[data-ppt-text-quick="align-right"]')?.click()`)
+  await delay(100)
+
+  const afterSingleFormat = await page.eval(`(() => {
+    const title = document.querySelector('[data-ppt-element="s1-title"]')
+
+    return {
+      color: title?.style.color ?? '',
+      fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
+      fontWeight: document.querySelector('[data-ppt-style-field="font-weight"]')?.value ?? '',
+      rightPressed: document.querySelector('[data-ppt-paragraph-align="right"]')?.getAttribute('aria-pressed') ?? '',
+      textAlign: title?.style.textAlign ?? '',
+    }
+  })()`)
+
+  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true', {
+    afterSingleFormat,
+    initial,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  titlePoint = await getElementCenter(page, 's1-title')
+  const summaryPoint = await getElementCenter(page, 's1-summary')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+  await clickMouse(page, summaryPoint.x, summaryPoint.y, 1, 8)
+  await delay(80)
+
+  const beforeMulti = await page.eval(`(() => ({
+    quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  await setTextQuickColor(page, '#008060')
+  await page.eval(`document.querySelector('[data-ppt-text-quick="align-center"]')?.click()`)
+  await delay(100)
+
+  const afterMultiFormat = await page.eval(`(() => {
+    const title = document.querySelector('[data-ppt-element="s1-title"]')
+    const summary = document.querySelector('[data-ppt-element="s1-summary"]')
+
+    return {
+      summaryColor: summary?.style.color ?? '',
+      summaryTextAlign: summary?.style.textAlign ?? '',
+      titleColor: title?.style.color ?? '',
+      titleTextAlign: title?.style.textAlign ?? '',
+    }
+  })()`)
+
+  record('applies PPT text quick formatting to multi-selected text objects', beforeMulti.quickBarVisible && beforeMulti.selectedCount === 2 && afterMultiFormat.titleColor === 'rgb(0, 128, 96)' && afterMultiFormat.summaryColor === 'rgb(0, 128, 96)' && afterMultiFormat.titleTextAlign === 'center' && afterMultiFormat.summaryTextAlign === 'center', {
+    afterMultiFormat,
+    beforeMulti,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(80)
+
+  const afterEditingGuard = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
+    }
+  })()`)
+
+  record('hides PPT text quick format bar while native text editing is active', afterEditingGuard.editing && !afterEditingGuard.quickBarVisible, afterEditingGuard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+}
+
 async function runExportScenario(page) {
   const state = await page.eval(`(() => {
     const code = document.querySelector('.ppt-export-code')?.value ?? ''
@@ -1910,6 +2023,17 @@ async function rightClickMouse(page, x, y) {
     x,
     y,
   })
+}
+
+async function setTextQuickColor(page, color) {
+  await page.eval(`((color) => {
+    const input = document.querySelector('[data-ppt-text-quick="color"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    valueSetter.call(input, color)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })(${JSON.stringify(color)})`)
 }
 
 function getElementCenter(page, elementId) {

@@ -1,13 +1,19 @@
 import {
+  ALargeSmall,
+  AlignCenter,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
   AlignEndVertical,
   AlignHorizontalDistributeCenter,
+  AlignLeft,
+  AlignRight,
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
   ArrowRight,
+  Baseline,
+  Bold,
   BringToFront,
   ChevronDown,
   ChevronUp,
@@ -28,6 +34,7 @@ import {
   Minus,
   MoveDown,
   MoveUp,
+  Plus,
   Redo2,
   RotateCw,
   Search,
@@ -130,6 +137,7 @@ import {
   type PPTShapeKind,
   type PPTSlide,
   type PPTTextBody,
+  type PPTTextElement,
   type PPTTextStyle,
 } from './pptModel'
 import { SAMPLE_PPT_DECK } from './pptSampleDeck'
@@ -235,6 +243,12 @@ type PPTContextMenuState = {
 }
 type PPTSelectionCommandAnchor = Point & {
   placement: 'above' | 'below'
+}
+type PPTTextQuickFormatState = {
+  align: NonNullable<PPTParagraph['align']>
+  color: string
+  fontSize: number
+  isBold: boolean
 }
 
 const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
@@ -350,6 +364,9 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
   h: 76,
   w: 360,
 }
+const PPT_TEXT_FONT_SIZE_MIN = 8
+const PPT_TEXT_FONT_SIZE_MAX = 120
+const PPT_TEXT_FONT_SIZE_STEP = 2
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTCreationTool =
@@ -487,6 +504,10 @@ function App() {
     () => activeSlide.elements.filter((element) => selection.includes(element.id)),
     [activeSlide.elements, selection],
   )
+  const selectedTextElements = useMemo(
+    () => selectedElements.filter(isPPTTextElement),
+    [selectedElements],
+  )
   const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
     ? selectedElement
     : null
@@ -500,6 +521,13 @@ function App() {
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
   const hasHiddenSelection = selectedElements.some((element) => element.visible === false)
   const hasGroupedSelection = selectedElements.some((element) => Boolean(element.groupId))
+  const canFormatSelectedText = selectedTextElements.length > 0 &&
+    selectedTextElements.length === selectedElements.length &&
+    !hasLockedSelection &&
+    !hasHiddenSelection
+  const textQuickFormatState = canFormatSelectedText
+    ? getPPTTextQuickFormatState(selectedTextElements)
+    : null
   const commandAvailability = useMemo(() => getPPTCanvasCommandAvailability({
     canPaste: clipboard.length > 0,
     canRedo: future.length > 0,
@@ -675,6 +703,14 @@ function App() {
           ungroupSelection()
         } else {
           groupSelection()
+        }
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+        if (canFormatSelectedText) {
+          event.preventDefault()
+          toggleSelectedTextBold()
         }
         return
       }
@@ -1421,6 +1457,98 @@ function App() {
         }
       }),
     )
+  }
+
+  function updateSelectedTextStyles(
+    update: (style: PPTTextStyle) => PPTTextStyle,
+  ) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    const selectedIds = new Set(selection)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!selectedIds.has(element.id) ||
+            !isPPTTextElement(element) ||
+            element.locked === true ||
+            element.visible === false) {
+            return element
+          }
+
+          return {
+            ...element,
+            style: update(getPPTTextElementStyle(element)),
+          }
+        }),
+      })),
+    )
+  }
+
+  function updateSelectedParagraphAlign(
+    align: NonNullable<PPTParagraph['align']>,
+  ) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    const selectedIds = new Set(selection)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!selectedIds.has(element.id) ||
+            !isPPTTextElement(element) ||
+            element.locked === true ||
+            element.visible === false) {
+            return element
+          }
+
+          return {
+            ...element,
+            textBody: {
+              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                ...paragraph,
+                align,
+              })),
+            },
+          }
+        }),
+      })),
+    )
+  }
+
+  function toggleSelectedTextBold() {
+    const isBold = selectedTextElements.length > 0 &&
+      selectedTextElements.every((element) =>
+        getPPTTextElementStyle(element).fontWeight === 'bold')
+
+    updateSelectedTextStyles((style) => ({
+      ...style,
+      fontWeight: isBold ? 'regular' : 'bold',
+    }))
+  }
+
+  function stepSelectedTextFontSize(delta: number) {
+    updateSelectedTextStyles((style) => ({
+      ...style,
+      fontSize: clamp(
+        style.fontSize + delta,
+        PPT_TEXT_FONT_SIZE_MIN,
+        PPT_TEXT_FONT_SIZE_MAX,
+      ),
+    }))
+  }
+
+  function updateSelectedTextColor(color: string) {
+    updateSelectedTextStyles((style) => ({
+      ...style,
+      color,
+    }))
   }
 
   function updateElementName(elementId: string, name: string) {
@@ -2320,6 +2448,7 @@ function App() {
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_CANVAS_SNAP_GUIDES
+  const selectionCommandBarWidth = textQuickFormatState ? 420 : 236
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
     !interaction &&
@@ -2327,6 +2456,7 @@ function App() {
     !creationTool &&
     !lineCreationMode
     ? getPPTSelectionCommandAnchor({
+        barWidth: selectionCommandBarWidth,
         bounds: selectedBounds,
         stage: stageRef.current,
         viewport,
@@ -2627,7 +2757,12 @@ function App() {
               anchor={selectionCommandAnchor}
               groups={selectionFloatingCommandGroups}
               scale={viewport.scale}
+              textFormat={textQuickFormatState}
               onCommand={runPPTSurfaceCommand}
+              onFontSizeStep={stepSelectedTextFontSize}
+              onParagraphAlign={updateSelectedParagraphAlign}
+              onTextBoldToggle={toggleSelectedTextBold}
+              onTextColorChange={updateSelectedTextColor}
             />
             {selectedLineElement && !editingId && canResizeSelection ? (
               <LineEndpointOverlay
@@ -2803,14 +2938,24 @@ function PPTSelectionFloatingBar({
   anchor,
   groups,
   onCommand,
+  onFontSizeStep,
+  onParagraphAlign,
+  onTextBoldToggle,
+  onTextColorChange,
   scale,
+  textFormat,
 }: {
   anchor: PPTSelectionCommandAnchor | null
   groups: readonly PPTSurfaceCommandViewGroup[]
   onCommand: (command: PPTSurfaceCommand) => void
+  onFontSizeStep: (delta: number) => void
+  onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
+  onTextBoldToggle: () => void
+  onTextColorChange: (color: string) => void
   scale: number
+  textFormat: PPTTextQuickFormatState | null
 }) {
-  if (!anchor || groups.length === 0) {
+  if (!anchor || (groups.length === 0 && !textFormat)) {
     return null
   }
 
@@ -2828,6 +2973,16 @@ function PPTSelectionFloatingBar({
       } as CSSProperties}
       onPointerDown={(event) => event.stopPropagation()}
     >
+      {textFormat ? (
+        <PPTTextQuickFormatControls
+          state={textFormat}
+          onFontSizeStep={onFontSizeStep}
+          onParagraphAlign={onParagraphAlign}
+          onTextBoldToggle={onTextBoldToggle}
+          onTextColorChange={onTextColorChange}
+        />
+      ) : null}
+      {textFormat && groups.length > 0 ? <span className="ppt-command-divider" /> : null}
       {groups.map((group, groupIndex) => (
         <Fragment key={group.id}>
           {groupIndex > 0 ? <span className="ppt-command-divider" /> : null}
@@ -2843,6 +2998,118 @@ function PPTSelectionFloatingBar({
       ))}
     </div>
   )
+}
+
+function PPTTextQuickFormatControls({
+  onFontSizeStep,
+  onParagraphAlign,
+  onTextBoldToggle,
+  onTextColorChange,
+  state,
+}: {
+  onFontSizeStep: (delta: number) => void
+  onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
+  onTextBoldToggle: () => void
+  onTextColorChange: (color: string) => void
+  state: PPTTextQuickFormatState
+}) {
+  return (
+    <span className="ppt-text-quick-format" data-ppt-text-quick-bar>
+      <button
+        aria-label="Bold text"
+        aria-pressed={state.isBold}
+        className="ppt-floating-command"
+        data-ppt-text-quick="bold"
+        title="Bold text"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onTextBoldToggle()
+        }}
+      >
+        <Bold size={16} />
+      </button>
+      <button
+        aria-label="Decrease font size"
+        className="ppt-floating-command"
+        data-ppt-text-quick="font-size-down"
+        title="Decrease font size"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onFontSizeStep(-PPT_TEXT_FONT_SIZE_STEP)
+        }}
+      >
+        <Minus size={16} />
+      </button>
+      <span className="ppt-font-size-chip" data-ppt-text-quick-size>
+        <ALargeSmall size={15} />
+        {state.fontSize}
+      </span>
+      <button
+        aria-label="Increase font size"
+        className="ppt-floating-command"
+        data-ppt-text-quick="font-size-up"
+        title="Increase font size"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onFontSizeStep(PPT_TEXT_FONT_SIZE_STEP)
+        }}
+      >
+        <Plus size={16} />
+      </button>
+      <label className="ppt-floating-color" title="Text color">
+        <Baseline size={15} />
+        <input
+          aria-label="Text color"
+          data-ppt-text-quick="color"
+          type="color"
+          value={state.color}
+          onChange={(event) => onTextColorChange(event.target.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+        />
+      </label>
+      {(['left', 'center', 'right'] as const).map((align) => (
+        <button
+          aria-label={`Align text ${align}`}
+          aria-pressed={state.align === align}
+          className="ppt-floating-command"
+          data-ppt-text-quick={`align-${align}`}
+          key={align}
+          title={`Align text ${align}`}
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onParagraphAlign(align)
+          }}
+        >
+          <PPTTextAlignIcon align={align} size={16} />
+        </button>
+      ))}
+    </span>
+  )
+}
+
+function PPTTextAlignIcon({
+  align,
+  size,
+}: {
+  align: NonNullable<PPTParagraph['align']>
+  size: number
+}) {
+  switch (align) {
+    case 'center':
+      return <AlignCenter size={size} />
+    case 'right':
+      return <AlignRight size={size} />
+    case 'left':
+      return <AlignLeft size={size} />
+  }
 }
 
 function PPTContextCommandMenu({
@@ -3960,11 +4227,51 @@ function getPPTCommandSurfaceGroups({
   })
 }
 
+function getPPTTextQuickFormatState(
+  elements: readonly PPTTextElement[],
+): PPTTextQuickFormatState {
+  const styles = elements.map(getPPTTextElementStyle)
+  const firstStyle = styles[0] ?? getDefaultPPTTextStyle()
+  const firstAlign = elements[0]?.textBody.paragraphs[0]?.align ?? 'left'
+
+  return {
+    align: elements.every((element) =>
+      (element.textBody.paragraphs[0]?.align ?? 'left') === firstAlign)
+      ? firstAlign
+      : 'left',
+    color: styles.every((style) => style.color === firstStyle.color)
+      ? firstStyle.color
+      : '#111827',
+    fontSize: styles.every((style) => style.fontSize === firstStyle.fontSize)
+      ? firstStyle.fontSize
+      : Math.round(styles.reduce((sum, style) => sum + style.fontSize, 0) / styles.length),
+    isBold: styles.length > 0 &&
+      styles.every((style) => style.fontWeight === 'bold'),
+  }
+}
+
+function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
+  return {
+    ...getDefaultPPTTextStyle(),
+    ...element.style,
+  }
+}
+
+function getDefaultPPTTextStyle(): PPTTextStyle {
+  return {
+    color: '#111827',
+    fontSize: 24,
+    fontWeight: 'regular',
+  }
+}
+
 function getPPTSelectionCommandAnchor({
+  barWidth,
   bounds,
   stage,
   viewport,
 }: {
+  barWidth: number
   bounds: Bounds
   stage: HTMLElement | null
   viewport: Viewport
@@ -3973,7 +4280,7 @@ function getPPTSelectionCommandAnchor({
   const gap = 10 / scale
   const screenMargin = 8
   const barHeight = 40
-  const barHalfWidth = 118 / scale
+  const barHalfWidth = barWidth / 2 / scale
   const centerX = bounds.x + bounds.w / 2
 
   if (!stage) {
