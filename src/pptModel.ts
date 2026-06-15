@@ -46,6 +46,8 @@ const PPTTextStyleSchema = z.object({
 })
 
 const PPTElementBaseSchema = z.object({
+  flipH: z.boolean().optional(),
+  flipV: z.boolean().optional(),
   geometry: PPTGeometrySchema,
   groupId: z.string().optional(),
   id: z.string(),

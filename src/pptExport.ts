@@ -50,15 +50,17 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
 }
 
 function renderPPTElementHTML(element: PPTElement) {
+  const transform = getPPTElementTransform(element)
+  const transformAttrs = getPPTElementTransformAttrs(element)
   const style = [
     `left:${toPercent(element.geometry.x, PPT_SLIDE_WIDTH)}`,
     `top:${toPercent(element.geometry.y, PPT_SLIDE_HEIGHT)}`,
     `width:${toPercent(element.geometry.w, PPT_SLIDE_WIDTH)}`,
     `height:${toPercent(element.geometry.h, PPT_SLIDE_HEIGHT)}`,
-    element.geometry.rotation
-      ? `transform:rotate(${element.geometry.rotation}deg)`
+    transform
+      ? `transform:${transform}`
       : '',
-    element.geometry.rotation
+    transform
       ? 'transform-origin:center'
       : '',
   ]
@@ -67,7 +69,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}" data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -82,10 +84,10 @@ function renderPPTElementHTML(element: PPTElement) {
     : ''
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${bulletListAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTSlideNotesHTML(slideId: string, notes: string | undefined) {
@@ -193,6 +195,23 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
   ].filter(Boolean).join(' ')
 
   return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+}
+
+function getPPTElementTransform(element: PPTElement) {
+  const transforms = [
+    element.geometry.rotation ? `rotate(${element.geometry.rotation}deg)` : '',
+    element.flipH === true ? 'scaleX(-1)' : '',
+    element.flipV === true ? 'scaleY(-1)' : '',
+  ].filter(Boolean)
+
+  return transforms.length > 0 ? transforms.join(' ') : ''
+}
+
+function getPPTElementTransformAttrs(element: PPTElement) {
+  return [
+    element.flipH === true ? ' data-ppt-flip-h="true"' : '',
+    element.flipV === true ? ' data-ppt-flip-v="true"' : '',
+  ].join('')
 }
 
 function getPPTLinePath(element: PPTLine) {

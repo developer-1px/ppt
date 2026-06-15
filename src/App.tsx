@@ -26,6 +26,8 @@ import {
   Eye,
   EyeOff,
   FilePlus2,
+  FlipHorizontal2,
+  FlipVertical2,
   Grid2X2,
   Group,
   ImagePlus,
@@ -218,6 +220,8 @@ type PPTSurfaceCommand =
   | 'bringToFront'
   | 'delete'
   | 'duplicate'
+  | 'flipHorizontal'
+  | 'flipVertical'
   | 'group'
   | 'lockSelection'
   | 'selectSameType'
@@ -227,6 +231,7 @@ type PPTSurfaceCommand =
   | 'ungroup'
   | 'unlockAll'
 type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
+  flipSelection: boolean
   selectSameType: boolean
   tidySelection: boolean
 }
@@ -297,6 +302,20 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     label: 'Tidy selection',
     surfaces: ['context-menu', 'selection-floating-bar'],
     title: 'Tidy selection',
+  }, {
+    availability: 'flipSelection',
+    command: 'flipHorizontal',
+    dataCommand: 'flip-horizontal',
+    label: 'Flip horizontal',
+    surfaces: ['context-menu'],
+    title: 'Flip horizontal',
+  }, {
+    availability: 'flipSelection',
+    command: 'flipVertical',
+    dataCommand: 'flip-vertical',
+    label: 'Flip vertical',
+    surfaces: ['context-menu'],
+    title: 'Flip vertical',
   }, {
     availability: 'delete',
     command: 'delete',
@@ -408,6 +427,7 @@ const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
 
 type LineCreationMode = 'arrow' | 'line'
+type PPTFlipAxis = 'horizontal' | 'vertical'
 type PPTCreationTool =
   | {
       kind: 'shape'
@@ -571,6 +591,10 @@ function App() {
     () => canTidyPPTSelection(activeSlide.elements, selection),
     [activeSlide.elements, selection],
   )
+  const canFlipSelection = useMemo(
+    () => canFlipPPTSelection(activeSlide.elements, selection),
+    [activeSlide.elements, selection],
+  )
   const canFormatSelectedText = selectedTextElements.length > 0 &&
     selectedTextElements.length === selectedElements.length &&
     !hasLockedSelection &&
@@ -589,9 +613,11 @@ function App() {
       hasLockedSelection,
       selection,
     }),
+    flipSelection: canFlipSelection,
     selectSameType: canSelectSameType,
     tidySelection: canTidySelection,
   }), [
+    canFlipSelection,
     clipboard.length,
     canSelectSameType,
     canTidySelection,
@@ -1468,6 +1494,26 @@ function App() {
     setContextMenu(null)
   }
 
+  function flipSelection(axis: PPTFlipAxis) {
+    if (!commandAvailability.flipSelection) {
+      return
+    }
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const elements = flipPPTSelectionElements(slide.elements, selection, axis)
+
+      return {
+        ...slide,
+        elements: syncPPTLineConnections(
+          elements,
+          getPPTSelectedLineIds(elements, selection),
+        ),
+      }
+    }))
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
   function activateSelectTool() {
     setCreationTool(null)
     setLineCreationMode(null)
@@ -1497,6 +1543,12 @@ function App() {
         break
       case 'duplicate':
         duplicateSelection()
+        break
+      case 'flipHorizontal':
+        flipSelection('horizontal')
+        break
+      case 'flipVertical':
+        flipSelection('vertical')
         break
       case 'group':
         groupSelection()
@@ -2919,6 +2971,18 @@ function App() {
     section: 'Arrange',
     title: 'Tidy selection',
   }, {
+    disabled: !commandAvailability.flipSelection,
+    id: 'command:flip-horizontal',
+    run: () => flipSelection('horizontal'),
+    section: 'Arrange',
+    title: 'Flip horizontal',
+  }, {
+    disabled: !commandAvailability.flipSelection,
+    id: 'command:flip-vertical',
+    run: () => flipSelection('vertical'),
+    section: 'Arrange',
+    title: 'Flip vertical',
+  }, {
     disabled: !commandAvailability.bringForward,
     id: 'command:bring-forward',
     run: () => reorderSelection('bringForward'),
@@ -3236,6 +3300,12 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
             <Grid2X2 size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="flip-horizontal" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('horizontal')} title="Flip horizontal" type="button">
+            <FlipHorizontal2 size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="flip-vertical" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('vertical')} title="Flip vertical" type="button">
+            <FlipVertical2 size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
@@ -4100,6 +4170,10 @@ function PPTSurfaceCommandIcon({
       return <Trash2 size={size} />
     case 'duplicate':
       return <CopyPlus size={size} />
+    case 'flipHorizontal':
+      return <FlipHorizontal2 size={size} />
+    case 'flipVertical':
+      return <FlipVertical2 size={size} />
     case 'group':
       return <Group size={size} />
     case 'lockSelection':
@@ -4154,6 +4228,8 @@ function SlideThumb({
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
+            data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
+            data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
               : undefined}
@@ -4179,9 +4255,7 @@ function SlideThumb({
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
-              transform: element.geometry.rotation
-                ? `rotate(${element.geometry.rotation}deg)`
-                : undefined,
+              transform: getPPTElementTransform(element),
               width: `${(element.geometry.w / PPT_SLIDE_WIDTH) * 100}%`,
             }}
           />
@@ -4260,6 +4334,8 @@ function PPTElementView({
         ? element.startConnection?.elementId
         : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
+      data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
+      data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
       data-ppt-image-crop-x={element.kind === 'image'
         ? getPPTImageCrop(element).x
         : undefined}
@@ -5169,9 +5245,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     height: element.geometry.h,
     left: element.geometry.x,
     top: element.geometry.y,
-    transform: element.geometry.rotation
-      ? `rotate(${element.geometry.rotation}deg)`
-      : undefined,
+    transform: getPPTElementTransform(element),
     transformOrigin: 'center',
     width: element.geometry.w,
   }
@@ -5189,6 +5263,16 @@ function pptElementStyle(element: PPTElement): CSSProperties {
       : undefined,
     textAlign: getPPTElementParagraphAlign(element),
   }
+}
+
+function getPPTElementTransform(element: PPTElement) {
+  const transforms = [
+    element.geometry.rotation ? `rotate(${element.geometry.rotation}deg)` : '',
+    element.flipH === true ? 'scaleX(-1)' : '',
+    element.flipV === true ? 'scaleY(-1)' : '',
+  ].filter(Boolean)
+
+  return transforms.length > 0 ? transforms.join(' ') : undefined
 }
 
 function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
@@ -5266,6 +5350,92 @@ function getPPTElementTypeKey(element: PPTElement) {
   }
 
   return element.kind
+}
+
+function canFlipPPTSelection(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+) {
+  if (selection.length === 0) {
+    return false
+  }
+
+  return getPPTFlipSelectionElements(elements, selection).length === selection.length
+}
+
+function flipPPTSelectionElements(
+  elements: PPTElement[],
+  selection: readonly string[],
+  axis: PPTFlipAxis,
+) {
+  if (!canFlipPPTSelection(elements, selection)) {
+    return elements
+  }
+
+  const selected = new Set(selection)
+  const selectedElements = getPPTFlipSelectionElements(elements, selection)
+  const selectionBounds = getPPTElementsBounds(selectedElements)
+
+  if (!selectionBounds) {
+    return elements
+  }
+
+  const pivot = axis === 'horizontal'
+    ? selectionBounds.x + selectionBounds.w / 2
+    : selectionBounds.y + selectionBounds.h / 2
+
+  return elements.map((element) =>
+    selected.has(element.id) ? flipPPTElement(element, axis, pivot) : element)
+}
+
+function flipPPTElement(
+  element: PPTElement,
+  axis: PPTFlipAxis,
+  pivot: number,
+): PPTElement {
+  if (element.kind === 'line') {
+    return flipPPTLineElement(element, axis, pivot)
+  }
+
+  const bounds = pptGeometryToBounds(element.geometry)
+  const next = updatePPTElementBounds(element, axis === 'horizontal'
+    ? { ...bounds, x: 2 * pivot - (bounds.x + bounds.w) }
+    : { ...bounds, y: 2 * pivot - (bounds.y + bounds.h) })
+
+  return axis === 'horizontal'
+    ? { ...next, flipH: next.flipH !== true }
+    : { ...next, flipV: next.flipV !== true }
+}
+
+function flipPPTLineElement(
+  line: PPTLine,
+  axis: PPTFlipAxis,
+  pivot: number,
+) {
+  const reflect = (point: Point): Point =>
+    axis === 'horizontal'
+      ? { x: 2 * pivot - point.x, y: point.y }
+      : { x: point.x, y: 2 * pivot - point.y }
+
+  return buildPPTLineFromWorldEndpoints({
+    end: reflect(getPPTLineEndpointPoint(line, 'end')),
+    endConnection: undefined,
+    line,
+    start: reflect(getPPTLineEndpointPoint(line, 'start')),
+    startConnection: undefined,
+  })
+}
+
+function getPPTFlipSelectionElements(
+  elements: readonly PPTElement[],
+  selection: readonly string[],
+) {
+  const selected = new Set(selection)
+
+  return elements.filter((element) =>
+    selected.has(element.id) &&
+    element.visible !== false &&
+    element.locked !== true)
 }
 
 function canTidyPPTSelection(

@@ -49,6 +49,7 @@ try {
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
+  await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
   await runExportScenario(page)
   await runSlideManagementScenario(page)
@@ -1490,12 +1491,15 @@ async function runCommandPaletteScenario(page) {
   const frontIds = await readCommandPaletteIds(page, 'front')
   const backIds = await readCommandPaletteIds(page, 'back')
   const tidyIds = await readCommandPaletteIds(page, 'tidy')
+  const flipIds = await readCommandPaletteIds(page, 'flip')
   const fitIds = await readCommandPaletteIds(page, 'fit')
   const gridIds = await readCommandPaletteIds(page, 'grid')
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') && toolIds.includes('tool:arrow'),
     hasFind: findIds.includes('view:find'),
+    hasFlip: flipIds.includes('command:flip-horizontal') &&
+      flipIds.includes('command:flip-vertical'),
     hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
     hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
     hasReorder: frontIds.includes('command:bring-to-front') && backIds.includes('command:send-to-back'),
@@ -1508,6 +1512,7 @@ async function runCommandPaletteScenario(page) {
       back: backIds.length,
       find: findIds.length,
       fit: fitIds.length,
+      flip: flipIds.length,
       front: frontIds.length,
       grid: gridIds.length,
       group: groupIds.length,
@@ -1517,7 +1522,7 @@ async function runCommandPaletteScenario(page) {
     },
   }
 
-  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasTidy && exposed.hasView, exposed)
+  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasTidy && exposed.hasView, exposed)
 
   await pressKey(page, {
     code: 'Escape',
@@ -1822,6 +1827,59 @@ async function readPPTTidyState(page, ids) {
   })()`)
 }
 
+async function readPPTFlipState(page, ids) {
+  return page.eval(`(() => {
+    const ids = ${JSON.stringify(ids)}
+    const entries = ids.map((id) => {
+      const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+
+      return {
+        flipH: element?.getAttribute('data-ppt-flip-h') ?? '',
+        flipV: element?.getAttribute('data-ppt-flip-v') ?? '',
+        h: parseFloat(element?.style.height ?? '0'),
+        id,
+        transform: element?.style.transform ?? '',
+        w: parseFloat(element?.style.width ?? '0'),
+        x: parseFloat(element?.style.left ?? '0'),
+        y: parseFloat(element?.style.top ?? '0'),
+      }
+    })
+    const minX = Math.min(...entries.map((entry) => entry.x))
+    const minY = Math.min(...entries.map((entry) => entry.y))
+    const maxX = Math.max(...entries.map((entry) => entry.x + entry.w))
+    const maxY = Math.max(...entries.map((entry) => entry.y + entry.h))
+    const pivotX = minX + (maxX - minX) / 2
+    const pivotY = minY + (maxY - minY) / 2
+    const expectedHorizontal = Object.fromEntries(entries.map((entry) => {
+      const targetX = 2 * pivotX - (entry.x + entry.w)
+
+      return [entry.id, {
+        ...entry,
+        x: Math.min(${PPT_SLIDE_WIDTH} - entry.w, Math.max(0, targetX)),
+      }]
+    }))
+    const expectedVertical = Object.fromEntries(entries.map((entry) => {
+      const targetY = 2 * pivotY - (entry.y + entry.h)
+
+      return [entry.id, {
+        ...entry,
+        y: Math.min(${PPT_SLIDE_HEIGHT} - entry.h, Math.max(0, targetY)),
+      }]
+    }))
+
+    return {
+      expectedHorizontal,
+      expectedVertical,
+      flipHorizontalDisabled: document.querySelector('[data-ppt-command="flip-horizontal"]')?.disabled ?? true,
+      flipVerticalDisabled: document.querySelector('[data-ppt-command="flip-vertical"]')?.disabled ?? true,
+      positions: Object.fromEntries(entries.map((entry) => [entry.id, entry])),
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element')),
+    }
+  })()`)
+}
+
 async function selectPPTLayerRows(page, ids) {
   await page.eval(`(() => {
     const ids = ${JSON.stringify(ids)}
@@ -2005,6 +2063,8 @@ async function runExportScenario(page) {
       hasImageFitModel: code.includes('"fit": "contain"'),
       hasImageCropMarkup: code.includes('data-ppt-image-crop-x="25"') && code.includes('data-ppt-image-crop-y="70"') && code.includes('object-position:25% 70%'),
       hasImageCropModel: code.includes('"crop"') && code.includes('"x": 25') && code.includes('"y": 70'),
+      hasImageFlipMarkup: code.includes('data-ppt-flip-h="true"') && code.includes('scaleX(-1)'),
+      hasImageFlipModel: code.includes('"flipH": true'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
       hasLineConnectionMarkup: code.includes('data-ppt-start-connection="'),
       hasLineConnectionModel: code.includes('"startConnection"') && code.includes('"anchor"'),
@@ -2029,6 +2089,7 @@ async function runExportScenario(page) {
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
   record('exports PPT image crop position markup and model data', state.hasImageCropMarkup && state.hasImageCropModel, state)
+  record('exports PPT image flip markup and model data', state.hasImageFlipMarkup && state.hasImageFlipModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
@@ -2664,6 +2725,158 @@ async function runLineAffordanceScenario(page) {
   })
 }
 
+async function runFlipSelectionScenario(page) {
+  const shapeIds = ['s1-card-1', 's1-card-2']
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+
+  await selectPPTLayerRows(page, shapeIds)
+  await delay(80)
+
+  const beforeShapeFlip = await readPPTFlipState(page, shapeIds)
+
+  record('enables PPT flip commands for visible unlocked selection', beforeShapeFlip.selectedCount === 2 && !beforeShapeFlip.flipHorizontalDisabled && !beforeShapeFlip.flipVerticalDisabled, beforeShapeFlip)
+
+  await page.eval(`document.querySelector('[data-ppt-command="flip-horizontal"]')?.click()`)
+  await delay(100)
+
+  const afterShapeFlip = await readPPTFlipState(page, shapeIds)
+
+  record('flips selected PPT shapes horizontally around selection bounds', afterShapeFlip.selectedCount === 2 && positionsChanged(beforeShapeFlip.positions, afterShapeFlip.positions, shapeIds) && positionsMatch(afterShapeFlip.positions, beforeShapeFlip.expectedHorizontal, shapeIds) && shapeIds.every((id) => afterShapeFlip.positions[id]?.flipH === 'true'), {
+    afterShapeFlip,
+    beforeShapeFlip,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const afterShapeUndo = await readPPTFlipState(page, shapeIds)
+
+  record('undoes PPT shape flip in one step', positionsMatch(afterShapeUndo.positions, beforeShapeFlip.positions, shapeIds) && shapeIds.every((id) => afterShapeUndo.positions[id]?.flipH !== 'true'), {
+    afterShapeUndo,
+    beforeShapeFlip,
+  })
+
+  const textIds = ['s1-title', 's1-summary']
+
+  await selectPPTLayerRows(page, textIds)
+  await delay(80)
+
+  const beforeTextFlip = await readPPTFlipState(page, textIds)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await readCommandPaletteIds(page, 'flip vertical')
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(120)
+
+  const afterTextFlip = await readPPTFlipState(page, textIds)
+
+  record('flips selected PPT text boxes from command palette', afterTextFlip.selectedCount === 2 && positionsMatch(afterTextFlip.positions, beforeTextFlip.expectedVertical, textIds) && textIds.every((id) => afterTextFlip.positions[id]?.flipV === 'true'), {
+    afterTextFlip,
+    beforeTextFlip,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const lineId = await page.eval(`(() => document.querySelector('[data-kind="line"]')?.getAttribute('data-ppt-element') ?? '')()`)
+
+  await selectPPTLayerRows(page, [lineId])
+  await delay(80)
+
+  const beforeLineFlip = await getPPTLineState(page, lineId)
+  const linePivotX = (Math.min(beforeLineFlip.worldX1, beforeLineFlip.worldX2) +
+    Math.max(beforeLineFlip.worldX1, beforeLineFlip.worldX2)) / 2
+
+  await page.eval(`document.querySelector('[data-ppt-command="flip-horizontal"]')?.click()`)
+  await delay(100)
+
+  const afterLineFlip = await getPPTLineState(page, lineId)
+
+  record('flips PPT line endpoints horizontally', afterLineFlip.selectedKind === 'line' && nearlyEqual(afterLineFlip.worldX1, 2 * linePivotX - beforeLineFlip.worldX1) && nearlyEqual(afterLineFlip.worldX2, 2 * linePivotX - beforeLineFlip.worldX2) && afterLineFlip.startConnection === '' && afterLineFlip.endConnection === '', {
+    afterLineFlip,
+    beforeLineFlip,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await readCommandPaletteIds(page, 'flip')
+
+  const paletteDisabled = await page.eval(`(() => ({
+    horizontalDisabled: document.querySelector('[data-ppt-command-palette-item="command:flip-horizontal"]')?.disabled ?? false,
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="command:flip-horizontal"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    verticalDisabled: document.querySelector('[data-ppt-command-palette-item="command:flip-vertical"]')?.disabled ?? false,
+  }))()`)
+
+  record('disables PPT flip palette items without selection', paletteDisabled.itemPresent && paletteDisabled.open && paletteDisabled.selectedCount === 0 && paletteDisabled.horizontalDisabled && paletteDisabled.verticalDisabled, paletteDisabled)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
+
+  await selectPPTLayerRows(page, [imageId])
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-command="flip-horizontal"]')?.click()`)
+  await delay(100)
+
+  const afterImageFlip = await getPPTImageImportState(page)
+
+  record('persists PPT image horizontal flip for export', afterImageFlip.selectedKind === 'image' && afterImageFlip.selectedFlipH === 'true' && afterImageFlip.selectedTransform.includes('scaleX(-1)') && afterImageFlip.thumbFlipHCount > 0, afterImageFlip)
+}
+
 async function runSelectionPaneScenario(page) {
   const initial = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
@@ -2846,6 +3059,8 @@ function getPPTImageImportState(page) {
       inspectorCropY: Number(document.querySelector('[data-ppt-style-field="image-crop-y"]')?.value ?? 0),
       inspectorImageFit: document.querySelector('[data-ppt-style-field="image-fit"]')?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
+      selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
+      selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedImageFit: selectedImage?.style.objectFit ?? '',
       selectedImagePosition: selectedImage?.style.objectPosition ?? '',
@@ -2854,9 +3069,12 @@ function getPPTImageImportState(page) {
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedTransform: selected?.style.transform ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       thumbCropXCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-crop-x="25"]').length,
       thumbCropYCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-crop-y="70"]').length,
+      thumbFlipHCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-flip-h="true"]').length,
+      thumbFlipVCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-flip-v="true"]').length,
       thumbContainCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-fit="contain"]').length,
       thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
     }
@@ -2977,6 +3195,10 @@ function positionsMatch(actual, expected, ids, tolerance = 0.5) {
   return ids.every((id) =>
     Math.abs((actual[id]?.x ?? 0) - (expected[id]?.x ?? 0)) <= tolerance &&
     Math.abs((actual[id]?.y ?? 0) - (expected[id]?.y ?? 0)) <= tolerance)
+}
+
+function nearlyEqual(left, right, tolerance = 0.75) {
+  return Math.abs(left - right) <= tolerance
 }
 
 function selectEditableContents(page, elementId) {
