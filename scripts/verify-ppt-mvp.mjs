@@ -265,6 +265,7 @@ async function runAffordanceScenario(page) {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
 
     return {
+      height: parseFloat(element.style.height),
       width: parseFloat(element.style.width),
     }
   })()`)
@@ -272,6 +273,56 @@ async function runAffordanceScenario(page) {
   record('auto-sizes selected object from resize handle double-click', afterAuto.width !== afterResize.width, {
     afterAuto,
     afterResize,
+  })
+
+  const aspectResizeHandle = await page.eval(`(() => {
+    const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mousePressed',
+    x: aspectResizeHandle.x,
+    y: aspectResizeHandle.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 8,
+    type: 'mouseMoved',
+    x: aspectResizeHandle.x + 46,
+    y: aspectResizeHandle.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mouseReleased',
+    x: aspectResizeHandle.x + 46,
+    y: aspectResizeHandle.y,
+  })
+  await delay(50)
+
+  const afterAspectResize = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      height: parseFloat(element.style.height),
+      ratio: parseFloat(element.style.width) / parseFloat(element.style.height),
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+  const expectedAspectRatio = afterAuto.width / afterAuto.height
+
+  record('preserves aspect ratio when Shift-resizing PPT object', afterAspectResize.width > afterAuto.width && afterAspectResize.height > afterAuto.height && Math.abs(afterAspectResize.ratio - expectedAspectRatio) < 0.02, {
+    afterAspectResize,
+    expectedAspectRatio,
   })
 
   const rotateHandle = await page.eval(`(() => {

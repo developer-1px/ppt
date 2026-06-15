@@ -1238,6 +1238,7 @@ function App() {
         handle: interaction.handle,
         items: startSlide.elements,
         point,
+        preserveAspectRatio: event.shiftKey,
         selection: interaction.selection,
       })
 
