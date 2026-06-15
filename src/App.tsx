@@ -88,11 +88,13 @@ import {
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditThemeColorToken,
 } from '@interactive-os/slide-edit-affordance'
@@ -902,6 +904,12 @@ type PPTContextMenuState = {
   x: number
   y: number
 }
+type PPTSlideDropPlacement = 'after' | 'before'
+type PPTSlideDragState = {
+  draggingSlideId: string
+  dropPlacement?: PPTSlideDropPlacement
+  dropTargetSlideId?: string
+}
 type PPTSelectionCommandAnchor = Point & {
   placement: 'above' | 'below'
 }
@@ -1391,6 +1399,8 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
+  const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -1412,6 +1422,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
+  const slideDragSuppressClickRef = useRef(false)
   const deckRef = useRef(deck)
 
   useEffect(() => {
@@ -1608,6 +1619,9 @@ function App() {
   const canDeleteSlide = deck.slides.length > 1
   const canMoveActiveSlideDown = activeSlideIndex >= 0 && activeSlideIndex < deck.slides.length - 1
   const canMoveActiveSlideUp = activeSlideIndex > 0
+  const lastSlideRailReorderPayload = lastSlideRailCommandEffect?.payload.id === 'reorder-slide'
+    ? lastSlideRailCommandEffect.payload
+    : null
   const canResizeSelection = selectedBounds
     ? scene.canResizeSelection?.(selection) ?? true
     : false
@@ -2056,6 +2070,19 @@ function App() {
     setContextMenu(null)
   }
 
+  function handleSlideThumbSelect(
+    slideId: string,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    if (slideDragSuppressClickRef.current) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+
+    selectSlide(slideId)
+  }
+
   function activateRelativeSlide(delta: number) {
     const index = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
     const nextSlide = deck.slides[index + delta]
@@ -2281,6 +2308,148 @@ function App() {
       const slide = slides[index]
       slides[index] = slides[targetIndex]
       slides[targetIndex] = slide
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+  }
+
+  function getSlideThumbDropPlacement(
+    event: ReactDragEvent<HTMLButtonElement>,
+  ): PPTSlideDropPlacement {
+    const rect = event.currentTarget.getBoundingClientRect()
+
+    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  }
+
+  function clearSlideDragState({
+    suppressClick = false,
+  }: {
+    suppressClick?: boolean
+  } = {}) {
+    if (suppressClick) {
+      slideDragSuppressClickRef.current = true
+      window.setTimeout(() => {
+        slideDragSuppressClickRef.current = false
+      }, 120)
+    }
+
+    setSlideDragState(null)
+  }
+
+  function handleSlideThumbDragStart(
+    slideId: string,
+    event: ReactDragEvent<HTMLButtonElement>,
+  ) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', slideId)
+    setContextMenu(null)
+    setSlideDragState({ draggingSlideId: slideId })
+  }
+
+  function handleSlideThumbDragOver(
+    targetSlideId: string,
+    event: ReactDragEvent<HTMLButtonElement>,
+  ) {
+    const sourceSlideId = slideDragState?.draggingSlideId
+
+    if (!sourceSlideId) {
+      return
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+
+    if (sourceSlideId === targetSlideId) {
+      setSlideDragState({ draggingSlideId: sourceSlideId })
+      return
+    }
+
+    setSlideDragState({
+      draggingSlideId: sourceSlideId,
+      dropPlacement: getSlideThumbDropPlacement(event),
+      dropTargetSlideId: targetSlideId,
+    })
+  }
+
+  function handleSlideThumbDrop(
+    targetSlideId: string,
+    event: ReactDragEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+
+    const sourceSlideId = slideDragState?.draggingSlideId ||
+      event.dataTransfer.getData('text/plain')
+    const dropPlacement = slideDragState?.dropTargetSlideId === targetSlideId
+      ? slideDragState.dropPlacement ?? getSlideThumbDropPlacement(event)
+      : getSlideThumbDropPlacement(event)
+
+    if (!sourceSlideId) {
+      clearSlideDragState()
+      return
+    }
+
+    reorderSlideByDrop(sourceSlideId, targetSlideId, dropPlacement)
+    clearSlideDragState({ suppressClick: true })
+  }
+
+  function handleSlideThumbDragEnd() {
+    clearSlideDragState({ suppressClick: true })
+  }
+
+  function reorderSlideByDrop(
+    sourceSlideId: string,
+    targetSlideId: string,
+    placement: PPTSlideDropPlacement,
+  ) {
+    const currentDeck = deckRef.current
+    const toIndex = getPPTSlideDropIndex(
+      currentDeck.slides,
+      sourceSlideId,
+      targetSlideId,
+      placement,
+    )
+
+    if (toIndex === null) {
+      return
+    }
+
+    const effect = getSlideEditRailPointerCommandEffect({
+      slideId: sourceSlideId,
+      slideOrder: currentDeck.slides.map((slide) => slide.id),
+      toIndex,
+      type: 'thumbnail-drop',
+    })
+
+    if (!effect) {
+      return
+    }
+
+    setLastSlideRailCommandEffect(effect)
+
+    commitDeck((current) => {
+      const dropIndex = getPPTSlideDropIndex(
+        current.slides,
+        sourceSlideId,
+        targetSlideId,
+        placement,
+      )
+
+      if (dropIndex === null) {
+        return current
+      }
+
+      const sourceIndex = current.slides.findIndex((slide) => slide.id === sourceSlideId)
+
+      if (sourceIndex < 0 || sourceIndex === dropIndex) {
+        return current
+      }
+
+      const slides = [...current.slides]
+      const [slide] = slides.splice(sourceIndex, 1)
+      slides.splice(dropIndex, 0, slide)
 
       return {
         ...current,
@@ -5300,16 +5469,36 @@ function App() {
             </button>
           </div>
         </div>
-        <div className="ppt-slide-list" role="listbox" aria-label="Slides">
+        <div
+          aria-label="Slides"
+          className="ppt-slide-list"
+          data-ppt-slide-dragging={slideDragState?.draggingSlideId ?? undefined}
+          data-ppt-slide-drop-placement={slideDragState?.dropPlacement ?? undefined}
+          data-ppt-slide-drop-target={slideDragState?.dropTargetSlideId ?? undefined}
+          data-ppt-slide-list
+          data-ppt-slide-rail-command={lastSlideRailCommandEffect?.payload.id}
+          data-ppt-slide-rail-command-from-index={lastSlideRailReorderPayload?.fromIndex}
+          data-ppt-slide-rail-command-selection-slide={lastSlideRailCommandEffect?.selection?.slideId}
+          data-ppt-slide-rail-command-slide={lastSlideRailReorderPayload?.slideId}
+          data-ppt-slide-rail-command-to-index={lastSlideRailReorderPayload?.toIndex}
+          data-ppt-slide-rail-command-type={lastSlideRailCommandEffect?.type}
+          role="listbox"
+        >
           {deck.slides.map((slide, index) => (
             <SlideThumb
               active={slide.id === activeSlide.id}
+              dragging={slideDragState?.draggingSlideId === slide.id}
+              dropPlacement={slideDragState?.dropTargetSlideId === slide.id
+                ? slideDragState.dropPlacement
+                : undefined}
               index={index}
               key={slide.id}
               slide={slide}
-              onSelect={() => {
-                selectSlide(slide.id)
-              }}
+              onDragEnd={handleSlideThumbDragEnd}
+              onDragOver={(event) => handleSlideThumbDragOver(slide.id, event)}
+              onDragStart={(event) => handleSlideThumbDragStart(slide.id, event)}
+              onDrop={(event) => handleSlideThumbDrop(slide.id, event)}
+              onSelect={(event) => handleSlideThumbSelect(slide.id, event)}
             />
           ))}
         </div>
@@ -7620,13 +7809,25 @@ function PPTSurfaceCommandIcon({
 
 function SlideThumb({
   active,
+  dragging,
+  dropPlacement,
   index,
+  onDragEnd,
+  onDragOver,
+  onDragStart,
+  onDrop,
   onSelect,
   slide,
 }: {
   active: boolean
+  dragging: boolean
+  dropPlacement?: PPTSlideDropPlacement
   index: number
-  onSelect: () => void
+  onDragEnd: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onDragOver: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onDrop: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void
   slide: PPTSlide
 }) {
   return (
@@ -7634,6 +7835,16 @@ function SlideThumb({
       aria-current={active ? 'page' : undefined}
       aria-label={`Open ${slide.name}`}
       className="ppt-thumb"
+      data-ppt-slide-dragging={dragging ? 'true' : undefined}
+      data-ppt-slide-draggable="true"
+      data-ppt-slide-drop-target={dropPlacement}
+      data-ppt-slide-id={slide.id}
+      data-ppt-slide-index={index}
+      draggable
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
       onClick={onSelect}
       role="option"
       type="button"
@@ -12288,6 +12499,30 @@ function createPPTSlideId(deck: PPTDeck) {
   }
 
   return id
+}
+
+function getPPTSlideDropIndex(
+  slides: readonly PPTSlide[],
+  sourceSlideId: string,
+  targetSlideId: string,
+  placement: PPTSlideDropPlacement,
+) {
+  const sourceIndex = slides.findIndex((slide) => slide.id === sourceSlideId)
+  const targetIndex = slides.findIndex((slide) => slide.id === targetSlideId)
+
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+    return null
+  }
+
+  let dropIndex = targetIndex + (placement === 'after' ? 1 : 0)
+
+  if (sourceIndex < dropIndex) {
+    dropIndex -= 1
+  }
+
+  const normalizedDropIndex = Math.max(0, Math.min(slides.length - 1, dropIndex))
+
+  return normalizedDropIndex === sourceIndex ? null : normalizedDropIndex
 }
 
 function normalizePPTCommentBody(value: string) {

@@ -6910,6 +6910,42 @@ async function runSlideManagementScenario(page) {
     afterPageUp,
   })
 
+  const selectedElementId = await page.eval(`document.querySelector('.ppt-slide [data-ppt-element]')?.getAttribute('data-ppt-element') ?? ''`)
+
+  if (selectedElementId) {
+    const point = await getElementCenter(page, selectedElementId)
+    await clickMouse(page, point.x, point.y, 1)
+    await delay(50)
+  }
+
+  const beforeDrag = await getSlideRailState(page)
+  const dragDetails = await dragPPTSlideThumbnail(page)
+  await delay(80)
+
+  const afterDrag = await getSlideRailState(page)
+
+  record('drags PPT slide thumbnail to reorder rail', dragDetails.ok && afterDrag.activeIndex === 0 && afterDrag.activeId === beforeDrag.activeId && afterDrag.activeName.startsWith('1. ') && afterDrag.activeName.includes('Copy') && afterDrag.selectedIds === beforeDrag.selectedIds && afterDrag.draggableCount === afterDrag.count && afterDrag.command === 'reorder-slide' && afterDrag.commandFromIndex === String(beforeDrag.activeIndex) && afterDrag.commandToIndex === '0' && afterDrag.commandSlide === beforeDrag.activeId && afterDrag.commandSelectionSlide === beforeDrag.activeId && afterDrag.commandType === 'slide-command-effect', {
+    afterDrag,
+    beforeDrag,
+    dragDetails,
+  })
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterDragUndo = await getSlideRailState(page)
+
+  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await delay(80)
+
+  const afterDragRedo = await getSlideRailState(page)
+
+  record('undoes and redoes PPT slide drag reorder as one history step', afterDragUndo.activeId === beforeDrag.activeId && afterDragUndo.activeIndex === beforeDrag.activeIndex && afterDragUndo.selectedIds === beforeDrag.selectedIds && afterDragRedo.activeId === beforeDrag.activeId && afterDragRedo.activeIndex === 0 && afterDragRedo.selectedIds === beforeDrag.selectedIds, {
+    afterDragRedo,
+    afterDragUndo,
+    beforeDrag,
+  })
+
   await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
   await delay(50)
 
@@ -7608,17 +7644,127 @@ function selectEditableContents(page, elementId) {
 
 function getSlideRailState(page) {
   return page.eval(`(() => {
+    const rail = document.querySelector('[data-ppt-slide-list]')
+    const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element'))
+      .filter(Boolean)
     const thumbs = [...document.querySelectorAll('.ppt-thumb')]
     const activeIndex = thumbs.findIndex((thumb) => thumb.getAttribute('aria-current') === 'page')
     const activeThumb = thumbs[activeIndex] ?? null
 
     return {
+      activeId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
       activeIndex,
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      command: rail?.getAttribute('data-ppt-slide-rail-command') ?? '',
+      commandFromIndex: rail?.getAttribute('data-ppt-slide-rail-command-from-index') ?? '',
+      commandSelectionSlide: rail?.getAttribute('data-ppt-slide-rail-command-selection-slide') ?? '',
+      commandSlide: rail?.getAttribute('data-ppt-slide-rail-command-slide') ?? '',
+      commandToIndex: rail?.getAttribute('data-ppt-slide-rail-command-to-index') ?? '',
+      commandType: rail?.getAttribute('data-ppt-slide-rail-command-type') ?? '',
       count: thumbs.length,
+      draggableCount: thumbs.filter((thumb) => thumb.getAttribute('data-ppt-slide-draggable') === 'true').length,
+      ids: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       names: thumbs.map((thumb) => thumb.querySelector('.ppt-thumb-name')?.textContent ?? ''),
+      selectedIds: selectedIds.join(','),
     }
   })()`)
+}
+
+function dragPPTSlideThumbnail(page, {
+  placement = 'before',
+  sourceSelector = '.ppt-thumb[aria-current="page"]',
+  targetSelector = '.ppt-slide-list .ppt-thumb:first-child',
+} = {}) {
+  return page.eval(`((input) => {
+    const source = document.querySelector(input.sourceSelector)
+    const target = document.querySelector(input.targetSelector)
+
+    if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+      return {
+        ok: false,
+        sourceFound: source instanceof HTMLElement,
+        targetFound: target instanceof HTMLElement,
+      }
+    }
+
+    const rect = target.getBoundingClientRect()
+    const clientX = rect.left + rect.width / 2
+    const clientY = input.placement === 'before'
+      ? rect.top + 2
+      : rect.bottom - 2
+    const dataTransfer = typeof DataTransfer === 'function'
+      ? new DataTransfer()
+      : {
+          data: new Map(),
+          dropEffect: 'move',
+          effectAllowed: 'move',
+          getData(type) {
+            return this.data.get(type) ?? ''
+          },
+          setData(type, value) {
+            this.data.set(type, value)
+          },
+        }
+
+    function createDragEvent(type) {
+      let event
+
+      try {
+        event = new DragEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          dataTransfer,
+        })
+      } catch {
+        event = new Event(type, {
+          bubbles: true,
+          cancelable: true,
+        })
+      }
+
+      if (!event.dataTransfer) {
+        Object.defineProperty(event, 'dataTransfer', {
+          configurable: true,
+          value: dataTransfer,
+        })
+      }
+      if (event.clientX !== clientX) {
+        Object.defineProperty(event, 'clientX', {
+          configurable: true,
+          value: clientX,
+        })
+      }
+      if (event.clientY !== clientY) {
+        Object.defineProperty(event, 'clientY', {
+          configurable: true,
+          value: clientY,
+        })
+      }
+
+      return event
+    }
+
+    const sourceId = source.getAttribute('data-ppt-slide-id') ?? ''
+    const sourceIndex = source.getAttribute('data-ppt-slide-index') ?? ''
+    const targetId = target.getAttribute('data-ppt-slide-id') ?? ''
+    const targetIndex = target.getAttribute('data-ppt-slide-index') ?? ''
+
+    source.dispatchEvent(createDragEvent('dragstart'))
+    target.dispatchEvent(createDragEvent('dragover'))
+    target.dispatchEvent(createDragEvent('drop'))
+    source.dispatchEvent(createDragEvent('dragend'))
+
+    return {
+      ok: true,
+      sourceId,
+      sourceIndex,
+      targetId,
+      targetIndex,
+    }
+  })(${JSON.stringify({ placement, sourceSelector, targetSelector })})`)
 }
 
 function getPPTCrossSlideClipboardState(page) {

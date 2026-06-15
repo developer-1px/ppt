@@ -706,17 +706,43 @@
 }
 
 .ppt-thumb {
+  position: relative;
   display: grid;
   gap: 6px;
   width: 100%;
   padding: 8px;
   border-radius: 6px;
+  cursor: grab;
   text-align: left;
 }
 
 .ppt-thumb[aria-current='page'] {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.ppt-thumb[data-ppt-slide-dragging='true'] {
+  cursor: grabbing;
+  opacity: 0.66;
+}
+
+.ppt-thumb[data-ppt-slide-drop-target]::before,
+.ppt-thumb[data-ppt-slide-drop-target]::after {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  content: '';
+}
+
+.ppt-thumb[data-ppt-slide-drop-target='before']::before {
+  top: -6px;
+}
+
+.ppt-thumb[data-ppt-slide-drop-target='after']::after {
+  bottom: -6px;
 }
 
 .ppt-thumb-preview {
