@@ -110,8 +110,13 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
   const markerEnd = element.endMarker === 'arrow'
     ? ` marker-end="url(#${markerId})"`
     : ''
+  const route = element.route ?? 'straight'
+  const lineMarkup = route === 'elbow'
+    ? `<path data-ppt-line-path d="${getPPTLinePath(element)}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round" stroke-linejoin="round"${markerStart}${markerEnd}></path>`
+    : `<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line>`
 
   const connectionAttrs = [
+    `data-ppt-line-route="${route}"`,
     element.startConnection
       ? `data-ppt-start-connection="${escapeHtml(element.startConnection.elementId)}:${element.startConnection.anchor}"`
       : '',
@@ -120,7 +125,19 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
       : '',
   ].filter(Boolean).join(' ')
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line></svg>`
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+}
+
+function getPPTLinePath(element: PPTLine) {
+  const bend = Math.min(0.92, Math.max(0.08, element.routeBend ?? 0.5))
+  const bendX = element.start.x + (element.end.x - element.start.x) * bend
+
+  return [
+    `M ${element.start.x} ${element.start.y}`,
+    `L ${bendX} ${element.start.y}`,
+    `L ${bendX} ${element.end.y}`,
+    `L ${element.end.x} ${element.end.y}`,
+  ].join(' ')
 }
 
 function exportTextStyle(style: PPTTextStyle) {

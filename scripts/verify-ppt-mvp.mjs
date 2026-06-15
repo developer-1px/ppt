@@ -693,6 +693,8 @@ async function runExportScenario(page) {
       hasLineConnectionModel: code.includes('"startConnection"') && code.includes('"anchor"'),
       hasLineMarkup: code.includes('class="ppt-element ppt-line"') && code.includes('<line '),
       hasLineModel: code.includes('"kind": "line"') && code.includes('"endMarker": "arrow"'),
+      hasLineRouteMarkup: code.includes('data-ppt-line-route="elbow"') && code.includes('<path '),
+      hasLineRouteModel: code.includes('"route": "elbow"') && code.includes('"routeBend"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
     }
@@ -704,6 +706,7 @@ async function runExportScenario(page) {
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
+  record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 }
 
@@ -987,15 +990,66 @@ async function runLineAffordanceScenario(page) {
 
   record('updates PPT line stroke and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.markerEnd.includes('url('), afterStyle)
 
+  await page.eval(`(() => {
+    const route = document.querySelector('[data-ppt-style-field="line-route"]')
+    route.value = 'elbow'
+    route.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterRoute = await getPPTLineState(page)
+
+  record('changes PPT connector route to elbow in inspector', afterRoute.route === 'elbow' && afterRoute.hasPath && afterRoute.routeHandleCount === 1, afterRoute)
+
+  const beforeRouteDrag = await page.eval(`(() => {
+    const handle = document.querySelector('[data-ppt-line-route-handle]').getBoundingClientRect()
+    const path = document.querySelector('[data-selected="true"] [data-ppt-line-path]')
+
+    return {
+      d: path.getAttribute('d'),
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: beforeRouteDrag.handleX,
+    y: beforeRouteDrag.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: beforeRouteDrag.handleX - 34,
+    y: beforeRouteDrag.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: beforeRouteDrag.handleX - 34,
+    y: beforeRouteDrag.handleY,
+  })
+  await delay(50)
+
+  const afterRouteDrag = await getPPTLineState(page)
+
+  record('moves PPT elbow connector route handle', afterRouteDrag.route === 'elbow' && afterRouteDrag.pathD !== beforeRouteDrag.d, {
+    afterRouteDrag,
+    beforeRouteDrag,
+  })
+
   const beforeEndpoint = await page.eval(`(() => {
     const handle = document.querySelector('[data-ppt-line-endpoint="end"]').getBoundingClientRect()
-    const line = document.querySelector('[data-selected="true"] line')
+    const shape = document.querySelector('[data-selected="true"]')
 
     return {
       handleX: handle.left + handle.width / 2,
       handleY: handle.top + handle.height / 2,
-      worldX2: parseFloat(document.querySelector('[data-selected="true"]').style.left) + Number(line.getAttribute('x2')),
-      worldY2: parseFloat(document.querySelector('[data-selected="true"]').style.top) + Number(line.getAttribute('y2')),
+      worldX2: parseFloat(shape.style.left) + Number(shape.getAttribute('data-line-end-x') ?? '0'),
+      worldY2: parseFloat(shape.style.top) + Number(shape.getAttribute('data-line-end-y') ?? '0'),
     }
   })()`)
 
@@ -1313,30 +1367,40 @@ function getPPTLineState(page, elementId = null) {
   return page.eval(`(() => {
     const selected = document.querySelector(${JSON.stringify(selector)})
     const selectedLine = selected?.querySelector('line') ?? null
+    const selectedPath = selected?.querySelector('[data-ppt-line-path]') ?? null
+    const selectedStrokeElement = selectedLine ?? selectedPath
     const left = parseFloat(selected?.style.left ?? '0')
     const top = parseFloat(selected?.style.top ?? '0')
+    const x1 = Number(selected?.getAttribute('data-line-start-x') ?? selectedLine?.getAttribute('x1') ?? 0)
+    const x2 = Number(selected?.getAttribute('data-line-end-x') ?? selectedLine?.getAttribute('x2') ?? 0)
+    const y1 = Number(selected?.getAttribute('data-line-start-y') ?? selectedLine?.getAttribute('y1') ?? 0)
+    const y2 = Number(selected?.getAttribute('data-line-end-y') ?? selectedLine?.getAttribute('y2') ?? 0)
 
     return {
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
-      markerEnd: selectedLine?.getAttribute('marker-end') ?? '',
+      hasPath: !!selectedPath,
+      markerEnd: selectedStrokeElement?.getAttribute('marker-end') ?? '',
+      pathD: selectedPath?.getAttribute('d') ?? '',
+      route: selected?.getAttribute('data-line-route') ?? '',
+      routeHandleCount: document.querySelectorAll('[data-ppt-line-route-handle]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       startConnection: selected?.getAttribute('data-line-start-connection') ?? '',
-      stroke: selectedLine?.getAttribute('stroke') ?? '',
-      strokeWidth: selectedLine?.getAttribute('stroke-width') ?? '',
+      stroke: selectedStrokeElement?.getAttribute('stroke') ?? '',
+      strokeWidth: selectedStrokeElement?.getAttribute('stroke-width') ?? '',
       thumbLineCount: document.querySelectorAll('.ppt-thumb-line').length,
       endpointHandleCount: document.querySelectorAll('[data-ppt-line-endpoint]').length,
-      x1: Number(selectedLine?.getAttribute('x1') ?? 0),
-      x2: Number(selectedLine?.getAttribute('x2') ?? 0),
-      y1: Number(selectedLine?.getAttribute('y1') ?? 0),
-      y2: Number(selectedLine?.getAttribute('y2') ?? 0),
-      worldX1: left + Number(selectedLine?.getAttribute('x1') ?? 0),
-      worldX2: left + Number(selectedLine?.getAttribute('x2') ?? 0),
-      worldY1: top + Number(selectedLine?.getAttribute('y1') ?? 0),
-      worldY2: top + Number(selectedLine?.getAttribute('y2') ?? 0),
+      x1,
+      x2,
+      y1,
+      y2,
+      worldX1: left + x1,
+      worldX2: left + x2,
+      worldY1: top + y1,
+      worldY2: top + y2,
     }
   })()`)
 }

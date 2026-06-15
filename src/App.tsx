@@ -114,6 +114,7 @@ import {
   type PPTLine,
   type PPTLineConnection,
   type PPTLineMarker,
+  type PPTLineRoute,
   type PPTParagraph,
   type PPTShape,
   type PPTShapeKind,
@@ -230,6 +231,12 @@ type Interaction =
       slideId: string
       startDeck: PPTDeck
       startPoint: Point
+    }
+  | {
+      kind: 'line-route'
+      lineId: string
+      slideId: string
+      startDeck: PPTDeck
     }
   | {
       additive: boolean
@@ -1069,6 +1076,27 @@ function App() {
     )
   }
 
+  function updateLineRoute(
+    elementId: string,
+    route: PPTLineRoute,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'line') {
+          return element
+        }
+
+        return {
+          ...element,
+          route,
+          routeBend: route === 'elbow'
+            ? element.routeBend ?? 0.5
+            : element.routeBend,
+        }
+      }),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -1422,6 +1450,25 @@ function App() {
     })
   }
 
+  function handleLineRoutePointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    if (!selectedLineElement || !canResizeSelection) {
+      return
+    }
+
+    setInteraction({
+      kind: 'line-route',
+      lineId: selectedLineElement.id,
+      slideId: activeSlide.id,
+      startDeck: deckRef.current,
+    })
+  }
+
   function autoSizeSelection(handle: ResizeHandle) {
     if (selection.length === 0) {
       return
@@ -1493,6 +1540,22 @@ function App() {
               currentSlide,
               interaction.lineId,
             )
+          : element)
+      const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      return
+    }
+
+    if (interaction.kind === 'line-route') {
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const elements = currentSlide.elements.map((element) =>
+        element.id === interaction.lineId && element.kind === 'line'
+          ? updatePPTLineRouteBend(element, point)
           : element)
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
@@ -1926,6 +1989,16 @@ function App() {
                 onPointerDown={handleLineEndpointPointerDown}
               />
             ) : null}
+            {selectedLineElement &&
+            (selectedLineElement.route ?? 'straight') === 'elbow' &&
+            !editingId &&
+            canResizeSelection ? (
+              <LineRouteOverlay
+                line={selectedLineElement}
+                scale={viewport.scale}
+                onPointerDown={handleLineRoutePointerDown}
+              />
+            ) : null}
             {marqueeBounds ? <Box className="ppt-marquee" bounds={marqueeBounds} /> : null}
             <Guides guides={snapGuides} scale={viewport.scale} />
           </div>
@@ -1945,6 +2018,7 @@ function App() {
         onElementNameChange={updateElementName}
         onElementRotationChange={updateElementRotation}
         onLineMarkerChange={updateLineMarker}
+        onLineRouteChange={updateLineRoute}
         onElementTextStyleChange={updateElementTextStyle}
         onElementVisibilityToggle={toggleElementVisibility}
         onLayerSelect={(elementId, additive) => {
@@ -2062,6 +2136,21 @@ function PPTElementView({
       data-line-end-connection={element.kind === 'line'
         ? element.endConnection?.elementId
         : undefined}
+      data-line-route={element.kind === 'line'
+        ? element.route ?? 'straight'
+        : undefined}
+      data-line-end-x={element.kind === 'line'
+        ? element.end.x
+        : undefined}
+      data-line-end-y={element.kind === 'line'
+        ? element.end.y
+        : undefined}
+      data-line-start-x={element.kind === 'line'
+        ? element.start.x
+        : undefined}
+      data-line-start-y={element.kind === 'line'
+        ? element.start.y
+        : undefined}
       data-line-start-connection={element.kind === 'line'
         ? element.startConnection?.elementId
         : undefined}
@@ -2112,6 +2201,8 @@ function PPTElementView({
 
 function PPTLineSvg({ element }: { element: PPTLine }) {
   const markerId = `${element.id}-arrow-marker`
+  const markerEnd = element.endMarker === 'arrow' ? `url(#${markerId})` : undefined
+  const markerStart = element.startMarker === 'arrow' ? `url(#${markerId})` : undefined
 
   return (
     <svg
@@ -2136,17 +2227,31 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
           </marker>
         </defs>
       ) : null}
-      <line
-        markerEnd={element.endMarker === 'arrow' ? `url(#${markerId})` : undefined}
-        markerStart={element.startMarker === 'arrow' ? `url(#${markerId})` : undefined}
-        stroke={element.stroke.color}
-        strokeLinecap="round"
-        strokeWidth={element.stroke.width}
-        x1={element.start.x}
-        x2={element.end.x}
-        y1={element.start.y}
-        y2={element.end.y}
-      />
+      {(element.route ?? 'straight') === 'elbow' ? (
+        <path
+          data-ppt-line-path
+          d={getPPTLinePath(element)}
+          fill="none"
+          markerEnd={markerEnd}
+          markerStart={markerStart}
+          stroke={element.stroke.color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={element.stroke.width}
+        />
+      ) : (
+        <line
+          markerEnd={markerEnd}
+          markerStart={markerStart}
+          stroke={element.stroke.color}
+          strokeLinecap="round"
+          strokeWidth={element.stroke.width}
+          x1={element.start.x}
+          x2={element.end.x}
+          y1={element.start.y}
+          y2={element.end.y}
+        />
+      )}
     </svg>
   )
 }
@@ -2270,6 +2375,35 @@ function LineEndpointOverlay({
   )
 }
 
+function LineRouteOverlay({
+  line,
+  onPointerDown,
+  scale,
+}: {
+  line: PPTLine
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
+  scale: number
+}) {
+  const point = getPPTLineBendPoint(line)
+  const size = 15 / scale
+
+  return (
+    <button
+      aria-label="Move line route"
+      className="ppt-line-route-handle"
+      data-ppt-line-route-handle
+      onPointerDown={onPointerDown}
+      style={{
+        height: size,
+        left: point.x - size / 2,
+        top: point.y - size / 2,
+        width: size,
+      }}
+      type="button"
+    />
+  )
+}
+
 function FrameGuides() {
   return (
     <>
@@ -2364,6 +2498,7 @@ function Inspector({
   onElementVisibilityToggle,
   onLayerSelect,
   onLineMarkerChange,
+  onLineRouteChange,
   onParagraphAlignChange,
   onShapeFillChange,
   onShapeKindChange,
@@ -2402,6 +2537,10 @@ function Inspector({
     elementId: string,
     field: 'endMarker' | 'startMarker',
     value: PPTLineMarker,
+  ) => void
+  onLineRouteChange: (
+    elementId: string,
+    route: PPTLineRoute,
   ) => void
   onParagraphAlignChange: (
     elementId: string,
@@ -2666,6 +2805,21 @@ function Inspector({
                     />
                   </label>
                 </div>
+                <label className="ppt-field">
+                  <span>Route</span>
+                  <select
+                    data-ppt-style-field="line-route"
+                    value={selectedElement.route ?? 'straight'}
+                    onChange={(event) => {
+                      if (isPPTLineRoute(event.target.value)) {
+                        onLineRouteChange(selectedElement.id, event.target.value)
+                      }
+                    }}
+                  >
+                    <option value="straight">Straight</option>
+                    <option value="elbow">Elbow</option>
+                  </select>
+                </label>
                 <div className="ppt-geometry-grid">
                   <label className="ppt-field">
                     <span>Start</span>
@@ -2892,6 +3046,30 @@ function getPPTLineEndpointPoint(
   }
 }
 
+function getPPTLineBend(line: PPTLine) {
+  return clamp(line.routeBend ?? 0.5, 0.08, 0.92)
+}
+
+function getPPTLineBendPoint(line: PPTLine): Point {
+  const bendX = line.start.x + (line.end.x - line.start.x) * getPPTLineBend(line)
+
+  return {
+    x: line.geometry.x + bendX,
+    y: line.geometry.y + (line.start.y + line.end.y) / 2,
+  }
+}
+
+function getPPTLinePath(line: PPTLine) {
+  const bendX = line.start.x + (line.end.x - line.start.x) * getPPTLineBend(line)
+
+  return [
+    `M ${line.start.x} ${line.start.y}`,
+    `L ${bendX} ${line.start.y}`,
+    `L ${bendX} ${line.end.y}`,
+    `L ${line.end.x} ${line.end.y}`,
+  ].join(' ')
+}
+
 function createPPTLineElement({
   end,
   endMarker,
@@ -2916,6 +3094,7 @@ function createPPTLineElement({
     id,
     kind: 'line',
     name,
+    route: 'straight',
     start: { x: 0, y: 12 },
     stroke: { color: '#111827', width: 4 },
   }
@@ -2958,6 +3137,22 @@ function updatePPTLineEndpoint(
       ? attachment?.connection
       : line.startConnection,
   })
+}
+
+function updatePPTLineRouteBend(line: PPTLine, point: Point): PPTLine {
+  const start = getPPTLineEndpointPoint(line, 'start')
+  const end = getPPTLineEndpointPoint(line, 'end')
+  const span = end.x - start.x
+  const fallback = getPPTLineBend(line)
+  const routeBend = Math.abs(span) < 1
+    ? fallback
+    : clamp((point.x - start.x) / span, 0.08, 0.92)
+
+  return {
+    ...line,
+    route: 'elbow',
+    routeBend,
+  }
 }
 
 function buildPPTLineFromWorldEndpoints({
@@ -3348,6 +3543,10 @@ function isPPTShapeKind(value: string): value is PPTShapeKind {
 
 function isPPTLineMarker(value: string): value is PPTLineMarker {
   return value === 'none' || value === 'arrow'
+}
+
+function isPPTLineRoute(value: string): value is PPTLineRoute {
+  return value === 'straight' || value === 'elbow'
 }
 
 function getPPTLayerSelection(

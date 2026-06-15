@@ -74,6 +74,7 @@ const PPTImageSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTLineMarkerSchema = z.enum(['none', 'arrow'])
+const PPTLineRouteSchema = z.enum(['straight', 'elbow'])
 
 const PPTLinePointSchema = z.object({
   x: z.number(),
@@ -90,6 +91,8 @@ const PPTLineSchema = PPTElementBaseSchema.extend({
   endConnection: PPTLineConnectionSchema.optional(),
   endMarker: PPTLineMarkerSchema.optional(),
   kind: z.literal('line'),
+  route: PPTLineRouteSchema.optional(),
+  routeBend: z.number().optional(),
   start: PPTLinePointSchema,
   startConnection: PPTLineConnectionSchema.optional(),
   startMarker: PPTLineMarkerSchema.optional(),
@@ -136,6 +139,7 @@ export type PPTLine = z.infer<typeof PPTLineSchema>
 export type PPTLineConnection = z.infer<typeof PPTLineConnectionSchema>
 export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
+export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
 export type PPTTextElement = PPTTextBox | (PPTShape & { textBody: PPTTextBody })
 export type PPTSlide = z.infer<typeof PPTSlideSchema>
