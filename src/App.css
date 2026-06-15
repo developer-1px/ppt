@@ -425,6 +425,80 @@
   padding: 12px 8px;
 }
 
+.ppt-presentation {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #020617;
+  color: #f8fafc;
+}
+
+.ppt-presentation-header,
+.ppt-presentation-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.ppt-presentation-header {
+  border-bottom: 1px solid rgb(148 163 184 / 24%);
+}
+
+.ppt-presentation-header [data-ppt-presentation-title] {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-presentation-header [data-ppt-presentation-count] {
+  margin-left: auto;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ppt-presentation-header .ppt-icon-button,
+.ppt-presentation-controls .ppt-button {
+  border-color: rgb(148 163 184 / 36%);
+  background: rgb(15 23 42 / 88%);
+  color: #f8fafc;
+}
+
+.ppt-presentation-stage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  padding: 24px;
+}
+
+.ppt-presentation-slide-shell {
+  position: relative;
+}
+
+.ppt-presentation-slide {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform-origin: 0 0;
+  box-shadow: 0 28px 80px rgb(0 0 0 / 42%);
+}
+
+.ppt-presentation-slide .ppt-element {
+  pointer-events: none;
+}
+
+.ppt-presentation-controls {
+  justify-content: center;
+  border-top: 1px solid rgb(148 163 184 / 24%);
+}
+
 .ppt-zoom-label {
   display: inline-flex;
   align-items: center;

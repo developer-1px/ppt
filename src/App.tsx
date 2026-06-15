@@ -16,6 +16,8 @@ import {
   Bold,
   BringToFront,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Circle,
   Command,
@@ -41,6 +43,7 @@ import {
   Moon,
   MoveDown,
   MoveUp,
+  Play,
   Plus,
   Redo2,
   RotateCw,
@@ -575,6 +578,7 @@ function App() {
   const [findQuery, setFindQuery] = useState('')
   const [replaceQuery, setReplaceQuery] = useState('')
   const [activeFindIndex, setActiveFindIndex] = useState(0)
+  const [presentationSlideId, setPresentationSlideId] = useState<string | null>(null)
   const [showGrid, setShowGrid] = useState(true)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
@@ -608,6 +612,12 @@ function App() {
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
   const activeSlideIndex = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
+  const presentationSlide = presentationSlideId
+    ? deck.slides.find((slide) => slide.id === presentationSlideId) ?? activeSlide
+    : null
+  const presentationSlideIndex = presentationSlide
+    ? Math.max(0, deck.slides.findIndex((slide) => slide.id === presentationSlide.id))
+    : -1
   const scene = useMemo(() => createPPTCanvasScene(activeSlide), [activeSlide])
   const commandAdapter = useMemo(() => createPPTCanvasCommandAdapter(), [])
   const selectedBounds = scene.getBounds(selection)
@@ -729,6 +739,32 @@ function App() {
     }))
   }, [scene, selection])
 
+  function startPresentation(slideId = activeSlide.id) {
+    setPresentationSlideId(slideId)
+    setCommandPaletteOpen(false)
+    setContextMenu(null)
+  }
+
+  function exitPresentation() {
+    setPresentationSlideId(null)
+  }
+
+  function navigatePresentation(delta: -1 | 1) {
+    setPresentationSlideId((current) => {
+      const slides = deckRef.current.slides
+
+      if (slides.length === 0) {
+        return current
+      }
+
+      const currentId = current ?? activeSlide.id
+      const currentIndex = Math.max(0, slides.findIndex((slide) => slide.id === currentId))
+      const nextIndex = (currentIndex + delta + slides.length) % slides.length
+
+      return slides[nextIndex]?.id ?? current
+    })
+  }
+
   useLayoutEffect(() => {
     fitSlide()
   }, [activeSlideId, fitSlide])
@@ -784,6 +820,26 @@ function App() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (presentationSlideId) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          exitPresentation()
+          return
+        }
+
+        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+          event.preventDefault()
+          navigatePresentation(1)
+          return
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+          event.preventDefault()
+          navigatePresentation(-1)
+          return
+        }
+      }
+
       if (isEditableTarget(event.target)) {
         return
       }
@@ -3385,6 +3441,11 @@ function App() {
     shortcut: 'Cmd/Ctrl+F',
     title: 'Find text',
   }, {
+    id: 'view:present',
+    run: () => startPresentation(),
+    section: 'View',
+    title: 'Start presentation',
+  }, {
     id: 'view:fit-slide',
     run: fitSlide,
     section: 'View',
@@ -3639,6 +3700,9 @@ function App() {
           </button>
         </div>
         <div className="ppt-toolbar-group">
+          <button className="ppt-icon-button" data-ppt-present-start onClick={() => startPresentation()} title="Start presentation" type="button">
+            <Play size={17} />
+          </button>
           <button className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
             <ZoomOut size={17} />
           </button>
@@ -3863,12 +3927,158 @@ function App() {
         onTableRowsChange={updateTableRows}
         selectedTextOverflow={selectedTextOverflow}
       />
+      <PPTPresentationOverlay
+        slide={presentationSlide}
+        slideCount={deck.slides.length}
+        slideIndex={presentationSlideIndex}
+        onExit={exitPresentation}
+        onNext={() => navigatePresentation(1)}
+        onPrevious={() => navigatePresentation(-1)}
+      />
       <PPTCommandPalette
         items={commandPaletteItems}
         open={commandPaletteOpen}
         onClose={closeCommandPalette}
       />
     </main>
+  )
+}
+
+function PPTPresentationOverlay({
+  onExit,
+  onNext,
+  onPrevious,
+  slide,
+  slideCount,
+  slideIndex,
+}: {
+  onExit: () => void
+  onNext: () => void
+  onPrevious: () => void
+  slide: PPTSlide | null
+  slideCount: number
+  slideIndex: number
+}) {
+  const scale = usePPTPresentationScale()
+
+  if (!slide) {
+    return null
+  }
+
+  const readableIndex = slideIndex + 1
+
+  return (
+    <div
+      aria-label="Presentation preview"
+      aria-modal="true"
+      className="ppt-presentation"
+      data-ppt-presentation
+      data-ppt-presentation-index={`${readableIndex}/${slideCount}`}
+      data-ppt-presentation-slide={slide.id}
+      role="dialog"
+    >
+      <div className="ppt-presentation-header">
+        <span data-ppt-presentation-title>{slide.name}</span>
+        <span data-ppt-presentation-count>{readableIndex}/{slideCount}</span>
+        <button
+          className="ppt-icon-button"
+          data-ppt-present-exit
+          title="Exit presentation"
+          type="button"
+          onClick={onExit}
+        >
+          <X size={17} />
+        </button>
+      </div>
+      <div className="ppt-presentation-stage">
+        <div
+          className="ppt-presentation-slide-shell"
+          style={{
+            height: PPT_SLIDE_HEIGHT * scale,
+            width: PPT_SLIDE_WIDTH * scale,
+          }}
+        >
+          <div
+            className="ppt-slide ppt-presentation-slide"
+            data-ppt-presentation-slide-frame
+            style={{
+              background: slide.background?.color ?? '#ffffff',
+              transform: `scale(${scale})`,
+            }}
+          >
+            {slide.elements.filter((element) => element.visible !== false).map((element) => (
+              <PPTElementView
+                editing={false}
+                element={element}
+                findActive={false}
+                hovered={false}
+                key={element.id}
+                selected={false}
+                textOverflow={false}
+                onCommitText={() => undefined}
+                onContextMenu={(event) => event.preventDefault()}
+                onEdit={() => undefined}
+                onPointerDown={() => undefined}
+                onPointerEnter={() => undefined}
+                onPointerLeave={() => undefined}
+                onStopEdit={() => undefined}
+                onTextOverflowChange={() => undefined}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="ppt-presentation-controls" role="toolbar" aria-label="Presentation controls">
+        <button
+          className="ppt-button"
+          data-ppt-present-prev
+          type="button"
+          onClick={onPrevious}
+        >
+          <ChevronLeft size={16} /> Previous
+        </button>
+        <button
+          className="ppt-button"
+          data-ppt-present-next
+          type="button"
+          onClick={onNext}
+        >
+          Next <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function usePPTPresentationScale() {
+  const [scale, setScale] = useState(() => getPPTPresentationScale())
+
+  useEffect(() => {
+    function updateScale() {
+      setScale(getPPTPresentationScale())
+    }
+
+    updateScale()
+    window.addEventListener('resize', updateScale)
+
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
+
+  return scale
+}
+
+function getPPTPresentationScale() {
+  if (typeof window === 'undefined') {
+    return 0.75
+  }
+
+  return clamp(
+    Math.min(
+      (window.innerWidth - 96) / PPT_SLIDE_WIDTH,
+      (window.innerHeight - 168) / PPT_SLIDE_HEIGHT,
+    ),
+    0.2,
+    1.4,
   )
 }
 

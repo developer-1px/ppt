@@ -55,6 +55,7 @@ try {
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
   await runTextOverflowScenario(page)
+  await runPresentationScenario(page)
   await runExportScenario(page)
   await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
@@ -1498,6 +1499,7 @@ async function runCommandPaletteScenario(page) {
   const flipIds = await readCommandPaletteIds(page, 'flip')
   const fitIds = await readCommandPaletteIds(page, 'fit')
   const gridIds = await readCommandPaletteIds(page, 'grid')
+  const presentIds = await readCommandPaletteIds(page, 'present')
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') && toolIds.includes('tool:arrow'),
@@ -1510,7 +1512,8 @@ async function runCommandPaletteScenario(page) {
     hasTidy: tidyIds.includes('command:tidy-selection'),
     hasView: fitIds.includes('view:fit-slide') &&
       fitIds.includes('view:fit-selection') &&
-      gridIds.includes('view:toggle-grid'),
+      gridIds.includes('view:toggle-grid') &&
+      presentIds.includes('view:present'),
     visibleCounts: {
       align: alignIds.length,
       back: backIds.length,
@@ -1521,6 +1524,7 @@ async function runCommandPaletteScenario(page) {
       grid: gridIds.length,
       group: groupIds.length,
       lock: lockIds.length,
+      present: presentIds.length,
       tidy: tidyIds.length,
       tool: toolIds.length,
     },
@@ -3550,6 +3554,158 @@ async function runTextOverflowScenario(page) {
     afterAutoFit,
     afterRedo,
   })
+}
+
+async function runPresentationScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const before = await getPPTPresentationState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const afterToolbarStart = await getPPTPresentationState(page)
+
+  record('starts PPT presentation preview from current slide toolbar', afterToolbarStart.open && afterToolbarStart.slideId === 'slide-1' && afterToolbarStart.index === '1/2' && afterToolbarStart.title === 'Overview' && afterToolbarStart.activeSlide === before.activeSlide && afterToolbarStart.selectedIds === before.selectedIds && afterToolbarStart.visibleElementCount > 0, {
+    afterToolbarStart,
+    before,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-present-next]')?.click()`)
+  await delay(80)
+
+  const afterNext = await getPPTPresentationState(page)
+
+  record('moves PPT presentation preview to next slide button', afterNext.open && afterNext.slideId === 'slide-2' && afterNext.index === '2/2' && afterNext.activeSlide === before.activeSlide && afterNext.selectedIds === before.selectedIds, {
+    afterNext,
+    before,
+  })
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(80)
+
+  const afterArrowRight = await getPPTPresentationState(page)
+
+  await pressKey(page, {
+    code: 'PageUp',
+    key: 'PageUp',
+    windowsVirtualKeyCode: 33,
+  })
+  await delay(80)
+
+  const afterPageUp = await getPPTPresentationState(page)
+
+  record('cycles PPT presentation preview with keyboard navigation', afterArrowRight.open && afterArrowRight.slideId === 'slide-1' && afterArrowRight.index === '1/2' && afterPageUp.open && afterPageUp.slideId === 'slide-2' && afterPageUp.index === '2/2', {
+    afterArrowRight,
+    afterNext,
+    afterPageUp,
+  })
+
+  const previewPoint = await page.eval(`(() => {
+    const frame = document.querySelector('[data-ppt-presentation-slide-frame]')?.getBoundingClientRect()
+
+    return frame
+      ? {
+          x: frame.left + frame.width / 2,
+          y: frame.top + frame.height / 2,
+        }
+      : {
+          x: 0,
+          y: 0,
+        }
+  })()`)
+  await clickMouse(page, previewPoint.x, previewPoint.y, 1)
+  await delay(80)
+
+  const afterPreviewClick = await getPPTPresentationState(page)
+
+  record('keeps PPT presentation preview read-only', afterPreviewClick.open && afterPreviewClick.activeSlide === before.activeSlide && afterPreviewClick.selectedIds === before.selectedIds, {
+    afterPreviewClick,
+    before,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(100)
+
+  const afterEscape = await getPPTPresentationState(page)
+
+  record('exits PPT presentation preview with Escape', !afterEscape.open && afterEscape.activeSlide === before.activeSlide && afterEscape.selectedIds === before.selectedIds, {
+    afterEscape,
+    before,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'present' })
+  await delay(80)
+
+  const beforePaletteStart = await getPPTPresentationState(page)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(120)
+
+  const afterPaletteStart = await getPPTPresentationState(page)
+
+  record('starts PPT presentation preview from command palette', beforePaletteStart.paletteOpen && beforePaletteStart.palettePresent && afterPaletteStart.open && !afterPaletteStart.paletteOpen && afterPaletteStart.slideId === 'slide-1' && afterPaletteStart.activeSlide === before.activeSlide && afterPaletteStart.selectedIds === before.selectedIds, {
+    afterPaletteStart,
+    before,
+    beforePaletteStart,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(100)
+
+  const afterExitButton = await getPPTPresentationState(page)
+
+  record('exits PPT presentation preview with explicit control', !afterExitButton.open && afterExitButton.activeSlide === before.activeSlide && afterExitButton.selectedIds === before.selectedIds, {
+    afterExitButton,
+    before,
+  })
+}
+
+async function getPPTPresentationState(page) {
+  return page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+
+    return {
+      activeSlide: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-name')?.textContent ?? '',
+      index: overlay?.getAttribute('data-ppt-presentation-index') ?? '',
+      open: !!overlay,
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      palettePresent: !!document.querySelector('[data-ppt-command-palette-item="view:present"]'),
+      selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element'))
+        .filter(Boolean)
+        .join(','),
+      slideId: overlay?.getAttribute('data-ppt-presentation-slide') ?? '',
+      title: overlay?.querySelector('[data-ppt-presentation-title]')?.textContent ?? '',
+      visibleElementCount: overlay?.querySelectorAll('[data-ppt-element]').length ?? 0,
+    }
+  })()`)
 }
 
 async function runSlideManagementScenario(page) {
