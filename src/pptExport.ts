@@ -4,6 +4,7 @@ import {
   type PPTComment,
   type PPTDeck,
   type PPTElement,
+  type PPTElementHyperlink,
   type PPTElementShadow,
   type PPTFreeform,
   type PPTImage,
@@ -76,6 +77,7 @@ const PPT_ELEMENT_SHADOW_BLUR_MAX = 80
 const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
 const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
+const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -231,6 +233,7 @@ function getPPTSlideTransitionAttrs(slide: PPTSlide, prefix: string) {
 function renderPPTElementHTML(element: PPTElement) {
   const transform = getPPTElementTransform(element)
   const transformAttrs = getPPTElementTransformAttrs(element)
+  const hyperlinkAttr = getPPTElementHyperlinkHTMLAttr(element)
   const opacity = getPPTElementOpacity(element)
   const opacityAttr = ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(opacity))}"`
   const shadowAttrs = getPPTElementShadowHTMLAttrs(element)
@@ -253,7 +256,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -290,10 +293,10 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -609,7 +612,7 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
       : '',
   ].filter(Boolean).join(' ')
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
 }
 
 function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
@@ -617,6 +620,7 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     `data-ppt-element="${escapeHtml(element.id)}"`,
     `data-ppt-kind="freeform"`,
     `data-ppt-freeform-points="${element.points.length}"`,
+    getPPTElementHyperlinkHTMLAttr(element).trim(),
     getPPTElementOpacityHTMLAttr(element).trim(),
     getPPTElementShadowHTMLAttrs(element).trim(),
   ].join(' ')
@@ -644,7 +648,7 @@ function renderPPTCommentHTML(
     ? ' data-ppt-comment-resolved="true"'
     : ''
 
-  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
+  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
 }
 
 function renderPPTCommentSVG(element: PPTComment) {
@@ -687,6 +691,7 @@ function renderPPTTableHTML(
     `class="ppt-element ppt-table"`,
     `data-ppt-element="${escapeHtml(element.id)}"`,
     transformAttrs.trim(),
+    getPPTElementHyperlinkHTMLAttr(element).trim(),
     getPPTElementOpacityHTMLAttr(element).trim(),
     getPPTElementShadowHTMLAttrs(element).trim(),
     `data-ppt-table-rows="${rowCount}"`,
@@ -758,6 +763,22 @@ function getPPTElementTransformAttrs(element: PPTElement) {
 
 function getPPTElementOpacityHTMLAttr(element: PPTElement) {
   return ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`
+}
+
+function getPPTElementHyperlinkHTMLAttr(element: PPTElement) {
+  const hyperlink = getPPTElementHyperlink(element)
+
+  return hyperlink
+    ? ` data-ppt-hyperlink-url="${escapeHtml(hyperlink.url)}"`
+    : ''
+}
+
+function getPPTElementHyperlinkSvgAttr(element: PPTElement) {
+  const hyperlink = getPPTElementHyperlink(element)
+
+  return hyperlink
+    ? `data-ppt-hyperlink-url="${escapeHtml(hyperlink.url)}"`
+    : ''
 }
 
 function getPPTElementShadowHTMLAttrs(element: PPTElement) {
@@ -847,6 +868,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
   return [
     `data-ppt-element="${escapeHtml(element.id)}"`,
     `data-ppt-kind="${element.kind}"`,
+    getPPTElementHyperlinkSvgAttr(element),
     `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     `opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     ...getPPTElementShadowAttrEntries(element),
@@ -1080,6 +1102,41 @@ function normalizePPTElementOpacity(value: number) {
 
 function formatPPTElementOpacity(value: number) {
   return String(normalizePPTElementOpacity(value))
+}
+
+function getPPTElementHyperlink(element: PPTElement) {
+  return element.hyperlink ? normalizePPTElementHyperlink(element.hyperlink) : null
+}
+
+function normalizePPTElementHyperlink(
+  hyperlink: Partial<PPTElementHyperlink>,
+): PPTElementHyperlink | null {
+  const url = normalizePPTElementHyperlinkUrl(hyperlink.url ?? '')
+
+  return url ? { url } : null
+}
+
+function normalizePPTElementHyperlinkUrl(url: string) {
+  const normalized = url.trim().slice(0, PPT_HYPERLINK_URL_MAX_LENGTH)
+
+  if (!normalized || !isPPTElementHyperlinkUrlAllowed(normalized)) {
+    return ''
+  }
+
+  return normalized
+}
+
+function isPPTElementHyperlinkUrlAllowed(url: string) {
+  return !hasPPTControlCharacter(url) &&
+    !/^(javascript|data|vbscript):/i.test(url)
+}
+
+function hasPPTControlCharacter(value: string) {
+  return [...value].some((char) => {
+    const code = char.charCodeAt(0)
+
+    return code <= 31 || code === 127
+  })
 }
 
 function getPPTElementShadow(element: PPTElement): PPTElementShadow | null {

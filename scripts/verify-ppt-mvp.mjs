@@ -51,6 +51,7 @@ try {
   await runObjectAnimationScenario(page)
   await runObjectOpacityScenario(page)
   await runObjectShadowScenario(page)
+  await runObjectHyperlinkScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
@@ -3136,6 +3137,8 @@ async function runExportScenario(page) {
       hasObjectOpacityModel: code.includes('"opacity": 0.42'),
       hasObjectShadowMarkup: code.includes('data-ppt-shadow="true"') && code.includes('data-ppt-shadow-color="#334155"') && code.includes('data-ppt-shadow-opacity="0.36"') && code.includes('filter:drop-shadow'),
       hasObjectShadowModel: code.includes('"shadow"') && code.includes('"color": "#334155"') && code.includes('"opacity": 0.36') && code.includes('"blur": 18') && code.includes('"distance": 12') && code.includes('"angle": 60'),
+      hasObjectHyperlinkMarkup: code.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
+      hasObjectHyperlinkModel: code.includes('"hyperlink"') && code.includes('"url": "https://example.com/ppt"'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
@@ -3185,6 +3188,7 @@ async function runExportScenario(page) {
   record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
   record('exports PPT object opacity metadata', state.hasObjectOpacityMarkup && state.hasObjectOpacityModel, state)
   record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
+  record('exports PPT object hyperlink metadata', state.hasObjectHyperlinkMarkup && state.hasObjectHyperlinkModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
@@ -3221,6 +3225,7 @@ async function runExportScenario(page) {
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasObjectOpacity: text.includes('data-ppt-opacity="0.42"') && text.includes('opacity="0.42"'),
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
+      hasObjectHyperlink: text.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
@@ -3248,6 +3253,7 @@ async function runExportScenario(page) {
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
   record('exports PPT object opacity metadata into slide SVG', slideSvgState.hasObjectOpacity, slideSvgState)
   record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
+  record('exports PPT object hyperlink metadata into slide SVG', slideSvgState.hasObjectHyperlink, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
@@ -4134,6 +4140,171 @@ async function runObjectShadowScenario(page) {
       preview.distance === '12' &&
       preview.angle === '60' &&
       preview.styleFilter.includes('drop-shadow'),
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
+async function runObjectHyperlinkScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const cardPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, cardPoint.x, cardPoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTObjectHyperlinkState(page)
+  const targetId = initial.selectedId
+  const url = 'https://example.com/ppt'
+
+  record(
+    'renders PPT object hyperlink control in inspector',
+    targetId.length > 0 &&
+      initial.url === '' &&
+      initial.selectedUrl === '' &&
+      initial.thumbUrl === '',
+    initial,
+  )
+
+  await page.eval(`((url) => {
+    const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(input, url)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })(${JSON.stringify(url)})`)
+  await delay(120)
+
+  const afterUrl = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'updates PPT object hyperlink metadata from inspector',
+    afterUrl.url === url &&
+      afterUrl.selectedUrl === url &&
+      afterUrl.thumbUrl === url,
+    {
+      afterUrl,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'undoes and redoes PPT object hyperlink URL as one history step',
+    afterUndo.url === '' &&
+      afterUndo.selectedUrl === '' &&
+      afterRedo.url === url &&
+      afterRedo.selectedUrl === url,
+    {
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(input, '')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterClear = await getPPTObjectHyperlinkState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterClearUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterClearRedo = await getPPTObjectHyperlinkState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterRestore = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'removes and restores PPT object hyperlink as one history step',
+    afterClear.url === '' &&
+      afterClear.selectedUrl === '' &&
+      afterClearUndo.url === url &&
+      afterClearUndo.selectedUrl === url &&
+      afterClearRedo.url === '' &&
+      afterClearRedo.selectedUrl === '' &&
+      afterRestore.url === url &&
+      afterRestore.selectedUrl === url,
+    {
+      afterClear,
+      afterClearRedo,
+      afterClearUndo,
+      afterRestore,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(${JSON.stringify(`[data-ppt-element="${targetId}"]`)})
+
+    return {
+      open: !!overlay,
+      url: element?.getAttribute('data-ppt-hyperlink-url') ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT object hyperlink metadata in presentation preview',
+    preview.open && preview.url === url,
     preview,
   )
 
@@ -6098,6 +6269,21 @@ function getPPTObjectShadowState(page, elementId) {
       thumbFilter: thumb?.style.filter ?? '',
       thumbOpacity: thumb?.getAttribute('data-ppt-thumb-shadow-opacity') ?? '',
       thumbShadow: thumb?.getAttribute('data-ppt-thumb-shadow') ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
+function getPPTObjectHyperlinkState(page, elementId) {
+  return page.eval(`((id) => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = id || selected?.getAttribute('data-ppt-element') || ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+
+    return {
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedUrl: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
+      thumbUrl: thumb?.getAttribute('data-ppt-thumb-hyperlink-url') ?? '',
+      url: document.querySelector('[data-ppt-style-field="hyperlink"]')?.value ?? '',
     }
   })(${JSON.stringify(elementId)})`)
 }

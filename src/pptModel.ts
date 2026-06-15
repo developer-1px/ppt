@@ -86,12 +86,17 @@ const PPTElementShadowSchema = z.object({
   opacity: z.number(),
 })
 
+const PPTElementHyperlinkSchema = z.object({
+  url: z.string(),
+})
+
 const PPTElementBaseSchema = z.object({
   animation: PPTElementAnimationSchema.optional(),
   flipH: z.boolean().optional(),
   flipV: z.boolean().optional(),
   geometry: PPTGeometrySchema,
   groupId: z.string().optional(),
+  hyperlink: PPTElementHyperlinkSchema.optional(),
   id: z.string(),
   locked: z.boolean().optional(),
   name: z.string(),
@@ -223,6 +228,7 @@ export type PPTTextAutoFit = z.infer<typeof PPTTextAutoFitSchema>
 export type PPTSlideTransition = z.infer<typeof PPTSlideTransitionSchema>
 export type PPTElementAnimation = z.infer<typeof PPTElementAnimationSchema>
 export type PPTElementShadow = z.infer<typeof PPTElementShadowSchema>
+export type PPTElementHyperlink = z.infer<typeof PPTElementHyperlinkSchema>
 export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']

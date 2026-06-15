@@ -162,6 +162,7 @@ import {
   type PPTComment,
   type PPTElement,
   type PPTElementAnimation,
+  type PPTElementHyperlink,
   type PPTElementShadow,
   type PPTFreeform,
   type PPTImage,
@@ -1081,6 +1082,7 @@ const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
 const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
+const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
   'fade',
@@ -2690,6 +2692,19 @@ function App() {
         ...element,
         opacity: normalizePPTElementOpacity(opacity),
       })),
+    )
+  }
+
+  function updateElementHyperlink(elementId: string, url: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        const hyperlink = normalizePPTElementHyperlink({ url })
+
+        return {
+          ...element,
+          hyperlink: hyperlink ?? undefined,
+        }
+      }),
     )
   }
 
@@ -5213,6 +5228,7 @@ function App() {
         onDownloadHTML={downloadHTML}
         onElementAnimationChange={updateElementAnimation}
         onElementGeometryChange={updateElementGeometry}
+        onElementHyperlinkChange={updateElementHyperlink}
         onImageCropChange={updateImageCrop}
         onImageFitChange={updateImageFit}
         onElementNameChange={updateElementName}
@@ -7395,6 +7411,7 @@ function SlideThumb({
               : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+            data-ppt-thumb-hyperlink-url={getPPTElementHyperlink(element)?.url}
             data-ppt-thumb-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
             data-ppt-thumb-shadow-angle={hasPPTElementShadow(element)
               ? getPPTElementShadow(element).angle
@@ -7600,6 +7617,7 @@ function PPTElementView({
       data-ppt-animation-order={animation.order}
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
+      data-ppt-hyperlink-url={getPPTElementHyperlink(element)?.url}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
       data-ppt-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
       data-ppt-shadow-angle={hasPPTElementShadow(element)
@@ -8138,6 +8156,7 @@ function Inspector({
   onDownloadHTML,
   onElementAnimationChange,
   onElementGeometryChange,
+  onElementHyperlinkChange,
   onElementNameChange,
   onElementOpacityChange,
   onElementRotationChange,
@@ -8192,6 +8211,7 @@ function Inspector({
     field: 'h' | 'w' | 'x' | 'y',
     value: number,
   ) => void
+  onElementHyperlinkChange: (elementId: string, url: string) => void
   onElementNameChange: (elementId: string, name: string) => void
   onElementOpacityChange: (elementId: string, opacity: number) => void
   onElementRotationChange: (elementId: string, rotation: number) => void
@@ -8282,6 +8302,9 @@ function Inspector({
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
+  const elementHyperlink = selectedElement
+    ? getPPTElementHyperlink(selectedElement)
+    : null
   const elementShadow = selectedElement
     ? getPPTElementShadow(selectedElement)
     : PPT_DEFAULT_ELEMENT_SHADOW
@@ -8516,6 +8539,20 @@ function Inspector({
                   onElementOpacityChange(
                     selectedElement.id,
                     parsePPTElementOpacity(event.target.value),
+                  )}
+              />
+            </label>
+            <label className="ppt-field">
+              <span>Link</span>
+              <input
+                data-ppt-style-field="hyperlink"
+                maxLength={PPT_HYPERLINK_URL_MAX_LENGTH}
+                placeholder="https://example.com"
+                value={elementHyperlink?.url ?? ''}
+                onChange={(event) =>
+                  onElementHyperlinkChange(
+                    selectedElement.id,
+                    event.target.value,
                   )}
               />
             </label>
@@ -9826,6 +9863,41 @@ function normalizePPTElementOpacity(value: number) {
 
 function formatPPTElementOpacity(value: number) {
   return String(normalizePPTElementOpacity(value))
+}
+
+function getPPTElementHyperlink(element: PPTElement) {
+  return element.hyperlink ? normalizePPTElementHyperlink(element.hyperlink) : null
+}
+
+function normalizePPTElementHyperlink(
+  hyperlink: Partial<PPTElementHyperlink>,
+): PPTElementHyperlink | null {
+  const url = normalizePPTElementHyperlinkUrl(hyperlink.url ?? '')
+
+  return url ? { url } : null
+}
+
+function normalizePPTElementHyperlinkUrl(url: string) {
+  const normalized = url.trim().slice(0, PPT_HYPERLINK_URL_MAX_LENGTH)
+
+  if (!normalized || !isPPTElementHyperlinkUrlAllowed(normalized)) {
+    return ''
+  }
+
+  return normalized
+}
+
+function isPPTElementHyperlinkUrlAllowed(url: string) {
+  return !hasPPTControlCharacter(url) &&
+    !/^(javascript|data|vbscript):/i.test(url)
+}
+
+function hasPPTControlCharacter(value: string) {
+  return [...value].some((char) => {
+    const code = char.charCodeAt(0)
+
+    return code <= 31 || code === 127
+  })
 }
 
 function hasPPTElementShadow(element: PPTElement) {
