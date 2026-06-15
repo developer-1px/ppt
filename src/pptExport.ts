@@ -10,7 +10,10 @@ import {
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
-    const elements = slide.elements.map(renderPPTElementHTML).join('\n')
+    const elements = slide.elements
+      .filter((element) => element.visible !== false)
+      .map(renderPPTElementHTML)
+      .join('\n')
 
     return [
       `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}" style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,

@@ -15,8 +15,12 @@ import {
   CopyPlus,
   Diamond,
   Download,
+  Eye,
+  EyeOff,
   FilePlus2,
   Grid2X2,
+  Layers,
+  Lock,
   Maximize2,
   MoveDown,
   MoveUp,
@@ -26,6 +30,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Unlock,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -71,9 +76,11 @@ import {
   deleteCanvasCommand,
   distributeCanvasCommand,
   duplicateCanvasCommand,
+  lockCanvasCommand,
   nudgeCanvasCommand,
   reorderCanvasCommand,
   selectAllCanvasCommand,
+  unlockAllCanvasCommand,
   type CanvasAlignMode,
   type CanvasCommandItemsResult,
   type CanvasDistributeMode,
@@ -117,11 +124,41 @@ import './App.css'
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
   commands: {
     group: false,
-    lockSelection: false,
+    lockSelection: true,
     ungroup: false,
-    unlockAll: false,
+    unlockAll: true,
   },
 })
+
+const canvasAlignModeAvailabilityKey = {
+  alignBottom: 'alignBottom',
+  alignCenter: 'alignCenter',
+  alignLeft: 'alignLeft',
+  alignMiddle: 'alignMiddle',
+  alignRight: 'alignRight',
+  alignTop: 'alignTop',
+} as const satisfies Record<
+  CanvasAlignMode,
+  keyof ReturnType<typeof getPPTCanvasCommandAvailability>
+>
+
+const canvasDistributeModeAvailabilityKey = {
+  distributeHorizontal: 'distributeHorizontal',
+  distributeVertical: 'distributeVertical',
+} as const satisfies Record<
+  CanvasDistributeMode,
+  keyof ReturnType<typeof getPPTCanvasCommandAvailability>
+>
+
+const canvasReorderModeAvailabilityKey = {
+  bringForward: 'bringForward',
+  bringToFront: 'bringToFront',
+  sendBackward: 'sendBackward',
+  sendToBack: 'sendToBack',
+} as const satisfies Record<
+  CanvasReorderMode,
+  keyof ReturnType<typeof getPPTCanvasCommandAvailability>
+>
 
 type Interaction =
   | {
@@ -184,15 +221,32 @@ function App() {
     [activeSlide.elements, selection],
   )
   const exportCode = useMemo(() => exportPPTDeckHTML(deck), [deck])
+  const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
+  const hasLockedSelection = selectedElements.some((element) => element.locked === true)
+  const hasHiddenSelection = selectedElements.some((element) => element.visible === false)
   const commandAvailability = useMemo(() => getPPTCanvasCommandAvailability({
     canPaste: clipboard.length > 0,
     canRedo: future.length > 0,
     canUndo: past.length > 0,
+    hasHiddenSelection,
+    hasLockedItems,
+    hasLockedSelection,
     selection,
-  }), [clipboard.length, future.length, past.length, selection])
+  }), [
+    clipboard.length,
+    future.length,
+    hasHiddenSelection,
+    hasLockedItems,
+    hasLockedSelection,
+    past.length,
+    selection,
+  ])
   const canDeleteSlide = deck.slides.length > 1
   const canMoveActiveSlideDown = activeSlideIndex >= 0 && activeSlideIndex < deck.slides.length - 1
   const canMoveActiveSlideUp = activeSlideIndex > 0
+  const canResizeSelection = selectedBounds
+    ? scene.canResizeSelection?.(selection) ?? true
+    : false
 
   const fitSlide = useCallback(() => {
     const rect = stageRef.current?.getBoundingClientRect()
@@ -537,7 +591,7 @@ function App() {
   }
 
   function deleteSelection() {
-    if (selection.length === 0) {
+    if (!commandAvailability.delete) {
       return
     }
 
@@ -551,7 +605,7 @@ function App() {
   }
 
   function duplicateSelection() {
-    if (selection.length === 0) {
+    if (!commandAvailability.duplicate) {
       return
     }
 
@@ -566,7 +620,7 @@ function App() {
   }
 
   function nudgeSelection(dx: number, dy: number) {
-    if (selection.length === 0) {
+    if (!commandAvailability.nudge) {
       return
     }
 
@@ -585,7 +639,7 @@ function App() {
   }
 
   function alignSelection(mode: CanvasAlignMode) {
-    if (selection.length === 0) {
+    if (!commandAvailability[canvasAlignModeAvailabilityKey[mode]]) {
       return
     }
 
@@ -612,7 +666,7 @@ function App() {
   }
 
   function distributeSelection(mode: CanvasDistributeMode) {
-    if (selection.length < 3) {
+    if (!commandAvailability[canvasDistributeModeAvailabilityKey[mode]]) {
       return
     }
 
@@ -627,7 +681,7 @@ function App() {
   }
 
   function reorderSelection(mode: CanvasReorderMode) {
-    if (selection.length === 0) {
+    if (!commandAvailability[canvasReorderModeAvailabilityKey[mode]]) {
       return
     }
 
@@ -637,6 +691,34 @@ function App() {
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
         mode,
+        selection,
+      }))
+  }
+
+  function lockSelectedElements() {
+    if (!commandAvailability.lockSelection) {
+      return
+    }
+
+    commitElementCommand((slide) =>
+      lockCanvasCommand({
+        adapter: commandAdapter,
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        items: slide.elements,
+        selection,
+      }))
+  }
+
+  function unlockAllElements() {
+    if (!commandAvailability.unlockAll) {
+      return
+    }
+
+    commitElementCommand((slide) =>
+      unlockAllCanvasCommand({
+        adapter: commandAdapter,
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        items: slide.elements,
         selection,
       }))
   }
@@ -656,7 +738,7 @@ function App() {
   }
 
   function cutSelection() {
-    if (selection.length === 0) {
+    if (!commandAvailability.cut) {
       return
     }
 
@@ -665,7 +747,7 @@ function App() {
   }
 
   function pasteSelection() {
-    if (clipboard.length === 0) {
+    if (!commandAvailability.paste) {
       return
     }
 
@@ -751,6 +833,15 @@ function App() {
     )
   }
 
+  function updateElementName(elementId: string, name: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
+        ...element,
+        name,
+      })),
+    )
+  }
+
   function updateShapeFill(elementId: string, color: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
@@ -766,6 +857,24 @@ function App() {
         element.kind === 'shape'
           ? { ...element, shape }
           : element),
+    )
+  }
+
+  function toggleElementLocked(elementId: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
+        ...element,
+        locked: element.locked === true ? false : true,
+      })),
+    )
+  }
+
+  function toggleElementVisibility(elementId: string) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
+        ...element,
+        visible: element.visible === false,
+      })),
     )
   }
 
@@ -885,10 +994,12 @@ function App() {
     })
     const nextSelection = pointerSelection.nextSelection
     const bounds = scene.getBounds(nextSelection)
+    const hasLockedTarget = activeSlide.elements.some((element) =>
+      nextSelection.includes(element.id) && element.locked === true)
 
     setSelection(nextSelection)
 
-    if (!bounds) {
+    if (!bounds || hasLockedTarget) {
       return
     }
 
@@ -1191,6 +1302,14 @@ function App() {
           </button>
         </div>
         <div className="ppt-toolbar-group">
+          <button className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={CANVAS_COMMAND_AFFORDANCES.lockSelection.title} type="button">
+            <Lock size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={CANVAS_COMMAND_AFFORDANCES.unlockAll.title} type="button">
+            <Unlock size={17} />
+          </button>
+        </div>
+        <div className="ppt-toolbar-group">
           <button className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
             <ZoomOut size={17} />
           </button>
@@ -1273,7 +1392,7 @@ function App() {
             data-ppt-slide={activeSlide.id}
             style={{ background: activeSlide.background?.color ?? '#ffffff' }}
           >
-            {activeSlide.elements.map((element) => (
+            {activeSlide.elements.filter((element) => element.visible !== false).map((element) => (
               <PPTElementView
                 editing={editingId === element.id}
                 element={element}
@@ -1297,6 +1416,7 @@ function App() {
             {selectedBounds ? (
               <SelectionOverlay
                 bounds={selectedBounds}
+                canResize={canResizeSelection}
                 scale={viewport.scale}
                 selectedElements={selectedElements}
                 onResizeHandleDoubleClick={handleResizeHandleDoubleClick}
@@ -1311,13 +1431,21 @@ function App() {
 
       <Inspector
         exportCode={exportCode}
+        selection={selection}
         selectedElement={selectedElement}
         slide={activeSlide}
         onCommitText={commitText}
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
         onElementGeometryChange={updateElementGeometry}
+        onElementLockToggle={toggleElementLocked}
+        onElementNameChange={updateElementName}
         onElementTextStyleChange={updateElementTextStyle}
+        onElementVisibilityToggle={toggleElementVisibility}
+        onLayerSelect={(elementId, additive) => {
+          setSelection((current) =>
+            getPPTLayerSelection(current, elementId, additive))
+        }}
         onParagraphAlignChange={updateParagraphAlign}
         onShapeKindChange={updateShapeKind}
         onSlideBackgroundChange={updateSlideBackground}
@@ -1411,6 +1539,7 @@ function PPTElementView({
       className="ppt-element"
       data-hovered={hovered ? 'true' : 'false'}
       data-kind={element.kind}
+      data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
       data-selected={selected ? 'true' : 'false'}
       data-shape={element.kind === 'shape' ? element.shape : undefined}
@@ -1454,12 +1583,14 @@ function PPTElementView({
 
 function SelectionOverlay({
   bounds,
+  canResize,
   onResizeHandleDoubleClick,
   onResizePointerDown,
   scale,
   selectedElements,
 }: {
   bounds: Bounds
+  canResize: boolean
   onResizeHandleDoubleClick: (
     event: ReactMouseEvent<HTMLButtonElement>,
     handle: ResizeHandle,
@@ -1486,7 +1617,7 @@ function SelectionOverlay({
           ? `${Math.round(bounds.w)} x ${Math.round(bounds.h)}`
           : `${selectedElements.length} objects`}
       </div>
-      {RESIZE_HANDLES.map((handle) => {
+      {canResize ? RESIZE_HANDLES.map((handle) => {
         const point = handlePoint(bounds, handle)
         const size = 10 / scale
 
@@ -1507,7 +1638,7 @@ function SelectionOverlay({
             type="button"
           />
         )
-      })}
+      }) : null}
     </>
   )
 }
@@ -1598,7 +1729,11 @@ function Inspector({
   onCopyHTML,
   onDownloadHTML,
   onElementGeometryChange,
+  onElementLockToggle,
+  onElementNameChange,
   onElementTextStyleChange,
+  onElementVisibilityToggle,
+  onLayerSelect,
   onParagraphAlignChange,
   onShapeFillChange,
   onShapeKindChange,
@@ -1606,6 +1741,7 @@ function Inspector({
   onSlideBackgroundChange,
   onSlideNameChange,
   onSlideNotesChange,
+  selection,
   selectedElement,
   slide,
 }: {
@@ -1618,11 +1754,15 @@ function Inspector({
     field: 'h' | 'w' | 'x' | 'y',
     value: number,
   ) => void
+  onElementLockToggle: (elementId: string) => void
+  onElementNameChange: (elementId: string, name: string) => void
   onElementTextStyleChange: (
     elementId: string,
     field: keyof PPTTextStyle,
     value: string | number,
   ) => void
+  onElementVisibilityToggle: (elementId: string) => void
+  onLayerSelect: (elementId: string, additive: boolean) => void
   onParagraphAlignChange: (
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
@@ -1637,6 +1777,7 @@ function Inspector({
   onSlideBackgroundChange: (color: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
+  selection: string[]
   selectedElement: PPTElement | null
   slide: PPTSlide
 }) {
@@ -1684,6 +1825,15 @@ function Inspector({
       <section className="ppt-panel-section">
         {selectedElement ? (
           <>
+            <label className="ppt-field">
+              <span>Name</span>
+              <input
+                data-ppt-style-field="name"
+                value={selectedElement.name}
+                onChange={(event) =>
+                  onElementNameChange(selectedElement.id, event.target.value)}
+              />
+            </label>
             <div className="ppt-geometry-grid">
               {(['x', 'y', 'w', 'h'] as const).map((field) => (
                 <label className="ppt-field" key={field}>
@@ -1840,6 +1990,65 @@ function Inspector({
         ) : (
           <span className="ppt-muted">None</span>
         )}
+      </section>
+
+      <div className="ppt-panel-header">
+        <h2>Objects</h2>
+      </div>
+      <section className="ppt-panel-section">
+        <div className="ppt-layer-list" aria-label="Selection pane">
+          {slide.elements.map((element) => (
+            <div
+              aria-selected={selection.includes(element.id)}
+              className="ppt-layer-row"
+              data-hidden={element.visible === false ? 'true' : 'false'}
+              data-locked={element.locked === true ? 'true' : 'false'}
+              data-ppt-layer-row={element.id}
+              key={element.id}
+            >
+              <button
+                className="ppt-layer-select"
+                data-ppt-layer-select={element.id}
+                type="button"
+                onClick={(event) =>
+                  onLayerSelect(element.id, event.metaKey || event.ctrlKey || event.shiftKey)}
+              >
+                <span className="ppt-layer-kind">
+                  <Layers size={14} />
+                </span>
+                <span className="ppt-layer-name">{element.name}</span>
+              </button>
+              <div className="ppt-layer-actions">
+                <button
+                  aria-label={element.visible === false ? 'Show object' : 'Hide object'}
+                  className="ppt-layer-icon-button"
+                  data-ppt-layer-visibility={element.id}
+                  title={element.visible === false ? 'Show object' : 'Hide object'}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onElementVisibilityToggle(element.id)
+                  }}
+                >
+                  {element.visible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+                <button
+                  aria-label={element.locked === true ? 'Unlock object' : 'Lock object'}
+                  className="ppt-layer-icon-button"
+                  data-ppt-layer-lock={element.id}
+                  title={element.locked === true ? 'Unlock object' : 'Lock object'}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onElementLockToggle(element.id)
+                  }}
+                >
+                  {element.locked === true ? <Lock size={14} /> : <Unlock size={14} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="ppt-panel-header">
@@ -2058,6 +2267,20 @@ function getPPTShapeLabel(shape: PPTShapeKind) {
 
 function isPPTShapeKind(value: string): value is PPTShapeKind {
   return value === 'rect' || value === 'ellipse' || value === 'diamond'
+}
+
+function getPPTLayerSelection(
+  selection: string[],
+  elementId: string,
+  additive: boolean,
+) {
+  if (!additive) {
+    return [elementId]
+  }
+
+  return selection.includes(elementId)
+    ? selection.filter((id) => id !== elementId)
+    : [...selection, elementId]
 }
 
 export default App

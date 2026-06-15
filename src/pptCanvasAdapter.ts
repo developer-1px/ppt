@@ -18,14 +18,16 @@ import {
 } from './pptModel'
 
 export function createPPTCanvasScene(slide: PPTSlide) {
-  const entries: CanvasSceneEntry[] = slide.elements.map((element, index) => ({
-    bounds: pptGeometryToBounds(element.geometry),
-    canResize: true,
-    id: element.id,
-    isGroup: false,
-    parentId: null,
-    path: [index],
-  }))
+  const entries: CanvasSceneEntry[] = slide.elements
+    .filter((element) => element.visible !== false)
+    .map((element, index) => ({
+      bounds: pptGeometryToBounds(element.geometry),
+      canResize: element.locked !== true,
+      id: element.id,
+      isGroup: false,
+      parentId: null,
+      path: [index],
+    }))
 
   return createCanvasSceneAdapter(entries)
 }
@@ -81,4 +83,3 @@ export function boundsToPPTGeometry(bounds: Bounds): PPTGeometry {
     y: clamp(bounds.y, 0, PPT_SLIDE_HEIGHT - h),
   }
 }
-

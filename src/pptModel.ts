@@ -46,7 +46,9 @@ const PPTTextStyleSchema = z.object({
 const PPTElementBaseSchema = z.object({
   geometry: PPTGeometrySchema,
   id: z.string(),
+  locked: z.boolean().optional(),
   name: z.string(),
+  visible: z.boolean().optional(),
 })
 
 const PPTTextBoxSchema = PPTElementBaseSchema.extend({

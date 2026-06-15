@@ -34,6 +34,7 @@ try {
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runViewAndShapeScenario(page)
+  await runSelectionPaneScenario(page)
   await runExportScenario(page)
   await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
@@ -567,6 +568,108 @@ async function runViewAndShapeScenario(page) {
   }))()`)
 
   record('updates PPT slide background in inspector', afterBackground.slideBackground === 'rgb(254, 243, 199)' && afterBackground.thumbBackground === 'rgb(254, 243, 199)', afterBackground)
+}
+
+async function runSelectionPaneScenario(page) {
+  const initial = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedId = selected?.getAttribute('data-ppt-element') ?? ''
+
+    return {
+      layerCount: document.querySelectorAll('[data-ppt-layer-row]').length,
+      selectedId,
+      stageCount: document.querySelectorAll('[data-ppt-element]').length,
+    }
+  })()`)
+
+  record('renders PPT object selection pane', initial.layerCount === initial.stageCount && initial.layerCount > 0, initial)
+
+  await page.eval(`(() => {
+    const name = document.querySelector('[data-ppt-style-field="name"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(name, 'Locked accent')
+    name.dispatchEvent(new Event('input', { bubbles: true }))
+    name.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterRename = await page.eval(`(() => {
+    const row = document.querySelector('[data-ppt-layer-row][aria-selected="true"]')
+
+    return {
+      inspectorName: document.querySelector('[data-ppt-style-field="name"]')?.value ?? '',
+      rowName: row?.querySelector('.ppt-layer-name')?.textContent ?? '',
+    }
+  })()`)
+
+  record('renames selected PPT object from inspector', afterRename.inspectorName === 'Locked accent' && afterRename.rowName === 'Locked accent', afterRename)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row][aria-selected="true"] [data-ppt-layer-lock]').click()`)
+  await delay(50)
+
+  const afterLayerLock = await page.eval(`(() => {
+    const selected = document.querySelector('[data-ppt-element="${initial.selectedId}"]')
+    const row = document.querySelector('[data-ppt-layer-row="${initial.selectedId}"]')
+
+    return {
+      deleteDisabled: document.querySelector('button[title="Delete"]')?.disabled ?? false,
+      lockDisabled: document.querySelector('[data-ppt-command="lock-selection"]')?.disabled ?? false,
+      locked: selected?.getAttribute('data-locked') ?? null,
+      resizeHandleCount: document.querySelectorAll('.ppt-resize-handle').length,
+      rowLocked: row?.getAttribute('data-locked') ?? null,
+      unlockDisabled: document.querySelector('[data-ppt-command="unlock-all"]')?.disabled ?? true,
+    }
+  })()`)
+
+  record('locks selected PPT object from selection pane', afterLayerLock.locked === 'true' && afterLayerLock.rowLocked === 'true' && afterLayerLock.resizeHandleCount === 0, afterLayerLock)
+  record('disables transform commands for locked PPT object', afterLayerLock.deleteDisabled && afterLayerLock.lockDisabled && !afterLayerLock.unlockDisabled, afterLayerLock)
+
+  await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]').click()`)
+  await delay(50)
+
+  const afterUnlockAll = await page.eval(`(() => {
+    const selected = document.querySelector('[data-ppt-element="${initial.selectedId}"]')
+    const row = document.querySelector('[data-ppt-layer-row="${initial.selectedId}"]')
+
+    return {
+      locked: selected?.getAttribute('data-locked') ?? null,
+      resizeHandleCount: document.querySelectorAll('.ppt-resize-handle').length,
+      rowLocked: row?.getAttribute('data-locked') ?? null,
+    }
+  })()`)
+
+  record('unlocks all PPT objects from toolbar', afterUnlockAll.locked === 'false' && afterUnlockAll.rowLocked === 'false' && afterUnlockAll.resizeHandleCount > 0, afterUnlockAll)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row="${initial.selectedId}"] [data-ppt-layer-visibility]').click()`)
+  await delay(50)
+
+  const afterHide = await page.eval(`(() => {
+    const stageElement = document.querySelector('[data-ppt-element="${initial.selectedId}"]')
+    const row = document.querySelector('[data-ppt-layer-row="${initial.selectedId}"]')
+
+    return {
+      hidden: row?.getAttribute('data-hidden') ?? null,
+      rowSelected: row?.getAttribute('aria-selected') ?? null,
+      stageElementExists: !!stageElement,
+    }
+  })()`)
+
+  record('hides selected PPT object from selection pane', afterHide.hidden === 'true' && afterHide.rowSelected === 'true' && !afterHide.stageElementExists, afterHide)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-row="${initial.selectedId}"] [data-ppt-layer-visibility]').click()`)
+  await delay(50)
+
+  const afterShow = await page.eval(`(() => {
+    const stageElement = document.querySelector('[data-ppt-element="${initial.selectedId}"]')
+    const row = document.querySelector('[data-ppt-layer-row="${initial.selectedId}"]')
+
+    return {
+      hidden: row?.getAttribute('data-hidden') ?? null,
+      stageElementExists: !!stageElement,
+    }
+  })()`)
+
+  record('shows hidden PPT object from selection pane', afterShow.hidden === 'false' && afterShow.stageElementExists, afterShow)
 }
 
 async function runSlideManagementScenario(page) {

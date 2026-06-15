@@ -41,7 +41,7 @@ export function createPPTCanvasCommandAdapter({
     deleteSelection({ items, selection }) {
       const selected = new Set(selection)
 
-      return items.filter((item) => !selected.has(item.id))
+      return items.filter((item) => !selected.has(item.id) || item.locked === true)
     },
     distributeSelection({ items, mode, selection }) {
       return distributePPTElements(items, selection, mode)
@@ -50,13 +50,19 @@ export function createPPTCanvasCommandAdapter({
       return { items, selection }
     },
     lockSelection({ items, selection }) {
-      return { items, selection }
+      const selected = new Set(selection)
+
+      return {
+        items: items.map((item) =>
+          selected.has(item.id) ? { ...item, locked: true } : item),
+        selection,
+      }
     },
     nudgeSelection({ dx, dy, items, selection }) {
       const selected = new Set(selection)
 
       return items.map((item) =>
-        selected.has(item.id)
+        selected.has(item.id) && item.locked !== true
           ? updatePPTElementBounds(item, {
               ...pptGeometryToBounds(item.geometry),
               x: item.geometry.x + dx,
@@ -72,13 +78,18 @@ export function createPPTCanvasCommandAdapter({
       return reorderPPTElements(items, selection, mode)
     },
     selectAll({ items }) {
-      return items.map((item) => item.id)
+      return items
+        .filter((item) => item.visible !== false)
+        .map((item) => item.id)
     },
     ungroupSelection({ items }) {
       return { items, selection: [] }
     },
     unlockAll({ items, selection }) {
-      return { items, selection }
+      return {
+        items: items.map(unlockPPTElement),
+        selection,
+      }
     },
   }
 }
@@ -87,41 +98,49 @@ export function getPPTCanvasCommandAvailability({
   canPaste,
   canRedo,
   canUndo,
+  hasHiddenSelection = false,
+  hasLockedItems = false,
+  hasLockedSelection = false,
   selection,
 }: {
   canPaste: boolean
   canRedo: boolean
   canUndo: boolean
+  hasHiddenSelection?: boolean
+  hasLockedItems?: boolean
+  hasLockedSelection?: boolean
   selection: readonly string[]
 }): PPTCanvasCommandAvailability {
   const hasSelection = selection.length > 0
   const canDistribute = selection.length >= 3
+  const canEditSelection = hasSelection && !hasLockedSelection
+  const canTransformSelection = canEditSelection && !hasHiddenSelection
 
   return {
-    alignBottom: hasSelection,
-    alignCenter: hasSelection,
-    alignLeft: hasSelection,
-    alignMiddle: hasSelection,
-    alignRight: hasSelection,
-    alignTop: hasSelection,
-    bringForward: hasSelection,
-    bringToFront: hasSelection,
-    cut: hasSelection,
-    delete: hasSelection,
-    duplicate: hasSelection,
-    distributeHorizontal: canDistribute,
-    distributeVertical: canDistribute,
+    alignBottom: canTransformSelection,
+    alignCenter: canTransformSelection,
+    alignLeft: canTransformSelection,
+    alignMiddle: canTransformSelection,
+    alignRight: canTransformSelection,
+    alignTop: canTransformSelection,
+    bringForward: canTransformSelection,
+    bringToFront: canTransformSelection,
+    cut: canEditSelection,
+    delete: canEditSelection,
+    duplicate: canEditSelection,
+    distributeHorizontal: canDistribute && !hasLockedSelection,
+    distributeVertical: canDistribute && !hasLockedSelection,
     group: false,
-    lockSelection: false,
-    nudge: hasSelection,
+    lockSelection: hasSelection && !hasLockedSelection,
+    nudge: canTransformSelection,
     paste: canPaste,
     redo: canRedo,
     selectAll: true,
-    sendBackward: hasSelection,
-    sendToBack: hasSelection,
+    sendBackward: canTransformSelection,
+    sendToBack: canTransformSelection,
     undo: canUndo,
     ungroup: false,
-    unlockAll: false,
+    unlockAll: hasLockedItems,
   }
 }
 
@@ -210,7 +229,7 @@ function alignPPTElements(
   }
 
   return items.map((item) => {
-    if (!selected.has(item.id)) {
+    if (!selected.has(item.id) || item.locked === true) {
       return item
     }
 
@@ -241,7 +260,8 @@ function distributePPTElements(
   mode: CanvasDistributeMode,
 ) {
   const selected = new Set(selection)
-  const selectedItems = items.filter((item) => selected.has(item.id))
+  const selectedItems = items.filter((item) =>
+    selected.has(item.id) && item.locked !== true)
   const distributed = mode === 'distributeHorizontal'
     ? distributePPTElementsHorizontally(selectedItems)
     : distributePPTElementsVertically(selectedItems)
@@ -317,7 +337,7 @@ function clonePPTElements(
   const sourceIds = new Set(ids)
 
   return items
-    .filter((item) => sourceIds.has(item.id))
+    .filter((item) => sourceIds.has(item.id) && item.locked !== true)
     .map((item) =>
       clonePPTElement(item, createId(getPPTElementIdPrefix(item)), offset))
 }
@@ -346,7 +366,15 @@ function reorderPPTElements(
   selection: string[],
   mode: CanvasReorderMode,
 ) {
-  const selected = new Set(selection)
+  const selected = new Set(
+    items
+      .filter((item) => selection.includes(item.id) && item.locked !== true)
+      .map((item) => item.id),
+  )
+
+  if (selected.size === 0) {
+    return items
+  }
 
   if (mode === 'bringToFront') {
     return [
@@ -365,6 +393,17 @@ function reorderPPTElements(
   return mode === 'bringForward'
     ? movePPTSelectionForward(items, selected)
     : movePPTSelectionBackward(items, selected)
+}
+
+function unlockPPTElement(item: PPTElement): PPTElement {
+  if (item.locked !== true) {
+    return item
+  }
+
+  const next = { ...item }
+  delete next.locked
+
+  return next
 }
 
 function movePPTSelectionForward(

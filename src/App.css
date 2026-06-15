@@ -284,6 +284,14 @@
   outline-offset: 2px;
 }
 
+.ppt-element[data-locked='true'] {
+  cursor: default;
+}
+
+.ppt-element[data-locked='true'][data-selected='true'] {
+  outline-style: dashed;
+}
+
 .ppt-element-editor {
   width: 100%;
   min-width: 0;
@@ -490,6 +498,86 @@
   background: #e0ecff;
   color: var(--accent-strong);
   font-weight: 700;
+}
+
+.ppt-layer-list {
+  display: grid;
+  gap: 4px;
+}
+
+.ppt-layer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ppt-layer-row[aria-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.ppt-layer-row[data-hidden='true'] {
+  color: #98a2b3;
+}
+
+.ppt-layer-row[data-locked='true'] .ppt-layer-name {
+  font-weight: 700;
+}
+
+.ppt-layer-select {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.ppt-layer-kind {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.ppt-layer-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-layer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.ppt-layer-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #475569;
+}
+
+.ppt-layer-icon-button:hover {
+  background: var(--control-hover);
 }
 
 .ppt-export-code {
