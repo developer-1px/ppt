@@ -43,6 +43,7 @@ try {
   await runCommandSurfaceScenario(page)
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
+  await runThemeScenario(page)
   await runFitSelectionScenario(page)
   await runTidySelectionScenario(page)
   await runTextQuickFormatScenario(page)
@@ -1564,6 +1565,82 @@ async function runCommandPaletteScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+}
+
+async function runThemeScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const initial = await readPPTThemeState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-theme-toggle]')?.click()`)
+  await delay(80)
+
+  const afterToolbarToggle = await readPPTThemeState(page)
+
+  record('toggles PPT dark mode from toolbar', initial.theme === 'light' && afterToolbarToggle.theme === 'dark' && afterToolbarToggle.themePressed === 'true' && afterToolbarToggle.topbarBg !== initial.topbarBg && afterToolbarToggle.inspectorBg !== initial.inspectorBg && afterToolbarToggle.stageBg !== initial.stageBg, {
+    afterToolbarToggle,
+    initial,
+  })
+  record('keeps PPT slide model background while toggling dark mode', afterToolbarToggle.slideBg === initial.slideBg && afterToolbarToggle.slideInlineBg === initial.slideInlineBg, {
+    afterToolbarToggle,
+    initial,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'light theme' })
+  await delay(80)
+
+  const paletteState = await page.eval(`(() => ({
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="view:toggle-theme"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const afterPaletteToggle = await readPPTThemeState(page)
+
+  record('toggles PPT theme from command palette', paletteState.open && paletteState.itemPresent && afterPaletteToggle.theme === 'light' && afterPaletteToggle.themePressed === 'false' && afterPaletteToggle.topbarBg === initial.topbarBg && afterPaletteToggle.stageBg === initial.stageBg, {
+    afterPaletteToggle,
+    initial,
+    paletteState,
+  })
+}
+
+async function readPPTThemeState(page) {
+  return page.eval(`(() => {
+    const app = document.querySelector('[data-ppt-app]')
+    const topbar = document.querySelector('.ppt-topbar')
+    const inspector = document.querySelector('.ppt-inspector')
+    const stage = document.querySelector('.ppt-stage-shell')
+    const slide = document.querySelector('.ppt-slide')
+
+    return {
+      appBg: getComputedStyle(app).backgroundColor,
+      inspectorBg: getComputedStyle(inspector).backgroundColor,
+      slideBg: getComputedStyle(slide).backgroundColor,
+      slideInlineBg: slide?.style.background ?? '',
+      stageBg: getComputedStyle(stage).backgroundColor,
+      theme: app?.getAttribute('data-theme') ?? '',
+      themePressed: document.querySelector('[data-ppt-theme-toggle]')?.getAttribute('aria-pressed') ?? '',
+      topbarBg: getComputedStyle(topbar).backgroundColor,
+    }
+  })()`)
 }
 
 async function runFitSelectionScenario(page) {

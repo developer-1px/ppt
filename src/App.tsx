@@ -37,6 +37,7 @@ import {
   Lock,
   Maximize2,
   Minus,
+  Moon,
   MoveDown,
   MoveUp,
   Plus,
@@ -45,6 +46,7 @@ import {
   Search,
   SendToBack,
   Square,
+  Sun,
   Trash2,
   Type,
   Undo2,
@@ -545,6 +547,7 @@ function App() {
   const [replaceQuery, setReplaceQuery] = useState('')
   const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [showGrid, setShowGrid] = useState(true)
+  const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -2104,6 +2107,10 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  function toggleTheme() {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
+
   function screenToWorld(event: Pick<PointerEvent, 'clientX' | 'clientY'>) {
     const rect = stageRef.current?.getBoundingClientRect()
 
@@ -3196,6 +3203,11 @@ function App() {
     section: 'View',
     title: showGrid ? 'Hide grid' : 'Show grid',
   }, {
+    id: 'view:toggle-theme',
+    run: toggleTheme,
+    section: 'View',
+    title: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+  }, {
     disabled: !canFormatSelectedText,
     id: 'format:bold',
     run: toggleSelectedTextBold,
@@ -3223,7 +3235,7 @@ function App() {
   }]
 
   return (
-    <main className="ppt-app" data-ppt-app>
+    <main className="ppt-app" data-ppt-app data-theme={theme}>
       <header className="ppt-topbar">
         <div className="ppt-brand">
           <strong>PPT</strong>
@@ -3408,6 +3420,17 @@ function App() {
           </button>
           <button aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
             <Grid2X2 size={17} />
+          </button>
+          <button
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={theme === 'dark'}
+            className="ppt-icon-button"
+            data-ppt-theme-toggle
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            type="button"
+          >
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
           <span className="ppt-zoom-label">{Math.round(viewport.scale * 100)}%</span>
         </div>
