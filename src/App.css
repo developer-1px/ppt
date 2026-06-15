@@ -545,6 +545,10 @@
   font-weight: 700;
 }
 
+.ppt-layer-row[data-grouped='true'] .ppt-layer-kind {
+  color: var(--accent-strong);
+}
+
 .ppt-layer-select {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);

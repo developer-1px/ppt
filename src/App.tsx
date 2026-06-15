@@ -19,6 +19,7 @@ import {
   EyeOff,
   FilePlus2,
   Grid2X2,
+  Group,
   Layers,
   Lock,
   Maximize2,
@@ -31,6 +32,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Ungroup,
   Unlock,
   ZoomIn,
   ZoomOut,
@@ -77,10 +79,12 @@ import {
   deleteCanvasCommand,
   distributeCanvasCommand,
   duplicateCanvasCommand,
+  groupCanvasCommand,
   lockCanvasCommand,
   nudgeCanvasCommand,
   reorderCanvasCommand,
   selectAllCanvasCommand,
+  ungroupCanvasCommand,
   unlockAllCanvasCommand,
   type CanvasAlignMode,
   type CanvasCommandItemsResult,
@@ -124,9 +128,9 @@ import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
   commands: {
-    group: false,
+    group: true,
     lockSelection: true,
-    ungroup: false,
+    ungroup: true,
     unlockAll: true,
   },
 })
@@ -238,10 +242,12 @@ function App() {
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
   const hasHiddenSelection = selectedElements.some((element) => element.visible === false)
+  const hasGroupedSelection = selectedElements.some((element) => Boolean(element.groupId))
   const commandAvailability = useMemo(() => getPPTCanvasCommandAvailability({
     canPaste: clipboard.length > 0,
     canRedo: future.length > 0,
     canUndo: past.length > 0,
+    hasGroupedSelection,
     hasHiddenSelection,
     hasLockedItems,
     hasLockedSelection,
@@ -249,6 +255,7 @@ function App() {
   }), [
     clipboard.length,
     future.length,
+    hasGroupedSelection,
     hasHiddenSelection,
     hasLockedItems,
     hasLockedSelection,
@@ -338,6 +345,16 @@ function App() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
         event.preventDefault()
         duplicateSelection()
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'g') {
+        event.preventDefault()
+        if (event.shiftKey) {
+          ungroupSelection()
+        } else {
+          groupSelection()
+        }
         return
       }
 
@@ -694,6 +711,35 @@ function App() {
       }))
   }
 
+  function groupSelection() {
+    if (!commandAvailability.group) {
+      return
+    }
+
+    commitElementCommand((slide) =>
+      groupCanvasCommand({
+        adapter: commandAdapter,
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        createId: createPPTElementIdFactory(slide),
+        items: slide.elements,
+        selection,
+      }))
+  }
+
+  function ungroupSelection() {
+    if (!commandAvailability.ungroup) {
+      return
+    }
+
+    commitElementCommand((slide) =>
+      ungroupCanvasCommand({
+        adapter: commandAdapter,
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        items: slide.elements,
+        selection,
+      }))
+  }
+
   function reorderSelection(mode: CanvasReorderMode) {
     if (!commandAvailability[canvasReorderModeAvailabilityKey[mode]]) {
       return
@@ -1012,13 +1058,20 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
 
+    const additive = isAdditivePointerInput(event)
     const pointerSelection = getCanvasItemPointerSelection({
-      additive: isAdditivePointerInput(event),
+      additive,
       itemId: elementId,
       scene,
       selection,
     })
-    const nextSelection = pointerSelection.nextSelection
+    const nextSelection = getPPTGroupPointerSelection({
+      additive,
+      fallbackSelection: pointerSelection.nextSelection,
+      itemId: elementId,
+      selection,
+      slide: activeSlide,
+    })
     const bounds = scene.getBounds(nextSelection)
     const hasLockedTarget = activeSlide.elements.some((element) =>
       nextSelection.includes(element.id) && element.locked === true)
@@ -1392,6 +1445,12 @@ function App() {
           </button>
         </div>
         <div className="ppt-toolbar-group">
+          <button className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={CANVAS_COMMAND_AFFORDANCES.group.title} type="button">
+            <Group size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={CANVAS_COMMAND_AFFORDANCES.ungroup.title} type="button">
+            <Ungroup size={17} />
+          </button>
           <button className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={CANVAS_COMMAND_AFFORDANCES.lockSelection.title} type="button">
             <Lock size={17} />
           </button>
@@ -1536,7 +1595,7 @@ function App() {
         onElementVisibilityToggle={toggleElementVisibility}
         onLayerSelect={(elementId, additive) => {
           setSelection((current) =>
-            getPPTLayerSelection(current, elementId, additive))
+            getPPTLayerSelection(current, elementId, additive, activeSlide))
         }}
         onParagraphAlignChange={updateParagraphAlign}
         onShapeKindChange={updateShapeKind}
@@ -1633,6 +1692,7 @@ function PPTElementView({
     <div
       className="ppt-element"
       data-hovered={hovered ? 'true' : 'false'}
+      data-group-id={element.groupId}
       data-kind={element.kind}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
@@ -2130,6 +2190,7 @@ function Inspector({
             <div
               aria-selected={selection.includes(element.id)}
               className="ppt-layer-row"
+              data-grouped={element.groupId ? 'true' : 'false'}
               data-hidden={element.visible === false ? 'true' : 'false'}
               data-locked={element.locked === true ? 'true' : 'false'}
               data-ppt-layer-row={element.id}
@@ -2423,6 +2484,28 @@ function getPPTLayerSelection(
   selection: string[],
   elementId: string,
   additive: boolean,
+  slide: PPTSlide,
+) {
+  const fallbackSelection = getPPTSingleElementSelection(
+    selection,
+    elementId,
+    additive,
+  )
+
+  return getPPTGroupPointerSelection({
+    additive,
+    fallbackSelection,
+    includeHidden: true,
+    itemId: elementId,
+    selection,
+    slide,
+  })
+}
+
+function getPPTSingleElementSelection(
+  selection: string[],
+  elementId: string,
+  additive: boolean,
 ) {
   if (!additive) {
     return [elementId]
@@ -2431,6 +2514,62 @@ function getPPTLayerSelection(
   return selection.includes(elementId)
     ? selection.filter((id) => id !== elementId)
     : [...selection, elementId]
+}
+
+function getPPTGroupPointerSelection({
+  additive,
+  fallbackSelection,
+  includeHidden = false,
+  itemId,
+  selection,
+  slide,
+}: {
+  additive: boolean
+  fallbackSelection: string[]
+  includeHidden?: boolean
+  itemId: string
+  selection: string[]
+  slide: PPTSlide
+}) {
+  const memberIds = getPPTGroupMemberIds(slide, itemId, includeHidden)
+
+  if (memberIds.length === 0) {
+    return fallbackSelection
+  }
+
+  if (!additive) {
+    return memberIds
+  }
+
+  const selected = new Set(selection)
+  const allMembersSelected = memberIds.every((id) => selected.has(id))
+
+  if (allMembersSelected) {
+    return selection.filter((id) => !memberIds.includes(id))
+  }
+
+  return [
+    ...selection,
+    ...memberIds.filter((id) => !selected.has(id)),
+  ]
+}
+
+function getPPTGroupMemberIds(
+  slide: PPTSlide,
+  elementId: string,
+  includeHidden: boolean,
+) {
+  const element = findPPTElement(slide, elementId)
+
+  if (!element?.groupId) {
+    return []
+  }
+
+  return slide.elements
+    .filter((candidate) =>
+      candidate.groupId === element.groupId &&
+      (includeHidden || candidate.visible !== false))
+    .map((candidate) => candidate.id)
 }
 
 export default App

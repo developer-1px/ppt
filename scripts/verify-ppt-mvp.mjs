@@ -471,6 +471,82 @@ async function runAffordanceScenario(page) {
     beforeDistribute,
   })
 
+  await page.eval(`document.querySelector('[data-ppt-command="group"]').click()`)
+  await delay(50)
+
+  const afterGroup = await page.eval(`(() => {
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+    const groupIds = selected.map((element) => element.getAttribute('data-group-id'))
+
+    return {
+      groupedLayerCount: document.querySelectorAll('[data-ppt-layer-row][data-grouped="true"]').length,
+      groupIds,
+      selectedCount: selected.length,
+      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]').disabled,
+      uniqueGroupCount: new Set(groupIds).size,
+    }
+  })()`)
+
+  record('groups multi-selected PPT objects with canvas command adapter', afterGroup.selectedCount === 3 && afterGroup.groupIds.every(Boolean) && afterGroup.uniqueGroupCount === 1 && afterGroup.groupedLayerCount >= 3 && !afterGroup.ungroupDisabled, afterGroup)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await clickMouse(page, afterDistribute.x, afterDistribute.y, 1)
+  await delay(50)
+
+  const afterGroupedClick = await page.eval(`(() => ({
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record('selects all grouped PPT objects from one grouped member click', afterGroupedClick.selectedCount === 3 && afterGroupedClick.selectedIds.includes('s1-card-1'), afterGroupedClick)
+
+  const beforeGroupNudge = await page.eval(`(() => ({
+    card1: parseFloat(document.querySelector('[data-ppt-element="s1-card-1"]').style.left),
+    card2: parseFloat(document.querySelector('[data-ppt-element="s1-card-2"]').style.left),
+    panel: parseFloat(document.querySelector('[data-ppt-element="s1-side-panel"]').style.left),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(50)
+
+  const afterGroupNudge = await page.eval(`(() => ({
+    card1: parseFloat(document.querySelector('[data-ppt-element="s1-card-1"]').style.left),
+    card2: parseFloat(document.querySelector('[data-ppt-element="s1-card-2"]').style.left),
+    panel: parseFloat(document.querySelector('[data-ppt-element="s1-side-panel"]').style.left),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('nudges grouped PPT objects together', afterGroupNudge.selectedCount === 3 && afterGroupNudge.card1 === beforeGroupNudge.card1 + 1 && afterGroupNudge.card2 === beforeGroupNudge.card2 + 1 && afterGroupNudge.panel === beforeGroupNudge.panel + 1, {
+    afterGroupNudge,
+    beforeGroupNudge,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-command="ungroup"]').click()`)
+  await delay(50)
+
+  const afterUngroup = await page.eval(`(() => {
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+
+    return {
+      groupedLayerCount: document.querySelectorAll('[data-ppt-layer-row][data-grouped="true"]').length,
+      groupIds: selected.map((element) => element.getAttribute('data-group-id')),
+      selectedCount: selected.length,
+      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]').disabled,
+    }
+  })()`)
+
+  record('ungroups selected PPT objects with canvas command adapter', afterUngroup.selectedCount === 3 && afterUngroup.groupIds.every((groupId) => groupId === null) && afterUngroup.groupedLayerCount === 0 && afterUngroup.ungroupDisabled, afterUngroup)
+
   await pressKey(page, {
     code: 'Escape',
     key: 'Escape',

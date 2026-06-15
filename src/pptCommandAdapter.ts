@@ -46,8 +46,21 @@ export function createPPTCanvasCommandAdapter({
     distributeSelection({ items, mode, selection }) {
       return distributePPTElements(items, selection, mode)
     },
-    groupSelection({ items, selection }) {
-      return { items, selection }
+    groupSelection({ groupId, items, selection }) {
+      const selected = new Set(selection)
+      const selectedItems = items.filter((item) =>
+        selected.has(item.id) && item.locked !== true && item.visible !== false)
+      const groupable = new Set(selectedItems.map((item) => item.id))
+
+      if (selectedItems.length < 2) {
+        return { items, selection }
+      }
+
+      return {
+        items: items.map((item) =>
+          groupable.has(item.id) ? { ...item, groupId } : item),
+        selection: selectedItems.map((item) => item.id),
+      }
     },
     lockSelection({ items, selection }) {
       const selected = new Set(selection)
@@ -71,8 +84,7 @@ export function createPPTCanvasCommandAdapter({
           : item)
     },
     pasteItems({ clipboard, createId, offset }) {
-      return clipboard.map((item) =>
-        clonePPTElement(item, createId(getPPTElementIdPrefix(item)), offset))
+      return clonePPTElementsFromSource(clipboard, createId, offset)
     },
     reorderSelection({ items, mode, selection }) {
       return reorderPPTElements(items, selection, mode)
@@ -82,8 +94,22 @@ export function createPPTCanvasCommandAdapter({
         .filter((item) => item.visible !== false)
         .map((item) => item.id)
     },
-    ungroupSelection({ items }) {
-      return { items, selection: [] }
+    ungroupSelection({ items, selection }) {
+      const selectedGroupIds = getSelectedPPTGroupIds(items, selection)
+
+      if (selectedGroupIds.size === 0) {
+        return { items, selection: [] }
+      }
+
+      return {
+        items: items.map((item) =>
+          item.groupId && selectedGroupIds.has(item.groupId)
+            ? ungroupPPTElement(item)
+            : item),
+        selection: items
+          .filter((item) => item.groupId && selectedGroupIds.has(item.groupId))
+          .map((item) => item.id),
+      }
     },
     unlockAll({ items, selection }) {
       return {
@@ -99,6 +125,7 @@ export function getPPTCanvasCommandAvailability({
   canRedo,
   canUndo,
   hasHiddenSelection = false,
+  hasGroupedSelection = false,
   hasLockedItems = false,
   hasLockedSelection = false,
   selection,
@@ -106,6 +133,7 @@ export function getPPTCanvasCommandAvailability({
   canPaste: boolean
   canRedo: boolean
   canUndo: boolean
+  hasGroupedSelection?: boolean
   hasHiddenSelection?: boolean
   hasLockedItems?: boolean
   hasLockedSelection?: boolean
@@ -130,7 +158,7 @@ export function getPPTCanvasCommandAvailability({
     duplicate: canEditSelection,
     distributeHorizontal: canDistribute && !hasLockedSelection,
     distributeVertical: canDistribute && !hasLockedSelection,
-    group: false,
+    group: canTransformSelection && selection.length >= 2,
     lockSelection: hasSelection && !hasLockedSelection,
     nudge: canTransformSelection,
     paste: canPaste,
@@ -139,7 +167,7 @@ export function getPPTCanvasCommandAvailability({
     sendBackward: canTransformSelection,
     sendToBack: canTransformSelection,
     undo: canUndo,
-    ungroup: false,
+    ungroup: canEditSelection && hasGroupedSelection,
     unlockAll: hasLockedItems,
   }
 }
@@ -335,17 +363,38 @@ function clonePPTElements(
   offset: { x: number; y: number },
 ) {
   const sourceIds = new Set(ids)
-
-  return items
+  const sourceItems = items
     .filter((item) => sourceIds.has(item.id) && item.locked !== true)
-    .map((item) =>
-      clonePPTElement(item, createId(getPPTElementIdPrefix(item)), offset))
+
+  return clonePPTElementsFromSource(sourceItems, createId, offset)
+}
+
+function clonePPTElementsFromSource(
+  items: PPTElement[],
+  createId: (prefix: string) => string,
+  offset: { x: number; y: number },
+) {
+  const groupIdBySource = new Map<string, string>()
+
+  return items.map((item) => {
+    const groupId = item.groupId
+      ? getClonedPPTGroupId(groupIdBySource, item.groupId, createId)
+      : undefined
+
+    return clonePPTElement(
+      item,
+      createId(getPPTElementIdPrefix(item)),
+      offset,
+      groupId,
+    )
+  })
 }
 
 function clonePPTElement(
   item: PPTElement,
   id: string,
   offset: { x: number; y: number },
+  groupId: string | undefined,
 ): PPTElement {
   const geometry = {
     ...item.geometry,
@@ -356,9 +405,27 @@ function clonePPTElement(
   return {
     ...item,
     geometry,
+    groupId,
     id,
     name: `${item.name} Copy`,
   }
+}
+
+function getClonedPPTGroupId(
+  groupIdBySource: Map<string, string>,
+  sourceGroupId: string,
+  createId: (prefix: string) => string,
+) {
+  const existing = groupIdBySource.get(sourceGroupId)
+
+  if (existing) {
+    return existing
+  }
+
+  const next = createId('group-copy')
+  groupIdBySource.set(sourceGroupId, next)
+
+  return next
 }
 
 function reorderPPTElements(
@@ -404,6 +471,33 @@ function unlockPPTElement(item: PPTElement): PPTElement {
   delete next.locked
 
   return next
+}
+
+function ungroupPPTElement(item: PPTElement): PPTElement {
+  if (!item.groupId) {
+    return item
+  }
+
+  const next = { ...item }
+  delete next.groupId
+
+  return next
+}
+
+function getSelectedPPTGroupIds(
+  items: PPTElement[],
+  selection: string[],
+) {
+  const selected = new Set(selection)
+  const groupIds = new Set<string>()
+
+  for (const item of items) {
+    if (selected.has(item.id) && item.groupId) {
+      groupIds.add(item.groupId)
+    }
+  }
+
+  return groupIds
 }
 
 function movePPTSelectionForward(
