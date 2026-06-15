@@ -50,6 +50,7 @@ const PPTTextStyleSchema = z.object({
   fontFamily: z.string().optional(),
   fontSize: z.number(),
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
+  verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
 })
 
 const PPTTextAutoFitSchema = z.enum(['resizeShapeToFitText'])

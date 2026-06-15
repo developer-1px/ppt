@@ -32,6 +32,19 @@ const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
 const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
   PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => option.value),
 )
+type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
+const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
+const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
+  { css: 'flex-start', value: 'top' },
+  { css: 'center', value: 'middle' },
+  { css: 'flex-end', value: 'bottom' },
+] as const satisfies readonly {
+  css: string
+  value: PPTTextVerticalAlign
+}[])
+const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
+  PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
+)
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -226,6 +239,9 @@ function renderPPTElementHTML(element: PPTElement) {
   const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
+  const verticalAlign = getPPTElementTextVerticalAlign(element)
+  const verticalAlignAttr = ` data-ppt-vertical-align="${escapeHtml(verticalAlign)}"`
+  const verticalAlignStyle = `align-items:${getPPTTextVerticalAlignCSS(verticalAlign)}`
   const fontFamilyAttr = element.style
     ? ` data-ppt-font-family="${escapeHtml(normalizePPTTextFontFamily(element.style.fontFamily))}"`
     : ''
@@ -235,10 +251,10 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -268,6 +284,7 @@ function renderPPTElementSVG(element: PPTElement) {
     geometry: element.geometry,
     inset: element.kind === 'shape' ? 18 : 0,
     style: element.style,
+    verticalAlign: getPPTElementTextVerticalAlign(element),
   })
 
   if (element.kind === 'shape') {
@@ -365,18 +382,26 @@ function renderPPTTextBodySVG({
   geometry,
   inset,
   style,
+  verticalAlign,
 }: {
   body: PPTTextBody | undefined
   geometry: PPTElement['geometry']
   inset: number
   style: PPTTextStyle | undefined
+  verticalAlign: PPTTextVerticalAlign
 }) {
   if (!body) {
     return ''
   }
 
   const fontSize = style?.fontSize ?? 24
-  let y = geometry.y + inset
+  let y = geometry.y + inset + getPPTTextVerticalAlignOffset({
+    body,
+    fontSize,
+    geometry,
+    inset,
+    verticalAlign,
+  })
 
   return body.paragraphs.map((paragraph) => {
     const bullet = paragraph.bullet === 'bullet'
@@ -398,6 +423,7 @@ function renderPPTTextBodySVG({
       `data-ppt-line-height="${formatNumber(lineHeight)}"`,
       `data-ppt-spacing-after="${formatNumber(spacingAfter)}"`,
       `data-ppt-spacing-before="${formatNumber(spacingBefore)}"`,
+      `data-ppt-vertical-align="${escapeHtml(verticalAlign)}"`,
       `x="${formatNumber(x)}"`,
       `y="${formatNumber(y)}"`,
       `fill="${escapeHtml(style?.color ?? '#111827')}"`,
@@ -704,6 +730,12 @@ function getPPTTextAutoFitSvgAttr(element: PPTElement) {
   return autoFit ? `data-ppt-text-autofit="${autoFit}"` : ''
 }
 
+function getPPTTextVerticalAlignSvgAttr(element: PPTElement) {
+  return isPPTElementWithText(element)
+    ? `data-ppt-vertical-align="${escapeHtml(getPPTElementTextVerticalAlign(element))}"`
+    : ''
+}
+
 function getPPTTextAutoFit(element: PPTElement) {
   if (element.kind === 'textBox') {
     return element.textAutoFit
@@ -726,6 +758,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
       ? `data-ppt-shape="${element.shape}"`
       : '',
     getPPTTextAutoFitSvgAttr(element),
+    getPPTTextVerticalAlignSvgAttr(element),
     ...getPPTElementAnimationAttrEntries(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
     element.flipV === true ? 'data-ppt-flip-v="true"' : '',
@@ -862,6 +895,10 @@ function exportTextStyle(style: PPTTextStyle) {
   ].join(';')
 }
 
+function isPPTElementWithText(element: PPTElement) {
+  return element.kind === 'textBox' || (element.kind === 'shape' && !!element.textBody)
+}
+
 function normalizePPTTextFontFamily(fontFamily: string | undefined) {
   return PPT_TEXT_FONT_FAMILY_VALUES.has(fontFamily ?? '')
     ? fontFamily ?? PPT_DEFAULT_TEXT_FONT_FAMILY
@@ -873,6 +910,68 @@ function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
 
   return PPT_TEXT_FONT_FAMILY_OPTIONS.find((option) => option.value === normalized)?.css ??
     PPT_TEXT_FONT_FAMILY_OPTIONS[0].css
+}
+
+function getPPTElementTextVerticalAlign(element: PPTElement) {
+  const verticalAlign = element.kind === 'shape' || element.kind === 'textBox'
+    ? element.style?.verticalAlign
+    : undefined
+
+  return normalizePPTTextVerticalAlign(
+    verticalAlign,
+    element.kind === 'shape' ? 'middle' : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+  )
+}
+
+function normalizePPTTextVerticalAlign(
+  verticalAlign: string | undefined,
+  fallback: PPTTextVerticalAlign = PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+) {
+  return PPT_TEXT_VERTICAL_ALIGN_VALUES.has(verticalAlign ?? '')
+    ? verticalAlign as PPTTextVerticalAlign
+    : fallback
+}
+
+function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
+  const normalized = normalizePPTTextVerticalAlign(verticalAlign)
+
+  return PPT_TEXT_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === normalized)?.css ??
+    PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
+}
+
+function getPPTTextVerticalAlignOffset({
+  body,
+  fontSize,
+  geometry,
+  inset,
+  verticalAlign,
+}: {
+  body: PPTTextBody
+  fontSize: number
+  geometry: PPTElement['geometry']
+  inset: number
+  verticalAlign: PPTTextVerticalAlign
+}) {
+  if (verticalAlign === 'top') {
+    return 0
+  }
+
+  const innerHeight = Math.max(0, geometry.h - inset * 2)
+  const textHeight = getPPTTextBodySVGHeight(body, fontSize)
+  const available = Math.max(0, innerHeight - textHeight)
+
+  return verticalAlign === 'middle' ? available / 2 : available
+}
+
+function getPPTTextBodySVGHeight(body: PPTTextBody, fontSize: number) {
+  return body.paragraphs.reduce(
+    (height, paragraph) =>
+      height +
+      getPPTParagraphSpacingBefore(paragraph) +
+      fontSize * getPPTParagraphLineHeight(paragraph) +
+      getPPTParagraphSpacingAfter(paragraph),
+    0,
+  )
 }
 
 function getPPTParagraphHTMLAttrs(paragraph: PPTParagraph) {

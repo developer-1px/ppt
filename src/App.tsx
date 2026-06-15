@@ -724,6 +724,7 @@ type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
   | 'spacingBefore'
+type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
 type PPTLayerPaneAriaContract = {
   containerRole: 'tree'
   keyboardModel: 'roving-tabindex'
@@ -1022,6 +1023,19 @@ const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
 ] as const)
 const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
   PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => option.value),
+)
+const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
+const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
+  { css: 'flex-start', label: 'Top', value: 'top' },
+  { css: 'center', label: 'Middle', value: 'middle' },
+  { css: 'flex-end', label: 'Bottom', value: 'bottom' },
+] as const satisfies readonly {
+  css: string
+  label: string
+  value: PPTTextVerticalAlign
+}[])
+const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
+  PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
 )
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
@@ -2668,11 +2682,15 @@ function App() {
           color: '#111827',
           fontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
           fontSize: 24,
+          verticalAlign: PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
           ...element.style,
         }
-        const nextValue = field === 'fontFamily'
-          ? normalizePPTTextFontFamily(String(value))
-          : value
+        const nextValue =
+          field === 'fontFamily'
+            ? normalizePPTTextFontFamily(String(value))
+            : field === 'verticalAlign'
+              ? normalizePPTTextVerticalAlign(String(value))
+              : value
 
         return {
           ...element,
@@ -7277,6 +7295,9 @@ function SlideThumb({
             data-ppt-thumb-font-family={isPPTTextElement(element)
               ? normalizePPTTextFontFamily(getPPTTextElementStyle(element).fontFamily)
               : undefined}
+            data-ppt-thumb-vertical-align={isPPTTextElement(element)
+              ? getPPTTextElementVerticalAlign(element)
+              : undefined}
             data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
@@ -7303,6 +7324,9 @@ function SlideThumb({
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
               fontFamily: isPPTTextElement(element)
                 ? getPPTTextFontFamilyCSS(getPPTTextElementStyle(element).fontFamily)
+                : undefined,
+              alignItems: isPPTTextElement(element)
+                ? getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))
                 : undefined,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
@@ -7450,6 +7474,9 @@ function PPTElementView({
       data-ppt-animation-type={animation.type}
       data-ppt-font-family={isPPTTextElement(element)
         ? normalizePPTTextFontFamily(textStyle?.fontFamily)
+        : undefined}
+      data-ppt-vertical-align={isPPTTextElement(element)
+        ? getPPTTextElementVerticalAlign(element)
         : undefined}
       data-ppt-text-autofit={isPPTTextElement(element) ? element.textAutoFit : undefined}
       data-ppt-text-overflow={textOverflow ? 'true' : undefined}
@@ -8496,6 +8523,25 @@ function Inspector({
                   </select>
                 </label>
                 <label className="ppt-field">
+                  <span>Vertical</span>
+                  <select
+                    data-ppt-style-field="vertical-align"
+                    value={getPPTTextElementVerticalAlign(selectedElement)}
+                    onChange={(event) =>
+                      onElementTextStyleChange(
+                        selectedElement.id,
+                        'verticalAlign',
+                        event.target.value,
+                      )}
+                  >
+                    {PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ppt-field">
                   <span>Weight</span>
                   <select
                     data-ppt-style-field="font-weight"
@@ -8998,6 +9044,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
   return {
     ...base,
     ...pptTextStyle(element.style),
+    alignItems: getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element)),
     background: element.kind === 'shape' ? element.fill.color : 'transparent',
     border: element.kind === 'shape' && element.stroke
       ? `${element.stroke.width}px solid ${element.stroke.color}`
@@ -9356,6 +9403,7 @@ function getDefaultPPTTextStyle(): PPTTextStyle {
     fontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
     fontSize: 24,
     fontWeight: 'regular',
+    verticalAlign: PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
   }
 }
 
@@ -9370,6 +9418,33 @@ function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
 
   return PPT_TEXT_FONT_FAMILY_OPTIONS.find((option) => option.value === normalized)?.css ??
     PPT_TEXT_FONT_FAMILY_OPTIONS[0].css
+}
+
+function getPPTTextElementVerticalAlign(element: PPTElement) {
+  const verticalAlign = element.kind === 'shape' || element.kind === 'textBox'
+    ? element.style?.verticalAlign
+    : undefined
+
+  return normalizePPTTextVerticalAlign(
+    verticalAlign,
+    element.kind === 'shape' ? 'middle' : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+  )
+}
+
+function normalizePPTTextVerticalAlign(
+  verticalAlign: string | undefined,
+  fallback: PPTTextVerticalAlign = PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+) {
+  return PPT_TEXT_VERTICAL_ALIGN_VALUES.has(verticalAlign ?? '')
+    ? verticalAlign as PPTTextVerticalAlign
+    : fallback
+}
+
+function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
+  const normalized = normalizePPTTextVerticalAlign(verticalAlign)
+
+  return PPT_TEXT_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === normalized)?.css ??
+    PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
 }
 
 function getPPTSelectionCommandAnchor({

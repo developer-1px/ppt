@@ -55,6 +55,7 @@ try {
   await runTextQuickFormatScenario(page)
   await runTextParagraphSpacingScenario(page)
   await runTextFontFamilyScenario(page)
+  await runTextVerticalAlignScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
@@ -2878,6 +2879,115 @@ async function runTextFontFamilyScenario(page) {
   await delay(80)
 }
 
+async function runTextVerticalAlignScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'renders PPT text vertical alignment control in text inspector',
+    initial.selectedId === 's1-title' &&
+      initial.verticalAlign === 'top' &&
+      initial.selectedVerticalAlign === 'top' &&
+      initial.thumbVerticalAlign === 'top',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const verticalAlign = document.querySelector('[data-ppt-style-field="vertical-align"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+
+    setter.call(verticalAlign, 'middle')
+    verticalAlign.dispatchEvent(new Event('input', { bubbles: true }))
+    verticalAlign.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterMiddle = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'updates PPT text vertical alignment metadata from inspector',
+    afterMiddle.verticalAlign === 'middle' &&
+      afterMiddle.selectedVerticalAlign === 'middle' &&
+      afterMiddle.selectedStyleAlignItems === 'center' &&
+      afterMiddle.thumbVerticalAlign === 'middle' &&
+      afterMiddle.thumbStyleAlignItems === 'center',
+    {
+      afterMiddle,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTTextVerticalAlignState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'undoes and redoes PPT text vertical alignment as one history step',
+    afterUndo.verticalAlign === 'top' &&
+      afterUndo.selectedVerticalAlign === 'top' &&
+      afterRedo.verticalAlign === 'middle' &&
+      afterRedo.selectedVerticalAlign === 'middle',
+    {
+      afterMiddle,
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector('[data-ppt-element="s1-title"]')
+
+    return {
+      alignItems: element?.style.alignItems ?? '',
+      open: !!overlay,
+      verticalAlign: element?.getAttribute('data-ppt-vertical-align') ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT text vertical alignment metadata in presentation preview',
+    preview.open &&
+      preview.verticalAlign === 'middle' &&
+      preview.alignItems === 'center',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
 async function runExportScenario(page) {
   await installPPTDownloadCapture(page)
 
@@ -2899,6 +3009,8 @@ async function runExportScenario(page) {
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
       hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
+      hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="middle"') && code.includes('align-items:center'),
+      hasTextVerticalAlignModel: code.includes('"verticalAlign": "middle"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageFitMarkup: code.includes('data-ppt-image-fit="contain"') && code.includes('object-fit:contain'),
       hasImageFitModel: code.includes('"fit": "contain"'),
@@ -2941,6 +3053,7 @@ async function runExportScenario(page) {
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
+  record('exports PPT text vertical alignment markup and model data', state.hasTextVerticalAlignMarkup && state.hasTextVerticalAlignModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
@@ -2972,6 +3085,7 @@ async function runExportScenario(page) {
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
+      hasTextVerticalAlign: text.includes('data-ppt-vertical-align="middle"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
@@ -2995,6 +3109,7 @@ async function runExportScenario(page) {
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
+  record('exports PPT text vertical alignment metadata into slide SVG', slideSvgState.hasTextVerticalAlign, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
   record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
@@ -5537,6 +5652,22 @@ function getPPTTextFontFamilyState(page) {
       selectedStyleFontFamily: selected?.style.fontFamily ?? '',
       thumbFontFamily: thumb?.getAttribute('data-ppt-thumb-font-family') ?? '',
       thumbStyleFontFamily: thumb?.style.fontFamily ?? '',
+    }
+  })()`)
+}
+
+function getPPTTextVerticalAlignState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
+
+    return {
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedStyleAlignItems: selected?.style.alignItems ?? '',
+      selectedVerticalAlign: selected?.getAttribute('data-ppt-vertical-align') ?? '',
+      thumbStyleAlignItems: thumb?.style.alignItems ?? '',
+      thumbVerticalAlign: thumb?.getAttribute('data-ppt-thumb-vertical-align') ?? '',
+      verticalAlign: document.querySelector('[data-ppt-style-field="vertical-align"]')?.value ?? '',
     }
   })()`)
 }
