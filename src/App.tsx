@@ -131,6 +131,7 @@ import {
   type PPTDeck,
   type PPTElement,
   type PPTImage,
+  type PPTImageCrop,
   type PPTImageFit,
   type PPTLine,
   type PPTLineConnection,
@@ -1735,6 +1736,28 @@ function App() {
     )
   }
 
+  function updateImageCrop(
+    elementId: string,
+    field: keyof PPTImageCrop,
+    value: number,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'image') {
+          return element
+        }
+
+        return {
+          ...element,
+          crop: {
+            ...getPPTImageCrop(element),
+            [field]: clamp(value, 0, 100),
+          },
+        }
+      }),
+    )
+  }
+
   function toggleElementLocked(elementId: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -2945,6 +2968,7 @@ function App() {
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
         onElementGeometryChange={updateElementGeometry}
+        onImageCropChange={updateImageCrop}
         onImageFitChange={updateImageFit}
         onElementLockToggle={toggleElementLocked}
         onElementNameChange={updateElementName}
@@ -3469,6 +3493,12 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-image-crop-x={element.kind === 'image'
+              ? getPPTImageCrop(element).x
+              : undefined}
+            data-ppt-image-crop-y={element.kind === 'image'
+              ? getPPTImageCrop(element).y
+              : undefined}
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
@@ -3487,6 +3517,9 @@ function SlideThumb({
                     : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
+                : undefined,
+              backgroundPosition: element.kind === 'image'
+                ? getPPTImageObjectPosition(element)
                 : undefined,
               backgroundSize: element.kind === 'image'
                 ? getPPTImageFit(element)
@@ -3575,6 +3608,12 @@ function PPTElementView({
         ? element.startConnection?.elementId
         : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
+      data-ppt-image-crop-x={element.kind === 'image'
+        ? getPPTImageCrop(element).x
+        : undefined}
+      data-ppt-image-crop-y={element.kind === 'image'
+        ? getPPTImageCrop(element).y
+        : undefined}
       data-ppt-image-fit={element.kind === 'image'
         ? getPPTImageFit(element)
         : undefined}
@@ -3596,7 +3635,10 @@ function PPTElementView({
           alt={element.alt}
           draggable={false}
           src={element.src}
-          style={{ objectFit: getPPTImageFit(element) }}
+          style={{
+            objectFit: getPPTImageFit(element),
+            objectPosition: getPPTImageObjectPosition(element),
+          }}
         />
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
@@ -3952,6 +3994,7 @@ function Inspector({
   onElementStrokeChange,
   onElementTextStyleChange,
   onElementVisibilityToggle,
+  onImageCropChange,
   onImageFitChange,
   onLayerSelect,
   onLineMarkerChange,
@@ -3990,6 +4033,11 @@ function Inspector({
     value: string | number,
   ) => void
   onElementVisibilityToggle: (elementId: string) => void
+  onImageCropChange: (
+    elementId: string,
+    field: keyof PPTImageCrop,
+    value: number,
+  ) => void
   onImageFitChange: (
     elementId: string,
     fit: PPTImageFit,
@@ -4252,21 +4300,43 @@ function Inspector({
               </>
             ) : null}
             {selectedElement.kind === 'image' ? (
-              <label className="ppt-field">
-                <span>Fit</span>
-                <select
-                  data-ppt-style-field="image-fit"
-                  value={getPPTImageFit(selectedElement)}
-                  onChange={(event) => {
-                    if (isPPTImageFit(event.target.value)) {
-                      onImageFitChange(selectedElement.id, event.target.value)
-                    }
-                  }}
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                </select>
-              </label>
+              <>
+                <label className="ppt-field">
+                  <span>Fit</span>
+                  <select
+                    data-ppt-style-field="image-fit"
+                    value={getPPTImageFit(selectedElement)}
+                    onChange={(event) => {
+                      if (isPPTImageFit(event.target.value)) {
+                        onImageFitChange(selectedElement.id, event.target.value)
+                      }
+                    }}
+                  >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                  </select>
+                </label>
+                <div className="ppt-geometry-grid">
+                  {(['x', 'y'] as const).map((field) => (
+                    <label className="ppt-field" key={field}>
+                      <span>Crop {field.toUpperCase()}</span>
+                      <input
+                        data-ppt-style-field={`image-crop-${field}`}
+                        max={100}
+                        min={0}
+                        type="number"
+                        value={Math.round(getPPTImageCrop(selectedElement)[field])}
+                        onChange={(event) =>
+                          onImageCropChange(
+                            selectedElement.id,
+                            field,
+                            Number(event.target.value),
+                          )}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
             ) : null}
             {selectedElement.kind === 'line' ? (
               <>
@@ -4583,6 +4653,16 @@ function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
 
 function getPPTImageFit(element: PPTImage): PPTImageFit {
   return element.fit ?? 'cover'
+}
+
+function getPPTImageCrop(element: PPTImage): PPTImageCrop {
+  return element.crop ?? { x: 50, y: 50 }
+}
+
+function getPPTImageObjectPosition(element: PPTImage) {
+  const crop = getPPTImageCrop(element)
+
+  return `${crop.x}% ${crop.y}%`
 }
 
 function getDefaultPPTTextStyle(): PPTTextStyle {

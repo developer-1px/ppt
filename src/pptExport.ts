@@ -63,9 +63,10 @@ function renderPPTElementHTML(element: PPTElement) {
   ]
 
   if (element.kind === 'image') {
+    const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}" data-ppt-image-fit="${fit}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}" data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {

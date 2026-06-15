@@ -71,6 +71,10 @@ const PPTShapeSchema = PPTElementBaseSchema.extend({
 
 const PPTImageSchema = PPTElementBaseSchema.extend({
   alt: z.string(),
+  crop: z.object({
+    x: z.number(),
+    y: z.number(),
+  }).optional(),
   fit: z.enum(['cover', 'contain']).optional(),
   kind: z.literal('image'),
   src: z.string(),
@@ -138,6 +142,7 @@ export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
+export type PPTImageCrop = NonNullable<PPTImage['crop']>
 export type PPTImageFit = NonNullable<PPTImage['fit']>
 export type PPTLine = z.infer<typeof PPTLineSchema>
 export type PPTLineConnection = z.infer<typeof PPTLineConnectionSchema>

@@ -35,6 +35,10 @@ export function createPPTImportedImageElement({
 
   return {
     alt: name,
+    crop: {
+      x: 50,
+      y: 50,
+    },
     geometry: {
       h: size.h,
       w: size.w,

@@ -1184,6 +1184,8 @@ async function runExportScenario(page) {
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageFitMarkup: code.includes('data-ppt-image-fit="contain"') && code.includes('object-fit:contain'),
       hasImageFitModel: code.includes('"fit": "contain"'),
+      hasImageCropMarkup: code.includes('data-ppt-image-crop-x="25"') && code.includes('data-ppt-image-crop-y="70"') && code.includes('object-position:25% 70%'),
+      hasImageCropModel: code.includes('"crop"') && code.includes('"x": 25') && code.includes('"y": 70'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
       hasLineConnectionMarkup: code.includes('data-ppt-start-connection="'),
       hasLineConnectionModel: code.includes('"startConnection"') && code.includes('"anchor"'),
@@ -1205,6 +1207,7 @@ async function runExportScenario(page) {
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
+  record('exports PPT image crop position markup and model data', state.hasImageCropMarkup && state.hasImageCropModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
@@ -1470,6 +1473,28 @@ async function runImageImportScenario(page) {
 
   record('changes selected PPT image fit in inspector', afterFit.selectedImageFit === 'contain' && afterFit.inspectorImageFit === 'contain' && afterFit.thumbContainCount > 0, {
     afterDrop,
+    afterFit,
+  })
+
+  await page.eval(`(() => {
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    const x = document.querySelector('[data-ppt-style-field="image-crop-x"]')
+    const y = document.querySelector('[data-ppt-style-field="image-crop-y"]')
+
+    valueSetter.call(x, '25')
+    x.dispatchEvent(new Event('input', { bubbles: true }))
+    x.dispatchEvent(new Event('change', { bubbles: true }))
+
+    valueSetter.call(y, '70')
+    y.dispatchEvent(new Event('input', { bubbles: true }))
+    y.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterCrop = await getPPTImageImportState(page)
+
+  record('changes selected PPT image crop position in inspector', afterCrop.inspectorCropX === 25 && afterCrop.inspectorCropY === 70 && afterCrop.selectedImagePosition === '25% 70%' && afterCrop.thumbCropXCount > 0 && afterCrop.thumbCropYCount > 0, {
+    afterCrop,
     afterFit,
   })
 
@@ -1979,16 +2004,21 @@ function getPPTImageImportState(page) {
     const selectedImage = selected?.querySelector('img') ?? null
 
     return {
+      inspectorCropX: Number(document.querySelector('[data-ppt-style-field="image-crop-x"]')?.value ?? 0),
+      inspectorCropY: Number(document.querySelector('[data-ppt-style-field="image-crop-y"]')?.value ?? 0),
       inspectorImageFit: document.querySelector('[data-ppt-style-field="image-fit"]')?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedImageFit: selectedImage?.style.objectFit ?? '',
+      selectedImagePosition: selectedImage?.style.objectPosition ?? '',
       selectedImageSrc: selectedImage?.getAttribute('src') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      thumbCropXCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-crop-x="25"]').length,
+      thumbCropYCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-crop-y="70"]').length,
       thumbContainCount: document.querySelectorAll('.ppt-thumb-image[data-ppt-image-fit="contain"]').length,
       thumbImageCount: document.querySelectorAll('.ppt-thumb-image').length,
     }
