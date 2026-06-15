@@ -425,6 +425,101 @@
   padding: 12px 8px;
 }
 
+.ppt-shortcut-help-backdrop {
+  position: fixed;
+  z-index: 42;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 18%);
+}
+
+.ppt-shortcut-help {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 48px));
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--floating-panel);
+  box-shadow: 0 22px 60px rgb(15 23 42 / 22%);
+}
+
+.ppt-shortcut-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ppt-shortcut-help-header h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ppt-shortcut-help-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  overflow: auto;
+}
+
+.ppt-shortcut-help-section {
+  min-width: 0;
+}
+
+.ppt-shortcut-help-section h3 {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ppt-shortcut-help-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.ppt-shortcut-help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: var(--control);
+}
+
+.ppt-shortcut-help-row dt {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-shortcut-help-row dd {
+  margin: 0;
+}
+
+.ppt-shortcut-help-row kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--shortcut-bg);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .ppt-presentation {
   position: fixed;
   z-index: 40;

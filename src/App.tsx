@@ -34,6 +34,7 @@ import {
   Group,
   ImagePlus,
   Italic,
+  Keyboard,
   Layers,
   List,
   Lock,
@@ -530,6 +531,16 @@ type PPTCommandPaletteItem = {
   shortcut?: string
   title: string
 }
+type PPTShortcutHelpItem = {
+  id: string
+  section: string
+  shortcut: string
+  title: string
+}
+type PPTShortcutHelpSectionGroup = {
+  items: PPTShortcutHelpItem[]
+  section: string
+}
 type PPTContextMenuState = {
   x: number
   y: number
@@ -702,6 +713,17 @@ const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
+const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
+const PPT_SHORTCUT_HELP_SECTION_ORDER = [
+  'Create',
+  'Edit',
+  'Arrange',
+  'Format',
+  'Slides',
+  'View',
+  'Export',
+  'System',
+]
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
@@ -825,6 +847,7 @@ function App() {
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
@@ -1117,6 +1140,20 @@ function App() {
         return
       }
 
+      if (shortcutHelpOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          closeShortcutHelp()
+        }
+        return
+      }
+
+      if (isPPTShortcutHelpShortcut(event)) {
+        event.preventDefault()
+        openShortcutHelp()
+        return
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         openCommandPalette()
@@ -1397,6 +1434,7 @@ function App() {
 
   function openCommandPalette() {
     setCommandPaletteOpen(true)
+    setShortcutHelpOpen(false)
     setFindOpen(false)
     setEditingId(null)
     setInteraction(null)
@@ -1407,6 +1445,21 @@ function App() {
 
   function closeCommandPalette() {
     setCommandPaletteOpen(false)
+  }
+
+  function openShortcutHelp() {
+    setShortcutHelpOpen(true)
+    setCommandPaletteOpen(false)
+    setFindOpen(false)
+    setEditingId(null)
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setContextMenu(null)
+  }
+
+  function closeShortcutHelp() {
+    setShortcutHelpOpen(false)
   }
 
   function focusPPTFindMatch(match: PPTFindMatch) {
@@ -3567,6 +3620,12 @@ function App() {
     surface: 'context-menu',
   })
   const commandPaletteItems: PPTCommandPaletteItem[] = [{
+    id: 'system:keyboard-shortcuts',
+    run: openShortcutHelp,
+    section: 'System',
+    shortcut: PPT_SHORTCUT_HELP_SHORTCUT,
+    title: 'Keyboard shortcuts',
+  }, {
     disabled: !commandAvailability.undo,
     id: 'command:undo',
     run: undo,
@@ -3933,6 +3992,7 @@ function App() {
     section: 'Format',
     title: 'Auto fit text',
   }]
+  const shortcutHelpItems = getPPTShortcutHelpItems(commandPaletteItems)
 
   return (
     <main className="ppt-app" data-ppt-app data-theme={theme}>
@@ -3953,6 +4013,9 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
             <Command size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-shortcut-help-open onClick={openShortcutHelp} title="Keyboard shortcuts" type="button">
+            <Keyboard size={17} />
           </button>
         </div>
         {findOpen ? (
@@ -4389,7 +4452,129 @@ function App() {
         open={commandPaletteOpen}
         onClose={closeCommandPalette}
       />
+      <PPTShortcutHelpOverlay
+        items={shortcutHelpItems}
+        open={shortcutHelpOpen}
+        onClose={closeShortcutHelp}
+      />
     </main>
+  )
+}
+
+function PPTShortcutHelpOverlay({
+  items,
+  onClose,
+  open,
+}: {
+  items: readonly PPTShortcutHelpItem[]
+  onClose: () => void
+  open: boolean
+}) {
+  if (!open) {
+    return null
+  }
+
+  return <PPTShortcutHelpDialog items={items} onClose={onClose} />
+}
+
+function PPTShortcutHelpDialog({
+  items,
+  onClose,
+}: {
+  items: readonly PPTShortcutHelpItem[]
+  onClose: () => void
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const groups = useMemo(() => groupPPTShortcutHelpItems(items), [items])
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+
+    const focusTimer = window.setTimeout(() => {
+      closeButtonRef.current?.focus()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(focusTimer)
+      previousFocusRef.current?.focus()
+    }
+  }, [])
+
+  function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose()
+    }
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+  }
+
+  return (
+    <div
+      className="ppt-shortcut-help-backdrop"
+      data-ppt-shortcut-help-backdrop
+      onMouseDown={handleBackdropMouseDown}
+    >
+      <section
+        aria-label="Keyboard shortcuts"
+        aria-modal="true"
+        className="ppt-shortcut-help"
+        data-ppt-shortcut-help
+        role="dialog"
+        onKeyDown={handleKeyDown}
+      >
+        <header className="ppt-shortcut-help-header">
+          <h2>Keyboard shortcuts</h2>
+          <button
+            aria-label="Close keyboard shortcuts"
+            className="ppt-icon-button"
+            data-ppt-shortcut-help-close
+            ref={closeButtonRef}
+            title="Close"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="ppt-shortcut-help-sections">
+          {groups.map((group) => (
+            <section
+              aria-label={group.section}
+              className="ppt-shortcut-help-section"
+              data-ppt-shortcut-help-section={group.section}
+              key={group.section}
+            >
+              <h3>{group.section}</h3>
+              <dl className="ppt-shortcut-help-list">
+                {group.items.map((item) => (
+                  <div
+                    className="ppt-shortcut-help-row"
+                    data-ppt-shortcut-help-item={item.id}
+                    key={item.id}
+                  >
+                    <dt>{item.title}</dt>
+                    <dd>
+                      <kbd data-ppt-shortcut-help-shortcut={item.shortcut}>
+                        {item.shortcut}
+                      </kbd>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -4695,6 +4880,40 @@ function filterPPTCommandPaletteItems(
     ].join(' ').toLowerCase()
 
     return terms.every((term) => haystack.includes(term))
+  })
+}
+
+function getPPTShortcutHelpItems(
+  items: readonly PPTCommandPaletteItem[],
+): PPTShortcutHelpItem[] {
+  return items.flatMap((item) =>
+    item.shortcut
+      ? [{
+          id: item.id,
+          section: item.section,
+          shortcut: item.shortcut,
+          title: item.title,
+        }]
+      : [],
+  )
+}
+
+function groupPPTShortcutHelpItems(
+  items: readonly PPTShortcutHelpItem[],
+): PPTShortcutHelpSectionGroup[] {
+  const orderedSections = [
+    ...PPT_SHORTCUT_HELP_SECTION_ORDER,
+    ...items
+      .map((item) => item.section)
+      .filter((section) => !PPT_SHORTCUT_HELP_SECTION_ORDER.includes(section)),
+  ]
+
+  return orderedSections.flatMap((section) => {
+    const sectionItems = items.filter((item) => item.section === section)
+
+    return sectionItems.length > 0
+      ? [{ items: sectionItems, section }]
+      : []
   })
 }
 
@@ -6617,6 +6836,14 @@ function isEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement &&
     (target.isContentEditable ||
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+
+function isPPTShortcutHelpShortcut(event: KeyboardEvent) {
+  return event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    (event.key === '?' || event.key === '/' || event.code === 'Slash')
 }
 
 function selectSameTypePPTSelection(

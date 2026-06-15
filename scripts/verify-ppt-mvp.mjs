@@ -44,6 +44,7 @@ try {
   await runCrossSlideClipboardScenario(page)
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
+  await runShortcutHelpScenario(page)
   await runThemeScenario(page)
   await runFitSelectionScenario(page)
   await runTidySelectionScenario(page)
@@ -1744,6 +1745,134 @@ async function runCommandPaletteScenario(page) {
   })()`)
 
   record('does not open PPT command palette while native text editing is active', afterNativeGuard.editing && !afterNativeGuard.open, afterNativeGuard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+}
+
+async function runShortcutHelpScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  await pressKey(page, {
+    code: 'Slash',
+    key: '?',
+    modifiers: 8,
+    windowsVirtualKeyCode: 191,
+  })
+  await delay(100)
+
+  const afterShortcutOpen = await page.eval(`(() => {
+    const sectionNames = [...document.querySelectorAll('[data-ppt-shortcut-help-section]')]
+      .map((section) => section.getAttribute('data-ppt-shortcut-help-section'))
+    const itemIds = [...document.querySelectorAll('[data-ppt-shortcut-help-item]')]
+      .map((item) => item.getAttribute('data-ppt-shortcut-help-item'))
+    const shortcuts = [...document.querySelectorAll('[data-ppt-shortcut-help-shortcut]')]
+      .map((item) => item.getAttribute('data-ppt-shortcut-help-shortcut'))
+
+    return {
+      closeFocused: document.activeElement?.matches('[data-ppt-shortcut-help-close]') === true,
+      itemCount: itemIds.length,
+      itemIds,
+      open: !!document.querySelector('[data-ppt-shortcut-help]'),
+      sectionNames,
+      shortcuts,
+    }
+  })()`)
+
+  record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
+  record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D'), afterShortcutOpen)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  const afterEscapeClose = await page.eval(`(() => ({
+    open: !!document.querySelector('[data-ppt-shortcut-help]'),
+  }))()`)
+
+  record('closes PPT keyboard shortcut help with Escape', !afterEscapeClose.open, afterEscapeClose)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'keyboard' })
+  await delay(80)
+
+  const beforePaletteRun = await page.eval(`(() => ({
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="system:keyboard-shortcuts"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPaletteRun = await page.eval(`(() => ({
+    helpOpen: !!document.querySelector('[data-ppt-shortcut-help]'),
+    paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+    systemItem: !!document.querySelector('[data-ppt-shortcut-help-item="system:keyboard-shortcuts"]'),
+  }))()`)
+
+  record('opens PPT keyboard shortcut help from command palette entry', beforePaletteRun.open && beforePaletteRun.itemPresent && afterPaletteRun.helpOpen && !afterPaletteRun.paletteOpen && afterPaletteRun.systemItem, {
+    afterPaletteRun,
+    beforePaletteRun,
+  })
+
+  await clickMouse(page, 12, 12, 1)
+  await delay(80)
+
+  const afterBackdropClose = await page.eval(`(() => ({
+    open: !!document.querySelector('[data-ppt-shortcut-help]'),
+  }))()`)
+
+  record('closes PPT keyboard shortcut help with backdrop click', !afterBackdropClose.open, afterBackdropClose)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(80)
+  await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Slash',
+      key: '?',
+      shiftKey: true,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterNativeGuard = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      open: !!document.querySelector('[data-ppt-shortcut-help]'),
+    }
+  })()`)
+
+  record('does not open PPT keyboard shortcut help while native text editing is active', afterNativeGuard.editing && !afterNativeGuard.open, afterNativeGuard)
 
   await pressKey(page, {
     code: 'Escape',
