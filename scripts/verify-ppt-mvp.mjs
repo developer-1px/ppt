@@ -54,6 +54,7 @@ try {
   await runTidySelectionScenario(page)
   await runTextQuickFormatScenario(page)
   await runTextParagraphSpacingScenario(page)
+  await runTextFontFamilyScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
@@ -2768,6 +2769,115 @@ async function runTextParagraphSpacingScenario(page) {
   )
 }
 
+async function runTextFontFamilyScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTTextFontFamilyState(page)
+
+  record(
+    'renders PPT font family control in text inspector',
+    initial.selectedId === 's1-title' &&
+      initial.fontFamily === 'Inter' &&
+      initial.selectedFontFamily === 'Inter' &&
+      initial.thumbFontFamily === 'Inter',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const fontFamily = document.querySelector('[data-ppt-style-field="font-family"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+
+    setter.call(fontFamily, 'Georgia')
+    fontFamily.dispatchEvent(new Event('input', { bubbles: true }))
+    fontFamily.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterGeorgia = await getPPTTextFontFamilyState(page)
+
+  record(
+    'updates PPT text font family metadata from inspector',
+    afterGeorgia.fontFamily === 'Georgia' &&
+      afterGeorgia.selectedFontFamily === 'Georgia' &&
+      afterGeorgia.selectedStyleFontFamily.includes('Georgia') &&
+      afterGeorgia.thumbFontFamily === 'Georgia' &&
+      afterGeorgia.thumbStyleFontFamily.includes('Georgia'),
+    {
+      afterGeorgia,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTTextFontFamilyState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTTextFontFamilyState(page)
+
+  record(
+    'undoes and redoes PPT text font family as one history step',
+    afterUndo.fontFamily === 'Inter' &&
+      afterUndo.selectedFontFamily === 'Inter' &&
+      afterRedo.fontFamily === 'Georgia' &&
+      afterRedo.selectedFontFamily === 'Georgia',
+    {
+      afterGeorgia,
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector('[data-ppt-element="s1-title"]')
+
+    return {
+      fontFamily: element?.getAttribute('data-ppt-font-family') ?? '',
+      open: !!overlay,
+      styleFontFamily: element?.style.fontFamily ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT font family metadata in presentation preview',
+    preview.open &&
+      preview.fontFamily === 'Georgia' &&
+      preview.styleFontFamily.includes('Georgia'),
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
 async function runExportScenario(page) {
   await installPPTDownloadCapture(page)
 
@@ -2785,6 +2895,8 @@ async function runExportScenario(page) {
       hasCommentModel: code.includes('"kind": "comment"') && code.includes('"resolved": true') && code.includes('"body": "Review CTA wording"'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
+      hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
+      hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
       hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
@@ -2827,6 +2939,7 @@ async function runExportScenario(page) {
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
+  record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
@@ -2857,6 +2970,7 @@ async function runExportScenario(page) {
       download: download.download ?? '',
       hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
+      hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
@@ -2879,6 +2993,7 @@ async function runExportScenario(page) {
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
+  record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
@@ -5406,6 +5521,22 @@ function getPPTTextParagraphSpacingState(page) {
       selectedStyleMarginTop: paragraph?.style.marginTop ?? '',
       spacingAfter: document.querySelector('[data-ppt-paragraph-field="spacingAfter"]')?.value ?? '',
       spacingBefore: document.querySelector('[data-ppt-paragraph-field="spacingBefore"]')?.value ?? '',
+    }
+  })()`)
+}
+
+function getPPTTextFontFamilyState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
+
+    return {
+      fontFamily: document.querySelector('[data-ppt-style-field="font-family"]')?.value ?? '',
+      selectedFontFamily: selected?.getAttribute('data-ppt-font-family') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedStyleFontFamily: selected?.style.fontFamily ?? '',
+      thumbFontFamily: thumb?.getAttribute('data-ppt-thumb-font-family') ?? '',
+      thumbStyleFontFamily: thumb?.style.fontFamily ?? '',
     }
   })()`)
 }

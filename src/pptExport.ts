@@ -22,6 +22,16 @@ const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
+const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
+const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
+  { css: 'Inter, ui-sans-serif, system-ui, sans-serif', value: 'Inter' },
+  { css: 'Arial, Helvetica, sans-serif', value: 'Arial' },
+  { css: 'Georgia, serif', value: 'Georgia' },
+  { css: '"Courier New", monospace', value: 'Courier New' },
+] as const)
+const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
+  PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => option.value),
+)
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -216,16 +226,19 @@ function renderPPTElementHTML(element: PPTElement) {
   const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
+  const fontFamilyAttr = element.style
+    ? ` data-ppt-font-family="${escapeHtml(normalizePPTTextFontFamily(element.style.fontFamily))}"`
+    : ''
   const bulletListAttr = element.textBody && hasPPTTextBodyBullet(element.textBody)
     ? ' data-ppt-bullet-list="true"'
     : ''
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${fontFamilyAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -388,7 +401,8 @@ function renderPPTTextBodySVG({
       `x="${formatNumber(x)}"`,
       `y="${formatNumber(y)}"`,
       `fill="${escapeHtml(style?.color ?? '#111827')}"`,
-      'font-family="Inter, Arial, sans-serif"',
+      `data-ppt-font-family="${escapeHtml(normalizePPTTextFontFamily(style?.fontFamily))}"`,
+      `font-family="${escapeHtml(getPPTTextFontFamilyCSS(style?.fontFamily))}"`,
       `font-size="${formatNumber(fontSize)}"`,
       `font-weight="${getPPTSvgFontWeight(style)}"`,
       `text-anchor="${textAnchor}"`,
@@ -841,10 +855,24 @@ function exportTextStyle(style: PPTTextStyle) {
 
   return [
     `color:${style.color}`,
+    `font-family:${getPPTTextFontFamilyCSS(style.fontFamily)}`,
     `font-size:${style.fontSize}px`,
     `font-weight:${fontWeight}`,
     `line-height:${PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT}`,
   ].join(';')
+}
+
+function normalizePPTTextFontFamily(fontFamily: string | undefined) {
+  return PPT_TEXT_FONT_FAMILY_VALUES.has(fontFamily ?? '')
+    ? fontFamily ?? PPT_DEFAULT_TEXT_FONT_FAMILY
+    : PPT_DEFAULT_TEXT_FONT_FAMILY
+}
+
+function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
+  const normalized = normalizePPTTextFontFamily(fontFamily)
+
+  return PPT_TEXT_FONT_FAMILY_OPTIONS.find((option) => option.value === normalized)?.css ??
+    PPT_TEXT_FONT_FAMILY_OPTIONS[0].css
 }
 
 function getPPTParagraphHTMLAttrs(paragraph: PPTParagraph) {

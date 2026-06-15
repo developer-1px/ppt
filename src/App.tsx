@@ -1013,6 +1013,16 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
+const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
+const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
+  { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
+  { css: 'Arial, Helvetica, sans-serif', label: 'Arial', value: 'Arial' },
+  { css: 'Georgia, serif', label: 'Georgia', value: 'Georgia' },
+  { css: '"Courier New", monospace', label: 'Courier New', value: 'Courier New' },
+] as const)
+const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
+  PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => option.value),
+)
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
@@ -2656,15 +2666,19 @@ function App() {
 
         const style = {
           color: '#111827',
+          fontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
           fontSize: 24,
           ...element.style,
         }
+        const nextValue = field === 'fontFamily'
+          ? normalizePPTTextFontFamily(String(value))
+          : value
 
         return {
           ...element,
           style: {
             ...style,
-            [field]: value,
+            [field]: nextValue,
           },
         }
       }),
@@ -7231,6 +7245,7 @@ function SlideThumb({
         {slide.elements.map((element) => (
           <span
             className={getPPTThumbElementClassName(element)}
+            data-ppt-thumb-element={element.id}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
             data-ppt-freeform-points={element.kind === 'freeform'
@@ -7259,6 +7274,9 @@ function SlideThumb({
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
               : undefined}
+            data-ppt-thumb-font-family={isPPTTextElement(element)
+              ? normalizePPTTextFontFamily(getPPTTextElementStyle(element).fontFamily)
+              : undefined}
             data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
@@ -7283,6 +7301,9 @@ function SlideThumb({
                 ? getPPTImageFit(element)
                 : undefined,
               height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
+              fontFamily: isPPTTextElement(element)
+                ? getPPTTextFontFamilyCSS(getPPTTextElementStyle(element).fontFamily)
+                : undefined,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
               transform: getPPTElementTransform(element),
@@ -7427,6 +7448,9 @@ function PPTElementView({
       data-ppt-animation-order={animation.order}
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
+      data-ppt-font-family={isPPTTextElement(element)
+        ? normalizePPTTextFontFamily(textStyle?.fontFamily)
+        : undefined}
       data-ppt-text-autofit={isPPTTextElement(element) ? element.textAutoFit : undefined}
       data-ppt-text-overflow={textOverflow ? 'true' : undefined}
       data-ppt-image-crop-x={element.kind === 'image'
@@ -8453,6 +8477,25 @@ function Inspector({
                   </label>
                 </div>
                 <label className="ppt-field">
+                  <span>Font</span>
+                  <select
+                    data-ppt-style-field="font-family"
+                    value={normalizePPTTextFontFamily(textStyle?.fontFamily)}
+                    onChange={(event) =>
+                      onElementTextStyleChange(
+                        selectedElement.id,
+                        'fontFamily',
+                        event.target.value,
+                      )}
+                  >
+                    {PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ppt-field">
                   <span>Weight</span>
                   <select
                     data-ppt-style-field="font-weight"
@@ -8980,6 +9023,7 @@ function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
 
   return {
     color: style.color,
+    fontFamily: getPPTTextFontFamilyCSS(style.fontFamily),
     fontSize: style.fontSize,
     fontWeight: style.fontWeight === 'bold'
       ? 700
@@ -9309,9 +9353,23 @@ function getPPTImageObjectPosition(element: PPTImage) {
 function getDefaultPPTTextStyle(): PPTTextStyle {
   return {
     color: '#111827',
+    fontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
     fontSize: 24,
     fontWeight: 'regular',
   }
+}
+
+function normalizePPTTextFontFamily(fontFamily: string | undefined) {
+  return PPT_TEXT_FONT_FAMILY_VALUES.has(fontFamily ?? '')
+    ? fontFamily ?? PPT_DEFAULT_TEXT_FONT_FAMILY
+    : PPT_DEFAULT_TEXT_FONT_FAMILY
+}
+
+function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
+  const normalized = normalizePPTTextFontFamily(fontFamily)
+
+  return PPT_TEXT_FONT_FAMILY_OPTIONS.find((option) => option.value === normalized)?.css ??
+    PPT_TEXT_FONT_FAMILY_OPTIONS[0].css
 }
 
 function getPPTSelectionCommandAnchor({
@@ -10542,7 +10600,7 @@ function measurePPTTextContentSize(
   measurer.style.width = options.width
   measurer.style.whiteSpace = options.whiteSpace ?? 'pre-wrap'
   measurer.style.overflowWrap = 'anywhere'
-  measurer.style.fontFamily = 'Inter, ui-sans-serif, system-ui, sans-serif'
+  measurer.style.fontFamily = getPPTTextFontFamilyCSS(style?.fontFamily)
   measurer.style.fontSize = `${style?.fontSize ?? 24}px`
   measurer.style.fontWeight = style?.fontWeight === 'bold'
     ? '700'

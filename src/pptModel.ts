@@ -47,6 +47,7 @@ export const PPTTextBodySchema = z.object({
 
 const PPTTextStyleSchema = z.object({
   color: z.string(),
+  fontFamily: z.string().optional(),
   fontSize: z.number(),
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
 })
