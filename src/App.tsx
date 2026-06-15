@@ -112,6 +112,7 @@ import {
   type PPTDeck,
   type PPTElement,
   type PPTLine,
+  type PPTLineConnection,
   type PPTLineMarker,
   type PPTParagraph,
   type PPTShape,
@@ -180,6 +181,10 @@ const canvasReorderModeAvailabilityKey = {
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
+const PPT_LINE_CONNECTION_DISTANCE = 36
+
+type LineCreationMode = 'arrow' | 'line'
+
 type Interaction =
   | {
       bounds: Bounds
@@ -219,6 +224,14 @@ type Interaction =
       startDeck: PPTDeck
     }
   | {
+      endMarker: PPTLineMarker
+      kind: 'line-create'
+      lineId: string
+      slideId: string
+      startDeck: PPTDeck
+      startPoint: Point
+    }
+  | {
       additive: boolean
       baseSelection: string[]
       currentPoint: Point
@@ -236,6 +249,7 @@ function App() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
+  const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [showGrid, setShowGrid] = useState(true)
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
@@ -402,6 +416,7 @@ function App() {
         event.preventDefault()
         setEditingId(null)
         setInteraction(null)
+        setLineCreationMode(null)
         setSelection([])
         return
       }
@@ -476,7 +491,11 @@ function App() {
 
       return {
         ...slide,
-        elements: result.items,
+        elements: syncPPTLineConnections(
+          result.items,
+          new Set(result.selection.filter((id) =>
+            result.items.some((element) => element.id === id && element.kind === 'line'))),
+        ),
       }
     }))
   }
@@ -670,27 +689,9 @@ function App() {
     }))
   }
 
-  function addLine(endMarker: PPTLineMarker = 'none') {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const id = createPPTElementId(slide, 'line')
-      const element: PPTLine = {
-        end: { x: 280, y: 18 },
-        endMarker,
-        geometry: { h: 36, w: 280, x: 184, y: 326 },
-        id,
-        kind: 'line',
-        name: endMarker === 'arrow' ? 'Arrow' : 'Line',
-        start: { x: 0, y: 18 },
-        stroke: { color: '#111827', width: 4 },
-      }
-
-      setSelection([id])
-
-      return {
-        ...slide,
-        elements: [...slide.elements, element],
-      }
-    }))
+  function activateLineCreationMode(mode: LineCreationMode) {
+    setLineCreationMode((current) => current === mode ? null : mode)
+    setEditingId(null)
   }
 
   function insertPPTImageSource(
@@ -1215,11 +1216,59 @@ function App() {
     void insertPPTImageFile(file, screenToWorld(event.nativeEvent))
   }
 
+  function beginLineCreation(
+    event: ReactPointerEvent<HTMLElement>,
+    point: Point,
+  ) {
+    if (!lineCreationMode) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const startDeck = deckRef.current
+    const startSlide = findPPTSlide(startDeck, activeSlide.id)
+    const id = createPPTElementId(startSlide, 'line')
+    const endMarker = lineCreationMode === 'arrow' ? 'arrow' : 'none'
+    const element = createPPTLineElement({
+      end: point,
+      endMarker,
+      id,
+      name: lineCreationMode === 'arrow' ? 'Arrow' : 'Line',
+      slide: startSlide,
+      start: point,
+    })
+    const nextDeck = updatePPTDeckSlide(startDeck, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: [...slide.elements, element],
+    }))
+
+    deckRef.current = nextDeck
+    setDeck(nextDeck)
+    setSelection([id])
+    setInteraction({
+      endMarker,
+      kind: 'line-create',
+      lineId: id,
+      slideId: activeSlide.id,
+      startDeck,
+      startPoint: point,
+    })
+
+    return true
+  }
+
   function handleElementPointerDown(
     event: ReactPointerEvent<HTMLDivElement>,
     elementId: string,
   ) {
     if (editingId || event.detail > 1) {
+      return
+    }
+
+    if (lineCreationMode && beginLineCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
 
@@ -1270,6 +1319,10 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     const additive = isAdditivePointerInput(event)
     const point = screenToWorld(event.nativeEvent)
+
+    if (lineCreationMode && beginLineCreation(event, point)) {
+      return
+    }
 
     setInteraction({
       additive,
@@ -1429,6 +1482,28 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'line-create') {
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const elements = currentSlide.elements.map((element) =>
+        element.id === interaction.lineId && element.kind === 'line'
+          ? updatePPTLineEndpoint(
+              element,
+              'end',
+              point,
+              currentSlide,
+              interaction.lineId,
+            )
+          : element)
+      const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+        ...slide,
+        elements,
+      }))
+
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      return
+    }
+
     const startSlide = findPPTSlide(interaction.startDeck, interaction.slideId)
 
     if (interaction.kind === 'move') {
@@ -1457,10 +1532,14 @@ function App() {
         items: startSlide.elements,
         selection: interaction.selection,
       })
+      const syncedElements = syncPPTLineConnections(
+        elements,
+        getPPTSelectedLineIds(elements, interaction.selection),
+      )
 
       const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
         ...slide,
-        elements,
+        elements: syncedElements,
       }))
       deckRef.current = nextDeck
       setDeck(nextDeck)
@@ -1484,10 +1563,13 @@ function App() {
         preserveAspectRatio: event.shiftKey,
         selection: interaction.selection,
       })
+      const syncedElements = syncPPTLineConnections(
+        elements,
+      )
 
       const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
         ...slide,
-        elements,
+        elements: syncedElements,
       }))
       deckRef.current = nextDeck
       setDeck(nextDeck)
@@ -1497,7 +1579,13 @@ function App() {
     if (interaction.kind === 'line-endpoint') {
       const elements = startSlide.elements.map((element) =>
         element.id === interaction.lineId && element.kind === 'line'
-          ? updatePPTLineEndpoint(element, interaction.endpoint, point)
+          ? updatePPTLineEndpoint(
+              element,
+              interaction.endpoint,
+              point,
+              startSlide,
+              interaction.lineId,
+            )
           : element)
 
       const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
@@ -1546,6 +1634,38 @@ function App() {
   function handlePointerUp() {
     if (!interaction) {
       return
+    }
+
+    if (interaction.kind === 'line-create') {
+      const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const createdLine = currentSlide.elements.find((element) =>
+        element.id === interaction.lineId && element.kind === 'line')
+
+      if (createdLine?.kind === 'line' && getPPTLineLength(createdLine) < 8) {
+        const fallbackEnd = {
+          x: Math.min(PPT_SLIDE_WIDTH, interaction.startPoint.x + 160),
+          y: interaction.startPoint.y,
+        }
+        const elements = currentSlide.elements.map((element) =>
+          element.id === createdLine.id && element.kind === 'line'
+            ? updatePPTLineEndpoint(
+                element,
+                'end',
+                fallbackEnd,
+                currentSlide,
+                interaction.lineId,
+              )
+            : element)
+        const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+          ...slide,
+          elements,
+        }))
+
+        deckRef.current = nextDeck
+        setDeck(nextDeck)
+      }
+
+      setLineCreationMode(null)
     }
 
     if (
@@ -1605,10 +1725,10 @@ function App() {
           <button className="ppt-icon-button" data-ppt-insert-shape="diamond" onClick={() => addShape('diamond')} title="Add diamond" type="button">
             <Diamond size={17} />
           </button>
-          <button className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => addLine()} title="Add line" type="button">
+          <button aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
             <Minus size={17} />
           </button>
-          <button className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => addLine('arrow')} title="Add arrow" type="button">
+          <button aria-pressed={lineCreationMode === 'arrow'} className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => activateLineCreationMode('arrow')} title="Draw arrow" type="button">
             <ArrowRight size={17} />
           </button>
           <button className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
@@ -1748,6 +1868,7 @@ function App() {
       <section
         className="ppt-stage-shell"
         data-grid={showGrid ? 'true' : 'false'}
+        data-line-tool={lineCreationMode ?? undefined}
         onDragOver={handleStageDragOver}
         onDrop={handleStageDrop}
         onPointerDown={handleStagePointerDown}
@@ -1938,6 +2059,12 @@ function PPTElementView({
       data-hovered={hovered ? 'true' : 'false'}
       data-group-id={element.groupId}
       data-kind={element.kind}
+      data-line-end-connection={element.kind === 'line'
+        ? element.endConnection?.elementId
+        : undefined}
+      data-line-start-connection={element.kind === 'line'
+        ? element.startConnection?.elementId
+        : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
       data-rotation={Math.round(element.geometry.rotation ?? 0)}
@@ -2765,19 +2892,87 @@ function getPPTLineEndpointPoint(
   }
 }
 
+function createPPTLineElement({
+  end,
+  endMarker,
+  id,
+  name,
+  slide,
+  start,
+}: {
+  end: Point
+  endMarker: PPTLineMarker
+  id: string
+  name: string
+  slide: PPTSlide
+  start: Point
+}): PPTLine {
+  const startAttachment = getPPTLineAttachment(slide, start, id)
+  const endAttachment = getPPTLineAttachment(slide, end, id)
+  const line: PPTLine = {
+    end: { x: 24, y: 12 },
+    endMarker,
+    geometry: { h: 24, w: 24, x: start.x, y: start.y },
+    id,
+    kind: 'line',
+    name,
+    start: { x: 0, y: 12 },
+    stroke: { color: '#111827', width: 4 },
+  }
+
+  return buildPPTLineFromWorldEndpoints({
+    end: endAttachment?.point ?? end,
+    endConnection: endAttachment?.connection,
+    line,
+    start: startAttachment?.point ?? start,
+    startConnection: startAttachment?.connection,
+  })
+}
+
 function updatePPTLineEndpoint(
   line: PPTLine,
   endpoint: 'end' | 'start',
   point: Point,
+  slide: PPTSlide,
+  lineId: string,
 ): PPTLine {
   const currentStart = getPPTLineEndpointPoint(line, 'start')
   const currentEnd = getPPTLineEndpointPoint(line, 'end')
-  const nextPoint = {
+  const rawPoint = {
     x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
     y: clamp(point.y, 0, PPT_SLIDE_HEIGHT),
   }
+  const attachment = getPPTLineAttachment(slide, rawPoint, lineId)
+  const nextPoint = attachment?.point ?? rawPoint
   const start = endpoint === 'start' ? nextPoint : currentStart
   const end = endpoint === 'end' ? nextPoint : currentEnd
+
+  return buildPPTLineFromWorldEndpoints({
+    end,
+    endConnection: endpoint === 'end'
+      ? attachment?.connection
+      : line.endConnection,
+    line,
+    start,
+    startConnection: endpoint === 'start'
+      ? attachment?.connection
+      : line.startConnection,
+  })
+}
+
+function buildPPTLineFromWorldEndpoints({
+  end,
+  endConnection,
+  line,
+  start,
+  startConnection,
+}: {
+  end: Point
+  endConnection: PPTLineConnection | undefined
+  line: PPTLine
+  start: Point
+  startConnection: PPTLineConnection | undefined
+}): PPTLine {
   const rawLeft = Math.min(start.x, end.x)
   const rawTop = Math.min(start.y, end.y)
   const rawWidth = Math.abs(end.x - start.x)
@@ -2795,7 +2990,7 @@ function updatePPTLineEndpoint(
     PPT_SLIDE_HEIGHT - height,
   )
 
-  return {
+  const next: PPTLine = {
     ...line,
     end: {
       x: end.x - x,
@@ -2813,6 +3008,193 @@ function updatePPTLineEndpoint(
       y: start.y - y,
     },
   }
+
+  if (endConnection) {
+    next.endConnection = endConnection
+  } else {
+    delete next.endConnection
+  }
+
+  if (startConnection) {
+    next.startConnection = startConnection
+  } else {
+    delete next.startConnection
+  }
+
+  return next
+}
+
+function getPPTLineAttachment(
+  slide: PPTSlide,
+  point: Point,
+  lineId: string,
+): { connection: PPTLineConnection; point: Point } | null {
+  let nearest: {
+    connection: PPTLineConnection
+    distance: number
+    point: Point
+  } | null = null
+
+  for (const element of slide.elements) {
+    if (
+      element.id === lineId ||
+      element.visible === false ||
+      (element.kind !== 'shape' && element.kind !== 'image')
+    ) {
+      continue
+    }
+
+    for (const anchor of getPPTConnectorAnchors(element)) {
+      const distance = getPointDistance(point, anchor.point)
+
+      if (
+        distance <= PPT_LINE_CONNECTION_DISTANCE &&
+        (!nearest || distance < nearest.distance)
+      ) {
+        nearest = {
+          connection: {
+            anchor: anchor.anchor,
+            elementId: element.id,
+          },
+          distance,
+          point: anchor.point,
+        }
+      }
+    }
+  }
+
+  if (!nearest) {
+    return null
+  }
+
+  return {
+    connection: nearest.connection,
+    point: nearest.point,
+  }
+}
+
+function syncPPTLineConnections(
+  elements: PPTElement[],
+  detachedLineIds = new Set<string>(),
+) {
+  const byId = new Map(elements.map((element) => [element.id, element]))
+
+  return elements.map((element) => {
+    if (element.kind !== 'line') {
+      return element
+    }
+
+    if (detachedLineIds.has(element.id)) {
+      return clearPPTLineConnections(element)
+    }
+
+    const startConnection = getValidPPTLineConnection(byId, element.startConnection)
+    const endConnection = getValidPPTLineConnection(byId, element.endConnection)
+
+    if (!startConnection && !endConnection) {
+      return clearPPTLineConnections(element)
+    }
+
+    return buildPPTLineFromWorldEndpoints({
+      end: endConnection
+        ? getPPTConnectionAnchorPoint(byId.get(endConnection.elementId), endConnection)
+        : getPPTLineEndpointPoint(element, 'end'),
+      endConnection,
+      line: element,
+      start: startConnection
+        ? getPPTConnectionAnchorPoint(byId.get(startConnection.elementId), startConnection)
+        : getPPTLineEndpointPoint(element, 'start'),
+      startConnection,
+    })
+  })
+}
+
+function clearPPTLineConnections(line: PPTLine): PPTLine {
+  if (!line.startConnection && !line.endConnection) {
+    return line
+  }
+
+  const next = { ...line }
+  delete next.startConnection
+  delete next.endConnection
+
+  return next
+}
+
+function getValidPPTLineConnection(
+  elements: ReadonlyMap<string, PPTElement>,
+  connection: PPTLineConnection | undefined,
+) {
+  const target = connection ? elements.get(connection.elementId) : undefined
+
+  if (
+    !connection ||
+    !target ||
+    target.visible === false ||
+    (target.kind !== 'shape' && target.kind !== 'image')
+  ) {
+    return undefined
+  }
+
+  return connection
+}
+
+function getPPTSelectedLineIds(
+  elements: PPTElement[],
+  selection: string[],
+) {
+  const selected = new Set(selection)
+
+  return new Set(
+    elements
+      .filter((element) => selected.has(element.id) && element.kind === 'line')
+      .map((element) => element.id),
+  )
+}
+
+function getPPTConnectorAnchors(element: PPTElement): Array<{
+  anchor: PPTLineConnection['anchor']
+  point: Point
+}> {
+  const left = element.geometry.x
+  const top = element.geometry.y
+  const right = element.geometry.x + element.geometry.w
+  const bottom = element.geometry.y + element.geometry.h
+  const centerX = element.geometry.x + element.geometry.w / 2
+  const centerY = element.geometry.y + element.geometry.h / 2
+
+  return [
+    { anchor: 'left', point: { x: left, y: centerY } },
+    { anchor: 'right', point: { x: right, y: centerY } },
+    { anchor: 'top', point: { x: centerX, y: top } },
+    { anchor: 'bottom', point: { x: centerX, y: bottom } },
+    { anchor: 'center', point: { x: centerX, y: centerY } },
+  ]
+}
+
+function getPPTConnectionAnchorPoint(
+  element: PPTElement | undefined,
+  connection: PPTLineConnection,
+) {
+  const fallback = { x: 0, y: 0 }
+
+  if (!element) {
+    return fallback
+  }
+
+  return getPPTConnectorAnchors(element)
+    .find((anchor) => anchor.anchor === connection.anchor)?.point ?? fallback
+}
+
+function getPPTLineLength(line: PPTLine) {
+  return getPointDistance(
+    getPPTLineEndpointPoint(line, 'start'),
+    getPPTLineEndpointPoint(line, 'end'),
+  )
+}
+
+function getPointDistance(a: Point, b: Point) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
 function getPointAngle(center: Point, point: Point) {

@@ -111,7 +111,16 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
     ? ` marker-end="url(#${markerId})"`
     : ''
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line></svg>`
+  const connectionAttrs = [
+    element.startConnection
+      ? `data-ppt-start-connection="${escapeHtml(element.startConnection.elementId)}:${element.startConnection.anchor}"`
+      : '',
+    element.endConnection
+      ? `data-ppt-end-connection="${escapeHtml(element.endConnection.elementId)}:${element.endConnection.anchor}"`
+      : '',
+  ].filter(Boolean).join(' ')
+
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}" ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}<line x1="${element.start.x}" y1="${element.start.y}" x2="${element.end.x}" y2="${element.end.y}" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${element.stroke.width}" stroke-linecap="round"${markerStart}${markerEnd}></line></svg>`
 }
 
 function exportTextStyle(style: PPTTextStyle) {

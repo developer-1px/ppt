@@ -80,11 +80,18 @@ const PPTLinePointSchema = z.object({
   y: z.number(),
 })
 
+const PPTLineConnectionSchema = z.object({
+  anchor: z.enum(['bottom', 'center', 'left', 'right', 'top']),
+  elementId: z.string(),
+})
+
 const PPTLineSchema = PPTElementBaseSchema.extend({
   end: PPTLinePointSchema,
+  endConnection: PPTLineConnectionSchema.optional(),
   endMarker: PPTLineMarkerSchema.optional(),
   kind: z.literal('line'),
   start: PPTLinePointSchema,
+  startConnection: PPTLineConnectionSchema.optional(),
   startMarker: PPTLineMarkerSchema.optional(),
   stroke: PPTStrokeSchema,
 })
@@ -126,6 +133,7 @@ export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
 export type PPTLine = z.infer<typeof PPTLineSchema>
+export type PPTLineConnection = z.infer<typeof PPTLineConnectionSchema>
 export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
