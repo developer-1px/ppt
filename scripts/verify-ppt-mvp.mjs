@@ -47,6 +47,7 @@ try {
   await runShortcutHelpScenario(page)
   await runThemeScenario(page)
   await runFitSelectionScenario(page)
+  await runMinimapScenario(page)
   await runTidySelectionScenario(page)
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
@@ -2077,6 +2078,95 @@ async function runFitSelectionScenario(page) {
   })
 }
 
+async function runMinimapScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(100)
+
+  const initial = await readPPTMinimapState(page)
+
+  record('renders PPT minimap viewport overview', initial.open && initial.itemCount >= 5 && initial.hasWorld && initial.hasViewport && initial.togglePressed === 'true', initial)
+
+  const point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-view-fit-selection]')?.click()`)
+  await delay(120)
+
+  const afterFitSelection = await readPPTMinimapState(page)
+
+  record('syncs PPT minimap viewport rect with zoomed viewport', afterFitSelection.open && afterFitSelection.scale > initial.scale && afterFitSelection.viewportW < initial.viewportW && afterFitSelection.viewportH < initial.viewportH, {
+    afterFitSelection,
+    initial,
+  })
+
+  const clickPoint = await page.eval(`(() => {
+    const world = document.querySelector('[data-ppt-minimap-world]')
+    const map = document.querySelector('[data-ppt-minimap-map]')
+    const worldRect = world.getBoundingClientRect()
+    const mapRect = map.getBoundingClientRect()
+
+    return {
+      x: Math.min(mapRect.right - 6, worldRect.left + worldRect.width * 0.86),
+      y: Math.min(mapRect.bottom - 6, worldRect.top + worldRect.height * 0.52),
+    }
+  })()`)
+
+  await clickMouse(page, clickPoint.x, clickPoint.y, 1)
+  await delay(120)
+
+  const afterMinimapClick = await readPPTMinimapState(page)
+
+  record('moves PPT viewport from minimap click without changing zoom', afterMinimapClick.open && Math.abs(afterMinimapClick.scale - afterFitSelection.scale) < 0.001 && (Math.abs(afterMinimapClick.viewportX - afterFitSelection.viewportX) > 1 || Math.abs(afterMinimapClick.viewportY - afterFitSelection.viewportY) > 1), {
+    afterFitSelection,
+    afterMinimapClick,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-view-minimap]')?.click()`)
+  await delay(80)
+
+  const afterToolbarHide = await readPPTMinimapState(page)
+
+  record('hides PPT minimap from toolbar toggle', !afterToolbarHide.open && afterToolbarHide.stageAttr === 'false' && afterToolbarHide.togglePressed === 'false', afterToolbarHide)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'minimap' })
+  await delay(80)
+
+  const beforePaletteShow = await page.eval(`(() => ({
+    itemPresent: !!document.querySelector('[data-ppt-command-palette-item="view:toggle-minimap"]'),
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterPaletteShow = await readPPTMinimapState(page)
+
+  record('shows PPT minimap from command palette toggle', beforePaletteShow.open && beforePaletteShow.itemPresent && afterPaletteShow.open && afterPaletteShow.stageAttr === 'true' && afterPaletteShow.togglePressed === 'true' && !afterPaletteShow.paletteOpen, {
+    afterPaletteShow,
+    beforePaletteShow,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
+  await delay(80)
+}
+
 async function runTidySelectionScenario(page) {
   const ids = ['s1-card-1', 's1-card-2', 's1-side-panel']
 
@@ -2299,6 +2389,39 @@ async function readViewportState(page) {
       transform,
       x: Number(translate?.[1] ?? 0),
       y: Number(translate?.[2] ?? 0),
+    }
+  })()`)
+}
+
+async function readPPTMinimapState(page) {
+  return page.eval(`(() => {
+    const minimap = document.querySelector('[data-ppt-minimap]')
+    const viewport = document.querySelector('[data-ppt-minimap-viewport]')
+    const viewportRect = viewport?.getBoundingClientRect()
+    const world = document.querySelector('[data-ppt-minimap-world]')
+    const stage = document.querySelector('.ppt-stage-shell')
+    const view = {
+      h: Number(viewport?.getAttribute('height') ?? 0),
+      w: Number(viewport?.getAttribute('width') ?? 0),
+      x: Number(viewport?.getAttribute('x') ?? 0),
+      y: Number(viewport?.getAttribute('y') ?? 0),
+    }
+
+    return {
+      hasViewport: !!viewport,
+      hasWorld: !!world,
+      itemCount: Number(minimap?.getAttribute('data-ppt-minimap-item-count') ?? 0),
+      open: !!minimap,
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      scale: Number(document.querySelector('.ppt-stage-world')?.style.transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0),
+      stageAttr: stage?.getAttribute('data-minimap') ?? '',
+      togglePressed: document.querySelector('[data-ppt-view-minimap]')?.getAttribute('aria-pressed') ?? '',
+      view,
+      viewportBoxWidth: viewportRect?.width ?? 0,
+      viewportH: Number(minimap?.getAttribute('data-ppt-minimap-viewport-h') ?? 0),
+      viewportW: Number(minimap?.getAttribute('data-ppt-minimap-viewport-w') ?? 0),
+      viewportX: Number(minimap?.getAttribute('data-ppt-minimap-viewport-x') ?? 0),
+      viewportY: Number(minimap?.getAttribute('data-ppt-minimap-viewport-y') ?? 0),
     }
   })()`)
 }

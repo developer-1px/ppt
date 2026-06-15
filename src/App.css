@@ -815,6 +815,48 @@
   transform-origin: 0 0;
 }
 
+.ppt-minimap {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
+  width: 176px;
+  height: 112px;
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgb(251 252 254 / 92%);
+  box-shadow: 0 14px 36px rgb(15 23 42 / 18%);
+}
+
+.ppt-app[data-theme='dark'] .ppt-minimap {
+  background: rgb(24 27 33 / 92%);
+}
+
+.ppt-minimap-map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.ppt-minimap-world {
+  fill: var(--field-bg);
+  stroke: var(--panel-border);
+  stroke-width: 1;
+}
+
+.ppt-minimap-item {
+  fill: #94a3b8;
+  opacity: 0.72;
+}
+
+.ppt-minimap-viewport {
+  fill: rgb(37 99 235 / 16%);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
 .ppt-slide {
   position: absolute;
   left: 0;

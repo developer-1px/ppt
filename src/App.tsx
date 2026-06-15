@@ -38,6 +38,7 @@ import {
   Layers,
   List,
   Lock,
+  Map as MapIcon,
   Maximize2,
   MessageSquare,
   Minus,
@@ -541,6 +542,26 @@ type PPTShortcutHelpSectionGroup = {
   items: PPTShortcutHelpItem[]
   section: string
 }
+type PPTMinimapSize = {
+  h: number
+  w: number
+}
+type PPTMinimapItemBounds = {
+  bounds: Bounds
+  id: string
+}
+type PPTMinimapItemRect = {
+  id: string
+  rect: Bounds
+}
+type PPTMinimapReadModel = {
+  displayBounds: Bounds
+  itemRects: PPTMinimapItemRect[]
+  size: PPTMinimapSize
+  viewportRect: Bounds
+  viewportWorldBounds: Bounds
+  worldBounds: Bounds
+}
 type PPTContextMenuState = {
   x: number
   y: number
@@ -724,6 +745,12 @@ const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Export',
   'System',
 ]
+const PPT_MINIMAP_SIZE: PPTMinimapSize = {
+  h: 112,
+  w: 176,
+}
+const PPT_MINIMAP_PADDING = 8
+const PPT_MINIMAP_MIN_WORLD_SIZE = 120
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
@@ -856,6 +883,7 @@ function App() {
   const [presentationSlideId, setPresentationSlideId] = useState<string | null>(null)
   const [showGrid, setShowGrid] = useState(true)
   const [showFrameGuides, setShowFrameGuides] = useState(true)
+  const [showMinimap, setShowMinimap] = useState(true)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
   const [past, setPast] = useState<PPTDeck[]>([])
@@ -917,6 +945,26 @@ function App() {
     () => getPPTLayoutPlaceholders(activeLayout),
     [activeLayout],
   )
+  const minimapItems = useMemo<PPTMinimapItemBounds[]>(
+    () => activeSlide.elements
+      .filter((element) => element.visible !== false)
+      .map((element) => ({
+        bounds: pptGeometryToBounds(element.geometry),
+        id: element.id,
+      })),
+    [activeSlide.elements],
+  )
+  const stageRect = stageRef.current?.getBoundingClientRect()
+  const minimapModel = stageRect && showMinimap
+    ? getPPTMinimapReadModel({
+        items: minimapItems,
+        stageSize: {
+          h: stageRect.height,
+          w: stageRect.width,
+        },
+        viewport,
+      })
+    : null
 
   const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
     ? selectedElement
@@ -1034,6 +1082,23 @@ function App() {
       width: rect.width,
     }))
   }, [scene, selection])
+
+  const navigateMinimapToWorldPoint = useCallback((point: Point) => {
+    const rect = stageRef.current?.getBoundingClientRect()
+
+    if (!rect) {
+      return
+    }
+
+    setViewport((current) => getPPTMinimapViewportForWorldCenter({
+      current,
+      stageSize: {
+        h: rect.height,
+        w: rect.width,
+      },
+      worldCenter: point,
+    }))
+  }, [])
 
   function startPresentation(slideId = activeSlide.id) {
     setPresentationSlideId(slideId)
@@ -3947,6 +4012,11 @@ function App() {
     section: 'View',
     title: showGrid ? 'Hide grid' : 'Show grid',
   }, {
+    id: 'view:toggle-minimap',
+    run: () => setShowMinimap((current) => !current),
+    section: 'View',
+    title: showMinimap ? 'Hide minimap' : 'Show minimap',
+  }, {
     id: 'view:toggle-frame-guides',
     run: () => setShowFrameGuides((current) => !current),
     section: 'View',
@@ -4213,6 +4283,9 @@ function App() {
           <button aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
             <Grid2X2 size={17} />
           </button>
+          <button aria-pressed={showMinimap} className="ppt-icon-button" data-ppt-view-minimap onClick={() => setShowMinimap((current) => !current)} title="Toggle minimap" type="button">
+            <MapIcon size={17} />
+          </button>
           <button aria-pressed={showFrameGuides} className="ppt-icon-button" data-ppt-view-frame-guides onClick={() => setShowFrameGuides((current) => !current)} title="Toggle frame guides" type="button">
             <Ruler size={17} />
           </button>
@@ -4293,6 +4366,7 @@ function App() {
         data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}
         data-line-tool={lineCreationMode ?? undefined}
+        data-minimap={showMinimap ? 'true' : 'false'}
         onContextMenu={handleStageContextMenu}
         onDragOver={handleStageDragOver}
         onDrop={handleStageDrop}
@@ -4395,6 +4469,10 @@ function App() {
           onClose={() => setContextMenu(null)}
           onCommand={runPPTSurfaceCommand}
         />
+        <PPTMinimap
+          model={minimapModel}
+          onNavigateToWorldPoint={navigateMinimapToWorldPoint}
+        />
       </section>
 
       <Inspector
@@ -4458,6 +4536,114 @@ function App() {
         onClose={closeShortcutHelp}
       />
     </main>
+  )
+}
+
+function PPTMinimap({
+  model,
+  onNavigateToWorldPoint,
+}: {
+  model: PPTMinimapReadModel | null
+  onNavigateToWorldPoint: (point: Point) => void
+}) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const [activePointerId, setActivePointerId] = useState<number | null>(null)
+
+  if (!model) {
+    return null
+  }
+
+  const readModel = model
+
+  function navigate(event: ReactPointerEvent<SVGSVGElement>) {
+    const point = getPPTMinimapSvgPoint(event, svgRef.current, readModel)
+
+    if (!point) {
+      return
+    }
+
+    onNavigateToWorldPoint(getPPTMinimapWorldPoint({ model: readModel, point }))
+  }
+
+  function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setActivePointerId(event.pointerId)
+    navigate(event)
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    if (activePointerId !== event.pointerId) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    navigate(event)
+  }
+
+  function clearPointer(event: ReactPointerEvent<SVGSVGElement>) {
+    if (activePointerId === event.pointerId) {
+      setActivePointerId(null)
+    }
+  }
+
+  return (
+    <div
+      className="ppt-minimap"
+      data-ppt-minimap
+      data-ppt-minimap-item-count={readModel.itemRects.length}
+      data-ppt-minimap-scale={getPPTMinimapScale(readModel.worldBounds, readModel.displayBounds)}
+      data-ppt-minimap-viewport-h={readModel.viewportWorldBounds.h}
+      data-ppt-minimap-viewport-w={readModel.viewportWorldBounds.w}
+      data-ppt-minimap-viewport-x={readModel.viewportWorldBounds.x}
+      data-ppt-minimap-viewport-y={readModel.viewportWorldBounds.y}
+    >
+      <svg
+        aria-label="PPT minimap"
+        className="ppt-minimap-map"
+        data-ppt-minimap-map
+        ref={svgRef}
+        role="img"
+        viewBox={`0 0 ${readModel.size.w} ${readModel.size.h}`}
+        onPointerCancel={clearPointer}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={clearPointer}
+      >
+        <rect
+          className="ppt-minimap-world"
+          data-ppt-minimap-world
+          height={readModel.displayBounds.h}
+          rx="3"
+          width={readModel.displayBounds.w}
+          x={readModel.displayBounds.x}
+          y={readModel.displayBounds.y}
+        />
+        {readModel.itemRects.map((item) => (
+          <rect
+            className="ppt-minimap-item"
+            data-ppt-minimap-item={item.id}
+            height={item.rect.h}
+            key={item.id}
+            rx="1.5"
+            width={item.rect.w}
+            x={item.rect.x}
+            y={item.rect.y}
+          />
+        ))}
+        <rect
+          className="ppt-minimap-viewport"
+          data-ppt-minimap-viewport
+          height={readModel.viewportRect.h}
+          rx="2"
+          width={readModel.viewportRect.w}
+          x={readModel.viewportRect.x}
+          y={readModel.viewportRect.y}
+        />
+      </svg>
+    </div>
   )
 }
 
@@ -4915,6 +5101,213 @@ function groupPPTShortcutHelpItems(
       ? [{ items: sectionItems, section }]
       : []
   })
+}
+
+function getPPTMinimapReadModel({
+  items,
+  size = PPT_MINIMAP_SIZE,
+  stageSize,
+  viewport,
+}: {
+  items: readonly PPTMinimapItemBounds[]
+  size?: PPTMinimapSize
+  stageSize: PPTMinimapSize
+  viewport: Viewport
+}): PPTMinimapReadModel {
+  const viewportWorldBounds = getPPTMinimapViewportWorldBounds({
+    stageSize,
+    viewport,
+  })
+  const contentBounds = items.reduce<Bounds>(
+    (bounds, item) => unionPPTMinimapBounds(bounds, normalizePPTMinimapBounds(item.bounds)),
+    {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  )
+  const worldBounds = expandPPTMinimapWorldBounds(
+    unionPPTMinimapBounds(contentBounds, viewportWorldBounds),
+  )
+  const displayBounds = getPPTMinimapDisplayBounds({
+    size,
+    worldBounds,
+  })
+
+  return {
+    displayBounds,
+    itemRects: items.map((item) => ({
+      id: item.id,
+      rect: pptWorldBoundsToMinimapRect({
+        displayBounds,
+        rect: item.bounds,
+        worldBounds,
+      }),
+    })),
+    size,
+    viewportRect: pptWorldBoundsToMinimapRect({
+      displayBounds,
+      rect: viewportWorldBounds,
+      worldBounds,
+    }),
+    viewportWorldBounds,
+    worldBounds,
+  }
+}
+
+function getPPTMinimapViewportForWorldCenter({
+  current,
+  stageSize,
+  worldCenter,
+}: {
+  current: Viewport
+  stageSize: PPTMinimapSize
+  worldCenter: Point
+}): Viewport {
+  return {
+    scale: current.scale,
+    x: stageSize.w / 2 - worldCenter.x * current.scale,
+    y: stageSize.h / 2 - worldCenter.y * current.scale,
+  }
+}
+
+function getPPTMinimapWorldPoint({
+  model,
+  point,
+}: {
+  model: PPTMinimapReadModel
+  point: Point
+}): Point {
+  const scale = getPPTMinimapScale(model.worldBounds, model.displayBounds)
+
+  return {
+    x: model.worldBounds.x + (point.x - model.displayBounds.x) / scale,
+    y: model.worldBounds.y + (point.y - model.displayBounds.y) / scale,
+  }
+}
+
+function getPPTMinimapSvgPoint(
+  event: ReactPointerEvent<SVGSVGElement>,
+  svg: SVGSVGElement | null,
+  model: PPTMinimapReadModel,
+): Point | null {
+  const rect = svg?.getBoundingClientRect()
+
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return null
+  }
+
+  return {
+    x: (event.clientX - rect.left) * model.size.w / rect.width,
+    y: (event.clientY - rect.top) * model.size.h / rect.height,
+  }
+}
+
+function getPPTMinimapViewportWorldBounds({
+  stageSize,
+  viewport,
+}: {
+  stageSize: PPTMinimapSize
+  viewport: Viewport
+}): Bounds {
+  const scale = Math.max(Number.isFinite(viewport.scale) ? viewport.scale : 1, 0.001)
+  const viewportX = Number.isFinite(viewport.x) ? viewport.x : 0
+  const viewportY = Number.isFinite(viewport.y) ? viewport.y : 0
+
+  return {
+    h: Math.max(1, stageSize.h / scale),
+    w: Math.max(1, stageSize.w / scale),
+    x: -viewportX / scale,
+    y: -viewportY / scale,
+  }
+}
+
+function expandPPTMinimapWorldBounds(bounds: Bounds): Bounds {
+  const width = Math.max(bounds.w, PPT_MINIMAP_MIN_WORLD_SIZE)
+  const height = Math.max(bounds.h, PPT_MINIMAP_MIN_WORLD_SIZE)
+  const centerX = bounds.x + bounds.w / 2
+  const centerY = bounds.y + bounds.h / 2
+
+  return {
+    h: height,
+    w: width,
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+  }
+}
+
+function getPPTMinimapDisplayBounds({
+  size,
+  worldBounds,
+}: {
+  size: PPTMinimapSize
+  worldBounds: Bounds
+}): Bounds {
+  const availableWidth = Math.max(1, size.w - PPT_MINIMAP_PADDING * 2)
+  const availableHeight = Math.max(1, size.h - PPT_MINIMAP_PADDING * 2)
+  const scale = Math.min(
+    availableWidth / Math.max(1, worldBounds.w),
+    availableHeight / Math.max(1, worldBounds.h),
+  )
+  const width = worldBounds.w * scale
+  const height = worldBounds.h * scale
+
+  return {
+    h: height,
+    w: width,
+    x: (size.w - width) / 2,
+    y: (size.h - height) / 2,
+  }
+}
+
+function pptWorldBoundsToMinimapRect({
+  displayBounds,
+  rect,
+  worldBounds,
+}: {
+  displayBounds: Bounds
+  rect: Bounds
+  worldBounds: Bounds
+}): Bounds {
+  const scale = getPPTMinimapScale(worldBounds, displayBounds)
+
+  return {
+    h: Math.max(1, rect.h * scale),
+    w: Math.max(1, rect.w * scale),
+    x: displayBounds.x + (rect.x - worldBounds.x) * scale,
+    y: displayBounds.y + (rect.y - worldBounds.y) * scale,
+  }
+}
+
+function getPPTMinimapScale(worldBounds: Bounds, displayBounds: Bounds) {
+  return Math.min(
+    displayBounds.w / Math.max(1, worldBounds.w),
+    displayBounds.h / Math.max(1, worldBounds.h),
+  )
+}
+
+function unionPPTMinimapBounds(left: Bounds, right: Bounds): Bounds {
+  const x = Math.min(left.x, right.x)
+  const y = Math.min(left.y, right.y)
+  const rightEdge = Math.max(left.x + left.w, right.x + right.w)
+  const bottomEdge = Math.max(left.y + left.h, right.y + right.h)
+
+  return {
+    h: bottomEdge - y,
+    w: rightEdge - x,
+    x,
+    y,
+  }
+}
+
+function normalizePPTMinimapBounds(bounds: Bounds): Bounds {
+  return {
+    h: Math.max(1, bounds.h),
+    w: Math.max(1, bounds.w),
+    x: bounds.x,
+    y: bounds.y,
+  }
 }
 
 function FindReplaceStrip({
