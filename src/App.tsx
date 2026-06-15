@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Circle,
+  Command,
   Copy,
   CopyPlus,
   Diamond,
@@ -242,6 +243,14 @@ type PPTSurfaceCommandView = PPTSurfaceCommandDescriptor & {
 type PPTSurfaceCommandViewGroup = {
   commands: PPTSurfaceCommandView[]
   id: string
+}
+type PPTCommandPaletteItem = {
+  disabled?: boolean
+  id: string
+  run: () => void
+  section: string
+  shortcut?: string
+  title: string
 }
 type PPTContextMenuState = {
   x: number
@@ -483,6 +492,7 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
@@ -638,6 +648,12 @@ function App() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (isEditableTarget(event.target)) {
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        openCommandPalette()
         return
       }
 
@@ -891,6 +907,7 @@ function App() {
 
   function openFindStrip() {
     setFindOpen(true)
+    setCommandPaletteOpen(false)
     setEditingId(null)
     setInteraction(null)
     setLineCreationMode(null)
@@ -904,6 +921,20 @@ function App() {
 
   function closeFindStrip() {
     setFindOpen(false)
+  }
+
+  function openCommandPalette() {
+    setCommandPaletteOpen(true)
+    setFindOpen(false)
+    setEditingId(null)
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setContextMenu(null)
+  }
+
+  function closeCommandPalette() {
+    setCommandPaletteOpen(false)
   }
 
   function focusPPTFindMatch(match: PPTFindMatch) {
@@ -1359,6 +1390,13 @@ function App() {
     if (nextSelection) {
       setSelection(nextSelection)
     }
+  }
+
+  function activateSelectTool() {
+    setCreationTool(null)
+    setLineCreationMode(null)
+    setEditingId(null)
+    setContextMenu(null)
   }
 
   function runPPTSurfaceCommand(command: PPTSurfaceCommand) {
@@ -2615,6 +2653,7 @@ function App() {
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
     !interaction &&
+    !commandPaletteOpen &&
     !contextMenu &&
     !creationTool &&
     !lineCreationMode
@@ -2633,6 +2672,284 @@ function App() {
     availability: commandAvailability,
     surface: 'context-menu',
   })
+  const commandPaletteItems: PPTCommandPaletteItem[] = [{
+    disabled: !commandAvailability.undo,
+    id: 'command:undo',
+    run: undo,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+Z',
+    title: CANVAS_COMMAND_AFFORDANCES.undo.title,
+  }, {
+    disabled: !commandAvailability.redo,
+    id: 'command:redo',
+    run: redo,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+Y',
+    title: CANVAS_COMMAND_AFFORDANCES.redo.title,
+  }, {
+    disabled: !commandAvailability.duplicate,
+    id: 'command:duplicate',
+    run: duplicateSelection,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+D',
+    title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+  }, {
+    disabled: !commandAvailability.delete,
+    id: 'command:delete',
+    run: deleteSelection,
+    section: 'Edit',
+    title: CANVAS_COMMAND_AFFORDANCES.delete.title,
+  }, {
+    disabled: !commandAvailability.cut,
+    id: 'command:cut',
+    run: cutSelection,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+X',
+    title: CANVAS_COMMAND_AFFORDANCES.cut.title,
+  }, {
+    disabled: selection.length === 0,
+    id: 'command:copy',
+    run: copySelection,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+C',
+    title: CANVAS_COMMAND_AFFORDANCES.copy.title,
+  }, {
+    disabled: !commandAvailability.paste,
+    id: 'command:paste',
+    run: pasteSelection,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+V',
+    title: CANVAS_COMMAND_AFFORDANCES.paste.title,
+  }, {
+    id: 'command:select-all',
+    run: selectAllElements,
+    section: 'Edit',
+    shortcut: 'Cmd/Ctrl+A',
+    title: CANVAS_COMMAND_AFFORDANCES.selectAll.title,
+  }, {
+    disabled: !commandAvailability.alignLeft,
+    id: 'command:align-left',
+    run: () => alignSelection('alignLeft'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignLeft.title,
+  }, {
+    disabled: !commandAvailability.alignCenter,
+    id: 'command:align-center',
+    run: () => alignSelection('alignCenter'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
+  }, {
+    disabled: !commandAvailability.alignRight,
+    id: 'command:align-right',
+    run: () => alignSelection('alignRight'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignRight.title,
+  }, {
+    disabled: !commandAvailability.alignTop,
+    id: 'command:align-top',
+    run: () => alignSelection('alignTop'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignTop.title,
+  }, {
+    disabled: !commandAvailability.alignMiddle,
+    id: 'command:align-middle',
+    run: () => alignSelection('alignMiddle'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignMiddle.title,
+  }, {
+    disabled: !commandAvailability.alignBottom,
+    id: 'command:align-bottom',
+    run: () => alignSelection('alignBottom'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.alignBottom.title,
+  }, {
+    disabled: !commandAvailability.distributeHorizontal,
+    id: 'command:distribute-horizontal',
+    run: () => distributeSelection('distributeHorizontal'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.distributeHorizontal.title,
+  }, {
+    disabled: !commandAvailability.distributeVertical,
+    id: 'command:distribute-vertical',
+    run: () => distributeSelection('distributeVertical'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.distributeVertical.title,
+  }, {
+    disabled: !commandAvailability.bringForward,
+    id: 'command:bring-forward',
+    run: () => reorderSelection('bringForward'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
+  }, {
+    disabled: !commandAvailability.bringToFront,
+    id: 'command:bring-to-front',
+    run: () => reorderSelection('bringToFront'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
+  }, {
+    disabled: !commandAvailability.sendBackward,
+    id: 'command:send-backward',
+    run: () => reorderSelection('sendBackward'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
+  }, {
+    disabled: !commandAvailability.sendToBack,
+    id: 'command:send-to-back',
+    run: () => reorderSelection('sendToBack'),
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
+  }, {
+    disabled: !commandAvailability.group,
+    id: 'command:group',
+    run: groupSelection,
+    section: 'Arrange',
+    shortcut: 'Cmd/Ctrl+G',
+    title: CANVAS_COMMAND_AFFORDANCES.group.title,
+  }, {
+    disabled: !commandAvailability.ungroup,
+    id: 'command:ungroup',
+    run: ungroupSelection,
+    section: 'Arrange',
+    shortcut: 'Shift+Cmd/Ctrl+G',
+    title: CANVAS_COMMAND_AFFORDANCES.ungroup.title,
+  }, {
+    disabled: !commandAvailability.lockSelection,
+    id: 'command:lock-selection',
+    run: lockSelectedElements,
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
+  }, {
+    disabled: !commandAvailability.unlockAll,
+    id: 'command:unlock-all',
+    run: unlockAllElements,
+    section: 'Arrange',
+    title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
+  }, {
+    id: 'tool:select',
+    run: activateSelectTool,
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.select.shortcut,
+    title: 'Select tool',
+  }, {
+    id: 'tool:text',
+    run: () => activatePPTCreationTool({ kind: 'text' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.text.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.text.ariaLabel,
+  }, {
+    id: 'tool:rect',
+    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'rect' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.rect.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.rect.ariaLabel,
+  }, {
+    id: 'tool:ellipse',
+    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.ellipse.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.ellipse.ariaLabel,
+  }, {
+    id: 'tool:diamond',
+    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.diamond.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.diamond.ariaLabel,
+  }, {
+    id: 'tool:line',
+    run: () => activateLineCreationMode('line'),
+    section: 'Create',
+    title: 'Line tool',
+  }, {
+    id: 'tool:arrow',
+    run: () => activateLineCreationMode('arrow'),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.arrow.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel,
+  }, {
+    id: 'tool:image',
+    run: () => imageInputRef.current?.click(),
+    section: 'Create',
+    title: 'Add image',
+  }, {
+    id: 'slide:add',
+    run: addSlide,
+    section: 'Slides',
+    title: 'Add slide',
+  }, {
+    id: 'slide:duplicate',
+    run: duplicateActiveSlide,
+    section: 'Slides',
+    title: 'Duplicate slide',
+  }, {
+    disabled: !canDeleteSlide,
+    id: 'slide:delete',
+    run: deleteActiveSlide,
+    section: 'Slides',
+    title: 'Delete slide',
+  }, {
+    disabled: !canMoveActiveSlideUp,
+    id: 'slide:move-up',
+    run: () => moveActiveSlide(-1),
+    section: 'Slides',
+    title: 'Move slide up',
+  }, {
+    disabled: !canMoveActiveSlideDown,
+    id: 'slide:move-down',
+    run: () => moveActiveSlide(1),
+    section: 'Slides',
+    title: 'Move slide down',
+  }, {
+    id: 'view:find',
+    run: openFindStrip,
+    section: 'View',
+    shortcut: 'Cmd/Ctrl+F',
+    title: 'Find text',
+  }, {
+    id: 'view:fit-slide',
+    run: fitSlide,
+    section: 'View',
+    title: 'Fit slide',
+  }, {
+    id: 'view:zoom-in',
+    run: () => zoom('in'),
+    section: 'View',
+    title: CANVAS_COMMAND_AFFORDANCES.zoomIn.title,
+  }, {
+    id: 'view:zoom-out',
+    run: () => zoom('out'),
+    section: 'View',
+    title: CANVAS_COMMAND_AFFORDANCES.zoomOut.title,
+  }, {
+    id: 'view:toggle-grid',
+    run: () => setShowGrid((current) => !current),
+    section: 'View',
+    title: showGrid ? 'Hide grid' : 'Show grid',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:bold',
+    run: toggleSelectedTextBold,
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+B',
+    title: 'Bold text',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:italic',
+    run: toggleSelectedTextItalic,
+    section: 'Format',
+    title: 'Italic text',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:underline',
+    run: toggleSelectedTextUnderline,
+    section: 'Format',
+    title: 'Underline text',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:bullet',
+    run: toggleSelectedParagraphBullet,
+    section: 'Format',
+    title: 'Toggle bullet list',
+  }]
 
   return (
     <main className="ppt-app" data-ppt-app>
@@ -2650,6 +2967,9 @@ function App() {
           </button>
           <button className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
             <Search size={17} />
+          </button>
+          <button className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
+            <Command size={17} />
           </button>
         </div>
         {findOpen ? (
@@ -2990,8 +3310,180 @@ function App() {
         onSlideNameChange={updateSlideName}
         onSlideNotesChange={updateSlideNotes}
       />
+      <PPTCommandPalette
+        items={commandPaletteItems}
+        open={commandPaletteOpen}
+        onClose={closeCommandPalette}
+      />
     </main>
   )
+}
+
+function PPTCommandPalette({
+  items,
+  onClose,
+  open,
+}: {
+  items: readonly PPTCommandPaletteItem[]
+  onClose: () => void
+  open: boolean
+}) {
+  if (!open) {
+    return null
+  }
+
+  return <PPTCommandPaletteDialog items={items} onClose={onClose} />
+}
+
+function PPTCommandPaletteDialog({
+  items,
+  onClose,
+}: {
+  items: readonly PPTCommandPaletteItem[]
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [activeIndex, setActiveIndex] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const filteredItems = useMemo(
+    () => filterPPTCommandPaletteItems(items, query).slice(0, 10),
+    [items, query],
+  )
+  const maxActiveIndex = Math.max(0, filteredItems.length - 1)
+  const activeItemIndex = Math.min(activeIndex, maxActiveIndex)
+
+  useEffect(() => {
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0)
+
+    return () => window.clearTimeout(focusTimer)
+  }, [])
+
+  function runItem(item: PPTCommandPaletteItem | undefined) {
+    if (!item || item.disabled) {
+      return
+    }
+
+    item.run()
+    onClose()
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+      return
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      event.stopPropagation()
+      setActiveIndex(() => Math.min(activeItemIndex + 1, maxActiveIndex))
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      event.stopPropagation()
+      setActiveIndex(() => Math.max(0, activeItemIndex - 1))
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.stopPropagation()
+      runItem(filteredItems[activeItemIndex])
+    }
+  }
+
+  function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose()
+    }
+  }
+
+  return (
+    <div
+      className="ppt-command-palette-backdrop"
+      data-ppt-command-palette-backdrop
+      onMouseDown={handleBackdropMouseDown}
+    >
+      <section
+        aria-label="Command palette"
+        aria-modal="true"
+        className="ppt-command-palette"
+        data-ppt-command-palette
+        role="dialog"
+        onKeyDown={handleKeyDown}
+      >
+        <input
+          aria-label="Search commands"
+          className="ppt-command-palette-input"
+          data-ppt-command-palette-query
+          placeholder="Search commands"
+          ref={inputRef}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setActiveIndex(0)
+          }}
+        />
+        <div className="ppt-command-palette-list" role="listbox">
+          {filteredItems.length > 0 ? filteredItems.map((item, index) => (
+            <button
+              aria-selected={index === activeItemIndex}
+              className="ppt-command-palette-item"
+              data-ppt-command-palette-active={index === activeItemIndex ? 'true' : undefined}
+              data-ppt-command-palette-item={item.id}
+              disabled={item.disabled}
+              key={item.id}
+              role="option"
+              type="button"
+              onClick={() => runItem(item)}
+              onMouseEnter={() => setActiveIndex(index)}
+            >
+              <span className="ppt-command-palette-item-main">
+                <span className="ppt-command-palette-item-title">{item.title}</span>
+                <span className="ppt-command-palette-item-section">{item.section}</span>
+              </span>
+              {item.shortcut ? (
+                <kbd className="ppt-command-palette-shortcut">{item.shortcut}</kbd>
+              ) : null}
+            </button>
+          )) : (
+            <div className="ppt-command-palette-empty" data-ppt-command-palette-empty>
+              No matches
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function filterPPTCommandPaletteItems(
+  items: readonly PPTCommandPaletteItem[],
+  query: string,
+) {
+  const terms = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (terms.length === 0) {
+    return [...items]
+  }
+
+  return items.filter((item) => {
+    const haystack = [
+      item.title,
+      item.section,
+      item.shortcut ?? '',
+    ].join(' ').toLowerCase()
+
+    return terms.every((term) => haystack.includes(term))
+  })
 }
 
 function FindReplaceStrip({

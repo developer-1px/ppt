@@ -37,6 +37,7 @@ try {
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
+  await runCommandPaletteScenario(page)
   await runTextQuickFormatScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
@@ -1032,6 +1033,233 @@ async function runCommandSurfaceScenario(page) {
   }))()`)
 
   record('unlocks locked PPT object from context menu', afterUnlock.locked === 'false', afterUnlock)
+}
+
+async function runCommandPaletteScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+
+  const initial = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(100)
+
+  const afterOpen = await page.eval(`(() => ({
+    focused: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
+    itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  record('opens PPT command palette from keyboard shortcut', afterOpen.open && afterOpen.focused && afterOpen.itemCount >= 10, afterOpen)
+
+  await page.send('Input.insertText', { text: 'duplicate' })
+  await delay(80)
+
+  const afterFilter = await page.eval(`(() => ({
+    firstItem: document.querySelector('[data-ppt-command-palette-item]')?.getAttribute('data-ppt-command-palette-item') ?? '',
+    itemIds: [...document.querySelectorAll('[data-ppt-command-palette-item]')]
+      .map((item) => item.getAttribute('data-ppt-command-palette-item')),
+    itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
+  }))()`)
+
+  record('filters PPT command palette items by query', afterFilter.firstItem === 'command:duplicate' && afterFilter.itemIds.includes('slide:duplicate'), afterFilter)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterDuplicate = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('runs PPT command palette item with Enter', afterDuplicate.elementCount === initial.elementCount + 1 && afterDuplicate.selectedCount >= 1 && !afterDuplicate.open, {
+    afterDuplicate,
+    initial,
+  })
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'delete' })
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterCleanupDelete = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+  }))()`)
+
+  record('cleans up PPT command palette duplicate through delete command', afterCleanupDelete.elementCount === initial.elementCount && !afterCleanupDelete.open, afterCleanupDelete)
+
+  const pointAfterDelete = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, pointAfterDelete.x, pointAfterDelete.y, 1)
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'group' })
+  await delay(80)
+
+  const beforeDisabled = await page.eval(`(() => ({
+    groupDisabled: document.querySelector('[data-ppt-command-palette-item="command:group"]')?.disabled ?? false,
+    groupId: document.querySelector('[data-selected="true"]')?.getAttribute('data-group-id') ?? null,
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const afterDisabled = await page.eval(`(() => ({
+    groupId: document.querySelector('[data-selected="true"]')?.getAttribute('data-group-id') ?? null,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('does not run disabled PPT command palette item', beforeDisabled.groupDisabled && beforeDisabled.selectedCount === 1 && afterDisabled.selectedCount === 1 && afterDisabled.groupId === beforeDisabled.groupId && afterDisabled.open, {
+    afterDisabled,
+    beforeDisabled,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+
+  const alignIds = await readCommandPaletteIds(page, 'align')
+  const toolIds = await readCommandPaletteIds(page, 'tool')
+  const findIds = await readCommandPaletteIds(page, 'find')
+  const groupIds = await readCommandPaletteIds(page, 'group')
+  const lockIds = await readCommandPaletteIds(page, 'lock')
+  const frontIds = await readCommandPaletteIds(page, 'front')
+  const backIds = await readCommandPaletteIds(page, 'back')
+  const fitIds = await readCommandPaletteIds(page, 'fit')
+  const gridIds = await readCommandPaletteIds(page, 'grid')
+  const exposed = {
+    hasAlign: alignIds.includes('command:align-left'),
+    hasCreate: toolIds.includes('tool:text') && toolIds.includes('tool:arrow'),
+    hasFind: findIds.includes('view:find'),
+    hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
+    hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
+    hasReorder: frontIds.includes('command:bring-to-front') && backIds.includes('command:send-to-back'),
+    hasView: fitIds.includes('view:fit-slide') && gridIds.includes('view:toggle-grid'),
+    visibleCounts: {
+      align: alignIds.length,
+      back: backIds.length,
+      find: findIds.length,
+      fit: fitIds.length,
+      front: frontIds.length,
+      grid: gridIds.length,
+      group: groupIds.length,
+      lock: lockIds.length,
+      tool: toolIds.length,
+    },
+  }
+
+  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasView, exposed)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(80)
+  await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyK',
+      ctrlKey: true,
+      key: 'k',
+    }))
+  })()`)
+  await delay(80)
+
+  const afterNativeGuard = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      open: !!document.querySelector('[data-ppt-command-palette]'),
+    }
+  })()`)
+
+  record('does not open PPT command palette while native text editing is active', afterNativeGuard.editing && !afterNativeGuard.open, afterNativeGuard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+}
+
+async function readCommandPaletteIds(page, query) {
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-command-palette-query]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    valueSetter.call(input, ${JSON.stringify(query)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  return page.eval(`(() => [...document.querySelectorAll('[data-ppt-command-palette-item]')]
+    .map((item) => item.getAttribute('data-ppt-command-palette-item'))
+  )()`)
 }
 
 async function runTextQuickFormatScenario(page) {
