@@ -162,6 +162,7 @@ import {
   type PPTComment,
   type PPTElement,
   type PPTElementAnimation,
+  type PPTElementShadow,
   type PPTFreeform,
   type PPTImage,
   type PPTImageCrop,
@@ -720,6 +721,13 @@ type PPTElementAnimationUpdateField =
   | 'order'
   | 'trigger'
   | 'type'
+type PPTElementShadowUpdateField =
+  | 'angle'
+  | 'blur'
+  | 'color'
+  | 'distance'
+  | 'enabled'
+  | 'opacity'
 type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
@@ -1059,6 +1067,20 @@ const PPT_TEXT_OVERFLOW_EPSILON = 1
 const PPT_ELEMENT_OPACITY_MIN = 0
 const PPT_ELEMENT_OPACITY_MAX = 1
 const PPT_ELEMENT_OPACITY_STEP = 0.05
+const PPT_DEFAULT_ELEMENT_SHADOW = Object.freeze({
+  angle: 45,
+  blur: 14,
+  color: '#000000',
+  distance: 8,
+  opacity: 0.22,
+} as const satisfies PPTElementShadow)
+const PPT_ELEMENT_SHADOW_ANGLE_MIN = 0
+const PPT_ELEMENT_SHADOW_ANGLE_MAX = 359
+const PPT_ELEMENT_SHADOW_BLUR_MAX = 80
+const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
+const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
+const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
+const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
   'fade',
@@ -2668,6 +2690,31 @@ function App() {
         ...element,
         opacity: normalizePPTElementOpacity(opacity),
       })),
+    )
+  }
+
+  function updateElementShadow(
+    elementId: string,
+    field: PPTElementShadowUpdateField,
+    value: boolean | number | string,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (field === 'enabled') {
+          return {
+            ...element,
+            shadow: value === true ? getPPTElementShadow(element) : undefined,
+          }
+        }
+
+        return {
+          ...element,
+          shadow: normalizePPTElementShadow({
+            ...getPPTElementShadow(element),
+            [field]: value,
+          }),
+        }
+      }),
     )
   }
 
@@ -5171,6 +5218,7 @@ function App() {
         onElementNameChange={updateElementName}
         onElementOpacityChange={updateElementOpacity}
         onElementRotationChange={updateElementRotation}
+        onElementShadowChange={updateElementShadow}
         onElementTextInsetChange={updateElementTextInset}
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
@@ -7347,6 +7395,22 @@ function SlideThumb({
               : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+            data-ppt-thumb-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
+            data-ppt-thumb-shadow-angle={hasPPTElementShadow(element)
+              ? getPPTElementShadow(element).angle
+              : undefined}
+            data-ppt-thumb-shadow-blur={hasPPTElementShadow(element)
+              ? getPPTElementShadow(element).blur
+              : undefined}
+            data-ppt-thumb-shadow-color={hasPPTElementShadow(element)
+              ? getPPTElementShadow(element).color
+              : undefined}
+            data-ppt-thumb-shadow-distance={hasPPTElementShadow(element)
+              ? getPPTElementShadow(element).distance
+              : undefined}
+            data-ppt-thumb-shadow-opacity={hasPPTElementShadow(element)
+              ? formatPPTElementShadowOpacity(getPPTElementShadow(element).opacity)
+              : undefined}
             data-ppt-thumb-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
@@ -7391,6 +7455,7 @@ function SlideThumb({
                 ? getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))
                 : undefined,
               left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
+              filter: getPPTElementShadowFilter(element),
               opacity: getPPTElementOpacity(element),
               top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
               transform: getPPTElementTransform(element),
@@ -7536,6 +7601,22 @@ function PPTElementView({
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
+      data-ppt-shadow={hasPPTElementShadow(element) ? 'true' : undefined}
+      data-ppt-shadow-angle={hasPPTElementShadow(element)
+        ? getPPTElementShadow(element).angle
+        : undefined}
+      data-ppt-shadow-blur={hasPPTElementShadow(element)
+        ? getPPTElementShadow(element).blur
+        : undefined}
+      data-ppt-shadow-color={hasPPTElementShadow(element)
+        ? getPPTElementShadow(element).color
+        : undefined}
+      data-ppt-shadow-distance={hasPPTElementShadow(element)
+        ? getPPTElementShadow(element).distance
+        : undefined}
+      data-ppt-shadow-opacity={hasPPTElementShadow(element)
+        ? formatPPTElementShadowOpacity(getPPTElementShadow(element).opacity)
+        : undefined}
       data-ppt-font-family={isPPTTextElement(element)
         ? normalizePPTTextFontFamily(textStyle?.fontFamily)
         : undefined}
@@ -8060,6 +8141,7 @@ function Inspector({
   onElementNameChange,
   onElementOpacityChange,
   onElementRotationChange,
+  onElementShadowChange,
   onElementStrokeChange,
   onElementTextInsetChange,
   onElementTextStyleChange,
@@ -8113,6 +8195,11 @@ function Inspector({
   onElementNameChange: (elementId: string, name: string) => void
   onElementOpacityChange: (elementId: string, opacity: number) => void
   onElementRotationChange: (elementId: string, rotation: number) => void
+  onElementShadowChange: (
+    elementId: string,
+    field: PPTElementShadowUpdateField,
+    value: boolean | number | string,
+  ) => void
   onElementStrokeChange: (
     elementId: string,
     field: 'color' | 'width',
@@ -8195,6 +8282,12 @@ function Inspector({
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
+  const elementShadow = selectedElement
+    ? getPPTElementShadow(selectedElement)
+    : PPT_DEFAULT_ELEMENT_SHADOW
+  const elementShadowEnabled = selectedElement
+    ? hasPPTElementShadow(selectedElement)
+    : false
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
@@ -8426,6 +8519,118 @@ function Inspector({
                   )}
               />
             </label>
+            <label className="ppt-checkbox-field">
+              <input
+                checked={elementShadowEnabled}
+                data-ppt-shadow-field="enabled"
+                type="checkbox"
+                onChange={(event) =>
+                  onElementShadowChange(
+                    selectedElement.id,
+                    'enabled',
+                    event.target.checked,
+                  )}
+              />
+              <span>Shadow</span>
+            </label>
+            <div
+              className="ppt-geometry-grid"
+              data-ppt-shadow-angle={elementShadow.angle}
+              data-ppt-shadow-blur={elementShadow.blur}
+              data-ppt-shadow-color={elementShadow.color}
+              data-ppt-shadow-distance={elementShadow.distance}
+              data-ppt-shadow-enabled={elementShadowEnabled ? 'true' : 'false'}
+              data-ppt-shadow-inspector
+              data-ppt-shadow-opacity={elementShadow.opacity}
+            >
+              <label className="ppt-field">
+                <span>Color</span>
+                <input
+                  data-ppt-shadow-field="color"
+                  disabled={!elementShadowEnabled}
+                  type="color"
+                  value={elementShadow.color}
+                  onChange={(event) =>
+                    onElementShadowChange(
+                      selectedElement.id,
+                      'color',
+                      event.target.value,
+                    )}
+                />
+              </label>
+              <label className="ppt-field">
+                <span>Shadow opacity</span>
+                <input
+                  data-ppt-shadow-field="opacity"
+                  disabled={!elementShadowEnabled}
+                  max={PPT_ELEMENT_SHADOW_OPACITY_MAX}
+                  min={PPT_ELEMENT_SHADOW_OPACITY_MIN}
+                  step={PPT_ELEMENT_SHADOW_OPACITY_STEP}
+                  type="number"
+                  value={elementShadow.opacity}
+                  onChange={(event) =>
+                    onElementShadowChange(
+                      selectedElement.id,
+                      'opacity',
+                      parsePPTElementShadowOpacity(event.target.value),
+                    )}
+                />
+              </label>
+              <label className="ppt-field">
+                <span>Blur</span>
+                <input
+                  data-ppt-shadow-field="blur"
+                  disabled={!elementShadowEnabled}
+                  max={PPT_ELEMENT_SHADOW_BLUR_MAX}
+                  min={0}
+                  step={1}
+                  type="number"
+                  value={elementShadow.blur}
+                  onChange={(event) =>
+                    onElementShadowChange(
+                      selectedElement.id,
+                      'blur',
+                      parsePPTElementShadowBlur(event.target.value),
+                    )}
+                />
+              </label>
+              <label className="ppt-field">
+                <span>Distance</span>
+                <input
+                  data-ppt-shadow-field="distance"
+                  disabled={!elementShadowEnabled}
+                  max={PPT_ELEMENT_SHADOW_DISTANCE_MAX}
+                  min={0}
+                  step={1}
+                  type="number"
+                  value={elementShadow.distance}
+                  onChange={(event) =>
+                    onElementShadowChange(
+                      selectedElement.id,
+                      'distance',
+                      parsePPTElementShadowDistance(event.target.value),
+                    )}
+                />
+              </label>
+              <label className="ppt-field">
+                <span>Angle</span>
+                <input
+                  data-ppt-shadow-field="angle"
+                  disabled={!elementShadowEnabled}
+                  max={PPT_ELEMENT_SHADOW_ANGLE_MAX}
+                  min={PPT_ELEMENT_SHADOW_ANGLE_MIN}
+                  step={1}
+                  type="number"
+                  value={elementShadow.angle}
+                  onChange={(event) =>
+                    onElementShadowChange(
+                      selectedElement.id,
+                      'angle',
+                      parsePPTElementShadowAngle(event.target.value),
+                    )}
+                />
+              </label>
+            </div>
             <div className="ppt-geometry-grid">
               {(['x', 'y', 'w', 'h'] as const).map((field) => (
                 <label className="ppt-field" key={field}>
@@ -9145,6 +9350,7 @@ function Inspector({
 
 function pptElementStyle(element: PPTElement): CSSProperties {
   const base: CSSProperties = {
+    filter: getPPTElementShadowFilter(element),
     height: element.geometry.h,
     left: element.geometry.x,
     opacity: getPPTElementOpacity(element),
@@ -9620,6 +9826,109 @@ function normalizePPTElementOpacity(value: number) {
 
 function formatPPTElementOpacity(value: number) {
   return String(normalizePPTElementOpacity(value))
+}
+
+function hasPPTElementShadow(element: PPTElement) {
+  return element.shadow !== undefined
+}
+
+function getPPTElementShadow(element: PPTElement): PPTElementShadow {
+  return normalizePPTElementShadow(element.shadow ?? PPT_DEFAULT_ELEMENT_SHADOW)
+}
+
+function normalizePPTElementShadow(
+  shadow: Partial<PPTElementShadow>,
+): PPTElementShadow {
+  return {
+    angle: normalizePPTElementShadowAngle(shadow.angle ?? PPT_DEFAULT_ELEMENT_SHADOW.angle),
+    blur: normalizePPTElementShadowBlur(shadow.blur ?? PPT_DEFAULT_ELEMENT_SHADOW.blur),
+    color: normalizePPTElementShadowColor(shadow.color ?? PPT_DEFAULT_ELEMENT_SHADOW.color),
+    distance: normalizePPTElementShadowDistance(shadow.distance ?? PPT_DEFAULT_ELEMENT_SHADOW.distance),
+    opacity: normalizePPTElementShadowOpacity(shadow.opacity ?? PPT_DEFAULT_ELEMENT_SHADOW.opacity),
+  }
+}
+
+function parsePPTElementShadowAngle(value: string) {
+  return normalizePPTElementShadowAngle(Number(value))
+}
+
+function normalizePPTElementShadowAngle(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.angle
+
+  return clamp(
+    Math.round(finiteValue),
+    PPT_ELEMENT_SHADOW_ANGLE_MIN,
+    PPT_ELEMENT_SHADOW_ANGLE_MAX,
+  )
+}
+
+function parsePPTElementShadowBlur(value: string) {
+  return normalizePPTElementShadowBlur(Number(value))
+}
+
+function normalizePPTElementShadowBlur(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.blur
+
+  return clamp(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_BLUR_MAX)
+}
+
+function parsePPTElementShadowDistance(value: string) {
+  return normalizePPTElementShadowDistance(Number(value))
+}
+
+function normalizePPTElementShadowDistance(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.distance
+
+  return clamp(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_DISTANCE_MAX)
+}
+
+function parsePPTElementShadowOpacity(value: string) {
+  return normalizePPTElementShadowOpacity(Number(value))
+}
+
+function normalizePPTElementShadowOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.opacity
+  const clamped = clamp(
+    finiteValue,
+    PPT_ELEMENT_SHADOW_OPACITY_MIN,
+    PPT_ELEMENT_SHADOW_OPACITY_MAX,
+  )
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTElementShadowOpacity(value: number) {
+  return String(normalizePPTElementShadowOpacity(value))
+}
+
+function normalizePPTElementShadowColor(color: string) {
+  return /^#[\da-f]{6}$/i.test(color) ? color : PPT_DEFAULT_ELEMENT_SHADOW.color
+}
+
+function getPPTElementShadowFilter(element: PPTElement) {
+  return hasPPTElementShadow(element)
+    ? `drop-shadow(${getPPTElementShadowFilterCSS(getPPTElementShadow(element))})`
+    : undefined
+}
+
+function getPPTElementShadowFilterCSS(shadow: PPTElementShadow) {
+  const radians = (shadow.angle * Math.PI) / 180
+  const offsetX = formatPPTPathNumber(Math.cos(radians) * shadow.distance)
+  const offsetY = formatPPTPathNumber(Math.sin(radians) * shadow.distance)
+
+  return `${offsetX}px ${offsetY}px ${shadow.blur}px ${getPPTElementShadowColorCSS(shadow)}`
+}
+
+function getPPTElementShadowColorCSS(shadow: PPTElementShadow) {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(shadow.color)
+
+  if (!match) {
+    return shadow.color
+  }
+
+  const [, red, green, blue] = match
+
+  return `rgb(${Number.parseInt(red, 16)} ${Number.parseInt(green, 16)} ${Number.parseInt(blue, 16)} / ${formatPPTElementShadowOpacity(shadow.opacity)})`
 }
 
 function getPPTSelectionCommandAnchor({

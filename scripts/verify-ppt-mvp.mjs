@@ -50,6 +50,7 @@ try {
   await runSlideTransitionScenario(page)
   await runObjectAnimationScenario(page)
   await runObjectOpacityScenario(page)
+  await runObjectShadowScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
@@ -3133,6 +3134,8 @@ async function runExportScenario(page) {
       hasItalicModel: code.includes('"italic": true'),
       hasObjectOpacityMarkup: code.includes('data-ppt-opacity="0.42"') && code.includes('opacity:0.42'),
       hasObjectOpacityModel: code.includes('"opacity": 0.42'),
+      hasObjectShadowMarkup: code.includes('data-ppt-shadow="true"') && code.includes('data-ppt-shadow-color="#334155"') && code.includes('data-ppt-shadow-opacity="0.36"') && code.includes('filter:drop-shadow'),
+      hasObjectShadowModel: code.includes('"shadow"') && code.includes('"color": "#334155"') && code.includes('"opacity": 0.36') && code.includes('"blur": 18') && code.includes('"distance": 12') && code.includes('"angle": 60'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
@@ -3181,6 +3184,7 @@ async function runExportScenario(page) {
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
   record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
   record('exports PPT object opacity metadata', state.hasObjectOpacityMarkup && state.hasObjectOpacityModel, state)
+  record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT font family markup and model data', state.hasFontFamilyMarkup && state.hasFontFamilyModel, state)
   record('exports PPT paragraph spacing markup and model data', state.hasParagraphSpacingMarkup && state.hasParagraphSpacingModel, state)
@@ -3216,6 +3220,7 @@ async function runExportScenario(page) {
       hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasObjectOpacity: text.includes('data-ppt-opacity="0.42"') && text.includes('opacity="0.42"'),
+      hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
@@ -3242,6 +3247,7 @@ async function runExportScenario(page) {
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
   record('exports PPT object opacity metadata into slide SVG', slideSvgState.hasObjectOpacity, slideSvgState)
+  record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
   record('exports PPT paragraph spacing metadata into slide SVG', slideSvgState.hasParagraphSpacing, slideSvgState)
   record('exports PPT text frame inset metadata into slide SVG', slideSvgState.hasTextFrameInset, slideSvgState)
@@ -3942,6 +3948,192 @@ async function runObjectOpacityScenario(page) {
     preview.open &&
       preview.opacity === '0.42' &&
       preview.styleOpacity === '0.42',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
+}
+
+async function runObjectShadowScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const cardPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, cardPoint.x, cardPoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTObjectShadowState(page)
+  const targetId = initial.selectedId
+
+  record(
+    'renders PPT object shadow controls in inspector',
+    targetId.length > 0 &&
+      initial.inspectorEnabled === 'false' &&
+      initial.enabled === false &&
+      initial.opacity === '0.22' &&
+      initial.opacityDisabled === true &&
+      initial.selectedShadow === '' &&
+      initial.thumbShadow === '',
+    initial,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-shadow-field="enabled"]')?.click()`)
+  await delay(120)
+
+  const afterEnable = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'enables PPT object shadow metadata from inspector',
+    afterEnable.enabled === true &&
+      afterEnable.inspectorEnabled === 'true' &&
+      afterEnable.selectedShadow === 'true' &&
+      afterEnable.selectedOpacity === '0.22' &&
+      afterEnable.selectedFilter.includes('drop-shadow') &&
+      afterEnable.thumbShadow === 'true' &&
+      afterEnable.thumbFilter.includes('drop-shadow'),
+    {
+      afterEnable,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterEnableUndo = await getPPTObjectShadowState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterEnableRedo = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'undoes and redoes PPT object shadow enable as one history step',
+    afterEnableUndo.enabled === false &&
+      afterEnableUndo.selectedShadow === '' &&
+      afterEnableRedo.enabled === true &&
+      afterEnableRedo.selectedShadow === 'true',
+    {
+      afterEnableRedo,
+      afterEnableUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const setInputValue = (selector, value) => {
+      const input = document.querySelector(selector)
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    setInputValue('[data-ppt-shadow-field="color"]', '#334155')
+    setInputValue('[data-ppt-shadow-field="opacity"]', '0.36')
+    setInputValue('[data-ppt-shadow-field="blur"]', '18')
+    setInputValue('[data-ppt-shadow-field="distance"]', '12')
+    setInputValue('[data-ppt-shadow-field="angle"]', '60')
+  })()`)
+  await delay(160)
+
+  const afterFields = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'updates PPT object shadow fields from inspector',
+    afterFields.color === '#334155' &&
+      afterFields.opacity === '0.36' &&
+      afterFields.blur === '18' &&
+      afterFields.distance === '12' &&
+      afterFields.angle === '60' &&
+      afterFields.selectedColor === '#334155' &&
+      afterFields.selectedOpacity === '0.36' &&
+      afterFields.selectedBlur === '18' &&
+      afterFields.selectedDistance === '12' &&
+      afterFields.selectedAngle === '60' &&
+      afterFields.thumbOpacity === '0.36',
+    {
+      afterEnableRedo,
+      afterFields,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterFieldUndo = await getPPTObjectShadowState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterFieldRedo = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'undoes and redoes PPT object shadow field as one history step',
+    afterFieldUndo.angle === '45' &&
+      afterFieldUndo.selectedAngle === '45' &&
+      afterFieldRedo.angle === '60' &&
+      afterFieldRedo.selectedAngle === '60',
+    {
+      afterFieldRedo,
+      afterFieldUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(${JSON.stringify(`[data-ppt-element="${targetId}"]`)})
+
+    return {
+      angle: element?.getAttribute('data-ppt-shadow-angle') ?? '',
+      color: element?.getAttribute('data-ppt-shadow-color') ?? '',
+      distance: element?.getAttribute('data-ppt-shadow-distance') ?? '',
+      open: !!overlay,
+      opacity: element?.getAttribute('data-ppt-shadow-opacity') ?? '',
+      shadow: element?.getAttribute('data-ppt-shadow') ?? '',
+      styleFilter: element?.style.filter ?? '',
+    }
+  })()`)
+
+  record(
+    'keeps PPT object shadow metadata in presentation preview',
+    preview.open &&
+      preview.shadow === 'true' &&
+      preview.color === '#334155' &&
+      preview.opacity === '0.36' &&
+      preview.distance === '12' &&
+      preview.angle === '60' &&
+      preview.styleFilter.includes('drop-shadow'),
     preview,
   )
 
@@ -5874,6 +6066,38 @@ function getPPTObjectOpacityState(page, elementId) {
       selectedStyleOpacity: selected?.style.opacity ?? '',
       thumbOpacity: thumb?.getAttribute('data-ppt-thumb-opacity') ?? '',
       thumbStyleOpacity: thumb?.style.opacity ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
+function getPPTObjectShadowState(page, elementId) {
+  return page.eval(`((id) => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = id || selected?.getAttribute('data-ppt-element') || ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const enabled = document.querySelector('[data-ppt-shadow-field="enabled"]')
+    const opacity = document.querySelector('[data-ppt-shadow-field="opacity"]')
+
+    return {
+      angle: document.querySelector('[data-ppt-shadow-field="angle"]')?.value ?? '',
+      blur: document.querySelector('[data-ppt-shadow-field="blur"]')?.value ?? '',
+      color: document.querySelector('[data-ppt-shadow-field="color"]')?.value ?? '',
+      distance: document.querySelector('[data-ppt-shadow-field="distance"]')?.value ?? '',
+      enabled: enabled?.checked ?? false,
+      inspectorEnabled: document.querySelector('[data-ppt-shadow-inspector]')?.getAttribute('data-ppt-shadow-enabled') ?? '',
+      opacity: opacity?.value ?? '',
+      opacityDisabled: opacity?.disabled ?? false,
+      selectedAngle: selected?.getAttribute('data-ppt-shadow-angle') ?? '',
+      selectedBlur: selected?.getAttribute('data-ppt-shadow-blur') ?? '',
+      selectedColor: selected?.getAttribute('data-ppt-shadow-color') ?? '',
+      selectedDistance: selected?.getAttribute('data-ppt-shadow-distance') ?? '',
+      selectedFilter: selected?.style.filter ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedOpacity: selected?.getAttribute('data-ppt-shadow-opacity') ?? '',
+      selectedShadow: selected?.getAttribute('data-ppt-shadow') ?? '',
+      thumbFilter: thumb?.style.filter ?? '',
+      thumbOpacity: thumb?.getAttribute('data-ppt-thumb-shadow-opacity') ?? '',
+      thumbShadow: thumb?.getAttribute('data-ppt-thumb-shadow') ?? '',
     }
   })(${JSON.stringify(elementId)})`)
 }

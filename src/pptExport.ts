@@ -4,6 +4,7 @@ import {
   type PPTComment,
   type PPTDeck,
   type PPTElement,
+  type PPTElementShadow,
   type PPTFreeform,
   type PPTImage,
   type PPTLine,
@@ -62,6 +63,19 @@ const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
 } as const satisfies PPTTextInset)
 const PPT_ELEMENT_OPACITY_MIN = 0
 const PPT_ELEMENT_OPACITY_MAX = 1
+const PPT_DEFAULT_ELEMENT_SHADOW = Object.freeze({
+  angle: 45,
+  blur: 14,
+  color: '#000000',
+  distance: 8,
+  opacity: 0.22,
+} as const satisfies PPTElementShadow)
+const PPT_ELEMENT_SHADOW_ANGLE_MIN = 0
+const PPT_ELEMENT_SHADOW_ANGLE_MAX = 359
+const PPT_ELEMENT_SHADOW_BLUR_MAX = 80
+const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
+const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
+const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -219,12 +233,14 @@ function renderPPTElementHTML(element: PPTElement) {
   const transformAttrs = getPPTElementTransformAttrs(element)
   const opacity = getPPTElementOpacity(element)
   const opacityAttr = ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(opacity))}"`
+  const shadowAttrs = getPPTElementShadowHTMLAttrs(element)
   const style = [
     `left:${toPercent(element.geometry.x, PPT_SLIDE_WIDTH)}`,
     `top:${toPercent(element.geometry.y, PPT_SLIDE_HEIGHT)}`,
     `width:${toPercent(element.geometry.w, PPT_SLIDE_WIDTH)}`,
     `height:${toPercent(element.geometry.h, PPT_SLIDE_HEIGHT)}`,
     `opacity:${formatPPTElementOpacity(opacity)}`,
+    getPPTElementShadowStyle(element),
     transform
       ? `transform:${transform}`
       : '',
@@ -237,7 +253,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(element.alt)}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -274,10 +290,10 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -593,7 +609,7 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
       : '',
   ].filter(Boolean).join(' ')
 
-  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementOpacityHTMLAttr(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
+  return `    <svg class="ppt-element ppt-line" data-ppt-element="${escapeHtml(element.id)}"${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)} ${connectionAttrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${element.geometry.w} ${element.geometry.h}" preserveAspectRatio="none" aria-hidden="true">${marker}${lineMarkup}</svg>`
 }
 
 function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
@@ -602,6 +618,7 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     `data-ppt-kind="freeform"`,
     `data-ppt-freeform-points="${element.points.length}"`,
     getPPTElementOpacityHTMLAttr(element).trim(),
+    getPPTElementShadowHTMLAttrs(element).trim(),
   ].join(' ')
 
   return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}" stroke-linecap="round" stroke-linejoin="round"></path></svg>`
@@ -627,7 +644,7 @@ function renderPPTCommentHTML(
     ? ' data-ppt-comment-resolved="true"'
     : ''
 
-  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementOpacityHTMLAttr(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
+  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
 }
 
 function renderPPTCommentSVG(element: PPTComment) {
@@ -671,6 +688,7 @@ function renderPPTTableHTML(
     `data-ppt-element="${escapeHtml(element.id)}"`,
     transformAttrs.trim(),
     getPPTElementOpacityHTMLAttr(element).trim(),
+    getPPTElementShadowHTMLAttrs(element).trim(),
     `data-ppt-table-rows="${rowCount}"`,
     `data-ppt-table-cols="${columnCount}"`,
     `style="${style.filter(Boolean).join(';')}"`,
@@ -742,6 +760,45 @@ function getPPTElementOpacityHTMLAttr(element: PPTElement) {
   return ` data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`
 }
 
+function getPPTElementShadowHTMLAttrs(element: PPTElement) {
+  const entries = getPPTElementShadowAttrEntries(element)
+
+  return entries.length > 0
+    ? ` ${entries.join(' ')}`
+    : ''
+}
+
+function getPPTElementShadowAttrEntries(element: PPTElement) {
+  const shadow = getPPTElementShadow(element)
+
+  if (!shadow) {
+    return []
+  }
+
+  return [
+    'data-ppt-shadow="true"',
+    `data-ppt-shadow-angle="${shadow.angle}"`,
+    `data-ppt-shadow-blur="${shadow.blur}"`,
+    `data-ppt-shadow-color="${escapeHtml(shadow.color)}"`,
+    `data-ppt-shadow-distance="${shadow.distance}"`,
+    `data-ppt-shadow-opacity="${escapeHtml(formatPPTElementShadowOpacity(shadow.opacity))}"`,
+  ]
+}
+
+function getPPTElementShadowStyle(element: PPTElement) {
+  const shadow = getPPTElementShadow(element)
+
+  return shadow
+    ? `filter:drop-shadow(${getPPTElementShadowFilterCSS(shadow)})`
+    : ''
+}
+
+function getPPTElementShadowSVGStyleAttr(element: PPTElement) {
+  const style = getPPTElementShadowStyle(element)
+
+  return style ? `style="${escapeHtml(style)}"` : ''
+}
+
 function getPPTElementAnimationHTMLAttrs(element: PPTElement) {
   return getPPTElementAnimationAttrEntries(element)
     .map((attr) => ` ${attr}`)
@@ -792,6 +849,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     `data-ppt-kind="${element.kind}"`,
     `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
     `opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
+    ...getPPTElementShadowAttrEntries(element),
     element.kind === 'shape'
       ? `data-ppt-shape="${element.shape}"`
       : '',
@@ -801,6 +859,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     ...getPPTElementAnimationAttrEntries(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
     element.flipV === true ? 'data-ppt-flip-v="true"' : '',
+    getPPTElementShadowSVGStyleAttr(element),
     transform ? `transform="${escapeHtml(transform)}"` : '',
   ].filter(Boolean).join(' ')
 }
@@ -1021,6 +1080,81 @@ function normalizePPTElementOpacity(value: number) {
 
 function formatPPTElementOpacity(value: number) {
   return String(normalizePPTElementOpacity(value))
+}
+
+function getPPTElementShadow(element: PPTElement): PPTElementShadow | null {
+  return element.shadow ? normalizePPTElementShadow(element.shadow) : null
+}
+
+function normalizePPTElementShadow(
+  shadow: Partial<PPTElementShadow>,
+): PPTElementShadow {
+  return {
+    angle: normalizePPTElementShadowAngle(shadow.angle ?? PPT_DEFAULT_ELEMENT_SHADOW.angle),
+    blur: normalizePPTElementShadowBlur(shadow.blur ?? PPT_DEFAULT_ELEMENT_SHADOW.blur),
+    color: normalizePPTElementShadowColor(shadow.color ?? PPT_DEFAULT_ELEMENT_SHADOW.color),
+    distance: normalizePPTElementShadowDistance(shadow.distance ?? PPT_DEFAULT_ELEMENT_SHADOW.distance),
+    opacity: normalizePPTElementShadowOpacity(shadow.opacity ?? PPT_DEFAULT_ELEMENT_SHADOW.opacity),
+  }
+}
+
+function normalizePPTElementShadowAngle(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.angle
+
+  return Math.min(
+    PPT_ELEMENT_SHADOW_ANGLE_MAX,
+    Math.max(PPT_ELEMENT_SHADOW_ANGLE_MIN, Math.round(finiteValue)),
+  )
+}
+
+function normalizePPTElementShadowBlur(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.blur
+
+  return Math.min(PPT_ELEMENT_SHADOW_BLUR_MAX, Math.max(0, Math.round(finiteValue)))
+}
+
+function normalizePPTElementShadowDistance(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.distance
+
+  return Math.min(PPT_ELEMENT_SHADOW_DISTANCE_MAX, Math.max(0, Math.round(finiteValue)))
+}
+
+function normalizePPTElementShadowOpacity(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.opacity
+  const clamped = Math.min(
+    PPT_ELEMENT_SHADOW_OPACITY_MAX,
+    Math.max(PPT_ELEMENT_SHADOW_OPACITY_MIN, finiteValue),
+  )
+
+  return Math.round(clamped * 100) / 100
+}
+
+function formatPPTElementShadowOpacity(value: number) {
+  return String(normalizePPTElementShadowOpacity(value))
+}
+
+function normalizePPTElementShadowColor(color: string) {
+  return /^#[\da-f]{6}$/i.test(color) ? color : PPT_DEFAULT_ELEMENT_SHADOW.color
+}
+
+function getPPTElementShadowFilterCSS(shadow: PPTElementShadow) {
+  const radians = (shadow.angle * Math.PI) / 180
+  const offsetX = formatNumber(Math.cos(radians) * shadow.distance)
+  const offsetY = formatNumber(Math.sin(radians) * shadow.distance)
+
+  return `${offsetX}px ${offsetY}px ${shadow.blur}px ${getPPTElementShadowColorCSS(shadow)}`
+}
+
+function getPPTElementShadowColorCSS(shadow: PPTElementShadow) {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(shadow.color)
+
+  if (!match) {
+    return shadow.color
+  }
+
+  const [, red, green, blue] = match
+
+  return `rgb(${Number.parseInt(red, 16)} ${Number.parseInt(green, 16)} ${Number.parseInt(blue, 16)} / ${formatPPTElementShadowOpacity(shadow.opacity)})`
 }
 
 function getPPTTextVerticalAlignOffset({
