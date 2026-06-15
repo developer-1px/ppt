@@ -48,6 +48,7 @@ try {
   await runSlideMetadataScenario(page)
   await runThemeScenario(page)
   await runSlideTransitionScenario(page)
+  await runObjectAnimationScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
   await runTidySelectionScenario(page)
@@ -2673,6 +2674,8 @@ async function runExportScenario(page) {
       hasDeckJson: code.includes('data-ppt-deck'),
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
+      hasAnimationMarkup: code.includes('data-ppt-animation-type="flyIn"') && code.includes('data-ppt-animation-trigger="withPrevious"') && code.includes('data-ppt-animation-duration="800"') && code.includes('data-ppt-animation-delay="200"') && code.includes('data-ppt-animation-order="2"'),
+      hasAnimationModel: code.includes('"animation"') && code.includes('"type": "flyIn"') && code.includes('"trigger": "withPrevious"') && code.includes('"durationMs": 800') && code.includes('"delayMs": 200') && code.includes('"order": 2'),
       hasBulletMarkup: code.includes('data-ppt-bullet-list="true"') && code.includes('data-ppt-bullet="true"'),
       hasBulletModel: code.includes('"bullet": "bullet"'),
       hasCommentMarkup: code.includes('class="ppt-element ppt-comment"') && code.includes('data-ppt-comment-resolved="true"') && code.includes('Review CTA wording'),
@@ -2717,6 +2720,7 @@ async function runExportScenario(page) {
   record('exports HTML slide markup', state.hasSlideMarkup, state)
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
+  record('exports PPT object animation metadata', state.hasAnimationMarkup && state.hasAnimationModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
@@ -2745,6 +2749,7 @@ async function runExportScenario(page) {
 
     return {
       download: download.download ?? '',
+      hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
@@ -2766,6 +2771,7 @@ async function runExportScenario(page) {
 
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
+  record('exports PPT object animation metadata into slide SVG', slideSvgState.hasAnimation, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
   record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
   record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
@@ -3214,6 +3220,149 @@ async function runSlideTransitionScenario(page) {
       afterUndo,
     },
   )
+}
+
+async function runObjectAnimationScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+
+  const initial = await getPPTObjectAnimationState(page)
+
+  record(
+    'renders PPT object animation/build order controls in inspector',
+    initial.inspector &&
+      initial.selectedId === 's1-title' &&
+      initial.type === 'none' &&
+      initial.trigger === 'onClick' &&
+      initial.duration === '400' &&
+      initial.delay === '0' &&
+      Number(initial.order) > 0 &&
+      initial.selectedType === 'none',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const type = document.querySelector('[data-ppt-animation-field="type"]')
+    const trigger = document.querySelector('[data-ppt-animation-field="trigger"]')
+    const duration = document.querySelector('[data-ppt-animation-field="durationMs"]')
+    const delay = document.querySelector('[data-ppt-animation-field="delayMs"]')
+    const order = document.querySelector('[data-ppt-animation-field="order"]')
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    selectSetter.call(type, 'fadeIn')
+    type.dispatchEvent(new Event('input', { bubbles: true }))
+    type.dispatchEvent(new Event('change', { bubbles: true }))
+
+    selectSetter.call(trigger, 'withPrevious')
+    trigger.dispatchEvent(new Event('input', { bubbles: true }))
+    trigger.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(duration, '800')
+    duration.dispatchEvent(new Event('input', { bubbles: true }))
+    duration.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(delay, '200')
+    delay.dispatchEvent(new Event('input', { bubbles: true }))
+    delay.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(order, '2')
+    order.dispatchEvent(new Event('input', { bubbles: true }))
+    order.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(120)
+
+  const afterFade = await getPPTObjectAnimationState(page)
+
+  record(
+    'updates PPT object animation/build order metadata from inspector',
+    afterFade.type === 'fadeIn' &&
+      afterFade.trigger === 'withPrevious' &&
+      afterFade.duration === '800' &&
+      afterFade.delay === '200' &&
+      afterFade.order === '2' &&
+      afterFade.selectedType === 'fadeIn' &&
+      afterFade.selectedTrigger === 'withPrevious' &&
+      afterFade.selectedDuration === '800' &&
+      afterFade.selectedDelay === '200' &&
+      afterFade.selectedOrder === '2',
+    {
+      afterFade,
+      initial,
+    },
+  )
+
+  await page.eval(`(() => {
+    const type = document.querySelector('[data-ppt-animation-field="type"]')
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+
+    selectSetter.call(type, 'flyIn')
+    type.dispatchEvent(new Event('input', { bubbles: true }))
+    type.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterFly = await getPPTObjectAnimationState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterUndo = await getPPTObjectAnimationState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterRedo = await getPPTObjectAnimationState(page)
+
+  record(
+    'undoes and redoes PPT object animation type as one history step',
+    afterFly.type === 'flyIn' &&
+      afterUndo.type === 'fadeIn' &&
+      afterRedo.type === 'flyIn' &&
+      afterRedo.trigger === 'withPrevious' &&
+      afterRedo.duration === '800' &&
+      afterRedo.delay === '200' &&
+      afterRedo.order === '2',
+    {
+      afterFade,
+      afterFly,
+      afterRedo,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const preview = await getPPTObjectAnimationPreviewState(page, 's1-title')
+
+  record(
+    'applies PPT object animation metadata in presentation preview',
+    preview.open &&
+      preview.type === 'flyIn' &&
+      preview.trigger === 'withPrevious' &&
+      preview.duration === '800' &&
+      preview.delay === '200' &&
+      preview.order === '2',
+    preview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
 }
 
 async function runImageImportScenario(page) {
@@ -5082,6 +5231,50 @@ function getPPTSlideTransitionState(page) {
       type: document.querySelector('[data-ppt-slide-transition-field="type"]')?.value ?? '',
     }
   })()`)
+}
+
+function getPPTObjectAnimationState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('[data-ppt-object-animation-inspector]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      delay: document.querySelector('[data-ppt-animation-field="delayMs"]')?.value ?? '',
+      duration: document.querySelector('[data-ppt-animation-field="durationMs"]')?.value ?? '',
+      inspector: !!inspector,
+      inspectorDelay: inspector?.getAttribute('data-ppt-animation-delay') ?? '',
+      inspectorDuration: inspector?.getAttribute('data-ppt-animation-duration') ?? '',
+      inspectorOrder: inspector?.getAttribute('data-ppt-animation-order') ?? '',
+      inspectorTrigger: inspector?.getAttribute('data-ppt-animation-trigger') ?? '',
+      inspectorType: inspector?.getAttribute('data-ppt-animation-type') ?? '',
+      order: document.querySelector('[data-ppt-animation-field="order"]')?.value ?? '',
+      selectedDelay: selected?.getAttribute('data-ppt-animation-delay') ?? '',
+      selectedDuration: selected?.getAttribute('data-ppt-animation-duration') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedOrder: selected?.getAttribute('data-ppt-animation-order') ?? '',
+      selectedTrigger: selected?.getAttribute('data-ppt-animation-trigger') ?? '',
+      selectedType: selected?.getAttribute('data-ppt-animation-type') ?? '',
+      trigger: document.querySelector('[data-ppt-animation-field="trigger"]')?.value ?? '',
+      type: document.querySelector('[data-ppt-animation-field="type"]')?.value ?? '',
+    }
+  })()`)
+}
+
+function getPPTObjectAnimationPreviewState(page, elementId) {
+  return page.eval(`((id) => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector(\`[data-ppt-element="\${id}"]\`)
+
+    return {
+      delay: element?.getAttribute('data-ppt-animation-delay') ?? '',
+      duration: element?.getAttribute('data-ppt-animation-duration') ?? '',
+      elementId: element?.getAttribute('data-ppt-element') ?? '',
+      open: !!overlay,
+      order: element?.getAttribute('data-ppt-animation-order') ?? '',
+      trigger: element?.getAttribute('data-ppt-animation-trigger') ?? '',
+      type: element?.getAttribute('data-ppt-animation-type') ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
 }
 
 async function clickMouse(page, x, y, clickCount, modifiers = 0) {

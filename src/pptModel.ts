@@ -57,7 +57,16 @@ const PPTSlideTransitionSchema = z.object({
   type: z.enum(['none', 'fade', 'push']),
 })
 
+const PPTElementAnimationSchema = z.object({
+  delayMs: z.number(),
+  durationMs: z.number(),
+  order: z.number(),
+  trigger: z.enum(['onClick', 'withPrevious']),
+  type: z.enum(['none', 'fadeIn', 'flyIn']),
+})
+
 const PPTElementBaseSchema = z.object({
+  animation: PPTElementAnimationSchema.optional(),
   flipH: z.boolean().optional(),
   flipV: z.boolean().optional(),
   geometry: PPTGeometrySchema,
@@ -190,6 +199,7 @@ export type PPTTextBody = z.infer<typeof PPTTextBodySchema>
 export type PPTTextStyle = z.infer<typeof PPTTextStyleSchema>
 export type PPTTextAutoFit = z.infer<typeof PPTTextAutoFitSchema>
 export type PPTSlideTransition = z.infer<typeof PPTSlideTransitionSchema>
+export type PPTElementAnimation = z.infer<typeof PPTElementAnimationSchema>
 export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']

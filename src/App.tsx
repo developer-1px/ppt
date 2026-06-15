@@ -161,6 +161,7 @@ import {
   type PPTDeck,
   type PPTComment,
   type PPTElement,
+  type PPTElementAnimation,
   type PPTFreeform,
   type PPTImage,
   type PPTImageCrop,
@@ -711,6 +712,14 @@ type PPTSlideTransitionUpdateField =
   | 'advanceOnClick'
   | 'durationMs'
   | 'type'
+type PPTElementAnimationType = PPTElementAnimation['type']
+type PPTElementAnimationTrigger = PPTElementAnimation['trigger']
+type PPTElementAnimationUpdateField =
+  | 'delayMs'
+  | 'durationMs'
+  | 'order'
+  | 'trigger'
+  | 'type'
 type PPTLayerPaneAriaContract = {
   containerRole: 'tree'
   keyboardModel: 'roving-tabindex'
@@ -1014,6 +1023,23 @@ const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
   type: 'none',
 } as const satisfies PPTSlideTransition)
 const PPT_SLIDE_TRANSITION_DURATION_MAX = 10000
+const PPT_ELEMENT_ANIMATION_TYPES = Object.freeze([
+  'none',
+  'fadeIn',
+  'flyIn',
+] as const satisfies readonly PPTElementAnimationType[])
+const PPT_ELEMENT_ANIMATION_TRIGGERS = Object.freeze([
+  'onClick',
+  'withPrevious',
+] as const satisfies readonly PPTElementAnimationTrigger[])
+const PPT_DEFAULT_ELEMENT_ANIMATION = Object.freeze({
+  delayMs: 0,
+  durationMs: 400,
+  order: 1,
+  trigger: 'onClick',
+  type: 'none',
+} as const satisfies PPTElementAnimation)
+const PPT_ELEMENT_ANIMATION_TIME_MAX = 10000
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -1264,6 +1290,9 @@ function App() {
   const commandAdapter = useMemo(() => createPPTCanvasCommandAdapter(), [])
   const selectedBounds = scene.getBounds(selection)
   const selectedElement = findPPTElement(activeSlide, selection[0] ?? null)
+  const selectedElementAnimation = selectedElement
+    ? getPPTElementAnimation(selectedElement, activeSlide)
+    : null
   const selectedElements = useMemo(
     () => activeSlide.elements.filter((element) => selection.includes(element.id)),
     [activeSlide.elements, selection],
@@ -2574,6 +2603,31 @@ function App() {
           ...element.geometry,
           rotation: normalizePPTElementRotation(rotation),
         },
+      })),
+    )
+  }
+
+  function updateElementAnimation(
+    elementId: string,
+    field: PPTElementAnimationUpdateField,
+    value: PPTElementAnimation[PPTElementAnimationUpdateField],
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (element.id !== elementId) {
+            return element
+          }
+
+          return {
+            ...element,
+            animation: normalizePPTElementAnimation({
+              ...getPPTElementAnimation(element, slide),
+              [field]: value,
+            }, slide, element.id),
+          }
+        }),
       })),
     )
   }
@@ -4973,6 +5027,7 @@ function App() {
         layoutPlaceholders={activeLayoutPlaceholders}
         selection={selection}
         selectedElement={selectedElement}
+        selectedElementAnimation={selectedElementAnimation}
         slide={activeSlide}
         slideMetadataDescriptor={slideMetadataDescriptor}
         slideLayoutId={activeLayout.layoutId}
@@ -4984,6 +5039,7 @@ function App() {
         onCommitText={commitText}
         onCopyHTML={copyHTML}
         onDownloadHTML={downloadHTML}
+        onElementAnimationChange={updateElementAnimation}
         onElementGeometryChange={updateElementGeometry}
         onImageCropChange={updateImageCrop}
         onImageFitChange={updateImageFit}
@@ -5651,6 +5707,106 @@ function formatPPTSlideTransitionType(type: PPTSlideTransitionType) {
       return 'Push'
     case 'none':
       return 'None'
+  }
+}
+
+function getPPTElementAnimation(
+  element: PPTElement,
+  slide?: PPTSlide,
+): PPTElementAnimation {
+  return normalizePPTElementAnimation(
+    element.animation ?? {
+      ...PPT_DEFAULT_ELEMENT_ANIMATION,
+      order: getPPTElementDefaultAnimationOrder(element.id, slide),
+    },
+    slide,
+    element.id,
+  )
+}
+
+function normalizePPTElementAnimation(
+  animation: PPTElementAnimation,
+  slide?: PPTSlide,
+  elementId?: string,
+): PPTElementAnimation {
+  return {
+    delayMs: clampPPTElementAnimationTime(animation.delayMs),
+    durationMs: clampPPTElementAnimationTime(animation.durationMs),
+    order: clampPPTElementAnimationOrder(
+      animation.order,
+      slide?.elements.length,
+      elementId ? getPPTElementDefaultAnimationOrder(elementId, slide) : undefined,
+    ),
+    trigger: PPT_ELEMENT_ANIMATION_TRIGGERS.includes(animation.trigger)
+      ? animation.trigger
+      : 'onClick',
+    type: PPT_ELEMENT_ANIMATION_TYPES.includes(animation.type)
+      ? animation.type
+      : 'none',
+  }
+}
+
+function getPPTElementDefaultAnimationOrder(
+  elementId: string,
+  slide?: PPTSlide,
+) {
+  const index = slide?.elements.findIndex((element) => element.id === elementId) ?? -1
+
+  return index >= 0 ? index + 1 : PPT_DEFAULT_ELEMENT_ANIMATION.order
+}
+
+function clampPPTElementAnimationTime(value: number) {
+  return clamp(
+    Number.isFinite(value) ? Math.round(value) : 0,
+    0,
+    PPT_ELEMENT_ANIMATION_TIME_MAX,
+  )
+}
+
+function clampPPTElementAnimationOrder(
+  value: number,
+  elementCount: number = Number.MAX_SAFE_INTEGER,
+  fallback: number = PPT_DEFAULT_ELEMENT_ANIMATION.order,
+) {
+  return clamp(
+    Number.isFinite(value) ? Math.round(value) : fallback,
+    1,
+    Math.max(1, elementCount),
+  )
+}
+
+function parsePPTElementAnimationTime(value: string) {
+  return clampPPTElementAnimationTime(Number(value))
+}
+
+function parsePPTElementAnimationOrder(value: string, elementCount: number) {
+  return clampPPTElementAnimationOrder(Number(value), elementCount)
+}
+
+function getPPTElementAnimationStyle(animation: PPTElementAnimation): CSSProperties {
+  return {
+    '--ppt-animation-delay': `${animation.delayMs}ms`,
+    '--ppt-animation-duration': `${Math.max(1, animation.durationMs)}ms`,
+  } as CSSProperties
+}
+
+function formatPPTElementAnimationType(type: PPTElementAnimationType) {
+  switch (type) {
+    case 'fadeIn':
+      return 'Fade in'
+    case 'flyIn':
+      return 'Fly in'
+    case 'none':
+      return 'None'
+  }
+}
+
+function formatPPTElementAnimationTrigger(trigger: PPTElementAnimationTrigger) {
+  switch (trigger) {
+    case 'onClick':
+      return 'On click'
+    case 'withPrevious':
+      return 'With previous'
   }
 }
 
@@ -7063,7 +7219,11 @@ function PPTElementView({
   selected: boolean
   textOverflow: boolean
 }) {
-  const style = pptElementStyle(element)
+  const animation = getPPTElementAnimation(element)
+  const style = {
+    ...pptElementStyle(element),
+    ...getPPTElementAnimationStyle(animation),
+  }
   const textBody = isPPTTextElement(element) ? element.textBody : null
   const textStyle = isPPTTextElement(element) ? element.style : undefined
   const text = isPPTTextElement(element) ? readPPTText(element.textBody) : ''
@@ -7154,6 +7314,11 @@ function PPTElementView({
       data-ppt-find-active={findActive ? 'true' : undefined}
       data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
       data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
+      data-ppt-animation-delay={animation.delayMs}
+      data-ppt-animation-duration={animation.durationMs}
+      data-ppt-animation-order={animation.order}
+      data-ppt-animation-trigger={animation.trigger}
+      data-ppt-animation-type={animation.type}
       data-ppt-text-autofit={isPPTTextElement(element) ? element.textAutoFit : undefined}
       data-ppt-text-overflow={textOverflow ? 'true' : undefined}
       data-ppt-image-crop-x={element.kind === 'image'
@@ -7660,6 +7825,7 @@ function Inspector({
   onCommitText,
   onCopyHTML,
   onDownloadHTML,
+  onElementAnimationChange,
   onElementGeometryChange,
   onElementNameChange,
   onElementRotationChange,
@@ -7683,6 +7849,7 @@ function Inspector({
   onTextAutoFit,
   selection,
   selectedElement,
+  selectedElementAnimation,
   selectedTextOverflow,
   slide,
   slideMetadataDescriptor,
@@ -7700,6 +7867,11 @@ function Inspector({
   onCommitText: (elementId: string, text: string) => void
   onCopyHTML: () => void
   onDownloadHTML: () => void
+  onElementAnimationChange: (
+    elementId: string,
+    field: PPTElementAnimationUpdateField,
+    value: PPTElementAnimation[PPTElementAnimationUpdateField],
+  ) => void
   onElementGeometryChange: (
     elementId: string,
     field: 'h' | 'w' | 'x' | 'y',
@@ -7758,6 +7930,7 @@ function Inspector({
   onTextAutoFit: (elementId: string) => void
   selection: string[]
   selectedElement: PPTElement | null
+  selectedElementAnimation: PPTElementAnimation | null
   selectedTextOverflow: boolean
   slide: PPTSlide
   slideMetadataDescriptor: PPTSlideMetadataInspectorDescriptor
@@ -8018,6 +8191,106 @@ function Inspector({
                 />
               </label>
             </div>
+            {selectedElementAnimation ? (
+              <div
+                className="ppt-animation-grid"
+                data-ppt-object-animation-inspector
+                data-ppt-animation-delay={selectedElementAnimation.delayMs}
+                data-ppt-animation-duration={selectedElementAnimation.durationMs}
+                data-ppt-animation-order={selectedElementAnimation.order}
+                data-ppt-animation-trigger={selectedElementAnimation.trigger}
+                data-ppt-animation-type={selectedElementAnimation.type}
+              >
+                <label className="ppt-field">
+                  <span>Animation</span>
+                  <select
+                    data-ppt-animation-field="type"
+                    value={selectedElementAnimation.type}
+                    onChange={(event) =>
+                      onElementAnimationChange(
+                        selectedElement.id,
+                        'type',
+                        event.target.value as PPTElementAnimationType,
+                      )}
+                  >
+                    {PPT_ELEMENT_ANIMATION_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {formatPPTElementAnimationType(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ppt-field">
+                  <span>Trigger</span>
+                  <select
+                    data-ppt-animation-field="trigger"
+                    value={selectedElementAnimation.trigger}
+                    onChange={(event) =>
+                      onElementAnimationChange(
+                        selectedElement.id,
+                        'trigger',
+                        event.target.value as PPTElementAnimationTrigger,
+                      )}
+                  >
+                    {PPT_ELEMENT_ANIMATION_TRIGGERS.map((trigger) => (
+                      <option key={trigger} value={trigger}>
+                        {formatPPTElementAnimationTrigger(trigger)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ppt-field">
+                  <span>Duration</span>
+                  <input
+                    data-ppt-animation-field="durationMs"
+                    max={PPT_ELEMENT_ANIMATION_TIME_MAX}
+                    min={0}
+                    step={100}
+                    type="number"
+                    value={selectedElementAnimation.durationMs}
+                    onChange={(event) =>
+                      onElementAnimationChange(
+                        selectedElement.id,
+                        'durationMs',
+                        parsePPTElementAnimationTime(event.target.value),
+                      )}
+                  />
+                </label>
+                <label className="ppt-field">
+                  <span>Delay</span>
+                  <input
+                    data-ppt-animation-field="delayMs"
+                    max={PPT_ELEMENT_ANIMATION_TIME_MAX}
+                    min={0}
+                    step={100}
+                    type="number"
+                    value={selectedElementAnimation.delayMs}
+                    onChange={(event) =>
+                      onElementAnimationChange(
+                        selectedElement.id,
+                        'delayMs',
+                        parsePPTElementAnimationTime(event.target.value),
+                      )}
+                  />
+                </label>
+                <label className="ppt-field">
+                  <span>Order</span>
+                  <input
+                    data-ppt-animation-field="order"
+                    min={1}
+                    step={1}
+                    type="number"
+                    value={selectedElementAnimation.order}
+                    onChange={(event) =>
+                      onElementAnimationChange(
+                        selectedElement.id,
+                        'order',
+                        parsePPTElementAnimationOrder(event.target.value, slide.elements.length),
+                      )}
+                  />
+                </label>
+              </div>
+            ) : null}
             {isPPTTextElement(selectedElement) ? (
               <>
                 <label className="ppt-field">

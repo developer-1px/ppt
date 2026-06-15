@@ -597,6 +597,16 @@
   pointer-events: none;
 }
 
+.ppt-presentation-slide .ppt-element[data-ppt-animation-type='fadeIn'] {
+  animation: ppt-object-fade-in var(--ppt-animation-duration, 400ms) ease-out both;
+  animation-delay: var(--ppt-animation-delay, 0ms);
+}
+
+.ppt-presentation-slide .ppt-element[data-ppt-animation-type='flyIn'] {
+  animation: ppt-object-fly-in var(--ppt-animation-duration, 400ms) ease-out both;
+  animation-delay: var(--ppt-animation-delay, 0ms);
+}
+
 .ppt-presentation-controls {
   justify-content: center;
   border-top: 1px solid rgb(148 163 184 / 24%);
@@ -612,6 +622,19 @@
   from {
     opacity: 0;
     transform: translateX(24px) scale(var(--ppt-presentation-scale, 1));
+  }
+}
+
+@keyframes ppt-object-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ppt-object-fly-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
 }
 
@@ -1457,6 +1480,16 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.ppt-animation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ppt-animation-grid .ppt-field:last-child {
+  grid-column: 1 / -1;
 }
 
 .ppt-segmented-control {

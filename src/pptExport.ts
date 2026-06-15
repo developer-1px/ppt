@@ -652,7 +652,14 @@ function getPPTElementTransformAttrs(element: PPTElement) {
   return [
     element.flipH === true ? ' data-ppt-flip-h="true"' : '',
     element.flipV === true ? ' data-ppt-flip-v="true"' : '',
+    getPPTElementAnimationHTMLAttrs(element),
   ].join('')
+}
+
+function getPPTElementAnimationHTMLAttrs(element: PPTElement) {
+  return getPPTElementAnimationAttrEntries(element)
+    .map((attr) => ` ${attr}`)
+    .join('')
 }
 
 function getPPTTextAutoFitAttr(element: PPTElement) {
@@ -689,10 +696,25 @@ function getPPTElementSVGAttrs(element: PPTElement) {
       ? `data-ppt-shape="${element.shape}"`
       : '',
     getPPTTextAutoFitSvgAttr(element),
+    ...getPPTElementAnimationAttrEntries(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
     element.flipV === true ? 'data-ppt-flip-v="true"' : '',
     transform ? `transform="${escapeHtml(transform)}"` : '',
   ].filter(Boolean).join(' ')
+}
+
+function getPPTElementAnimationAttrEntries(element: PPTElement) {
+  if (!element.animation) {
+    return []
+  }
+
+  return [
+    `data-ppt-animation-type="${escapeHtml(element.animation.type)}"`,
+    `data-ppt-animation-trigger="${escapeHtml(element.animation.trigger)}"`,
+    `data-ppt-animation-duration="${element.animation.durationMs}"`,
+    `data-ppt-animation-delay="${element.animation.delayMs}"`,
+    `data-ppt-animation-order="${element.animation.order}"`,
+  ]
 }
 
 function getPPTElementSVGTransform(element: PPTElement) {
