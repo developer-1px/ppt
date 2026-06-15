@@ -236,6 +236,7 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
     unlockAll: true,
   },
 })
+const PPT_RECENT_COLOR_LIMIT = 8
 
 const PPT_FRAME_GUIDE_CONFIG = Object.freeze({
   columns: {
@@ -579,6 +580,11 @@ type PPTStyleClipboard = {
   text?: PPTTextStyle
   type: 'slide-style-clipboard'
 }
+type PPTColorSwatchChannel =
+  | 'line-stroke'
+  | 'shape-fill'
+  | 'shape-stroke'
+  | 'text-color'
 type PPTSurfaceCommand =
   | 'alignCenter'
   | 'alignLeft'
@@ -1399,6 +1405,7 @@ function App() {
   const [showFrameGuides, setShowFrameGuides] = useState(true)
   const [showMinimap, setShowMinimap] = useState(true)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
+  const [recentColors, setRecentColors] = useState<string[]>([])
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
@@ -1426,6 +1433,19 @@ function App() {
             ...current,
             [elementId]: hasOverflow,
           })
+  }, [])
+
+  const rememberRecentColor = useCallback((color: string) => {
+    const normalized = normalizePPTSwatchColor(color)
+
+    if (!normalized) {
+      return
+    }
+
+    setRecentColors((current) => [
+      normalized,
+      ...current.filter((item) => normalizePPTSwatchColor(item) !== normalized),
+    ].slice(0, PPT_RECENT_COLOR_LIMIT))
   }, [])
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
@@ -2919,6 +2939,10 @@ function App() {
     field: keyof PPTTextStyle,
     value: string | number,
   ) {
+    if (field === 'color' && typeof value === 'string') {
+      rememberRecentColor(value)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (!isPPTTextElement(element)) {
@@ -3153,6 +3177,7 @@ function App() {
   }
 
   function updateSelectedTextColor(color: string) {
+    rememberRecentColor(color)
     updateSelectedTextStyles((style) => ({
       ...style,
       color,
@@ -3173,6 +3198,10 @@ function App() {
     field: keyof PPTFill,
     value: number | string,
   ) {
+    if (field === 'color' && typeof value === 'string') {
+      rememberRecentColor(value)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
         element.kind === 'shape'
@@ -3432,9 +3461,17 @@ function App() {
     field: keyof PPTStroke,
     value: string | number,
   ) {
+    if (field === 'color' && typeof value === 'string') {
+      rememberRecentColor(value)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind !== 'shape' && element.kind !== 'line') {
+        if (
+          element.kind !== 'shape' &&
+          element.kind !== 'line' &&
+          element.kind !== 'freeform'
+        ) {
           return element
         }
 
@@ -5301,6 +5338,8 @@ function App() {
         data-ppt-style-clipboard-source-id={styleClipboard?.sourceId ?? undefined}
         data-ppt-style-clipboard-source-kind={styleClipboard?.sourceKind ?? undefined}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-recent-colors={recentColors.join(' ')}
+        data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-frame-guides={showFrameGuides ? 'true' : 'false'}
         data-grid={showGrid ? 'true' : 'false'}
@@ -5423,6 +5462,7 @@ function App() {
         inspectorSurface={inspectorSurface}
         layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
         layoutPlaceholders={activeLayoutPlaceholders}
+        recentColors={recentColors}
         selection={selection}
         selectedElement={selectedElement}
         selectedElementAnimation={selectedElementAnimation}
@@ -8390,6 +8430,82 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
   )
 }
 
+function PPTColorSwatchStrip({
+  channel,
+  currentColor,
+  recentColors,
+  themeColorTokens,
+  onSelect,
+}: {
+  channel: PPTColorSwatchChannel
+  currentColor: string
+  recentColors: readonly string[]
+  themeColorTokens: readonly SlideEditThemeColorToken[]
+  onSelect: (color: string) => void
+}) {
+  const normalizedCurrent = normalizePPTSwatchColor(currentColor)
+  const normalizedRecentColors = getPPTUniqueSwatchColors(recentColors)
+
+  return (
+    <div
+      className="ppt-color-swatch-strip"
+      data-ppt-color-swatch-channel={channel}
+      data-ppt-color-swatch-count={themeColorTokens.length + normalizedRecentColors.length}
+      data-ppt-color-swatch-strip={channel}
+      data-ppt-recent-color-count={normalizedRecentColors.length}
+    >
+      <div className="ppt-color-swatch-group" data-ppt-color-swatch-group="theme">
+        {themeColorTokens.map((token) => {
+          const color = normalizePPTSwatchColor(token.value) || token.value
+          const selected = normalizedCurrent === normalizePPTSwatchColor(color)
+
+          return (
+            <button
+              aria-label={`${token.label} ${channel}`}
+              aria-pressed={selected}
+              className="ppt-color-swatch"
+              data-ppt-color-source="theme"
+              data-ppt-color-swatch={channel}
+              data-ppt-color-swatch-selected={selected ? 'true' : undefined}
+              data-ppt-color-token={token.tokenId}
+              data-ppt-color-value={color}
+              key={token.tokenId}
+              style={{ backgroundColor: color }}
+              title={token.label}
+              type="button"
+              onClick={() => onSelect(color)}
+            />
+          )
+        })}
+      </div>
+      {normalizedRecentColors.length > 0 ? (
+        <div className="ppt-color-swatch-group" data-ppt-color-swatch-group="recent">
+          {normalizedRecentColors.map((color) => {
+            const selected = normalizedCurrent === color
+
+            return (
+              <button
+                aria-label={`Recent ${color} ${channel}`}
+                aria-pressed={selected}
+                className="ppt-color-swatch"
+                data-ppt-color-source="recent"
+                data-ppt-color-swatch={channel}
+                data-ppt-color-swatch-selected={selected ? 'true' : undefined}
+                data-ppt-color-value={color}
+                key={color}
+                style={{ backgroundColor: color }}
+                title={color}
+                type="button"
+                onClick={() => onSelect(color)}
+              />
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function Inspector({
   exportCode,
   inspectorSurface,
@@ -8429,6 +8545,7 @@ function Inspector({
   onSlideTransitionChange,
   onTableRowsChange,
   onTextAutoFit,
+  recentColors,
   selection,
   selectedElement,
   selectedElementAnimation,
@@ -8536,6 +8653,7 @@ function Inspector({
   ) => void
   onTableRowsChange: (elementId: string, value: string) => void
   onTextAutoFit: (elementId: string) => void
+  recentColors: readonly string[]
   selection: string[]
   selectedElement: PPTElement | null
   selectedElementAnimation: PPTElementAnimation | null
@@ -9083,20 +9201,30 @@ function Inspector({
                   />
                 </label>
                 <div className="ppt-geometry-grid">
-                  <label className="ppt-field">
-                    <span>Text color</span>
-                    <input
-                      data-ppt-style-field="text-color"
-                      type="color"
-                      value={textStyle?.color ?? '#111827'}
-                      onChange={(event) =>
-                        onElementTextStyleChange(
-                          selectedElement.id,
-                          'color',
-                          event.target.value,
-                        )}
+                  <div className="ppt-color-control" data-ppt-color-control="text-color">
+                    <label className="ppt-field">
+                      <span>Text color</span>
+                      <input
+                        data-ppt-style-field="text-color"
+                        type="color"
+                        value={textStyle?.color ?? '#111827'}
+                        onChange={(event) =>
+                          onElementTextStyleChange(
+                            selectedElement.id,
+                            'color',
+                            event.target.value,
+                          )}
+                      />
+                    </label>
+                    <PPTColorSwatchStrip
+                      channel="text-color"
+                      currentColor={textStyle?.color ?? '#111827'}
+                      recentColors={recentColors}
+                      themeColorTokens={themeColorTokens}
+                      onSelect={(color) =>
+                        onElementTextStyleChange(selectedElement.id, 'color', color)}
                     />
-                  </label>
+                  </div>
                   <label className="ppt-field">
                     <span>Font size</span>
                     <input
@@ -9335,34 +9463,54 @@ function Inspector({
                   </label>
                 ) : null}
                 <div className="ppt-geometry-grid">
-                  <label className="ppt-field">
-                    <span>Fill</span>
-                    <input
-                      data-ppt-style-field="fill"
-                      type="color"
-                      value={selectedElement.fill.color}
-                      onChange={(event) =>
-                        onShapeFillChange(
-                          selectedElement.id,
-                          'color',
-                          event.target.value,
-                        )}
+                  <div className="ppt-color-control" data-ppt-color-control="shape-fill">
+                    <label className="ppt-field">
+                      <span>Fill</span>
+                      <input
+                        data-ppt-style-field="fill"
+                        type="color"
+                        value={selectedElement.fill.color}
+                        onChange={(event) =>
+                          onShapeFillChange(
+                            selectedElement.id,
+                            'color',
+                            event.target.value,
+                          )}
+                      />
+                    </label>
+                    <PPTColorSwatchStrip
+                      channel="shape-fill"
+                      currentColor={selectedElement.fill.color}
+                      recentColors={recentColors}
+                      themeColorTokens={themeColorTokens}
+                      onSelect={(color) =>
+                        onShapeFillChange(selectedElement.id, 'color', color)}
                     />
-                  </label>
-                  <label className="ppt-field">
-                    <span>Stroke</span>
-                    <input
-                      data-ppt-style-field="stroke-color"
-                      type="color"
-                      value={selectedElement.stroke?.color ?? '#111827'}
-                      onChange={(event) =>
-                        onElementStrokeChange(
-                          selectedElement.id,
-                          'color',
-                          event.target.value,
-                        )}
+                  </div>
+                  <div className="ppt-color-control" data-ppt-color-control="shape-stroke">
+                    <label className="ppt-field">
+                      <span>Stroke</span>
+                      <input
+                        data-ppt-style-field="stroke-color"
+                        type="color"
+                        value={selectedElement.stroke?.color ?? '#111827'}
+                        onChange={(event) =>
+                          onElementStrokeChange(
+                            selectedElement.id,
+                            'color',
+                            event.target.value,
+                          )}
+                      />
+                    </label>
+                    <PPTColorSwatchStrip
+                      channel="shape-stroke"
+                      currentColor={selectedElement.stroke?.color ?? '#111827'}
+                      recentColors={recentColors}
+                      themeColorTokens={themeColorTokens}
+                      onSelect={(color) =>
+                        onElementStrokeChange(selectedElement.id, 'color', color)}
                     />
-                  </label>
+                  </div>
                 </div>
                 <label className="ppt-field">
                   <span>Fill opacity</span>
@@ -9501,23 +9649,33 @@ function Inspector({
                 </label>
               </>
             ) : null}
-            {selectedElement.kind === 'line' ? (
+            {selectedElement.kind === 'line' || selectedElement.kind === 'freeform' ? (
               <>
                 <div className="ppt-geometry-grid">
-                  <label className="ppt-field">
-                    <span>Stroke</span>
-                    <input
-                      data-ppt-style-field="line-stroke-color"
-                      type="color"
-                      value={selectedElement.stroke.color}
-                      onChange={(event) =>
-                        onElementStrokeChange(
-                          selectedElement.id,
-                          'color',
-                          event.target.value,
-                        )}
+                  <div className="ppt-color-control" data-ppt-color-control="line-stroke">
+                    <label className="ppt-field">
+                      <span>Stroke</span>
+                      <input
+                        data-ppt-style-field="line-stroke-color"
+                        type="color"
+                        value={selectedElement.stroke.color}
+                        onChange={(event) =>
+                          onElementStrokeChange(
+                            selectedElement.id,
+                            'color',
+                            event.target.value,
+                          )}
+                      />
+                    </label>
+                    <PPTColorSwatchStrip
+                      channel="line-stroke"
+                      currentColor={selectedElement.stroke.color}
+                      recentColors={recentColors}
+                      themeColorTokens={themeColorTokens}
+                      onSelect={(color) =>
+                        onElementStrokeChange(selectedElement.id, 'color', color)}
                     />
-                  </label>
+                  </div>
                   <label className="ppt-field">
                     <span>Width</span>
                     <input
@@ -9555,61 +9713,65 @@ function Inspector({
                     ))}
                   </select>
                 </label>
-                <label className="ppt-field">
-                  <span>Route</span>
-                  <select
-                    data-ppt-style-field="line-route"
-                    value={selectedElement.route ?? 'straight'}
-                    onChange={(event) => {
-                      if (isPPTLineRoute(event.target.value)) {
-                        onLineRouteChange(selectedElement.id, event.target.value)
-                      }
-                    }}
-                  >
-                    <option value="straight">Straight</option>
-                    <option value="elbow">Elbow</option>
-                  </select>
-                </label>
-                <div className="ppt-geometry-grid">
-                  <label className="ppt-field">
-                    <span>Start</span>
-                    <select
-                      data-ppt-style-field="line-start-marker"
-                      value={selectedElement.startMarker ?? 'none'}
-                      onChange={(event) => {
-                        if (isPPTLineMarker(event.target.value)) {
-                          onLineMarkerChange(
-                            selectedElement.id,
-                            'startMarker',
-                            event.target.value,
-                          )
-                        }
-                      }}
-                    >
-                      <option value="none">None</option>
-                      <option value="arrow">Arrow</option>
-                    </select>
-                  </label>
-                  <label className="ppt-field">
-                    <span>End</span>
-                    <select
-                      data-ppt-style-field="line-end-marker"
-                      value={selectedElement.endMarker ?? 'none'}
-                      onChange={(event) => {
-                        if (isPPTLineMarker(event.target.value)) {
-                          onLineMarkerChange(
-                            selectedElement.id,
-                            'endMarker',
-                            event.target.value,
-                          )
-                        }
-                      }}
-                    >
-                      <option value="none">None</option>
-                      <option value="arrow">Arrow</option>
-                    </select>
-                  </label>
-                </div>
+                {selectedElement.kind === 'line' ? (
+                  <>
+                    <label className="ppt-field">
+                      <span>Route</span>
+                      <select
+                        data-ppt-style-field="line-route"
+                        value={selectedElement.route ?? 'straight'}
+                        onChange={(event) => {
+                          if (isPPTLineRoute(event.target.value)) {
+                            onLineRouteChange(selectedElement.id, event.target.value)
+                          }
+                        }}
+                      >
+                        <option value="straight">Straight</option>
+                        <option value="elbow">Elbow</option>
+                      </select>
+                    </label>
+                    <div className="ppt-geometry-grid">
+                      <label className="ppt-field">
+                        <span>Start</span>
+                        <select
+                          data-ppt-style-field="line-start-marker"
+                          value={selectedElement.startMarker ?? 'none'}
+                          onChange={(event) => {
+                            if (isPPTLineMarker(event.target.value)) {
+                              onLineMarkerChange(
+                                selectedElement.id,
+                                'startMarker',
+                                event.target.value,
+                              )
+                            }
+                          }}
+                        >
+                          <option value="none">None</option>
+                          <option value="arrow">Arrow</option>
+                        </select>
+                      </label>
+                      <label className="ppt-field">
+                        <span>End</span>
+                        <select
+                          data-ppt-style-field="line-end-marker"
+                          value={selectedElement.endMarker ?? 'none'}
+                          onChange={(event) => {
+                            if (isPPTLineMarker(event.target.value)) {
+                              onLineMarkerChange(
+                                selectedElement.id,
+                                'endMarker',
+                                event.target.value,
+                              )
+                            }
+                          }}
+                        >
+                          <option value="none">None</option>
+                          <option value="arrow">Arrow</option>
+                        </select>
+                      </label>
+                    </div>
+                  </>
+                ) : null}
               </>
             ) : null}
           </>
@@ -10556,6 +10718,30 @@ function normalizePPTColorHex(color: string) {
   return value.length === 3
     ? [...value].map((char) => `${char}${char}`).join('').toLowerCase()
     : value.toLowerCase()
+}
+
+function normalizePPTSwatchColor(color: string) {
+  const hex = normalizePPTColorHex(color)
+
+  return hex ? `#${hex}` : ''
+}
+
+function getPPTUniqueSwatchColors(colors: readonly string[]) {
+  const seen = new Set<string>()
+  const unique: string[] = []
+
+  for (const color of colors) {
+    const normalized = normalizePPTSwatchColor(color)
+
+    if (!normalized || seen.has(normalized)) {
+      continue
+    }
+
+    seen.add(normalized)
+    unique.push(normalized)
+  }
+
+  return unique
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {

@@ -2488,6 +2488,55 @@ async function selectPPTLayerRows(page, ids) {
   })()`)
 }
 
+function getPPTColorSwatchState(page, channel, elementId = '') {
+  return page.eval(`((channel, elementId) => {
+    const selected = elementId
+      ? document.querySelector(\`[data-ppt-element="\${elementId}"]\`)
+      : document.querySelector('[data-selected="true"]')
+    const selectedId = selected?.getAttribute('data-ppt-element') ?? ''
+    const strokeElement = selected?.querySelector('line, [data-ppt-line-path], [data-ppt-freeform-path]')
+    const thumb = selectedId
+      ? document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${selectedId}"]\`)
+      : null
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const exportIndex = selectedId ? exportCode.indexOf(\`"id": "\${selectedId}"\`) : -1
+    const recentColors = (document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-recent-colors') ?? '')
+      .split(/\\s+/)
+      .filter(Boolean)
+    const selectedTheme = document.querySelector(\`[data-ppt-color-swatch="\${channel}"][data-ppt-color-source="theme"][aria-pressed="true"]\`)
+    const inputSelector = channel === 'shape-fill'
+      ? '[data-ppt-style-field="fill"]'
+      : channel === 'shape-stroke'
+        ? '[data-ppt-style-field="stroke-color"]'
+        : channel === 'text-color'
+          ? '[data-ppt-style-field="text-color"]'
+          : '[data-ppt-style-field="line-stroke-color"]'
+
+    return {
+      background: selected?.style.background ?? '',
+      borderColor: selected?.style.borderColor ?? '',
+      exportSlice: exportIndex >= 0
+        ? exportCode.slice(Math.max(0, exportIndex - 700), exportIndex + 1200)
+        : '',
+      fillValue: document.querySelector('[data-ppt-style-field="fill"]')?.value ?? '',
+      inputValue: document.querySelector(inputSelector)?.value ?? '',
+      recentAccentCount: recentColors.filter((color) => color === '#2563eb').length,
+      recentColors,
+      recentCount: document.querySelectorAll(\`[data-ppt-color-swatch="\${channel}"][data-ppt-color-source="recent"]\`).length,
+      recentUnique: new Set(recentColors).size === recentColors.length,
+      selectedId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedToken: selectedTheme?.getAttribute('data-ppt-color-token') ?? '',
+      stroke: strokeElement?.getAttribute('stroke') ?? '',
+      strokeValue: document.querySelector('[data-ppt-style-field="stroke-color"]')?.value ?? '',
+      styleColor: selected?.style.color ?? '',
+      themeCount: document.querySelectorAll(\`[data-ppt-color-swatch="\${channel}"][data-ppt-color-source="theme"]\`).length,
+      thumbBackground: thumb?.style.background ?? '',
+      thumbBorder: thumb?.style.border ?? '',
+    }
+  })(${JSON.stringify(channel)}, ${JSON.stringify(elementId)})`)
+}
+
 function getPPTTextFormatPainterState(page, elementId) {
   return page.eval(`((id) => {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
@@ -2586,6 +2635,50 @@ async function runTextQuickFormatScenario(page) {
   }))()`)
 
   record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.italicPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
+
+  const beforeTextColorSwatch = await getPPTColorSwatchState(page, 'text-color', 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-color-swatch="text-color"][data-ppt-color-token="ppt-color-accent"]')?.click()`)
+  await delay(100)
+
+  const afterTextColorSwatch = await getPPTColorSwatchState(page, 'text-color', 's1-title')
+
+  record(
+    'applies PPT text theme color swatch to text color model',
+    beforeTextColorSwatch.themeCount >= 4 &&
+      afterTextColorSwatch.inputValue === '#2563eb' &&
+      afterTextColorSwatch.styleColor === 'rgb(37, 99, 235)' &&
+      afterTextColorSwatch.selectedToken === 'ppt-color-accent' &&
+      afterTextColorSwatch.recentColors.includes('#2563eb') &&
+      afterTextColorSwatch.recentUnique &&
+      afterTextColorSwatch.exportSlice.includes('"color": "#2563eb"'),
+    {
+      afterTextColorSwatch,
+      beforeTextColorSwatch,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
+  await delay(120)
+
+  const textColorPreview = await page.eval(`(() => {
+    const overlay = document.querySelector('[data-ppt-presentation]')
+    const element = overlay?.querySelector('[data-ppt-element="s1-title"]')
+
+    return {
+      color: element?.style.color ?? '',
+      open: !!overlay,
+    }
+  })()`)
+
+  record(
+    'keeps PPT text theme color swatch in presentation preview',
+    textColorPreview.open && textColorPreview.color === 'rgb(37, 99, 235)',
+    textColorPreview,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
+  await delay(80)
 
   await page.eval(`document.querySelector('[data-ppt-text-quick="bold"]')?.click()`)
   await page.eval(`document.querySelector('[data-ppt-text-quick="italic"]')?.click()`)
@@ -3563,6 +3656,61 @@ async function runViewAndShapeScenario(page) {
     afterDragRect,
     dragRect,
   })
+
+  const beforeShapeColorSwatch = await getPPTColorSwatchState(page, 'shape-fill')
+
+  await page.eval(`document.querySelector('[data-ppt-color-swatch="shape-fill"][data-ppt-color-token="ppt-color-accent"]')?.click()`)
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-color-swatch="shape-stroke"][data-ppt-color-token="ppt-color-background"]')?.click()`)
+  await delay(80)
+
+  const afterShapeColorSwatch = await getPPTColorSwatchState(page, 'shape-stroke')
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterShapeColorSwatchUndo = await getPPTColorSwatchState(page, 'shape-stroke')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterShapeColorSwatchRedo = await getPPTColorSwatchState(page, 'shape-stroke')
+
+  record(
+    'applies PPT shape fill and stroke theme color swatches with undo redo',
+    beforeShapeColorSwatch.themeCount >= 4 &&
+      afterShapeColorSwatch.fillValue === '#2563eb' &&
+      afterShapeColorSwatch.strokeValue === '#f8fafc' &&
+      afterShapeColorSwatch.background.includes('37, 99, 235') &&
+      afterShapeColorSwatch.borderColor === 'rgb(248, 250, 252)' &&
+      afterShapeColorSwatch.thumbBackground.includes('37, 99, 235') &&
+      afterShapeColorSwatch.exportSlice.includes('"fill"') &&
+      afterShapeColorSwatch.exportSlice.includes('"color": "#2563eb"') &&
+      afterShapeColorSwatch.exportSlice.includes('"stroke"') &&
+      afterShapeColorSwatch.exportSlice.includes('"color": "#f8fafc"') &&
+      afterShapeColorSwatch.recentColors.includes('#2563eb') &&
+      afterShapeColorSwatch.recentAccentCount === 1 &&
+      afterShapeColorSwatch.recentUnique &&
+      afterShapeColorSwatchUndo.strokeValue === '#6366f1' &&
+      afterShapeColorSwatchUndo.fillValue === '#2563eb' &&
+      afterShapeColorSwatchRedo.strokeValue === '#f8fafc',
+    {
+      afterShapeColorSwatch,
+      afterShapeColorSwatchRedo,
+      afterShapeColorSwatchUndo,
+      beforeShapeColorSwatch,
+    },
+  )
 
   await page.eval(`(() => {
     const dash = document.querySelector('[data-ppt-style-field="stroke-dash"]')
@@ -5498,6 +5646,28 @@ async function runLineAffordanceScenario(page) {
     lineId,
   })
 
+  const beforeLineColorSwatch = await getPPTColorSwatchState(page, 'line-stroke', lineId)
+
+  await page.eval(`document.querySelector('[data-ppt-color-swatch="line-stroke"][data-ppt-color-token="ppt-color-accent"]')?.click()`)
+  await delay(80)
+
+  const afterLineColorSwatch = await getPPTColorSwatchState(page, 'line-stroke', lineId)
+
+  record(
+    'applies PPT line stroke theme color swatch',
+    beforeLineColorSwatch.themeCount >= 4 &&
+      afterLineColorSwatch.stroke === '#2563eb' &&
+      afterLineColorSwatch.inputValue === '#2563eb' &&
+      afterLineColorSwatch.recentAccentCount === 1 &&
+      afterLineColorSwatch.recentUnique &&
+      afterLineColorSwatch.exportSlice.includes('"stroke"') &&
+      afterLineColorSwatch.exportSlice.includes('"color": "#2563eb"'),
+    {
+      afterLineColorSwatch,
+      beforeLineColorSwatch,
+    },
+  )
+
   await page.eval(`(() => {
     const color = document.querySelector('[data-ppt-style-field="line-stroke-color"]')
     const width = document.querySelector('[data-ppt-style-field="line-stroke-width"]')
@@ -5886,6 +6056,24 @@ async function runFreeformScenario(page) {
       afterFreeformFormatPaste,
       beforeFreeformFormatPaste,
     },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-color-swatch="line-stroke"][data-ppt-color-token="ppt-color-accent"]')?.click()`)
+  await delay(80)
+
+  const afterFreeformColorSwatch = await getPPTColorSwatchState(page, 'line-stroke', freeformId)
+
+  record(
+    'applies PPT freeform stroke theme color swatch',
+    afterFreeformColorSwatch.selectedKind === 'freeform' &&
+      afterFreeformColorSwatch.stroke === '#2563eb' &&
+      afterFreeformColorSwatch.inputValue === '#2563eb' &&
+      afterFreeformColorSwatch.recentAccentCount === 1 &&
+      afterFreeformColorSwatch.recentUnique &&
+      afterFreeformColorSwatch.exportSlice.includes('"kind": "freeform"') &&
+      afterFreeformColorSwatch.exportSlice.includes('"stroke"') &&
+      afterFreeformColorSwatch.exportSlice.includes('"color": "#2563eb"'),
+    afterFreeformColorSwatch,
   )
 
   const beforeMovePoint = await getElementCenter(page, freeformId)
