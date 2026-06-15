@@ -30,6 +30,7 @@ const PPTRunSchema = z.object({
 
 const PPTParagraphSchema = z.object({
   align: z.enum(['left', 'center', 'right']).optional(),
+  bullet: z.enum(['bullet']).optional(),
   runs: z.array(PPTRunSchema),
 })
 
@@ -180,7 +181,34 @@ export function replacePPTElementText(
 
   return {
     ...element,
-    textBody: createPPTTextBody(text),
+    textBody: copyPPTParagraphAttributes({
+      source: element.textBody,
+      target: createPPTTextBody(text),
+    }),
+  }
+}
+
+function copyPPTParagraphAttributes({
+  source,
+  target,
+}: {
+  source: PPTTextBody
+  target: PPTTextBody
+}): PPTTextBody {
+  return {
+    paragraphs: target.paragraphs.map((paragraph, index) => {
+      const sourceParagraph = source.paragraphs[index]
+
+      if (!sourceParagraph) {
+        return paragraph
+      }
+
+      return {
+        ...paragraph,
+        ...(sourceParagraph.align ? { align: sourceParagraph.align } : {}),
+        ...(sourceParagraph.bullet ? { bullet: sourceParagraph.bullet } : {}),
+      }
+    }),
   }
 }
 

@@ -1047,33 +1047,40 @@ async function runTextQuickFormatScenario(page) {
   await delay(80)
 
   const initial = await page.eval(`(() => ({
+    bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
     boldPressed: document.querySelector('[data-ppt-text-quick="bold"]')?.getAttribute('aria-pressed') ?? '',
     fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
     quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
   }))()`)
 
-  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.fontSize > 0, initial)
+  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.fontSize > 0, initial)
 
   await page.eval(`document.querySelector('[data-ppt-text-quick="bold"]')?.click()`)
   await page.eval(`document.querySelector('[data-ppt-text-quick="font-size-up"]')?.click()`)
   await setTextQuickColor(page, '#0055ff')
   await page.eval(`document.querySelector('[data-ppt-text-quick="align-right"]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-text-quick="bullet"]')?.click()`)
   await delay(100)
 
   const afterSingleFormat = await page.eval(`(() => {
     const title = document.querySelector('[data-ppt-element="s1-title"]')
 
     return {
+      bulletList: title?.getAttribute('data-ppt-bullet-list') ?? '',
+      bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
       color: title?.style.color ?? '',
       fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
       fontWeight: document.querySelector('[data-ppt-style-field="font-weight"]')?.value ?? '',
+      inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      paragraphBullet: title?.querySelector('[data-ppt-bullet="true"]')?.textContent ?? '',
       rightPressed: document.querySelector('[data-ppt-paragraph-align="right"]')?.getAttribute('aria-pressed') ?? '',
       textAlign: title?.style.textAlign ?? '',
+      thumbBulletCount: document.querySelectorAll('[data-ppt-thumb-bullet="true"]').length,
     }
   })()`)
 
-  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true', {
+  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true' && afterSingleFormat.bulletList === 'true' && afterSingleFormat.bulletPressed === 'true' && afterSingleFormat.inspectorBulletPressed === 'true' && afterSingleFormat.paragraphBullet.length > 0 && afterSingleFormat.thumbBulletCount > 0, {
     afterSingleFormat,
     initial,
   })
@@ -1098,6 +1105,7 @@ async function runTextQuickFormatScenario(page) {
 
   await setTextQuickColor(page, '#008060')
   await page.eval(`document.querySelector('[data-ppt-text-quick="align-center"]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-text-quick="bullet"]')?.click()`)
   await delay(100)
 
   const afterMultiFormat = await page.eval(`(() => {
@@ -1105,14 +1113,16 @@ async function runTextQuickFormatScenario(page) {
     const summary = document.querySelector('[data-ppt-element="s1-summary"]')
 
     return {
+      summaryBulletList: summary?.getAttribute('data-ppt-bullet-list') ?? '',
       summaryColor: summary?.style.color ?? '',
       summaryTextAlign: summary?.style.textAlign ?? '',
+      titleBulletList: title?.getAttribute('data-ppt-bullet-list') ?? '',
       titleColor: title?.style.color ?? '',
       titleTextAlign: title?.style.textAlign ?? '',
     }
   })()`)
 
-  record('applies PPT text quick formatting to multi-selected text objects', beforeMulti.quickBarVisible && beforeMulti.selectedCount === 2 && afterMultiFormat.titleColor === 'rgb(0, 128, 96)' && afterMultiFormat.summaryColor === 'rgb(0, 128, 96)' && afterMultiFormat.titleTextAlign === 'center' && afterMultiFormat.summaryTextAlign === 'center', {
+  record('applies PPT text quick formatting to multi-selected text objects', beforeMulti.quickBarVisible && beforeMulti.selectedCount === 2 && afterMultiFormat.titleColor === 'rgb(0, 128, 96)' && afterMultiFormat.summaryColor === 'rgb(0, 128, 96)' && afterMultiFormat.titleTextAlign === 'center' && afterMultiFormat.summaryTextAlign === 'center' && afterMultiFormat.titleBulletList === 'true' && afterMultiFormat.summaryBulletList === 'true', {
     afterMultiFormat,
     beforeMulti,
   })
@@ -1153,6 +1163,8 @@ async function runExportScenario(page) {
       hasDeckJson: code.includes('data-ppt-deck'),
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
+      hasBulletMarkup: code.includes('data-ppt-bullet-list="true"') && code.includes('data-ppt-bullet="true"'),
+      hasBulletModel: code.includes('"bullet": "bullet"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageModel: code.includes('"kind": "image"') && code.includes('"src": "data:image/svg+xml'),
       hasLineConnectionMarkup: code.includes('data-ppt-start-connection="'),
@@ -1169,6 +1181,7 @@ async function runExportScenario(page) {
   record('exports HTML slide markup', state.hasSlideMarkup, state)
   record('exports PPT element markup', state.hasElementMarkup, state)
   record('exports embedded PPT deck JSON', state.hasDeckJson && state.hasPPTDeckModel, state)
+  record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)

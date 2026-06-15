@@ -1,11 +1,11 @@
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
-  readPPTText,
   type PPTDeck,
   type PPTElement,
   type PPTLine,
   type PPTShape,
+  type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
 
@@ -69,15 +69,18 @@ function renderPPTElementHTML(element: PPTElement) {
     return renderPPTLineHTML(element, style)
   }
 
-  const text = escapeHtml(readPPTText(element.textBody))
+  const text = renderPPTTextBodyHTML(element.textBody)
   const textStyle = element.style ? exportTextStyle(element.style) : ''
   const paragraphStyle = `text-align:${element.textBody?.paragraphs[0]?.align ?? 'left'}`
+  const bulletListAttr = element.textBody && hasPPTTextBodyBullet(element.textBody)
+    ? ' data-ppt-bullet-list="true"'
+    : ''
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}" style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${bulletListAttr} style="${[...style, exportShapeStyle(element), textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}" style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${bulletListAttr} style="${[...style, textStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function exportCSS() {
@@ -92,11 +95,35 @@ function exportCSS() {
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
     '.ppt-line{display:block;overflow:visible;padding:0;}',
     '.ppt-text{align-items:flex-start;padding:0;}',
+    '.ppt-text-paragraph{display:block;min-height:1em;}',
+    '.ppt-text-paragraph[data-ppt-bullet="true"]{position:relative;padding-left:1.1em;}',
+    '.ppt-text-paragraph[data-ppt-bullet="true"]::before{content:"\\2022";position:absolute;left:0;}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
     '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
     '@media print{body{background:#fff;}.ppt-deck{display:block;padding:0;}.ppt-slide{break-after:page;page-break-after:always;}}',
   ].join('\n')
+}
+
+function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
+  if (!body) {
+    return ''
+  }
+
+  return body.paragraphs.map((paragraph) => {
+    const runs = paragraph.runs
+      .map((run) => escapeHtml(run.text))
+      .join('')
+    const bulletAttr = paragraph.bullet === 'bullet'
+      ? ' data-ppt-bullet="true"'
+      : ''
+
+    return `<span class="ppt-text-paragraph"${bulletAttr}>${runs}</span>`
+  }).join('')
+}
+
+function hasPPTTextBodyBullet(body: PPTTextBody) {
+  return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
 }
 
 function renderPPTLineHTML(element: PPTLine, style: string[]) {

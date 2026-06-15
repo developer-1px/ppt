@@ -29,6 +29,7 @@ import {
   Group,
   ImagePlus,
   Layers,
+  List,
   Lock,
   Maximize2,
   Minus,
@@ -246,6 +247,7 @@ type PPTSelectionCommandAnchor = Point & {
 }
 type PPTTextQuickFormatState = {
   align: NonNullable<PPTParagraph['align']>
+  bullet: boolean
   color: string
   fontSize: number
   isBold: boolean
@@ -389,6 +391,7 @@ type PPTFindMatch = {
 type PPTTextRunStyle = Omit<PPTRun, 'text'>
 type PPTTextToken = {
   align?: PPTParagraph['align']
+  bullet?: PPTParagraph['bullet']
   char: string
   runStyle: PPTTextRunStyle
 }
@@ -1522,6 +1525,44 @@ function App() {
     )
   }
 
+  function updateSelectedParagraphBullet(enabled: boolean) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    const selectedIds = new Set(selection)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!selectedIds.has(element.id) ||
+            !isPPTTextElement(element) ||
+            element.locked === true ||
+            element.visible === false) {
+            return element
+          }
+
+          return {
+            ...element,
+            textBody: {
+              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                ...paragraph,
+                ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
+              })),
+            },
+          }
+        }),
+      })),
+    )
+  }
+
+  function toggleSelectedParagraphBullet() {
+    const enabled = !areAllPPTTextElementsBulleted(selectedTextElements)
+
+    updateSelectedParagraphBullet(enabled)
+  }
+
   function toggleSelectedTextBold() {
     const isBold = selectedTextElements.length > 0 &&
       selectedTextElements.every((element) =>
@@ -1680,6 +1721,29 @@ function App() {
             paragraphs: element.textBody.paragraphs.map((paragraph) => ({
               ...paragraph,
               align,
+            })),
+          },
+        }
+      }),
+    )
+  }
+
+  function updateParagraphBullet(
+    elementId: string,
+    enabled: boolean,
+  ) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (!isPPTTextElement(element) || element.locked === true) {
+          return element
+        }
+
+        return {
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
             })),
           },
         }
@@ -2760,6 +2824,7 @@ function App() {
               textFormat={textQuickFormatState}
               onCommand={runPPTSurfaceCommand}
               onFontSizeStep={stepSelectedTextFontSize}
+              onParagraphBulletToggle={toggleSelectedParagraphBullet}
               onParagraphAlign={updateSelectedParagraphAlign}
               onTextBoldToggle={toggleSelectedTextBold}
               onTextColorChange={updateSelectedTextColor}
@@ -2807,6 +2872,7 @@ function App() {
         onElementRotationChange={updateElementRotation}
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
+        onParagraphBulletChange={updateParagraphBullet}
         onElementTextStyleChange={updateElementTextStyle}
         onElementVisibilityToggle={toggleElementVisibility}
         onLayerSelect={(elementId, additive) => {
@@ -2940,6 +3006,7 @@ function PPTSelectionFloatingBar({
   onCommand,
   onFontSizeStep,
   onParagraphAlign,
+  onParagraphBulletToggle,
   onTextBoldToggle,
   onTextColorChange,
   scale,
@@ -2950,6 +3017,7 @@ function PPTSelectionFloatingBar({
   onCommand: (command: PPTSurfaceCommand) => void
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
+  onParagraphBulletToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   scale: number
@@ -2978,6 +3046,7 @@ function PPTSelectionFloatingBar({
           state={textFormat}
           onFontSizeStep={onFontSizeStep}
           onParagraphAlign={onParagraphAlign}
+          onParagraphBulletToggle={onParagraphBulletToggle}
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
         />
@@ -3003,12 +3072,14 @@ function PPTSelectionFloatingBar({
 function PPTTextQuickFormatControls({
   onFontSizeStep,
   onParagraphAlign,
+  onParagraphBulletToggle,
   onTextBoldToggle,
   onTextColorChange,
   state,
 }: {
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
+  onParagraphBulletToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   state: PPTTextQuickFormatState
@@ -3073,6 +3144,21 @@ function PPTTextQuickFormatControls({
           onPointerDown={(event) => event.stopPropagation()}
         />
       </label>
+      <button
+        aria-label="Toggle bullet list"
+        aria-pressed={state.bullet}
+        className="ppt-floating-command"
+        data-ppt-text-quick="bullet"
+        title="Toggle bullet list"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onParagraphBulletToggle()
+        }}
+      >
+        <List size={16} />
+      </button>
       {(['left', 'center', 'right'] as const).map((align) => (
         <button
           aria-label={`Align text ${align}`}
@@ -3264,6 +3350,9 @@ function SlideThumb({
             className={getPPTThumbElementClassName(element)}
             data-line-end-marker={element.kind === 'line' ? element.endMarker : undefined}
             data-line-start-marker={element.kind === 'line' ? element.startMarker : undefined}
+            data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
+              ? 'true'
+              : undefined}
             data-shape={element.kind === 'shape' ? element.shape : undefined}
             key={element.id}
             style={{
@@ -3321,6 +3410,7 @@ function PPTElementView({
   selected: boolean
 }) {
   const style = pptElementStyle(element)
+  const textBody = isPPTTextElement(element) ? element.textBody : null
   const text = isPPTTextElement(element) ? readPPTText(element.textBody) : ''
   const editorRef = useRef<HTMLDivElement | null>(null)
 
@@ -3360,6 +3450,7 @@ function PPTElementView({
         ? element.startConnection?.elementId
         : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
+      data-ppt-bullet-list={textBody && hasPPTTextBodyBullet(textBody) ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
       data-rotation={Math.round(element.geometry.rotation ?? 0)}
@@ -3399,10 +3490,30 @@ function PPTElementView({
             }
           }}
         >
-          {text}
+          {editing || !textBody ? text : <PPTTextBodyView body={textBody} />}
         </div>
       )}
     </div>
+  )
+}
+
+function PPTTextBodyView({ body }: { body: PPTTextBody }) {
+  return (
+    <>
+      {body.paragraphs.map((paragraph, index) => (
+        <span
+          className="ppt-text-paragraph"
+          data-ppt-bullet={paragraph.bullet === 'bullet' ? 'true' : undefined}
+          key={index}
+        >
+          {paragraph.runs.map((run, runIndex) => (
+            <span key={runIndex}>
+              {run.text}
+            </span>
+          ))}
+        </span>
+      ))}
+    </>
   )
 }
 
@@ -3706,6 +3817,7 @@ function Inspector({
   onLayerSelect,
   onLineMarkerChange,
   onLineRouteChange,
+  onParagraphBulletChange,
   onParagraphAlignChange,
   onShapeFillChange,
   onShapeKindChange,
@@ -3749,6 +3861,10 @@ function Inspector({
     elementId: string,
     route: PPTLineRoute,
   ) => void
+  onParagraphBulletChange: (
+    elementId: string,
+    enabled: boolean,
+  ) => void
   onParagraphAlignChange: (
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
@@ -3768,6 +3884,9 @@ function Inspector({
   const paragraphAlign = selectedElement && isPPTTextElement(selectedElement)
     ? selectedElement.textBody?.paragraphs[0]?.align ?? 'left'
     : 'left'
+  const paragraphBullet = selectedElement && isPPTTextElement(selectedElement)
+    ? hasPPTTextBodyBullet(selectedElement.textBody)
+    : false
 
   return (
     <aside className="ppt-inspector" aria-label="Inspector">
@@ -3905,6 +4024,15 @@ function Inspector({
                 <div className="ppt-field">
                   <span>Paragraph</span>
                   <div className="ppt-segmented-control" role="group" aria-label="Paragraph align">
+                    <button
+                      aria-pressed={paragraphBullet}
+                      data-ppt-paragraph-bullet
+                      type="button"
+                      onClick={() =>
+                        onParagraphBulletChange(selectedElement.id, !paragraphBullet)}
+                    >
+                      bullet
+                    </button>
                     {(['left', 'center', 'right'] as const).map((align) => (
                       <button
                         aria-pressed={paragraphAlign === align}
@@ -4239,6 +4367,7 @@ function getPPTTextQuickFormatState(
       (element.textBody.paragraphs[0]?.align ?? 'left') === firstAlign)
       ? firstAlign
       : 'left',
+    bullet: areAllPPTTextElementsBulleted(elements),
     color: styles.every((style) => style.color === firstStyle.color)
       ? firstStyle.color
       : '#111827',
@@ -4248,6 +4377,17 @@ function getPPTTextQuickFormatState(
     isBold: styles.length > 0 &&
       styles.every((style) => style.fontWeight === 'bold'),
   }
+}
+
+function areAllPPTTextElementsBulleted(elements: readonly PPTTextElement[]) {
+  return elements.length > 0 &&
+    elements.every((element) =>
+      element.textBody.paragraphs.length > 0 &&
+      element.textBody.paragraphs.every((paragraph) => paragraph.bullet === 'bullet'))
+}
+
+function hasPPTTextBodyBullet(body: PPTTextBody) {
+  return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
 }
 
 function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
@@ -4640,13 +4780,14 @@ function replacePPTTextBodyRange(
     replacement,
     anchor?.runStyle ?? {},
     anchor?.align ?? body.paragraphs[0]?.align,
+    anchor?.bullet ?? body.paragraphs[0]?.bullet,
   )
 
   return buildPPTTextBodyFromTokens([
     ...tokens.slice(0, safeStart),
     ...replacementTokens,
     ...tokens.slice(safeEnd),
-  ], body.paragraphs[0]?.align)
+  ], body.paragraphs[0]?.align, body.paragraphs[0]?.bullet)
 }
 
 function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
@@ -4659,6 +4800,7 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
       for (let index = 0; index < text.length; index += 1) {
         tokens.push({
           align: paragraph.align,
+          bullet: paragraph.bullet,
           char: text[index],
           runStyle,
         })
@@ -4668,6 +4810,7 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
     if (paragraphIndex < body.paragraphs.length - 1) {
       tokens.push({
         align: paragraph.align,
+        bullet: paragraph.bullet,
         char: '\n',
         runStyle: getPPTParagraphFallbackRunStyle(paragraph),
       })
@@ -4681,12 +4824,14 @@ function createPPTTextTokens(
   text: string,
   runStyle: PPTTextRunStyle,
   align: PPTParagraph['align'] | undefined,
+  bullet: PPTParagraph['bullet'] | undefined,
 ): PPTTextToken[] {
   const tokens: PPTTextToken[] = []
 
   for (let index = 0; index < text.length; index += 1) {
     tokens.push({
       align,
+      bullet,
       char: text[index],
       runStyle,
     })
@@ -4698,9 +4843,11 @@ function createPPTTextTokens(
 function buildPPTTextBodyFromTokens(
   tokens: PPTTextToken[],
   fallbackAlign: PPTParagraph['align'] | undefined,
+  fallbackBullet: PPTParagraph['bullet'] | undefined,
 ): PPTTextBody {
   const paragraphs: PPTParagraph[] = []
   let currentAlign = fallbackAlign
+  let currentBullet = fallbackBullet
   let currentRuns: PPTRun[] = []
   let currentRunStyle: PPTTextRunStyle | null = null
   let currentText = ''
@@ -4720,22 +4867,25 @@ function buildPPTTextBodyFromTokens(
 
   function flushParagraph() {
     flushRun()
-    paragraphs.push(createPPTParagraph(currentRuns, currentAlign))
+    paragraphs.push(createPPTParagraph(currentRuns, currentAlign, currentBullet))
     currentRuns = []
     currentRunStyle = null
     currentText = ''
     currentAlign = fallbackAlign
+    currentBullet = fallbackBullet
   }
 
   tokens.forEach((token) => {
     if (token.char === '\n') {
       flushParagraph()
       currentAlign = token.align ?? fallbackAlign
+      currentBullet = token.bullet ?? fallbackBullet
       return
     }
 
     if (!currentRunStyle && currentText.length === 0 && currentRuns.length === 0) {
       currentAlign = token.align ?? fallbackAlign
+      currentBullet = token.bullet ?? fallbackBullet
     }
 
     if (!currentRunStyle || !arePPTTextRunStylesEqual(currentRunStyle, token.runStyle)) {
@@ -4756,9 +4906,11 @@ function buildPPTTextBodyFromTokens(
 function createPPTParagraph(
   runs: PPTRun[],
   align: PPTParagraph['align'] | undefined,
+  bullet: PPTParagraph['bullet'] | undefined,
 ): PPTParagraph {
   return {
     ...(align ? { align } : {}),
+    ...(bullet ? { bullet } : {}),
     runs: runs.length > 0 ? runs : [{ text: '' }],
   }
 }
