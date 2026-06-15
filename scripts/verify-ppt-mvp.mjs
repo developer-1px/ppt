@@ -2341,6 +2341,8 @@ async function runExportScenario(page) {
       hasLineModel: code.includes('"kind": "line"') && code.includes('"endMarker": "arrow"'),
       hasLineRouteMarkup: code.includes('data-ppt-line-route="elbow"') && code.includes('<path '),
       hasLineRouteModel: code.includes('"route": "elbow"') && code.includes('"routeBend"'),
+      hasLayoutMarkup: code.includes('data-ppt-layout-id="ppt-layout-split"'),
+      hasLayoutModel: code.includes('"layoutId": "ppt-layout-split"'),
       hasPPTDeckModel: code.includes('"slides"') && code.includes('"elements"'),
       hasRotationStyle: code.includes('transform:rotate(45deg)'),
       hasSpeakerNotesMarkup: code.includes('class="ppt-notes"') && code.includes('data-ppt-notes-for="slide-1"') && code.includes('Presenter cue: review image crop and final CTA.'),
@@ -2349,6 +2351,8 @@ async function runExportScenario(page) {
       hasTableModel: code.includes('"kind": "table"') && code.includes('"rows"') && code.includes('"Region"'),
       hasTextAutoFitMarkup: code.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
       hasTextAutoFitModel: code.includes('"textAutoFit": "resizeShapeToFitText"'),
+      hasThemeMarkup: code.includes('data-ppt-theme-id="ppt-theme-default"'),
+      hasThemeModel: code.includes('"themeId": "ppt-theme-default"'),
       hasUnderlineMarkup: code.includes('data-ppt-run-underline="true"') && code.includes('text-decoration:underline'),
       hasUnderlineModel: code.includes('"underline": true'),
     }
@@ -2368,6 +2372,7 @@ async function runExportScenario(page) {
   record('exports inserted PPT line and arrow model data', state.hasLineMarkup && state.hasLineModel, state)
   record('exports PPT connector attachment metadata', state.hasLineConnectionMarkup && state.hasLineConnectionModel, state)
   record('exports PPT connector route metadata', state.hasLineRouteMarkup && state.hasLineRouteModel, state)
+  record('exports PPT layout/theme metadata', state.hasLayoutMarkup && state.hasLayoutModel && state.hasThemeMarkup && state.hasThemeModel, state)
   record('exports inserted PPT table markup and model data', state.hasTableMarkup && state.hasTableModel, state)
   record('exports PPT text auto-fit markup and model data', state.hasTextAutoFitMarkup && state.hasTextAutoFitModel, state)
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
@@ -2387,6 +2392,7 @@ async function runExportScenario(page) {
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
+      hasLayout: text.includes('data-ppt-svg-layout-id="ppt-layout-split"'),
       hasLine: text.includes('data-ppt-kind="line"') && (text.includes('<line ') || text.includes('data-ppt-line-path')),
       hasScope: text.includes('data-ppt-svg-scope="slide"'),
       hasShape: text.includes('data-ppt-kind="shape"'),
@@ -2395,6 +2401,7 @@ async function runExportScenario(page) {
       hasTable: text.includes('data-ppt-kind="table"') && text.includes('data-ppt-table-cell=') && text.includes('data-ppt-table-text='),
       hasText: text.includes('data-ppt-kind="textBox"') && text.includes('<text '),
       hasTextAutoFit: text.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
+      hasTheme: text.includes('data-ppt-svg-theme-id="ppt-theme-default"'),
       type: download.type ?? '',
     }
   })()`)
@@ -2402,6 +2409,7 @@ async function runExportScenario(page) {
   record('downloads active PPT slide as SVG', slideSvgState.download === 'slide-1.svg' && slideSvgState.type.includes('image/svg+xml') && slideSvgState.hasSvg && slideSvgState.hasSlide && slideSvgState.hasScope && slideSvgState.hasBackground, slideSvgState)
   record('exports PPT image/shape/text/line/freeform/table/comment into slide SVG', slideSvgState.hasImage && slideSvgState.hasShape && slideSvgState.hasText && slideSvgState.hasLine && slideSvgState.hasFreeform && slideSvgState.hasTable && slideSvgState.hasComment, slideSvgState)
   record('exports PPT text auto-fit metadata into slide SVG', slideSvgState.hasTextAutoFit, slideSvgState)
+  record('exports PPT layout/theme metadata into slide SVG', slideSvgState.hasLayout && slideSvgState.hasTheme, slideSvgState)
 
   const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
   await selectPPTLayerRows(page, [imageId])
@@ -2672,6 +2680,55 @@ async function runViewAndShapeScenario(page) {
   }))()`)
 
   record('updates PPT slide background in inspector', afterBackground.slideBackground === 'rgb(254, 243, 199)' && afterBackground.thumbBackground === 'rgb(254, 243, 199)', afterBackground)
+
+  const beforeLayout = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-kind]').length,
+    layout: document.querySelector('[data-ppt-slide-field="layout"]')?.value ?? '',
+    placeholderCount: Number(document.querySelector('[data-ppt-layout-placeholder-count]')?.getAttribute('data-ppt-layout-placeholder-count') ?? 0),
+    slideLayout: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-layout-id') ?? '',
+    slideTheme: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-theme-id') ?? '',
+    themeTokenCount: document.querySelectorAll('[data-ppt-theme-token]').length,
+  }))()`)
+
+  record(
+    'renders PPT layout/theme token controls in inspector',
+    beforeLayout.layout === 'ppt-layout-title-body' &&
+      beforeLayout.slideLayout === 'ppt-layout-title-body' &&
+      beforeLayout.slideTheme === 'ppt-theme-default' &&
+      beforeLayout.themeTokenCount >= 4 &&
+      beforeLayout.placeholderCount >= 2,
+    beforeLayout,
+  )
+
+  await page.eval(`(() => {
+    const layout = document.querySelector('[data-ppt-slide-field="layout"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    valueSetter.call(layout, 'ppt-layout-split')
+    layout.dispatchEvent(new Event('input', { bubbles: true }))
+    layout.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(50)
+
+  const afterLayout = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-kind]').length,
+    layout: document.querySelector('[data-ppt-slide-field="layout"]')?.value ?? '',
+    placeholderCount: Number(document.querySelector('[data-ppt-layout-placeholder-count]')?.getAttribute('data-ppt-layout-placeholder-count') ?? 0),
+    slideLayout: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-layout-id') ?? '',
+    slideTheme: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-theme-id') ?? '',
+  }))()`)
+
+  record(
+    'updates PPT slide layout through slide-edit layout/theme command effect',
+    afterLayout.layout === 'ppt-layout-split' &&
+      afterLayout.slideLayout === 'ppt-layout-split' &&
+      afterLayout.slideTheme === 'ppt-theme-default' &&
+      afterLayout.placeholderCount >= 3 &&
+      afterLayout.elementCount === beforeLayout.elementCount,
+    {
+      afterLayout,
+      beforeLayout,
+    },
+  )
 
   await page.eval(`(() => {
     const notes = document.querySelector('[data-ppt-slide-field="notes"]')

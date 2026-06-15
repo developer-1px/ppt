@@ -1175,6 +1175,42 @@
   resize: vertical;
 }
 
+.ppt-theme-token-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 22px;
+}
+
+.ppt-theme-token {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.ppt-layout-placeholder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ppt-layout-placeholder {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ppt-checkbox-field {
   display: flex;
   align-items: center;

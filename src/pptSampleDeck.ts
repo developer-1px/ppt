@@ -1,7 +1,9 @@
 import {
+  PPT_DEFAULT_THEME_ID,
   PPTDeckSchema,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
+  PPT_TITLE_BODY_LAYOUT_ID,
   createPPTTextBody,
   type PPTDeck,
 } from './pptModel'
@@ -69,8 +71,10 @@ export const SAMPLE_PPT_DECK: PPTDeck = PPTDeckSchema.parse({
         },
       ],
       id: 'slide-1',
+      layoutId: PPT_TITLE_BODY_LAYOUT_ID,
       name: 'Overview',
       notes: 'Tighten the title and adjust the cards after AI generation.',
+      themeId: PPT_DEFAULT_THEME_ID,
     },
     {
       background: { color: '#ffffff' },
@@ -107,10 +111,11 @@ export const SAMPLE_PPT_DECK: PPTDeck = PPTDeckSchema.parse({
         },
       ],
       id: 'slide-2',
+      layoutId: PPT_TITLE_BODY_LAYOUT_ID,
       name: 'Model',
       notes: '',
+      themeId: PPT_DEFAULT_THEME_ID,
     },
   ],
   title: 'AI Retouch Demo',
 })
-

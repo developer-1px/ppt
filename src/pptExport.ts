@@ -25,8 +25,15 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
       .map(renderPPTElementHTML)
       .join('\n')
 
+    const layoutAttr = slide.layoutId
+      ? ` data-ppt-layout-id="${escapeHtml(slide.layoutId)}"`
+      : ''
+    const themeAttr = slide.themeId
+      ? ` data-ppt-theme-id="${escapeHtml(slide.themeId)}"`
+      : ''
+
     return [
-      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}" style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
+      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
       elements,
       '  </section>',
       renderPPTSlideNotesHTML(slide.id, slide.notes),
@@ -125,12 +132,21 @@ function renderPPTElementsSVG({
   const background = slide.background?.color ?? '#ffffff'
 
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${formatNumber(viewBox.x)} ${formatNumber(viewBox.y)} ${formatNumber(viewBox.w)} ${formatNumber(viewBox.h)}" data-ppt-svg-slide="${escapeHtml(slide.id)}" data-ppt-svg-scope="${scope}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${formatNumber(viewBox.x)} ${formatNumber(viewBox.y)} ${formatNumber(viewBox.w)} ${formatNumber(viewBox.h)}" data-ppt-svg-slide="${escapeHtml(slide.id)}" data-ppt-svg-scope="${scope}"${getPPTSlideLayoutThemeSvgAttrs(slide)}>`,
     `<rect data-ppt-svg-background="true" x="${formatNumber(viewBox.x)}" y="${formatNumber(viewBox.y)}" width="${formatNumber(viewBox.w)}" height="${formatNumber(viewBox.h)}" fill="${escapeHtml(background)}" />`,
     ...elements.map(renderPPTElementSVG),
     '</svg>',
     '',
   ].join('\n')
+}
+
+function getPPTSlideLayoutThemeSvgAttrs(slide: PPTSlide) {
+  const attrs = [
+    slide.layoutId ? `data-ppt-svg-layout-id="${escapeHtml(slide.layoutId)}"` : '',
+    slide.themeId ? `data-ppt-svg-theme-id="${escapeHtml(slide.themeId)}"` : '',
+  ].filter(Boolean)
+
+  return attrs.length > 0 ? ` ${attrs.join(' ')}` : ''
 }
 
 function renderPPTElementHTML(element: PPTElement) {

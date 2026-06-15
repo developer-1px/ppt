@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 export const PPT_SLIDE_WIDTH = 1280
 export const PPT_SLIDE_HEIGHT = 720
+export const PPT_DEFAULT_THEME_ID = 'ppt-theme-default'
+export const PPT_TITLE_BODY_LAYOUT_ID = 'ppt-layout-title-body'
+export const PPT_SPLIT_LAYOUT_ID = 'ppt-layout-split'
 
 const PPTFillSchema = z.object({
   color: z.string(),
@@ -154,8 +157,10 @@ export const PPTSlideSchema = z.object({
   background: PPTFillSchema.optional(),
   elements: z.array(PPTElementSchema),
   id: z.string(),
+  layoutId: z.string().optional(),
   name: z.string(),
   notes: z.string().optional(),
+  themeId: z.string().optional(),
 })
 
 export const PPTDeckSchema = z.object({

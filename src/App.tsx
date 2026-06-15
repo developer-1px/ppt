@@ -81,9 +81,17 @@ import {
   type RefObject,
 } from 'react'
 import {
+  createSlideEditLayoutPlaceholderDescriptor,
+  createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
+  getSlideEditLayoutApplyCommandEffect,
+  getSlideEditResolvedLayoutPlaceholder,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
+  type SlideEditLayoutDescriptor,
+  type SlideEditMasterDescriptor,
+  type SlideEditResolvedLayoutPlaceholder,
+  type SlideEditThemeColorToken,
 } from '@interactive-os/slide-edit-affordance'
 import {
   RESIZE_HANDLES,
@@ -134,8 +142,11 @@ import {
   type CanvasReorderMode,
 } from 'canvas/engine'
 import {
+  PPT_DEFAULT_THEME_ID,
+  PPT_SPLIT_LAYOUT_ID,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
+  PPT_TITLE_BODY_LAYOUT_ID,
   createPPTElementId,
   createPPTTextBody,
   findPPTElement,
@@ -237,6 +248,200 @@ const PPT_FRAME_GUIDE_CONFIG = Object.freeze({
     top: 76,
   },
 } as const satisfies SlideEditFrameGuideConfig)
+
+const PPT_MASTER_ID = 'ppt-master-default'
+
+const PPT_THEME_DESCRIPTOR = createSlideEditThemeDescriptor({
+  colorTokens: [
+    {
+      label: 'Background',
+      role: 'background',
+      tokenId: 'ppt-color-background',
+      value: '#f8fafc',
+    },
+    {
+      label: 'Surface',
+      role: 'surface',
+      tokenId: 'ppt-color-surface',
+      value: '#ffffff',
+    },
+    {
+      label: 'Text',
+      role: 'text',
+      tokenId: 'ppt-color-text',
+      value: '#111827',
+    },
+    {
+      label: 'Accent',
+      role: 'accent',
+      tokenId: 'ppt-color-accent',
+      value: '#2563eb',
+    },
+  ],
+  defaultStyle: {
+    colorTokenIds: {
+      background: 'ppt-color-background',
+      text: 'ppt-color-text',
+    },
+    fontTokenIds: {
+      body: 'ppt-font-body',
+      heading: 'ppt-font-heading',
+    },
+    spacingTokenIds: {
+      gap: 'ppt-space-gap',
+      margin: 'ppt-space-margin',
+    },
+  },
+  fontTokens: [
+    {
+      family: 'Inter',
+      label: 'Body',
+      role: 'body',
+      size: 24,
+      tokenId: 'ppt-font-body',
+      weight: 500,
+    },
+    {
+      family: 'Inter Display',
+      label: 'Heading',
+      role: 'heading',
+      size: 56,
+      tokenId: 'ppt-font-heading',
+      weight: 700,
+    },
+  ],
+  name: 'PPT default',
+  spacingTokens: [
+    {
+      label: 'Margin',
+      role: 'slide-margin',
+      tokenId: 'ppt-space-margin',
+      value: 84,
+    },
+    {
+      label: 'Gap',
+      role: 'object-gap',
+      tokenId: 'ppt-space-gap',
+      value: 28,
+    },
+  ],
+  themeId: PPT_DEFAULT_THEME_ID,
+})
+
+const PPT_MASTER_DESCRIPTOR: SlideEditMasterDescriptor = {
+  defaultStyle: {
+    colorTokenIds: {
+      background: 'ppt-color-background',
+      text: 'ppt-color-text',
+    },
+    fontTokenIds: {
+      body: 'ppt-font-body',
+      heading: 'ppt-font-heading',
+    },
+  },
+  layoutIds: [
+    PPT_TITLE_BODY_LAYOUT_ID,
+    PPT_SPLIT_LAYOUT_ID,
+  ],
+  masterId: PPT_MASTER_ID,
+  name: 'PPT master',
+  themeId: PPT_DEFAULT_THEME_ID,
+}
+
+const PPT_LAYOUT_DESCRIPTORS: SlideEditLayoutDescriptor[] = [
+  {
+    defaultStyle: {
+      spacingTokenIds: {
+        gap: 'ppt-space-gap',
+        margin: 'ppt-space-margin',
+      },
+    },
+    layoutId: PPT_TITLE_BODY_LAYOUT_ID,
+    masterId: PPT_MASTER_ID,
+    name: 'Title and body',
+    placeholders: [
+      createSlideEditLayoutPlaceholderDescriptor({
+        defaultBounds: { h: 96, w: 900, x: 84, y: 76 },
+        defaultStyle: {
+          fontTokenIds: {
+            heading: 'ppt-font-heading',
+          },
+        },
+        placeholderId: 'title',
+        role: 'title',
+        title: 'Title',
+      }),
+      createSlideEditLayoutPlaceholderDescriptor({
+        defaultBounds: { h: 420, w: 900, x: 84, y: 214 },
+        placeholderId: 'body',
+        role: 'body',
+        title: 'Body',
+      }),
+    ],
+  },
+  {
+    defaultStyle: {
+      spacingTokenIds: {
+        gap: 'ppt-space-gap',
+        margin: 'ppt-space-margin',
+      },
+    },
+    layoutId: PPT_SPLIT_LAYOUT_ID,
+    masterId: PPT_MASTER_ID,
+    name: 'Title with side panel',
+    placeholders: [
+      createSlideEditLayoutPlaceholderDescriptor({
+        defaultBounds: { h: 86, w: 700, x: 84, y: 76 },
+        defaultStyle: {
+          fontTokenIds: {
+            heading: 'ppt-font-heading',
+          },
+        },
+        placeholderId: 'title',
+        role: 'title',
+        title: 'Title',
+      }),
+      createSlideEditLayoutPlaceholderDescriptor({
+        defaultBounds: { h: 404, w: 680, x: 84, y: 214 },
+        placeholderId: 'body',
+        role: 'body',
+        title: 'Body',
+      }),
+      createSlideEditLayoutPlaceholderDescriptor({
+        defaultBounds: { h: 506, w: 300, x: 896, y: 112 },
+        defaultStyle: {
+          colorTokenIds: {
+            fill: 'ppt-color-surface',
+          },
+        },
+        placeholderId: 'media',
+        role: 'media',
+        title: 'Side panel',
+      }),
+    ],
+  },
+]
+
+const PPT_LAYOUT_BY_ID = new Map(PPT_LAYOUT_DESCRIPTORS.map((layout) => [
+  layout.layoutId,
+  layout,
+]))
+
+function getPPTLayoutDescriptor(layoutId: string | null | undefined) {
+  return PPT_LAYOUT_BY_ID.get(layoutId ?? '') ?? PPT_LAYOUT_DESCRIPTORS[0]
+}
+
+function getPPTLayoutPlaceholders(
+  layout: SlideEditLayoutDescriptor,
+): SlideEditResolvedLayoutPlaceholder[] {
+  return layout.placeholders.map((placeholder) =>
+    getSlideEditResolvedLayoutPlaceholder({
+      layout,
+      master: PPT_MASTER_DESCRIPTOR,
+      placeholder,
+      theme: PPT_THEME_DESCRIPTOR,
+    }))
+}
 
 const canvasAlignModeAvailabilityKey = {
   alignBottom: 'alignBottom',
@@ -681,6 +886,14 @@ function App() {
   const selectedTextOverflow = selectedElement && isPPTTextElement(selectedElement)
     ? textOverflowById[selectedElement.id] === true
     : false
+  const activeLayout = useMemo(
+    () => getPPTLayoutDescriptor(activeSlide.layoutId),
+    [activeSlide.layoutId],
+  )
+  const activeLayoutPlaceholders = useMemo(
+    () => getPPTLayoutPlaceholders(activeLayout),
+    [activeLayout],
+  )
 
   const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
     ? selectedElement
@@ -2346,6 +2559,22 @@ function App() {
     })))
   }
 
+  function applySlideLayout(layoutId: string) {
+    const layout = getPPTLayoutDescriptor(layoutId)
+    const effect = getSlideEditLayoutApplyCommandEffect({
+      existingObjectPolicy: 'preserve-existing-objects',
+      layoutId: layout.layoutId,
+      selectedObjectIds: selection,
+      slideId: activeSlide.id,
+    })
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+      ...slide,
+      layoutId: effect.payload.layoutId,
+      themeId: PPT_THEME_DESCRIPTOR.themeId,
+    })))
+  }
+
   function updateSlideNotes(notes: string) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
@@ -3604,7 +3833,13 @@ function App() {
     run: () => moveActiveSlide(1),
     section: 'Slides',
     title: 'Move slide down',
-  }, {
+  }, ...PPT_LAYOUT_DESCRIPTORS.map((layout) => ({
+    disabled: activeLayout.layoutId === layout.layoutId,
+    id: `slide:layout:${layout.layoutId}`,
+    run: () => applySlideLayout(layout.layoutId),
+    section: 'Slides',
+    title: `Apply ${layout.name}`,
+  })), {
     id: 'export:download-slide-svg',
     run: downloadSlideSVG,
     section: 'Export',
@@ -4011,7 +4246,9 @@ function App() {
         >
           <div
             className="ppt-slide"
+            data-ppt-layout-id={activeLayout.layoutId}
             data-ppt-slide={activeSlide.id}
+            data-ppt-theme-id={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
             style={{ background: activeSlide.background?.color ?? '#ffffff' }}
           >
             {activeSlide.elements.filter((element) => element.visible !== false).map((element) => (
@@ -4099,9 +4336,14 @@ function App() {
 
       <Inspector
         exportCode={exportCode}
+        layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
+        layoutPlaceholders={activeLayoutPlaceholders}
         selection={selection}
         selectedElement={selectedElement}
         slide={activeSlide}
+        slideLayoutId={activeLayout.layoutId}
+        slideThemeId={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
+        themeColorTokens={PPT_THEME_DESCRIPTOR.colorTokens}
         onCommentBodyChange={updateCommentBody}
         onCommentResolvedChange={updateCommentResolved}
         onCommitText={commitText}
@@ -4126,6 +4368,7 @@ function App() {
         onParagraphAlignChange={updateParagraphAlign}
         onShapeKindChange={updateShapeKind}
         onSlideBackgroundChange={updateSlideBackground}
+        onSlideLayoutChange={applySlideLayout}
         onShapeFillChange={updateShapeFill}
         onElementStrokeChange={updateElementStroke}
         onSlideNameChange={updateSlideName}
@@ -5645,6 +5888,8 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
 
 function Inspector({
   exportCode,
+  layoutDescriptors,
+  layoutPlaceholders,
   onCommentBodyChange,
   onCommentResolvedChange,
   onCommitText,
@@ -5667,6 +5912,7 @@ function Inspector({
   onShapeFillChange,
   onShapeKindChange,
   onSlideBackgroundChange,
+  onSlideLayoutChange,
   onSlideNameChange,
   onSlideNotesChange,
   onTableRowsChange,
@@ -5675,8 +5921,13 @@ function Inspector({
   selectedElement,
   selectedTextOverflow,
   slide,
+  slideLayoutId,
+  slideThemeId,
+  themeColorTokens,
 }: {
   exportCode: string
+  layoutDescriptors: readonly SlideEditLayoutDescriptor[]
+  layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
   onCommentBodyChange: (elementId: string, value: string) => void
   onCommentResolvedChange: (elementId: string, resolved: boolean) => void
   onCommitText: (elementId: string, text: string) => void
@@ -5731,6 +5982,7 @@ function Inspector({
   onShapeFillChange: (elementId: string, color: string) => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onSlideBackgroundChange: (color: string) => void
+  onSlideLayoutChange: (layoutId: string) => void
   onSlideNameChange: (name: string) => void
   onSlideNotesChange: (notes: string) => void
   onTableRowsChange: (elementId: string, value: string) => void
@@ -5739,6 +5991,9 @@ function Inspector({
   selectedElement: PPTElement | null
   selectedTextOverflow: boolean
   slide: PPTSlide
+  slideLayoutId: string
+  slideThemeId: string
+  themeColorTokens: readonly SlideEditThemeColorToken[]
 }) {
   const textStyle = selectedElement && isPPTTextElement(selectedElement)
     ? selectedElement.style
@@ -5772,6 +6027,52 @@ function Inspector({
             onChange={(event) => onSlideBackgroundChange(event.target.value)}
           />
         </label>
+        <label className="ppt-field">
+          <span>Layout</span>
+          <select
+            data-ppt-slide-field="layout"
+            value={slideLayoutId}
+            onChange={(event) => onSlideLayoutChange(event.target.value)}
+          >
+            {layoutDescriptors.map((layout) => (
+              <option key={layout.layoutId} value={layout.layoutId}>
+                {layout.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div
+          className="ppt-theme-token-strip"
+          data-ppt-layout-id={slideLayoutId}
+          data-ppt-theme-id={slideThemeId}
+        >
+          {themeColorTokens.map((token) => (
+            <span
+              className="ppt-theme-token"
+              data-ppt-theme-token={token.tokenId}
+              data-ppt-theme-token-role={token.role}
+              key={token.tokenId}
+              style={{ background: token.value }}
+              title={token.label}
+            />
+          ))}
+        </div>
+        <div
+          className="ppt-layout-placeholder-list"
+          data-ppt-layout-placeholder-count={layoutPlaceholders.length}
+        >
+          {layoutPlaceholders.map((placeholder) => (
+            <span
+              className="ppt-layout-placeholder"
+              data-ppt-layout-placeholder={placeholder.placeholderId}
+              data-ppt-placeholder-bounds={`${placeholder.bounds.x},${placeholder.bounds.y},${placeholder.bounds.w},${placeholder.bounds.h}`}
+              data-ppt-placeholder-role={placeholder.role}
+              key={placeholder.placeholderId}
+            >
+              {placeholder.title}
+            </span>
+          ))}
+        </div>
         <label className="ppt-field">
           <span>Notes</span>
           <textarea
