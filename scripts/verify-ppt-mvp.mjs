@@ -35,6 +35,7 @@ try {
   await runTextEditingScenario(page)
   await runFindReplaceScenario(page)
   await runSelectionAndDragScenario(page)
+  await runAltDragDuplicateScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
   await runCommandPaletteScenario(page)
@@ -151,6 +152,140 @@ async function runSelectionAndDragScenario(page) {
     before,
   })
   record('records drag in undo history', after.undoEnabled, after)
+}
+
+async function runAltDragDuplicateScenario(page) {
+  const point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(50)
+
+  const before = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      left: parseFloat(element.style.left),
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      top: parseFloat(element.style.top),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mousePressed',
+    x: point.x,
+    y: point.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 1,
+    type: 'mouseMoved',
+    x: point.x + 96,
+    y: point.y + 28,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mouseReleased',
+    x: point.x + 96,
+    y: point.y + 28,
+  })
+  await delay(100)
+
+  const afterDuplicate = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-style-field="name"]')?.value ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record('duplicates selected PPT object with Alt drag', afterDuplicate.count === before.count + 1 && afterDuplicate.selectedId !== before.selectedId && afterDuplicate.selectedName.includes('Copy') && afterDuplicate.originalLeft === before.left && afterDuplicate.originalTop === before.top && afterDuplicate.selectedLeft !== before.left && afterDuplicate.undoEnabled, {
+    afterDuplicate,
+    before,
+  })
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(100)
+
+  const afterUndo = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+    }
+  })()`)
+
+  record('undoes PPT Alt drag duplicate as one history step', afterUndo.count === before.count && afterUndo.originalLeft === before.left && afterUndo.originalTop === before.top && afterUndo.redoEnabled, {
+    afterUndo,
+    before,
+  })
+
+  const lockedPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, lockedPoint.x, lockedPoint.y, 1)
+  await delay(50)
+  await page.eval(`document.querySelector('[data-ppt-command="lock-selection"]').click()`)
+  await delay(80)
+
+  const beforeLockedDrag = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    locked: document.querySelector('[data-selected="true"]')?.getAttribute('data-locked') ?? '',
+  }))()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mousePressed',
+    x: lockedPoint.x,
+    y: lockedPoint.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 1,
+    type: 'mouseMoved',
+    x: lockedPoint.x + 80,
+    y: lockedPoint.y + 20,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mouseReleased',
+    x: lockedPoint.x + 80,
+    y: lockedPoint.y + 20,
+  })
+  await delay(80)
+
+  const afterLockedDrag = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    locked: document.querySelector('[data-selected="true"]')?.getAttribute('data-locked') ?? '',
+  }))()`)
+
+  record('does not Alt drag duplicate locked PPT objects', beforeLockedDrag.locked === 'true' && afterLockedDrag.count === beforeLockedDrag.count && afterLockedDrag.locked === 'true', {
+    afterLockedDrag,
+    beforeLockedDrag,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]').click()`)
+  await delay(80)
+  const restoredPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, restoredPoint.x, restoredPoint.y, 1)
+  await delay(50)
 }
 
 async function runTextEditingScenario(page) {

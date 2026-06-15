@@ -415,6 +415,7 @@ type PPTTextToken = {
 type Interaction =
   | {
       bounds: Bounds
+      historyDeck?: PPTDeck
       kind: 'move'
       selection: string[]
       slideId: string
@@ -2132,20 +2133,56 @@ function App() {
     const bounds = scene.getBounds(nextSelection)
     const hasLockedTarget = activeSlide.elements.some((element) =>
       nextSelection.includes(element.id) && element.locked === true)
+    const hasHiddenTarget = activeSlide.elements.some((element) =>
+      nextSelection.includes(element.id) && element.visible === false)
 
-    setSelection(nextSelection)
-
-    if (!bounds || hasLockedTarget) {
+    if (!bounds || hasLockedTarget || hasHiddenTarget) {
+      setSelection(nextSelection)
       return
     }
 
+    let interactionBounds = bounds
+    let interactionHistoryDeck: PPTDeck | undefined
+    let interactionSelection = nextSelection
+    let interactionStartDeck = deckRef.current
+
+    if (event.altKey) {
+      const sourceDeck = deckRef.current
+      const sourceSlide = findPPTSlide(sourceDeck, activeSlide.id)
+      const clones = commandAdapter.cloneSelection({
+        createId: createPPTElementIdFactory(sourceSlide),
+        ids: nextSelection,
+        items: sourceSlide.elements,
+        offset: { x: 0, y: 0 },
+      })
+
+      if (clones.length > 0) {
+        const cloneIds = clones.map((clone) => clone.id)
+        const liveDeck = updatePPTDeckSlide(sourceDeck, activeSlide.id, (slide) => ({
+          ...slide,
+          elements: [...slide.elements, ...clones],
+        }))
+        const liveSlide = findPPTSlide(liveDeck, activeSlide.id)
+        const liveScene = createPPTCanvasScene(liveSlide)
+
+        deckRef.current = liveDeck
+        setDeck(liveDeck)
+        interactionBounds = liveScene.getBounds(cloneIds) ?? bounds
+        interactionHistoryDeck = sourceDeck
+        interactionSelection = cloneIds
+        interactionStartDeck = liveDeck
+      }
+    }
+
+    setSelection(interactionSelection)
     setInteraction({
-      bounds,
+      bounds: interactionBounds,
+      historyDeck: interactionHistoryDeck,
       kind: 'move',
-      selection: nextSelection,
+      selection: interactionSelection,
       slideId: activeSlide.id,
       snapGuides: EMPTY_CANVAS_SNAP_GUIDES,
-      startDeck: deckRef.current,
+      startDeck: interactionStartDeck,
       startPoint: screenToWorld(event.nativeEvent),
     })
   }
@@ -2621,15 +2658,29 @@ function App() {
       }
     }
 
+    const historyDeck = getPPTInteractionHistoryDeck(interaction)
+
     if (
-      interaction.kind !== 'marquee' &&
-      JSON.stringify(deckRef.current) !== JSON.stringify(interaction.startDeck)
+      historyDeck &&
+      JSON.stringify(deckRef.current) !== JSON.stringify(historyDeck)
     ) {
-      setPast((history) => [...history.slice(-79), interaction.startDeck])
+      setPast((history) => [...history.slice(-79), historyDeck])
       setFuture([])
     }
 
     setInteraction(null)
+  }
+
+  function getPPTInteractionHistoryDeck(current: Interaction) {
+    if (current.kind === 'marquee') {
+      return null
+    }
+
+    if (current.kind === 'move') {
+      return current.historyDeck ?? current.startDeck
+    }
+
+    return current.startDeck
   }
 
   function zoom(direction: 'in' | 'out') {
