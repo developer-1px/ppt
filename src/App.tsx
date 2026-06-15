@@ -542,6 +542,107 @@ type PPTShortcutHelpSectionGroup = {
   items: PPTShortcutHelpItem[]
   section: string
 }
+type PPTSlideMetadataOrientation = 'landscape' | 'portrait'
+type PPTSlideMetadataBackgroundDescriptor =
+  | {
+      kind: 'none'
+    }
+  | {
+      color: string
+      kind: 'solid-color'
+      tokenId?: string
+    }
+type PPTSlideMetadataSizeDescriptor = {
+  h: number
+  w: number
+}
+type PPTSlideMetadataReadModel = {
+  background: PPTSlideMetadataBackgroundDescriptor
+  name: string
+  notes: string
+  orientation: PPTSlideMetadataOrientation
+  size: PPTSlideMetadataSizeDescriptor
+  slideId: string
+}
+type PPTSlideMetadataFieldId =
+  | 'background'
+  | 'name'
+  | 'notes'
+  | 'orientation'
+  | 'size'
+type PPTSlideMetadataCommandId =
+  | 'update-slide-background'
+  | 'update-slide-name'
+  | 'update-slide-notes'
+  | 'update-slide-orientation'
+  | 'update-slide-size'
+type PPTSlideMetadataFieldControl =
+  | 'background-control'
+  | 'multiline-text'
+  | 'orientation-control'
+  | 'size-control'
+  | 'text'
+type PPTSlideMetadataFieldDescriptor = {
+  commandId: PPTSlideMetadataCommandId
+  control: PPTSlideMetadataFieldControl
+  id: PPTSlideMetadataFieldId
+  isEditable: boolean
+  isOptional: boolean
+  requiredAdapterSlot: 'command-effect'
+}
+type PPTInspectorSurfaceId =
+  | 'none'
+  | 'object-selection-inspector'
+  | 'slide-metadata-inspector'
+type PPTSlideMetadataInspectorDescriptor = {
+  activeSlide: {
+    index: number | null
+    slideCount: number
+    slideId: string
+  }
+  fields: readonly PPTSlideMetadataFieldDescriptor[]
+  metadata: PPTSlideMetadataReadModel
+  surface: 'slide-metadata-inspector'
+}
+type PPTSlideMetadataUpdateCommand =
+  | {
+      fieldId: 'background'
+      id: 'update-slide-background'
+      slideId: string
+      value: PPTSlideMetadataBackgroundDescriptor
+    }
+  | {
+      fieldId: 'name'
+      id: 'update-slide-name'
+      slideId: string
+      value: string
+    }
+  | {
+      fieldId: 'notes'
+      id: 'update-slide-notes'
+      slideId: string
+      value: string
+    }
+  | {
+      fieldId: 'orientation'
+      id: 'update-slide-orientation'
+      slideId: string
+      value: PPTSlideMetadataOrientation
+    }
+  | {
+      fieldId: 'size'
+      id: 'update-slide-size'
+      slideId: string
+      value: PPTSlideMetadataSizeDescriptor
+    }
+type PPTSlideMetadataHostCommandEffect = {
+  payload: PPTSlideMetadataUpdateCommand
+  selection: {
+    objectIds: readonly string[]
+    slideId: string
+  }
+  type: 'slide-command-effect'
+}
 type PPTMinimapSize = {
   h: number
   w: number
@@ -745,6 +846,48 @@ const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Export',
   'System',
 ]
+const PPT_SLIDE_METADATA_FIELDS = Object.freeze([
+  {
+    commandId: 'update-slide-name',
+    control: 'text',
+    id: 'name',
+    isEditable: true,
+    isOptional: false,
+    requiredAdapterSlot: 'command-effect',
+  },
+  {
+    commandId: 'update-slide-background',
+    control: 'background-control',
+    id: 'background',
+    isEditable: true,
+    isOptional: false,
+    requiredAdapterSlot: 'command-effect',
+  },
+  {
+    commandId: 'update-slide-notes',
+    control: 'multiline-text',
+    id: 'notes',
+    isEditable: true,
+    isOptional: false,
+    requiredAdapterSlot: 'command-effect',
+  },
+  {
+    commandId: 'update-slide-size',
+    control: 'size-control',
+    id: 'size',
+    isEditable: false,
+    isOptional: true,
+    requiredAdapterSlot: 'command-effect',
+  },
+  {
+    commandId: 'update-slide-orientation',
+    control: 'orientation-control',
+    id: 'orientation',
+    isEditable: false,
+    isOptional: true,
+    requiredAdapterSlot: 'command-effect',
+  },
+] as const satisfies readonly PPTSlideMetadataFieldDescriptor[])
 const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   h: 112,
   w: 176,
@@ -945,6 +1088,18 @@ function App() {
     () => getPPTLayoutPlaceholders(activeLayout),
     [activeLayout],
   )
+  const slideMetadataDescriptor = useMemo(
+    () => createPPTSlideMetadataInspectorDescriptor({
+      slide: activeSlide,
+      slideCount: deck.slides.length,
+      slideIndex: activeSlideIndex,
+    }),
+    [activeSlide, activeSlideIndex, deck.slides.length],
+  )
+  const inspectorSurface = getPPTInspectorSurface({
+    activeSlideId: activeSlide.id,
+    selectedObjectIds: selection,
+  })
   const minimapItems = useMemo<PPTMinimapItemBounds[]>(
     () => activeSlide.elements
       .filter((element) => element.visible !== false)
@@ -2664,17 +2819,32 @@ function App() {
   }
 
   function updateSlideName(name: string) {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-      ...slide,
-      name,
-    })))
+    const effect = toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'name',
+      id: 'update-slide-name',
+      slideId: activeSlide.id,
+      value: name,
+    })
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) =>
+        applyPPTSlideMetadataHostCommandEffect(slide, effect)))
   }
 
   function updateSlideBackground(color: string) {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-      ...slide,
-      background: { color },
-    })))
+    const effect = toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'background',
+      id: 'update-slide-background',
+      slideId: activeSlide.id,
+      value: {
+        color,
+        kind: 'solid-color',
+      },
+    })
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) =>
+        applyPPTSlideMetadataHostCommandEffect(slide, effect)))
   }
 
   function applySlideLayout(layoutId: string) {
@@ -2694,10 +2864,16 @@ function App() {
   }
 
   function updateSlideNotes(notes: string) {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-      ...slide,
-      notes,
-    })))
+    const effect = toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'notes',
+      id: 'update-slide-notes',
+      slideId: activeSlide.id,
+      value: notes,
+    })
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) =>
+        applyPPTSlideMetadataHostCommandEffect(slide, effect)))
   }
 
   function copyHTML() {
@@ -4477,11 +4653,13 @@ function App() {
 
       <Inspector
         exportCode={exportCode}
+        inspectorSurface={inspectorSurface}
         layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
         layoutPlaceholders={activeLayoutPlaceholders}
         selection={selection}
         selectedElement={selectedElement}
         slide={activeSlide}
+        slideMetadataDescriptor={slideMetadataDescriptor}
         slideLayoutId={activeLayout.layoutId}
         slideThemeId={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
         themeColorTokens={PPT_THEME_DESCRIPTOR.colorTokens}
@@ -5101,6 +5279,137 @@ function groupPPTShortcutHelpItems(
       ? [{ items: sectionItems, section }]
       : []
   })
+}
+
+function createPPTSlideMetadataInspectorDescriptor({
+  slide,
+  slideCount,
+  slideIndex,
+}: {
+  slide: PPTSlide
+  slideCount: number
+  slideIndex: number
+}): PPTSlideMetadataInspectorDescriptor {
+  return {
+    activeSlide: {
+      index: slideIndex >= 0 ? slideIndex : null,
+      slideCount,
+      slideId: slide.id,
+    },
+    fields: PPT_SLIDE_METADATA_FIELDS,
+    metadata: {
+      background: getPPTSlideMetadataBackground(slide),
+      name: slide.name,
+      notes: slide.notes ?? '',
+      orientation: getPPTSlideMetadataOrientation(),
+      size: {
+        h: PPT_SLIDE_HEIGHT,
+        w: PPT_SLIDE_WIDTH,
+      },
+      slideId: slide.id,
+    },
+    surface: 'slide-metadata-inspector',
+  }
+}
+
+function getPPTInspectorSurface({
+  activeSlideId,
+  selectedObjectIds,
+}: {
+  activeSlideId: string | null
+  selectedObjectIds: readonly string[]
+}): PPTInspectorSurfaceId {
+  if (selectedObjectIds.length > 0) {
+    return 'object-selection-inspector'
+  }
+
+  return activeSlideId ? 'slide-metadata-inspector' : 'none'
+}
+
+function getPPTSlideMetadataBackground(
+  slide: PPTSlide,
+): PPTSlideMetadataBackgroundDescriptor {
+  if (!slide.background) {
+    return {
+      kind: 'none',
+    }
+  }
+
+  return {
+    color: slide.background.color,
+    kind: 'solid-color',
+  }
+}
+
+function getPPTSlideMetadataOrientation(): PPTSlideMetadataOrientation {
+  return PPT_SLIDE_WIDTH >= PPT_SLIDE_HEIGHT ? 'landscape' : 'portrait'
+}
+
+function getPPTSlideMetadataField(
+  descriptor: PPTSlideMetadataInspectorDescriptor,
+  fieldId: PPTSlideMetadataFieldId,
+): PPTSlideMetadataFieldDescriptor {
+  const field = descriptor.fields.find((field) => field.id === fieldId)
+
+  if (!field) {
+    throw new Error(`Missing PPT slide metadata field: ${fieldId}`)
+  }
+
+  return field
+}
+
+function getPPTSlideMetadataFieldData(field: PPTSlideMetadataFieldDescriptor) {
+  return {
+    'data-ppt-slide-metadata-adapter-slot': field.requiredAdapterSlot,
+    'data-ppt-slide-metadata-command': field.commandId,
+    'data-ppt-slide-metadata-control': field.control,
+    'data-ppt-slide-metadata-editable': String(field.isEditable),
+    'data-ppt-slide-metadata-field': field.id,
+    'data-ppt-slide-metadata-optional': String(field.isOptional),
+  }
+}
+
+function toPPTSlideMetadataHostCommandEffect(
+  command: PPTSlideMetadataUpdateCommand,
+): PPTSlideMetadataHostCommandEffect {
+  return {
+    payload: command,
+    selection: {
+      objectIds: [],
+      slideId: command.slideId,
+    },
+    type: 'slide-command-effect',
+  }
+}
+
+function applyPPTSlideMetadataHostCommandEffect(
+  slide: PPTSlide,
+  effect: PPTSlideMetadataHostCommandEffect,
+): PPTSlide {
+  const command = effect.payload
+
+  switch (command.fieldId) {
+    case 'background':
+      return {
+        ...slide,
+        background: command.value.kind === 'solid-color'
+          ? { color: command.value.color }
+          : { color: '#ffffff' },
+      }
+    case 'name':
+      return {
+        ...slide,
+        name: command.value,
+      }
+    case 'notes':
+      return {
+        ...slide,
+        notes: command.value,
+      }
+    case 'orientation':
+    case 'size':
+      return slide
+  }
 }
 
 function getPPTMinimapReadModel({
@@ -6500,6 +6809,7 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
 
 function Inspector({
   exportCode,
+  inspectorSurface,
   layoutDescriptors,
   layoutPlaceholders,
   onCommentBodyChange,
@@ -6533,11 +6843,13 @@ function Inspector({
   selectedElement,
   selectedTextOverflow,
   slide,
+  slideMetadataDescriptor,
   slideLayoutId,
   slideThemeId,
   themeColorTokens,
 }: {
   exportCode: string
+  inspectorSurface: PPTInspectorSurfaceId
   layoutDescriptors: readonly SlideEditLayoutDescriptor[]
   layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
   onCommentBodyChange: (elementId: string, value: string) => void
@@ -6603,6 +6915,7 @@ function Inspector({
   selectedElement: PPTElement | null
   selectedTextOverflow: boolean
   slide: PPTSlide
+  slideMetadataDescriptor: PPTSlideMetadataInspectorDescriptor
   slideLayoutId: string
   slideThemeId: string
   themeColorTokens: readonly SlideEditThemeColorToken[]
@@ -6616,21 +6929,38 @@ function Inspector({
   const paragraphBullet = selectedElement && isPPTTextElement(selectedElement)
     ? hasPPTTextBodyBullet(selectedElement.textBody)
     : false
+  const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
+  const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
+  const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
+  const sizeMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'size')
+  const orientationMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'orientation')
 
   return (
     <aside className="ppt-inspector" aria-label="Inspector">
       <div className="ppt-panel-header">
         <h2>Slide</h2>
       </div>
-      <section className="ppt-panel-section">
-        <label className="ppt-field">
+      <section
+        className="ppt-panel-section"
+        data-ppt-inspector-surface={inspectorSurface}
+        data-ppt-slide-inspector-priority={inspectorSurface === 'slide-metadata-inspector' ? 'active' : 'secondary'}
+        data-ppt-slide-metadata-active-index={slideMetadataDescriptor.activeSlide.index ?? ''}
+        data-ppt-slide-metadata-command-slot="command-effect"
+        data-ppt-slide-metadata-field-count={slideMetadataDescriptor.fields.length}
+        data-ppt-slide-metadata-inspector
+        data-ppt-slide-metadata-slide-count={slideMetadataDescriptor.activeSlide.slideCount}
+        data-ppt-slide-metadata-slide-id={slideMetadataDescriptor.activeSlide.slideId}
+        data-ppt-slide-metadata-surface={slideMetadataDescriptor.surface}
+      >
+        <label className="ppt-field" {...getPPTSlideMetadataFieldData(nameMetadataField)}>
           <span>Name</span>
           <input
+            data-ppt-slide-field="name"
             value={slide.name}
             onChange={(event) => onSlideNameChange(event.target.value)}
           />
         </label>
-        <label className="ppt-field">
+        <label className="ppt-field" {...getPPTSlideMetadataFieldData(backgroundMetadataField)}>
           <span>Background</span>
           <input
             data-ppt-slide-field="background"
@@ -6639,7 +6969,7 @@ function Inspector({
             onChange={(event) => onSlideBackgroundChange(event.target.value)}
           />
         </label>
-        <label className="ppt-field">
+        <label className="ppt-field" {...getPPTSlideMetadataFieldData(notesMetadataField)}>
           <span>Layout</span>
           <select
             data-ppt-slide-field="layout"
@@ -6693,12 +7023,38 @@ function Inspector({
             onChange={(event) => onSlideNotesChange(event.target.value)}
           />
         </label>
+        <div className="ppt-slide-metadata-readouts">
+          <span
+            className="ppt-slide-metadata-readout"
+            data-ppt-slide-field="size"
+            data-ppt-slide-metadata-value={`${slideMetadataDescriptor.metadata.size.w}x${slideMetadataDescriptor.metadata.size.h}`}
+            {...getPPTSlideMetadataFieldData(sizeMetadataField)}
+          >
+            <span>Size</span>
+            <strong>{slideMetadataDescriptor.metadata.size.w} x {slideMetadataDescriptor.metadata.size.h}</strong>
+          </span>
+          <span
+            className="ppt-slide-metadata-readout"
+            data-ppt-slide-field="orientation"
+            data-ppt-slide-metadata-value={slideMetadataDescriptor.metadata.orientation}
+            {...getPPTSlideMetadataFieldData(orientationMetadataField)}
+          >
+            <span>Orientation</span>
+            <strong>{slideMetadataDescriptor.metadata.orientation}</strong>
+          </span>
+        </div>
       </section>
 
       <div className="ppt-panel-header">
         <h2>Selection</h2>
       </div>
-      <section className="ppt-panel-section">
+      <section
+        className="ppt-panel-section"
+        data-ppt-inspector-surface={inspectorSurface}
+        data-ppt-object-inspector
+        data-ppt-object-inspector-active={selectedElement ? 'true' : 'false'}
+        data-ppt-object-inspector-priority={inspectorSurface === 'object-selection-inspector' ? '0' : '1'}
+      >
         {selectedElement ? (
           <>
             <label className="ppt-field">

@@ -45,6 +45,7 @@ try {
   await runSelectSameTypeScenario(page)
   await runCommandPaletteScenario(page)
   await runShortcutHelpScenario(page)
+  await runSlideMetadataScenario(page)
   await runThemeScenario(page)
   await runFitSelectionScenario(page)
   await runMinimapScenario(page)
@@ -1881,6 +1882,100 @@ async function runShortcutHelpScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+}
+
+async function runSlideMetadataScenario(page) {
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+
+  const initial = await getPPTSlideMetadataState(page)
+
+  record(
+    'renders PPT slide metadata inspector descriptor',
+    initial.inspector &&
+      initial.surface === 'slide-metadata-inspector' &&
+      initial.slideId === 'slide-1' &&
+      initial.slideCount >= 2 &&
+      initial.fieldCount === 5 &&
+      ['name', 'background', 'notes', 'size', 'orientation'].every((field) => initial.fields.includes(field)) &&
+      initial.sizeValue === '1280x720' &&
+      initial.orientationValue === 'landscape' &&
+      initial.editableByField.name === 'true' &&
+      initial.editableByField.background === 'true' &&
+      initial.editableByField.notes === 'true' &&
+      initial.editableByField.size === 'false' &&
+      initial.editableByField.orientation === 'false',
+    initial,
+  )
+  record(
+    'keeps PPT object inspector priority over slide metadata inspector',
+    initial.inspectorSurface === 'object-selection-inspector' &&
+      initial.objectActive === 'true' &&
+      initial.objectPriority === '0' &&
+      initial.slidePriority === 'secondary',
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const name = document.querySelector('[data-ppt-slide-field="name"]')
+    const background = document.querySelector('[data-ppt-slide-field="background"]')
+    const notes = document.querySelector('[data-ppt-slide-field="notes"]')
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    const textAreaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    inputSetter.call(name, 'Metadata Retouch')
+    name.dispatchEvent(new Event('input', { bubbles: true }))
+    name.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(background, '#dbeafe')
+    background.dispatchEvent(new Event('input', { bubbles: true }))
+    background.dispatchEvent(new Event('change', { bubbles: true }))
+
+    textAreaSetter.call(notes, 'Metadata cue from slide inspector.')
+    notes.dispatchEvent(new Event('input', { bubbles: true }))
+    notes.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterUpdate = await getPPTSlideMetadataState(page)
+
+  record(
+    'updates PPT slide metadata through slide-command-effect projection',
+    afterUpdate.commandSlot === 'command-effect' &&
+      afterUpdate.commands.includes('update-slide-name') &&
+      afterUpdate.commands.includes('update-slide-background') &&
+      afterUpdate.commands.includes('update-slide-notes') &&
+      afterUpdate.name === 'Metadata Retouch' &&
+      afterUpdate.thumbName.includes('Metadata Retouch') &&
+      afterUpdate.notes === 'Metadata cue from slide inspector.' &&
+      afterUpdate.slideBackground === 'rgb(219, 234, 254)',
+    {
+      afterUpdate,
+      initial,
+    },
+  )
+
+  await page.eval(`(() => {
+    const name = document.querySelector('[data-ppt-slide-field="name"]')
+    const background = document.querySelector('[data-ppt-slide-field="background"]')
+    const notes = document.querySelector('[data-ppt-slide-field="notes"]')
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    const textAreaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    inputSetter.call(name, ${JSON.stringify(initial.name)})
+    name.dispatchEvent(new Event('input', { bubbles: true }))
+    name.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(background, ${JSON.stringify(initial.backgroundValue)})
+    background.dispatchEvent(new Event('input', { bubbles: true }))
+    background.dispatchEvent(new Event('change', { bubbles: true }))
+
+    textAreaSetter.call(notes, ${JSON.stringify(initial.notes)})
+    notes.dispatchEvent(new Event('input', { bubbles: true }))
+    notes.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
 }
 
 async function runThemeScenario(page) {
@@ -4730,6 +4825,41 @@ function getPPTTextOverflowState(page) {
       selectedText: selected?.querySelector('.ppt-element-editor')?.textContent ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       textCount: document.querySelectorAll('[data-kind="textBox"]').length,
+    }
+  })()`)
+}
+
+function getPPTSlideMetadataState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('[data-ppt-slide-metadata-inspector]')
+    const objectInspector = document.querySelector('[data-ppt-object-inspector]')
+    const fields = [...document.querySelectorAll('[data-ppt-slide-metadata-field]')]
+    const editableByField = Object.fromEntries(fields.map((field) => [
+      field.getAttribute('data-ppt-slide-metadata-field') ?? '',
+      field.getAttribute('data-ppt-slide-metadata-editable') ?? '',
+    ]))
+
+    return {
+      commandSlot: inspector?.getAttribute('data-ppt-slide-metadata-command-slot') ?? '',
+      commands: fields.map((field) => field.getAttribute('data-ppt-slide-metadata-command') ?? ''),
+      editableByField,
+      backgroundValue: document.querySelector('[data-ppt-slide-field="background"]')?.value ?? '',
+      fieldCount: Number(inspector?.getAttribute('data-ppt-slide-metadata-field-count') ?? 0),
+      fields: fields.map((field) => field.getAttribute('data-ppt-slide-metadata-field') ?? ''),
+      inspector: !!inspector,
+      inspectorSurface: inspector?.getAttribute('data-ppt-inspector-surface') ?? '',
+      name: document.querySelector('[data-ppt-slide-field="name"]')?.value ?? '',
+      notes: document.querySelector('[data-ppt-slide-field="notes"]')?.value ?? '',
+      objectActive: objectInspector?.getAttribute('data-ppt-object-inspector-active') ?? '',
+      objectPriority: objectInspector?.getAttribute('data-ppt-object-inspector-priority') ?? '',
+      orientationValue: document.querySelector('[data-ppt-slide-metadata-field="orientation"]')?.getAttribute('data-ppt-slide-metadata-value') ?? '',
+      sizeValue: document.querySelector('[data-ppt-slide-metadata-field="size"]')?.getAttribute('data-ppt-slide-metadata-value') ?? '',
+      slideBackground: document.querySelector('.ppt-slide')?.style.background ?? '',
+      slideCount: Number(inspector?.getAttribute('data-ppt-slide-metadata-slide-count') ?? 0),
+      slideId: inspector?.getAttribute('data-ppt-slide-metadata-slide-id') ?? '',
+      slidePriority: inspector?.getAttribute('data-ppt-slide-inspector-priority') ?? '',
+      surface: inspector?.getAttribute('data-ppt-slide-metadata-surface') ?? '',
+      thumbName: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-name')?.textContent ?? '',
     }
   })()`)
 }
