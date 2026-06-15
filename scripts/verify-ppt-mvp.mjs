@@ -36,6 +36,7 @@ try {
   await runFindReplaceScenario(page)
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
+  await runCommandSurfaceScenario(page)
   await runViewAndShapeScenario(page)
   await runLineAffordanceScenario(page)
   await runImageImportScenario(page)
@@ -861,6 +862,175 @@ async function runAffordanceScenario(page) {
   }))()`)
 
   record('selects all PPT objects with keyboard command', afterSelectAll.selectedCount === afterSelectAll.elementCount, afterSelectAll)
+}
+
+async function runCommandSurfaceScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  let point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+
+  const initial = await page.eval(`(() => ({
+    deleteDisabled: document.querySelector('[data-ppt-floating-command="delete"]')?.disabled ?? true,
+    duplicateDisabled: document.querySelector('[data-ppt-floating-command="duplicate"]')?.disabled ?? true,
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    floatingVisible: !!document.querySelector('[data-ppt-selection-floating-bar]'),
+    groupDisabled: document.querySelector('[data-ppt-floating-command="group"]')?.disabled ?? false,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('renders PPT selection floating command bar from command availability', initial.floatingVisible && initial.selectedId.length > 0 && !initial.duplicateDisabled && !initial.deleteDisabled && initial.groupDisabled, initial)
+
+  await page.eval(`document.querySelector('[data-ppt-floating-command="duplicate"]')?.click()`)
+  await delay(80)
+
+  const afterFloatingDuplicate = await page.eval(`(() => ({
+    contextMenuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('runs duplicate from PPT selection floating bar', afterFloatingDuplicate.elementCount === initial.elementCount + 1 && afterFloatingDuplicate.selectedCount >= 1 && !afterFloatingDuplicate.contextMenuOpen, {
+    afterFloatingDuplicate,
+    initial,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-floating-command="delete"]')?.click()`)
+  await delay(80)
+
+  const afterFloatingDelete = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+  }))()`)
+
+  record('runs delete from PPT selection floating bar', afterFloatingDelete.elementCount === initial.elementCount, {
+    afterFloatingDelete,
+    initial,
+  })
+
+  point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(50)
+  await rightClickMouse(page, point.x, point.y)
+  await delay(80)
+
+  const afterContextOpen = await page.eval(`(() => ({
+    deleteDisabled: document.querySelector('[data-ppt-context-command="delete"]')?.disabled ?? true,
+    duplicateDisabled: document.querySelector('[data-ppt-context-command="duplicate"]')?.disabled ?? true,
+    floatingVisible: !!document.querySelector('[data-ppt-selection-floating-bar]'),
+    groupDisabled: document.querySelector('[data-ppt-context-command="group"]')?.disabled ?? false,
+    menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+  }))()`)
+
+  record('opens PPT context menu with shared command availability', afterContextOpen.menuOpen && !afterContextOpen.floatingVisible && !afterContextOpen.duplicateDisabled && !afterContextOpen.deleteDisabled && afterContextOpen.groupDisabled, afterContextOpen)
+
+  await page.eval(`document.querySelector('[data-ppt-context-command="duplicate"]')?.click()`)
+  await delay(80)
+
+  const afterContextDuplicate = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('runs duplicate from PPT context menu', afterContextDuplicate.elementCount === initial.elementCount + 1 && afterContextDuplicate.selectedCount >= 1 && !afterContextDuplicate.menuOpen, {
+    afterContextDuplicate,
+    initial,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-floating-command="delete"]')?.click()`)
+  await delay(80)
+
+  point = await getElementCenter(page, 's1-title')
+  await clickMouse(page, point.x, point.y, 2)
+  await delay(80)
+  await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    editor?.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 120,
+      clientY: 120,
+    }))
+  })()`)
+  await pressKey(page, {
+    code: 'ContextMenu',
+    key: 'ContextMenu',
+    windowsVirtualKeyCode: 93,
+  })
+  await delay(80)
+
+  const afterEditableGuard = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    }
+  })()`)
+
+  record('does not open PPT command surface while native text editing is active', afterEditableGuard.editing && !afterEditableGuard.menuOpen, afterEditableGuard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  point = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-floating-command="lock-selection"]')?.click()`)
+  await delay(80)
+
+  const afterLockFloating = await page.eval(`(() => ({
+    deleteDisabled: document.querySelector('[data-ppt-floating-command="delete"]')?.disabled ?? false,
+    duplicateDisabled: document.querySelector('[data-ppt-floating-command="duplicate"]')?.disabled ?? false,
+    lockDisabled: document.querySelector('[data-ppt-floating-command="lock-selection"]')?.disabled ?? false,
+    locked: document.querySelector('[data-selected="true"]')?.getAttribute('data-locked') ?? null,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('disables PPT floating commands for locked selection', afterLockFloating.locked === 'true' && afterLockFloating.deleteDisabled && afterLockFloating.duplicateDisabled && afterLockFloating.lockDisabled, afterLockFloating)
+
+  const lockedPoint = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const rect = selected.getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await rightClickMouse(page, lockedPoint.x, lockedPoint.y)
+  await delay(80)
+
+  const afterLockContext = await page.eval(`(() => ({
+    deleteDisabled: document.querySelector('[data-ppt-context-command="delete"]')?.disabled ?? false,
+    duplicateDisabled: document.querySelector('[data-ppt-context-command="duplicate"]')?.disabled ?? false,
+    lockDisabled: document.querySelector('[data-ppt-context-command="lock-selection"]')?.disabled ?? false,
+    menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    unlockDisabled: document.querySelector('[data-ppt-context-command="unlock-all"]')?.disabled ?? true,
+  }))()`)
+
+  record('disables PPT context commands for locked selection', afterLockContext.menuOpen && afterLockContext.deleteDisabled && afterLockContext.duplicateDisabled && afterLockContext.lockDisabled && !afterLockContext.unlockDisabled, afterLockContext)
+
+  await page.eval(`document.querySelector('[data-ppt-context-command="unlock-all"]')?.click()`)
+  await delay(80)
+
+  const afterUnlock = await page.eval(`(() => ({
+    locked: document.querySelector('[data-selected="true"]')?.getAttribute('data-locked') ?? null,
+  }))()`)
+
+  record('unlocks locked PPT object from context menu', afterUnlock.locked === 'false', afterUnlock)
 }
 
 async function runExportScenario(page) {
@@ -1719,6 +1889,23 @@ async function clickMouse(page, x, y, clickCount, modifiers = 0) {
     button: 'left',
     clickCount,
     modifiers,
+    type: 'mouseReleased',
+    x,
+    y,
+  })
+}
+
+async function rightClickMouse(page, x, y) {
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'right',
+    clickCount: 1,
+    type: 'mousePressed',
+    x,
+    y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'right',
+    clickCount: 1,
     type: 'mouseReleased',
     x,
     y,

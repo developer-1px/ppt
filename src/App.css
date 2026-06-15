@@ -130,9 +130,98 @@
 
 .ppt-icon-button:disabled,
 .ppt-button:disabled,
-.ppt-slide-action:disabled {
+.ppt-slide-action:disabled,
+.ppt-floating-command:disabled,
+.ppt-context-menu-item:disabled {
   cursor: not-allowed;
   color: #98a2b3;
+}
+
+.ppt-selection-floating-bar {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  pointer-events: auto;
+  transform: translate(-50%, -100%) scale(var(--ppt-command-scale));
+  transform-origin: bottom center;
+}
+
+.ppt-selection-floating-bar[data-placement='below'] {
+  transform: translate(-50%, 0) scale(var(--ppt-command-scale));
+  transform-origin: top center;
+}
+
+.ppt-floating-command {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #111827;
+}
+
+.ppt-floating-command:hover:not(:disabled),
+.ppt-context-menu-item:hover:not(:disabled) {
+  background: var(--control-hover);
+}
+
+.ppt-command-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--panel-border);
+}
+
+.ppt-context-menu {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  width: 208px;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgb(15 23 42 / 18%);
+}
+
+.ppt-context-menu-group + .ppt-context-menu-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.ppt-context-menu-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
+}
+
+.ppt-context-menu-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ppt-zoom-label {

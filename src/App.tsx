@@ -193,6 +193,158 @@ const canvasReorderModeAvailabilityKey = {
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
+type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
+type PPTSurfaceCommand =
+  | 'alignCenter'
+  | 'alignLeft'
+  | 'alignRight'
+  | 'bringForward'
+  | 'bringToFront'
+  | 'delete'
+  | 'duplicate'
+  | 'group'
+  | 'lockSelection'
+  | 'sendBackward'
+  | 'sendToBack'
+  | 'ungroup'
+  | 'unlockAll'
+type PPTCommandAvailabilityKey =
+  keyof ReturnType<typeof getPPTCanvasCommandAvailability>
+type PPTSurfaceCommandDescriptor = {
+  availability: PPTCommandAvailabilityKey
+  command: PPTSurfaceCommand
+  dataCommand: string
+  label: string
+  surfaces: readonly PPTCommandSurface[]
+  title: string
+}
+type PPTSurfaceCommandGroup = {
+  commands: readonly PPTSurfaceCommandDescriptor[]
+  id: string
+}
+type PPTSurfaceCommandView = PPTSurfaceCommandDescriptor & {
+  disabled: boolean
+}
+type PPTSurfaceCommandViewGroup = {
+  commands: PPTSurfaceCommandView[]
+  id: string
+}
+type PPTContextMenuState = {
+  x: number
+  y: number
+}
+type PPTSelectionCommandAnchor = Point & {
+  placement: 'above' | 'below'
+}
+
+const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
+  commands: [{
+    availability: 'duplicate',
+    command: 'duplicate',
+    dataCommand: 'duplicate',
+    label: 'Duplicate',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+  }, {
+    availability: 'delete',
+    command: 'delete',
+    dataCommand: 'delete',
+    label: 'Delete',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.delete.title,
+  }],
+  id: 'edit',
+}, {
+  commands: [{
+    availability: 'alignLeft',
+    command: 'alignLeft',
+    dataCommand: 'align-left',
+    label: 'Align left',
+    surfaces: ['context-menu'],
+    title: CANVAS_COMMAND_AFFORDANCES.alignLeft.title,
+  }, {
+    availability: 'alignCenter',
+    command: 'alignCenter',
+    dataCommand: 'align-center-x',
+    label: 'Align center',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
+  }, {
+    availability: 'alignRight',
+    command: 'alignRight',
+    dataCommand: 'align-right',
+    label: 'Align right',
+    surfaces: ['context-menu'],
+    title: CANVAS_COMMAND_AFFORDANCES.alignRight.title,
+  }],
+  id: 'align',
+}, {
+  commands: [{
+    availability: 'bringForward',
+    command: 'bringForward',
+    dataCommand: 'bring-forward',
+    label: 'Bring forward',
+    surfaces: ['context-menu'],
+    title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
+  }, {
+    availability: 'bringToFront',
+    command: 'bringToFront',
+    dataCommand: 'bring-to-front',
+    label: 'Bring to front',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
+  }, {
+    availability: 'sendBackward',
+    command: 'sendBackward',
+    dataCommand: 'send-backward',
+    label: 'Send backward',
+    surfaces: ['context-menu'],
+    title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
+  }, {
+    availability: 'sendToBack',
+    command: 'sendToBack',
+    dataCommand: 'send-to-back',
+    label: 'Send to back',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
+  }],
+  id: 'order',
+}, {
+  commands: [{
+    availability: 'group',
+    command: 'group',
+    dataCommand: 'group',
+    label: 'Group',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.group.title,
+  }, {
+    availability: 'ungroup',
+    command: 'ungroup',
+    dataCommand: 'ungroup',
+    label: 'Ungroup',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.ungroup.title,
+  }],
+  id: 'group',
+}, {
+  commands: [{
+    availability: 'lockSelection',
+    command: 'lockSelection',
+    dataCommand: 'lock-selection',
+    label: 'Lock',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
+  }, {
+    availability: 'unlockAll',
+    command: 'unlockAll',
+    dataCommand: 'unlock-all',
+    label: 'Unlock all',
+    surfaces: ['context-menu'],
+    title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
+  }],
+  id: 'lock',
+}]
+
 const PPT_LINE_CONNECTION_DISTANCE = 36
 const PPT_DEFAULT_TEXT_BOUNDS = {
   h: 76,
@@ -304,6 +456,7 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
+  const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
   const [replaceQuery, setReplaceQuery] = useState('')
@@ -402,6 +555,25 @@ function App() {
   }, [fitSlide])
 
   useEffect(() => {
+    if (!contextMenu) {
+      return
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      if (event.target instanceof Element &&
+        event.target.closest('[data-ppt-context-menu]')) {
+        return
+      }
+
+      setContextMenu(null)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [contextMenu])
+
+  useEffect(() => {
     if (!findOpen) {
       return
     }
@@ -428,6 +600,19 @@ function App() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (isEditableTarget(event.target)) {
+        return
+      }
+
+      if (contextMenu && event.key === 'Escape') {
+        event.preventDefault()
+        setContextMenu(null)
+        return
+      }
+
+      if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+        if (openPPTContextMenuAtSelection()) {
+          event.preventDefault()
+        }
         return
       }
 
@@ -527,6 +712,7 @@ function App() {
         setInteraction(null)
         setLineCreationMode(null)
         setCreationTool(null)
+        setContextMenu(null)
         setSelection([])
         return
       }
@@ -645,6 +831,7 @@ function App() {
     setSelection([])
     setEditingId(null)
     setInteraction(null)
+    setContextMenu(null)
   }
 
   function activateRelativeSlide(delta: number) {
@@ -661,6 +848,8 @@ function App() {
     setEditingId(null)
     setInteraction(null)
     setLineCreationMode(null)
+    setCreationTool(null)
+    setContextMenu(null)
 
     if (activeFindMatch) {
       focusPPTFindMatch(activeFindMatch)
@@ -677,6 +866,8 @@ function App() {
     setEditingId(null)
     setInteraction(null)
     setLineCreationMode(null)
+    setCreationTool(null)
+    setContextMenu(null)
   }
 
   function updateFindQuery(query: string) {
@@ -849,12 +1040,14 @@ function App() {
     setCreationTool((current) => arePPTCreationToolsEqual(current, tool) ? null : tool)
     setLineCreationMode(null)
     setEditingId(null)
+    setContextMenu(null)
   }
 
   function activateLineCreationMode(mode: LineCreationMode) {
     setLineCreationMode((current) => current === mode ? null : mode)
     setCreationTool(null)
     setEditingId(null)
+    setContextMenu(null)
   }
 
   function insertPPTImageSource(
@@ -1122,6 +1315,50 @@ function App() {
     }
   }
 
+  function runPPTSurfaceCommand(command: PPTSurfaceCommand) {
+    switch (command) {
+      case 'alignCenter':
+        alignSelection('alignCenter')
+        break
+      case 'alignLeft':
+        alignSelection('alignLeft')
+        break
+      case 'alignRight':
+        alignSelection('alignRight')
+        break
+      case 'bringForward':
+        reorderSelection('bringForward')
+        break
+      case 'bringToFront':
+        reorderSelection('bringToFront')
+        break
+      case 'delete':
+        deleteSelection()
+        break
+      case 'duplicate':
+        duplicateSelection()
+        break
+      case 'group':
+        groupSelection()
+        break
+      case 'lockSelection':
+        lockSelectedElements()
+        break
+      case 'sendBackward':
+        reorderSelection('sendBackward')
+        break
+      case 'sendToBack':
+        reorderSelection('sendToBack')
+        break
+      case 'ungroup':
+        ungroupSelection()
+        break
+      case 'unlockAll':
+        unlockAllElements()
+        break
+    }
+  }
+
   function commitText(elementId: string, text: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
@@ -1383,6 +1620,42 @@ function App() {
     })
   }
 
+  function worldToScreen(point: Point) {
+    const rect = stageRef.current?.getBoundingClientRect()
+
+    return {
+      x: (rect?.left ?? 0) + viewport.x + point.x * viewport.scale,
+      y: (rect?.top ?? 0) + viewport.y + point.y * viewport.scale,
+    }
+  }
+
+  function openPPTContextMenu(x: number, y: number) {
+    const menuWidth = 220
+    const menuHeight = 320
+    const margin = 8
+    const viewportWidth = globalThis.innerWidth || x + menuWidth + margin
+    const viewportHeight = globalThis.innerHeight || y + menuHeight + margin
+
+    setContextMenu({
+      x: clamp(x, margin, Math.max(margin, viewportWidth - menuWidth - margin)),
+      y: clamp(y, margin, Math.max(margin, viewportHeight - menuHeight - margin)),
+    })
+  }
+
+  function openPPTContextMenuAtSelection() {
+    if (!selectedBounds || selection.length === 0) {
+      return false
+    }
+
+    const point = worldToScreen({
+      x: selectedBounds.x + selectedBounds.w / 2,
+      y: selectedBounds.y,
+    })
+
+    openPPTContextMenu(point.x, point.y)
+    return true
+  }
+
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
     if (getPPTImageFileFromDataTransfer(event.dataTransfer)) {
       event.preventDefault()
@@ -1497,6 +1770,10 @@ function App() {
       return
     }
 
+    if (event.button !== 0) {
+      return
+    }
+
     if (lineCreationMode && beginLineCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
@@ -1544,6 +1821,35 @@ function App() {
     })
   }
 
+  function handleElementContextMenu(
+    event: ReactMouseEvent<HTMLDivElement>,
+    elementId: string,
+  ) {
+    if (editingId || isEditableTarget(event.target)) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+
+    if (!selection.includes(elementId)) {
+      const nextSelection = getPPTGroupPointerSelection({
+        additive: false,
+        fallbackSelection: [elementId],
+        itemId: elementId,
+        selection: [],
+        slide: activeSlide,
+      })
+
+      setSelection(nextSelection)
+    }
+
+    openPPTContextMenu(event.clientX, event.clientY)
+  }
+
   function handleStagePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (editingId || event.button !== 0) {
       return
@@ -1573,6 +1879,23 @@ function App() {
     if (!additive) {
       setSelection([])
     }
+  }
+
+  function handleStageContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    if (editingId || isEditableTarget(event.target)) {
+      return
+    }
+
+    if (selection.length === 0) {
+      setContextMenu(null)
+      return
+    }
+
+    event.preventDefault()
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    openPPTContextMenu(event.clientX, event.clientY)
   }
 
   function handleResizePointerDown(
@@ -1997,6 +2320,26 @@ function App() {
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_CANVAS_SNAP_GUIDES
+  const selectionCommandAnchor = selectedBounds &&
+    !editingId &&
+    !interaction &&
+    !contextMenu &&
+    !creationTool &&
+    !lineCreationMode
+    ? getPPTSelectionCommandAnchor({
+        bounds: selectedBounds,
+        stage: stageRef.current,
+        viewport,
+      })
+    : null
+  const selectionFloatingCommandGroups = getPPTCommandSurfaceGroups({
+    availability: commandAvailability,
+    surface: 'selection-floating-bar',
+  })
+  const contextCommandGroups = getPPTCommandSurfaceGroups({
+    availability: commandAvailability,
+    surface: 'context-menu',
+  })
 
   return (
     <main className="ppt-app" data-ppt-app>
@@ -2226,6 +2569,7 @@ function App() {
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
         data-grid={showGrid ? 'true' : 'false'}
         data-line-tool={lineCreationMode ?? undefined}
+        onContextMenu={handleStageContextMenu}
         onDragOver={handleStageDragOver}
         onDrop={handleStageDrop}
         onPointerDown={handleStagePointerDown}
@@ -2257,8 +2601,10 @@ function App() {
                   if (isPPTTextElement(element)) {
                     setEditingId(element.id)
                     setSelection([element.id])
+                    setContextMenu(null)
                   }
                 }}
+                onContextMenu={handleElementContextMenu}
                 onPointerDown={handleElementPointerDown}
                 onPointerEnter={() => setHoveredId(element.id)}
                 onPointerLeave={() => setHoveredId((current) => current === element.id ? null : current)}
@@ -2277,6 +2623,12 @@ function App() {
                 onResizePointerDown={handleResizePointerDown}
               />
             ) : null}
+            <PPTSelectionFloatingBar
+              anchor={selectionCommandAnchor}
+              groups={selectionFloatingCommandGroups}
+              scale={viewport.scale}
+              onCommand={runPPTSurfaceCommand}
+            />
             {selectedLineElement && !editingId && canResizeSelection ? (
               <LineEndpointOverlay
                 line={selectedLineElement}
@@ -2298,6 +2650,12 @@ function App() {
             <Guides guides={snapGuides} scale={viewport.scale} />
           </div>
         </div>
+        <PPTContextCommandMenu
+          groups={contextCommandGroups}
+          menu={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onCommand={runPPTSurfaceCommand}
+        />
       </section>
 
       <Inspector
@@ -2441,6 +2799,178 @@ function FindReplaceStrip({
   )
 }
 
+function PPTSelectionFloatingBar({
+  anchor,
+  groups,
+  onCommand,
+  scale,
+}: {
+  anchor: PPTSelectionCommandAnchor | null
+  groups: readonly PPTSurfaceCommandViewGroup[]
+  onCommand: (command: PPTSurfaceCommand) => void
+  scale: number
+}) {
+  if (!anchor || groups.length === 0) {
+    return null
+  }
+
+  return (
+    <div
+      aria-label="Selection actions"
+      className="ppt-selection-floating-bar"
+      data-placement={anchor.placement}
+      data-ppt-selection-floating-bar
+      role="toolbar"
+      style={{
+        '--ppt-command-scale': String(1 / scale),
+        left: anchor.x,
+        top: anchor.y,
+      } as CSSProperties}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {groups.map((group, groupIndex) => (
+        <Fragment key={group.id}>
+          {groupIndex > 0 ? <span className="ppt-command-divider" /> : null}
+          {group.commands.map((command) => (
+            <PPTSurfaceCommandButton
+              command={command}
+              key={command.command}
+              surface="selection-floating-bar"
+              onCommand={onCommand}
+            />
+          ))}
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
+function PPTContextCommandMenu({
+  groups,
+  menu,
+  onClose,
+  onCommand,
+}: {
+  groups: readonly PPTSurfaceCommandViewGroup[]
+  menu: PPTContextMenuState | null
+  onClose: () => void
+  onCommand: (command: PPTSurfaceCommand) => void
+}) {
+  if (!menu || groups.length === 0) {
+    return null
+  }
+
+  return (
+    <div
+      aria-label="Selection commands"
+      className="ppt-context-menu"
+      data-ppt-context-menu
+      role="menu"
+      style={{
+        left: menu.x,
+        top: menu.y,
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {groups.map((group) => (
+        <div className="ppt-context-menu-group" key={group.id} role="group">
+          {group.commands.map((command) => (
+            <PPTSurfaceCommandButton
+              command={command}
+              key={command.command}
+              surface="context-menu"
+              onAfterCommand={onClose}
+              onCommand={onCommand}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PPTSurfaceCommandButton({
+  command,
+  onAfterCommand,
+  onCommand,
+  surface,
+}: {
+  command: PPTSurfaceCommandView
+  onAfterCommand?: () => void
+  onCommand: (command: PPTSurfaceCommand) => void
+  surface: PPTCommandSurface
+}) {
+  const dataAttribute = surface === 'context-menu'
+    ? { 'data-ppt-context-command': command.dataCommand }
+    : { 'data-ppt-floating-command': command.dataCommand }
+
+  return (
+    <button
+      aria-label={command.label}
+      className={surface === 'context-menu'
+        ? 'ppt-context-menu-item'
+        : 'ppt-floating-command'}
+      disabled={command.disabled}
+      role={surface === 'context-menu' ? 'menuitem' : undefined}
+      title={command.title}
+      type="button"
+      {...dataAttribute}
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+
+        if (command.disabled) {
+          return
+        }
+
+        onCommand(command.command)
+        onAfterCommand?.()
+      }}
+    >
+      <PPTSurfaceCommandIcon command={command.command} size={16} />
+      {surface === 'context-menu' ? <span>{command.label}</span> : null}
+    </button>
+  )
+}
+
+function PPTSurfaceCommandIcon({
+  command,
+  size,
+}: {
+  command: PPTSurfaceCommand
+  size: number
+}) {
+  switch (command) {
+    case 'alignCenter':
+      return <AlignCenterVertical size={size} />
+    case 'alignLeft':
+      return <AlignStartVertical size={size} />
+    case 'alignRight':
+      return <AlignEndVertical size={size} />
+    case 'bringForward':
+      return <MoveUp size={size} />
+    case 'bringToFront':
+      return <BringToFront size={size} />
+    case 'delete':
+      return <Trash2 size={size} />
+    case 'duplicate':
+      return <CopyPlus size={size} />
+    case 'group':
+      return <Group size={size} />
+    case 'lockSelection':
+      return <Lock size={size} />
+    case 'sendBackward':
+      return <MoveDown size={size} />
+    case 'sendToBack':
+      return <SendToBack size={size} />
+    case 'ungroup':
+      return <Ungroup size={size} />
+    case 'unlockAll':
+      return <Unlock size={size} />
+  }
+}
+
 function SlideThumb({
   active,
   index,
@@ -2502,6 +3032,7 @@ function PPTElementView({
   findActive,
   hovered,
   onCommitText,
+  onContextMenu,
   onEdit,
   onPointerDown,
   onPointerEnter,
@@ -2514,6 +3045,7 @@ function PPTElementView({
   findActive: boolean
   hovered: boolean
   onCommitText: (elementId: string, text: string) => void
+  onContextMenu: (event: ReactMouseEvent<HTMLDivElement>, elementId: string) => void
   onEdit: () => void
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>, elementId: string) => void
   onPointerEnter: () => void
@@ -2566,6 +3098,7 @@ function PPTElementView({
       data-rotation={Math.round(element.geometry.rotation ?? 0)}
       data-selected={selected ? 'true' : 'false'}
       data-shape={element.kind === 'shape' ? element.shape : undefined}
+      onContextMenu={(event) => onContextMenu(event, element.id)}
       onDoubleClick={onEdit}
       onPointerDown={(event) => onPointerDown(event, element.id)}
       onPointerEnter={onPointerEnter}
@@ -3401,6 +3934,78 @@ function isEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement &&
     (target.isContentEditable ||
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+
+function getPPTCommandSurfaceGroups({
+  availability,
+  surface,
+}: {
+  availability: ReturnType<typeof getPPTCanvasCommandAvailability>
+  surface: PPTCommandSurface
+}): PPTSurfaceCommandViewGroup[] {
+  return PPT_COMMAND_SURFACE_GROUPS.flatMap((group) => {
+    const commands = group.commands
+      .filter((command) => command.surfaces.includes(surface))
+      .map((command) => ({
+        ...command,
+        disabled: !availability[command.availability],
+      }))
+
+    return commands.length > 0
+      ? [{
+          commands,
+          id: group.id,
+        }]
+      : []
+  })
+}
+
+function getPPTSelectionCommandAnchor({
+  bounds,
+  stage,
+  viewport,
+}: {
+  bounds: Bounds
+  stage: HTMLElement | null
+  viewport: Viewport
+}): PPTSelectionCommandAnchor {
+  const scale = viewport.scale
+  const gap = 10 / scale
+  const screenMargin = 8
+  const barHeight = 40
+  const barHalfWidth = 118 / scale
+  const centerX = bounds.x + bounds.w / 2
+
+  if (!stage) {
+    return {
+      placement: 'above',
+      x: clamp(centerX, barHalfWidth, PPT_SLIDE_WIDTH - barHalfWidth),
+      y: bounds.y - gap,
+    }
+  }
+
+  const rect = stage.getBoundingClientRect()
+  const visibleLeft = clamp((screenMargin - viewport.x) / scale, 0, PPT_SLIDE_WIDTH)
+  const visibleRight = clamp(
+    (rect.width - screenMargin - viewport.x) / scale,
+    0,
+    PPT_SLIDE_WIDTH,
+  )
+  const minX = Math.min(visibleLeft + barHalfWidth, PPT_SLIDE_WIDTH - barHalfWidth)
+  const maxX = Math.max(minX, visibleRight - barHalfWidth)
+  const aboveY = bounds.y - gap
+  const belowY = bounds.y + bounds.h + gap
+  const aboveScreenY = viewport.y + aboveY * scale
+  const belowScreenY = viewport.y + belowY * scale
+  const aboveFits = aboveScreenY - barHeight >= screenMargin
+  const belowFits = belowScreenY + barHeight <= rect.height - screenMargin
+  const placement = aboveFits || !belowFits ? 'above' : 'below'
+
+  return {
+    placement,
+    x: clamp(centerX, minX, maxX),
+    y: placement === 'above' ? aboveY : belowY,
+  }
 }
 
 function getPPTElementParagraphAlign(element: PPTElement) {
