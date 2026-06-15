@@ -33,6 +33,7 @@ try {
 
   await runFirstScreenScenario(page)
   await runTextEditingScenario(page)
+  await runFindReplaceScenario(page)
   await runSelectionAndDragScenario(page)
   await runAffordanceScenario(page)
   await runViewAndShapeScenario(page)
@@ -186,6 +187,188 @@ async function runTextEditingScenario(page) {
     afterCancel,
     beforeCancel,
   })
+}
+
+async function runFindReplaceScenario(page) {
+  await pressKey(page, {
+    code: 'KeyF',
+    key: 'f',
+    modifiers: 2,
+    windowsVirtualKeyCode: 70,
+  })
+  await delay(80)
+  await page.send('Input.insertText', { text: 'PPT' })
+  await delay(100)
+
+  const afterFindMany = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      findActive: selected?.getAttribute('data-ppt-find-active') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      stripOpen: !!document.querySelector('[data-ppt-find-strip]'),
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('finds multiple deck text results in slide order', afterFindMany.stripOpen && afterFindMany.count === '1/3' && afterFindMany.activeSlide === 'slide-1' && afterFindMany.selectedId === 's1-card-2', afterFindMany)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterFindNext = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record('moves to next PPT find result with Enter', afterFindNext.count === '2/3' && afterFindNext.activeSlide === 'slide-2' && afterFindNext.selectedId === 's2-title', afterFindNext)
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    modifiers: 8,
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(100)
+
+  const afterFindPrevious = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record('moves to previous PPT find result with Shift Enter', afterFindPrevious.count === '1/3' && afterFindPrevious.activeSlide === 'slide-1' && afterFindPrevious.selectedId === 's1-card-2', afterFindPrevious)
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-find-query]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(input, 'PPTX')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(100)
+
+  const afterFind = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      findActive: selected?.getAttribute('data-ppt-find-active') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      stripOpen: !!document.querySelector('[data-ppt-find-strip]'),
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('finds deck text across PPT slides', afterFind.stripOpen && afterFind.count === '1/1' && afterFind.activeSlide === 'slide-2' && afterFind.selectedId === 's2-title' && afterFind.findActive === 'true', afterFind)
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-replace-query]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(input, 'PPT-ready')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    document.querySelector('[data-ppt-find-replace]').click()
+  })()`)
+  await delay(100)
+
+  const afterReplace = await page.eval(`(() => {
+    const code = document.querySelector('.ppt-export-code')?.value ?? ''
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      hasTextBodyRuns: code.includes('"textBody"') && code.includes('"paragraphs"') && code.includes('"runs"'),
+      text: selected?.textContent ?? '',
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record('replaces active PPT text match while preserving textBody structure', afterReplace.text.includes('PPT-ready later') && afterReplace.count === '0/0' && afterReplace.hasTextBodyRuns && afterReplace.undoEnabled, afterReplace)
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(100)
+
+  const afterUndo = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('undoes PPT find replacement', afterUndo.text.includes('PPTX later') && afterUndo.count === '1/1' && afterUndo.redoEnabled && afterUndo.selectedId === 's2-title', afterUndo)
+
+  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await delay(100)
+
+  const afterRedo = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
+      text: selected?.textContent ?? '',
+    }
+  })()`)
+
+  record('redoes PPT find replacement', afterRedo.text.includes('PPT-ready later') && afterRedo.count === '0/0', afterRedo)
+
+  await page.eval(`document.querySelector('[data-ppt-find-close]').click()`)
+  await delay(50)
+
+  const titlePoint = await getElementCenter(page, 's2-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(50)
+  await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s2-title"] .ppt-element-editor')
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyF',
+      ctrlKey: true,
+      key: 'f',
+    }))
+  })()`)
+  await delay(50)
+
+  const afterGuard = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s2-title"] .ppt-element-editor')
+
+    return {
+      editing: editor?.isContentEditable === true && document.activeElement === editor,
+      stripOpen: !!document.querySelector('[data-ppt-find-strip]'),
+    }
+  })()`)
+
+  record('does not open PPT find while native text editing is active', afterGuard.editing && !afterGuard.stripOpen, afterGuard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(50)
 }
 
 async function runAffordanceScenario(page) {

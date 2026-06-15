@@ -55,6 +55,38 @@
   border-left: 1px solid var(--panel-border);
 }
 
+.ppt-find-strip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--panel-border);
+}
+
+.ppt-find-input {
+  width: 126px;
+  height: 34px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+}
+
+.ppt-find-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 34px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .ppt-icon-button,
 .ppt-button,
 .ppt-slide-action,

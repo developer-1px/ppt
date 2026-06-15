@@ -30,6 +30,7 @@ import {
   MoveUp,
   Redo2,
   RotateCw,
+  Search,
   SendToBack,
   Square,
   Trash2,
@@ -37,6 +38,7 @@ import {
   Undo2,
   Ungroup,
   Unlock,
+  X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -51,8 +53,10 @@ import {
   type ChangeEvent as ReactChangeEvent,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from 'react'
 import {
   RESIZE_HANDLES,
@@ -116,9 +120,11 @@ import {
   type PPTLineMarker,
   type PPTLineRoute,
   type PPTParagraph,
+  type PPTRun,
   type PPTShape,
   type PPTShapeKind,
   type PPTSlide,
+  type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
 import { SAMPLE_PPT_DECK } from './pptSampleDeck'
@@ -185,6 +191,21 @@ const canvasReorderModeAvailabilityKey = {
 const PPT_LINE_CONNECTION_DISTANCE = 36
 
 type LineCreationMode = 'arrow' | 'line'
+type PPTFindMatch = {
+  elementId: string
+  elementIndex: number
+  end: number
+  slideId: string
+  slideIndex: number
+  start: number
+}
+
+type PPTTextRunStyle = Omit<PPTRun, 'text'>
+type PPTTextToken = {
+  align?: PPTParagraph['align']
+  char: string
+  runStyle: PPTTextRunStyle
+}
 
 type Interaction =
   | {
@@ -257,11 +278,16 @@ function App() {
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTElement[]>([])
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [replaceQuery, setReplaceQuery] = useState('')
+  const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [showGrid, setShowGrid] = useState(true)
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const findInputRef = useRef<HTMLInputElement | null>(null)
   const deckRef = useRef(deck)
 
   useEffect(() => {
@@ -285,6 +311,11 @@ function App() {
   const selectedLineElement = selection.length === 1 && selectedElement?.kind === 'line'
     ? selectedElement
     : null
+  const findMatches = useMemo(() => getPPTDeckTextMatches(deck, findQuery), [deck, findQuery])
+  const clampedFindIndex = findMatches.length === 0
+    ? 0
+    : Math.min(activeFindIndex, findMatches.length - 1)
+  const activeFindMatch = findMatches[clampedFindIndex] ?? null
   const exportCode = useMemo(() => exportPPTDeckHTML(deck), [deck])
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
   const hasLockedSelection = selectedElements.some((element) => element.locked === true)
@@ -345,8 +376,38 @@ function App() {
   }, [fitSlide])
 
   useEffect(() => {
+    if (!findOpen) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      findInputRef.current?.focus()
+      findInputRef.current?.select()
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [findOpen])
+
+  useEffect(() => {
+    if (!findOpen || !activeFindMatch) {
+      return
+    }
+
+    focusPPTFindMatch(activeFindMatch)
+  }, [
+    activeFindMatch,
+    findOpen,
+  ])
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (isEditableTarget(event.target)) {
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        openFindStrip()
         return
       }
 
@@ -550,6 +611,98 @@ function App() {
 
     if (nextSlide) {
       selectSlide(nextSlide.id)
+    }
+  }
+
+  function openFindStrip() {
+    setFindOpen(true)
+    setEditingId(null)
+    setInteraction(null)
+    setLineCreationMode(null)
+
+    if (activeFindMatch) {
+      focusPPTFindMatch(activeFindMatch)
+    }
+  }
+
+  function closeFindStrip() {
+    setFindOpen(false)
+  }
+
+  function focusPPTFindMatch(match: PPTFindMatch) {
+    setActiveSlideId(match.slideId)
+    setSelection([match.elementId])
+    setEditingId(null)
+    setInteraction(null)
+    setLineCreationMode(null)
+  }
+
+  function updateFindQuery(query: string) {
+    setFindQuery(query)
+    setActiveFindIndex(0)
+
+    const firstMatch = getPPTDeckTextMatches(deckRef.current, query)[0]
+
+    if (firstMatch) {
+      focusPPTFindMatch(firstMatch)
+    }
+  }
+
+  function goToFindMatch(delta: -1 | 1) {
+    if (findMatches.length === 0) {
+      return
+    }
+
+    const nextIndex = (clampedFindIndex + delta + findMatches.length) % findMatches.length
+    const nextMatch = findMatches[nextIndex]
+
+    setActiveFindIndex(nextIndex)
+    focusPPTFindMatch(nextMatch)
+  }
+
+  function replaceActiveFindMatch() {
+    if (!activeFindMatch || findQuery.length === 0) {
+      return
+    }
+
+    const match = activeFindMatch
+    const nextMatchCount = Math.max(0, findMatches.length - 1)
+
+    commitDeck((current) =>
+      updatePPTDeckElement(current, match.slideId, match.elementId, (element) =>
+        replacePPTElementTextRange(element, match.start, match.end, replaceQuery),
+      ),
+    )
+    setActiveFindIndex((current) =>
+      nextMatchCount === 0 ? 0 : Math.min(current, nextMatchCount - 1))
+  }
+
+  function replaceAllFindMatches() {
+    if (findMatches.length === 0 || findQuery.length === 0) {
+      return
+    }
+
+    commitDeck((current) => ({
+      ...current,
+      slides: current.slides.map((slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) =>
+          replaceAllPPTElementTextMatches(element, findQuery, replaceQuery)),
+      })),
+    }))
+    setActiveFindIndex(0)
+  }
+
+  function handleFindKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      goToFindMatch(event.shiftKey ? -1 : 1)
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeFindStrip()
     }
   }
 
@@ -1774,7 +1927,27 @@ function App() {
           <button className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={CANVAS_COMMAND_AFFORDANCES.redo.title} type="button">
             <Redo2 size={17} />
           </button>
+          <button className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
+            <Search size={17} />
+          </button>
         </div>
+        {findOpen ? (
+          <FindReplaceStrip
+            activeIndex={clampedFindIndex}
+            inputRef={findInputRef}
+            matchCount={findMatches.length}
+            query={findQuery}
+            replaceQuery={replaceQuery}
+            onClose={closeFindStrip}
+            onFindKeyDown={handleFindKeyDown}
+            onFindQueryChange={updateFindQuery}
+            onNext={() => goToFindMatch(1)}
+            onPrevious={() => goToFindMatch(-1)}
+            onReplace={replaceActiveFindMatch}
+            onReplaceAll={replaceAllFindMatches}
+            onReplaceQueryChange={setReplaceQuery}
+          />
+        ) : null}
         <div className="ppt-toolbar-group">
           <button className="ppt-icon-button" onClick={addTextBox} title="Add text" type="button">
             <Type size={17} />
@@ -1955,6 +2128,7 @@ function App() {
                 editing={editingId === element.id}
                 element={element}
                 hovered={hoveredId === element.id}
+                findActive={findOpen && activeFindMatch?.elementId === element.id}
                 key={element.id}
                 selected={selection.includes(element.id)}
                 onCommitText={commitText}
@@ -2037,6 +2211,115 @@ function App() {
   )
 }
 
+function FindReplaceStrip({
+  activeIndex,
+  inputRef,
+  matchCount,
+  onClose,
+  onFindKeyDown,
+  onFindQueryChange,
+  onNext,
+  onPrevious,
+  onReplace,
+  onReplaceAll,
+  onReplaceQueryChange,
+  query,
+  replaceQuery,
+}: {
+  activeIndex: number
+  inputRef: RefObject<HTMLInputElement | null>
+  matchCount: number
+  onClose: () => void
+  onFindKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void
+  onFindQueryChange: (query: string) => void
+  onNext: () => void
+  onPrevious: () => void
+  onReplace: () => void
+  onReplaceAll: () => void
+  onReplaceQueryChange: (query: string) => void
+  query: string
+  replaceQuery: string
+}) {
+  const hasQuery = query.length > 0
+  const hasMatches = matchCount > 0
+
+  return (
+    <div className="ppt-find-strip" data-ppt-find-strip>
+      <input
+        aria-label="Find text"
+        className="ppt-find-input"
+        data-ppt-find-query
+        placeholder="Find"
+        ref={inputRef}
+        value={query}
+        onChange={(event) => onFindQueryChange(event.target.value)}
+        onKeyDown={onFindKeyDown}
+      />
+      <span className="ppt-find-count" data-ppt-find-count>
+        {hasQuery && hasMatches ? `${activeIndex + 1}/${matchCount}` : '0/0'}
+      </span>
+      <button
+        aria-label="Previous match"
+        className="ppt-icon-button"
+        data-ppt-find-prev
+        disabled={!hasMatches}
+        title="Previous match"
+        type="button"
+        onClick={onPrevious}
+      >
+        <ChevronUp size={16} />
+      </button>
+      <button
+        aria-label="Next match"
+        className="ppt-icon-button"
+        data-ppt-find-next
+        disabled={!hasMatches}
+        title="Next match"
+        type="button"
+        onClick={onNext}
+      >
+        <ChevronDown size={16} />
+      </button>
+      <input
+        aria-label="Replace text"
+        className="ppt-find-input"
+        data-ppt-replace-query
+        placeholder="Replace"
+        value={replaceQuery}
+        onChange={(event) => onReplaceQueryChange(event.target.value)}
+      />
+      <button
+        className="ppt-button"
+        data-ppt-find-replace
+        disabled={!hasMatches}
+        type="button"
+        onClick={onReplace}
+      >
+        Replace
+      </button>
+      <button
+        className="ppt-button"
+        data-ppt-find-replace-all
+        disabled={!hasMatches}
+        type="button"
+        onClick={onReplaceAll}
+      >
+        All
+      </button>
+      <button
+        aria-label="Close find"
+        className="ppt-icon-button"
+        data-ppt-find-close
+        title="Close find"
+        type="button"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+    </div>
+  )
+}
+
 function SlideThumb({
   active,
   index,
@@ -2095,6 +2378,7 @@ function SlideThumb({
 function PPTElementView({
   editing,
   element,
+  findActive,
   hovered,
   onCommitText,
   onEdit,
@@ -2106,6 +2390,7 @@ function PPTElementView({
 }: {
   editing: boolean
   element: PPTElement
+  findActive: boolean
   hovered: boolean
   onCommitText: (elementId: string, text: string) => void
   onEdit: () => void
@@ -2154,6 +2439,7 @@ function PPTElementView({
       data-line-start-connection={element.kind === 'line'
         ? element.startConnection?.elementId
         : undefined}
+      data-ppt-find-active={findActive ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
       data-rotation={Math.round(element.geometry.rotation ?? 0)}
@@ -3002,6 +3288,256 @@ function getPPTElementParagraphAlign(element: PPTElement) {
   }
 
   return element.textBody?.paragraphs[0]?.align ?? 'left'
+}
+
+function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {
+  if (query.length === 0) {
+    return []
+  }
+
+  const matches: PPTFindMatch[] = []
+
+  deck.slides.forEach((slide, slideIndex) => {
+    slide.elements.forEach((element, elementIndex) => {
+      if (!isPPTTextElement(element)) {
+        return
+      }
+
+      const text = readPPTText(element.textBody)
+      const ranges = getPPTTextMatchRanges(text, query)
+
+      ranges.forEach((range) => {
+        matches.push({
+          elementId: element.id,
+          elementIndex,
+          end: range.end,
+          slideId: slide.id,
+          slideIndex,
+          start: range.start,
+        })
+      })
+    })
+  })
+
+  return matches
+}
+
+function getPPTTextMatchRanges(text: string, query: string) {
+  if (query.length === 0) {
+    return []
+  }
+
+  const ranges: Array<{ end: number; start: number }> = []
+  const haystack = text.toLocaleLowerCase()
+  const needle = query.toLocaleLowerCase()
+  let start = haystack.indexOf(needle)
+
+  while (start >= 0) {
+    const end = start + query.length
+    ranges.push({ end, start })
+    start = haystack.indexOf(needle, end)
+  }
+
+  return ranges
+}
+
+function replaceAllPPTElementTextMatches(
+  element: PPTElement,
+  query: string,
+  replacement: string,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  const ranges = getPPTTextMatchRanges(readPPTText(element.textBody), query)
+
+  return ranges
+    .slice()
+    .reverse()
+    .reduce<PPTElement>(
+      (nextElement, range) =>
+        replacePPTElementTextRange(nextElement, range.start, range.end, replacement),
+      element,
+    )
+}
+
+function replacePPTElementTextRange(
+  element: PPTElement,
+  start: number,
+  end: number,
+  replacement: string,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  return {
+    ...element,
+    textBody: replacePPTTextBodyRange(element.textBody, start, end, replacement),
+  }
+}
+
+function replacePPTTextBodyRange(
+  body: PPTTextBody,
+  start: number,
+  end: number,
+  replacement: string,
+): PPTTextBody {
+  const tokens = tokenizePPTTextBody(body)
+  const safeStart = clamp(Math.min(start, end), 0, tokens.length)
+  const safeEnd = clamp(Math.max(start, end), safeStart, tokens.length)
+  const anchor = tokens[safeStart] ?? tokens[safeStart - 1] ?? tokens[0]
+  const replacementTokens = createPPTTextTokens(
+    replacement,
+    anchor?.runStyle ?? {},
+    anchor?.align ?? body.paragraphs[0]?.align,
+  )
+
+  return buildPPTTextBodyFromTokens([
+    ...tokens.slice(0, safeStart),
+    ...replacementTokens,
+    ...tokens.slice(safeEnd),
+  ], body.paragraphs[0]?.align)
+}
+
+function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
+  const tokens: PPTTextToken[] = []
+
+  body.paragraphs.forEach((paragraph, paragraphIndex) => {
+    paragraph.runs.forEach((run) => {
+      const { text, ...runStyle } = run
+
+      for (let index = 0; index < text.length; index += 1) {
+        tokens.push({
+          align: paragraph.align,
+          char: text[index],
+          runStyle,
+        })
+      }
+    })
+
+    if (paragraphIndex < body.paragraphs.length - 1) {
+      tokens.push({
+        align: paragraph.align,
+        char: '\n',
+        runStyle: getPPTParagraphFallbackRunStyle(paragraph),
+      })
+    }
+  })
+
+  return tokens
+}
+
+function createPPTTextTokens(
+  text: string,
+  runStyle: PPTTextRunStyle,
+  align: PPTParagraph['align'] | undefined,
+): PPTTextToken[] {
+  const tokens: PPTTextToken[] = []
+
+  for (let index = 0; index < text.length; index += 1) {
+    tokens.push({
+      align,
+      char: text[index],
+      runStyle,
+    })
+  }
+
+  return tokens
+}
+
+function buildPPTTextBodyFromTokens(
+  tokens: PPTTextToken[],
+  fallbackAlign: PPTParagraph['align'] | undefined,
+): PPTTextBody {
+  const paragraphs: PPTParagraph[] = []
+  let currentAlign = fallbackAlign
+  let currentRuns: PPTRun[] = []
+  let currentRunStyle: PPTTextRunStyle | null = null
+  let currentText = ''
+
+  function flushRun() {
+    if (!currentRunStyle || currentText.length === 0) {
+      return
+    }
+
+    currentRuns.push({
+      ...currentRunStyle,
+      text: currentText,
+    })
+    currentRunStyle = null
+    currentText = ''
+  }
+
+  function flushParagraph() {
+    flushRun()
+    paragraphs.push(createPPTParagraph(currentRuns, currentAlign))
+    currentRuns = []
+    currentRunStyle = null
+    currentText = ''
+    currentAlign = fallbackAlign
+  }
+
+  tokens.forEach((token) => {
+    if (token.char === '\n') {
+      flushParagraph()
+      currentAlign = token.align ?? fallbackAlign
+      return
+    }
+
+    if (!currentRunStyle && currentText.length === 0 && currentRuns.length === 0) {
+      currentAlign = token.align ?? fallbackAlign
+    }
+
+    if (!currentRunStyle || !arePPTTextRunStylesEqual(currentRunStyle, token.runStyle)) {
+      flushRun()
+      currentRunStyle = token.runStyle
+    }
+
+    currentText += token.char
+  })
+
+  flushParagraph()
+
+  return {
+    paragraphs,
+  }
+}
+
+function createPPTParagraph(
+  runs: PPTRun[],
+  align: PPTParagraph['align'] | undefined,
+): PPTParagraph {
+  return {
+    ...(align ? { align } : {}),
+    runs: runs.length > 0 ? runs : [{ text: '' }],
+  }
+}
+
+function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunStyle {
+  const firstRun = paragraph.runs[0]
+
+  if (!firstRun) {
+    return {}
+  }
+
+  return {
+    ...(firstRun.bold === undefined ? {} : { bold: firstRun.bold }),
+    ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
+    ...(firstRun.italic === undefined ? {} : { italic: firstRun.italic }),
+    ...(firstRun.size === undefined ? {} : { size: firstRun.size }),
+  }
+}
+
+function arePPTTextRunStylesEqual(
+  left: PPTTextRunStyle,
+  right: PPTTextRunStyle,
+) {
+  return left.bold === right.bold &&
+    left.color === right.color &&
+    left.italic === right.italic &&
+    left.size === right.size
 }
 
 function isArrowKey(key: string) {
