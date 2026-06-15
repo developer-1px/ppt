@@ -84,6 +84,9 @@ const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_FILL_OPACITY_MIN = 0
 const PPT_FILL_OPACITY_MAX = 1
+const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
+const PPT_SHAPE_CORNER_RADIUS_MIN = 0
+const PPT_SHAPE_CORNER_RADIUS_MAX = 120
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(['solid', 'dash', 'dot'])
 
@@ -243,6 +246,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const transformAttrs = getPPTElementTransformAttrs(element)
   const altTextAttr = getPPTElementAltTextHTMLAttr(element)
   const hyperlinkAttr = getPPTElementHyperlinkHTMLAttr(element)
+  const cornerRadiusAttr = getPPTElementCornerRadiusHTMLAttr(element)
   const fillOpacityAttr = getPPTElementFillOpacityHTMLAttr(element)
   const strokeDashAttr = getPPTElementStrokeDashHTMLAttr(element)
   const opacity = getPPTElementOpacity(element)
@@ -304,7 +308,7 @@ function renderPPTElementHTML(element: PPTElement) {
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${fillOpacityAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${cornerRadiusAttr}${fillOpacityAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
   return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
@@ -389,7 +393,9 @@ function renderPPTShapeSVG(element: PPTShape) {
     return `<polygon points="${points}" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
   }
 
-  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="24" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
+  const cornerRadius = formatNumber(getPPTShapeCornerRadius(element))
+
+  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${escapeHtml(fill)}"${fillOpacity}${stroke} />`
 }
 
 function renderPPTLineSVG(element: PPTLine) {
@@ -804,6 +810,12 @@ function getPPTElementStrokeDashHTMLAttr(element: PPTElement) {
     : ''
 }
 
+function getPPTElementCornerRadiusHTMLAttr(element: PPTElement) {
+  return element.kind === 'shape' && element.shape === 'rect'
+    ? ` data-ppt-corner-radius="${escapeHtml(formatPPTShapeCornerRadius(getPPTShapeCornerRadius(element)))}"`
+    : ''
+}
+
 function getPPTElementFillOpacityHTMLAttr(element: PPTElement) {
   if (element.kind !== 'shape') {
     return ''
@@ -818,6 +830,12 @@ function getPPTElementFillOpacitySvgAttr(element: PPTElement) {
   }
 
   return `data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(element.fill)))}"`
+}
+
+function getPPTElementCornerRadiusSvgAttr(element: PPTElement) {
+  return element.kind === 'shape' && element.shape === 'rect'
+    ? `data-ppt-corner-radius="${escapeHtml(formatPPTShapeCornerRadius(getPPTShapeCornerRadius(element)))}"`
+    : ''
 }
 
 function getPPTElementStrokeDashSvgAttr(element: PPTElement) {
@@ -933,6 +951,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     `data-ppt-kind="${element.kind}"`,
     getPPTElementAltTextSvgAttr(element),
     getPPTElementHyperlinkSvgAttr(element),
+    getPPTElementCornerRadiusSvgAttr(element),
     getPPTElementFillOpacitySvgAttr(element),
     getPPTElementStrokeDashSvgAttr(element),
     `data-ppt-opacity="${escapeHtml(formatPPTElementOpacity(getPPTElementOpacity(element)))}"`,
@@ -1184,6 +1203,28 @@ function getPPTElementStrokeDash(element: PPTElement) {
   const stroke = getPPTElementStroke(element)
 
   return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function getPPTShapeCornerRadius(element: PPTShape) {
+  return element.shape === 'rect'
+    ? normalizePPTShapeCornerRadius(element.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT)
+    : 0
+}
+
+function normalizePPTShapeCornerRadius(value: number) {
+  const finiteValue = Number.isFinite(value)
+    ? value
+    : PPT_SHAPE_CORNER_RADIUS_DEFAULT
+  const clamped = Math.min(
+    PPT_SHAPE_CORNER_RADIUS_MAX,
+    Math.max(PPT_SHAPE_CORNER_RADIUS_MIN, finiteValue),
+  )
+
+  return Math.round(clamped)
+}
+
+function formatPPTShapeCornerRadius(value: number) {
+  return String(normalizePPTShapeCornerRadius(value))
 }
 
 function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
@@ -1553,6 +1594,9 @@ function normalizePPTParagraphSpacing(value: number) {
 function exportShapeStyle(element: PPTShape) {
   return [
     `background:${getPPTFillColorCSS(element.fill)}`,
+    element.shape === 'rect'
+      ? `border-radius:${formatPPTShapeCornerRadius(getPPTShapeCornerRadius(element))}px`
+      : '',
     element.stroke
       ? `border:${element.stroke.width}px solid ${element.stroke.color}`
       : '',

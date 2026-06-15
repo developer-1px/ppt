@@ -120,6 +120,7 @@ const PPTTextBoxSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTShapeSchema = PPTElementBaseSchema.extend({
+  cornerRadius: z.number().optional(),
   fill: PPTFillSchema,
   kind: z.literal('shape'),
   shape: z.enum(['rect', 'ellipse', 'diamond']),

@@ -3145,6 +3145,8 @@ async function runExportScenario(page) {
       hasObjectHyperlinkModel: code.includes('"hyperlink"') && code.includes('"url": "https://example.com/ppt"'),
       hasObjectAltTextMarkup: code.includes('data-ppt-alt-text="' + objectAltText + '"') && code.includes('alt="' + objectAltText + '"'),
       hasObjectAltTextModel: code.includes('"accessibility"') && code.includes('"altText": "' + objectAltText + '"'),
+      hasCornerRadiusMarkup: code.includes('data-ppt-corner-radius="36"') && code.includes('border-radius:36px'),
+      hasCornerRadiusModel: code.includes('"cornerRadius": 36'),
       hasFillOpacityMarkup: code.includes('data-ppt-fill-opacity="0.35"') && code.includes('background:rgb(') && code.includes('/ 0.35'),
       hasFillOpacityModel: code.includes('"fill"') && code.includes('"opacity": 0.35'),
       hasStrokeDashMarkup: code.includes('data-ppt-stroke-dash="dash"') && code.includes('border-style:dashed') && code.includes('data-ppt-stroke-dash="dot"') && code.includes('stroke-dasharray='),
@@ -3200,6 +3202,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata', state.hasObjectShadowMarkup && state.hasObjectShadowModel, state)
   record('exports PPT object hyperlink metadata', state.hasObjectHyperlinkMarkup && state.hasObjectHyperlinkModel, state)
   record('exports PPT object alt text metadata', state.hasObjectAltTextMarkup && state.hasObjectAltTextModel, state)
+  record('exports PPT shape corner radius metadata', state.hasCornerRadiusMarkup && state.hasCornerRadiusModel, state)
   record('exports PPT shape fill opacity metadata', state.hasFillOpacityMarkup && state.hasFillOpacityModel, state)
   record('exports PPT stroke dash style metadata', state.hasStrokeDashMarkup && state.hasStrokeDashModel, state)
   record('exports PPT bullet list markup and model data', state.hasBulletMarkup && state.hasBulletModel, state)
@@ -3241,6 +3244,7 @@ async function runExportScenario(page) {
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
       hasObjectHyperlink: text.includes('data-ppt-hyperlink-url="https://example.com/ppt"'),
       hasObjectAltText: text.includes('data-ppt-alt-text="' + objectAltText + '"') && text.includes('<title>' + objectAltText + '</title>'),
+      hasCornerRadius: text.includes('data-ppt-corner-radius="36"') && text.includes('rx="36"'),
       hasFillOpacity: text.includes('data-ppt-fill-opacity="0.35"') && text.includes('fill-opacity="0.35"'),
       hasStrokeDash: text.includes('data-ppt-stroke-dash="dash"') && text.includes('data-ppt-stroke-dash="dot"') && text.includes('stroke-dasharray='),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
@@ -3272,6 +3276,7 @@ async function runExportScenario(page) {
   record('exports PPT object shadow metadata into slide SVG', slideSvgState.hasObjectShadow, slideSvgState)
   record('exports PPT object hyperlink metadata into slide SVG', slideSvgState.hasObjectHyperlink, slideSvgState)
   record('exports PPT object alt text metadata into slide SVG', slideSvgState.hasObjectAltText, slideSvgState)
+  record('exports PPT shape corner radius metadata into slide SVG', slideSvgState.hasCornerRadius, slideSvgState)
   record('exports PPT shape fill opacity metadata into slide SVG', slideSvgState.hasFillOpacity, slideSvgState)
   record('exports PPT stroke dash style metadata into slide SVG', slideSvgState.hasStrokeDash, slideSvgState)
   record('exports PPT font family metadata into slide SVG', slideSvgState.hasFontFamily, slideSvgState)
@@ -3592,6 +3597,56 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="shape-corner-radius"]')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    setter.call(input, '36')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  const afterCornerRadius = await getPPTShapeCornerRadiusState(page)
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCornerRadiusUndo = await getPPTShapeCornerRadiusState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterCornerRadiusRedo = await getPPTShapeCornerRadiusState(page)
+
+  record(
+    'updates and restores PPT shape corner radius from inspector',
+    afterCornerRadius.inspectorRadius === '36' &&
+      afterCornerRadius.selectedCornerRadius === '36' &&
+      afterCornerRadius.selectedBorderRadius === '36px' &&
+      afterCornerRadius.thumbCornerRadius === '36' &&
+      afterCornerRadius.thumbBorderRadius !== '' &&
+      afterCornerRadiusUndo.inspectorRadius === '24' &&
+      afterCornerRadiusUndo.selectedCornerRadius === '24' &&
+      afterCornerRadiusRedo.inspectorRadius === '36' &&
+      afterCornerRadiusRedo.selectedCornerRadius === '36',
+    {
+      afterCornerRadius,
+      afterCornerRadiusRedo,
+      afterCornerRadiusUndo,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -3601,6 +3656,8 @@ async function runViewAndShapeScenario(page) {
 
     return {
       background: element?.style.background ?? '',
+      borderRadius: element?.style.borderRadius ?? '',
+      cornerRadius: element?.getAttribute('data-ppt-corner-radius') ?? '',
       fillOpacity: element?.getAttribute('data-ppt-fill-opacity') ?? '',
       objectOpacity: element?.style.opacity ?? '',
       open: !!overlay,
@@ -3613,6 +3670,14 @@ async function runViewAndShapeScenario(page) {
       fillPreview.fillOpacity === '0.35' &&
       fillPreview.background.includes('0.35') &&
       fillPreview.objectOpacity === '1',
+    fillPreview,
+  )
+
+  record(
+    'keeps PPT shape corner radius in presentation preview',
+    fillPreview.open &&
+      fillPreview.cornerRadius === '36' &&
+      fillPreview.borderRadius === '36px',
     fillPreview,
   )
 
@@ -6450,6 +6515,24 @@ function getPPTShapeFillOpacityState(page) {
       selectedObjectOpacity: selected?.style.opacity ?? '',
       thumbBackground: thumb?.style.background ?? '',
       thumbFillOpacity: thumb?.getAttribute('data-ppt-thumb-fill-opacity') ?? '',
+    }
+  })()`)
+}
+
+function getPPTShapeCornerRadiusState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const targetId = selected?.getAttribute('data-ppt-element') ?? ''
+    const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+
+    return {
+      inspectorRadius: document.querySelector('[data-ppt-style-field="shape-corner-radius"]')?.value ?? '',
+      selectedBorderRadius: selected?.style.borderRadius ?? '',
+      selectedCornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
+      selectedId: targetId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      thumbBorderRadius: thumb?.style.borderRadius ?? '',
+      thumbCornerRadius: thumb?.getAttribute('data-ppt-thumb-corner-radius') ?? '',
     }
   })()`)
 }

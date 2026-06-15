@@ -1090,6 +1090,10 @@ const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_FILL_OPACITY_MIN = 0
 const PPT_FILL_OPACITY_MAX = 1
 const PPT_FILL_OPACITY_STEP = 0.05
+const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
+const PPT_SHAPE_CORNER_RADIUS_MIN = 0
+const PPT_SHAPE_CORNER_RADIUS_MAX = 120
+const PPT_SHAPE_CORNER_RADIUS_STEP = 1
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_OPTIONS = Object.freeze([
   { label: 'Solid', value: 'solid' },
@@ -3067,8 +3071,31 @@ function App() {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
         element.kind === 'shape'
-          ? { ...element, shape }
+          ? {
+              ...element,
+              cornerRadius: shape === 'rect' ? element.cornerRadius : undefined,
+              shape,
+            }
           : element),
+    )
+  }
+
+  function updateShapeCornerRadius(elementId: string, cornerRadius: number) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'shape' || element.shape !== 'rect') {
+          return element
+        }
+
+        const normalized = normalizePPTShapeCornerRadius(cornerRadius)
+
+        return {
+          ...element,
+          cornerRadius: normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
+            ? undefined
+            : normalized,
+        }
+      }),
     )
   }
 
@@ -5285,6 +5312,7 @@ function App() {
         onTextAutoFit={autoFitTextElement}
         onLayerPaneCommandEffect={applyLayerPaneCommandEffect}
         onParagraphAlignChange={updateParagraphAlign}
+        onShapeCornerRadiusChange={updateShapeCornerRadius}
         onShapeKindChange={updateShapeKind}
         onSlideBackgroundChange={updateSlideBackground}
         onSlideLayoutChange={applySlideLayout}
@@ -7450,6 +7478,9 @@ function SlideThumb({
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
+            data-ppt-thumb-corner-radius={element.kind === 'shape' && element.shape === 'rect'
+              ? formatPPTShapeCornerRadius(getPPTShapeCornerRadius(element))
+              : undefined}
             data-ppt-thumb-fill-opacity={element.kind === 'shape'
               ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
               : undefined}
@@ -7506,6 +7537,9 @@ function SlideThumb({
                 : undefined,
               borderStyle: element.kind === 'shape' && element.stroke
                 ? getPPTStrokeDashBorderStyle(element.stroke)
+                : undefined,
+              borderRadius: element.kind === 'shape' && element.shape === 'rect'
+                ? getPPTThumbShapeCornerRadiusCSS(element)
                 : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
@@ -7671,6 +7705,9 @@ function PPTElementView({
       data-ppt-animation-trigger={animation.trigger}
       data-ppt-animation-type={animation.type}
       data-ppt-alt-text={getPPTElementAltText(element)}
+      data-ppt-corner-radius={element.kind === 'shape' && element.shape === 'rect'
+        ? formatPPTShapeCornerRadius(getPPTShapeCornerRadius(element))
+        : undefined}
       data-ppt-fill-opacity={element.kind === 'shape'
         ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
         : undefined}
@@ -8234,6 +8271,7 @@ function Inspector({
   onParagraphBulletChange,
   onParagraphAlignChange,
   onParagraphSpacingChange,
+  onShapeCornerRadiusChange,
   onShapeFillChange,
   onShapeKindChange,
   onSlideBackgroundChange,
@@ -8329,6 +8367,10 @@ function Inspector({
     elementId: string,
     field: PPTParagraphSpacingField,
     value: number,
+  ) => void
+  onShapeCornerRadiusChange: (
+    elementId: string,
+    cornerRadius: number,
   ) => void
   onShapeFillChange: (
     elementId: string,
@@ -9126,6 +9168,24 @@ function Inspector({
                     <option value="diamond">Diamond</option>
                   </select>
                 </label>
+                {selectedElement.shape === 'rect' ? (
+                  <label className="ppt-field">
+                    <span>Corner radius</span>
+                    <input
+                      data-ppt-style-field="shape-corner-radius"
+                      max={PPT_SHAPE_CORNER_RADIUS_MAX}
+                      min={PPT_SHAPE_CORNER_RADIUS_MIN}
+                      step={PPT_SHAPE_CORNER_RADIUS_STEP}
+                      type="number"
+                      value={getPPTShapeCornerRadius(selectedElement)}
+                      onChange={(event) =>
+                        onShapeCornerRadiusChange(
+                          selectedElement.id,
+                          parsePPTShapeCornerRadius(event.target.value),
+                        )}
+                    />
+                  </label>
+                ) : null}
                 <div className="ppt-geometry-grid">
                   <label className="ppt-field">
                     <span>Fill</span>
@@ -9565,6 +9625,9 @@ function pptElementStyle(element: PPTElement): CSSProperties {
       : undefined,
     borderStyle: element.kind === 'shape' && element.stroke
       ? getPPTStrokeDashBorderStyle(element.stroke)
+      : undefined,
+    borderRadius: element.kind === 'shape' && element.shape === 'rect'
+      ? `${getPPTShapeCornerRadius(element)}px`
       : undefined,
     padding: getPPTTextInsetCSS(getPPTTextElementInset(element)),
     textAlign: getPPTElementParagraphAlign(element),
@@ -10030,6 +10093,41 @@ function getPPTElementStrokeDash(element: PPTElement) {
   const stroke = getPPTElementStroke(element)
 
   return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+function getPPTShapeCornerRadius(element: PPTShape) {
+  return element.shape === 'rect'
+    ? normalizePPTShapeCornerRadius(element.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT)
+    : 0
+}
+
+function getPPTThumbShapeCornerRadiusCSS(element: PPTShape) {
+  const radius = getPPTShapeCornerRadius(element)
+  const minSize = Math.max(1, Math.min(element.geometry.w, element.geometry.h))
+  const percent = Math.min(50, (radius / minSize) * 100)
+
+  return `${Math.round(percent * 100) / 100}%`
+}
+
+function parsePPTShapeCornerRadius(value: string) {
+  return normalizePPTShapeCornerRadius(Number(value))
+}
+
+function normalizePPTShapeCornerRadius(value: number) {
+  const finiteValue = Number.isFinite(value)
+    ? value
+    : PPT_SHAPE_CORNER_RADIUS_DEFAULT
+  const clamped = clamp(
+    finiteValue,
+    PPT_SHAPE_CORNER_RADIUS_MIN,
+    PPT_SHAPE_CORNER_RADIUS_MAX,
+  )
+
+  return Math.round(clamped)
+}
+
+function formatPPTShapeCornerRadius(value: number) {
+  return String(normalizePPTShapeCornerRadius(value))
 }
 
 function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
