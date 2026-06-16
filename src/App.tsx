@@ -1476,6 +1476,7 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
+  const commandPaletteRestoreFocusRef = useRef<HTMLElement | null>(null)
   const slideDragSuppressClickRef = useRef(false)
   const deckRef = useRef(deck)
 
@@ -2169,6 +2170,12 @@ function App() {
   }
 
   function openCommandPalette() {
+    const activeElement = document.activeElement
+    commandPaletteRestoreFocusRef.current =
+      activeElement instanceof HTMLElement &&
+        !activeElement.closest('[data-ppt-command-palette]')
+        ? activeElement
+        : null
     setCommandPaletteOpen(true)
     setShortcutHelpOpen(false)
     setFindOpen(false)
@@ -2180,7 +2187,16 @@ function App() {
   }
 
   function closeCommandPalette() {
+    const restoreFocusElement = commandPaletteRestoreFocusRef.current
+
     setCommandPaletteOpen(false)
+    commandPaletteRestoreFocusRef.current = null
+
+    if (restoreFocusElement?.isConnected) {
+      window.requestAnimationFrame(() => {
+        restoreFocusElement.focus({ preventScroll: true })
+      })
+    }
   }
 
   function openShortcutHelp() {
@@ -6207,6 +6223,7 @@ function PPTCommandPaletteDialog({
 }) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
+  const dialogRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const filteredItems = useMemo(
     () => filterPPTCommandPaletteItems(items, query).slice(0, 10),
@@ -6235,6 +6252,23 @@ function PPTCommandPaletteDialog({
       event.preventDefault()
       event.stopPropagation()
       onClose()
+      return
+    }
+
+    if (event.key === 'Tab') {
+      const focusables = getPPTCommandPaletteFocusables(dialogRef.current)
+
+      if (focusables.length > 0) {
+        const currentIndex = focusables.findIndex((item) => item === document.activeElement)
+        const direction = event.shiftKey ? -1 : 1
+        const nextIndex = currentIndex < 0
+          ? 0
+          : (currentIndex + direction + focusables.length) % focusables.length
+
+        event.preventDefault()
+        event.stopPropagation()
+        focusables[nextIndex]?.focus()
+      }
       return
     }
 
@@ -6276,6 +6310,9 @@ function PPTCommandPaletteDialog({
         aria-modal="true"
         className="ppt-command-palette"
         data-ppt-command-palette
+        data-ppt-command-palette-focus-trap="true"
+        data-ppt-command-palette-restore-focus="true"
+        ref={dialogRef}
         role="dialog"
         onKeyDown={handleKeyDown}
       >
@@ -6347,6 +6384,16 @@ function filterPPTCommandPaletteItems(
 
     return terms.every((term) => haystack.includes(term))
   })
+}
+
+function getPPTCommandPaletteFocusables(dialog: HTMLElement | null) {
+  if (!dialog) {
+    return []
+  }
+
+  return [...dialog.querySelectorAll<HTMLElement>(
+    'input, button:not(:disabled)',
+  )]
 }
 
 function getPPTShortcutHelpItems(

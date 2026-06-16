@@ -1739,6 +1739,101 @@ async function runCommandPaletteScenario(page) {
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
   }))()`)
 
+  const paletteButton = await page.eval(`(() => {
+    const button = document.querySelector('[data-ppt-command-palette-open]')
+    const rect = button?.getBoundingClientRect()
+
+    return {
+      exists: !!button,
+      x: rect ? rect.left + rect.width / 2 : 0,
+      y: rect ? rect.top + rect.height / 2 : 0,
+    }
+  })()`)
+  await clickMouse(page, paletteButton.x, paletteButton.y, 1)
+  await delay(100)
+
+  const afterToolbarOpen = await page.eval(`(() => ({
+    focusedQuery: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
+    focusTrap: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-focus-trap') ?? '',
+    itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    openerExists: !!document.querySelector('[data-ppt-command-palette-open]'),
+    restoreFocus: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-restore-focus') ?? '',
+  }))()`)
+
+  record(
+    'opens PPT command palette with focus trap metadata',
+    paletteButton.exists &&
+      afterToolbarOpen.open &&
+      afterToolbarOpen.focusedQuery &&
+      afterToolbarOpen.focusTrap === 'true' &&
+      afterToolbarOpen.restoreFocus === 'true' &&
+      afterToolbarOpen.itemCount > 0,
+    {
+      afterToolbarOpen,
+      paletteButton,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Tab',
+    key: 'Tab',
+    modifiers: 8,
+    windowsVirtualKeyCode: 9,
+  })
+  await delay(30)
+  const afterShiftTab = await page.eval(`(() => ({
+    activeInside: document.activeElement?.closest('[data-ppt-command-palette]') !== null,
+    activeItem: document.activeElement?.getAttribute('data-ppt-command-palette-item') ?? '',
+    focusedQuery: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Tab',
+    key: 'Tab',
+    windowsVirtualKeyCode: 9,
+  })
+  await delay(30)
+  const afterTabWrap = await page.eval(`(() => ({
+    activeInside: document.activeElement?.closest('[data-ppt-command-palette]') !== null,
+    activeItem: document.activeElement?.getAttribute('data-ppt-command-palette-item') ?? '',
+    focusedQuery: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
+  }))()`)
+
+  record(
+    'traps Tab focus inside PPT command palette',
+    afterShiftTab.activeInside &&
+      afterShiftTab.activeItem.length > 0 &&
+      !afterShiftTab.focusedQuery &&
+      afterTabWrap.activeInside &&
+      afterTabWrap.focusedQuery,
+    {
+      afterShiftTab,
+      afterTabWrap,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  const afterToolbarEscape = await page.eval(`(() => ({
+    focusedOpener: document.activeElement?.matches('[data-ppt-command-palette-open]') === true,
+    open: !!document.querySelector('[data-ppt-command-palette]'),
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record(
+    'restores focus to PPT command palette opener on Escape',
+    !afterToolbarEscape.open &&
+      afterToolbarEscape.focusedOpener &&
+      afterToolbarEscape.selectedId === initial.selectedId,
+    afterToolbarEscape,
+  )
+
   await pressKey(page, {
     code: 'KeyK',
     key: 'k',
