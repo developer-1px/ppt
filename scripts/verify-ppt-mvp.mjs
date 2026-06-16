@@ -9266,7 +9266,7 @@ async function runSlideManagementScenario(page) {
 
   const afterDrag = await getSlideRailState(page)
 
-  record('drags PPT slide thumbnail to reorder rail', dragDetails.ok && afterDrag.activeIndex === 0 && afterDrag.activeId === beforeDrag.activeId && afterDrag.activeName.startsWith('1. ') && afterDrag.activeName.includes('Copy') && afterDrag.selectedIds === beforeDrag.selectedIds && afterDrag.draggableCount === afterDrag.count && afterDrag.command === 'reorder-slide' && afterDrag.commandFromIndex === String(beforeDrag.activeIndex) && afterDrag.commandToIndex === '0' && afterDrag.commandSlide === beforeDrag.activeId && afterDrag.commandSelectionSlide === beforeDrag.activeId && afterDrag.commandType === 'slide-command-effect', {
+  record('drags PPT slide thumbnail to reorder rail', dragDetails.ok && afterDrag.model === 'slide-edit-rail-interactions' && afterDrag.activeIndex === 0 && afterDrag.activeId === beforeDrag.activeId && afterDrag.activeName.startsWith('1. ') && afterDrag.activeName.includes('Copy') && afterDrag.selectedIds === beforeDrag.selectedIds && afterDrag.draggableCount === afterDrag.count && afterDrag.command === 'reorder-slide' && afterDrag.commandFromIndex === String(beforeDrag.activeIndex) && afterDrag.commandToIndex === '0' && afterDrag.commandSlide === beforeDrag.activeId && afterDrag.commandSelectionSlide === beforeDrag.activeId && afterDrag.commandType === 'slide-command-effect', {
     afterDrag,
     beforeDrag,
     dragDetails,
@@ -9302,8 +9302,10 @@ async function runSlideManagementScenario(page) {
   await delay(50)
 
   const initialKeyboard = await getSlideRailState(page)
+  const expectedActiveOptionId = `slide-rail-option-${initialKeyboard.activeIndex}`
+  const expectedSlideOrder = initialKeyboard.ids.join(' ')
 
-  record('exposes PPT slide rail listbox keyboard affordance', initialKeyboard.listRole === 'listbox' && initialKeyboard.keyboardModel === 'listbox-roving-focus' && initialKeyboard.keyboardKeys === 'ArrowUp ArrowDown Home End Enter Space' && initialKeyboard.optionCount === initialKeyboard.count && initialKeyboard.selectedOptionIds.length === 1 && initialKeyboard.selectedOptionIds[0] === initialKeyboard.activeId && initialKeyboard.tabStopIds.length === 1 && initialKeyboard.tabStopIds[0] === initialKeyboard.activeId && initialKeyboard.focusedId === initialKeyboard.activeId, {
+  record('exposes PPT slide rail listbox keyboard affordance', initialKeyboard.model === 'slide-edit-rail-interactions' && initialKeyboard.listRole === 'listbox' && initialKeyboard.keyboardModel === 'aria-listbox-roving-focus' && initialKeyboard.keyboardKeys === 'ArrowUp ArrowDown Home End Enter Space' && initialKeyboard.selectionMode === 'single' && initialKeyboard.activeAttr === initialKeyboard.activeId && initialKeyboard.activeOption === expectedActiveOptionId && initialKeyboard.focusableOption === expectedActiveOptionId && initialKeyboard.slideOrder === expectedSlideOrder && initialKeyboard.optionCount === initialKeyboard.count && initialKeyboard.optionCountAttr === String(initialKeyboard.count) && initialKeyboard.thumbnailCount === String(initialKeyboard.count) && initialKeyboard.optionIds.length === initialKeyboard.count && initialKeyboard.optionIds.every((id, index) => id === `slide-rail-option-${index}`) && initialKeyboard.optionIndexes.every((value, index) => value === String(index)) && initialKeyboard.optionFocusableIds.length === 1 && initialKeyboard.optionFocusableIds[0] === initialKeyboard.activeId && initialKeyboard.activeThumbW === '112' && initialKeyboard.activeThumbH === '86' && initialKeyboard.activeHitW === '124' && initialKeyboard.activeHitH === '98' && initialKeyboard.selectedOptionIds.length === 1 && initialKeyboard.selectedOptionIds[0] === initialKeyboard.activeId && initialKeyboard.tabStopIds.length === 1 && initialKeyboard.tabStopIds[0] === initialKeyboard.activeId && initialKeyboard.focusedId === initialKeyboard.activeId, {
     initialKeyboard,
   })
 
@@ -10527,8 +10529,18 @@ function getSlideRailState(page) {
 
     return {
       activeId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
+      activeAttr: rail?.getAttribute('data-ppt-slide-rail-active') ?? '',
+      activeHitH: activeThumb?.getAttribute('data-ppt-slide-rail-hit-h') ?? '',
+      activeHitW: activeThumb?.getAttribute('data-ppt-slide-rail-hit-w') ?? '',
+      activeHitX: activeThumb?.getAttribute('data-ppt-slide-rail-hit-x') ?? '',
+      activeHitY: activeThumb?.getAttribute('data-ppt-slide-rail-hit-y') ?? '',
       activeIndex,
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeOption: rail?.getAttribute('data-ppt-slide-rail-active-option') ?? '',
+      activeThumbH: activeThumb?.getAttribute('data-ppt-slide-rail-thumb-h') ?? '',
+      activeThumbW: activeThumb?.getAttribute('data-ppt-slide-rail-thumb-w') ?? '',
+      activeThumbX: activeThumb?.getAttribute('data-ppt-slide-rail-thumb-x') ?? '',
+      activeThumbY: activeThumb?.getAttribute('data-ppt-slide-rail-thumb-y') ?? '',
       command: rail?.getAttribute('data-ppt-slide-rail-command') ?? '',
       commandFromIndex: rail?.getAttribute('data-ppt-slide-rail-command-from-index') ?? '',
       commandSelectionSlide: rail?.getAttribute('data-ppt-slide-rail-command-selection-slide') ?? '',
@@ -10537,21 +10549,32 @@ function getSlideRailState(page) {
       commandType: rail?.getAttribute('data-ppt-slide-rail-command-type') ?? '',
       count: thumbs.length,
       draggableCount: thumbs.filter((thumb) => thumb.getAttribute('data-ppt-slide-draggable') === 'true').length,
+      focusableOption: rail?.getAttribute('data-ppt-slide-rail-focusable-option') ?? '',
       focusedId: focusedThumb?.getAttribute('data-ppt-slide-id') ?? '',
       ids: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       keyboardKeys: rail?.getAttribute('data-ppt-slide-rail-keyboard-keys') ?? '',
       keyboardModel: rail?.getAttribute('data-ppt-slide-rail-keyboard-model') ?? '',
       listRole: rail?.getAttribute('role') ?? '',
+      model: rail?.getAttribute('data-ppt-slide-rail-model') ?? '',
       names: thumbs.map((thumb) => thumb.querySelector('.ppt-thumb-name')?.textContent ?? ''),
+      optionCountAttr: rail?.getAttribute('data-ppt-slide-rail-option-count') ?? '',
       optionCount: thumbs.filter((thumb) => thumb.getAttribute('role') === 'option').length,
+      optionFocusableIds: thumbs
+        .filter((thumb) => thumb.getAttribute('data-ppt-slide-rail-option-focusable') === 'true')
+        .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
+      optionIds: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-rail-option-id') ?? ''),
+      optionIndexes: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-rail-option-index') ?? ''),
       rovingTabIndexes: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-roving-tab-index') ?? ''),
+      selectionMode: rail?.getAttribute('data-ppt-slide-rail-selection-mode') ?? '',
       selectedOptionIds: thumbs
         .filter((thumb) => thumb.getAttribute('aria-selected') === 'true')
         .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       selectedIds: selectedIds.join(','),
+      slideOrder: rail?.getAttribute('data-ppt-slide-rail-slide-order') ?? '',
       tabStopIds: thumbs
         .filter((thumb) => thumb.tabIndex === 0)
         .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
+      thumbnailCount: rail?.getAttribute('data-ppt-slide-rail-thumbnail-count') ?? '',
     }
   })()`)
 }

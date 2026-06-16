@@ -122,7 +122,9 @@ import {
   getSlideEditObjectShadowCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleCommandEffect,
+  createSlideEditRailDescriptor,
   getSlideEditRailKeyboardCommandEffect,
+  getSlideEditRailListboxKeyboardIntent,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditStyleClipboardCopyCommandEffect,
@@ -180,7 +182,9 @@ import {
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditPlaceholderDescriptor,
+  type SlideEditRailListboxOptionDescriptor,
   type SlideEditRailHostCommandEffect,
+  type SlideEditRailThumbnailDescriptor,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditStyleClipboardBuiltInCategoryId,
   type SlideEditStyleClipboardCopyFormattingCommand,
@@ -344,6 +348,11 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
 })
 const PPT_RECENT_COLOR_LIMIT = 8
 const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right'] as const
+const PPT_SLIDE_RAIL_HIT_TARGET_PADDING = 6
+const PPT_SLIDE_RAIL_THUMB_GAP = 8
+const PPT_SLIDE_RAIL_THUMB_HEIGHT = 86
+const PPT_SLIDE_RAIL_THUMB_PADDING = 10
+const PPT_SLIDE_RAIL_THUMB_WIDTH = 112
 
 const PPT_FRAME_GUIDE_CONFIG = Object.freeze({
   columns: {
@@ -1750,6 +1759,18 @@ function App() {
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
   const activeSlideIndex = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
+  const slideRailDescriptor = useMemo(() => createSlideEditRailDescriptor({
+    activeSlideId: activeSlide.id,
+    getThumbnailBounds: (_slideId, index) => ({
+      h: PPT_SLIDE_RAIL_THUMB_HEIGHT,
+      w: PPT_SLIDE_RAIL_THUMB_WIDTH,
+      x: PPT_SLIDE_RAIL_THUMB_PADDING,
+      y: PPT_SLIDE_RAIL_THUMB_PADDING +
+        index * (PPT_SLIDE_RAIL_THUMB_HEIGHT + PPT_SLIDE_RAIL_THUMB_GAP),
+    }),
+    hitTargetPadding: PPT_SLIDE_RAIL_HIT_TARGET_PADDING,
+    slideOrder: deck.slides.map((slide) => slide.id),
+  }), [activeSlide.id, deck.slides])
   const presentationSlide = presentationSlideId
     ? deck.slides.find((slide) => slide.id === presentationSlideId) ?? activeSlide
     : null
@@ -2529,59 +2550,34 @@ function App() {
     }
 
     const slideOrder = deck.slides.map((slide) => slide.id)
-    let handled = false
-    let targetSlideId: string | null = null
+    const railKey = event.key === 'ArrowRight'
+      ? 'ArrowDown'
+      : event.key === 'ArrowLeft'
+        ? 'ArrowUp'
+        : event.key
+    const intent = getSlideEditRailListboxKeyboardIntent({
+      activeSlideId: slideId,
+      key: railKey,
+      slideOrder,
+    })
 
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-      handled = true
-      const effect = getSlideEditRailKeyboardCommandEffect({
-        activeSlideId: slideId,
-        direction: 'next',
-        slideOrder,
-        type: 'select-relative',
-      })
-
-      targetSlideId = effect?.payload.id === 'select-active-slide'
-        ? effect.payload.slideId
-        : null
-    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-      handled = true
-      const effect = getSlideEditRailKeyboardCommandEffect({
-        activeSlideId: slideId,
-        direction: 'previous',
-        slideOrder,
-        type: 'select-relative',
-      })
-
-      targetSlideId = effect?.payload.id === 'select-active-slide'
-        ? effect.payload.slideId
-        : null
-    } else if (event.key === 'Home') {
-      handled = true
-      targetSlideId = slideOrder[0] ?? null
-    } else if (event.key === 'End') {
-      handled = true
-      targetSlideId = slideOrder.at(-1) ?? null
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      handled = true
-      targetSlideId = slideId
-    }
-
-    if (!handled) {
+    if (!intent) {
       return
     }
 
     event.preventDefault()
     event.stopPropagation()
 
-    if (!targetSlideId) {
+    const effect = getSlideEditRailKeyboardCommandEffect(intent)
+    const targetSlideId = effect?.payload.id === 'select-active-slide'
+      ? effect.payload.slideId
+      : null
+
+    if (!effect || !targetSlideId) {
       return
     }
 
-    setLastSlideRailCommandEffect(toSlideEditRailHostCommandEffect({
-      id: 'select-active-slide',
-      slideId: targetSlideId,
-    }))
+    setLastSlideRailCommandEffect(effect)
     selectSlide(targetSlideId)
     focusPPTSlideThumb(targetSlideId)
   }
@@ -6755,15 +6751,23 @@ function App() {
           data-ppt-slide-drop-placement={slideDragState?.dropPlacement ?? undefined}
           data-ppt-slide-drop-target={slideDragState?.dropTargetSlideId ?? undefined}
           data-ppt-slide-list
+          data-ppt-slide-rail-active={slideRailDescriptor.activeSlideId ?? undefined}
+          data-ppt-slide-rail-active-option={slideRailDescriptor.listbox.activeOptionId ?? undefined}
           data-ppt-slide-rail-command={lastSlideRailCommandEffect?.payload.id}
           data-ppt-slide-rail-command-from-index={lastSlideRailReorderPayload?.fromIndex}
           data-ppt-slide-rail-command-selection-slide={lastSlideRailCommandEffect?.selection?.slideId}
           data-ppt-slide-rail-command-slide={lastSlideRailReorderPayload?.slideId}
           data-ppt-slide-rail-command-to-index={lastSlideRailReorderPayload?.toIndex}
           data-ppt-slide-rail-command-type={lastSlideRailCommandEffect?.type}
+          data-ppt-slide-rail-focusable-option={slideRailDescriptor.listbox.focusableOptionId ?? undefined}
           data-ppt-slide-rail-keyboard-keys="ArrowUp ArrowDown Home End Enter Space"
-          data-ppt-slide-rail-keyboard-model="listbox-roving-focus"
-          role="listbox"
+          data-ppt-slide-rail-keyboard-model={slideRailDescriptor.listbox.keyboardModel}
+          data-ppt-slide-rail-model="slide-edit-rail-interactions"
+          data-ppt-slide-rail-option-count={slideRailDescriptor.listbox.options.length}
+          data-ppt-slide-rail-selection-mode={slideRailDescriptor.listbox.selectionMode}
+          data-ppt-slide-rail-slide-order={slideRailDescriptor.slideOrder.join(' ')}
+          data-ppt-slide-rail-thumbnail-count={slideRailDescriptor.thumbnails.length}
+          role={slideRailDescriptor.listbox.role}
         >
           {deck.slides.map((slide, index) => (
             <SlideThumb
@@ -6774,7 +6778,9 @@ function App() {
                 : undefined}
               index={index}
               key={slide.id}
+              optionDescriptor={slideRailDescriptor.listbox.options[index]}
               slide={slide}
+              thumbnailDescriptor={slideRailDescriptor.thumbnails[index]}
               onDragEnd={handleSlideThumbDragEnd}
               onDragOver={(event) => handleSlideThumbDragOver(slide.id, event)}
               onDragStart={(event) => handleSlideThumbDragStart(slide.id, event)}
@@ -9860,6 +9866,7 @@ function SlideThumb({
   dragging,
   dropPlacement,
   index,
+  optionDescriptor,
   onDragEnd,
   onDragOver,
   onDragStart,
@@ -9867,11 +9874,13 @@ function SlideThumb({
   onKeyDown,
   onSelect,
   slide,
+  thumbnailDescriptor,
 }: {
   active: boolean
   dragging: boolean
   dropPlacement?: PPTSlideDropPlacement
   index: number
+  optionDescriptor?: SlideEditRailListboxOptionDescriptor<string>
   onDragEnd: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDragOver: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => void
@@ -9879,20 +9888,38 @@ function SlideThumb({
   onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
   onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void
   slide: PPTSlide
+  thumbnailDescriptor?: SlideEditRailThumbnailDescriptor<string>
 }) {
+  const descriptorActive = thumbnailDescriptor?.isActive ?? active
+  const descriptorIndex = thumbnailDescriptor?.index ?? index
+  const tabIndex = optionDescriptor?.tabIndex ?? (descriptorActive ? 0 : -1)
+
   return (
     <button
-      aria-current={active ? 'page' : undefined}
+      aria-current={descriptorActive ? 'page' : undefined}
       aria-label={`Open ${slide.name}`}
-      aria-selected={active}
+      aria-selected={optionDescriptor?.isSelected ?? descriptorActive}
       className="ppt-thumb"
-      data-ppt-slide-active={active ? 'true' : undefined}
+      data-ppt-slide-active={descriptorActive ? 'true' : undefined}
       data-ppt-slide-dragging={dragging ? 'true' : undefined}
       data-ppt-slide-draggable="true"
       data-ppt-slide-drop-target={dropPlacement}
       data-ppt-slide-id={slide.id}
-      data-ppt-slide-index={index}
-      data-ppt-slide-roving-tab-index={active ? '0' : '-1'}
+      data-ppt-slide-index={descriptorIndex}
+      data-ppt-slide-rail-hit-h={thumbnailDescriptor?.hitTarget.h}
+      data-ppt-slide-rail-hit-w={thumbnailDescriptor?.hitTarget.w}
+      data-ppt-slide-rail-hit-x={thumbnailDescriptor?.hitTarget.x}
+      data-ppt-slide-rail-hit-y={thumbnailDescriptor?.hitTarget.y}
+      data-ppt-slide-rail-option-focusable={optionDescriptor?.isFocusable ? 'true' : 'false'}
+      data-ppt-slide-rail-option-id={optionDescriptor?.id}
+      data-ppt-slide-rail-option-index={optionDescriptor?.index}
+      data-ppt-slide-rail-option-selected={optionDescriptor?.isSelected ? 'true' : 'false'}
+      data-ppt-slide-rail-thumb-active={thumbnailDescriptor?.isActive ? 'true' : 'false'}
+      data-ppt-slide-rail-thumb-h={thumbnailDescriptor?.bounds.h}
+      data-ppt-slide-rail-thumb-w={thumbnailDescriptor?.bounds.w}
+      data-ppt-slide-rail-thumb-x={thumbnailDescriptor?.bounds.x}
+      data-ppt-slide-rail-thumb-y={thumbnailDescriptor?.bounds.y}
+      data-ppt-slide-roving-tab-index={String(tabIndex)}
       draggable
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
@@ -9901,7 +9928,7 @@ function SlideThumb({
       onClick={onSelect}
       onKeyDown={onKeyDown}
       role="option"
-      tabIndex={active ? 0 : -1}
+      tabIndex={tabIndex}
       type="button"
     >
       <span className="ppt-thumb-preview" style={{ background: slide.background?.color ?? '#fff' }}>
@@ -10022,7 +10049,7 @@ function SlideThumb({
           />
         ))}
       </span>
-      <span className="ppt-thumb-name">{index + 1}. {slide.name}</span>
+      <span className="ppt-thumb-name">{descriptorIndex + 1}. {slide.name}</span>
     </button>
   )
 }
