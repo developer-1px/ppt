@@ -2207,6 +2207,7 @@ async function runCommandPaletteScenario(page) {
   await delay(100)
 
   const afterToolbarOpen = await page.eval(`(() => ({
+    focusLifecycle: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-focus-lifecycle') ?? '',
     focusedQuery: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
     focusTrap: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-focus-trap') ?? '',
     itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
@@ -2221,6 +2222,7 @@ async function runCommandPaletteScenario(page) {
     paletteButton.exists &&
       afterToolbarOpen.open &&
       afterToolbarOpen.focusedQuery &&
+      afterToolbarOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' &&
       afterToolbarOpen.focusTrap === 'true' &&
       afterToolbarOpen.model === 'canvas-command-palette-items' &&
       afterToolbarOpen.restoreFocus === 'true' &&
@@ -2682,6 +2684,7 @@ async function runShortcutHelpScenario(page) {
 
     return {
       closeFocused: document.activeElement?.matches('[data-ppt-shortcut-help-close]') === true,
+      focusLifecycle: document.querySelector('[data-ppt-shortcut-help]')?.getAttribute('data-ppt-shortcut-help-focus-lifecycle') ?? '',
       itemCount: itemIds.length,
       itemIds,
       open: !!document.querySelector('[data-ppt-shortcut-help]'),
@@ -2690,7 +2693,7 @@ async function runShortcutHelpScenario(page) {
     }
   })()`)
 
-  record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
+  record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
   record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 

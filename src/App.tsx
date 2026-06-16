@@ -245,6 +245,11 @@ import {
   type CanvasMinimapSize,
 } from 'canvas/app/minimap-model'
 import {
+  CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
+  trapCanvasModalTabFocus,
+  useCanvasModalFocusLifecycle,
+} from 'canvas/app/modal-focus-lifecycle'
+import {
   getCanvasRadioTabIndex,
   handleCanvasRadioGroupKeyDown,
 } from 'canvas/app/radio-group'
@@ -1667,7 +1672,6 @@ function App() {
   const stageRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
-  const commandPaletteRestoreFocusRef = useRef<HTMLElement | null>(null)
   const {
     onFocus: handleTopbarToolbarFocus,
     onKeyDown: handleTopbarToolbarKeyDown,
@@ -2551,12 +2555,6 @@ function App() {
   }
 
   function openCommandPalette() {
-    const activeElement = document.activeElement
-    commandPaletteRestoreFocusRef.current =
-      activeElement instanceof HTMLElement &&
-        !activeElement.closest('[data-ppt-command-palette]')
-        ? activeElement
-        : null
     setCommandPaletteOpen(true)
     setShortcutHelpOpen(false)
     setFindOpen(false)
@@ -2571,16 +2569,7 @@ function App() {
   }
 
   function closeCommandPalette() {
-    const restoreFocusElement = commandPaletteRestoreFocusRef.current
-
     setCommandPaletteOpen(false)
-    commandPaletteRestoreFocusRef.current = null
-
-    if (restoreFocusElement?.isConnected) {
-      window.requestAnimationFrame(() => {
-        restoreFocusElement.focus({ preventScroll: true })
-      })
-    }
   }
 
   function openShortcutHelp() {
@@ -7244,23 +7233,12 @@ function PPTShortcutHelpDialog({
   onClose: () => void
 }) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
+  const dialogRef = useRef<HTMLElement | null>(null)
   const groups = useMemo(() => groupPPTShortcutHelpItems(items), [items])
 
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
-
-    const focusTimer = window.setTimeout(() => {
-      closeButtonRef.current?.focus()
-    }, 0)
-
-    return () => {
-      window.clearTimeout(focusTimer)
-      previousFocusRef.current?.focus()
-    }
-  }, [])
+  useCanvasModalFocusLifecycle({
+    initialFocusRef: closeButtonRef,
+  })
 
   function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
     if (event.target === event.currentTarget) {
@@ -7273,6 +7251,14 @@ function PPTShortcutHelpDialog({
       event.preventDefault()
       event.stopPropagation()
       onClose()
+      return
+    }
+
+    if (event.key === 'Tab') {
+      trapCanvasModalTabFocus({
+        event,
+        root: dialogRef.current,
+      })
     }
   }
 
@@ -7287,6 +7273,8 @@ function PPTShortcutHelpDialog({
         aria-modal="true"
         className="ppt-shortcut-help"
         data-ppt-shortcut-help
+        data-ppt-shortcut-help-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
+        ref={dialogRef}
         role="dialog"
         onKeyDown={handleKeyDown}
       >
@@ -7528,11 +7516,9 @@ function PPTCommandPaletteDialog({
     ? getPPTCommandPaletteOptionId(activeItem.id)
     : undefined
 
-  useEffect(() => {
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0)
-
-    return () => window.clearTimeout(focusTimer)
-  }, [])
+  useCanvasModalFocusLifecycle({
+    initialFocusRef: inputRef,
+  })
 
   function runItem(item: PPTCommandPaletteItem | undefined) {
     if (!item || item.disabled) {
@@ -7552,19 +7538,10 @@ function PPTCommandPaletteDialog({
     }
 
     if (event.key === 'Tab') {
-      const focusables = getPPTCommandPaletteFocusables(dialogRef.current)
-
-      if (focusables.length > 0) {
-        const currentIndex = focusables.findIndex((item) => item === document.activeElement)
-        const direction = event.shiftKey ? -1 : 1
-        const nextIndex = currentIndex < 0
-          ? 0
-          : (currentIndex + direction + focusables.length) % focusables.length
-
-        event.preventDefault()
-        event.stopPropagation()
-        focusables[nextIndex]?.focus()
-      }
+      trapCanvasModalTabFocus({
+        event,
+        root: dialogRef.current,
+      })
       return
     }
 
@@ -7606,6 +7583,7 @@ function PPTCommandPaletteDialog({
         aria-modal="true"
         className="ppt-command-palette"
         data-ppt-command-palette
+        data-ppt-command-palette-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
         data-ppt-command-palette-focus-trap="true"
         data-ppt-command-palette-model="canvas-command-palette-items"
         data-ppt-command-palette-restore-focus="true"
@@ -7674,16 +7652,6 @@ function PPTCommandPaletteDialog({
       </section>
     </div>
   )
-}
-
-function getPPTCommandPaletteFocusables(dialog: HTMLElement | null) {
-  if (!dialog) {
-    return []
-  }
-
-  return [...dialog.querySelectorAll<HTMLElement>(
-    'input, button:not(:disabled)',
-  )]
 }
 
 function getPPTCommandPaletteOptionId(itemId: string) {
