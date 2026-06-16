@@ -293,6 +293,7 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  getCanvasContextMenuKeyboardIntent,
   getCanvasContextMenuPosition,
 } from 'canvas/app/context-menu-position'
 import {
@@ -2446,7 +2447,12 @@ function App() {
         return
       }
 
-      if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      const contextMenuKeyboardIntent = getCanvasContextMenuKeyboardIntent({
+        event,
+        key: event.key,
+      })
+
+      if (contextMenuKeyboardIntent?.kind === 'open-context-menu') {
         if (openPPTContextMenuAtSelection()) {
           event.preventDefault()
         }
