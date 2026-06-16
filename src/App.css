@@ -1722,7 +1722,7 @@
 
 .ppt-layer-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -1746,6 +1746,22 @@
 
 .ppt-layer-row[data-grouped='true'] .ppt-layer-kind {
   color: var(--accent-strong);
+}
+
+.ppt-layer-disclosure {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  min-width: 24px;
+  height: 32px;
+  padding: 0 0 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.ppt-layer-disclosure:not(.ppt-layer-disclosure--spacer):hover {
+  color: var(--text);
 }
 
 .ppt-layer-select {

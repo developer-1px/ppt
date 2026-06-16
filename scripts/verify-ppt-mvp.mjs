@@ -1329,17 +1329,83 @@ async function runAffordanceScenario(page) {
   const afterGroup = await page.eval(`(() => {
     const selected = [...document.querySelectorAll('[data-selected="true"]')]
     const groupIds = selected.map((element) => element.getAttribute('data-group-id'))
+    const groupRow = document.querySelector('[data-ppt-layer-pane-row-type="group"]')
+    const groupRowId = groupRow?.getAttribute('data-ppt-layer-pane-row') ?? ''
+    const childRows = [...document.querySelectorAll(\`[data-ppt-layer-pane-parent-object-id="\${groupRowId}"]\`)]
 
     return {
+      childLevels: childRows.map((row) => row.getAttribute('aria-level')),
+      childRowCount: childRows.length,
+      groupExpanded: groupRow?.getAttribute('aria-expanded') ?? '',
       groupedLayerCount: document.querySelectorAll('[data-ppt-layer-row][data-grouped="true"]').length,
       groupIds,
+      groupRowCount: document.querySelectorAll('[data-ppt-layer-pane-row-type="group"]').length,
+      groupRowId,
+      groupRowLevel: groupRow?.getAttribute('aria-level') ?? '',
+      groupRowType: groupRow?.getAttribute('data-ppt-layer-pane-row-type') ?? '',
       selectedCount: selected.length,
       ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]').disabled,
       uniqueGroupCount: new Set(groupIds).size,
     }
   })()`)
 
-  record('groups multi-selected PPT objects with canvas command adapter', afterGroup.selectedCount === 3 && afterGroup.groupIds.every(Boolean) && afterGroup.uniqueGroupCount === 1 && afterGroup.groupedLayerCount >= 3 && !afterGroup.ungroupDisabled, afterGroup)
+  record('groups multi-selected PPT objects with canvas command adapter', afterGroup.selectedCount === 3 && afterGroup.groupIds.every(Boolean) && afterGroup.uniqueGroupCount === 1 && afterGroup.groupedLayerCount >= 4 && !afterGroup.ungroupDisabled, afterGroup)
+  record('renders grouped PPT objects as layer pane tree rows', afterGroup.groupRowCount === 1 && afterGroup.groupRowId.length > 0 && afterGroup.groupRowType === 'group' && afterGroup.groupExpanded === 'true' && afterGroup.groupRowLevel === '1' && afterGroup.childRowCount === 3 && afterGroup.childLevels.every((level) => level === '2'), afterGroup)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-pane-row-type="group"]')?.focus()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'ArrowLeft',
+    key: 'ArrowLeft',
+    windowsVirtualKeyCode: 37,
+  })
+  await delay(80)
+  const afterGroupCollapse = await readPPTLayerPaneGroupTreeState(page)
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(80)
+  const afterGroupExpand = await readPPTLayerPaneGroupTreeState(page)
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(80)
+  const afterGroupFocusChild = await readPPTLayerPaneGroupTreeState(page)
+
+  await pressKey(page, {
+    code: 'ArrowLeft',
+    key: 'ArrowLeft',
+    windowsVirtualKeyCode: 37,
+  })
+  await delay(80)
+  const afterGroupFocusParent = await readPPTLayerPaneGroupTreeState(page)
+
+  record(
+    'expands and collapses PPT group layer pane rows with slide-edit keyboard intent',
+    afterGroupCollapse.keyboardIntentModel === 'slide-edit-layer-pane-keyboard-intent' &&
+      afterGroupCollapse.groupExpanded === 'false' &&
+      afterGroupCollapse.childRowCount === 0 &&
+      afterGroupCollapse.focusedRowId === afterGroupCollapse.groupRowId &&
+      afterGroupExpand.groupExpanded === 'true' &&
+      afterGroupExpand.childRowCount === 3 &&
+      afterGroupExpand.focusedRowId === afterGroupExpand.groupRowId &&
+      afterGroupFocusChild.focusedParentId === afterGroupFocusChild.groupRowId &&
+      afterGroupFocusChild.focusedRowId !== afterGroupFocusChild.groupRowId &&
+      afterGroupFocusChild.selectedStageCount === 3 &&
+      afterGroupFocusParent.focusedRowId === afterGroupFocusParent.groupRowId,
+    {
+      afterGroupCollapse,
+      afterGroupExpand,
+      afterGroupFocusChild,
+      afterGroupFocusParent,
+    },
+  )
 
   await pressKey(page, {
     code: 'Escape',
@@ -8976,6 +9042,35 @@ async function readPPTLayerPaneKeyboardState(page) {
       tabStopIds: tabStopRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
       treeKeyboardIntentModel: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-intent-model') ?? '',
       treeKeyboardKeys: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
+    }
+  })()`)
+}
+
+async function readPPTLayerPaneGroupTreeState(page) {
+  return page.eval(`(() => {
+    const tree = document.querySelector('.ppt-layer-list')
+    const groupRow = document.querySelector('[data-ppt-layer-pane-row-type="group"]')
+    const groupRowId = groupRow?.getAttribute('data-ppt-layer-pane-row') ?? ''
+    const childRows = [...document.querySelectorAll(\`[data-ppt-layer-pane-parent-object-id="\${groupRowId}"]\`)]
+    const focusedRow = document.activeElement?.closest('[data-ppt-layer-pane-row]')
+    const focusedRowId = focusedRow?.getAttribute('data-ppt-layer-pane-row') ?? ''
+
+    return {
+      childParentIds: childRows.map((row) => row.getAttribute('data-ppt-layer-pane-parent-object-id') ?? ''),
+      childRowCount: childRows.length,
+      childRowIds: childRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      focusedParentId: focusedRow?.getAttribute('data-ppt-layer-pane-parent-object-id') ?? '',
+      focusedRowId,
+      groupExpanded: groupRow?.getAttribute('aria-expanded') ?? '',
+      groupRowCount: document.querySelectorAll('[data-ppt-layer-pane-row-type="group"]').length,
+      groupRowId,
+      keyboardIntentModel: tree?.getAttribute('data-ppt-layer-pane-keyboard-intent-model') ?? '',
+      selectedRowIds: [...document.querySelectorAll('[data-ppt-layer-pane-row][aria-selected="true"]')]
+        .map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      selectedStageCount: document.querySelectorAll('[data-selected="true"]').length,
+      tabStopIds: [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+        .filter((row) => row.tabIndex === 0)
+        .map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
     }
   })()`)
 }

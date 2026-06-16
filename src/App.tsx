@@ -1113,6 +1113,10 @@ type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
+type PPTLayerPaneGroupState = {
+  collapsedGroupIds: readonly string[]
+  focusedObjectId: string | null
+}
 type PPTMinimapSize = CanvasMinimapSize
 type PPTMinimapItemBounds = CanvasMinimapItemBounds
 type PPTMinimapReadModel = CanvasMinimapReadModel
@@ -1480,6 +1484,7 @@ const PPT_LASER_POINT_DISTANCE = 3
 const PPT_LASER_TRAIL_MAX_POINTS = 80
 const PPT_ERASER_POINT_DISTANCE = 4
 const PPT_ERASER_HIT_PADDING = 8
+const PPT_LAYER_PANE_GROUP_ROW_PREFIX = 'ppt-layer-group:'
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
@@ -4233,7 +4238,15 @@ function App() {
       case 'show-objects':
       case 'lock-objects':
       case 'unlock-objects': {
-        const objectIds = new Set(payload.objectIds)
+        const objectIds = new Set(getPPTLayerPaneActualObjectIds(
+          activeSlide,
+          payload.objectIds,
+        ))
+
+        if (objectIds.size === 0) {
+          return
+        }
+
         const visible = payload.id === 'show-objects'
           ? true
           : payload.id === 'hide-objects'
@@ -4245,7 +4258,7 @@ function App() {
             ? false
             : null
 
-        setSelection(effect.selection.objectIds.filter((objectId) => objectIds.has(objectId)))
+        setSelection([...objectIds])
         commitDeck((current) =>
           updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
             ...slide,
@@ -4291,18 +4304,13 @@ function App() {
           return
         }
 
-        if (payload.mode === 'range') {
-          setSelection([...payload.objectIds])
-          return
-        }
-
         setSelection((current) =>
-          getPPTLayerSelection(
-            current,
-            targetObjectId,
-            payload.mode === 'additive',
-            activeSlide,
-          ))
+          getPPTLayerPaneSelection({
+            currentSelection: current,
+            mode: payload.mode,
+            objectIds: payload.objectIds,
+            slide: activeSlide,
+          }))
       }
     }
   }
@@ -4991,6 +4999,10 @@ function App() {
     return true
   }
 
+  function focusStageShell() {
+    stageRef.current?.focus({ preventScroll: true })
+  }
+
   function handleElementPointerDown(
     event: ReactPointerEvent<HTMLDivElement>,
     elementId: string,
@@ -5002,6 +5014,8 @@ function App() {
     if (event.button !== 0) {
       return
     }
+
+    focusStageShell()
 
     if (beginTemporaryPan(event)) {
       return
@@ -5139,6 +5153,7 @@ function App() {
       return
     }
 
+    focusStageShell()
     event.currentTarget.setPointerCapture(event.pointerId)
     const additive = isAdditivePointerInput(event)
     const point = screenToWorld(event.nativeEvent)
@@ -6914,6 +6929,7 @@ function App() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         ref={stageRef}
+        tabIndex={-1}
       >
         <div
           className="ppt-stage-world"
@@ -8543,32 +8559,293 @@ function clonePPTElementFromClipboardMapping(
 
 function createPPTLayerPaneDescriptor({
   activeObjectId = null,
+  collapsedGroupIds,
   selectedObjectIds,
   slide,
 }: {
   activeObjectId?: string | null
+  collapsedGroupIds: ReadonlySet<string>
   selectedObjectIds: readonly string[]
   slide: PPTSlide
 }): PPTLayerPaneDescriptor {
+  const objects = getPPTLayerPaneObjectInputs({
+    collapsedGroupIds,
+    slide,
+  })
+
   return createSlideEditLayerPaneDescriptor({
     activeObjectId,
-    objects: slide.elements.map((element, index) => ({
-      displayName: element.name,
-      groupId: element.groupId ?? null,
-      isGroup: false,
-      isHidden: element.visible === false,
-      isLocked: element.locked === true,
-      isRenamable: true,
-      isReorderable: element.locked !== true,
-      isSelectable: true,
-      kindLabel: getPPTElementKindLabel(element),
-      objectId: element.id,
-      order: index,
-      parentObjectId: null,
-    })),
-    selectedObjectIds,
+    objects,
+    selectedObjectIds: getPPTLayerPaneSelectedRowIds(slide, selectedObjectIds),
     slideId: slide.id,
   })
+}
+
+function getPPTLayerPaneObjectInputs({
+  collapsedGroupIds,
+  slide,
+}: {
+  collapsedGroupIds: ReadonlySet<string>
+  slide: PPTSlide
+}) {
+  const groupedElements = new Map<string, PPTElement[]>()
+
+  for (const element of slide.elements) {
+    if (!element.groupId) {
+      continue
+    }
+
+    const group = groupedElements.get(element.groupId) ?? []
+    group.push(element)
+    groupedElements.set(element.groupId, group)
+  }
+
+  const addedGroupIds = new Set<string>()
+  const objects: Array<{
+    displayName: string
+    groupId?: string | null
+    isExpanded?: boolean
+    isGroup?: boolean
+    isHidden?: boolean
+    isLocked?: boolean
+    isRenamable?: boolean
+    isReorderable?: boolean
+    isSelectable?: boolean
+    kindLabel: string
+    objectId: string
+    order?: number
+    parentObjectId?: string | null
+  }> = []
+  let order = 0
+
+  for (const element of slide.elements) {
+    if (!element.groupId) {
+      objects.push(getPPTLayerPaneElementInput(element, order))
+      order += 1
+      continue
+    }
+
+    if (addedGroupIds.has(element.groupId)) {
+      continue
+    }
+
+    addedGroupIds.add(element.groupId)
+
+    const groupElements = groupedElements.get(element.groupId) ?? []
+    const groupRowId = toPPTLayerPaneGroupRowId(element.groupId)
+    const isExpanded = !collapsedGroupIds.has(element.groupId)
+
+    objects.push({
+      displayName: getPPTLayerPaneGroupDisplayName(addedGroupIds.size),
+      groupId: element.groupId,
+      isExpanded,
+      isGroup: true,
+      isHidden: groupElements.every((member) => member.visible === false),
+      isLocked: groupElements.length > 0 &&
+        groupElements.every((member) => member.locked === true),
+      isRenamable: false,
+      isReorderable: false,
+      isSelectable: groupElements.length > 0,
+      kindLabel: 'Group',
+      objectId: groupRowId,
+      order,
+      parentObjectId: null,
+    })
+    order += 1
+
+    if (!isExpanded) {
+      continue
+    }
+
+    for (const groupElement of groupElements) {
+      objects.push(getPPTLayerPaneElementInput(groupElement, order, groupRowId))
+      order += 1
+    }
+  }
+
+  return objects
+}
+
+function getPPTLayerPaneElementInput(
+  element: PPTElement,
+  order: number,
+  parentObjectId: string | null = null,
+) {
+  return {
+    displayName: element.name,
+    groupId: element.groupId ?? null,
+    isGroup: false,
+    isHidden: element.visible === false,
+    isLocked: element.locked === true,
+    isRenamable: true,
+    isReorderable: element.locked !== true,
+    isSelectable: true,
+    kindLabel: getPPTElementKindLabel(element),
+    objectId: element.id,
+    order,
+    parentObjectId,
+  }
+}
+
+function getPPTLayerPaneGroupDisplayName(index: number) {
+  return `Group ${index}`
+}
+
+function toPPTLayerPaneGroupRowId(groupId: string) {
+  return `${PPT_LAYER_PANE_GROUP_ROW_PREFIX}${groupId}`
+}
+
+function getPPTLayerPaneGroupIdFromRowId(objectId: string) {
+  return objectId.startsWith(PPT_LAYER_PANE_GROUP_ROW_PREFIX)
+    ? objectId.slice(PPT_LAYER_PANE_GROUP_ROW_PREFIX.length)
+    : null
+}
+
+function getPPTLayerPaneGroupMemberIds(slide: PPTSlide, groupId: string) {
+  return slide.elements
+    .filter((element) => element.groupId === groupId)
+    .map((element) => element.id)
+}
+
+function getPPTLayerPaneSelectedRowIds(
+  slide: PPTSlide,
+  selectedObjectIds: readonly string[],
+) {
+  const selected = new Set(selectedObjectIds)
+  const selectedRowIds = new Set(selectedObjectIds)
+  const groupIds = new Set(slide.elements.flatMap((element) =>
+    element.groupId ? [element.groupId] : []))
+
+  for (const groupId of groupIds) {
+    const memberIds = getPPTLayerPaneGroupMemberIds(slide, groupId)
+
+    if (
+      memberIds.length > 0 &&
+      memberIds.every((memberId) => selected.has(memberId))
+    ) {
+      selectedRowIds.add(toPPTLayerPaneGroupRowId(groupId))
+    }
+  }
+
+  return [...selectedRowIds]
+}
+
+function getPPTLayerPaneDefaultFocusObjectId(
+  slide: PPTSlide,
+  selection: readonly string[],
+) {
+  const firstSelectedObjectId = selection[0]
+  const firstSelectedElement = findPPTElement(slide, firstSelectedObjectId ?? null)
+
+  if (firstSelectedElement?.groupId) {
+    const memberIds = getPPTLayerPaneGroupMemberIds(slide, firstSelectedElement.groupId)
+    const selected = new Set(selection)
+
+    if (
+      memberIds.length > 0 &&
+      memberIds.every((memberId) => selected.has(memberId))
+    ) {
+      return toPPTLayerPaneGroupRowId(firstSelectedElement.groupId)
+    }
+  }
+
+  return firstSelectedObjectId ?? null
+}
+
+function getPPTLayerPaneResolvedFocusObjectId(
+  descriptor: PPTLayerPaneDescriptor,
+  focusedObjectId: string | null,
+  slide: PPTSlide,
+  selection: readonly string[],
+) {
+  const rowIds = new Set(descriptor.rows.map((row) => row.objectId))
+
+  if (focusedObjectId && rowIds.has(focusedObjectId)) {
+    return focusedObjectId
+  }
+
+  const defaultFocusObjectId = getPPTLayerPaneDefaultFocusObjectId(slide, selection)
+
+  if (defaultFocusObjectId && rowIds.has(defaultFocusObjectId)) {
+    return defaultFocusObjectId
+  }
+
+  const selectedRow = descriptor.rows.find((row) => row.isSelected)
+
+  return selectedRow?.objectId ?? descriptor.rows[0]?.objectId ?? null
+}
+
+function getPPTLayerPaneActualObjectIds(
+  slide: PPTSlide,
+  objectIds: readonly string[],
+) {
+  const expanded = new Set<string>()
+
+  for (const objectId of objectIds) {
+    const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
+
+    if (groupId) {
+      for (const memberId of getPPTLayerPaneGroupMemberIds(slide, groupId)) {
+        expanded.add(memberId)
+      }
+      continue
+    }
+
+    if (findPPTElement(slide, objectId)) {
+      expanded.add(objectId)
+    }
+  }
+
+  return [...expanded]
+}
+
+function getPPTLayerPaneSelection({
+  currentSelection,
+  mode,
+  objectIds,
+  slide,
+}: {
+  currentSelection: string[]
+  mode: 'additive' | 'range' | 'replace'
+  objectIds: readonly string[]
+  slide: PPTSlide
+}) {
+  const targetObjectId = objectIds.at(-1)
+
+  if (!targetObjectId) {
+    return currentSelection
+  }
+
+  const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
+
+  if (targetGroupId) {
+    const memberIds = getPPTLayerPaneGroupMemberIds(slide, targetGroupId)
+
+    if (mode !== 'additive') {
+      return memberIds
+    }
+
+    const selected = new Set(currentSelection)
+    const allMembersSelected = memberIds.every((memberId) => selected.has(memberId))
+
+    return allMembersSelected
+      ? currentSelection.filter((objectId) => !memberIds.includes(objectId))
+      : [
+          ...currentSelection,
+          ...memberIds.filter((memberId) => !selected.has(memberId)),
+        ]
+  }
+
+  if (mode === 'range') {
+    return getPPTLayerPaneActualObjectIds(slide, objectIds)
+  }
+
+  return getPPTLayerSelection(
+    currentSelection,
+    targetObjectId,
+    mode === 'additive',
+    slide,
+  )
 }
 
 function getPPTMinimapSvgPoint(
@@ -10421,11 +10698,28 @@ function Inspector({
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
   const sizeMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'size')
   const orientationMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'orientation')
+  const [layerPaneGroupState, setLayerPaneGroupState] =
+    useState<PPTLayerPaneGroupState>({
+      collapsedGroupIds: [],
+      focusedObjectId: null,
+    })
+  const collapsedLayerPaneGroupIdSet = useMemo(
+    () => new Set(layerPaneGroupState.collapsedGroupIds),
+    [layerPaneGroupState.collapsedGroupIds],
+  )
   const layerPaneDescriptor = createPPTLayerPaneDescriptor({
-    activeObjectId: selectedElement?.id ?? null,
+    activeObjectId: layerPaneGroupState.focusedObjectId ??
+      getPPTLayerPaneDefaultFocusObjectId(slide, selection),
+    collapsedGroupIds: collapsedLayerPaneGroupIdSet,
     selectedObjectIds: selection,
     slide,
   })
+  const activeLayerPaneObjectId = getPPTLayerPaneResolvedFocusObjectId(
+    layerPaneDescriptor,
+    layerPaneGroupState.focusedObjectId,
+    slide,
+    selection,
+  )
   const layerPaneCommandIds = PPT_LAYER_PANE_COMMANDS.map((command) => command.id).join(' ')
   const layoutPlaceholderById = new Map(layoutPlaceholders.map((placeholder) => [
     placeholder.placeholderId,
@@ -10477,11 +10771,42 @@ function Inspector({
     })
   }
 
+  function setLayerPaneFocusedObjectId(objectId: string) {
+    setLayerPaneGroupState((current) => ({
+      ...current,
+      focusedObjectId: objectId,
+    }))
+  }
+
+  function setLayerPaneGroupExpanded(objectId: string, isExpanded: boolean) {
+    const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
+
+    if (!groupId) {
+      return
+    }
+
+    setLayerPaneGroupState((current) => {
+      const collapsedGroupIds = new Set(current.collapsedGroupIds)
+
+      if (isExpanded) {
+        collapsedGroupIds.delete(groupId)
+      } else {
+        collapsedGroupIds.add(groupId)
+      }
+
+      return {
+        collapsedGroupIds: [...collapsedGroupIds],
+        focusedObjectId: objectId,
+      }
+    })
+  }
+
   function applyLayerPaneKeyboardIntent(intent: PPTLayerPaneKeyboardIntent) {
     switch (intent.type) {
       case 'focus-row':
       case 'focus-parent-row':
       case 'select-row':
+        setLayerPaneFocusedObjectId(intent.objectId)
         runLayerPaneIntent({
           objectId: intent.objectId,
           type: 'row-press',
@@ -10489,7 +10814,11 @@ function Inspector({
         focusLayerPaneRow(intent.objectId)
         return
       case 'collapse-row':
+        setLayerPaneGroupExpanded(intent.objectId, false)
+        focusLayerPaneRow(intent.objectId)
+        return
       case 'expand-row':
+        setLayerPaneGroupExpanded(intent.objectId, true)
         focusLayerPaneRow(intent.objectId)
         return
       case 'none':
@@ -11842,7 +12171,7 @@ function Inspector({
       <section
         className="ppt-panel-section"
         data-ppt-layer-pane
-        data-ppt-layer-pane-active-object-id={layerPaneDescriptor.activeObjectId ?? ''}
+        data-ppt-layer-pane-active-object-id={activeLayerPaneObjectId ?? ''}
         data-ppt-layer-pane-command-count={PPT_LAYER_PANE_COMMANDS.length}
         data-ppt-layer-pane-commands={layerPaneCommandIds}
         data-ppt-layer-pane-command-slot="command-effect"
@@ -11873,35 +12202,65 @@ function Inspector({
               data-grouped={row.isGrouped ? 'true' : 'false'}
               data-hidden={row.isHidden ? 'true' : 'false'}
               data-locked={row.isLocked ? 'true' : 'false'}
+              data-ppt-layer-pane-expanded={row.ariaExpanded === undefined ? '' : String(row.ariaExpanded)}
               data-ppt-layer-pane-grouped={row.isGrouped ? 'true' : 'false'}
               data-ppt-layer-pane-hidden={row.isHidden ? 'true' : 'false'}
+              data-ppt-layer-pane-is-group={row.isGroup ? 'true' : 'false'}
               data-ppt-layer-pane-kind={row.kindLabel}
               data-ppt-layer-pane-locked={row.isLocked ? 'true' : 'false'}
               data-ppt-layer-pane-order={row.order}
+              data-ppt-layer-pane-parent-object-id={row.parentObjectId ?? ''}
               data-ppt-layer-pane-renamable={row.isRenamable ? 'true' : 'false'}
               data-ppt-layer-pane-reorderable={row.isReorderable ? 'true' : 'false'}
               data-ppt-layer-pane-row={row.objectId}
+              data-ppt-layer-pane-row-type={row.isGroup ? 'group' : 'object'}
               data-ppt-layer-pane-selected={row.isSelected ? 'true' : 'false'}
               data-ppt-layer-row={row.objectId}
               key={row.objectId}
               role={layerPaneDescriptor.aria.rowRole}
-              tabIndex={row.isSelected ? 0 : -1}
+              tabIndex={row.objectId === activeLayerPaneObjectId ? 0 : -1}
               onKeyDown={(event) => handleLayerPaneRowKeyDown(row, event)}
             >
+              {row.isGroup ? (
+                <button
+                  aria-label={row.ariaExpanded ? 'Collapse group' : 'Expand group'}
+                  className="ppt-layer-disclosure"
+                  data-ppt-layer-pane-disclosure={row.objectId}
+                  data-ppt-layer-pane-intent={row.ariaExpanded ? 'collapse-row' : 'expand-row'}
+                  style={{ paddingLeft: Math.max(0, row.ariaLevel - 1) * 12 }}
+                  title={row.ariaExpanded ? 'Collapse group' : 'Expand group'}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setLayerPaneFocusedObjectId(row.objectId)
+                    setLayerPaneGroupExpanded(row.objectId, row.ariaExpanded !== true)
+                    focusLayerPaneRow(row.objectId)
+                  }}
+                >
+                  {row.ariaExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+              ) : (
+                <span
+                  className="ppt-layer-disclosure ppt-layer-disclosure--spacer"
+                  style={{ paddingLeft: Math.max(0, row.ariaLevel - 1) * 12 }}
+                />
+              )}
               <button
                 className="ppt-layer-select"
                 data-ppt-layer-pane-intent="row-press"
                 data-ppt-layer-select={row.objectId}
                 type="button"
-                onClick={(event) =>
+                onClick={(event) => {
+                  setLayerPaneFocusedObjectId(row.objectId)
                   runLayerPaneIntent({
                     additive: event.metaKey || event.ctrlKey || event.shiftKey,
                     objectId: row.objectId,
                     type: 'row-press',
-                  })}
+                  })
+                }}
               >
                 <span className="ppt-layer-kind">
-                  <Layers size={14} />
+                  {row.isGroup ? <Group size={14} /> : <Layers size={14} />}
                 </span>
                 <span className="ppt-layer-name">{row.displayName}</span>
               </button>
