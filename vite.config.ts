@@ -20,6 +20,7 @@ const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasTabsRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts', import.meta.url))
+const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts', import.meta.url))
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts', import.meta.url))
 const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/text-paste-import/CanvasTextPasteImport.ts', import.meta.url))
 const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
@@ -51,6 +52,7 @@ export default defineConfig({
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/tabs-roving-focus', replacement: canvasTabsRovingFocusEntry },
+      { find: 'canvas/app/stage-element', replacement: canvasStageElementEntry },
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
       { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },

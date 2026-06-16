@@ -316,6 +316,7 @@ import {
   getCanvasTabsKeyboardIntent,
   type CanvasTabsDescriptor,
 } from 'canvas/app/tabs-roving-focus'
+import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import {
   inlineEditHistoryDirectionFromInputType,
   inlineEditHistoryDirectionFromKeydown,
@@ -336,7 +337,6 @@ import {
   clamp,
   fitBoundsIntoViewport,
   getCanvasViewportScreenPoint,
-  getCanvasViewportWorldBounds,
   getCanvasViewportWorldPoint,
   getCanvasViewportZoomStepMultiplier,
   handlePoint,
@@ -1903,6 +1903,11 @@ function App() {
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const canvasStageElement = useCanvasAppStageElement()
+  const setPPTStageElementRef = useCallback((element: HTMLDivElement | null) => {
+    stageRef.current = element
+    canvasStageElement.mount.ref(element)
+  }, [canvasStageElement])
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
   const {
@@ -2276,15 +2281,7 @@ function App() {
   }, [fitSlide])
 
   useEffect(() => {
-    const stage = stageRef.current
-
-    if (!stage) {
-      return
-    }
-
-    stage.addEventListener('wheel', handleStageWheel, { passive: false })
-
-    return () => stage.removeEventListener('wheel', handleStageWheel)
+    return canvasStageElement.addWheelListener(handleStageWheel)
   })
 
   useEffect(() => {
@@ -5350,12 +5347,10 @@ function App() {
   }
 
   function screenToWorld(event: Pick<PointerEvent, 'clientX' | 'clientY'>) {
-    const rect = stageRef.current?.getBoundingClientRect()
-
-    return getCanvasViewportWorldPoint(viewport, {
-      x: event.clientX - (rect?.left ?? 0),
-      y: event.clientY - (rect?.top ?? 0),
-    })
+    return getCanvasViewportWorldPoint(
+      viewport,
+      canvasStageElement.getScreenPoint(event),
+    )
   }
 
   function getPointerClientPoint(event: Pick<PointerEvent, 'clientX' | 'clientY'>): Point {
@@ -5366,25 +5361,14 @@ function App() {
   }
 
   function getPPTViewportCenter() {
-    const rect = stageRef.current?.getBoundingClientRect()
-
-    if (!rect) {
-      return {
-        x: PPT_SLIDE_WIDTH / 2,
-        y: PPT_SLIDE_HEIGHT / 2,
-      }
-    }
-
-    const bounds = getCanvasViewportWorldBounds(viewport, rect)
-
-    return {
-      x: bounds.x + bounds.w / 2,
-      y: bounds.y + bounds.h / 2,
+    return canvasStageElement.getViewportCenter(viewport) ?? {
+      x: PPT_SLIDE_WIDTH / 2,
+      y: PPT_SLIDE_HEIGHT / 2,
     }
   }
 
   function worldToScreen(point: Point) {
-    const rect = stageRef.current?.getBoundingClientRect()
+    const rect = canvasStageElement.getRect()
     const screenPoint = getCanvasViewportScreenPoint(viewport, point)
 
     return {
@@ -5449,7 +5433,7 @@ function App() {
       return
     }
 
-    const rect = stageRef.current?.getBoundingClientRect()
+    const rect = canvasStageElement.getRect()
 
     if (!rect) {
       return
@@ -5465,10 +5449,7 @@ function App() {
         metaKey: event.metaKey,
         shiftKey: event.shiftKey,
       },
-      point: {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      },
+      point: canvasStageElement.getScreenPoint(event),
       viewport,
     })
 
@@ -7804,7 +7785,7 @@ function App() {
         onPointerDown={handleStagePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        ref={stageRef}
+        ref={setPPTStageElementRef}
         tabIndex={-1}
       >
         <div
