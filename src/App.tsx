@@ -1121,6 +1121,9 @@ type PPTLayerPaneRenameState = {
   objectId: string
   value: string
 }
+type PPTLayerPaneDragState = {
+  objectId: string
+}
 type PPTMinimapSize = CanvasMinimapSize
 type PPTMinimapItemBounds = CanvasMinimapItemBounds
 type PPTMinimapReadModel = CanvasMinimapReadModel
@@ -4284,14 +4287,15 @@ function App() {
       case 'reorder-object':
         commitDeck((current) =>
           updatePPTDeckSlide(current, effect.selection.slideId, (slide) => {
-            const elements = [...slide.elements]
-            const [element] = elements.splice(payload.fromIndex, 1)
+            const elements = reorderPPTLayerPaneElement(
+              slide.elements,
+              payload.objectId,
+              payload.toIndex,
+            )
 
-            if (!element) {
+            if (!elements) {
               return slide
             }
-
-            elements.splice(payload.toIndex, 0, element)
 
             return {
               ...slide,
@@ -8803,6 +8807,55 @@ function getPPTLayerPaneActualObjectIds(
   return [...expanded]
 }
 
+function getPPTLayerPaneDropIndex(slide: PPTSlide, targetObjectId: string) {
+  const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
+
+  if (targetGroupId) {
+    const firstGroupElementIndex = slide.elements.findIndex(
+      (element) => element.groupId === targetGroupId,
+    )
+
+    return firstGroupElementIndex < 0 ? null : firstGroupElementIndex
+  }
+
+  const targetIndex = slide.elements.findIndex((element) => element.id === targetObjectId)
+
+  return targetIndex < 0 ? null : targetIndex
+}
+
+function reorderPPTLayerPaneElement(
+  elements: readonly PPTElement[],
+  objectId: string,
+  toIndex: number,
+) {
+  const fromIndex = elements.findIndex((element) => element.id === objectId)
+
+  if (fromIndex < 0) {
+    return null
+  }
+
+  const boundedToIndex = clamp(toIndex, 0, Math.max(0, elements.length - 1))
+
+  if (fromIndex === boundedToIndex) {
+    return null
+  }
+
+  const next = [...elements]
+  const [element] = next.splice(fromIndex, 1)
+
+  if (!element) {
+    return null
+  }
+
+  const insertionIndex = fromIndex < boundedToIndex
+    ? Math.max(0, boundedToIndex - 1)
+    : boundedToIndex
+
+  next.splice(insertionIndex, 0, element)
+
+  return next
+}
+
 function getPPTLayerPaneSelection({
   currentSelection,
   mode,
@@ -10710,6 +10763,8 @@ function Inspector({
     })
   const [layerPaneRenameState, setLayerPaneRenameState] =
     useState<PPTLayerPaneRenameState | null>(null)
+  const [layerPaneDragState, setLayerPaneDragState] =
+    useState<PPTLayerPaneDragState | null>(null)
   const layerPaneRenameCommitSuppressedRef = useRef(false)
   const collapsedLayerPaneGroupIdSet = useMemo(
     () => new Set(layerPaneGroupState.collapsedGroupIds),
@@ -10858,6 +10913,78 @@ function Inspector({
     }
 
     commitLayerPaneRename(objectId, value)
+  }
+
+  function canDragLayerPaneRow(row: PPTLayerPaneRowDescriptor) {
+    return row.isReorderable && !row.isGroup
+  }
+
+  function handleLayerPaneRowDragStart(
+    row: PPTLayerPaneRowDescriptor,
+    event: ReactDragEvent<HTMLElement>,
+  ) {
+    if (!canDragLayerPaneRow(row)) {
+      event.preventDefault()
+      return
+    }
+
+    setLayerPaneFocusedObjectId(row.objectId)
+    setLayerPaneDragState({ objectId: row.objectId })
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', row.objectId)
+  }
+
+  function handleLayerPaneRowDragOver(
+    row: PPTLayerPaneRowDescriptor,
+    event: ReactDragEvent<HTMLElement>,
+  ) {
+    const draggedObjectId = layerPaneDragState?.objectId
+
+    if (draggedObjectId === row.objectId) {
+      return
+    }
+
+    const dropIndex = getPPTLayerPaneDropIndex(slide, row.objectId)
+
+    if (dropIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleLayerPaneRowDrop(
+    row: PPTLayerPaneRowDescriptor,
+    event: ReactDragEvent<HTMLElement>,
+  ) {
+    const draggedObjectId = layerPaneDragState?.objectId ||
+      event.dataTransfer.getData('text/plain')
+
+    if (!draggedObjectId || draggedObjectId === row.objectId) {
+      return
+    }
+
+    const dropIndex = getPPTLayerPaneDropIndex(slide, row.objectId)
+
+    if (dropIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    setLayerPaneDragState(null)
+    setLayerPaneFocusedObjectId(draggedObjectId)
+    runLayerPaneIntent({
+      objectId: draggedObjectId,
+      toIndex: dropIndex,
+      type: 'row-drop',
+    })
+    focusLayerPaneRow(draggedObjectId)
+  }
+
+  function handleLayerPaneRowDragEnd() {
+    setLayerPaneDragState(null)
   }
 
   function applyLayerPaneKeyboardIntent(intent: PPTLayerPaneKeyboardIntent) {
@@ -12264,6 +12391,7 @@ function Inspector({
               : null
             const isRenaming = activeLayerPaneRename !== null
             const renameValue = activeLayerPaneRename?.value ?? ''
+            const isDraggable = canDragLayerPaneRow(row)
 
             return (
               <div
@@ -12280,6 +12408,8 @@ function Inspector({
               data-ppt-layer-pane-expanded={row.ariaExpanded === undefined ? '' : String(row.ariaExpanded)}
               data-ppt-layer-pane-grouped={row.isGrouped ? 'true' : 'false'}
               data-ppt-layer-pane-hidden={row.isHidden ? 'true' : 'false'}
+              data-ppt-layer-pane-draggable={isDraggable ? 'true' : 'false'}
+              data-ppt-layer-pane-dragging={layerPaneDragState?.objectId === row.objectId ? 'true' : 'false'}
               data-ppt-layer-pane-is-group={row.isGroup ? 'true' : 'false'}
               data-ppt-layer-pane-kind={row.kindLabel}
               data-ppt-layer-pane-locked={row.isLocked ? 'true' : 'false'}
@@ -12291,9 +12421,14 @@ function Inspector({
               data-ppt-layer-pane-row-type={row.isGroup ? 'group' : 'object'}
               data-ppt-layer-pane-selected={row.isSelected ? 'true' : 'false'}
               data-ppt-layer-row={row.objectId}
+              draggable={isDraggable}
               key={row.objectId}
               role={layerPaneDescriptor.aria.rowRole}
               tabIndex={row.objectId === activeLayerPaneObjectId ? 0 : -1}
+              onDragEnd={handleLayerPaneRowDragEnd}
+              onDragOver={(event) => handleLayerPaneRowDragOver(row, event)}
+              onDragStart={(event) => handleLayerPaneRowDragStart(row, event)}
+              onDrop={(event) => handleLayerPaneRowDrop(row, event)}
               onKeyDown={(event) => handleLayerPaneRowKeyDown(row, event)}
             >
               {row.isGroup ? (

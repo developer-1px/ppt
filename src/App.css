@@ -1744,6 +1744,10 @@
   font-weight: 700;
 }
 
+.ppt-layer-row[data-ppt-layer-pane-dragging='true'] {
+  opacity: 0.58;
+}
+
 .ppt-layer-row[data-grouped='true'] .ppt-layer-kind {
   color: var(--accent-strong);
 }
