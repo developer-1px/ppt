@@ -2,7 +2,6 @@ import { clamp } from 'canvas/core'
 import {
   getCanvasTableCsvFileFromDataTransfer,
   getCanvasTableCsvFileFromList,
-  getCanvasTableCsvSourceFromDataTransfer,
   getCanvasTableCsvSourceFromText,
   readCanvasTableCsvFileSource,
   type CanvasTableImportSource,
@@ -13,7 +12,15 @@ import {
   type PPTTable,
 } from './pptModel'
 
-export type PPTTableImportSource = CanvasTableImportSource
+export type PPTTableImportFormat =
+  | 'canvas-csv'
+  | 'default'
+  | 'text-delimited'
+  | 'text-html'
+  | 'text-tsv'
+export type PPTTableImportSource = CanvasTableImportSource & {
+  format?: PPTTableImportFormat
+}
 
 export const PPT_DEFAULT_TABLE_ROWS = [
   ['Metric', 'Current', 'Target'],
@@ -84,19 +91,35 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
   const tabSeparatedText = dataTransfer.getData('text/tab-separated-values')
 
   if (tabSeparatedText) {
-    return getPPTTableSourceFromText(tabSeparatedText)
+    return getPPTTableSourceFromText(tabSeparatedText, {
+      format: 'text-tsv',
+    })
   }
 
-  return toPPTTableImportSource(
-    getCanvasTableCsvSourceFromDataTransfer(dataTransfer),
-  )
+  const csvText = dataTransfer.getData('text/csv')
+
+  if (csvText) {
+    return getPPTTableSourceFromText(csvText, {
+      format: 'canvas-csv',
+    })
+  }
+
+  const htmlSource = getPPTTableSourceFromHTML(dataTransfer.getData('text/html'))
+
+  if (htmlSource) {
+    return htmlSource
+  }
+
+  return getPPTTableSourceFromText(dataTransfer.getData('text/plain'), {
+    format: 'text-delimited',
+  })
 }
 
 export async function readPPTTableFileSource(file: Blob & { name?: string }) {
   const canvasSource = await readCanvasTableCsvFileSource(file)
 
   if (canvasSource) {
-    return toPPTTableImportSource(canvasSource)
+    return toPPTTableImportSource(canvasSource, 'canvas-csv')
   }
 
   if (!isPPTTableTsvFile(file)) {
@@ -104,28 +127,62 @@ export async function readPPTTableFileSource(file: Blob & { name?: string }) {
   }
 
   return getPPTTableSourceFromText(await readPPTBlobAsText(file), {
+    format: 'text-tsv',
     name: file.name,
   })
 }
 
 export function getPPTTableSourceFromText(
   text: string,
-  options: { name?: string } = {},
+  options: { format?: PPTTableImportFormat; name?: string } = {},
 ): PPTTableImportSource | null {
-  const canvasSource = getCanvasTableCsvSourceFromText(text, options)
-
-  if (canvasSource) {
-    return toPPTTableImportSource(canvasSource)
-  }
-
-  const rows = normalizePPTTableRows(parsePPTTableTextRows(text))
-
-  if (!isPPTTableImportRows(rows)) {
+  if (!text.trim()) {
     return null
   }
 
+  const canvasSource = getCanvasTableCsvSourceFromText(text, options)
+
+  if (canvasSource) {
+    return toPPTTableImportSource(canvasSource, options.format ?? 'canvas-csv')
+  }
+
+  const parsedRows = parsePPTTableTextRows(text)
+
+  if (!isPPTTableImportRows(parsedRows)) {
+    return null
+  }
+
+  const rows = normalizePPTTableRows(parsedRows)
+
   return {
+    ...(options.format === undefined ? {} : { format: options.format }),
     ...(options.name === undefined ? {} : { name: getPPTTableImportName(options.name) }),
+    rows,
+  }
+}
+
+export function getPPTTableSourceFromHTML(value: string) {
+  if (!value || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(value, 'text/html')
+  const table = doc.querySelector('table')
+
+  if (!table) {
+    return null
+  }
+
+  const parsedRows = parsePPTTableHTMLRows(table)
+
+  if (!isPPTTableImportRows(parsedRows)) {
+    return null
+  }
+
+  const rows = normalizePPTTableRows(parsedRows)
+
+  return {
+    format: 'text-html' as const,
     rows,
   }
 }
@@ -161,6 +218,7 @@ export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
 
 function toPPTTableImportSource(
   source: CanvasTableImportSource | null,
+  format?: PPTTableImportFormat,
 ): PPTTableImportSource | null {
   if (!source) {
     return null
@@ -173,6 +231,7 @@ function toPPTTableImportSource(
   }
 
   return {
+    ...(format === undefined ? {} : { format }),
     ...(source.name === undefined ? {} : { name: getPPTTableImportName(source.name) }),
     rows,
   }
@@ -198,6 +257,75 @@ function parsePPTTableTextRows(text: string) {
   const delimiter = text.includes('\t') ? '\t' : ','
 
   return parsePPTDelimitedRows(text, delimiter)
+}
+
+function parsePPTTableHTMLRows(table: Element) {
+  const rows: string[][] = []
+  const tableRows = Array.from(
+    table instanceof HTMLTableElement
+      ? table.rows
+      : table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr, :scope > tr'),
+  )
+
+  for (const [rowIndex, tableRow] of tableRows.entries()) {
+    const row = rows[rowIndex] ?? []
+    const cells = Array.from(tableRow.children).filter((cell) =>
+      cell.tagName.toLowerCase() === 'td' ||
+      cell.tagName.toLowerCase() === 'th',
+    )
+    let columnIndex = 0
+
+    rows[rowIndex] = row
+
+    for (const cell of cells) {
+      while (row[columnIndex] !== undefined) {
+        columnIndex += 1
+      }
+
+      const text = getPPTTableHTMLCellText(cell)
+      const columnSpan = getPPTTableHTMLSpan(cell.getAttribute('colspan'))
+      const rowSpan = getPPTTableHTMLSpan(cell.getAttribute('rowspan'))
+
+      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+        const targetRowIndex = rowIndex + rowOffset
+        const targetRow = rows[targetRowIndex] ?? []
+
+        rows[targetRowIndex] = targetRow
+
+        for (let columnOffset = 0; columnOffset < columnSpan; columnOffset += 1) {
+          const targetColumnIndex = columnIndex + columnOffset
+
+          targetRow[targetColumnIndex] = rowOffset === 0 && columnOffset === 0
+            ? text
+            : targetRow[targetColumnIndex] ?? ''
+        }
+      }
+
+      columnIndex += columnSpan
+    }
+  }
+
+  return rows
+}
+
+function getPPTTableHTMLSpan(value: string | null) {
+  const span = Number.parseInt(value ?? '1', 10)
+
+  return Number.isFinite(span)
+    ? clamp(span, 1, PPT_TABLE_MAX_COLUMNS)
+    : 1
+}
+
+function getPPTTableHTMLCellText(cell: Element) {
+  const clone = cell.cloneNode(true)
+
+  if (clone instanceof Element) {
+    clone.querySelectorAll('script, style, noscript').forEach((node) => node.remove())
+
+    return normalizePPTTableCell(clone.textContent ?? '')
+  }
+
+  return normalizePPTTableCell(cell.textContent ?? '')
 }
 
 function parsePPTDelimitedRows(text: string, delimiter: string) {

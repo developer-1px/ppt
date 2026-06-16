@@ -464,6 +464,7 @@ import {
   normalizePPTTableRows,
   readPPTTableFileSource,
   stringifyPPTTableRows,
+  type PPTTableImportFormat,
   type PPTTableImportSource,
 } from './pptTableImport'
 import {
@@ -811,6 +812,14 @@ type PPTClipboardPastePositionEffect = {
 type PPTClipboardPastePositionMemory = {
   key: string
   pasteIndex: number
+}
+type PPTTableImportEffect = {
+  columnCount: number
+  fallbackIssue?: string
+  format: PPTTableImportFormat
+  model: 'canvas-table-import'
+  name: string
+  rowCount: number
 }
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
@@ -1835,6 +1844,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
+  const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
@@ -3338,7 +3348,7 @@ function App() {
   }
 
   function insertPPTTableSource(
-    source: PPTTableImportSource = { rows: PPT_DEFAULT_TABLE_ROWS },
+    source: PPTTableImportSource = { format: 'default', rows: PPT_DEFAULT_TABLE_ROWS },
     center = getPPTViewportCenter(),
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
@@ -3350,6 +3360,14 @@ function App() {
         rows: source.rows,
       })
 
+      setLastTableImportEffect({
+        columnCount: getPPTTableColumnCount(element.rows),
+        fallbackIssue: source.format === 'text-html' ? 'canvas#254' : undefined,
+        format: source.format ?? 'text-delimited',
+        model: 'canvas-table-import',
+        name: element.name,
+        rowCount: element.rows.length,
+      })
       setSelection([element.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -7667,7 +7685,13 @@ function App() {
         data-ppt-resize-handle-click-model="canvas-pointer-click-memory"
         data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
+        data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
+        data-ppt-table-import-fallback-issue={lastTableImportEffect?.fallbackIssue}
+        data-ppt-table-import-format={lastTableImportEffect?.format}
         data-ppt-table-import-model="canvas-table-import"
+        data-ppt-table-import-name={lastTableImportEffect?.name}
+        data-ppt-table-import-rows={lastTableImportEffect?.rowCount}
+        data-ppt-table-import-html-fallback="canvas#254"
         data-ppt-table-import-tsv-fallback="canvas#253"
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
         data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}

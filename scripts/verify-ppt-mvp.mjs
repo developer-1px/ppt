@@ -8252,8 +8252,27 @@ async function runTableImportScenario(page) {
 
   const afterPaste = await getPPTTableState(page)
 
-  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportTsvFallback === 'canvas#253' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
+  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportFormat === 'text-tsv' && afterPaste.tableImportTsvFallback === 'canvas#253' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
     afterPaletteInsert,
+    afterPaste,
+  })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', '<table><thead><tr><th>Plan</th><th>Owner</th><th>Status</th></tr></thead><tbody><tr><td>Outline</td><td>AI</td><td>Draft</td></tr><tr><td>Retouch</td><td>Human</td><td>Ready</td></tr></tbody></table>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterHtmlPaste = await getPPTTableState(page)
+
+  record('pastes HTML table clipboard data into PPT table element', afterHtmlPaste.tableImportModel === 'canvas-table-import' && afterHtmlPaste.tableImportFormat === 'text-html' && afterHtmlPaste.tableImportHtmlFallback === 'canvas#254' && afterHtmlPaste.tableImportFallbackIssue === 'canvas#254' && afterHtmlPaste.tableCount === afterPaste.tableCount + 1 && afterHtmlPaste.selectedKind === 'table' && afterHtmlPaste.selectedRows === 3 && afterHtmlPaste.selectedCols === 3 && afterHtmlPaste.tableImportRows === 3 && afterHtmlPaste.tableImportCols === 3 && afterHtmlPaste.cellTexts.includes('Retouch') && afterHtmlPaste.cellTexts.includes('Human'), {
+    afterHtmlPaste,
     afterPaste,
   })
 
@@ -8276,9 +8295,9 @@ async function runTableImportScenario(page) {
 
   const afterDrop = await getPPTTableState(page)
 
-  record('drops CSV file onto PPT stage as table element', afterDrop.tableImportModel === 'canvas-table-import' && afterDrop.tableCount === afterPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops CSV file onto PPT stage as table element', afterDrop.tableImportModel === 'canvas-table-import' && afterDrop.tableImportFormat === 'canvas-csv' && afterDrop.tableCount === afterHtmlPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
-    afterPaste,
+    afterHtmlPaste,
   })
 }
 
@@ -11947,7 +11966,13 @@ function getPPTTableState(page) {
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedRows: Number(selected?.getAttribute('data-ppt-table-rows') ?? 0),
+      tableImportCols: Number(stage?.getAttribute('data-ppt-table-import-cols') ?? 0),
+      tableImportFallbackIssue: stage?.getAttribute('data-ppt-table-import-fallback-issue') ?? '',
+      tableImportFormat: stage?.getAttribute('data-ppt-table-import-format') ?? '',
+      tableImportHtmlFallback: stage?.getAttribute('data-ppt-table-import-html-fallback') ?? '',
       tableImportModel: stage?.getAttribute('data-ppt-table-import-model') ?? '',
+      tableImportName: stage?.getAttribute('data-ppt-table-import-name') ?? '',
+      tableImportRows: Number(stage?.getAttribute('data-ppt-table-import-rows') ?? 0),
       tableImportTsvFallback: stage?.getAttribute('data-ppt-table-import-tsv-fallback') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
