@@ -138,6 +138,7 @@ import {
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
+  normalizeSlideEditObjectHyperlinkStorageUrl,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
@@ -16104,18 +16105,10 @@ function normalizePPTElementHyperlink(
 }
 
 function normalizePPTElementHyperlinkUrl(url: string) {
-  const normalized = url.trim().slice(0, PPT_HYPERLINK_URL_MAX_LENGTH)
-
-  if (!normalized || !isPPTElementHyperlinkUrlAllowed(normalized)) {
-    return ''
-  }
-
-  return normalized
-}
-
-function isPPTElementHyperlinkUrlAllowed(url: string) {
-  return !hasPPTControlCharacter(url) &&
-    !/^(javascript|data|vbscript):/i.test(url)
+  return normalizeSlideEditObjectHyperlinkStorageUrl(url, {
+    blockedSchemes: ['javascript', 'data', 'vbscript'],
+    maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
+  }) ?? ''
 }
 
 function hasPPTControlCharacter(value: string) {
