@@ -135,6 +135,7 @@ import {
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectImageCropCommandEffect,
+  getSlideEditObjectImageCropPositionCSS,
   getSlideEditObjectImageReplaceCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
@@ -11381,7 +11382,7 @@ function SlideThumb({
                 ? `url(${element.src})`
                 : undefined,
               backgroundPosition: element.kind === 'image'
-                ? getPPTImageObjectPosition(element)
+                ? getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element))
                 : undefined,
               backgroundSize: element.kind === 'image'
                 ? getPPTImageFit(element)
@@ -11720,7 +11721,7 @@ function PPTElementView({
           src={element.src}
           style={{
             objectFit: getPPTImageFit(element),
-            objectPosition: getPPTImageObjectPosition(element),
+            objectPosition: getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element)),
           }}
         />
       ) : element.kind === 'line' ? (
@@ -15614,12 +15615,6 @@ function getPPTImageReplaceDescriptor(
     sourceName: element.name,
     unsupportedReason: element.locked === true ? 'locked-object' : 'unsupported-object',
   })
-}
-
-function getPPTImageObjectPosition(element: PPTImage) {
-  const crop = getPPTImageCrop(element)
-
-  return `${crop.x}% ${crop.y}%`
 }
 
 function getDefaultPPTTextStyle(): PPTTextStyle {
