@@ -423,6 +423,7 @@ import {
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
   isAdditivePointerInput,
+  moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
   resizeCanvasSelection,
@@ -10076,48 +10077,22 @@ function reorderPPTLayerPaneElement(
   toIndex: number,
 ) {
   const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
-  const draggedObjectIds = new Set(
-    groupId
-      ? elements
-          .filter((element) => element.groupId === groupId)
-          .map((element) => element.id)
-      : [objectId],
-  )
-  const fromIndex = elements.findIndex((element) => draggedObjectIds.has(element.id))
+  const selection = groupId
+    ? getCanvasItemGroupMemberIdsForGroup({
+      getItemGroupId: (element) => element.groupId,
+      getItemId: (element) => element.id,
+      groupId,
+      items: elements,
+    })
+    : [objectId]
+  const result = moveCanvasSelectionItemsToIndex({
+    getItemId: (element) => element.id,
+    items: elements,
+    selection,
+    toIndex,
+  })
 
-  if (fromIndex < 0) {
-    return null
-  }
-
-  const boundedToIndex = clamp(toIndex, 0, elements.length)
-  const block = elements.filter((element) => draggedObjectIds.has(element.id))
-
-  if (block.length === 0) {
-    return null
-  }
-
-  const removedBeforeDropIndex = elements
-    .slice(0, boundedToIndex)
-    .filter((element) => draggedObjectIds.has(element.id))
-    .length
-  const remaining = elements.filter((element) => !draggedObjectIds.has(element.id))
-  const insertionIndex = clamp(
-    boundedToIndex - removedBeforeDropIndex,
-    0,
-    remaining.length,
-  )
-  const next = [
-    ...remaining.slice(0, insertionIndex),
-    ...block,
-    ...remaining.slice(insertionIndex),
-  ]
-
-  if (next.map((element) => element.id).join('\u0000') ===
-    elements.map((element) => element.id).join('\u0000')) {
-    return null
-  }
-
-  return next
+  return result.changed ? result.items : null
 }
 
 function getPPTLayerPaneSelection({
