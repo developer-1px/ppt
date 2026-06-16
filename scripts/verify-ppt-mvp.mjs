@@ -72,6 +72,7 @@ try {
   await runObjectAltTextScenario(page)
   await runTableImportScenario(page)
   await runTextPasteScenario(page)
+  await runMediaImportScenario(page)
   await runCommentReviewScenario(page)
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
@@ -8138,6 +8139,148 @@ async function runTextPasteScenario(page) {
   await delay(50)
 }
 
+async function runMediaImportScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const before = await getPPTMediaImportState(page)
+  const pasteUrl = 'https://example.com/ppt-link-card'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.items.add(url, 'text/plain')
+    dataTransfer.items.add(url, 'text/uri-list')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(pasteUrl)})`)
+  await delay(120)
+
+  const afterPaste = await getPPTMediaImportState(page)
+
+  record(
+    'pastes URL media source into PPT link card via canvas media import',
+    afterPaste.mediaImportModel === 'canvas-media-import' &&
+      afterPaste.mediaImportImporter === 'ppt-link-card' &&
+      afterPaste.mediaImportUrl === pasteUrl &&
+      afterPaste.mediaImportSelection === afterPaste.selectedId &&
+      afterPaste.shapeCount === before.shapeCount + 1 &&
+      afterPaste.textBoxCount === before.textBoxCount &&
+      afterPaste.selectedKind === 'shape' &&
+      afterPaste.selectedName === 'Link card' &&
+      afterPaste.selectedHyperlink === pasteUrl &&
+      afterPaste.selectedText.includes(pasteUrl) &&
+      afterPaste.thumbHyperlinkCount >= before.thumbHyperlinkCount + 1 &&
+      afterPaste.exportCode.includes(`data-ppt-hyperlink-url="${pasteUrl}"`) &&
+      afterPaste.exportCode.includes('"name": "Link card"'),
+    {
+      afterPaste,
+      before,
+    },
+  )
+
+  const dropUrl = 'https://example.com/dropped-resource'
+
+  const dropDispatch = await page.eval(`((url) => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const rect = stage.getBoundingClientRect()
+    const dataTransfer = new DataTransfer()
+    const point = {
+      x: rect.left + rect.width * 0.72,
+      y: rect.top + rect.height * 0.62,
+    }
+    let captured = null
+
+    stage.addEventListener('drop', (event) => {
+      captured = {
+        plain: event.dataTransfer?.getData('text/plain') ?? null,
+        types: Array.from(event.dataTransfer?.types ?? []),
+        uri: event.dataTransfer?.getData('text/uri-list') ?? null,
+      }
+    }, {
+      capture: true,
+      once: true,
+    })
+
+    dataTransfer.setData('text/uri-list', url)
+    dataTransfer.setData('text/plain', url)
+    const event = new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: point.x,
+      clientY: point.y,
+      dataTransfer,
+    })
+    const allowed = stage.dispatchEvent(event)
+
+    return {
+      allowed,
+      captured,
+      defaultPrevented: event.defaultPrevented,
+      point,
+    }
+  })(${JSON.stringify(dropUrl)})`)
+  await delay(120)
+
+  const afterDrop = await getPPTMediaImportState(page)
+
+  record(
+    'drops URL media source onto PPT stage as link card',
+    afterDrop.shapeCount === afterPaste.shapeCount + 1 &&
+      afterDrop.selectedKind === 'shape' &&
+      afterDrop.selectedName === 'Link card' &&
+      afterDrop.selectedHyperlink === dropUrl &&
+      afterDrop.mediaImportUrl === dropUrl &&
+      dropDispatch.defaultPrevented &&
+      dropDispatch.captured?.uri === dropUrl &&
+      afterDrop.selectedLeft > afterPaste.selectedLeft &&
+      afterDrop.selectedTop > afterPaste.selectedTop,
+    {
+      afterDrop,
+      afterPaste,
+      dropDispatch,
+    },
+  )
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(80)
+
+  const beforeNativeGuard = await getPPTMediaImportState(page)
+
+  await page.eval(`((url) => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/plain', url)
+    editor?.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify('https://example.com/native-editor')})`)
+  await delay(80)
+
+  const afterNativeGuard = await getPPTMediaImportState(page)
+
+  record(
+    'keeps native PPT text editor URL paste out of global media import',
+    beforeNativeGuard.editing &&
+      afterNativeGuard.shapeCount === beforeNativeGuard.shapeCount &&
+      afterNativeGuard.mediaImportUrl === beforeNativeGuard.mediaImportUrl,
+    {
+      afterNativeGuard,
+      beforeNativeGuard,
+    },
+  )
+
+  await page.eval(`document.activeElement?.blur()`)
+  await delay(50)
+}
+
 async function runCommentReviewScenario(page) {
   await pressKey(page, {
     code: 'Escape',
@@ -11571,6 +11714,32 @@ function getPPTTextPasteState(page) {
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
       thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
       undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
+    }
+  })()`)
+}
+
+function getPPTMediaImportState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      editing: !!document.querySelector('.ppt-element-editor[contenteditable="true"]'),
+      exportCode: document.querySelector('.ppt-export-code')?.value ?? '',
+      mediaImportImporter: stage?.getAttribute('data-ppt-media-import-importer') ?? '',
+      mediaImportModel: stage?.getAttribute('data-ppt-media-import-model') ?? '',
+      mediaImportSelection: stage?.getAttribute('data-ppt-media-import-selection') ?? '',
+      mediaImportUrl: stage?.getAttribute('data-ppt-media-import-url') ?? '',
+      selectedHyperlink: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
+      selectedText: selected?.textContent ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      shapeCount: document.querySelectorAll('[data-kind="shape"]').length,
+      textBoxCount: document.querySelectorAll('[data-kind="textBox"]').length,
+      thumbHyperlinkCount: document.querySelectorAll('.ppt-thumb-shape[data-ppt-thumb-hyperlink-url]').length,
     }
   })()`)
 }

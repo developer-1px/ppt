@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/image/CanvasImageImport.ts', import.meta.url))
+const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/media/CanvasMediaImport.ts', import.meta.url))
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/table/CanvasTableImport.ts', import.meta.url))
 const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/text-paste/CanvasTextPasteImport.ts', import.meta.url))
 const canvasKeyboardCommandDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts', import.meta.url))
@@ -30,6 +31,7 @@ export default defineConfig({
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
+      { find: 'canvas/app/media-import', replacement: canvasMediaImportEntry },
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
       { find: 'canvas/app/keyboard-command-dispatch', replacement: canvasKeyboardCommandDispatchEntry },

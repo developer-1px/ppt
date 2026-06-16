@@ -436,6 +436,12 @@ import {
   type PPTImageImportSource,
 } from './pptImageImport'
 import {
+  createPPTMediaElement,
+  getPPTMediaSourceFromDataTransfer,
+  type PPTMediaImportResult,
+  type PPTMediaImportSource,
+} from './pptMediaImport'
+import {
   PPT_DEFAULT_TABLE_ROWS,
   createPPTTableElement,
   getPPTTableColumnCount,
@@ -1763,6 +1769,7 @@ function App() {
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastMediaImport, setLastMediaImport] = useState<PPTMediaImportResult | null>(null)
   const [lastTextPasteImport, setLastTextPasteImport] = useState<PPTTextPasteImportResult | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
   const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
@@ -2510,6 +2517,13 @@ function App() {
       if (tableSource) {
         event.preventDefault()
         insertPPTTableSource(tableSource)
+        return
+      }
+
+      const mediaSource = getPPTMediaSourceFromDataTransfer(event.clipboardData)
+
+      if (mediaSource && insertPPTMediaSource(mediaSource)) {
+        event.preventDefault()
         return
       }
 
@@ -3266,6 +3280,47 @@ function App() {
 
     insertPPTTableSource(source, center)
     return true
+  }
+
+  function insertPPTMediaSource(
+    source: PPTMediaImportSource,
+    center = getPPTViewportCenter(),
+  ) {
+    let imported: PPTMediaImportResult | null = null
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const result = createPPTMediaElement({
+        createId: createPPTElementIdFactory(slide),
+        position: center,
+        source,
+        viewport,
+      })
+
+      if (!result) {
+        return slide
+      }
+
+      imported = result
+      setLastMediaImport(result)
+      setSelection([result.item.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, result.item],
+      }
+    }))
+
+    setLastMediaImport(imported)
+
+    return imported !== null
   }
 
   function insertPPTTextPasteSource(
@@ -5108,7 +5163,8 @@ function App() {
     if (
       getPPTImageFileFromDataTransfer(event.dataTransfer) ||
       getPPTTableFileFromDataTransfer(event.dataTransfer) ||
-      getPPTTableSourceFromDataTransfer(event.dataTransfer)
+      getPPTTableSourceFromDataTransfer(event.dataTransfer) ||
+      getPPTMediaSourceFromDataTransfer(event.dataTransfer)
     ) {
       event.preventDefault()
     }
@@ -5140,6 +5196,14 @@ function App() {
     if (tableSource) {
       event.preventDefault()
       insertPPTTableSource(tableSource, point)
+      return
+    }
+
+    const mediaSource = getPPTMediaSourceFromDataTransfer(event.dataTransfer)
+
+    if (mediaSource) {
+      event.preventDefault()
+      insertPPTMediaSource(mediaSource, point)
     }
   }
 
@@ -7149,6 +7213,10 @@ function App() {
           .join(' ')}
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-media-import-importer={lastMediaImport?.importerId}
+        data-ppt-media-import-model="canvas-media-import"
+        data-ppt-media-import-selection={lastMediaImport?.item.id}
+        data-ppt-media-import-url={lastMediaImport?.source.url}
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-model="canvas-text-paste-import"
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
