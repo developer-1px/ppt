@@ -104,6 +104,7 @@ import {
   type SlideEditThemeColorToken,
 } from '@interactive-os/slide-edit-affordance'
 import {
+  INITIAL_VIEWPORT,
   RESIZE_HANDLES,
   clamp,
   fitBoundsIntoViewport,
@@ -1731,6 +1732,10 @@ function App() {
     }))
   }, [scene, selection])
 
+  const resetZoom = useCallback(() => {
+    setViewport(INITIAL_VIEWPORT)
+  }, [])
+
   const navigateMinimapToWorldPoint = useCallback((point: Point) => {
     const rect = stageRef.current?.getBoundingClientRect()
 
@@ -1892,6 +1897,24 @@ function App() {
         return
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.key === '0') {
+        event.preventDefault()
+        resetZoom()
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && (event.key === '=' || event.key === '+')) {
+        event.preventDefault()
+        zoom('in')
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === '-') {
+        event.preventDefault()
+        zoom('out')
+        return
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault()
         if (event.shiftKey) {
@@ -2015,6 +2038,18 @@ function App() {
         event.preventDefault()
         setCreationTool(null)
         setLineCreationMode(null)
+        return
+      }
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key === '0') {
+        event.preventDefault()
+        fitSlide()
+        return
+      }
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key === '1') {
+        event.preventDefault()
+        fitSelection()
         return
       }
 
@@ -5380,22 +5415,32 @@ function App() {
     id: 'view:fit-slide',
     run: fitSlide,
     section: 'View',
+    shortcut: '0',
     title: 'Fit slide',
   }, {
     disabled: !canFitSelection,
     id: 'view:fit-selection',
     run: fitSelection,
     section: 'View',
+    shortcut: '1',
     title: 'Fit selection',
+  }, {
+    id: 'view:reset-zoom',
+    run: resetZoom,
+    section: 'View',
+    shortcut: 'Cmd/Ctrl+0',
+    title: CANVAS_COMMAND_AFFORDANCES.zoomReset.title,
   }, {
     id: 'view:zoom-in',
     run: () => zoom('in'),
     section: 'View',
+    shortcut: 'Cmd/Ctrl+=',
     title: CANVAS_COMMAND_AFFORDANCES.zoomIn.title,
   }, {
     id: 'view:zoom-out',
     run: () => zoom('out'),
     section: 'View',
+    shortcut: 'Cmd/Ctrl+-',
     title: CANVAS_COMMAND_AFFORDANCES.zoomOut.title,
   }, {
     id: 'view:toggle-grid',

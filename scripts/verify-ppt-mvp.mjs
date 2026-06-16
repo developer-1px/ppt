@@ -767,6 +767,7 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
   await page.eval(`(() => {
@@ -785,6 +786,19 @@ async function runFindReplaceScenario(page) {
       ctrlKey: true,
       key: ']',
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Digit0',
+      ctrlKey: true,
+      key: '0',
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Digit1',
+      key: '1',
+    }))
   })()`)
   await delay(50)
 
@@ -793,9 +807,10 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange or lock shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order, {
+  record('does not run PPT arrange lock or viewport shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -2378,6 +2393,11 @@ async function runCommandPaletteScenario(page) {
   const tidyIds = await readCommandPaletteIds(page, 'tidy')
   const flipIds = await readCommandPaletteIds(page, 'flip')
   const fitIds = await readCommandPaletteIds(page, 'fit')
+  const resetZoomIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+0')
+  const zoomInShortcutIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+=')
+  const zoomOutShortcutIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+-')
+  const fitSlideShortcutIds = await readCommandPaletteIds(page, '0')
+  const fitSelectionShortcutIds = await readCommandPaletteIds(page, '1')
   const gridIds = await readCommandPaletteIds(page, 'grid')
   const guideIds = await readCommandPaletteIds(page, 'guide')
   const presentIds = await readCommandPaletteIds(page, 'present')
@@ -2407,16 +2427,29 @@ async function runCommandPaletteScenario(page) {
     hasTidy: tidyIds.includes('command:tidy-selection'),
     hasView: fitIds.includes('view:fit-slide') &&
       fitIds.includes('view:fit-selection') &&
+      resetZoomIds.includes('view:reset-zoom') &&
+      zoomInShortcutIds.includes('view:zoom-in') &&
+      zoomOutShortcutIds.includes('view:zoom-out') &&
       gridIds.includes('view:toggle-grid') &&
       guideIds.includes('view:toggle-frame-guides') &&
       presentIds.includes('view:present'),
+    hasViewportShortcuts: fitSlideShortcutIds.includes('view:fit-slide') &&
+      fitSelectionShortcutIds.includes('view:fit-selection') &&
+      resetZoomIds.includes('view:reset-zoom') &&
+      zoomInShortcutIds.includes('view:zoom-in') &&
+      zoomOutShortcutIds.includes('view:zoom-out'),
     shortcuts: {
       bringForward: bringForwardShortcutIds,
       bringToFront: bringToFrontShortcutIds,
+      fitSelection: fitSelectionShortcutIds,
+      fitSlide: fitSlideShortcutIds,
       lockSelection: lockShortcutIds,
+      resetZoom: resetZoomIds,
       sendBackward: sendBackwardShortcutIds,
       sendToBack: sendToBackShortcutIds,
       unlockAll: unlockShortcutIds,
+      zoomIn: zoomInShortcutIds,
+      zoomOut: zoomOutShortcutIds,
     },
     visibleCounts: {
       align: alignIds.length,
@@ -2435,7 +2468,7 @@ async function runCommandPaletteScenario(page) {
     },
   }
 
-  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasLockShortcuts && exposed.hasReorder && exposed.hasReorderShortcuts && exposed.hasTidy && exposed.hasView, exposed)
+  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasLockShortcuts && exposed.hasReorder && exposed.hasReorderShortcuts && exposed.hasTidy && exposed.hasView && exposed.hasViewportShortcuts, exposed)
 
   const guideToggleIds = await readCommandPaletteIds(page, 'frame guides')
   await pressKey(page, {
@@ -2536,7 +2569,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+='), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -3004,6 +3037,62 @@ async function runFitSelectionScenario(page) {
   record('keeps PPT fit slide command on full slide bounds', afterRestoreFitSlide.scale < afterPaletteFit.scale && afterRestoreFitSlide.label !== afterPaletteFit.label, {
     afterPaletteFit,
     afterRestoreFitSlide,
+  })
+
+  await pressKey(page, {
+    code: 'Digit1',
+    key: '1',
+    windowsVirtualKeyCode: 49,
+  })
+  await delay(120)
+  const afterShortcutFitSelection = await readViewportState(page)
+
+  await pressKey(page, {
+    code: 'Digit0',
+    key: '0',
+    windowsVirtualKeyCode: 48,
+  })
+  await delay(120)
+  const afterShortcutFitSlide = await readViewportState(page)
+
+  record('runs PPT viewport fit keyboard shortcuts from canvas bindings', afterShortcutFitSelection.scale > afterRestoreFitSlide.scale && afterShortcutFitSlide.scale < afterShortcutFitSelection.scale && afterShortcutFitSlide.label === afterRestoreFitSlide.label, {
+    afterRestoreFitSlide,
+    afterShortcutFitSelection,
+    afterShortcutFitSlide,
+  })
+
+  await pressKey(page, {
+    code: 'Equal',
+    key: '=',
+    modifiers: 2,
+    windowsVirtualKeyCode: 187,
+  })
+  await delay(80)
+  const afterShortcutZoomIn = await readViewportState(page)
+
+  await pressKey(page, {
+    code: 'Minus',
+    key: '-',
+    modifiers: 2,
+    windowsVirtualKeyCode: 189,
+  })
+  await delay(80)
+  const afterShortcutZoomOut = await readViewportState(page)
+
+  await pressKey(page, {
+    code: 'Digit0',
+    key: '0',
+    modifiers: 2,
+    windowsVirtualKeyCode: 48,
+  })
+  await delay(80)
+  const afterShortcutResetZoom = await readViewportState(page)
+
+  record('runs PPT viewport zoom keyboard shortcuts from canvas bindings', afterShortcutZoomIn.scale > afterShortcutFitSlide.scale && afterShortcutZoomOut.scale < afterShortcutZoomIn.scale && nearlyEqual(afterShortcutResetZoom.scale, 1, 0.001) && nearlyEqual(afterShortcutResetZoom.x, 0, 0.001) && nearlyEqual(afterShortcutResetZoom.y, 0, 0.001), {
+    afterShortcutFitSlide,
+    afterShortcutResetZoom,
+    afterShortcutZoomIn,
+    afterShortcutZoomOut,
   })
 }
 
