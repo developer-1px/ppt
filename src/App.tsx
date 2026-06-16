@@ -416,6 +416,7 @@ import {
 import {
   EMPTY_CANVAS_SNAP_GUIDES,
   canFlipCanvasSelectionItems,
+  getCanvasGroupedItemPointerSelection,
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
@@ -17682,45 +17683,16 @@ function getPPTGroupPointerSelection({
   selection: string[]
   slide: PPTSlide
 }) {
-  const memberIds = getPPTGroupMemberIds(slide, itemId, includeHidden)
-
-  if (memberIds.length === 0) {
-    return fallbackSelection
-  }
-
-  if (!additive) {
-    return memberIds
-  }
-
-  const selected = new Set(selection)
-  const allMembersSelected = memberIds.every((id) => selected.has(id))
-
-  if (allMembersSelected) {
-    return selection.filter((id) => !memberIds.includes(id))
-  }
-
-  return [
-    ...selection,
-    ...memberIds.filter((id) => !selected.has(id)),
-  ]
-}
-
-function getPPTGroupMemberIds(
-  slide: PPTSlide,
-  elementId: string,
-  includeHidden: boolean,
-) {
-  const element = findPPTElement(slide, elementId)
-
-  if (!element?.groupId) {
-    return []
-  }
-
-  return slide.elements
-    .filter((candidate) =>
-      candidate.groupId === element.groupId &&
-      (includeHidden || candidate.visible !== false))
-    .map((candidate) => candidate.id)
+  return getCanvasGroupedItemPointerSelection({
+    additive,
+    fallbackSelection,
+    getItemGroupId: (element) => element.groupId,
+    getItemId: (element) => element.id,
+    isItemSelectable: (element) => includeHidden || element.visible !== false,
+    itemId,
+    items: slide.elements,
+    selection,
+  })
 }
 
 export default App
