@@ -153,6 +153,7 @@ import {
   getSlideEditRailListboxKeyboardIntent,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  getSlideEditStyleClipboardCategoryDescriptors,
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextAutoFitGestureCommandEffect,
@@ -192,7 +193,6 @@ import {
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
-  SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
@@ -15188,7 +15188,9 @@ function createPPTStyleClipboardDescriptor(
     PPTStyleClipboardPackageCategory,
     unknown
   >({
-    categories: getPPTStyleClipboardCategoryDescriptors(clipboard),
+    categories: getSlideEditStyleClipboardCategoryDescriptors({
+      categoryIds: getPPTStyleClipboardPackageCategoryIds(clipboard),
+    }),
     source: {
       kind: clipboard.sourceKind,
       objectId: clipboard.sourceId,
@@ -15196,15 +15198,6 @@ function createPPTStyleClipboardDescriptor(
     },
     styles: getPPTStyleClipboardPackageStyles(clipboard),
   })
-}
-
-function getPPTStyleClipboardCategoryDescriptors(
-  clipboard: PPTStyleClipboard,
-) {
-  const categoryIds = new Set(getPPTStyleClipboardPackageCategoryIds(clipboard))
-
-  return SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES
-    .filter((category) => categoryIds.has(category.id))
 }
 
 function getPPTStyleClipboardPackageCategoryIds(
