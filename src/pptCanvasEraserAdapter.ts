@@ -6,6 +6,7 @@ import type {
   Bounds,
   Point,
 } from 'canvas/core'
+import { unionCanvasRectList } from 'canvas/foundation'
 import { pptGeometryToBounds } from './pptCanvasAdapter'
 import type {
   PPTElement,
@@ -54,7 +55,7 @@ function createPPTEraserItemReadModel(slide: PPTSlide): CanvasEraserItemReadMode
     getItemBounds: getCanvasEraserItemBounds,
     getSelection: (ids) => ids.filter((id) => itemById.has(id)),
     getSelectionBounds: (ids) =>
-      getBoundsUnion(Array.from(ids).flatMap((id) => {
+      unionCanvasRectList(Array.from(ids).flatMap((id) => {
         const item = itemById.get(id)
 
         return item ? [getCanvasEraserItemBounds(item)] : []
@@ -102,33 +103,6 @@ function getCanvasEraserItemBounds(item: CanvasEraserItem): Bounds {
     w: item.w,
     x: item.x,
     y: item.y,
-  }
-}
-
-function getBoundsUnion(bounds: Bounds[]) {
-  const first = bounds[0]
-
-  if (!first) {
-    return null
-  }
-
-  let left = first.x
-  let top = first.y
-  let right = first.x + first.w
-  let bottom = first.y + first.h
-
-  for (const bound of bounds.slice(1)) {
-    left = Math.min(left, bound.x)
-    top = Math.min(top, bound.y)
-    right = Math.max(right, bound.x + bound.w)
-    bottom = Math.max(bottom, bound.y + bound.h)
-  }
-
-  return {
-    h: bottom - top,
-    w: right - left,
-    x: left,
-    y: top,
   }
 }
 
