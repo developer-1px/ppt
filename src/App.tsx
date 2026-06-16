@@ -417,6 +417,7 @@ import {
 import {
   EMPTY_CANVAS_SNAP_GUIDES,
   canFlipCanvasSelectionItems,
+  getCanvasFullySelectedItemGroupIds,
   getCanvasGroupedItemSelection,
   getCanvasGroupedItemPointerSelection,
   getCanvasItemGroupMemberIdsForGroup,
@@ -9917,24 +9918,26 @@ function getPPTLayerPaneGroupMemberIds(slide: PPTSlide, groupId: string) {
   })
 }
 
+function getPPTLayerPaneFullySelectedGroupIds(
+  slide: PPTSlide,
+  selectedObjectIds: readonly string[],
+) {
+  return getCanvasFullySelectedItemGroupIds({
+    getItemGroupId: (element) => element.groupId,
+    getItemId: (element) => element.id,
+    items: slide.elements,
+    selection: selectedObjectIds,
+  })
+}
+
 function getPPTLayerPaneSelectedRowIds(
   slide: PPTSlide,
   selectedObjectIds: readonly string[],
 ) {
-  const selected = new Set(selectedObjectIds)
   const selectedRowIds = new Set(selectedObjectIds)
-  const groupIds = new Set(slide.elements.flatMap((element) =>
-    element.groupId ? [element.groupId] : []))
 
-  for (const groupId of groupIds) {
-    const memberIds = getPPTLayerPaneGroupMemberIds(slide, groupId)
-
-    if (
-      memberIds.length > 0 &&
-      memberIds.every((memberId) => selected.has(memberId))
-    ) {
-      selectedRowIds.add(toPPTLayerPaneGroupRowId(groupId))
-    }
+  for (const groupId of getPPTLayerPaneFullySelectedGroupIds(slide, selectedObjectIds)) {
+    selectedRowIds.add(toPPTLayerPaneGroupRowId(groupId))
   }
 
   return [...selectedRowIds]
@@ -9948,12 +9951,9 @@ function getPPTLayerPaneDefaultFocusObjectId(
   const firstSelectedElement = findPPTElement(slide, firstSelectedObjectId ?? null)
 
   if (firstSelectedElement?.groupId) {
-    const memberIds = getPPTLayerPaneGroupMemberIds(slide, firstSelectedElement.groupId)
-    const selected = new Set(selection)
-
     if (
-      memberIds.length > 0 &&
-      memberIds.every((memberId) => selected.has(memberId))
+      getPPTLayerPaneFullySelectedGroupIds(slide, selection)
+        .includes(firstSelectedElement.groupId)
     ) {
       return toPPTLayerPaneGroupRowId(firstSelectedElement.groupId)
     }
