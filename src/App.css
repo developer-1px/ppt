@@ -889,6 +889,10 @@
   cursor: grab;
 }
 
+.ppt-stage-shell[data-ppt-pan-tool-active='true'] {
+  cursor: grab;
+}
+
 .ppt-stage-shell[data-ppt-temporary-pan-gesture='true'] {
   cursor: grabbing;
 }

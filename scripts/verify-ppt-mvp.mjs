@@ -767,6 +767,7 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    panToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-pan-tool-active') ?? '',
     temporaryPanActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-active') ?? '',
     temporaryPanGesture: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-gesture') ?? '',
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
@@ -807,6 +808,12 @@ async function runFindReplaceScenario(page) {
       code: 'Space',
       key: ' ',
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyH',
+      key: 'h',
+    }))
   })()`)
   await delay(50)
 
@@ -815,12 +822,13 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    panToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-pan-tool-active') ?? '',
     temporaryPanActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-active') ?? '',
     temporaryPanGesture: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-gesture') ?? '',
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange lock viewport or pan shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture, {
+  record('does not run PPT arrange lock viewport or pan shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -2421,6 +2429,7 @@ async function runCommandPaletteScenario(page) {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') &&
       toolIds.includes('tool:arrow') &&
+      toolIds.includes('tool:pan') &&
       toolIds.includes('tool:pen'),
     hasFind: findIds.includes('view:find'),
     hasFlip: flipIds.includes('command:flip-horizontal') &&
@@ -2579,7 +2588,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+='), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -3138,6 +3147,76 @@ async function runFitSelectionScenario(page) {
   await delay(80)
   const afterWheelZoom = await readPPTWheelViewportState(page)
 
+  await page.eval(`document.querySelector('[data-ppt-pan-tool]')?.click()`)
+  await delay(80)
+  const afterToolbarPanTool = await readPPTPanToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  const panToolPaletteIds = await readCommandPaletteIds(page, 'pan tool')
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+  const afterPalettePanTool = await readPPTPanToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+
+  const beforePanToolDrag = await readPPTPanToolState(page)
+  await pressKey(page, {
+    code: 'KeyH',
+    key: 'h',
+    windowsVirtualKeyCode: 72,
+  })
+  await delay(80)
+  const afterPanToolShortcut = await readPPTPanToolState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: panStart.x,
+    y: panStart.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: panStart.x + 76,
+    y: panStart.y + 29,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: panStart.x + 76,
+    y: panStart.y + 29,
+  })
+  await delay(80)
+  const afterPanToolDrag = await readPPTPanToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+  const afterPanToolSelect = await readPPTPanToolState(page)
+
   await pressKey(page, {
     code: 'Digit0',
     key: '0',
@@ -3164,6 +3243,16 @@ async function runFitSelectionScenario(page) {
     afterWheelPan,
     afterWheelZoom,
     beforeWheelViewport,
+  })
+
+  record('activates and drags PPT viewport with canvas pan tool affordance', afterToolbarPanTool.active === 'true' && afterToolbarPanTool.toolbarPressed === 'true' && panToolPaletteIds.includes('tool:pan') && afterPalettePanTool.active === 'true' && !afterPalettePanTool.paletteOpen && beforePanToolDrag.active === 'false' && afterPanToolShortcut.model === 'canvas-pan-tool' && afterPanToolShortcut.shortcut === 'H' && afterPanToolShortcut.active === 'true' && afterPanToolShortcut.cursor === 'grab' && nearlyEqual(afterPanToolDrag.scale, beforePanToolDrag.scale, 0.001) && Math.abs(afterPanToolDrag.x - beforePanToolDrag.x) >= 40 && Math.abs(afterPanToolDrag.y - beforePanToolDrag.y) >= 20 && afterPanToolDrag.selectedIds === beforePanToolDrag.selectedIds && afterPanToolSelect.active === 'false', {
+    afterPalettePanTool,
+    afterPanToolDrag,
+    afterPanToolSelect,
+    afterPanToolShortcut,
+    afterToolbarPanTool,
+    beforePanToolDrag,
+    panToolPaletteIds,
   })
 
   await pressKey(page, {
@@ -3667,6 +3756,33 @@ async function readPPTWheelViewportState(page) {
       x: Number(translate?.[1] ?? 0),
       y: Number(translate?.[2] ?? 0),
       zoomModifier: shell?.getAttribute('data-ppt-wheel-viewport-zoom-modifier') ?? '',
+    }
+  })()`)
+}
+
+async function readPPTPanToolState(page) {
+  return page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
+    const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
+    const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
+    const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element') ?? '')
+      .filter(Boolean)
+      .join(' ')
+
+    return {
+      active: shell?.getAttribute('data-ppt-pan-tool-active') ?? '',
+      cursor: shell ? getComputedStyle(shell).cursor : '',
+      model: shell?.getAttribute('data-ppt-pan-tool-model') ?? '',
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      scale,
+      selectedIds,
+      shortcut: shell?.getAttribute('data-ppt-pan-tool-shortcut') ?? '',
+      toolbarPressed: document.querySelector('[data-ppt-pan-tool]')?.getAttribute('aria-pressed') ?? '',
+      transform,
+      x: Number(translate?.[1] ?? 0),
+      y: Number(translate?.[2] ?? 0),
     }
   })()`)
 }

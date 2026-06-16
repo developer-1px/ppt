@@ -32,6 +32,7 @@ import {
   FlipVertical2,
   Grid2X2,
   Group,
+  Hand,
   ImagePlus,
   Italic,
   Keyboard,
@@ -1472,6 +1473,7 @@ function App() {
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [isTemporaryPanActive, setIsTemporaryPanActive] = useState(false)
+  const [isPanToolActive, setIsPanToolActive] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
@@ -1764,6 +1766,7 @@ function App() {
     setPresentationSlideId(slideId)
     setCommandPaletteOpen(false)
     setContextMenu(null)
+    setIsPanToolActive(false)
   }
 
   function exitPresentation() {
@@ -2052,6 +2055,12 @@ function App() {
         return
       }
 
+      if (isPPTPanToolShortcut(event)) {
+        event.preventDefault()
+        activatePanTool()
+        return
+      }
+
       const shortcutTool = getPPTCreationToolForShortcut(event)
 
       if (shortcutTool) {
@@ -2062,8 +2071,7 @@ function App() {
 
       if (isPPTSelectToolShortcut(event)) {
         event.preventDefault()
-        setCreationTool(null)
-        setLineCreationMode(null)
+        activateSelectTool()
         return
       }
 
@@ -2240,6 +2248,7 @@ function App() {
     setSelection([])
     setEditingId(null)
     setInteraction(null)
+    setIsPanToolActive(false)
     setContextMenu(null)
   }
 
@@ -2786,6 +2795,7 @@ function App() {
   function activatePPTCreationTool(tool: PPTCreationTool) {
     setCreationTool((current) => arePPTCreationToolsEqual(current, tool) ? null : tool)
     setLineCreationMode(null)
+    setIsPanToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2793,6 +2803,15 @@ function App() {
   function activateLineCreationMode(mode: LineCreationMode) {
     setLineCreationMode((current) => current === mode ? null : mode)
     setCreationTool(null)
+    setIsPanToolActive(false)
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
+  function activatePanTool() {
+    setIsPanToolActive((current) => !current)
+    setCreationTool(null)
+    setLineCreationMode(null)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2812,6 +2831,7 @@ function App() {
       setEditingId(null)
       setLineCreationMode(null)
       setCreationTool(null)
+      setIsPanToolActive(false)
       setContextMenu(null)
 
       return {
@@ -2852,6 +2872,7 @@ function App() {
       setEditingId(null)
       setLineCreationMode(null)
       setCreationTool(null)
+      setIsPanToolActive(false)
       setContextMenu(null)
 
       return {
@@ -3208,6 +3229,7 @@ function App() {
   function activateSelectTool() {
     setCreationTool(null)
     setLineCreationMode(null)
+    setIsPanToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -4352,7 +4374,7 @@ function App() {
   }
 
   function beginTemporaryPan(event: ReactPointerEvent<HTMLElement>) {
-    if (!isTemporaryPanActive || event.button !== 0) {
+    if ((!isTemporaryPanActive && !isPanToolActive) || event.button !== 0) {
       return false
     }
 
@@ -5427,6 +5449,12 @@ function App() {
     shortcut: CANVAS_TOOL_AFFORDANCES.select.shortcut,
     title: 'Select tool',
   }, {
+    id: 'tool:pan',
+    run: activatePanTool,
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.pan.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.pan.ariaLabel,
+  }, {
     id: 'tool:text',
     run: () => activatePPTCreationTool({ kind: 'text' }),
     section: 'Create',
@@ -5687,6 +5715,18 @@ function App() {
           />
         ) : null}
         <div className="ppt-toolbar-group">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.pan.ariaLabel}
+            aria-pressed={isPanToolActive}
+            className="ppt-icon-button"
+            data-ppt-pan-tool
+            data-ppt-tool="pan"
+            onClick={activatePanTool}
+            title={CANVAS_TOOL_AFFORDANCES.pan.title}
+            type="button"
+          >
+            <Hand size={17} />
+          </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.text.ariaLabel}
             aria-pressed={creationTool?.kind === 'text'}
@@ -5997,6 +6037,9 @@ function App() {
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
         data-ppt-keyboard-nudge-step="1"
+        data-ppt-pan-tool-active={isPanToolActive ? 'true' : 'false'}
+        data-ppt-pan-tool-model="canvas-pan-tool"
+        data-ppt-pan-tool-shortcut="H"
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
@@ -12591,6 +12634,13 @@ function isPPTSelectToolShortcut(event: KeyboardEvent) {
     !event.ctrlKey &&
     !event.altKey &&
     doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.select.keyboardShortcut)
+}
+
+function isPPTPanToolShortcut(event: KeyboardEvent) {
+  return !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pan.keyboardShortcut)
 }
 
 function doesEventMatchCanvasToolShortcut(
