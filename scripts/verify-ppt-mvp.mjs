@@ -3909,7 +3909,7 @@ async function selectPPTLayerRows(page, ids) {
       document.querySelector(\`[data-ppt-layer-select="\${id}"]\`)?.dispatchEvent(new MouseEvent('click', {
         bubbles: true,
         cancelable: true,
-        shiftKey: index > 0,
+        ctrlKey: index > 0,
       }))
     })
   })()`)
@@ -8810,6 +8810,7 @@ async function runSelectionPaneScenario(page) {
       keyboardModel: tree?.getAttribute('data-ppt-layer-pane-keyboard-model') ?? '',
       layerCount: document.querySelectorAll('[data-ppt-layer-row]').length,
       pane: !!pane,
+      rangeSelectionModel: tree?.getAttribute('data-ppt-layer-pane-range-selection-model') ?? '',
       rowIds: rows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
       rowRole: rows[0]?.getAttribute('role') ?? '',
       selectedId,
@@ -8830,6 +8831,7 @@ async function runSelectionPaneScenario(page) {
       initial.keyboardModel === 'roving-tabindex' &&
       initial.keyboardIntentModel === 'slide-edit-layer-pane-keyboard-intent' &&
       initial.keyboardKeys === 'arrow-left-right-home-end-enter-space' &&
+      initial.rangeSelectionModel === 'row-press-range-anchor' &&
       initial.selectionModel === 'host-controlled-multi-select' &&
       initial.selectedRowId === initial.selectedId &&
       initial.rowIds.length === initial.layerCount &&
@@ -8844,6 +8846,38 @@ async function runSelectionPaneScenario(page) {
       ['select-objects', 'rename-object', 'hide-objects', 'show-objects', 'lock-objects', 'unlock-objects', 'reorder-object'].every((command) => initial.commands.includes(command)),
     initial,
   )
+
+  const layerPaneRangeSelection = await selectPPTLayerPaneRange(page)
+  record(
+    'range-selects PPT object layer pane rows with Shift click command-effect',
+    layerPaneRangeSelection.ok &&
+      layerPaneRangeSelection.firstClickOk &&
+      layerPaneRangeSelection.shiftClickOk &&
+      layerPaneRangeSelection.anchorAfterFirstClick === layerPaneRangeSelection.anchorId &&
+      layerPaneRangeSelection.anchorAfterShiftClick === layerPaneRangeSelection.anchorId &&
+      layerPaneRangeSelection.expectedActualIds.length >= 2 &&
+      layerPaneRangeSelection.selectedStageIds.length === layerPaneRangeSelection.expectedActualIds.length &&
+      layerPaneRangeSelection.expectedActualIds.every((objectId) =>
+        layerPaneRangeSelection.selectedStageIds.includes(objectId)) &&
+      layerPaneRangeSelection.expectedRowIds.every((rowId) =>
+        layerPaneRangeSelection.selectedRowIds.includes(rowId)),
+    layerPaneRangeSelection,
+  )
+
+  const layerPaneAdditiveSelection = await selectPPTLayerPaneAdditive(page)
+  record(
+    'keeps PPT object layer pane Ctrl click additive selection',
+    layerPaneAdditiveSelection.ok &&
+      layerPaneAdditiveSelection.firstClickOk &&
+      layerPaneAdditiveSelection.additiveClickOk &&
+      layerPaneAdditiveSelection.anchorAfterAdditive === layerPaneAdditiveSelection.additiveId &&
+      layerPaneAdditiveSelection.selectedStageIds.includes(layerPaneAdditiveSelection.anchorId) &&
+      layerPaneAdditiveSelection.selectedStageIds.includes(layerPaneAdditiveSelection.additiveId),
+    layerPaneAdditiveSelection,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-layer-select="${initial.selectedId}"]')?.click()`)
+  await delay(50)
 
   await page.eval(`(() => {
     const row = document.querySelector('[data-ppt-layer-pane-row][aria-selected="true"]')
@@ -9159,6 +9193,164 @@ async function readPPTLayerPaneKeyboardState(page) {
       treeKeyboardKeys: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
     }
   })()`)
+}
+
+async function clickPPTLayerPaneSelect(page, objectId, modifiers = {}) {
+  return page.eval(`((objectId, modifiers) => {
+    const button = document.querySelector(\`[data-ppt-layer-select="\${objectId}"]\`)
+
+    if (!(button instanceof HTMLElement)) {
+      return false
+    }
+
+    button.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: Boolean(modifiers.ctrlKey),
+      metaKey: Boolean(modifiers.metaKey),
+      shiftKey: Boolean(modifiers.shiftKey),
+    }))
+
+    return true
+  })(${JSON.stringify(objectId)}, ${JSON.stringify(modifiers)})`)
+}
+
+async function readPPTLayerPaneClickSelectionState(page) {
+  return page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+
+    return {
+      rangeAnchorId: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-range-anchor-object-id') ?? '',
+      selectedRowIds: rows
+        .filter((row) => row.getAttribute('aria-selected') === 'true')
+        .map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      selectedStageIds: [...document.querySelectorAll('[data-selected="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element') ?? ''),
+    }
+  })()`)
+}
+
+async function getPPTLayerPaneRangeTargets(page) {
+  return page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+      .filter((row) => row.getAttribute('aria-disabled') !== 'true')
+    const visibleObjectRows = rows.filter((row) =>
+      row.getAttribute('data-ppt-layer-pane-row-type') === 'object' &&
+        row.getAttribute('data-ppt-layer-pane-hidden') !== 'true')
+    const anchor = visibleObjectRows[0]
+    const target = visibleObjectRows[Math.min(2, visibleObjectRows.length - 1)]
+
+    if (!(anchor instanceof HTMLElement) || !(target instanceof HTMLElement) || anchor === target) {
+      return {
+        ok: false,
+        rowCount: rows.length,
+        visibleObjectRowCount: visibleObjectRows.length,
+      }
+    }
+
+    const anchorIndex = rows.indexOf(anchor)
+    const targetIndex = rows.indexOf(target)
+    const [fromIndex, toIndex] = anchorIndex < targetIndex
+      ? [anchorIndex, targetIndex]
+      : [targetIndex, anchorIndex]
+    const expectedRows = rows.slice(fromIndex, toIndex + 1)
+    const expectedActualIds = new Set()
+
+    for (const row of expectedRows) {
+      const rowId = row.getAttribute('data-ppt-layer-pane-row') ?? ''
+
+      if (row.getAttribute('data-ppt-layer-pane-row-type') === 'group') {
+        rows
+          .filter((candidate) =>
+            candidate.getAttribute('data-ppt-layer-pane-parent-object-id') === rowId &&
+              candidate.getAttribute('data-ppt-layer-pane-row-type') === 'object')
+          .forEach((child) => expectedActualIds.add(child.getAttribute('data-ppt-layer-pane-row') ?? ''))
+        continue
+      }
+
+      expectedActualIds.add(rowId)
+    }
+
+    return {
+      anchorId: anchor.getAttribute('data-ppt-layer-pane-row') ?? '',
+      expectedActualIds: [...expectedActualIds].filter(Boolean),
+      expectedRowIds: expectedRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      ok: true,
+      targetId: target.getAttribute('data-ppt-layer-pane-row') ?? '',
+    }
+  })()`)
+}
+
+async function selectPPTLayerPaneRange(page) {
+  const targets = await getPPTLayerPaneRangeTargets(page)
+
+  if (!targets.ok) {
+    return targets
+  }
+
+  const firstClickOk = await clickPPTLayerPaneSelect(page, targets.anchorId)
+  await delay(50)
+  const afterFirstClick = await readPPTLayerPaneClickSelectionState(page)
+  const shiftClickOk = await clickPPTLayerPaneSelect(page, targets.targetId, {
+    shiftKey: true,
+  })
+  await delay(80)
+  const afterShiftClick = await readPPTLayerPaneClickSelectionState(page)
+
+  return {
+    ...targets,
+    anchorAfterFirstClick: afterFirstClick.rangeAnchorId,
+    anchorAfterShiftClick: afterShiftClick.rangeAnchorId,
+    firstClickOk,
+    selectedRowIds: afterShiftClick.selectedRowIds,
+    selectedStageIds: afterShiftClick.selectedStageIds,
+    shiftClickOk,
+  }
+}
+
+async function selectPPTLayerPaneAdditive(page) {
+  const targets = await page.eval(`(() => {
+    const objectRows = [...document.querySelectorAll('[data-ppt-layer-pane-row-type="object"]')]
+      .filter((row) =>
+        row.getAttribute('aria-disabled') !== 'true' &&
+          row.getAttribute('data-ppt-layer-pane-hidden') !== 'true')
+    const anchor = objectRows[0]
+    const additive = objectRows[1]
+
+    if (!(anchor instanceof HTMLElement) || !(additive instanceof HTMLElement)) {
+      return {
+        ok: false,
+        objectRowCount: objectRows.length,
+      }
+    }
+
+    return {
+      additiveId: additive.getAttribute('data-ppt-layer-pane-row') ?? '',
+      anchorId: anchor.getAttribute('data-ppt-layer-pane-row') ?? '',
+      ok: true,
+    }
+  })()`)
+
+  if (!targets.ok) {
+    return targets
+  }
+
+  const firstClickOk = await clickPPTLayerPaneSelect(page, targets.anchorId)
+  await delay(50)
+  const additiveClickOk = await clickPPTLayerPaneSelect(page, targets.additiveId, {
+    ctrlKey: true,
+  })
+  await delay(80)
+  const afterAdditive = await readPPTLayerPaneClickSelectionState(page)
+
+  return {
+    ...targets,
+    additiveClickOk,
+    anchorAfterAdditive: afterAdditive.rangeAnchorId,
+    firstClickOk,
+    selectedRowIds: afterAdditive.selectedRowIds,
+    selectedStageIds: afterAdditive.selectedStageIds,
+  }
 }
 
 async function readPPTLayerPaneRenameState(page, objectId) {

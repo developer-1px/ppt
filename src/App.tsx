@@ -1116,6 +1116,7 @@ type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
 type PPTLayerPaneGroupState = {
   collapsedGroupIds: readonly string[]
   focusedObjectId: string | null
+  rangeAnchorObjectId: string | null
 }
 type PPTLayerPaneRenameState = {
   objectId: string
@@ -10760,6 +10761,7 @@ function Inspector({
     useState<PPTLayerPaneGroupState>({
       collapsedGroupIds: [],
       focusedObjectId: null,
+      rangeAnchorObjectId: null,
     })
   const [layerPaneRenameState, setLayerPaneRenameState] =
     useState<PPTLayerPaneRenameState | null>(null)
@@ -10834,10 +10836,16 @@ function Inspector({
     })
   }
 
-  function setLayerPaneFocusedObjectId(objectId: string) {
+  function setLayerPaneFocusedObjectId(
+    objectId: string,
+    options?: { rangeAnchor?: boolean },
+  ) {
     setLayerPaneGroupState((current) => ({
       ...current,
       focusedObjectId: objectId,
+      rangeAnchorObjectId: options?.rangeAnchor
+        ? objectId
+        : current.rangeAnchorObjectId,
     }))
   }
 
@@ -10858,6 +10866,7 @@ function Inspector({
       }
 
       return {
+        ...current,
         collapsedGroupIds: [...collapsedGroupIds],
         focusedObjectId: objectId,
       }
@@ -10917,6 +10926,27 @@ function Inspector({
 
   function canDragLayerPaneRow(row: PPTLayerPaneRowDescriptor) {
     return row.isReorderable && !row.isGroup
+  }
+
+  function handleLayerPaneRowPress(
+    row: PPTLayerPaneRowDescriptor,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    const rangeAnchorObjectId = event.shiftKey
+      ? layerPaneGroupState.rangeAnchorObjectId ?? activeLayerPaneObjectId
+      : null
+    const isRangeSelection = Boolean(rangeAnchorObjectId)
+
+    setLayerPaneFocusedObjectId(row.objectId, {
+      rangeAnchor: !isRangeSelection,
+    })
+    runLayerPaneIntent({
+      ...(rangeAnchorObjectId
+        ? { rangeAnchorObjectId }
+        : { additive: event.metaKey || event.ctrlKey }),
+      objectId: row.objectId,
+      type: 'row-press',
+    })
   }
 
   function handleLayerPaneRowDragStart(
@@ -10992,7 +11022,9 @@ function Inspector({
       case 'focus-row':
       case 'focus-parent-row':
       case 'select-row':
-        setLayerPaneFocusedObjectId(intent.objectId)
+        setLayerPaneFocusedObjectId(intent.objectId, {
+          rangeAnchor: true,
+        })
         runLayerPaneIntent({
           objectId: intent.objectId,
           type: 'row-press',
@@ -12382,6 +12414,8 @@ function Inspector({
           data-ppt-layer-pane-keyboard-intent-model={SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL}
           data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space"
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
+          data-ppt-layer-pane-range-anchor-object-id={layerPaneGroupState.rangeAnchorObjectId ?? ''}
+          data-ppt-layer-pane-range-selection-model="row-press-range-anchor"
           data-ppt-layer-pane-selection-model={layerPaneDescriptor.aria.selectionModel}
           role={layerPaneDescriptor.aria.containerRole}
         >
@@ -12507,12 +12541,7 @@ function Inspector({
                     startLayerPaneRename(row)
                   }}
                   onClick={(event) => {
-                    setLayerPaneFocusedObjectId(row.objectId)
-                    runLayerPaneIntent({
-                      additive: event.metaKey || event.ctrlKey || event.shiftKey,
-                      objectId: row.objectId,
-                      type: 'row-press',
-                    })
+                    handleLayerPaneRowPress(row, event)
                   }}
                 >
                   <span className="ppt-layer-kind">
