@@ -426,6 +426,7 @@ import {
   deleteCanvasSelectionItems,
   isAdditivePointerInput,
   insertCanvasItemAtTargetPlacement,
+  mapCanvasSelectionItems,
   moveCanvasItemToTargetPlacement,
   moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
@@ -4510,26 +4511,32 @@ function App() {
       return
     }
 
-    const selectedIds = new Set(selection)
-
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          if (!selectedIds.has(element.id) ||
-            !isPPTTextElement(element) ||
-            element.locked === true ||
-            element.visible === false) {
-            return element
-          }
-
-          return {
-            ...element,
-            style: update(getPPTTextElementStyle(element)),
-          }
-        }),
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          style: update(getPPTTextElementStyle(element)),
+        })),
       })),
     )
+  }
+
+  function mapSelectedPPTTextElements(
+    elements: PPTElement[],
+    mapTextElement: (element: PPTTextElement, index: number) => PPTTextElement,
+  ) {
+    return mapCanvasSelectionItems({
+      getItemId: (element) => element.id,
+      isItemSelectable: (element) =>
+        isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false,
+      items: elements,
+      mapItem: (element, index) =>
+        isPPTTextElement(element) ? mapTextElement(element, index) : element,
+      selection,
+    })
   }
 
   function updateSelectedParagraphAlign(
@@ -4539,29 +4546,18 @@ function App() {
       return
     }
 
-    const selectedIds = new Set(selection)
-
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          if (!selectedIds.has(element.id) ||
-            !isPPTTextElement(element) ||
-            element.locked === true ||
-            element.visible === false) {
-            return element
-          }
-
-          return {
-            ...element,
-            textBody: {
-              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                ...paragraph,
-                align,
-              })),
-            },
-          }
-        }),
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              align,
+            })),
+          },
+        })),
       })),
     )
   }
@@ -4571,29 +4567,18 @@ function App() {
       return
     }
 
-    const selectedIds = new Set(selection)
-
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          if (!selectedIds.has(element.id) ||
-            !isPPTTextElement(element) ||
-            element.locked === true ||
-            element.visible === false) {
-            return element
-          }
-
-          return {
-            ...element,
-            textBody: {
-              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                ...paragraph,
-                ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
-              })),
-            },
-          }
-        }),
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
+            })),
+          },
+        })),
       })),
     )
   }
@@ -4612,32 +4597,21 @@ function App() {
       return
     }
 
-    const selectedIds = new Set(selection)
-
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          if (!selectedIds.has(element.id) ||
-            !isPPTTextElement(element) ||
-            element.locked === true ||
-            element.visible === false) {
-            return element
-          }
-
-          return {
-            ...element,
-            textBody: {
-              paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                ...paragraph,
-                runs: paragraph.runs.map((run) => ({
-                  ...run,
-                  [field]: enabled ? true : undefined,
-                })),
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              runs: paragraph.runs.map((run) => ({
+                ...run,
+                [field]: enabled ? true : undefined,
               })),
-            },
-          }
-        }),
+            })),
+          },
+        })),
       })),
     )
   }
