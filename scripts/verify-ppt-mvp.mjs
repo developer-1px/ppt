@@ -2368,14 +2368,25 @@ async function runCrossSlideClipboardScenario(page) {
   await delay(80)
 
   const afterKeyboardPaste = await getPPTCrossSlideClipboardState(page)
+  const firstPasteAnchor = parsePPTPoint(afterKeyboardPaste.pasteAnchor)
+  const expectedFirstPasteAnchor = {
+    x: afterKeyboardPaste.pastePositionViewportX - (sourceBefore.selectedX + sourceBefore.selectedWidth / 2),
+    y: afterKeyboardPaste.pastePositionViewportY - (sourceBefore.selectedY + sourceBefore.selectedHeight / 2),
+  }
 
   record('pastes copied PPT object onto another slide with target slide ids', afterKeyboardPaste.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterKeyboardPaste.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterKeyboardPaste.activeSlide === 'slide-2' && afterKeyboardPaste.stageCount === targetBefore.stageCount + 1 && afterKeyboardPaste.selectedCount === 1 && afterKeyboardPaste.selectedId.startsWith('slide-2-') && afterKeyboardPaste.selectedName.includes('Copy'), {
     afterKeyboardPaste,
     targetBefore,
   })
-  record('creates PPT cross-slide paste command effect plan', afterKeyboardPaste.pasteCommand === 'paste-slide-objects' && afterKeyboardPaste.pasteType === 'slide-command-effect' && afterKeyboardPaste.pasteSourceSlide === 'slide-1' && afterKeyboardPaste.pasteTargetSlide === 'slide-2' && afterKeyboardPaste.pasteMappingCount === 1 && afterKeyboardPaste.pasteSelection === afterKeyboardPaste.selectedId && afterKeyboardPaste.pasteAnchor === '28,28' && afterKeyboardPaste.pasteOperation === 'copy', {
+  record('creates PPT cross-slide paste command effect plan', afterKeyboardPaste.pasteCommand === 'paste-slide-objects' && afterKeyboardPaste.pasteType === 'slide-command-effect' && afterKeyboardPaste.pasteSourceSlide === 'slide-1' && afterKeyboardPaste.pasteTargetSlide === 'slide-2' && afterKeyboardPaste.pasteMappingCount === 1 && afterKeyboardPaste.pasteSelection === afterKeyboardPaste.selectedId && nearlyEqual(firstPasteAnchor.x, expectedFirstPasteAnchor.x, 0.001) && nearlyEqual(firstPasteAnchor.y, expectedFirstPasteAnchor.y, 0.001) && afterKeyboardPaste.pasteOperation === 'copy', {
     afterKeyboardPaste,
+    expectedFirstPasteAnchor,
+    firstPasteAnchor,
     targetBefore,
+  })
+  record('routes first PPT object paste anchor through canvas paste position', afterKeyboardPaste.pastePositionModel === 'canvas-paste-position' && afterKeyboardPaste.pastePositionIndex === 0 && afterKeyboardPaste.pastePositionCount === 1 && nearlyEqual(afterKeyboardPaste.pastePositionViewportX, afterKeyboardPaste.pastePositionBoundsX + afterKeyboardPaste.pastePositionBoundsWidth / 2 + firstPasteAnchor.x, 0.001) && nearlyEqual(afterKeyboardPaste.pastePositionViewportY, afterKeyboardPaste.pastePositionBoundsY + afterKeyboardPaste.pastePositionBoundsHeight / 2 + firstPasteAnchor.y, 0.001), {
+    afterKeyboardPaste,
+    firstPasteAnchor,
   })
 
   await pressKey(page, {
@@ -2434,6 +2445,9 @@ async function runCrossSlideClipboardScenario(page) {
     afterPalettePaste,
     afterRedo,
     beforePalettePaste,
+  })
+  record('routes repeated PPT object paste through canvas paste offset', afterPalettePaste.pastePositionModel === 'canvas-paste-position' && afterPalettePaste.pastePositionIndex === 1 && afterPalettePaste.pasteAnchor === '28,28' && afterPalettePaste.pasteSelection === afterPalettePaste.selectedId, {
+    afterPalettePaste,
   })
 
   await pressKey(page, {
@@ -13071,6 +13085,12 @@ function nearlyEqual(left, right, tolerance = 0.75) {
   return Math.abs(left - right) <= tolerance
 }
 
+function parsePPTPoint(value) {
+  const [x = 0, y = 0] = value.split(',').map((part) => Number(part))
+
+  return { x, y }
+}
+
 function selectEditableContents(page, elementId) {
   return page.eval(`(() => {
     const editor = document.querySelector('[data-ppt-element="${elementId}"] .ppt-element-editor')
@@ -13309,14 +13329,27 @@ function getPPTCrossSlideClipboardState(page) {
       pasteCommand: stage?.getAttribute('data-ppt-clipboard-paste-command') ?? '',
       pasteMappingCount: Number(stage?.getAttribute('data-ppt-clipboard-paste-mapping-count') ?? 0),
       pasteOperation: stage?.getAttribute('data-ppt-clipboard-paste-operation') ?? '',
+      pastePositionBoundsHeight: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-bounds-height') ?? 0),
+      pastePositionBoundsWidth: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-bounds-width') ?? 0),
+      pastePositionBoundsX: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-bounds-x') ?? 0),
+      pastePositionBoundsY: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-bounds-y') ?? 0),
+      pastePositionCount: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-count') ?? 0),
+      pastePositionIndex: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-index') ?? 0),
+      pastePositionModel: stage?.getAttribute('data-ppt-clipboard-paste-position-model') ?? '',
+      pastePositionViewportX: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-viewport-x') ?? 0),
+      pastePositionViewportY: Number(stage?.getAttribute('data-ppt-clipboard-paste-position-viewport-y') ?? 0),
       pasteSelection: stage?.getAttribute('data-ppt-clipboard-paste-selection') ?? '',
       pasteSourceSlide: stage?.getAttribute('data-ppt-clipboard-paste-source-slide') ?? '',
       pasteTargetSlide: stage?.getAttribute('data-ppt-clipboard-paste-target-slide') ?? '',
       pasteType: stage?.getAttribute('data-ppt-clipboard-paste-type') ?? '',
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedHeight: Number.parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedWidth: Number.parseFloat(selected?.style.width ?? '0'),
+      selectedX: Number.parseFloat(selected?.style.left ?? '0'),
+      selectedY: Number.parseFloat(selected?.style.top ?? '0'),
       stageCount: document.querySelectorAll('[data-ppt-element]').length,
       thumbCounts: thumbs.map((thumb) => thumb.querySelectorAll('.ppt-thumb-preview > span').length),
     }

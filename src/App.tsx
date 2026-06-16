@@ -302,6 +302,7 @@ import {
   trapCanvasModalTabFocus,
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
+import { getCanvasPasteOffset } from 'canvas/app/paste-position'
 import {
   getCanvasRadioTabIndex,
   handleCanvasRadioGroupKeyDown,
@@ -797,6 +798,19 @@ type PPTClipboardPasteObjectMapping =
   SlideEditClipboardPasteObjectMapping<string, string, string>
 type PPTClipboardPasteHostCommandEffect =
   SlideEditClipboardPasteHostCommandEffect<string, string, PPTElement, string, string>
+type PPTCanvasPastePositionClipboard = Parameters<typeof getCanvasPasteOffset>[0]['clipboard']
+type PPTClipboardPastePositionEffect = {
+  anchor: Point
+  clipboardBounds: Bounds | null
+  clipboardObjectCount: number
+  model: 'canvas-paste-position'
+  pasteIndex: number
+  viewportCenter: Point | null
+}
+type PPTClipboardPastePositionMemory = {
+  key: string
+  pasteIndex: number
+}
 type PPTStyleClipboardCategory =
   | 'object'
   | 'paragraph'
@@ -1777,6 +1791,7 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
+  const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
@@ -1836,6 +1851,7 @@ function App() {
     ref: setTopbarToolbarRoot,
   } = useCanvasToolbarRovingFocus<HTMLElement>()
   const slideDragSuppressClickRef = useRef(false)
+  const clipboardPastePositionMemoryRef = useRef<PPTClipboardPastePositionMemory | null>(null)
   const resizeHandleClickMemoryRef = useRef<CanvasPointerClickMemory>(null)
   const deckRef = useRef(deck)
 
@@ -3632,6 +3648,11 @@ function App() {
 
     setClipboard(payload)
     setLastClipboardPasteEffect(null)
+    setLastClipboardPastePositionEffect(null)
+    clipboardPastePositionMemoryRef.current = {
+      key: getPPTClipboardPastePositionKey(payload, activeSlide.id),
+      pasteIndex: 0,
+    }
     void navigator.clipboard?.writeText(JSON.stringify({
       metadata: payload.metadata,
       objects: selected,
@@ -3656,30 +3677,53 @@ function App() {
       return
     }
 
+    const pasteKey = getPPTClipboardPastePositionKey(clipboard, activeSlide.id)
+    const pasteIndex = clipboardPastePositionMemoryRef.current?.key === pasteKey
+      ? clipboardPastePositionMemoryRef.current.pasteIndex
+      : 0
+    const viewportCenter = getPPTViewportCenter()
+    const pasteAnchor = getCanvasPasteOffset({
+      clipboard: getPPTCanvasPastePositionClipboard(clipboard.objects),
+      pasteIndex,
+      viewportCenter,
+    })
+    const pastePositionEffect: PPTClipboardPastePositionEffect = {
+      anchor: pasteAnchor,
+      clipboardBounds: getPPTElementsBounds([...clipboard.objects]),
+      clipboardObjectCount: clipboard.objects.length,
+      model: 'canvas-paste-position',
+      pasteIndex,
+      viewportCenter,
+    }
+    const effect = createPPTClipboardPasteCommandEffect({
+      createId: createPPTElementIdFactory(activeSlide),
+      payload: clipboard,
+      slideFrame: {
+        h: PPT_SLIDE_HEIGHT,
+        w: PPT_SLIDE_WIDTH,
+        x: 0,
+        y: 0,
+      },
+      target: {
+        kind: 'slide-frame-offset',
+        offset: pasteAnchor,
+        slideId: activeSlide.id,
+      },
+    })
+
+    if (!effect) {
+      return
+    }
+
+    setLastClipboardPasteEffect(effect)
+    setLastClipboardPastePositionEffect(pastePositionEffect)
+    clipboardPastePositionMemoryRef.current = {
+      key: pasteKey,
+      pasteIndex: pasteIndex + 1,
+    }
+    setSelection([...effect.selection.objectIds])
+
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const effect = createPPTClipboardPasteCommandEffect({
-        createId: createPPTElementIdFactory(slide),
-        payload: clipboard,
-        slideFrame: {
-          h: PPT_SLIDE_HEIGHT,
-          w: PPT_SLIDE_WIDTH,
-          x: 0,
-          y: 0,
-        },
-        target: {
-          kind: 'slide-frame-offset',
-          offset: { x: 28, y: 28 },
-          slideId: slide.id,
-        },
-      })
-
-      if (!effect) {
-        return slide
-      }
-
-      setLastClipboardPasteEffect(effect)
-      setSelection([...effect.selection.objectIds])
-
       return applyPPTClipboardPasteHostCommandEffect(slide, effect)
     }))
   }
@@ -7225,6 +7269,15 @@ function App() {
         data-ppt-clipboard-paste-command={lastClipboardPasteEffect?.payload.id}
         data-ppt-clipboard-paste-mapping-count={lastClipboardPasteEffect?.payload.pastePlan.mappings.length}
         data-ppt-clipboard-paste-operation={lastClipboardPasteEffect?.payload.pastePlan.operation}
+        data-ppt-clipboard-paste-position-bounds-height={lastClipboardPastePositionEffect?.clipboardBounds?.h}
+        data-ppt-clipboard-paste-position-bounds-width={lastClipboardPastePositionEffect?.clipboardBounds?.w}
+        data-ppt-clipboard-paste-position-bounds-x={lastClipboardPastePositionEffect?.clipboardBounds?.x}
+        data-ppt-clipboard-paste-position-bounds-y={lastClipboardPastePositionEffect?.clipboardBounds?.y}
+        data-ppt-clipboard-paste-position-count={lastClipboardPastePositionEffect?.clipboardObjectCount}
+        data-ppt-clipboard-paste-position-index={lastClipboardPastePositionEffect?.pasteIndex}
+        data-ppt-clipboard-paste-position-model={lastClipboardPastePositionEffect?.model}
+        data-ppt-clipboard-paste-position-viewport-x={lastClipboardPastePositionEffect?.viewportCenter?.x}
+        data-ppt-clipboard-paste-position-viewport-y={lastClipboardPastePositionEffect?.viewportCenter?.y}
         data-ppt-clipboard-paste-selection={lastClipboardPasteEffect?.selection.objectIds.join(' ') ?? undefined}
         data-ppt-clipboard-paste-source-slide={lastClipboardPasteEffect?.payload.pastePlan.sourceSlideId}
         data-ppt-clipboard-paste-target-slide={lastClipboardPasteEffect?.payload.pastePlan.targetSlideId}
@@ -9147,6 +9200,34 @@ function createPPTClipboardPayload({
     selectedObjectIds,
     sourceSlideId,
   })
+}
+
+function getPPTCanvasPastePositionClipboard(
+  objects: readonly PPTElement[],
+): PPTCanvasPastePositionClipboard {
+  return objects.map((object) => ({
+    fill: '#ffffff',
+    h: object.geometry.h,
+    id: object.id,
+    stroke: '#000000',
+    type: 'rect',
+    w: object.geometry.w,
+    x: object.geometry.x,
+    y: object.geometry.y,
+  }))
+}
+
+function getPPTClipboardPastePositionKey(
+  payload: PPTClipboardPayload,
+  targetSlideId: string,
+) {
+  return [
+    payload.operation,
+    payload.sourceSlideId,
+    targetSlideId,
+    payload.selectedObjectIds.join(','),
+    payload.metadata.map((item) => item.objectId).join(','),
+  ].join(':')
 }
 
 function createPPTClipboardPasteCommandEffect({
