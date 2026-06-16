@@ -899,13 +899,18 @@ const PPT_COLOR_SWATCH_CHANNEL_MAP = {
   'text-color': 'text',
 } as const satisfies Record<PPTColorSwatchChannel, PPTColorSwatchPackageChannel>
 type PPTSurfaceCommand =
+  | 'alignBottom'
   | 'alignCenter'
   | 'alignLeft'
+  | 'alignMiddle'
   | 'alignRight'
+  | 'alignTop'
   | 'bringForward'
   | 'bringToFront'
   | 'copyFormatting'
   | 'delete'
+  | 'distributeHorizontal'
+  | 'distributeVertical'
   | 'duplicate'
   | 'flipHorizontal'
   | 'flipVertical'
@@ -918,6 +923,17 @@ type PPTSurfaceCommand =
   | 'tidySelection'
   | 'ungroup'
   | 'unlockAll'
+type PPTAlignmentPopoverCommand = Extract<
+  PPTSurfaceCommand,
+  | 'alignBottom'
+  | 'alignCenter'
+  | 'alignLeft'
+  | 'alignMiddle'
+  | 'alignRight'
+  | 'alignTop'
+  | 'distributeHorizontal'
+  | 'distributeVertical'
+>
 type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
   copyFormatting: boolean
   flipSelection: boolean
@@ -1256,7 +1272,7 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     command: 'alignCenter',
     dataCommand: 'align-center-x',
     label: 'Align center',
-    surfaces: ['context-menu', 'selection-floating-bar'],
+    surfaces: ['context-menu'],
     title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
   }, {
     availability: 'alignRight',
@@ -1333,6 +1349,43 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
   }],
   id: 'lock',
 }]
+const PPT_ALIGNMENT_POPOVER_COMMANDS = [{
+  command: 'alignLeft',
+  dataCommand: 'align-left',
+  label: 'Align left',
+}, {
+  command: 'alignCenter',
+  dataCommand: 'align-center-x',
+  label: 'Align center',
+}, {
+  command: 'alignRight',
+  dataCommand: 'align-right',
+  label: 'Align right',
+}, {
+  command: 'alignTop',
+  dataCommand: 'align-top',
+  label: 'Align top',
+}, {
+  command: 'alignMiddle',
+  dataCommand: 'align-middle',
+  label: 'Align middle',
+}, {
+  command: 'alignBottom',
+  dataCommand: 'align-bottom',
+  label: 'Align bottom',
+}, {
+  command: 'distributeHorizontal',
+  dataCommand: 'distribute-horizontal',
+  label: 'Distribute horizontal',
+}, {
+  command: 'distributeVertical',
+  dataCommand: 'distribute-vertical',
+  label: 'Distribute vertical',
+}] as const satisfies readonly {
+  command: PPTAlignmentPopoverCommand
+  dataCommand: string
+  label: string
+}[]
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
 const PPT_TIDY_GAP = 24
@@ -1676,6 +1729,8 @@ function App() {
   const [viewport, setViewport] = useState<Viewport>({ scale: 1, x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [alignmentPreviewCommand, setAlignmentPreviewCommand] =
+    useState<PPTAlignmentPopoverCommand | null>(null)
   const [interaction, setInteraction] = useState<Interaction | null>(null)
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
@@ -3533,14 +3588,23 @@ function App() {
 
   function runPPTSurfaceCommand(command: PPTSurfaceCommand) {
     switch (command) {
+      case 'alignBottom':
+        alignSelection('alignBottom')
+        break
       case 'alignCenter':
         alignSelection('alignCenter')
         break
       case 'alignLeft':
         alignSelection('alignLeft')
         break
+      case 'alignMiddle':
+        alignSelection('alignMiddle')
+        break
       case 'alignRight':
         alignSelection('alignRight')
+        break
+      case 'alignTop':
+        alignSelection('alignTop')
         break
       case 'bringForward':
         reorderSelection('bringForward')
@@ -3553,6 +3617,12 @@ function App() {
         break
       case 'delete':
         deleteSelection()
+        break
+      case 'distributeHorizontal':
+        distributeSelection('distributeHorizontal')
+        break
+      case 'distributeVertical':
+        distributeSelection('distributeVertical')
         break
       case 'duplicate':
         duplicateSelection()
@@ -6990,6 +7060,8 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-alignment-popover-preview={alignmentPreviewCommand ?? undefined}
+        data-ppt-alignment-popover-preview-model="canvas-dom-alignment-preview-guide"
         data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}
         data-ppt-comment-thread-command-body={lastCommentThreadEffect?.payload.body}
         data-ppt-comment-thread-command-count={lastCommentThreadEffect?.payload.messageCount}
@@ -7222,10 +7294,12 @@ function App() {
             ) : null}
             <PPTSelectionFloatingBar
               anchor={selectionCommandAnchor}
+              commandAvailability={commandAvailability}
               groups={selectionFloatingCommandGroups}
               scale={viewport.scale}
               textFormat={textQuickFormatState}
               onCommand={runPPTSurfaceCommand}
+              onAlignmentPreviewChange={setAlignmentPreviewCommand}
               onFontSizeStep={stepSelectedTextFontSize}
               onParagraphBulletToggle={toggleSelectedParagraphBullet}
               onParagraphAlign={updateSelectedParagraphAlign}
@@ -9325,7 +9399,9 @@ function FindReplaceStrip({
 
 function PPTSelectionFloatingBar({
   anchor,
+  commandAvailability,
   groups,
+  onAlignmentPreviewChange,
   onCommand,
   onFontSizeStep,
   onParagraphAlign,
@@ -9338,7 +9414,9 @@ function PPTSelectionFloatingBar({
   textFormat,
 }: {
   anchor: PPTSelectionCommandAnchor | null
+  commandAvailability: PPTCommandAvailability
   groups: readonly PPTSurfaceCommandViewGroup[]
+  onAlignmentPreviewChange: (command: PPTAlignmentPopoverCommand | null) => void
   onCommand: (command: PPTSurfaceCommand) => void
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
@@ -9380,7 +9458,13 @@ function PPTSelectionFloatingBar({
           onTextUnderlineToggle={onTextUnderlineToggle}
         />
       ) : null}
-      {textFormat && groups.length > 0 ? <span className="ppt-command-divider" /> : null}
+      {textFormat ? <span className="ppt-command-divider" /> : null}
+      <PPTAlignmentPopover
+        availability={commandAvailability}
+        onCommand={onCommand}
+        onPreviewChange={onAlignmentPreviewChange}
+      />
+      {groups.length > 0 ? <span className="ppt-command-divider" /> : null}
       {groups.map((group, groupIndex) => (
         <Fragment key={group.id}>
           {groupIndex > 0 ? <span className="ppt-command-divider" /> : null}
@@ -9396,6 +9480,254 @@ function PPTSelectionFloatingBar({
       ))}
     </div>
   )
+}
+
+function PPTAlignmentPopover({
+  availability,
+  onCommand,
+  onPreviewChange,
+}: {
+  availability: PPTCommandAvailability
+  onCommand: (command: PPTSurfaceCommand) => void
+  onPreviewChange: (command: PPTAlignmentPopoverCommand | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [activeCommand, setActiveCommand] =
+    useState<PPTAlignmentPopoverCommand>('alignCenter')
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const itemRefs = useRef(new Map<PPTAlignmentPopoverCommand, HTMLButtonElement>())
+  const commands = PPT_ALIGNMENT_POPOVER_COMMANDS.map((command) => ({
+    ...command,
+    disabled: !availability[command.command],
+  }))
+  const enabledCommands = commands.filter((command) => !command.disabled)
+  const triggerDisabled = enabledCommands.length === 0
+  const activeEnabledCommand = enabledCommands.find((command) =>
+    command.command === activeCommand
+  ) ?? enabledCommands[0] ?? null
+  const activeEnabledCommandId = activeEnabledCommand?.command ?? null
+
+  useEffect(() => () => onPreviewChange(null), [onPreviewChange])
+
+  function focusCommand(command: PPTAlignmentPopoverCommand) {
+    window.requestAnimationFrame(() => {
+      itemRefs.current.get(command)?.focus({ preventScroll: true })
+    })
+  }
+
+  function openPopover(command = activeEnabledCommand?.command) {
+    if (!command) {
+      return
+    }
+
+    setOpen(true)
+    setActiveCommand(command)
+    onPreviewChange(command)
+    focusCommand(command)
+  }
+
+  function closePopover() {
+    setOpen(false)
+    onPreviewChange(null)
+  }
+
+  function focusTrigger() {
+    window.requestAnimationFrame(() => {
+      triggerRef.current?.focus({ preventScroll: true })
+    })
+  }
+
+  function moveFocus(delta: number) {
+    if (enabledCommands.length === 0) {
+      return
+    }
+
+    const currentIndex = Math.max(
+      0,
+      enabledCommands.findIndex((command) => command.command === activeCommand),
+    )
+    const nextCommand = enabledCommands[
+      (currentIndex + delta + enabledCommands.length) % enabledCommands.length
+    ]
+
+    setActiveCommand(nextCommand.command)
+    onPreviewChange(nextCommand.command)
+    focusCommand(nextCommand.command)
+  }
+
+  function focusFirst() {
+    const command = enabledCommands[0]
+
+    if (!command) {
+      return
+    }
+
+    setActiveCommand(command.command)
+    onPreviewChange(command.command)
+    focusCommand(command.command)
+  }
+
+  function focusLast() {
+    const command = enabledCommands.at(-1)
+
+    if (!command) {
+      return
+    }
+
+    setActiveCommand(command.command)
+    onPreviewChange(command.command)
+    focusCommand(command.command)
+  }
+
+  function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      event.stopPropagation()
+      openPopover()
+    }
+  }
+
+  function handleItemKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+        event.preventDefault()
+        event.stopPropagation()
+        moveFocus(1)
+        return
+      case 'ArrowUp':
+      case 'ArrowLeft':
+        event.preventDefault()
+        event.stopPropagation()
+        moveFocus(-1)
+        return
+      case 'Home':
+        event.preventDefault()
+        event.stopPropagation()
+        focusFirst()
+        return
+      case 'End':
+        event.preventDefault()
+        event.stopPropagation()
+        focusLast()
+        return
+      case 'Escape':
+        event.preventDefault()
+        event.stopPropagation()
+        closePopover()
+        focusTrigger()
+        return
+    }
+  }
+
+  return (
+    <span
+      className="ppt-alignment-popover-wrap"
+      data-ppt-alignment-popover-open={open ? 'true' : 'false'}
+    >
+      <button
+        aria-controls="ppt-alignment-popover-menu"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Alignment editor"
+        className="ppt-floating-command"
+        data-ppt-alignment-popover-trigger
+        disabled={triggerDisabled}
+        ref={triggerRef}
+        title="Alignment editor"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (open) {
+            closePopover()
+          } else {
+            openPopover()
+          }
+        }}
+        onKeyDown={handleTriggerKeyDown}
+      >
+        <AlignCenterHorizontal size={16} />
+      </button>
+      {open ? (
+        <div
+          aria-label="Alignment editor"
+          className="ppt-alignment-popover"
+          data-ppt-alignment-popover
+          data-ppt-alignment-popover-active={activeEnabledCommandId ?? activeCommand}
+          data-ppt-alignment-popover-model="canvas-dom-alignment-popover"
+          id="ppt-alignment-popover-menu"
+          role="menu"
+          onMouseLeave={() => onPreviewChange(null)}
+        >
+          {commands.map((command) => (
+            <button
+              aria-disabled={command.disabled}
+              className="ppt-alignment-popover-item"
+              data-ppt-alignment-popover-command={command.dataCommand}
+              data-ppt-alignment-popover-item
+              disabled={command.disabled}
+              key={command.command}
+              ref={(node) => {
+                if (node) {
+                  itemRefs.current.set(command.command, node)
+                } else {
+                  itemRefs.current.delete(command.command)
+                }
+              }}
+              role="menuitem"
+              tabIndex={command.command === activeEnabledCommand?.command ? 0 : -1}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                if (command.disabled) {
+                  return
+                }
+
+                onCommand(command.command)
+                closePopover()
+                focusTrigger()
+              }}
+              onFocus={() => {
+                setActiveCommand(command.command)
+                onPreviewChange(command.command)
+              }}
+              onKeyDown={handleItemKeyDown}
+              onMouseEnter={() => {
+                setActiveCommand(command.command)
+                onPreviewChange(command.command)
+              }}
+            >
+              {renderPPTAlignmentPopoverIcon(command.command)}
+              <span>{command.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
+  )
+}
+
+function renderPPTAlignmentPopoverIcon(command: PPTAlignmentPopoverCommand) {
+  switch (command) {
+    case 'alignLeft':
+      return <AlignLeft size={15} />
+    case 'alignCenter':
+      return <AlignCenterHorizontal size={15} />
+    case 'alignRight':
+      return <AlignRight size={15} />
+    case 'alignTop':
+      return <AlignStartVertical size={15} />
+    case 'alignMiddle':
+      return <AlignCenterVertical size={15} />
+    case 'alignBottom':
+      return <AlignEndVertical size={15} />
+    case 'distributeHorizontal':
+      return <AlignHorizontalDistributeCenter size={15} />
+    case 'distributeVertical':
+      return <AlignVerticalDistributeCenter size={15} />
+  }
 }
 
 function PPTTextQuickFormatControls({

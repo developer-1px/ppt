@@ -76,6 +76,7 @@ try {
   await runTextOverflowScenario(page)
   await runPresentationScenario(page)
   await runExportScenario(page)
+  await runAlignmentPopoverScenario(page)
   await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
 
@@ -5265,6 +5266,129 @@ async function runExportScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+}
+
+async function runAlignmentPopoverScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const point = await page.eval(`(() => {
+    const rect = document.querySelector('[data-ppt-element="s1-card-1"]').getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await clickMouse(page, point.x, point.y, 1)
+  await delay(80)
+
+  await page.eval(`document.querySelector('[data-ppt-alignment-popover-trigger]')?.click()`)
+  await delay(50)
+
+  const alignmentPopoverOpen = await page.eval(`(() => {
+    const trigger = document.querySelector('[data-ppt-alignment-popover-trigger]')
+    const popover = document.querySelector('[data-ppt-alignment-popover]')
+    const items = [...document.querySelectorAll('[data-ppt-alignment-popover-item]')]
+
+    return {
+      active: popover?.getAttribute('data-ppt-alignment-popover-active') ?? '',
+      expanded: trigger?.getAttribute('aria-expanded') ?? '',
+      itemCommands: items.map((item) => item.getAttribute('data-ppt-alignment-popover-command') ?? ''),
+      itemCount: items.length,
+      model: popover?.getAttribute('data-ppt-alignment-popover-model') ?? '',
+      role: popover?.getAttribute('role') ?? '',
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      triggerHasPopup: trigger?.getAttribute('aria-haspopup') ?? '',
+    }
+  })()`)
+
+  record('opens PPT selection alignment popover from floating bar', alignmentPopoverOpen.selectedId !== '' && alignmentPopoverOpen.expanded === 'true' && alignmentPopoverOpen.role === 'menu' && alignmentPopoverOpen.model === 'canvas-dom-alignment-popover' && alignmentPopoverOpen.triggerHasPopup === 'menu' && alignmentPopoverOpen.itemCount === 8 && alignmentPopoverOpen.itemCommands.includes('align-center-x') && alignmentPopoverOpen.itemCommands.includes('distribute-horizontal'), alignmentPopoverOpen)
+
+  await page.eval(`document.querySelector('[data-ppt-alignment-popover-command="align-center-x"]')?.focus()`)
+  await delay(40)
+
+  const alignmentPreview = await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      active: document.querySelector('[data-ppt-alignment-popover]')?.getAttribute('data-ppt-alignment-popover-active') ?? '',
+      focusedCommand: document.activeElement?.getAttribute('data-ppt-alignment-popover-command') ?? '',
+      preview: stage?.getAttribute('data-ppt-alignment-popover-preview') ?? '',
+      previewModel: stage?.getAttribute('data-ppt-alignment-popover-preview-model') ?? '',
+    }
+  })()`)
+
+  record('exposes PPT alignment popover focus preview metadata', alignmentPreview.focusedCommand === 'align-center-x' && alignmentPreview.active === 'alignCenter' && alignmentPreview.preview === 'alignCenter' && alignmentPreview.previewModel === 'canvas-dom-alignment-preview-guide', alignmentPreview)
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(40)
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(40)
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(40)
+
+  const alignmentKeyboard = await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      active: document.querySelector('[data-ppt-alignment-popover]')?.getAttribute('data-ppt-alignment-popover-active') ?? '',
+      focusedCommand: document.activeElement?.getAttribute('data-ppt-alignment-popover-command') ?? '',
+      preview: stage?.getAttribute('data-ppt-alignment-popover-preview') ?? '',
+    }
+  })()`)
+
+  record('moves PPT alignment popover focus with Arrow Home End keys', alignmentKeyboard.focusedCommand === 'align-left' && alignmentKeyboard.active === 'alignLeft' && alignmentKeyboard.preview === 'alignLeft', alignmentKeyboard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(40)
+
+  const alignmentEscape = await page.eval(`(() => ({
+    expanded: document.querySelector('[data-ppt-alignment-popover-trigger]')?.getAttribute('aria-expanded') ?? '',
+    focusedTrigger: document.activeElement?.hasAttribute('data-ppt-alignment-popover-trigger') ?? false,
+    open: !!document.querySelector('[data-ppt-alignment-popover]'),
+    preview: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-alignment-popover-preview') ?? '',
+  }))()`)
+
+  record('closes PPT alignment popover with Escape and restores trigger focus', alignmentEscape.expanded === 'false' && alignmentEscape.focusedTrigger && !alignmentEscape.open && alignmentEscape.preview === '', alignmentEscape)
+
+  await page.eval(`document.querySelector('[data-ppt-alignment-popover-trigger]')?.click()`)
+  await delay(40)
+  await page.eval(`document.querySelector('[data-ppt-alignment-popover-command="align-left"]')?.click()`)
+  await delay(50)
+
+  const afterPopoverAlign = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      expanded: document.querySelector('[data-ppt-alignment-popover-trigger]')?.getAttribute('aria-expanded') ?? '',
+      left: parseFloat(selected?.style.left ?? '0'),
+      open: !!document.querySelector('[data-ppt-alignment-popover]'),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record('runs PPT alignment command from selection popover', afterPopoverAlign.selectedId === alignmentPopoverOpen.selectedId && afterPopoverAlign.expanded === 'false' && !afterPopoverAlign.open && afterPopoverAlign.left <= 1, {
+    afterPopoverAlign,
+    alignmentPopoverOpen,
+  })
 }
 
 async function runViewAndShapeScenario(page) {

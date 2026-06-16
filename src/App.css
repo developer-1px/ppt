@@ -221,6 +221,53 @@
   color: var(--accent-strong);
 }
 
+.ppt-alignment-popover-wrap {
+  position: relative;
+  display: inline-flex;
+  pointer-events: auto;
+}
+
+.ppt-alignment-popover {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  width: 190px;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--floating-panel);
+  box-shadow: 0 14px 36px rgb(15 23 42 / 16%);
+  transform: translateX(-50%);
+}
+
+.ppt-alignment-popover-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ppt-alignment-popover-item:hover:not(:disabled),
+.ppt-alignment-popover-item:focus-visible {
+  background: var(--control-hover);
+  outline: none;
+}
+
+.ppt-alignment-popover-item:disabled {
+  color: var(--control-disabled);
+}
+
 .ppt-text-quick-format {
   display: inline-flex;
   flex: 0 0 auto;
