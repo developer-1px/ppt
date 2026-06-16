@@ -219,6 +219,13 @@ import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
+  isCanvasKeyboardViewportIntent,
+  runCanvasKeyboardViewportIntent,
+} from 'canvas/app/keyboard-viewport-dispatch'
+import {
+  getCanvasKeyboardViewportShortcutIntent,
+} from 'canvas/app/keyboard-viewport-shortcuts'
+import {
   CANVAS_MENU_ITEM_PROPS,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
@@ -1886,6 +1893,25 @@ function App() {
     }))
   }, [scene, selection])
 
+  const fitViewportToItems = useCallback((ids?: string[]) => {
+    if (!ids || ids.length === 0) {
+      fitSlide()
+      return
+    }
+
+    const rect = stageRef.current?.getBoundingClientRect()
+    const bounds = scene.getBounds(ids)
+
+    if (!rect || !bounds) {
+      return
+    }
+
+    setViewport(fitBoundsIntoViewport(bounds, {
+      height: rect.height,
+      width: rect.width,
+    }))
+  }, [fitSlide, scene])
+
   const resetZoom = useCallback(() => {
     setViewport(INITIAL_VIEWPORT)
   }, [])
@@ -2071,21 +2097,27 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key === '0') {
-        event.preventDefault()
-        resetZoom()
-        return
-      }
+      const viewportIntent = getCanvasKeyboardViewportShortcutIntent({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+        key: event.key,
+        mod: event.metaKey || event.ctrlKey,
+        selection,
+      })
 
-      if ((event.metaKey || event.ctrlKey) && (event.key === '=' || event.key === '+')) {
-        event.preventDefault()
-        zoom('in')
-        return
-      }
+      if (viewportIntent && isCanvasKeyboardViewportIntent(viewportIntent)) {
+        if (viewportIntent.preventDefault) {
+          event.preventDefault()
+        }
 
-      if ((event.metaKey || event.ctrlKey) && event.key === '-') {
-        event.preventDefault()
-        zoom('out')
+        runCanvasKeyboardViewportIntent({
+          handlers: {
+            fitToItems: fitViewportToItems,
+            resetViewport: resetZoom,
+            zoom,
+          },
+          intent: viewportIntent,
+        })
         return
       }
 
@@ -2235,18 +2267,6 @@ function App() {
       if (isPPTSelectToolShortcut(event)) {
         event.preventDefault()
         activateSelectTool()
-        return
-      }
-
-      if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key === '0') {
-        event.preventDefault()
-        fitSlide()
-        return
-      }
-
-      if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key === '1') {
-        event.preventDefault()
-        fitSelection()
         return
       }
 
@@ -6867,6 +6887,8 @@ function App() {
         data-ppt-text-vertical-align-command-type={lastTextVerticalAlignmentEffect?.type}
         data-ppt-text-vertical-align-command-value={lastTextVerticalAlignmentEffect?.payload.value}
         data-ppt-text-vertical-align-model="slide-edit-text-vertical-alignment"
+        data-ppt-keyboard-viewport-intent="canvas-keyboard-viewport-shortcut-intent"
+        data-ppt-keyboard-viewport-model="canvas-keyboard-viewport-shortcuts"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
         data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}

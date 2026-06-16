@@ -3329,7 +3329,7 @@ async function runFitSelectionScenario(page) {
   await delay(120)
   const afterShortcutFitSlide = await readViewportState(page)
 
-  record('runs PPT viewport fit keyboard shortcuts from canvas bindings', afterShortcutFitSelection.scale > afterRestoreFitSlide.scale && afterShortcutFitSlide.scale < afterShortcutFitSelection.scale && afterShortcutFitSlide.label === afterRestoreFitSlide.label, {
+  record('runs PPT viewport fit keyboard shortcuts from canvas bindings', afterShortcutFitSelection.keyboardIntent === 'canvas-keyboard-viewport-shortcut-intent' && afterShortcutFitSelection.keyboardModel === 'canvas-keyboard-viewport-shortcuts' && afterShortcutFitSelection.scale > afterRestoreFitSlide.scale && afterShortcutFitSlide.scale < afterShortcutFitSelection.scale && afterShortcutFitSlide.label === afterRestoreFitSlide.label, {
     afterRestoreFitSlide,
     afterShortcutFitSelection,
     afterShortcutFitSlide,
@@ -3475,7 +3475,7 @@ async function runFitSelectionScenario(page) {
   await delay(80)
   const afterShortcutResetZoom = await readViewportState(page)
 
-  record('runs PPT viewport zoom keyboard shortcuts from canvas bindings', afterShortcutZoomIn.scale > afterShortcutFitSlide.scale && afterShortcutZoomOut.scale < afterShortcutZoomIn.scale && nearlyEqual(afterShortcutResetZoom.scale, 1, 0.001) && nearlyEqual(afterShortcutResetZoom.x, 0, 0.001) && nearlyEqual(afterShortcutResetZoom.y, 0, 0.001), {
+  record('runs PPT viewport zoom keyboard shortcuts from canvas bindings', afterShortcutZoomIn.keyboardIntent === 'canvas-keyboard-viewport-shortcut-intent' && afterShortcutZoomIn.keyboardModel === 'canvas-keyboard-viewport-shortcuts' && afterShortcutZoomIn.scale > afterShortcutFitSlide.scale && afterShortcutZoomOut.scale < afterShortcutZoomIn.scale && nearlyEqual(afterShortcutResetZoom.scale, 1, 0.001) && nearlyEqual(afterShortcutResetZoom.x, 0, 0.001) && nearlyEqual(afterShortcutResetZoom.y, 0, 0.001), {
     afterShortcutFitSlide,
     afterShortcutResetZoom,
     afterShortcutZoomIn,
@@ -3911,11 +3911,14 @@ function getPPTTextFormatPainterState(page, elementId) {
 
 async function readViewportState(page) {
   return page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
     const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
     const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
     const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
 
     return {
+      keyboardIntent: shell?.getAttribute('data-ppt-keyboard-viewport-intent') ?? '',
+      keyboardModel: shell?.getAttribute('data-ppt-keyboard-viewport-model') ?? '',
       label: document.querySelector('.ppt-zoom-label')?.textContent ?? '',
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       scale,
