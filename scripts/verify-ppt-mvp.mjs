@@ -2395,6 +2395,7 @@ async function runSlideMetadataScenario(page) {
   await delay(50)
 
   const initial = await getPPTSlideMetadataState(page)
+  const initialTabs = await getPPTInspectorTabsState(page)
 
   record(
     'renders PPT slide metadata inspector descriptor',
@@ -2420,6 +2421,95 @@ async function runSlideMetadataScenario(page) {
       initial.objectPriority === '0' &&
       initial.slidePriority === 'secondary',
     initial,
+  )
+  record(
+    'exposes PPT inspector APG tabs contract',
+    initialTabs.tablistRole === 'tablist' &&
+      initialTabs.activation === 'automatic' &&
+      initialTabs.keyboard === 'arrow-home-end-enter-space' &&
+      initialTabs.tabCount === 2 &&
+      initialTabs.panelCount === 2 &&
+      initialTabs.selectedTabIds.length === 1 &&
+      initialTabs.tabStopIds.length === 1 &&
+      initialTabs.relationshipsValid &&
+      initialTabs.activePanelIds.length === 1 &&
+      initialTabs.activePanelIds[0] === initialTabs.selectedTabIds[0],
+    initialTabs,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-inspector-tab="slide"]')?.focus()`)
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(50)
+
+  const afterTabArrowRight = await getPPTInspectorTabsState(page)
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(50)
+
+  const afterTabHome = await getPPTInspectorTabsState(page)
+
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(50)
+
+  const afterTabEnd = await getPPTInspectorTabsState(page)
+
+  record(
+    'moves PPT inspector tab focus with Arrow and Home End keys',
+    afterTabArrowRight.activeTab === 'selection' &&
+      afterTabArrowRight.focusedTab === 'selection' &&
+      afterTabHome.activeTab === 'slide' &&
+      afterTabHome.focusedTab === 'slide' &&
+      afterTabEnd.activeTab === 'selection' &&
+      afterTabEnd.focusedTab === 'selection',
+    {
+      afterTabArrowRight,
+      afterTabEnd,
+      afterTabHome,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-inspector-tab="slide"]')?.focus()`)
+  await pressKey(page, {
+    code: 'Space',
+    key: ' ',
+    windowsVirtualKeyCode: 32,
+  })
+  await delay(50)
+
+  const afterTabSpace = await getPPTInspectorTabsState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-inspector-tab="selection"]')?.focus()`)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
+
+  const afterTabEnter = await getPPTInspectorTabsState(page)
+
+  record(
+    'activates PPT inspector tabs with Enter and Space',
+    afterTabSpace.activeTab === 'slide' &&
+      afterTabSpace.focusedTab === 'slide' &&
+      afterTabEnter.activeTab === 'selection' &&
+      afterTabEnter.focusedTab === 'selection',
+    {
+      afterTabEnter,
+      afterTabSpace,
+    },
   )
 
   await page.eval(`(() => {
@@ -8149,6 +8239,60 @@ function getPPTSlideMetadataState(page) {
       slidePriority: inspector?.getAttribute('data-ppt-slide-inspector-priority') ?? '',
       surface: inspector?.getAttribute('data-ppt-slide-metadata-surface') ?? '',
       thumbName: document.querySelector('.ppt-thumb[aria-current="page"] .ppt-thumb-name')?.textContent ?? '',
+    }
+  })()`)
+}
+
+function getPPTInspectorTabsState(page) {
+  return page.eval(`(() => {
+    const inspector = document.querySelector('.ppt-inspector')
+    const tablist = document.querySelector('[data-ppt-inspector-tabs]')
+    const tabs = [...document.querySelectorAll('[data-ppt-inspector-tab]')]
+    const panels = [...document.querySelectorAll('[data-ppt-inspector-tabpanel]')]
+    const tabDetails = tabs.map((tab) => ({
+      controls: tab.getAttribute('aria-controls') ?? '',
+      focused: document.activeElement === tab,
+      id: tab.getAttribute('data-ppt-inspector-tab') ?? '',
+      role: tab.getAttribute('role') ?? '',
+      selected: tab.getAttribute('aria-selected') ?? '',
+      tabId: tab.id,
+      tabIndex: tab.tabIndex,
+    }))
+    const panelDetails = panels.map((panel) => ({
+      active: panel.getAttribute('data-ppt-inspector-tabpanel-active') ?? '',
+      hidden: panel.hasAttribute('hidden'),
+      id: panel.getAttribute('data-ppt-inspector-tabpanel') ?? '',
+      labelledBy: panel.getAttribute('aria-labelledby') ?? '',
+      panelId: panel.id,
+      role: panel.getAttribute('role') ?? '',
+    }))
+
+    return {
+      activation: tablist?.getAttribute('data-ppt-inspector-tabs-activation') ?? '',
+      activePanelIds: panelDetails
+        .filter((panel) => panel.active === 'true' && !panel.hidden)
+        .map((panel) => panel.id),
+      activeTab: inspector?.getAttribute('data-ppt-inspector-active-tab') ?? '',
+      focusedTab: tabDetails.find((tab) => tab.focused)?.id ?? '',
+      keyboard: tablist?.getAttribute('data-ppt-inspector-tabs-keyboard') ?? '',
+      panelCount: panels.length,
+      panels: panelDetails,
+      relationshipsValid: tabDetails.every((tab) =>
+        panelDetails.some((panel) =>
+          panel.panelId === tab.controls &&
+            panel.labelledBy === tab.tabId &&
+            panel.role === 'tabpanel',
+        ),
+      ),
+      selectedTabIds: tabDetails
+        .filter((tab) => tab.selected === 'true')
+        .map((tab) => tab.id),
+      tabCount: tabs.length,
+      tablistRole: tablist?.getAttribute('role') ?? '',
+      tabs: tabDetails,
+      tabStopIds: tabDetails
+        .filter((tab) => tab.tabIndex === 0)
+        .map((tab) => tab.id),
     }
   })()`)
 }

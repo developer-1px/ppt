@@ -747,6 +747,9 @@ type PPTInspectorSurfaceId =
   | 'none'
   | 'object-selection-inspector'
   | 'slide-metadata-inspector'
+type PPTInspectorTabId =
+  | 'selection'
+  | 'slide'
 type PPTSlideMetadataInspectorDescriptor = {
   activeSlide: {
     index: number | null
@@ -9542,6 +9545,39 @@ function Inspector({
   ]))
   const hiddenPlaceholderCount = layoutPlaceholderVisibilityDescriptors
     .filter((placeholder) => !placeholder.isVisible).length
+  const hasSelectedElement = selectedElement !== null
+  const [activeInspectorTabId, setActiveInspectorTabId] = useState<PPTInspectorTabId>(
+    hasSelectedElement ? 'selection' : 'slide',
+  )
+  const previousInspectorSelectionStateRef = useRef(hasSelectedElement)
+  const inspectorTabs: readonly {
+    id: PPTInspectorTabId
+    label: string
+    panelId: string
+    tabId: string
+  }[] = [
+    {
+      id: 'slide',
+      label: 'Slide',
+      panelId: 'ppt-inspector-panel-slide',
+      tabId: 'ppt-inspector-tab-slide',
+    },
+    {
+      id: 'selection',
+      label: 'Selection',
+      panelId: 'ppt-inspector-panel-selection',
+      tabId: 'ppt-inspector-tab-selection',
+    },
+  ]
+
+  useEffect(() => {
+    if (previousInspectorSelectionStateRef.current === hasSelectedElement) {
+      return
+    }
+
+    previousInspectorSelectionStateRef.current = hasSelectedElement
+    setActiveInspectorTabId(hasSelectedElement ? 'selection' : 'slide')
+  }, [hasSelectedElement])
 
   function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
     const effect = getPPTLayerPaneCommandEffect(layerPaneDescriptor, intent)
@@ -9557,6 +9593,63 @@ function Inspector({
         .querySelector<HTMLElement>(`[data-ppt-layer-pane-row="${objectId}"]`)
         ?.focus({ preventScroll: true })
     })
+  }
+
+  function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLButtonElement>(`[data-ppt-inspector-tab="${tabId}"]`)
+        ?.focus({ preventScroll: true })
+    })
+  }
+
+  function selectPPTInspectorTab(tabId: PPTInspectorTabId) {
+    setActiveInspectorTabId(tabId)
+  }
+
+  function handlePPTInspectorTabKeyDown(
+    tabId: PPTInspectorTabId,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (
+      event.target !== event.currentTarget ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return
+    }
+
+    const currentIndex = inspectorTabs.findIndex((tab) => tab.id === tabId)
+
+    if (currentIndex < 0) {
+      return
+    }
+
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % inspectorTabs.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + inspectorTabs.length) % inspectorTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = inspectorTabs.length - 1
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      nextIndex = currentIndex
+    }
+
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const nextTab = inspectorTabs[nextIndex]
+    setActiveInspectorTabId(nextTab.id)
+    focusPPTInspectorTab(nextTab.id)
   }
 
   function handleLayerPaneRowKeyDown(
@@ -9607,13 +9700,48 @@ function Inspector({
   }
 
   return (
-    <aside className="ppt-inspector" aria-label="Inspector">
-      <div className="ppt-panel-header">
-        <h2>Slide</h2>
+    <aside
+      aria-label="Inspector"
+      className="ppt-inspector"
+      data-ppt-inspector-active-tab={activeInspectorTabId}
+    >
+      <div
+        aria-label="Inspector panels"
+        className="ppt-inspector-tabs"
+        data-ppt-inspector-tabs
+        data-ppt-inspector-tabs-activation="automatic"
+        data-ppt-inspector-tabs-keyboard="arrow-home-end-enter-space"
+        role="tablist"
+      >
+        {inspectorTabs.map((tab) => {
+          const active = activeInspectorTabId === tab.id
+
+          return (
+            <button
+              aria-controls={tab.panelId}
+              aria-selected={active}
+              className="ppt-inspector-tab"
+              data-ppt-inspector-tab={tab.id}
+              data-ppt-inspector-tab-active={active ? 'true' : 'false'}
+              id={tab.tabId}
+              key={tab.id}
+              role="tab"
+              tabIndex={active ? 0 : -1}
+              type="button"
+              onClick={() => selectPPTInspectorTab(tab.id)}
+              onKeyDown={(event) => handlePPTInspectorTabKeyDown(tab.id, event)}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
       <section
+        aria-labelledby="ppt-inspector-tab-slide"
         className="ppt-panel-section"
         data-ppt-inspector-surface={inspectorSurface}
+        data-ppt-inspector-tabpanel="slide"
+        data-ppt-inspector-tabpanel-active={activeInspectorTabId === 'slide' ? 'true' : 'false'}
         data-ppt-slide-inspector-priority={inspectorSurface === 'slide-metadata-inspector' ? 'active' : 'secondary'}
         data-ppt-slide-metadata-active-index={slideMetadataDescriptor.activeSlide.index ?? ''}
         data-ppt-slide-metadata-command-slot="command-effect"
@@ -9622,6 +9750,9 @@ function Inspector({
         data-ppt-slide-metadata-slide-count={slideMetadataDescriptor.activeSlide.slideCount}
         data-ppt-slide-metadata-slide-id={slideMetadataDescriptor.activeSlide.slideId}
         data-ppt-slide-metadata-surface={slideMetadataDescriptor.surface}
+        hidden={activeInspectorTabId !== 'slide'}
+        id="ppt-inspector-panel-slide"
+        role="tabpanel"
       >
         <label className="ppt-field" {...getPPTSlideMetadataFieldData(nameMetadataField)}>
           <span>Name</span>
@@ -9808,15 +9939,18 @@ function Inspector({
         </div>
       </section>
 
-      <div className="ppt-panel-header">
-        <h2>Selection</h2>
-      </div>
       <section
+        aria-labelledby="ppt-inspector-tab-selection"
         className="ppt-panel-section"
         data-ppt-inspector-surface={inspectorSurface}
+        data-ppt-inspector-tabpanel="selection"
+        data-ppt-inspector-tabpanel-active={activeInspectorTabId === 'selection' ? 'true' : 'false'}
         data-ppt-object-inspector
         data-ppt-object-inspector-active={selectedElement ? 'true' : 'false'}
         data-ppt-object-inspector-priority={inspectorSurface === 'object-selection-inspector' ? '0' : '1'}
+        hidden={activeInspectorTabId !== 'selection'}
+        id="ppt-inspector-panel-selection"
+        role="tabpanel"
       >
         {selectedElement ? (
           <>

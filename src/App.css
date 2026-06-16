@@ -1342,11 +1342,44 @@
   background: var(--panel);
 }
 
+.ppt-inspector-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.ppt-inspector-tab {
+  min-width: 0;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-inspector-tab[aria-selected='true'] {
+  border-color: var(--panel-border);
+  background: var(--field-bg);
+  color: var(--text);
+}
+
 .ppt-panel-section {
   display: grid;
   gap: 10px;
   padding: 12px;
   border-bottom: 1px solid var(--panel-border);
+}
+
+.ppt-panel-section[hidden] {
+  display: none;
 }
 
 .ppt-field {
