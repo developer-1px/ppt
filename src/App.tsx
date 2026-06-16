@@ -1973,6 +1973,28 @@ function App() {
         return
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.key === ']') {
+        event.preventDefault()
+        reorderSelection(event.shiftKey ? 'bringToFront' : 'bringForward')
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === '[') {
+        event.preventDefault()
+        reorderSelection(event.shiftKey ? 'sendToBack' : 'sendBackward')
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'l') {
+        event.preventDefault()
+        if (event.shiftKey) {
+          unlockAllElements()
+        } else {
+          lockSelectedElements()
+        }
+        return
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
         if (canFormatSelectedText) {
           event.preventDefault()
@@ -5184,24 +5206,28 @@ function App() {
     id: 'command:bring-forward',
     run: () => reorderSelection('bringForward'),
     section: 'Arrange',
+    shortcut: 'Cmd/Ctrl+]',
     title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
   }, {
     disabled: !commandAvailability.bringToFront,
     id: 'command:bring-to-front',
     run: () => reorderSelection('bringToFront'),
     section: 'Arrange',
+    shortcut: 'Shift+Cmd/Ctrl+]',
     title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
   }, {
     disabled: !commandAvailability.sendBackward,
     id: 'command:send-backward',
     run: () => reorderSelection('sendBackward'),
     section: 'Arrange',
+    shortcut: 'Cmd/Ctrl+[',
     title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
   }, {
     disabled: !commandAvailability.sendToBack,
     id: 'command:send-to-back',
     run: () => reorderSelection('sendToBack'),
     section: 'Arrange',
+    shortcut: 'Shift+Cmd/Ctrl+[',
     title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
   }, {
     disabled: !commandAvailability.group,
@@ -5222,12 +5248,14 @@ function App() {
     id: 'command:lock-selection',
     run: lockSelectedElements,
     section: 'Arrange',
+    shortcut: 'Cmd/Ctrl+L',
     title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
   }, {
     disabled: !commandAvailability.unlockAll,
     id: 'command:unlock-all',
     run: unlockAllElements,
     section: 'Arrange',
+    shortcut: 'Shift+Cmd/Ctrl+L',
     title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
   }, {
     id: 'tool:select',

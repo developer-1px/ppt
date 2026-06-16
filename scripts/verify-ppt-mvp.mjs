@@ -763,6 +763,43 @@ async function runFindReplaceScenario(page) {
 
   record('does not open PPT find while native text editing is active', afterGuard.editing && !afterGuard.stripOpen, afterGuard)
 
+  const beforeNativeShortcutGuard = await page.eval(`(() => ({
+    locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
+    order: [...document.querySelectorAll('[data-ppt-element]')]
+      .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+  }))()`)
+
+  await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s2-title"] .ppt-element-editor')
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyL',
+      ctrlKey: true,
+      key: 'l',
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'BracketRight',
+      ctrlKey: true,
+      key: ']',
+    }))
+  })()`)
+  await delay(50)
+
+  const afterNativeShortcutGuard = await page.eval(`(() => ({
+    editing: document.activeElement?.matches('[data-ppt-element="s2-title"] .ppt-element-editor') === true,
+    locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
+    order: [...document.querySelectorAll('[data-ppt-element]')]
+      .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+  }))()`)
+
+  record('does not run PPT arrange or lock shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order, {
+    afterNativeShortcutGuard,
+    beforeNativeShortcutGuard,
+  })
+
   await pressKey(page, {
     code: 'Escape',
     key: 'Escape',
@@ -1284,6 +1321,73 @@ async function runAffordanceScenario(page) {
   })()`)
 
   record('reorders selected object with canvas command adapter', afterReorder.first === 's1-card-1', afterReorder)
+
+  await pressKey(page, {
+    code: 'BracketRight',
+    key: ']',
+    modifiers: 2,
+    windowsVirtualKeyCode: 221,
+  })
+  await delay(50)
+  const afterBringForwardShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  await pressKey(page, {
+    code: 'BracketRight',
+    key: ']',
+    modifiers: 10,
+    windowsVirtualKeyCode: 221,
+  })
+  await delay(50)
+  const afterBringToFrontShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  await pressKey(page, {
+    code: 'BracketLeft',
+    key: '[',
+    modifiers: 2,
+    windowsVirtualKeyCode: 219,
+  })
+  await delay(50)
+  const afterSendBackwardShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  await pressKey(page, {
+    code: 'BracketLeft',
+    key: '[',
+    modifiers: 10,
+    windowsVirtualKeyCode: 219,
+  })
+  await delay(50)
+  const afterSendToBackShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  record('runs PPT layer order keyboard shortcuts from canvas command bindings', afterBringForwardShortcut.index > afterReorder.order.indexOf('s1-card-1') && afterBringToFrontShortcut.index === afterBringToFrontShortcut.order.length - 1 && afterSendBackwardShortcut.index === afterBringToFrontShortcut.index - 1 && afterSendToBackShortcut.index === 0, {
+    afterBringForwardShortcut,
+    afterBringToFrontShortcut,
+    afterReorder,
+    afterSendBackwardShortcut,
+    afterSendToBackShortcut,
+  })
+
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    modifiers: 2,
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(50)
+  const afterLockShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    modifiers: 10,
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(50)
+  const afterUnlockShortcut = await readPPTElementLayerState(page, 's1-card-1')
+
+  record('runs PPT lock and unlock keyboard shortcuts from canvas command bindings', afterLockShortcut.locked === 'true' && afterUnlockShortcut.locked === 'false' && afterUnlockShortcut.selected, {
+    afterLockShortcut,
+    afterUnlockShortcut,
+  })
 
   await pressKey(page, {
     code: 'KeyD',
@@ -2277,6 +2381,12 @@ async function runCommandPaletteScenario(page) {
   const gridIds = await readCommandPaletteIds(page, 'grid')
   const guideIds = await readCommandPaletteIds(page, 'guide')
   const presentIds = await readCommandPaletteIds(page, 'present')
+  const bringForwardShortcutIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+]')
+  const bringToFrontShortcutIds = await readCommandPaletteIds(page, 'Shift+Cmd/Ctrl+]')
+  const sendBackwardShortcutIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+[')
+  const sendToBackShortcutIds = await readCommandPaletteIds(page, 'Shift+Cmd/Ctrl+[')
+  const lockShortcutIds = await readCommandPaletteIds(page, 'Cmd/Ctrl+L')
+  const unlockShortcutIds = await readCommandPaletteIds(page, 'Shift+Cmd/Ctrl+L')
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') &&
@@ -2287,13 +2397,27 @@ async function runCommandPaletteScenario(page) {
       flipIds.includes('command:flip-vertical'),
     hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
     hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
+    hasLockShortcuts: lockShortcutIds.includes('command:lock-selection') &&
+      unlockShortcutIds.includes('command:unlock-all'),
     hasReorder: frontIds.includes('command:bring-to-front') && backIds.includes('command:send-to-back'),
+    hasReorderShortcuts: bringForwardShortcutIds.includes('command:bring-forward') &&
+      bringToFrontShortcutIds.includes('command:bring-to-front') &&
+      sendBackwardShortcutIds.includes('command:send-backward') &&
+      sendToBackShortcutIds.includes('command:send-to-back'),
     hasTidy: tidyIds.includes('command:tidy-selection'),
     hasView: fitIds.includes('view:fit-slide') &&
       fitIds.includes('view:fit-selection') &&
       gridIds.includes('view:toggle-grid') &&
       guideIds.includes('view:toggle-frame-guides') &&
       presentIds.includes('view:present'),
+    shortcuts: {
+      bringForward: bringForwardShortcutIds,
+      bringToFront: bringToFrontShortcutIds,
+      lockSelection: lockShortcutIds,
+      sendBackward: sendBackwardShortcutIds,
+      sendToBack: sendToBackShortcutIds,
+      unlockAll: unlockShortcutIds,
+    },
     visibleCounts: {
       align: alignIds.length,
       back: backIds.length,
@@ -2311,7 +2435,7 @@ async function runCommandPaletteScenario(page) {
     },
   }
 
-  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasReorder && exposed.hasTidy && exposed.hasView, exposed)
+  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasLockShortcuts && exposed.hasReorder && exposed.hasReorderShortcuts && exposed.hasTidy && exposed.hasView, exposed)
 
   const guideToggleIds = await readCommandPaletteIds(page, 'frame guides')
   await pressKey(page, {
@@ -2412,7 +2536,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -3083,6 +3207,22 @@ async function readCommandPaletteIds(page, query) {
   return page.eval(`(() => [...document.querySelectorAll('[data-ppt-command-palette-item]')]
     .map((item) => item.getAttribute('data-ppt-command-palette-item'))
   )()`)
+}
+
+async function readPPTElementLayerState(page, elementId) {
+  return page.eval(`(() => {
+    const elementId = ${JSON.stringify(elementId)}
+    const order = [...document.querySelectorAll('[data-ppt-element]')]
+      .map((element) => element.getAttribute('data-ppt-element'))
+    const element = document.querySelector('[data-ppt-element="' + elementId + '"]')
+
+    return {
+      index: order.indexOf(elementId),
+      locked: element?.getAttribute('data-locked') ?? '',
+      order,
+      selected: element?.getAttribute('data-selected') === 'true',
+    }
+  })()`)
 }
 
 async function readPPTTidyState(page, ids) {
