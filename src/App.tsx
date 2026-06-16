@@ -2166,6 +2166,7 @@ function App() {
       canPaste: (clipboard?.objects.length ?? 0) > 0,
       canRedo: future.length > 0,
       canUndo: past.length > 0,
+      config: PPT_CANVAS_COMMAND_CONFIG,
       hasGroupedSelection,
       hasHiddenSelection,
       hasLockedItems,

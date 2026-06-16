@@ -6,9 +6,10 @@ import {
   type CanvasAlignMode,
   type CanvasCommandAdapter,
   type CanvasCommandAvailability,
+  type CanvasCommandAvailabilityConfig,
   type CanvasDistributeMode,
   type CanvasReorderMode,
-  getCanvasCommandSelectionState,
+  getCanvasCommandAvailability,
   unionCanvasRectList,
 } from 'canvas/foundation'
 import {
@@ -26,6 +27,14 @@ export type PPTCanvasCommandAvailability = CanvasCommandAvailability & {
   cut: boolean
   nudge: boolean
   paste: boolean
+}
+
+type PPTCanvasCommandAvailabilityConfig = CanvasCommandAvailabilityConfig & {
+  commands: CanvasCommandAvailabilityConfig['commands'] & Readonly<{
+    cut?: boolean
+    nudge?: boolean
+    paste?: boolean
+  }>
 }
 
 export function createPPTCanvasCommandAdapter({
@@ -126,6 +135,7 @@ export function getPPTCanvasCommandAvailability({
   canPaste,
   canRedo,
   canUndo,
+  config,
   hasHiddenSelection = false,
   hasGroupedSelection = false,
   hasLockedItems = false,
@@ -135,42 +145,49 @@ export function getPPTCanvasCommandAvailability({
   canPaste: boolean
   canRedo: boolean
   canUndo: boolean
+  config: PPTCanvasCommandAvailabilityConfig
   hasGroupedSelection?: boolean
   hasHiddenSelection?: boolean
   hasLockedItems?: boolean
   hasLockedSelection?: boolean
   selection: readonly string[]
 }): PPTCanvasCommandAvailability {
-  const selectionState = getCanvasCommandSelectionState({ selection })
-  const { canDistribute, canGroup, hasSelection } = selectionState
+  const baseAvailability = getCanvasCommandAvailability({
+    canRedo,
+    canUndo,
+    config,
+    hasSelectedGroup: hasGroupedSelection,
+    selection,
+  })
+  const hasSelection = selection.length > 0
   const canEditSelection = hasSelection && !hasLockedSelection
   const canTransformSelection = canEditSelection && !hasHiddenSelection
 
   return {
-    alignBottom: canTransformSelection,
-    alignCenter: canTransformSelection,
-    alignLeft: canTransformSelection,
-    alignMiddle: canTransformSelection,
-    alignRight: canTransformSelection,
-    alignTop: canTransformSelection,
-    bringForward: canTransformSelection,
-    bringToFront: canTransformSelection,
-    cut: canEditSelection,
-    delete: canEditSelection,
-    duplicate: canEditSelection,
-    distributeHorizontal: canDistribute && !hasLockedSelection,
-    distributeVertical: canDistribute && !hasLockedSelection,
-    group: canTransformSelection && canGroup,
-    lockSelection: hasSelection && !hasLockedSelection,
-    nudge: canTransformSelection,
-    paste: canPaste,
-    redo: canRedo,
-    selectAll: true,
-    sendBackward: canTransformSelection,
-    sendToBack: canTransformSelection,
-    undo: canUndo,
-    ungroup: canEditSelection && hasGroupedSelection,
-    unlockAll: hasLockedItems,
+    ...baseAvailability,
+    alignBottom: config.commands.alignBottom && canTransformSelection,
+    alignCenter: config.commands.alignCenter && canTransformSelection,
+    alignLeft: config.commands.alignLeft && canTransformSelection,
+    alignMiddle: config.commands.alignMiddle && canTransformSelection,
+    alignRight: config.commands.alignRight && canTransformSelection,
+    alignTop: config.commands.alignTop && canTransformSelection,
+    bringForward: baseAvailability.bringForward && canTransformSelection,
+    bringToFront: baseAvailability.bringToFront && canTransformSelection,
+    cut: config.commands.cut !== false && canEditSelection,
+    delete: baseAvailability.delete && !hasLockedSelection,
+    duplicate: baseAvailability.duplicate && canEditSelection,
+    distributeHorizontal:
+      baseAvailability.distributeHorizontal && !hasLockedSelection,
+    distributeVertical:
+      baseAvailability.distributeVertical && !hasLockedSelection,
+    group: baseAvailability.group && canTransformSelection,
+    lockSelection: baseAvailability.lockSelection && !hasLockedSelection,
+    nudge: config.commands.nudge !== false && canTransformSelection,
+    paste: config.commands.paste !== false && canPaste,
+    sendBackward: baseAvailability.sendBackward && canTransformSelection,
+    sendToBack: baseAvailability.sendToBack && canTransformSelection,
+    ungroup: baseAvailability.ungroup && canEditSelection,
+    unlockAll: baseAvailability.unlockAll && hasLockedItems,
   }
 }
 
