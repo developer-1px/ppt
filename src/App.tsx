@@ -31,6 +31,7 @@ import {
   FilePlus2,
   FlipHorizontal2,
   FlipVertical2,
+  Frame,
   Grid2X2,
   Group,
   Hand,
@@ -60,6 +61,7 @@ import {
   Search,
   SendToBack,
   Square,
+  StickyNote,
   Sun,
   Table2,
   Trash2,
@@ -1222,6 +1224,14 @@ const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
 const PPT_SHAPE_CORNER_RADIUS_MIN = 0
 const PPT_SHAPE_CORNER_RADIUS_MAX = 120
 const PPT_SHAPE_CORNER_RADIUS_STEP = 1
+const PPT_STICKY_BOUNDS = Object.freeze({
+  h: 168,
+  w: 220,
+} as const)
+const PPT_SECTION_BOUNDS = Object.freeze({
+  h: 240,
+  w: 420,
+} as const)
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_OPTIONS = Object.freeze([
   { label: 'Solid', value: 'solid' },
@@ -1356,6 +1366,12 @@ type PPTCreationTool =
     }
   | {
       kind: 'text'
+    }
+  | {
+      kind: 'sticky'
+    }
+  | {
+      kind: 'section'
     }
   | {
       kind: 'comment'
@@ -5404,7 +5420,7 @@ function App() {
     if (interaction.kind === 'element-create') {
       setCreationTool(null)
 
-      if (interaction.tool.kind === 'text') {
+      if (interaction.tool.kind === 'sticky' || interaction.tool.kind === 'text') {
         setEditingId(interaction.elementId)
       }
     }
@@ -5705,6 +5721,18 @@ function App() {
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.text.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.text.ariaLabel,
+  }, {
+    id: 'tool:sticky',
+    run: () => activatePPTCreationTool({ kind: 'sticky' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.sticky.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.sticky.ariaLabel,
+  }, {
+    id: 'tool:section',
+    run: () => activatePPTCreationTool({ kind: 'section' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.section.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.section.ariaLabel,
   }, {
     id: 'tool:rect',
     run: () => activatePPTCreationTool({ kind: 'shape', shape: 'rect' }),
@@ -6012,6 +6040,28 @@ function App() {
             type="button"
           >
             <Type size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.sticky.ariaLabel}
+            aria-pressed={creationTool?.kind === 'sticky'}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="sticky"
+            onClick={() => activatePPTCreationTool({ kind: 'sticky' })}
+            title={CANVAS_TOOL_AFFORDANCES.sticky.title}
+            type="button"
+          >
+            <StickyNote size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.section.ariaLabel}
+            aria-pressed={creationTool?.kind === 'section'}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="section"
+            onClick={() => activatePPTCreationTool({ kind: 'section' })}
+            title={CANVAS_TOOL_AFFORDANCES.section.title}
+            type="button"
+          >
+            <Frame size={17} />
           </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.rect.ariaLabel}
@@ -6370,9 +6420,13 @@ function App() {
         data-ppt-pan-tool-shortcut="H"
         data-ppt-marker-tool-model="canvas-marker-tool"
         data-ppt-marker-tool-shortcut="M"
+        data-ppt-section-tool-model="canvas-section-tool"
+        data-ppt-section-tool-shortcut="Shift+S"
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-sticky-tool-model="canvas-sticky-note-tool"
+        data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
         data-ppt-temporary-pan-model="canvas-temporary-pan-shortcut"
@@ -12850,6 +12904,26 @@ function createPPTElementFromCreationTool({
     })
   }
 
+  if (tool.kind === 'sticky') {
+    return createPPTStickyElement({
+      bounds: getPPTCreatedStickyBounds({
+        currentWorld: current,
+        startWorld: start,
+      }),
+      id,
+    })
+  }
+
+  if (tool.kind === 'section') {
+    return createPPTSectionElement({
+      bounds: getPPTCreatedSectionBounds({
+        currentWorld: current,
+        startWorld: start,
+      }),
+      id,
+    })
+  }
+
   if (tool.kind === 'freeform') {
     const style = getPPTFreeformToolStyle(tool.tool)
 
@@ -12918,6 +12992,70 @@ function createPPTTextElement({
   }
 }
 
+function createPPTStickyElement({
+  bounds,
+  id,
+}: {
+  bounds: Bounds
+  id: string
+}): PPTShape {
+  return {
+    cornerRadius: 12,
+    fill: { color: '#fef3c7' },
+    geometry: clampPPTCreationBounds(bounds),
+    id,
+    kind: 'shape',
+    name: 'Sticky note',
+    shape: 'rect',
+    stroke: { color: '#f59e0b', width: 2 },
+    style: {
+      color: '#713f12',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 18,
+        left: 18,
+        right: 18,
+        top: 18,
+      },
+      verticalAlign: 'middle',
+    },
+    textBody: createPPTTextBody('Sticky note'),
+  }
+}
+
+function createPPTSectionElement({
+  bounds,
+  id,
+}: {
+  bounds: Bounds
+  id: string
+}): PPTShape {
+  return {
+    cornerRadius: 16,
+    fill: { color: '#dbeafe', opacity: 0.16 },
+    geometry: clampPPTCreationBounds(bounds),
+    id,
+    kind: 'shape',
+    name: 'Section',
+    shape: 'rect',
+    stroke: { color: '#2563eb', dash: 'dash', width: 2 },
+    style: {
+      color: '#1e3a8a',
+      fontSize: 20,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 18,
+        left: 18,
+        right: 18,
+        top: 18,
+      },
+      verticalAlign: 'top',
+    },
+    textBody: createPPTTextBody('Section'),
+  }
+}
+
 function createPPTShapeElement({
   bounds,
   id,
@@ -12962,6 +13100,46 @@ function getPPTCreatedTextBounds({
   })
 }
 
+function getPPTCreatedStickyBounds({
+  currentWorld,
+  startWorld,
+}: {
+  currentWorld: Point
+  startWorld: Point
+}): Bounds {
+  const bounds = normalizeBounds(startWorld, currentWorld)
+
+  if (bounds.w > 6 && bounds.h > 6) {
+    return clampPPTCreationBounds(bounds)
+  }
+
+  return clampPPTCreationBounds({
+    ...PPT_STICKY_BOUNDS,
+    x: startWorld.x,
+    y: startWorld.y,
+  })
+}
+
+function getPPTCreatedSectionBounds({
+  currentWorld,
+  startWorld,
+}: {
+  currentWorld: Point
+  startWorld: Point
+}): Bounds {
+  const bounds = normalizeBounds(startWorld, currentWorld)
+
+  if (bounds.w > 12 && bounds.h > 12) {
+    return clampPPTCreationBounds(bounds)
+  }
+
+  return clampPPTCreationBounds({
+    ...PPT_SECTION_BOUNDS,
+    x: startWorld.x,
+    y: startWorld.y,
+  })
+}
+
 function clampPPTCreationBounds(bounds: Bounds): Bounds {
   const w = clamp(bounds.w, 24, PPT_SLIDE_WIDTH)
   const h = clamp(bounds.h, 24, PPT_SLIDE_HEIGHT)
@@ -12989,6 +13167,14 @@ function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | 
 
   if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.text.keyboardShortcut)) {
     return { kind: 'text' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.sticky.keyboardShortcut)) {
+    return { kind: 'sticky' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.section.keyboardShortcut)) {
+    return { kind: 'section' }
   }
 
   if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.rect.keyboardShortcut)) {

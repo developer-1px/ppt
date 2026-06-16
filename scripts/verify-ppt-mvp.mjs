@@ -64,6 +64,7 @@ try {
   await runTextVerticalAlignScenario(page)
   await runTextFrameInsetScenario(page)
   await runViewAndShapeScenario(page)
+  await runStickySectionScenario(page)
   await runLineAffordanceScenario(page)
   await runFreeformScenario(page)
   await runImageImportScenario(page)
@@ -843,6 +844,19 @@ async function runFindReplaceScenario(page) {
       cancelable: true,
       code: 'KeyE',
       key: 'e',
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyS',
+      key: 's',
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyS',
+      key: 'S',
+      shiftKey: true,
     }))
   })()`)
   await delay(50)
@@ -2438,8 +2452,11 @@ async function runCommandPaletteScenario(page) {
 
   const alignIds = await readCommandPaletteIds(page, 'align')
   const toolIds = await readCommandPaletteIds(page, 'tool')
+  const arrowToolIds = await readCommandPaletteIds(page, 'arrow tool')
   const panToolIds = await readCommandPaletteIds(page, 'pan tool')
   const laserToolIds = await readCommandPaletteIds(page, 'laser pointer')
+  const stickyToolIds = await readCommandPaletteIds(page, 'sticky')
+  const sectionToolIds = await readCommandPaletteIds(page, 'section tool')
   const penToolIds = await readCommandPaletteIds(page, 'pen tool')
   const markerToolIds = await readCommandPaletteIds(page, 'marker')
   const highlighterToolIds = await readCommandPaletteIds(page, 'highlighter')
@@ -2469,9 +2486,11 @@ async function runCommandPaletteScenario(page) {
   const exposed = {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') &&
-      toolIds.includes('tool:arrow') &&
+      arrowToolIds.includes('tool:arrow') &&
       panToolIds.includes('tool:pan') &&
       laserToolIds.includes('tool:laser') &&
+      stickyToolIds.includes('tool:sticky') &&
+      sectionToolIds.includes('tool:section') &&
       penToolIds.includes('tool:pen') &&
       markerToolIds.includes('tool:marker') &&
       highlighterToolIds.includes('tool:highlight') &&
@@ -2526,12 +2545,15 @@ async function runCommandPaletteScenario(page) {
       guide: guideIds.length,
       group: groupIds.length,
       eraserTool: eraserToolIds.length,
+      arrowTool: arrowToolIds.length,
       highlighterTool: highlighterToolIds.length,
       lock: lockIds.length,
       laserTool: laserToolIds.length,
       markerTool: markerToolIds.length,
       present: presentIds.length,
       panTool: panToolIds.length,
+      sectionTool: sectionToolIds.length,
+      stickyTool: stickyToolIds.length,
       penTool: penToolIds.length,
       tidy: tidyIds.length,
       tool: toolIds.length,
@@ -2639,7 +2661,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -7107,6 +7129,133 @@ async function runCommentReviewScenario(page) {
   })
 }
 
+async function runStickySectionScenario(page) {
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  await pressKey(page, {
+    code: 'KeyS',
+    key: 's',
+    windowsVirtualKeyCode: 83,
+  })
+  await delay(80)
+
+  const afterStickyShortcut = await getPPTStickySectionState(page)
+
+  record('starts PPT sticky note tool from canvas S shortcut', afterStickyShortcut.creationTool === 'sticky' && afterStickyShortcut.stickyToolbarPressed === 'true' && afterStickyShortcut.stickyToolModel === 'canvas-sticky-note-tool' && afterStickyShortcut.stickyToolShortcut === 'S', afterStickyShortcut)
+
+  const stickyPoint = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      x: slide.left + slide.width * 0.74,
+      y: slide.top + slide.height * 0.28,
+    }
+  })()`)
+
+  const beforeStickyCreate = await getPPTStickySectionState(page)
+
+  await clickMouse(page, stickyPoint.x, stickyPoint.y, 1)
+  await delay(100)
+
+  const afterStickyCreate = await getPPTStickySectionState(page)
+  const stickyId = afterStickyCreate.selectedId
+
+  record('creates editable PPT sticky note from canvas sticky tool', afterStickyCreate.elementCount === beforeStickyCreate.elementCount + 1 && afterStickyCreate.selectedKind === 'shape' && afterStickyCreate.selectedShape === 'rect' && afterStickyCreate.selectedName === 'Sticky note' && afterStickyCreate.selectedFillOpacity === '1' && afterStickyCreate.selectedStrokeDash === 'solid' && afterStickyCreate.selectedText.includes('Sticky note') && afterStickyCreate.editingSticky, {
+    afterStickyCreate,
+    beforeStickyCreate,
+  })
+
+  await selectEditableContents(page, stickyId)
+  await page.send('Input.insertText', { text: 'Review assumption' })
+  await page.eval(`document.querySelector('[data-ppt-element="${stickyId}"] .ppt-element-editor')?.blur()`)
+  await delay(100)
+
+  const afterStickyEdit = await getPPTStickySectionState(page)
+
+  record('edits PPT sticky note through existing text editing flow', afterStickyEdit.selectedId === stickyId && afterStickyEdit.selectedText.includes('Review assumption') && afterStickyEdit.exportCode.includes('Review assumption') && afterStickyEdit.undoEnabled, afterStickyEdit)
+
+  await pressKey(page, {
+    code: 'KeyS',
+    key: 'S',
+    modifiers: 8,
+    windowsVirtualKeyCode: 83,
+  })
+  await delay(80)
+
+  const afterSectionShortcut = await getPPTStickySectionState(page)
+
+  record('starts PPT section tool from canvas Shift+S shortcut', afterSectionShortcut.creationTool === 'section' && afterSectionShortcut.sectionToolbarPressed === 'true' && afterSectionShortcut.sectionToolModel === 'canvas-section-tool' && afterSectionShortcut.sectionToolShortcut === 'Shift+S', afterSectionShortcut)
+
+  const sectionDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.88,
+      endY: slide.top + slide.height * 0.76,
+      startX: slide.left + slide.width * 0.52,
+      startY: slide.top + slide.height * 0.55,
+    }
+  })()`)
+
+  const beforeSectionCreate = await getPPTStickySectionState(page)
+
+  await dragMouse(page, [{
+    x: sectionDrag.startX,
+    y: sectionDrag.startY,
+  }, {
+    x: sectionDrag.endX,
+    y: sectionDrag.endY,
+  }])
+  await delay(100)
+
+  const afterSectionCreate = await getPPTStickySectionState(page)
+  const beforeSectionResizeWidth = afterSectionCreate.selectedWidth
+
+  record('creates PPT section frame from canvas section tool drag', afterSectionCreate.elementCount === beforeSectionCreate.elementCount + 1 && afterSectionCreate.selectedKind === 'shape' && afterSectionCreate.selectedShape === 'rect' && afterSectionCreate.selectedName === 'Section' && afterSectionCreate.selectedStrokeDash === 'dash' && afterSectionCreate.selectedFillOpacity === '0.16' && afterSectionCreate.selectedWidth > 250 && afterSectionCreate.selectedHeight > 100 && afterSectionCreate.exportCode.includes('Section'), {
+    afterSectionCreate,
+    beforeSectionCreate,
+  })
+
+  const resizeHandle = await page.eval(`(() => {
+    const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: resizeHandle.x,
+    y: resizeHandle.y,
+  }, {
+    x: resizeHandle.x + 48,
+    y: resizeHandle.y,
+  }])
+  await delay(100)
+
+  const afterSectionResize = await getPPTStickySectionState(page)
+
+  record('resizes PPT section frame through existing selection handles', afterSectionResize.selectedName === 'Section' && afterSectionResize.selectedWidth > beforeSectionResizeWidth, {
+    afterSectionResize,
+    beforeSectionResizeWidth,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(60)
+}
+
 async function runLineAffordanceScenario(page) {
   await pressKey(page, {
     code: 'Escape',
@@ -9187,6 +9336,41 @@ function getPPTFreeformState(page) {
       strokeWidth: selectedPath?.getAttribute('stroke-width') ?? '',
       thumbFreeformCount: document.querySelectorAll('.ppt-thumb-freeform').length,
       toolbarPressed: document.querySelector('[data-ppt-insert-tool="pen"]')?.getAttribute('aria-pressed') ?? '',
+    }
+  })()`)
+}
+
+function getPPTStickySectionState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const selectedId = selected?.getAttribute('data-ppt-element') ?? ''
+    const layerName = selectedId
+      ? document.querySelector(\`[data-ppt-layer-row="\${selectedId}"] .ppt-layer-name\`)
+      : null
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      creationTool: stage?.getAttribute('data-creation-tool') ?? '',
+      editingSticky: selectedId.length > 0 &&
+        document.activeElement?.matches(\`[data-ppt-element="\${selectedId}"] .ppt-element-editor\`) === true,
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      exportCode: document.querySelector('.ppt-export-code')?.value ?? '',
+      sectionToolbarPressed: document.querySelector('[data-ppt-insert-tool="section"]')?.getAttribute('aria-pressed') ?? '',
+      sectionToolModel: stage?.getAttribute('data-ppt-section-tool-model') ?? '',
+      sectionToolShortcut: stage?.getAttribute('data-ppt-section-tool-shortcut') ?? '',
+      selectedFillOpacity: selected?.getAttribute('data-ppt-fill-opacity') ?? '',
+      selectedHeight: parseFloat(selected?.style.height ?? '0'),
+      selectedId,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedName: layerName?.textContent ?? '',
+      selectedShape: selected?.getAttribute('data-shape') ?? '',
+      selectedStrokeDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
+      selectedText: selected?.textContent ?? '',
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      stickyToolbarPressed: document.querySelector('[data-ppt-insert-tool="sticky"]')?.getAttribute('aria-pressed') ?? '',
+      stickyToolModel: stage?.getAttribute('data-ppt-sticky-tool-model') ?? '',
+      stickyToolShortcut: stage?.getAttribute('data-ppt-sticky-tool-shortcut') ?? '',
+      undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
     }
   })()`)
 }
