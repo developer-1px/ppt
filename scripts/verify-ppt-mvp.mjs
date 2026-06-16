@@ -5279,6 +5279,18 @@ async function runViewAndShapeScenario(page) {
   record(
     'updates and restores PPT shape fill opacity without fading object stroke/text',
     afterFillOpacity.inspectorOpacity === '0.35' &&
+      afterFillOpacity.descriptorSurface === 'object-fill-opacity' &&
+      afterFillOpacity.descriptorCommand === 'update-object-fill-opacity' &&
+      afterFillOpacity.descriptorControl === 'fill-opacity-slider' &&
+      afterFillOpacity.descriptorAttribute === 'data-slide-object-fill-opacity' &&
+      afterFillOpacity.descriptorAttributeValue === '0.35' &&
+      afterFillOpacity.model === 'slide-edit-object-fill-opacity' &&
+      afterFillOpacity.command === 'update-object-fill-opacity' &&
+      afterFillOpacity.commandField === 'fillOpacity' &&
+      afterFillOpacity.commandObject === afterFillOpacity.selectedId &&
+      afterFillOpacity.commandSlide === 'slide-1' &&
+      afterFillOpacity.commandType === 'slide-command-effect' &&
+      afterFillOpacity.commandValue === '0.35' &&
       afterFillOpacity.selectedFillOpacity === '0.35' &&
       afterFillOpacity.selectedBackground.includes('0.35') &&
       afterFillOpacity.selectedObjectOpacity === '1' &&
@@ -9283,9 +9295,23 @@ function getPPTShapeFillOpacityState(page) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = selected?.getAttribute('data-ppt-element') ?? ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="fill-opacity"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
-      inspectorOpacity: document.querySelector('[data-ppt-style-field="fill-opacity"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-fill-opacity-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-fill-opacity-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-fill-opacity-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-fill-opacity-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-fill-opacity-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-fill-opacity-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-fill-opacity-attribute') ?? '',
+      descriptorAttributeValue: field?.getAttribute('data-ppt-fill-opacity-attribute-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-fill-opacity-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-fill-opacity-control') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-fill-opacity-surface') ?? '',
+      inspectorOpacity: field?.value ?? '',
+      model: stage?.getAttribute('data-ppt-fill-opacity-model') ?? '',
       selectedBackground: selected?.style.background ?? '',
       selectedBorderStyle: selected?.style.borderStyle ?? '',
       selectedFillOpacity: selected?.getAttribute('data-ppt-fill-opacity') ?? '',

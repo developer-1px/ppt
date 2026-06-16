@@ -93,15 +93,18 @@ import {
 } from 'react'
 import {
   createSlideEditLayoutPlaceholderDescriptor,
+  createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  normalizeSlideEditObjectFillOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
@@ -110,6 +113,8 @@ import {
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditObjectFillOpacityDescriptor,
+  type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditPlaceholderDescriptor,
@@ -1517,6 +1522,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
@@ -3855,6 +3861,22 @@ function App() {
       rememberRecentColor(value)
     }
 
+    const fillOpacityEffect = field === 'opacity'
+      ? getSlideEditObjectFillOpacityCommandEffect({
+        fieldId: 'fillOpacity',
+        id: 'update-object-fill-opacity',
+        objectId: elementId,
+        slideId: activeSlide.id,
+        value: normalizeSlideEditObjectFillOpacity(
+          typeof value === 'number' ? value : Number(value),
+        ),
+      })
+      : null
+
+    if (fillOpacityEffect) {
+      setLastFillOpacityEffect(fillOpacityEffect)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
         element.kind === 'shape'
@@ -3862,7 +3884,7 @@ function App() {
               ...element,
               fill: normalizePPTFill({
                 ...element.fill,
-                [field]: value,
+                [field]: fillOpacityEffect?.payload.value ?? value,
               }),
             }
           : element),
@@ -6466,6 +6488,13 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-fill-opacity-command={lastFillOpacityEffect?.payload.id}
+        data-ppt-fill-opacity-command-field={lastFillOpacityEffect?.payload.fieldId}
+        data-ppt-fill-opacity-command-object={lastFillOpacityEffect?.payload.objectId}
+        data-ppt-fill-opacity-command-slide={lastFillOpacityEffect?.payload.slideId}
+        data-ppt-fill-opacity-command-type={lastFillOpacityEffect?.type}
+        data-ppt-fill-opacity-command-value={lastFillOpacityEffect?.payload.value}
+        data-ppt-fill-opacity-model="slide-edit-object-fill-opacity"
         data-ppt-stroke-line-style-command={lastStrokeLineStyleEffect?.payload.id}
         data-ppt-stroke-line-style-command-field={lastStrokeLineStyleEffect?.payload.fieldId}
         data-ppt-stroke-line-style-command-object={lastStrokeLineStyleEffect?.payload.objectId}
@@ -10256,6 +10285,9 @@ function Inspector({
   const strokeLineStyleDescriptor = selectedElement
     ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
     : null
+  const fillOpacityDescriptor = selectedElement?.kind === 'shape'
+    ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
+    : null
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -11314,11 +11346,16 @@ function Inspector({
                   <span>Fill opacity</span>
                   <input
                     data-ppt-style-field="fill-opacity"
-                    max={PPT_FILL_OPACITY_MAX}
-                    min={PPT_FILL_OPACITY_MIN}
-                    step={PPT_FILL_OPACITY_STEP}
+                    data-ppt-fill-opacity-attribute={fillOpacityDescriptor?.metadata.attribute}
+                    data-ppt-fill-opacity-attribute-value={fillOpacityDescriptor?.metadata.attributeValue}
+                    data-ppt-fill-opacity-command={fillOpacityDescriptor?.field.commandId}
+                    data-ppt-fill-opacity-control={fillOpacityDescriptor?.field.control}
+                    data-ppt-fill-opacity-surface={fillOpacityDescriptor?.surface}
+                    max={fillOpacityDescriptor?.field.max ?? PPT_FILL_OPACITY_MAX}
+                    min={fillOpacityDescriptor?.field.min ?? PPT_FILL_OPACITY_MIN}
+                    step={fillOpacityDescriptor?.field.step ?? PPT_FILL_OPACITY_STEP}
                     type="number"
-                    value={getPPTFillOpacity(selectedElement.fill)}
+                    value={fillOpacityDescriptor?.value ?? getPPTFillOpacity(selectedElement.fill)}
                     onChange={(event) =>
                       onShapeFillChange(
                         selectedElement.id,
@@ -12509,6 +12546,17 @@ function formatPPTShapeCornerRadius(value: number) {
   return String(normalizePPTShapeCornerRadius(value))
 }
 
+function getPPTFillOpacityDescriptor(
+  slideId: string,
+  element: PPTShape,
+): SlideEditObjectFillOpacityDescriptor<string, string> {
+  return createSlideEditObjectFillOpacityDescriptor({
+    objectId: element.id,
+    slideId,
+    value: getPPTFillOpacity(element.fill),
+  })
+}
+
 function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
   const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
   const normalized = {
@@ -12531,10 +12579,7 @@ function parsePPTFillOpacity(value: string) {
 }
 
 function normalizePPTFillOpacity(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : 1
-  const clamped = clamp(finiteValue, PPT_FILL_OPACITY_MIN, PPT_FILL_OPACITY_MAX)
-
-  return Math.round(clamped * 100) / 100
+  return normalizeSlideEditObjectFillOpacity(value)
 }
 
 function formatPPTFillOpacity(value: number) {
