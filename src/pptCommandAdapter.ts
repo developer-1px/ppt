@@ -12,6 +12,7 @@ import {
   type CanvasReorderMode,
   distributeCanvasSelectionItems,
   getCanvasCommandAvailability,
+  moveCanvasSelection,
   reorderCanvasSelectionItems,
   unionCanvasRectList,
 } from 'canvas/foundation'
@@ -23,6 +24,7 @@ import {
 } from './pptModel'
 import {
   boundsToPPTGeometry,
+  pptCanvasTransformAdapter,
   pptGeometryToBounds,
 } from './pptCanvasAdapter'
 
@@ -86,16 +88,13 @@ export function createPPTCanvasCommandAdapter({
       }
     },
     nudgeSelection({ dx, dy, items, selection }) {
-      const selected = new Set(selection)
-
-      return items.map((item) =>
-        selected.has(item.id) && item.locked !== true
-          ? updatePPTElementBounds(item, {
-              ...pptGeometryToBounds(item.geometry),
-              x: item.geometry.x + dx,
-              y: item.geometry.y + dy,
-            })
-          : item)
+      return moveCanvasSelection({
+        adapter: pptCanvasTransformAdapter,
+        dx,
+        dy,
+        items,
+        selection: getEditablePPTSelection(items, selection),
+      })
     },
     pasteItems({ clipboard, createId, offset }) {
       return clonePPTElementsFromSource(clipboard, createId, offset)
@@ -285,6 +284,17 @@ function distributePPTElements(
 
 function isPPTCommandElementEditable(element: PPTElement) {
   return element.locked !== true
+}
+
+function getEditablePPTSelection(
+  items: PPTElement[],
+  selection: readonly string[],
+) {
+  const selected = new Set(selection)
+
+  return items
+    .filter((item) => selected.has(item.id) && isPPTCommandElementEditable(item))
+    .map((item) => item.id)
 }
 
 function clonePPTElements(
