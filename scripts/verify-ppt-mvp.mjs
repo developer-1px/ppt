@@ -786,6 +786,116 @@ async function runTextEditingScenario(page) {
     afterCancel,
     beforeCancel,
   })
+
+  await clickMouse(page, summaryPoint.x, summaryPoint.y, 2)
+  await delay(50)
+  await selectEditableContents(page, 's1-summary')
+
+  const beforeInlinePaste = await getPPTInlineEditState(page)
+  const inlinePasteText = 'Inline pasted text'
+
+  await page.eval(`((text) => {
+    const editor = document.querySelector('[data-ppt-element="s1-summary"] .ppt-element-editor')
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/plain', text)
+    editor?.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(inlinePasteText)})`)
+  await delay(50)
+
+  const afterInlinePaste = await getPPTInlineEditState(page)
+
+  record(
+    'pastes text inside PPT inline editor through canvas inline edit DOM contract',
+    beforeInlinePaste.editorActive &&
+      afterInlinePaste.editorActive &&
+      afterInlinePaste.inlineEditModel === 'canvas-inline-edit-dom' &&
+      afterInlinePaste.editorInlineEditModel === 'canvas-inline-edit-dom' &&
+      afterInlinePaste.inlineEditElement === 's1-summary' &&
+      afterInlinePaste.inlineEditPasteText === inlinePasteText &&
+      afterInlinePaste.selectedText.includes(inlinePasteText) &&
+      afterInlinePaste.elementCount === beforeInlinePaste.elementCount &&
+      afterInlinePaste.textPasteSelection === beforeInlinePaste.textPasteSelection &&
+      afterInlinePaste.mediaImportUrl === beforeInlinePaste.mediaImportUrl,
+    {
+      afterInlinePaste,
+      beforeInlinePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(50)
+
+  const afterInlineUndoIntent = await getPPTInlineEditState(page)
+
+  record(
+    'records PPT inline editor undo shortcut as canvas inline edit history intent',
+    afterInlineUndoIntent.inlineEditModel === 'canvas-inline-edit-dom' &&
+      afterInlineUndoIntent.inlineEditElement === 's1-summary' &&
+      afterInlineUndoIntent.inlineEditHistoryDirection === 'undo' &&
+      afterInlineUndoIntent.elementCount === beforeInlinePaste.elementCount,
+    afterInlineUndoIntent,
+  )
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(50)
+
+  const afterInlineRedoIntent = await getPPTInlineEditState(page)
+
+  record(
+    'records PPT inline editor redo shortcut as canvas inline edit history intent',
+    afterInlineRedoIntent.inlineEditModel === 'canvas-inline-edit-dom' &&
+      afterInlineRedoIntent.inlineEditElement === 's1-summary' &&
+      afterInlineRedoIntent.inlineEditHistoryDirection === 'redo' &&
+      afterInlineRedoIntent.elementCount === beforeInlinePaste.elementCount,
+    afterInlineRedoIntent,
+  )
+
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
+
+  const afterInlineLineBreakIntent = await getPPTInlineEditState(page)
+
+  record(
+    'records PPT inline editor line break input through canvas inline edit DOM contract',
+    afterInlineLineBreakIntent.inlineEditModel === 'canvas-inline-edit-dom' &&
+      afterInlineLineBreakIntent.inlineEditElement === 's1-summary' &&
+      afterInlineLineBreakIntent.inlineEditInputType === 'insertParagraph' &&
+      afterInlineLineBreakIntent.inlineEditLineBreak === 'true',
+    afterInlineLineBreakIntent,
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const afterInlineCancel = await page.eval(`document.querySelector('[data-ppt-element="s1-summary"]')?.textContent ?? ''`)
+
+  record('keeps PPT inline editor paste probe out of committed deck text on Escape', afterInlineCancel === beforeCancel, {
+    afterInlineCancel,
+    beforeCancel,
+  })
 }
 
 async function runFindReplaceScenario(page) {
@@ -8128,8 +8238,9 @@ async function runTextPasteScenario(page) {
   record(
     'keeps native PPT text editor paste out of global text import',
     nativeGuard.editorEditable &&
-      nativeGuard.eventAllowed &&
+      !nativeGuard.eventAllowed &&
       nativeGuard.afterCount === nativeGuard.beforeCount &&
+      nativeGuard.selectedText.includes('Native editor paste') &&
       nativeGuard.selectedText.includes('Pasted plain text') &&
       nativeGuard.textPasteImporter === 'ppt-plain-text',
     nativeGuard,
@@ -11714,6 +11825,30 @@ function getPPTTextPasteState(page) {
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
       thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
       undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
+    }
+  })()`)
+}
+
+function getPPTInlineEditState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const editor = selected?.querySelector('.ppt-element-editor')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      editorActive: document.activeElement === editor,
+      editorInlineEditModel: editor?.getAttribute('data-ppt-inline-edit-model') ?? '',
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      inlineEditElement: stage?.getAttribute('data-ppt-inline-edit-element') ?? '',
+      inlineEditHistoryDirection: stage?.getAttribute('data-ppt-inline-edit-history-direction') ?? '',
+      inlineEditInputType: stage?.getAttribute('data-ppt-inline-edit-input-type') ?? '',
+      inlineEditLineBreak: stage?.getAttribute('data-ppt-inline-edit-line-break') ?? '',
+      inlineEditModel: stage?.getAttribute('data-ppt-inline-edit-model') ?? '',
+      inlineEditPasteText: stage?.getAttribute('data-ppt-inline-edit-paste-text') ?? '',
+      mediaImportUrl: stage?.getAttribute('data-ppt-media-import-url') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedText: selected?.textContent ?? '',
+      textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
     }
   })()`)
 }

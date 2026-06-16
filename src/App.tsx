@@ -83,8 +83,10 @@ import {
   useRef,
   useState,
   type ChangeEvent as ReactChangeEvent,
+  type ClipboardEvent as ReactClipboardEvent,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type FormEvent as ReactFormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -309,6 +311,12 @@ import {
   getCanvasTabsKeyboardIntent,
   type CanvasTabsDescriptor,
 } from 'canvas/app/tabs-roving-focus'
+import {
+  inlineEditHistoryDirectionFromInputType,
+  inlineEditHistoryDirectionFromKeydown,
+  insertInlineEditText,
+  isInlineEditLineBreakInput,
+} from 'canvas/app/inline-edit-dom'
 import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
@@ -1156,6 +1164,15 @@ type PPTCommentThreadHostCommandEffect = {
   }
   type: 'slide-command-effect'
 }
+type PPTInlineEditHistoryDirection = 'redo' | 'undo'
+type PPTInlineEditEffect = {
+  elementId: string
+  historyDirection?: PPTInlineEditHistoryDirection
+  inputType?: string
+  lineBreak?: boolean
+  model: 'canvas-inline-edit-dom'
+  pasteText?: string
+}
 type PPTLayerPaneGroupState = {
   collapsedGroupIds: readonly string[]
   focusedObjectId: string | null
@@ -1769,6 +1786,7 @@ function App() {
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastInlineEditEffect, setLastInlineEditEffect] = useState<PPTInlineEditEffect | null>(null)
   const [lastMediaImport, setLastMediaImport] = useState<PPTMediaImportResult | null>(null)
   const [lastTextPasteImport, setLastTextPasteImport] = useState<PPTTextPasteImportResult | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
@@ -7217,6 +7235,12 @@ function App() {
         data-ppt-media-import-model="canvas-media-import"
         data-ppt-media-import-selection={lastMediaImport?.item.id}
         data-ppt-media-import-url={lastMediaImport?.source.url}
+        data-ppt-inline-edit-element={lastInlineEditEffect?.elementId}
+        data-ppt-inline-edit-history-direction={lastInlineEditEffect?.historyDirection}
+        data-ppt-inline-edit-input-type={lastInlineEditEffect?.inputType}
+        data-ppt-inline-edit-line-break={lastInlineEditEffect?.lineBreak ? 'true' : undefined}
+        data-ppt-inline-edit-model="canvas-inline-edit-dom"
+        data-ppt-inline-edit-paste-text={lastInlineEditEffect?.pasteText}
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-model="canvas-text-paste-import"
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
@@ -7550,6 +7574,7 @@ function App() {
                 onPointerDown={handleElementPointerDown}
                 onPointerEnter={() => setHoveredId(element.id)}
                 onPointerLeave={() => setHoveredId((current) => current === element.id ? null : current)}
+                onInlineEditEffect={setLastInlineEditEffect}
                 onStopEdit={() => setEditingId(null)}
                 onTextOverflowChange={updateTextOverflowState}
               />
@@ -8030,6 +8055,7 @@ function PPTPresentationOverlay({
                 onCommitText={() => undefined}
                 onContextMenu={(event) => event.preventDefault()}
                 onEdit={() => undefined}
+                onInlineEditEffect={() => undefined}
                 onPointerDown={() => undefined}
                 onPointerEnter={() => undefined}
                 onPointerLeave={() => undefined}
@@ -10867,6 +10893,7 @@ function PPTElementView({
   onCommitText,
   onContextMenu,
   onEdit,
+  onInlineEditEffect,
   onPointerDown,
   onPointerEnter,
   onPointerLeave,
@@ -10885,6 +10912,7 @@ function PPTElementView({
   onCommitText: (elementId: string, text: string) => void
   onContextMenu: (event: ReactMouseEvent<HTMLDivElement>, elementId: string) => void
   onEdit: () => void
+  onInlineEditEffect: (effect: PPTInlineEditEffect) => void
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>, elementId: string) => void
   onPointerEnter: () => void
   onPointerLeave: () => void
@@ -10953,6 +10981,85 @@ function PPTElementView({
     text,
     textBody,
   ])
+
+  function recordInlineEditEffect(effect: Omit<PPTInlineEditEffect, 'elementId' | 'model'>) {
+    onInlineEditEffect({
+      elementId: element.id,
+      model: 'canvas-inline-edit-dom',
+      ...effect,
+    })
+  }
+
+  function handleInlineEditBeforeInput(event: ReactFormEvent<HTMLDivElement>) {
+    if (!editing) {
+      return
+    }
+
+    const inputType = getPPTInlineEditInputType(event)
+    const historyDirection = inlineEditHistoryDirectionFromInputType(inputType)
+    const lineBreak = isInlineEditLineBreakInput(inputType)
+
+    if (!historyDirection && !lineBreak) {
+      return
+    }
+
+    recordInlineEditEffect({
+      ...(historyDirection ? { historyDirection } : {}),
+      inputType,
+      ...(lineBreak ? { lineBreak: true } : {}),
+    })
+  }
+
+  function handleInlineEditKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!editing) {
+      return
+    }
+
+    const historyDirection = inlineEditHistoryDirectionFromKeydown(event.nativeEvent)
+
+    if (historyDirection) {
+      recordInlineEditEffect({ historyDirection })
+    }
+
+    if (
+      event.key === 'Enter' &&
+      !(event.altKey || event.ctrlKey || event.metaKey)
+    ) {
+      const inputType = 'insertParagraph'
+
+      recordInlineEditEffect({
+        inputType,
+        ...(isInlineEditLineBreakInput(inputType) ? { lineBreak: true } : {}),
+      })
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.currentTarget.innerText = text
+      event.currentTarget.blur()
+      onStopEdit()
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault()
+      event.currentTarget.blur()
+    }
+  }
+
+  function handleInlineEditPaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    if (!editing) {
+      return
+    }
+
+    const pasteText = event.clipboardData.getData('text/plain')
+
+    if (!pasteText) {
+      return
+    }
+
+    event.preventDefault()
+    insertInlineEditText(event.currentTarget, pasteText)
+    recordInlineEditEffect({ pasteText })
+  }
 
   return (
     <div
@@ -11103,24 +11210,17 @@ function PPTElementView({
         <div
           className="ppt-element-editor"
           contentEditable={editing}
+          data-ppt-inline-edit-active={editing ? 'true' : 'false'}
+          data-ppt-inline-edit-model="canvas-inline-edit-dom"
           ref={editorRef}
           suppressContentEditableWarning={true}
+          onBeforeInput={handleInlineEditBeforeInput}
           onBlur={(event) => {
             onCommitText(element.id, event.currentTarget.innerText)
             onStopEdit()
           }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              event.currentTarget.innerText = text
-              event.currentTarget.blur()
-              onStopEdit()
-            }
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-              event.preventDefault()
-              event.currentTarget.blur()
-            }
-          }}
+          onKeyDown={handleInlineEditKeyDown}
+          onPaste={handleInlineEditPaste}
         >
           {editing || !textBody ? text : <PPTTextBodyView body={textBody} />}
         </div>
@@ -11149,6 +11249,12 @@ function PPTCommentView({ element }: { element: PPTComment }) {
       <p data-ppt-comment-body>{element.body || PPT_COMMENT_DEFAULT_BODY}</p>
     </div>
   )
+}
+
+function getPPTInlineEditInputType(event: ReactFormEvent<HTMLElement>) {
+  const inputType = (event.nativeEvent as InputEvent).inputType
+
+  return typeof inputType === 'string' ? inputType : ''
 }
 
 function PPTTableView({ element }: { element: PPTTable }) {
