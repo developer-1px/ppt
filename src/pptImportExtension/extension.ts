@@ -1,4 +1,7 @@
 import {
+  createCanvasDataTransferImportActionPlan,
+} from 'canvas/app/data-transfer-import-actions'
+import {
   getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
   getPPTSVGImageSourceFromDataTransfer,
@@ -113,83 +116,116 @@ export type PPTStageDropImportAction =
 export function getPPTClipboardImportActions(
   dataTransfer: DataTransfer | null,
 ): PPTClipboardImportAction[] {
-  const actions: PPTClipboardImportAction[] = []
+  return createCanvasDataTransferImportActionPlan<PPTClipboardImportAction>({
+    resolvers: [
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const file = getPPTImageFileFromDataTransfer(dataTransfer)
 
-  const file = getPPTImageFileFromDataTransfer(dataTransfer)
+          return file ? { file, kind: 'image-file' } : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source = getPPTSVGImageSourceFromDataTransfer(dataTransfer)
 
-  if (file) {
-    return [{ file, kind: 'image-file' }]
-  }
+          return source ? { kind: 'image-source', source } : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source = getPPTDataImageSourceFromDataTransfer(dataTransfer)
 
-  const svgImageSource = getPPTSVGImageSourceFromDataTransfer(dataTransfer)
+          return source
+            ? { kind: 'image-source', resolveNaturalSize: true, source }
+            : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source = getPPTTableSourceFromDataTransfer(dataTransfer)
 
-  if (svgImageSource) {
-    return [{ kind: 'image-source', source: svgImageSource }]
-  }
+          return source ? { kind: 'table-source', source } : null
+        },
+      },
+      {
+        mode: 'append',
+        resolve: () => {
+          const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
 
-  const dataImageSource = getPPTDataImageSourceFromDataTransfer(dataTransfer)
+          return source ? { kind: 'media-source', source } : null
+        },
+      },
+      {
+        mode: 'append',
+        resolve: () => {
+          const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
 
-  if (dataImageSource) {
-    return [{
-      kind: 'image-source',
-      resolveNaturalSize: true,
-      source: dataImageSource,
-    }]
-  }
-
-  const tableSource = getPPTTableSourceFromDataTransfer(dataTransfer)
-
-  if (tableSource) {
-    return [{ kind: 'table-source', source: tableSource }]
-  }
-
-  const mediaSource = getPPTMediaSourceFromDataTransfer(dataTransfer)
-
-  if (mediaSource) {
-    actions.push({ kind: 'media-source', source: mediaSource })
-  }
-
-  const richTextSource = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
-
-  if (richTextSource) {
-    actions.push({ kind: 'rich-text-source', source: richTextSource })
-  }
-
-  actions.push(
-    ...getPPTTextPasteSourcesFromDataTransfer(dataTransfer)
-      .map((text): PPTClipboardImportAction => ({ kind: 'text-source', text })),
-  )
-
-  return actions
+          return source ? { kind: 'rich-text-source', source } : null
+        },
+      },
+      {
+        mode: 'append',
+        resolve: () => getPPTTextPasteSourcesFromDataTransfer(dataTransfer)
+          .map((text): PPTClipboardImportAction => ({ kind: 'text-source', text })),
+      },
+    ],
+  })
 }
 
 export function getPPTStageDropImportAction(
   dataTransfer: DataTransfer | null,
 ): PPTStageDropImportAction | null {
-  const imageFile = getPPTImageFileFromDataTransfer(dataTransfer)
+  const [action = null] =
+    createCanvasDataTransferImportActionPlan<PPTStageDropImportAction>({
+      resolvers: [
+        {
+          mode: 'exclusive',
+          resolve: () => {
+            const file = getPPTImageFileFromDataTransfer(dataTransfer)
 
-  if (imageFile) {
-    return { file: imageFile, kind: 'image-file' }
-  }
+            return file ? { file, kind: 'image-file' } : null
+          },
+        },
+        {
+          mode: 'exclusive',
+          resolve: () => {
+            const file = getPPTTableFileFromDataTransfer(dataTransfer)
 
-  const tableFile = getPPTTableFileFromDataTransfer(dataTransfer)
-  const tableSource = getPPTTableSourceFromDataTransfer(dataTransfer)
+            return file
+              ? {
+                  fallbackSource:
+                    getPPTTableSourceFromDataTransfer(dataTransfer),
+                  file,
+                  kind: 'table-file',
+                }
+              : null
+          },
+        },
+        {
+          mode: 'exclusive',
+          resolve: () => {
+            const source = getPPTTableSourceFromDataTransfer(dataTransfer)
 
-  if (tableFile) {
-    return {
-      fallbackSource: tableSource,
-      file: tableFile,
-      kind: 'table-file',
-    }
-  }
+            return source ? { kind: 'table-source', source } : null
+          },
+        },
+        {
+          mode: 'exclusive',
+          resolve: () => {
+            const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
 
-  if (tableSource) {
-    return { kind: 'table-source', source: tableSource }
-  }
+            return source ? { kind: 'media-source', source } : null
+          },
+        },
+      ],
+    })
 
-  const mediaSource = getPPTMediaSourceFromDataTransfer(dataTransfer)
-
-  return mediaSource ? { kind: 'media-source', source: mediaSource } : null
+  return action
 }
 
 export function canHandlePPTStageDropImport(dataTransfer: DataTransfer | null) {

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
 const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts', import.meta.url))
+const canvasDataTransferImportActionsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasFloatingAnchorEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
@@ -47,6 +48,7 @@ export default defineConfig({
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/context-menu-position', replacement: canvasContextMenuPositionEntry },
+      { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/floating-anchor', replacement: canvasFloatingAnchorEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
