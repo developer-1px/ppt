@@ -2820,6 +2820,7 @@ async function runSlideMetadataScenario(page) {
   record(
     'exposes PPT inspector APG tabs contract',
     initialTabs.tablistRole === 'tablist' &&
+      initialTabs.model === 'canvas-tabs-roving-focus' &&
       initialTabs.activation === 'automatic' &&
       initialTabs.keyboard === 'arrow-home-end-enter-space' &&
       initialTabs.tabCount === 2 &&
@@ -9897,6 +9898,7 @@ function getPPTInspectorTabsState(page) {
       activeTab: inspector?.getAttribute('data-ppt-inspector-active-tab') ?? '',
       focusedTab: tabDetails.find((tab) => tab.focused)?.id ?? '',
       keyboard: tablist?.getAttribute('data-ppt-inspector-tabs-keyboard') ?? '',
+      model: tablist?.getAttribute('data-ppt-inspector-tabs-model') ?? '',
       panelCount: panels.length,
       panels: panelDetails,
       relationshipsValid: tabDetails.every((tab) =>
