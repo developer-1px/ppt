@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/keyboard-nudge-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts"],
       "canvas/app/menu-roving-focus": ["../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts"],
       "canvas/app/minimap-model": ["../canvas/src/canvas/app/affordances/controls/minimap/CanvasMinimapModel.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],

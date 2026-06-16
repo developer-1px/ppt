@@ -1226,6 +1226,7 @@ async function runAffordanceScenario(page) {
     return {
       elementCount: document.querySelectorAll('[data-ppt-element]').length,
       nudgeEnabled: shell?.getAttribute('data-ppt-keyboard-nudge-enabled') ?? '',
+      nudgeIntent: shell?.getAttribute('data-ppt-keyboard-nudge-intent') ?? '',
       nudgeKeys: shell?.getAttribute('data-ppt-keyboard-nudge-keys') ?? '',
       nudgeLargeStep: shell?.getAttribute('data-ppt-keyboard-nudge-large-step') ?? '',
       nudgeModel: shell?.getAttribute('data-ppt-keyboard-nudge-model') ?? '',
@@ -1235,7 +1236,7 @@ async function runAffordanceScenario(page) {
     }
   })()`)
 
-  record('exposes PPT canvas keyboard nudge shortcut metadata', afterNudge.nudgeEnabled === 'true' && afterNudge.nudgeModel === 'canvas-keyboard-nudge-shortcuts' && afterNudge.nudgeStep === '1' && afterNudge.nudgeLargeStep === '10' && afterNudge.nudgeKeys.includes('ArrowRight') && afterNudge.nudgeKeys.includes('Shift+ArrowRight'), {
+  record('exposes PPT canvas keyboard nudge shortcut metadata', afterNudge.nudgeEnabled === 'true' && afterNudge.nudgeModel === 'canvas-keyboard-nudge-shortcuts' && afterNudge.nudgeIntent === 'canvas-keyboard-nudge-shortcut-intent' && afterNudge.nudgeStep === '1' && afterNudge.nudgeLargeStep === '10' && afterNudge.nudgeKeys.includes('ArrowRight') && afterNudge.nudgeKeys.includes('Shift+ArrowRight'), {
     afterNudge,
   })
 

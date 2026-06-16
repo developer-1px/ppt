@@ -208,6 +208,9 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  getCanvasKeyboardNudgeShortcutIntent,
+} from 'canvas/app/keyboard-nudge-shortcuts'
+import {
   CANVAS_MENU_ITEM_PROPS,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
@@ -2380,11 +2383,17 @@ function App() {
         return
       }
 
-      if (isArrowKey(event.key)) {
+      const nudgeIntent = getCanvasKeyboardNudgeShortcutIntent({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+        key: event.key,
+        mod: event.metaKey || event.ctrlKey,
+        selection,
+      })
+
+      if (nudgeIntent?.kind === 'nudge-selection') {
         event.preventDefault()
-        const distance = event.shiftKey ? 10 : 1
-        const delta = getArrowNudgeDelta(event.key, distance)
-        nudgeSelection(delta.dx, delta.dy)
+        nudgeSelection(nudgeIntent.dx, nudgeIntent.dy)
         return
       }
     }
@@ -6819,6 +6828,7 @@ function App() {
           ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
           : undefined}
         data-ppt-keyboard-nudge-enabled={commandAvailability.nudge ? 'true' : 'false'}
+        data-ppt-keyboard-nudge-intent="canvas-keyboard-nudge-shortcut-intent"
         data-ppt-keyboard-nudge-keys="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
@@ -14578,29 +14588,6 @@ function arePPTTextRunStylesEqual(
     left.italic === right.italic &&
     left.size === right.size &&
     left.underline === right.underline
-}
-
-function isArrowKey(key: string) {
-  return key === 'ArrowDown' ||
-    key === 'ArrowLeft' ||
-    key === 'ArrowRight' ||
-    key === 'ArrowUp'
-}
-
-function getArrowNudgeDelta(key: string, distance: number) {
-  if (key === 'ArrowLeft') {
-    return { dx: -distance, dy: 0 }
-  }
-
-  if (key === 'ArrowRight') {
-    return { dx: distance, dy: 0 }
-  }
-
-  if (key === 'ArrowUp') {
-    return { dx: 0, dy: -distance }
-  }
-
-  return { dx: 0, dy: distance }
 }
 
 function getBoundsCenter(bounds: Bounds): Point {
