@@ -885,6 +885,14 @@
   cursor: crosshair;
 }
 
+.ppt-stage-shell[data-ppt-temporary-pan-active='true'] {
+  cursor: grab;
+}
+
+.ppt-stage-shell[data-ppt-temporary-pan-gesture='true'] {
+  cursor: grabbing;
+}
+
 .ppt-stage-world {
   position: absolute;
   left: 0;

@@ -767,6 +767,8 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    temporaryPanActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-active') ?? '',
+    temporaryPanGesture: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-gesture') ?? '',
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
@@ -799,6 +801,12 @@ async function runFindReplaceScenario(page) {
       code: 'Digit1',
       key: '1',
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    }))
   })()`)
   await delay(50)
 
@@ -807,10 +815,12 @@ async function runFindReplaceScenario(page) {
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
+    temporaryPanActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-active') ?? '',
+    temporaryPanGesture: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-temporary-pan-gesture') ?? '',
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange lock or viewport shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform, {
+  record('does not run PPT arrange lock viewport or pan shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -3047,6 +3057,56 @@ async function runFitSelectionScenario(page) {
   await delay(120)
   const afterShortcutFitSelection = await readViewportState(page)
 
+  await page.eval(`document.activeElement instanceof HTMLElement && document.activeElement.blur()`)
+  const beforeTemporaryPan = await readPPTTemporaryPanState(page)
+  const panStart = await page.eval(`(() => {
+    const rect = document.querySelector('.ppt-stage-shell')?.getBoundingClientRect()
+
+    return {
+      x: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
+      y: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchKeyEvent', {
+    code: 'Space',
+    key: ' ',
+    type: 'keyDown',
+    windowsVirtualKeyCode: 32,
+  })
+  await delay(50)
+  const duringTemporaryPan = await readPPTTemporaryPanState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: panStart.x,
+    y: panStart.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: panStart.x + 86,
+    y: panStart.y + 34,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: panStart.x + 86,
+    y: panStart.y + 34,
+  })
+  await delay(80)
+  const afterTemporaryPanDrag = await readPPTTemporaryPanState(page)
+  await page.send('Input.dispatchKeyEvent', {
+    code: 'Space',
+    key: ' ',
+    type: 'keyUp',
+    windowsVirtualKeyCode: 32,
+  })
+  await delay(50)
+  const afterTemporaryPanRelease = await readPPTTemporaryPanState(page)
+
   await pressKey(page, {
     code: 'Digit0',
     key: '0',
@@ -3059,6 +3119,13 @@ async function runFitSelectionScenario(page) {
     afterRestoreFitSlide,
     afterShortcutFitSelection,
     afterShortcutFitSlide,
+  })
+
+  record('pans PPT viewport with canvas Space temporary pan shortcut', beforeTemporaryPan.model === 'canvas-temporary-pan-shortcut' && beforeTemporaryPan.shortcut === 'Space' && beforeTemporaryPan.active === 'false' && duringTemporaryPan.active === 'true' && duringTemporaryPan.cursor === 'grab' && afterTemporaryPanDrag.gesture === 'false' && nearlyEqual(afterTemporaryPanDrag.scale, beforeTemporaryPan.scale, 0.001) && Math.abs(afterTemporaryPanDrag.x - beforeTemporaryPan.x) >= 40 && Math.abs(afterTemporaryPanDrag.y - beforeTemporaryPan.y) >= 20 && afterTemporaryPanDrag.selectedIds === beforeTemporaryPan.selectedIds && afterTemporaryPanRelease.active === 'false' && afterTemporaryPanRelease.gesture === 'false', {
+    afterTemporaryPanDrag,
+    afterTemporaryPanRelease,
+    beforeTemporaryPan,
+    duringTemporaryPan,
   })
 
   await pressKey(page, {
@@ -3512,6 +3579,33 @@ async function readViewportState(page) {
       label: document.querySelector('.ppt-zoom-label')?.textContent ?? '',
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       scale,
+      transform,
+      x: Number(translate?.[1] ?? 0),
+      y: Number(translate?.[2] ?? 0),
+    }
+  })()`)
+}
+
+async function readPPTTemporaryPanState(page) {
+  return page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
+    const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
+    const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
+    const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element') ?? '')
+      .filter(Boolean)
+      .join(' ')
+
+    return {
+      active: shell?.getAttribute('data-ppt-temporary-pan-active') ?? '',
+      cursor: shell ? getComputedStyle(shell).cursor : '',
+      gesture: shell?.getAttribute('data-ppt-temporary-pan-gesture') ?? '',
+      model: shell?.getAttribute('data-ppt-temporary-pan-model') ?? '',
+      scale,
+      selectedCount: selectedIds ? selectedIds.split(' ').length : 0,
+      selectedIds,
+      shortcut: shell?.getAttribute('data-ppt-temporary-pan-shortcut') ?? '',
       transform,
       x: Number(translate?.[1] ?? 0),
       y: Number(translate?.[2] ?? 0),

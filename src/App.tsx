@@ -1448,6 +1448,11 @@ type Interaction =
       slideId: string
       startPoint: Point
     }
+  | {
+      kind: 'pan'
+      startPoint: Point
+      startViewport: Viewport
+    }
 
 function App() {
   const [deck, setDeck] = useState(SAMPLE_PPT_DECK)
@@ -1465,6 +1470,7 @@ function App() {
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
+  const [isTemporaryPanActive, setIsTemporaryPanActive] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
@@ -1866,6 +1872,13 @@ function App() {
         return
       }
 
+      if (isPPTTemporaryPanShortcut(event) && !isPPTTemporaryPanBlockedTarget(event.target)) {
+        event.preventDefault()
+        setContextMenu(null)
+        setIsTemporaryPanActive(true)
+        return
+      }
+
       if (isPPTShortcutHelpShortcut(event)) {
         event.preventDefault()
         openShortcutHelp()
@@ -2069,6 +2082,7 @@ function App() {
         event.preventDefault()
         setEditingId(null)
         setInteraction(null)
+        setIsTemporaryPanActive(false)
         setLineCreationMode(null)
         setCreationTool(null)
         setContextMenu(null)
@@ -2091,9 +2105,26 @@ function App() {
       }
     }
 
-    window.addEventListener('keydown', onKeyDown)
+    function releaseTemporaryPan() {
+      setIsTemporaryPanActive(false)
+      setInteraction((current) => current?.kind === 'pan' ? null : current)
+    }
 
-    return () => window.removeEventListener('keydown', onKeyDown)
+    function onKeyUp(event: KeyboardEvent) {
+      if (isPPTTemporaryPanKey(event)) {
+        releaseTemporaryPan()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', releaseTemporaryPan)
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', releaseTemporaryPan)
+    }
   })
 
   useEffect(() => {
@@ -4169,6 +4200,13 @@ function App() {
     })
   }
 
+  function getPointerClientPoint(event: Pick<PointerEvent, 'clientX' | 'clientY'>): Point {
+    return {
+      x: event.clientX,
+      y: event.clientY,
+    }
+  }
+
   function getPPTViewportCenter() {
     const rect = stageRef.current?.getBoundingClientRect()
 
@@ -4258,6 +4296,24 @@ function App() {
       event.preventDefault()
       insertPPTTableSource(tableSource, point)
     }
+  }
+
+  function beginTemporaryPan(event: ReactPointerEvent<HTMLElement>) {
+    if (!isTemporaryPanActive || event.button !== 0) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setContextMenu(null)
+    setInteraction({
+      kind: 'pan',
+      startPoint: getPointerClientPoint(event.nativeEvent),
+      startViewport: viewport,
+    })
+
+    return true
   }
 
   function beginLineCreation(
@@ -4402,6 +4458,10 @@ function App() {
       return
     }
 
+    if (beginTemporaryPan(event)) {
+      return
+    }
+
     if (beginFreeformCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
@@ -4526,6 +4586,10 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
     const additive = isAdditivePointerInput(event)
     const point = screenToWorld(event.nativeEvent)
+
+    if (beginTemporaryPan(event)) {
+      return
+    }
 
     if (beginFreeformCreation(event, point)) {
       return
@@ -4711,6 +4775,17 @@ function App() {
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     if (!interaction) {
+      return
+    }
+
+    if (interaction.kind === 'pan') {
+      const point = getPointerClientPoint(event.nativeEvent)
+
+      setViewport({
+        ...interaction.startViewport,
+        x: interaction.startViewport.x + point.x - interaction.startPoint.x,
+        y: interaction.startViewport.y + point.y - interaction.startPoint.y,
+      })
       return
     }
 
@@ -5039,7 +5114,7 @@ function App() {
   }
 
   function getPPTInteractionHistoryDeck(current: Interaction) {
-    if (current.kind === 'marquee') {
+    if (current.kind === 'marquee' || current.kind === 'pan') {
       return null
     }
 
@@ -5872,6 +5947,10 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
+        data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
+        data-ppt-temporary-pan-model="canvas-temporary-pan-shortcut"
+        data-ppt-temporary-pan-shortcut="Space"
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
@@ -11125,6 +11204,35 @@ function isEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement &&
     (target.isContentEditable ||
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+
+function isPPTTemporaryPanKey(event: KeyboardEvent) {
+  return event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar'
+}
+
+function isPPTTemporaryPanShortcut(event: KeyboardEvent) {
+  return isPPTTemporaryPanKey(event) &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey
+}
+
+function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {
+  return target instanceof Element &&
+    Boolean(target.closest([
+      'button',
+      'input',
+      'select',
+      'textarea',
+      '[contenteditable="true"]',
+      '[data-ppt-command-palette]',
+      '[data-ppt-context-menu]',
+      '[data-ppt-shortcut-help]',
+      '[role="button"]',
+      '[role="menuitem"]',
+      '[role="option"]',
+      '[role="tab"]',
+    ].join(',')))
 }
 
 function isPPTShortcutHelpShortcut(event: KeyboardEvent) {
