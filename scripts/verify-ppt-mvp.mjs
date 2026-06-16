@@ -3107,6 +3107,37 @@ async function runFitSelectionScenario(page) {
   await delay(50)
   const afterTemporaryPanRelease = await readPPTTemporaryPanState(page)
 
+  const beforeWheelViewport = await readPPTWheelViewportState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    deltaX: 14,
+    deltaY: 28,
+    type: 'mouseWheel',
+    x: panStart.x,
+    y: panStart.y,
+  })
+  await delay(80)
+  const afterWheelPan = await readPPTWheelViewportState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    deltaX: 0,
+    deltaY: 32,
+    modifiers: 8,
+    type: 'mouseWheel',
+    x: panStart.x,
+    y: panStart.y,
+  })
+  await delay(80)
+  const afterShiftWheelPan = await readPPTWheelViewportState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    deltaX: 0,
+    deltaY: -120,
+    modifiers: 2,
+    type: 'mouseWheel',
+    x: panStart.x,
+    y: panStart.y,
+  })
+  await delay(80)
+  const afterWheelZoom = await readPPTWheelViewportState(page)
+
   await pressKey(page, {
     code: 'Digit0',
     key: '0',
@@ -3126,6 +3157,13 @@ async function runFitSelectionScenario(page) {
     afterTemporaryPanRelease,
     beforeTemporaryPan,
     duringTemporaryPan,
+  })
+
+  record('pans and zooms PPT viewport with canvas wheel affordance', beforeWheelViewport.model === 'canvas-wheel-viewport' && beforeWheelViewport.pan === 'ordinary-wheel' && beforeWheelViewport.horizontalPanModifier === 'Shift' && beforeWheelViewport.zoomModifier === 'Ctrl/Meta' && nearlyEqual(afterWheelPan.scale, beforeWheelViewport.scale, 0.001) && afterWheelPan.x < beforeWheelViewport.x && afterWheelPan.y < beforeWheelViewport.y && nearlyEqual(afterShiftWheelPan.scale, afterWheelPan.scale, 0.001) && afterShiftWheelPan.x < afterWheelPan.x && nearlyEqual(afterShiftWheelPan.y, afterWheelPan.y, 0.001) && afterWheelZoom.scale > afterShiftWheelPan.scale, {
+    afterShiftWheelPan,
+    afterWheelPan,
+    afterWheelZoom,
+    beforeWheelViewport,
   })
 
   await pressKey(page, {
@@ -3609,6 +3647,26 @@ async function readPPTTemporaryPanState(page) {
       transform,
       x: Number(translate?.[1] ?? 0),
       y: Number(translate?.[2] ?? 0),
+    }
+  })()`)
+}
+
+async function readPPTWheelViewportState(page) {
+  return page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
+    const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
+    const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
+
+    return {
+      horizontalPanModifier: shell?.getAttribute('data-ppt-wheel-viewport-horizontal-pan-modifier') ?? '',
+      model: shell?.getAttribute('data-ppt-wheel-viewport-model') ?? '',
+      pan: shell?.getAttribute('data-ppt-wheel-viewport-pan') ?? '',
+      scale,
+      transform,
+      x: Number(translate?.[1] ?? 0),
+      y: Number(translate?.[2] ?? 0),
+      zoomModifier: shell?.getAttribute('data-ppt-wheel-viewport-zoom-modifier') ?? '',
     }
   })()`)
 }

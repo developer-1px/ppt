@@ -138,6 +138,7 @@ import {
   deleteCanvasCommand,
   distributeCanvasCommand,
   duplicateCanvasCommand,
+  getCanvasWheelViewport,
   groupCanvasCommand,
   lockCanvasCommand,
   nudgeCanvasCommand,
@@ -1794,6 +1795,18 @@ function App() {
 
     return () => window.removeEventListener('resize', fitSlide)
   }, [fitSlide])
+
+  useEffect(() => {
+    const stage = stageRef.current
+
+    if (!stage) {
+      return
+    }
+
+    stage.addEventListener('wheel', handleStageWheel, { passive: false })
+
+    return () => stage.removeEventListener('wheel', handleStageWheel)
+  })
 
   useEffect(() => {
     if (!contextMenu) {
@@ -4298,6 +4311,46 @@ function App() {
     }
   }
 
+  function handleStageWheel(event: WheelEvent) {
+    if (
+      editingId ||
+      isEditableTarget(event.target) ||
+      isPPTWheelViewportPassthroughTarget(event.target)
+    ) {
+      return
+    }
+
+    const rect = stageRef.current?.getBoundingClientRect()
+
+    if (!rect) {
+      return
+    }
+
+    const nextViewport = getCanvasWheelViewport({
+      config: PPT_CANVAS_COMMAND_CONFIG,
+      input: {
+        ctrlKey: event.ctrlKey,
+        deltaMode: event.deltaMode,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      },
+      point: {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      },
+      viewport,
+    })
+
+    if (!nextViewport) {
+      return
+    }
+
+    event.preventDefault()
+    setViewport(nextViewport)
+  }
+
   function beginTemporaryPan(event: ReactPointerEvent<HTMLElement>) {
     if (!isTemporaryPanActive || event.button !== 0) {
       return false
@@ -5951,6 +6004,10 @@ function App() {
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
         data-ppt-temporary-pan-model="canvas-temporary-pan-shortcut"
         data-ppt-temporary-pan-shortcut="Space"
+        data-ppt-wheel-viewport-horizontal-pan-modifier="Shift"
+        data-ppt-wheel-viewport-model="canvas-wheel-viewport"
+        data-ppt-wheel-viewport-pan="ordinary-wheel"
+        data-ppt-wheel-viewport-zoom-modifier="Ctrl/Meta"
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
@@ -11228,6 +11285,26 @@ function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {
       '[data-ppt-command-palette]',
       '[data-ppt-context-menu]',
       '[data-ppt-shortcut-help]',
+      '[role="button"]',
+      '[role="menuitem"]',
+      '[role="option"]',
+      '[role="tab"]',
+    ].join(',')))
+}
+
+function isPPTWheelViewportPassthroughTarget(target: EventTarget | null) {
+  return target instanceof Element &&
+    Boolean(target.closest([
+      'button',
+      'input',
+      'select',
+      'textarea',
+      '[contenteditable="true"]',
+      '[data-ppt-command-palette]',
+      '[data-ppt-context-menu]',
+      '[data-ppt-minimap]',
+      '[data-ppt-shortcut-help]',
+      '[data-ppt-wheel-passthrough="true"]',
       '[role="button"]',
       '[role="menuitem"]',
       '[role="option"]',
