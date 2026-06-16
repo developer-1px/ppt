@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
+const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
@@ -16,6 +17,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: 'canvas/app/menu-roving-focus', replacement: canvasMenuRovingFocusEntry },
+      { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },

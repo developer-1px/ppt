@@ -208,6 +208,10 @@ import {
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
 import {
+  getCanvasRadioTabIndex,
+  handleCanvasRadioGroupKeyDown,
+} from 'canvas/app/radio-group'
+import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
@@ -9424,8 +9428,6 @@ function PPTParagraphAlignRadioGroup({
   onAlignChange: (align: NonNullable<PPTParagraph['align']>) => void
   surface: 'inspector' | 'quick'
 }) {
-  const selectedIndex = Math.max(0, PPT_PARAGRAPH_ALIGN_OPTIONS.indexOf(align))
-
   function selectAlign(
     nextAlign: NonNullable<PPTParagraph['align']>,
     container: HTMLElement | null,
@@ -9435,34 +9437,7 @@ function PPTParagraphAlignRadioGroup({
       container
         ?.querySelector<HTMLButtonElement>(`[data-ppt-paragraph-align="${nextAlign}"]`)
         ?.focus({ preventScroll: true })
-    })
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.altKey || event.ctrlKey || event.metaKey) {
-      return
-    }
-
-    let nextIndex: number | null = null
-
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      nextIndex = (selectedIndex + 1) % PPT_PARAGRAPH_ALIGN_OPTIONS.length
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      nextIndex = (selectedIndex - 1 + PPT_PARAGRAPH_ALIGN_OPTIONS.length) %
-        PPT_PARAGRAPH_ALIGN_OPTIONS.length
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = PPT_PARAGRAPH_ALIGN_OPTIONS.length - 1
-    }
-
-    if (nextIndex === null) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-    selectAlign(PPT_PARAGRAPH_ALIGN_OPTIONS[nextIndex], event.currentTarget)
+      })
   }
 
   return (
@@ -9473,9 +9448,10 @@ function PPTParagraphAlignRadioGroup({
         : 'ppt-segmented-control ppt-paragraph-align-radio-group'}
       data-ppt-paragraph-align-focus-model="roving-tabindex"
       data-ppt-paragraph-align-keyboard-model="arrow-home-end"
+      data-ppt-paragraph-align-model="canvas-radio-group"
       data-ppt-paragraph-align-radiogroup={surface}
       role="radiogroup"
-      onKeyDown={handleKeyDown}
+      onKeyDown={handleCanvasRadioGroupKeyDown}
     >
       {PPT_PARAGRAPH_ALIGN_OPTIONS.map((option) => {
         const selected = align === option
@@ -9491,7 +9467,10 @@ function PPTParagraphAlignRadioGroup({
             data-ppt-text-quick={surface === 'quick' ? `align-${option}` : undefined}
             key={option}
             role="radio"
-            tabIndex={selected ? 0 : -1}
+            tabIndex={getCanvasRadioTabIndex({
+              checked: selected,
+              disabled: false,
+            })}
             title={`Align text ${option}`}
             type="button"
             onClick={(event) => {

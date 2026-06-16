@@ -4094,12 +4094,14 @@ async function runTextQuickFormatScenario(page) {
     initialAlignRadio.quick.role === 'radiogroup' &&
       initialAlignRadio.quick.focusModel === 'roving-tabindex' &&
       initialAlignRadio.quick.keyboardModel === 'arrow-home-end' &&
+      initialAlignRadio.quick.model === 'canvas-radio-group' &&
       initialAlignRadio.quick.radioCount === 3 &&
       initialAlignRadio.quick.checkedValues.includes('left') &&
       initialAlignRadio.quick.tabStopValues.includes('left') &&
       initialAlignRadio.inspector.role === 'radiogroup' &&
       initialAlignRadio.inspector.focusModel === 'roving-tabindex' &&
       initialAlignRadio.inspector.keyboardModel === 'arrow-home-end' &&
+      initialAlignRadio.inspector.model === 'canvas-radio-group' &&
       initialAlignRadio.inspector.radioCount === 3 &&
       initialAlignRadio.inspector.checkedValues.includes('left') &&
       initialAlignRadio.inspector.tabStopValues.includes('left'),
@@ -10479,6 +10481,7 @@ async function readPPTParagraphAlignRadioGroupState(page) {
           ? document.activeElement?.getAttribute('data-ppt-paragraph-align') ?? ''
           : '',
         keyboardModel: group?.getAttribute('data-ppt-paragraph-align-keyboard-model') ?? '',
+        model: group?.getAttribute('data-ppt-paragraph-align-model') ?? '',
         radioCount: radios.length,
         role: group?.getAttribute('role') ?? '',
         tabStopValues: radios

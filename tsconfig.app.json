@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/menu-roving-focus": ["../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts"],
+      "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
       "canvas/app/toolbar-roving-focus": ["../canvas/src/canvas/app/affordances/controls/toolbar/CanvasToolbarRovingFocus.ts"],
       "canvas/engine": ["../canvas/src/canvas/engine/index.ts"],
       "canvas/core": ["../canvas/src/canvas/core/index.ts"],
