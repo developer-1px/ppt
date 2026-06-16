@@ -216,6 +216,13 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  isCanvasKeyboardCommandIntent,
+  runCanvasKeyboardCommandIntent,
+} from 'canvas/app/keyboard-command-dispatch'
+import {
+  getCanvasKeyboardBuiltinCommandShortcutIntent,
+} from 'canvas/app/keyboard-command-shortcuts'
+import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
@@ -387,6 +394,14 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
     unlockAll: true,
   },
 })
+const PPT_CANVAS_ARRANGE_COMMAND_INTENT_KINDS = new Set([
+  'duplicate-selection',
+  'group-selection',
+  'lock-selection',
+  'reorder-selection',
+  'ungroup-selection',
+  'unlock-all',
+])
 const PPT_RECENT_COLOR_LIMIT = 8
 const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right'] as const
 const PPT_SLIDE_RAIL_HIT_TARGET_PADDING = 6
@@ -2186,41 +2201,44 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
-        event.preventDefault()
-        duplicateSelection()
-        return
-      }
+      const arrangeCommandIntent = getCanvasKeyboardBuiltinCommandShortcutIntent({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+        key: event.key,
+        mod: event.metaKey || event.ctrlKey,
+        selection,
+      })
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'g') {
-        event.preventDefault()
-        if (event.shiftKey) {
-          ungroupSelection()
-        } else {
-          groupSelection()
+      if (
+        arrangeCommandIntent &&
+        isCanvasKeyboardCommandIntent(arrangeCommandIntent) &&
+        isPPTCanvasArrangeCommandIntentKind(arrangeCommandIntent.kind)
+      ) {
+        if (arrangeCommandIntent.preventDefault) {
+          event.preventDefault()
         }
-        return
-      }
 
-      if ((event.metaKey || event.ctrlKey) && event.key === ']') {
-        event.preventDefault()
-        reorderSelection(event.shiftKey ? 'bringToFront' : 'bringForward')
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key === '[') {
-        event.preventDefault()
-        reorderSelection(event.shiftKey ? 'sendToBack' : 'sendBackward')
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'l') {
-        event.preventDefault()
-        if (event.shiftKey) {
-          unlockAllElements()
-        } else {
-          lockSelectedElements()
-        }
+        runCanvasKeyboardCommandIntent({
+          handlers: {
+            copySelection,
+            cutSelection,
+            deleteSelection,
+            duplicateSelection,
+            editSelection: noopPPTKeyboardCommandHandler,
+            groupSelection,
+            lockSelection: lockSelectedElements,
+            moveSelection: nudgeSelection,
+            pasteSelection,
+            quickCreateSticky: noopPPTKeyboardCommandHandler,
+            redoHistory: redo,
+            reorderSelection,
+            selectAll: selectAllElements,
+            undoHistory: undo,
+            ungroupSelection,
+            unlockAll: unlockAllElements,
+          },
+          intent: arrangeCommandIntent,
+        })
         return
       }
 
@@ -6887,6 +6905,8 @@ function App() {
         data-ppt-text-vertical-align-command-type={lastTextVerticalAlignmentEffect?.type}
         data-ppt-text-vertical-align-command-value={lastTextVerticalAlignmentEffect?.payload.value}
         data-ppt-text-vertical-align-model="slide-edit-text-vertical-alignment"
+        data-ppt-keyboard-command-dispatch="canvas-keyboard-command-dispatch"
+        data-ppt-keyboard-command-intent="canvas-keyboard-command-shortcut-intent"
         data-ppt-keyboard-viewport-intent="canvas-keyboard-viewport-shortcut-intent"
         data-ppt-keyboard-viewport-model="canvas-keyboard-viewport-shortcuts"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
@@ -12152,6 +12172,12 @@ function isPPTShortcutHelpShortcut(event: KeyboardEvent) {
     !event.altKey &&
     (event.key === '?' || event.key === '/' || event.code === 'Slash')
 }
+
+function isPPTCanvasArrangeCommandIntentKind(kind: string) {
+  return PPT_CANVAS_ARRANGE_COMMAND_INTENT_KINDS.has(kind)
+}
+
+function noopPPTKeyboardCommandHandler() {}
 
 function selectSameTypePPTSelection(
   elements: readonly PPTElement[],

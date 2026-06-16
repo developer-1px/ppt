@@ -12,6 +12,8 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/keyboard-command-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts"],
+      "canvas/app/keyboard-command-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts"],
       "canvas/app/keyboard-nudge-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts"],
       "canvas/app/keyboard-viewport-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts"],
       "canvas/app/keyboard-viewport-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportShortcuts.ts"],

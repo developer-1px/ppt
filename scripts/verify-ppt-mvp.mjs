@@ -1459,7 +1459,7 @@ async function runAffordanceScenario(page) {
   await delay(50)
   const afterSendToBackShortcut = await readPPTElementLayerState(page, 's1-card-1')
 
-  record('runs PPT layer order keyboard shortcuts from canvas command bindings', afterBringForwardShortcut.index > afterReorder.order.indexOf('s1-card-1') && afterBringToFrontShortcut.index === afterBringToFrontShortcut.order.length - 1 && afterSendBackwardShortcut.index === afterBringToFrontShortcut.index - 1 && afterSendToBackShortcut.index === 0, {
+  record('runs PPT layer order keyboard shortcuts from canvas command bindings', afterBringForwardShortcut.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterBringForwardShortcut.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterBringForwardShortcut.index > afterReorder.order.indexOf('s1-card-1') && afterBringToFrontShortcut.index === afterBringToFrontShortcut.order.length - 1 && afterSendBackwardShortcut.index === afterBringToFrontShortcut.index - 1 && afterSendToBackShortcut.index === 0, {
     afterBringForwardShortcut,
     afterBringToFrontShortcut,
     afterReorder,
@@ -1485,7 +1485,7 @@ async function runAffordanceScenario(page) {
   await delay(50)
   const afterUnlockShortcut = await readPPTElementLayerState(page, 's1-card-1')
 
-  record('runs PPT lock and unlock keyboard shortcuts from canvas command bindings', afterLockShortcut.locked === 'true' && afterUnlockShortcut.locked === 'false' && afterUnlockShortcut.selected, {
+  record('runs PPT lock and unlock keyboard shortcuts from canvas command bindings', afterLockShortcut.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterLockShortcut.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterLockShortcut.locked === 'true' && afterUnlockShortcut.locked === 'false' && afterUnlockShortcut.selected, {
     afterLockShortcut,
     afterUnlockShortcut,
   })
@@ -3688,12 +3688,15 @@ async function readCommandPaletteIds(page, query) {
 async function readPPTElementLayerState(page, elementId) {
   return page.eval(`(() => {
     const elementId = ${JSON.stringify(elementId)}
+    const shell = document.querySelector('.ppt-stage-shell')
     const order = [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element'))
     const element = document.querySelector('[data-ppt-element="' + elementId + '"]')
 
     return {
       index: order.indexOf(elementId),
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       locked: element?.getAttribute('data-locked') ?? '',
       order,
       selected: element?.getAttribute('data-selected') === 'true',
