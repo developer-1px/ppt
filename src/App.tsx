@@ -119,6 +119,7 @@ import {
   getSlideEditFrameGuideGeometry,
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
+  getSlideEditColorWithAlphaCSS,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
@@ -166,6 +167,7 @@ import {
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
+  normalizeSlideEditColorHex,
   normalizeSlideEditTextFontFamily,
   normalizeSlideEditTextFrameInsetValue,
   normalizeSlideEditTextLineHeightRatio,
@@ -15928,35 +15930,10 @@ function getPPTFillColorCSS(fill: PPTFill) {
     return fill.color
   }
 
-  return getPPTColorWithAlpha(fill.color, opacity)
-}
-
-function getPPTColorWithAlpha(color: string, opacity: number) {
-  const hex = normalizePPTColorHex(color)
-
-  if (!hex) {
-    return color
-  }
-
-  const red = Number.parseInt(hex.slice(0, 2), 16)
-  const green = Number.parseInt(hex.slice(2, 4), 16)
-  const blue = Number.parseInt(hex.slice(4, 6), 16)
-
-  return `rgb(${red} ${green} ${blue} / ${formatPPTFillOpacity(opacity)})`
-}
-
-function normalizePPTColorHex(color: string) {
-  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())
-
-  if (!match) {
-    return ''
-  }
-
-  const value = match[1]
-
-  return value.length === 3
-    ? [...value].map((char) => `${char}${char}`).join('').toLowerCase()
-    : value.toLowerCase()
+  return getSlideEditColorWithAlphaCSS({
+    color: fill.color,
+    opacity,
+  })
 }
 
 function getPPTColorSwatchPackageChannel(
@@ -16015,9 +15992,7 @@ function getPPTColorSwatchDescriptor({
 }
 
 function normalizePPTSwatchColor(color: string) {
-  const hex = normalizePPTColorHex(color)
-
-  return hex ? `#${hex}` : ''
+  return normalizeSlideEditColorHex(color) ?? ''
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {
