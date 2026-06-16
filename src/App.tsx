@@ -391,6 +391,7 @@ import {
   getCanvasMoveSnap,
   isAdditivePointerInput,
   moveCanvasSelection,
+  normalizeCanvasRotationDegrees,
   resizeCanvasSelection,
   type CanvasSnapGuides,
 } from 'canvas/foundation'
@@ -17480,9 +17481,7 @@ function getPointAngle(center: Point, point: Point) {
 }
 
 function normalizePPTElementRotation(rotation: number) {
-  const normalized = ((rotation % 360) + 360) % 360
-
-  return Math.abs(normalized) < 0.001 ? 0 : Number(normalized.toFixed(3))
+  return normalizeCanvasRotationDegrees(rotation)
 }
 
 function measurePPTElementAutoSize(element: PPTElement) {
