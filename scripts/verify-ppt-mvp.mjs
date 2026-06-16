@@ -1386,6 +1386,21 @@ async function runAffordanceScenario(page) {
     afterGroupRenameGuard,
   )
 
+  const groupLayerKeyboardReorder = await reorderPPTLayerPaneGroupWithKeyboard(page)
+
+  record(
+    'reorders PPT group row with Alt Arrow keyboard intent',
+    groupLayerKeyboardReorder.ok &&
+      groupLayerKeyboardReorder.before.groupDraggable === 'true' &&
+      groupLayerKeyboardReorder.before.childStageIds.length >= 2 &&
+      groupLayerKeyboardReorder.after.groupMemberContiguous &&
+      groupLayerKeyboardReorder.after.childStageIds.join(' ') === groupLayerKeyboardReorder.before.childStageIds.join(' ') &&
+      groupLayerKeyboardReorder.after.groupStartIndex !== groupLayerKeyboardReorder.before.groupStartIndex &&
+      groupLayerKeyboardReorder.after.selectedStageIds.join(' ') === groupLayerKeyboardReorder.before.childStageIds.join(' ') &&
+      groupLayerKeyboardReorder.focusedRowId === groupLayerKeyboardReorder.groupRowId,
+    groupLayerKeyboardReorder,
+  )
+
   const beforeGroupLayerReorder = await readPPTLayerPaneGroupReorderState(page)
   const groupLayerReorderDrag = await dragPPTLayerPaneGroupRow(page)
   await delay(80)
@@ -8859,7 +8874,7 @@ async function runSelectionPaneScenario(page) {
       initial.rowRole === 'treeitem' &&
       initial.keyboardModel === 'roving-tabindex' &&
       initial.keyboardIntentModel === 'slide-edit-layer-pane-keyboard-intent' &&
-      initial.keyboardKeys === 'arrow-left-right-home-end-enter-space-shift-range' &&
+      initial.keyboardKeys === 'arrow-left-right-home-end-enter-space-shift-range-alt-reorder' &&
       initial.rangeSelectionModel === 'row-press-range-anchor' &&
       initial.selectionModel === 'host-controlled-multi-select' &&
       initial.selectedRowId === initial.selectedId &&
@@ -8973,6 +8988,21 @@ async function runSelectionPaneScenario(page) {
     },
   )
 
+  const layerPaneKeyboardReorder = await reorderPPTLayerPaneObjectWithKeyboard(page)
+
+  record(
+    'reorders PPT object layer pane row with Alt Arrow keyboard intent',
+    layerPaneKeyboardReorder.ok &&
+      layerPaneKeyboardReorder.before.objectRowIds[layerPaneKeyboardReorder.sourceIndex] === layerPaneKeyboardReorder.sourceId &&
+      layerPaneKeyboardReorder.before.objectRowIds[layerPaneKeyboardReorder.targetIndex] === layerPaneKeyboardReorder.targetId &&
+      layerPaneKeyboardReorder.after.objectRowIds[layerPaneKeyboardReorder.sourceIndex] === layerPaneKeyboardReorder.targetId &&
+      layerPaneKeyboardReorder.after.objectRowIds[layerPaneKeyboardReorder.targetIndex] === layerPaneKeyboardReorder.sourceId &&
+      layerPaneKeyboardReorder.after.stageOrder[layerPaneKeyboardReorder.targetIndex] === layerPaneKeyboardReorder.sourceId &&
+      layerPaneKeyboardReorder.after.selectedId === layerPaneKeyboardReorder.sourceId &&
+      layerPaneKeyboardReorder.focusedRowId === layerPaneKeyboardReorder.sourceId,
+    layerPaneKeyboardReorder,
+  )
+
   await page.eval(`(() => {
     const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
     rows.at(-1)?.focus()
@@ -9001,12 +9031,12 @@ async function runSelectionPaneScenario(page) {
 
   record(
     'selects PPT object layer pane treeitem with Space and Enter',
-    afterLayerSpace.selectedRowId === initial.rowIds.at(-1) &&
-      afterLayerSpace.focusedRowId === initial.rowIds.at(-1) &&
-      afterLayerEnter.selectedRowId === initial.rowIds[0] &&
-      afterLayerEnter.focusedRowId === initial.rowIds[0] &&
+    afterLayerSpace.selectedRowId === afterLayerSpace.rowIds.at(-1) &&
+      afterLayerSpace.focusedRowId === afterLayerSpace.rowIds.at(-1) &&
+      afterLayerEnter.selectedRowId === afterLayerEnter.rowIds[0] &&
+      afterLayerEnter.focusedRowId === afterLayerEnter.rowIds[0] &&
       afterLayerEnter.tabStopIds.length === 1 &&
-      afterLayerEnter.tabStopIds[0] === initial.rowIds[0],
+      afterLayerEnter.tabStopIds[0] === afterLayerEnter.rowIds[0],
     {
       afterLayerEnter,
       afterLayerSpace,
@@ -9528,6 +9558,63 @@ async function readPPTLayerPaneRenameState(page, objectId) {
   })(${JSON.stringify(objectId)})`)
 }
 
+async function reorderPPTLayerPaneObjectWithKeyboard(page) {
+  const before = await readPPTLayerPaneReorderState(page)
+  const target = await page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row-type="object"][data-ppt-layer-pane-draggable="true"]')]
+    const source = rows.find((row, index) => index < rows.length - 1)
+    const sourceIndex = source ? rows.indexOf(source) : -1
+    const next = sourceIndex >= 0 ? rows[sourceIndex + 1] : null
+
+    if (!(source instanceof HTMLElement) || !(next instanceof HTMLElement)) {
+      return {
+        ok: false,
+        rowCount: rows.length,
+        sourceFound: source instanceof HTMLElement,
+        targetFound: next instanceof HTMLElement,
+      }
+    }
+
+    source.querySelector('[data-ppt-layer-select]')?.click()
+    source.focus()
+
+    return {
+      ok: true,
+      sourceId: source.getAttribute('data-ppt-layer-pane-row') ?? '',
+      sourceIndex,
+      targetId: next.getAttribute('data-ppt-layer-pane-row') ?? '',
+      targetIndex: sourceIndex + 1,
+    }
+  })()`)
+
+  if (!target.ok) {
+    return {
+      ...target,
+      before,
+    }
+  }
+
+  await delay(50)
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    modifiers: 1,
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(100)
+  const after = await readPPTLayerPaneReorderState(page)
+  const focusedRowId = await page.eval(`(() =>
+    document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? ''
+  )()`)
+
+  return {
+    ...target,
+    after,
+    before,
+    focusedRowId,
+  }
+}
+
 async function readPPTLayerPaneReorderState(page) {
   return page.eval(`(() => {
     const objectRows = [...document.querySelectorAll('[data-ppt-layer-pane-row-type="object"]')]
@@ -9545,7 +9632,7 @@ async function readPPTLayerPaneReorderState(page) {
 }
 
 async function dragPPTLayerPaneRow(page, mode = 'before-start') {
-  return page.eval(`(async (mode) => {
+  const started = await page.eval(`((mode) => {
     const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row-type="object"][data-ppt-layer-pane-draggable="true"]')]
     const source = mode === 'after-end' ? rows[0] : rows.at(-1)
     const target = mode === 'after-end' ? rows.at(-1) : rows[0]
@@ -9624,25 +9711,112 @@ async function dragPPTLayerPaneRow(page, mode = 'before-start') {
 
     source.dispatchEvent(createDragEvent('dragstart'))
     target.dispatchEvent(createDragEvent('dragover'))
-    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    window.__pptLayerPaneObjectDrag = {
+      clientX,
+      clientY,
+      dataTransfer,
+      mode,
+      sourceId,
+      targetId,
+    }
+
+    return {
+      mode,
+      ok: true,
+      pending: true,
+      sourceId,
+      targetId,
+    }
+  })(${JSON.stringify(mode)})`)
+
+  if (!started.ok) {
+    return started
+  }
+
+  await delay(30)
+
+  return page.eval(`(() => {
+    const drag = window.__pptLayerPaneObjectDrag
+
+    if (!drag) {
+      return {
+        ok: false,
+        pendingFound: false,
+      }
+    }
+
+    const source = document.querySelector(\`[data-ppt-layer-pane-row="\${drag.sourceId}"]\`)
+    const target = document.querySelector(\`[data-ppt-layer-pane-row="\${drag.targetId}"]\`)
+
+    if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+      delete window.__pptLayerPaneObjectDrag
+      return {
+        ok: false,
+        sourceFound: source instanceof HTMLElement,
+        targetFound: target instanceof HTMLElement,
+      }
+    }
+
+    function createDragEvent(type) {
+      let event
+
+      try {
+        event = new DragEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: drag.clientX,
+          clientY: drag.clientY,
+          dataTransfer: drag.dataTransfer,
+        })
+      } catch {
+        event = new Event(type, {
+          bubbles: true,
+          cancelable: true,
+        })
+      }
+
+      if (!event.dataTransfer) {
+        Object.defineProperty(event, 'dataTransfer', {
+          configurable: true,
+          value: drag.dataTransfer,
+        })
+      }
+      if (event.clientX !== drag.clientX) {
+        Object.defineProperty(event, 'clientX', {
+          configurable: true,
+          value: drag.clientX,
+        })
+      }
+      if (event.clientY !== drag.clientY) {
+        Object.defineProperty(event, 'clientY', {
+          configurable: true,
+          value: drag.clientY,
+        })
+      }
+
+      return event
+    }
+
     const indicatorModel = target.getAttribute('data-ppt-layer-pane-drop-indicator-model') ?? ''
     const indicatorPlacement = target.getAttribute('data-ppt-layer-pane-drop-indicator') ?? ''
     const indicatorTarget = target.getAttribute('data-ppt-layer-pane-drop-target') ?? ''
     const indicatorToIndex = target.getAttribute('data-ppt-layer-pane-drop-to-index') ?? ''
     target.dispatchEvent(createDragEvent('drop'))
     source.dispatchEvent(createDragEvent('dragend'))
+    delete window.__pptLayerPaneObjectDrag
 
     return {
       indicatorModel,
       indicatorPlacement,
       indicatorTarget,
       indicatorToIndex,
-      mode,
+      mode: drag.mode,
       ok: true,
-      sourceId,
-      targetId,
+      sourceId: drag.sourceId,
+      targetId: drag.targetId,
     }
-  })(${JSON.stringify(mode)})`)
+  })()`)
 }
 
 async function dragPPTLayerPaneGroupRow(page) {
@@ -9846,6 +10020,76 @@ async function dragPPTLayerPaneGroupRow(page) {
       targetId: drag.targetId,
     }
   })()`)
+}
+
+async function reorderPPTLayerPaneGroupWithKeyboard(page) {
+  const before = await readPPTLayerPaneGroupReorderState(page)
+  const target = await page.eval(`(() => {
+    const group = document.querySelector('[data-ppt-layer-pane-row-type="group"]')
+
+    if (!(group instanceof HTMLElement)) {
+      return {
+        groupFound: false,
+        ok: false,
+      }
+    }
+
+    group.focus()
+
+    const groupRowId = group.getAttribute('data-ppt-layer-pane-row') ?? ''
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+    const groupIndex = rows.indexOf(group)
+    const hasTargetAfter = rows.some((row, index) =>
+      index > groupIndex &&
+        row.getAttribute('data-ppt-layer-pane-draggable') === 'true' &&
+        row.getAttribute('data-ppt-layer-pane-parent-object-id') !== groupRowId)
+    const hasTargetBefore = rows.some((row, index) =>
+      index < groupIndex &&
+        row.getAttribute('data-ppt-layer-pane-draggable') === 'true' &&
+        row.getAttribute('data-ppt-layer-pane-parent-object-id') !== groupRowId)
+
+    if (!hasTargetAfter && !hasTargetBefore) {
+      return {
+        groupRowId,
+        ok: false,
+        targetFound: false,
+      }
+    }
+
+    return {
+      direction: hasTargetAfter ? 'down' : 'up',
+      groupRowId,
+      ok: true,
+    }
+  })()`)
+
+  if (!target.ok) {
+    return {
+      ...target,
+      before,
+    }
+  }
+
+  await delay(50)
+  await pressKey(page, {
+    code: target.direction === 'down' ? 'ArrowDown' : 'ArrowUp',
+    key: target.direction === 'down' ? 'ArrowDown' : 'ArrowUp',
+    modifiers: 1,
+    windowsVirtualKeyCode: target.direction === 'down' ? 40 : 38,
+  })
+  await delay(100)
+  const after = await readPPTLayerPaneGroupReorderState(page)
+  const focusedRowId = await page.eval(`(() =>
+    document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? ''
+  )()`)
+
+  return {
+    ...target,
+    after,
+    before,
+    focusedRowId,
+    groupRowId: target.groupRowId,
+  }
 }
 
 async function readPPTLayerPaneGroupReorderState(page) {

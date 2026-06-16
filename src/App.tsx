@@ -8850,6 +8850,33 @@ function getPPTLayerPaneDropIndex(
   return placement === 'before' ? targetIndex : targetIndex + 1
 }
 
+function getPPTLayerPaneKeyboardDropIndex(
+  descriptor: PPTLayerPaneDescriptor,
+  slide: PPTSlide,
+  objectId: string,
+  toIndex: number,
+) {
+  const fromIndex = descriptor.rows.findIndex((row) => row.objectId === objectId)
+
+  if (fromIndex < 0) {
+    return null
+  }
+
+  if (fromIndex < toIndex) {
+    const targetRow = descriptor.rows[toIndex - 1]
+
+    return targetRow
+      ? getPPTLayerPaneDropIndex(slide, targetRow.objectId, 'after')
+      : slide.elements.length
+  }
+
+  const targetRow = descriptor.rows[toIndex]
+
+  return targetRow
+    ? getPPTLayerPaneDropIndex(slide, targetRow.objectId, 'before')
+    : slide.elements.length
+}
+
 function reorderPPTLayerPaneElement(
   elements: readonly PPTElement[],
   objectId: string,
@@ -11141,6 +11168,28 @@ function Inspector({
         })
         focusLayerPaneRow(intent.objectId)
         return
+      case 'reorder-row':
+        {
+          const dropIndex = getPPTLayerPaneKeyboardDropIndex(
+            layerPaneDescriptor,
+            slide,
+            intent.objectId,
+            intent.toIndex,
+          )
+
+          if (dropIndex === null) {
+            return
+          }
+
+          setLayerPaneFocusedObjectId(intent.objectId)
+          runLayerPaneIntent({
+            objectId: intent.objectId,
+            toIndex: dropIndex,
+            type: 'row-drop',
+          })
+          focusLayerPaneRow(intent.objectId)
+        }
+        return
       case 'collapse-row':
         setLayerPaneGroupExpanded(intent.objectId, false)
         focusLayerPaneRow(intent.objectId)
@@ -11172,9 +11221,9 @@ function Inspector({
   ) {
     if (
       event.target !== event.currentTarget ||
-      event.altKey ||
       event.ctrlKey ||
-      event.metaKey
+      event.metaKey ||
+      (event.altKey && event.key !== 'ArrowDown' && event.key !== 'ArrowUp')
     ) {
       return
     }
@@ -11205,9 +11254,9 @@ function Inspector({
   ) {
     if (
       event.target !== event.currentTarget ||
-      event.altKey ||
       event.ctrlKey ||
-      event.metaKey
+      event.metaKey ||
+      (event.altKey && event.key !== 'ArrowDown' && event.key !== 'ArrowUp')
     ) {
       return
     }
@@ -11224,6 +11273,7 @@ function Inspector({
     const intent = getSlideEditLayerPaneKeyboardIntent(layerPaneDescriptor, {
       currentObjectId: row.objectId,
       key: event.key,
+      altKey: event.altKey,
       rangeAnchorObjectId: layerPaneGroupState.rangeAnchorObjectId,
       shiftKey: event.shiftKey,
     })
@@ -12524,7 +12574,7 @@ function Inspector({
           data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
           data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
           data-ppt-layer-pane-keyboard-intent-model={SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL}
-          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space-shift-range"
+          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space-shift-range-alt-reorder"
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
           data-ppt-layer-pane-range-anchor-object-id={layerPaneGroupState.rangeAnchorObjectId ?? ''}
           data-ppt-layer-pane-range-selection-model="row-press-range-anchor"
