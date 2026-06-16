@@ -336,6 +336,7 @@ import {
   clamp,
   fitBoundsIntoViewport,
   getCanvasViewportScreenPoint,
+  getCanvasViewportWorldBounds,
   getCanvasViewportWorldPoint,
   getCanvasViewportZoomStepMultiplier,
   handlePoint,
@@ -5374,10 +5375,12 @@ function App() {
       }
     }
 
-    return getCanvasViewportWorldPoint(viewport, {
-      x: rect.width / 2,
-      y: rect.height / 2,
-    })
+    const bounds = getCanvasViewportWorldBounds(viewport, rect)
+
+    return {
+      x: bounds.x + bounds.w / 2,
+      y: bounds.y + bounds.h / 2,
+    }
   }
 
   function worldToScreen(point: Point) {
