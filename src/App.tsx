@@ -136,6 +136,7 @@ import {
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
+  getSlideEditObjectShadowFilter,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
@@ -16241,7 +16242,7 @@ function normalizePPTElementShadowOpacity(value: number) {
 }
 
 function formatPPTElementShadowOpacity(value: number) {
-  return String(normalizePPTElementShadowOpacity(value))
+  return toSlideEditObjectOpacityAttributeValue(value)
 }
 
 function normalizePPTElementShadowColor(color: string) {
@@ -16249,29 +16250,10 @@ function normalizePPTElementShadowColor(color: string) {
 }
 
 function getPPTElementShadowFilter(element: PPTElement) {
-  return hasPPTElementShadow(element)
-    ? `drop-shadow(${getPPTElementShadowFilterCSS(getPPTElementShadow(element))})`
-    : undefined
-}
-
-function getPPTElementShadowFilterCSS(shadow: PPTElementShadow) {
-  const radians = (shadow.angle * Math.PI) / 180
-  const offsetX = formatPPTPathNumber(Math.cos(radians) * shadow.distance)
-  const offsetY = formatPPTPathNumber(Math.sin(radians) * shadow.distance)
-
-  return `${offsetX}px ${offsetY}px ${shadow.blur}px ${getPPTElementShadowColorCSS(shadow)}`
-}
-
-function getPPTElementShadowColorCSS(shadow: PPTElementShadow) {
-  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(shadow.color)
-
-  if (!match) {
-    return shadow.color
-  }
-
-  const [, red, green, blue] = match
-
-  return `rgb(${Number.parseInt(red, 16)} ${Number.parseInt(green, 16)} ${Number.parseInt(blue, 16)} / ${formatPPTElementShadowOpacity(shadow.opacity)})`
+  return getSlideEditObjectShadowFilter({
+    ...getPPTElementShadow(element),
+    enabled: hasPPTElementShadow(element),
+  })
 }
 
 function getPPTSelectionCommandAnchor({
@@ -17212,10 +17194,6 @@ function getPPTFreeformWorldPoints(element: PPTFreeform) {
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
   }))
-}
-
-function formatPPTPathNumber(value: number) {
-  return Number(value.toFixed(2))
 }
 
 function createPPTLineElement({
