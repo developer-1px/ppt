@@ -2122,6 +2122,12 @@ function App() {
         return
       }
 
+      if (isPPTArrowToolShortcut(event)) {
+        event.preventDefault()
+        activateLineCreationMode('arrow')
+        return
+      }
+
       if (isPPTLaserToolShortcut(event)) {
         event.preventDefault()
         activateLaserTool()
@@ -6102,7 +6108,16 @@ function App() {
           <button aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
             <Minus size={17} />
           </button>
-          <button aria-pressed={lineCreationMode === 'arrow'} className="ppt-icon-button" data-ppt-insert-line="arrow" onClick={() => activateLineCreationMode('arrow')} title="Draw arrow" type="button">
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel}
+            aria-pressed={lineCreationMode === 'arrow'}
+            className="ppt-icon-button"
+            data-ppt-insert-line="arrow"
+            data-ppt-insert-tool="arrow"
+            onClick={() => activateLineCreationMode('arrow')}
+            title={CANVAS_TOOL_AFFORDANCES.arrow.title}
+            type="button"
+          >
             <ArrowRight size={17} />
           </button>
           <button
@@ -6396,6 +6411,8 @@ function App() {
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
         data-ppt-keyboard-nudge-step="1"
+        data-ppt-arrow-tool-model="canvas-arrow-tool"
+        data-ppt-arrow-tool-shortcut="L"
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
           ? creationTool.tool
           : undefined}
@@ -13223,6 +13240,13 @@ function isPPTLaserToolShortcut(event: KeyboardEvent) {
     !event.ctrlKey &&
     !event.altKey &&
     doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.laser.keyboardShortcut)
+}
+
+function isPPTArrowToolShortcut(event: KeyboardEvent) {
+  return !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.arrow.keyboardShortcut)
 }
 
 function isPPTEraserToolShortcut(event: KeyboardEvent) {

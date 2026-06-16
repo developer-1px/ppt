@@ -770,6 +770,7 @@ async function runFindReplaceScenario(page) {
     eraserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-tool-active') ?? '',
     laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
     laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
+    lineTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-line-tool') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
@@ -858,6 +859,12 @@ async function runFindReplaceScenario(page) {
       key: 'S',
       shiftKey: true,
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyL',
+      key: 'l',
+    }))
   })()`)
   await delay(50)
 
@@ -868,6 +875,7 @@ async function runFindReplaceScenario(page) {
     eraserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-tool-active') ?? '',
     laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
     laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
+    lineTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-line-tool') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
@@ -877,7 +885,7 @@ async function runFindReplaceScenario(page) {
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange lock viewport pan laser or drawing shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture && afterNativeShortcutGuard.laserToolActive === beforeNativeShortcutGuard.laserToolActive && afterNativeShortcutGuard.laserTrailPointCount === beforeNativeShortcutGuard.laserTrailPointCount && afterNativeShortcutGuard.creationTool === beforeNativeShortcutGuard.creationTool && afterNativeShortcutGuard.drawingTool === beforeNativeShortcutGuard.drawingTool && afterNativeShortcutGuard.eraserToolActive === beforeNativeShortcutGuard.eraserToolActive, {
+  record('does not run PPT arrange lock viewport pan laser or drawing shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture && afterNativeShortcutGuard.laserToolActive === beforeNativeShortcutGuard.laserToolActive && afterNativeShortcutGuard.laserTrailPointCount === beforeNativeShortcutGuard.laserTrailPointCount && afterNativeShortcutGuard.creationTool === beforeNativeShortcutGuard.creationTool && afterNativeShortcutGuard.lineTool === beforeNativeShortcutGuard.lineTool && afterNativeShortcutGuard.drawingTool === beforeNativeShortcutGuard.drawingTool && afterNativeShortcutGuard.eraserToolActive === beforeNativeShortcutGuard.eraserToolActive, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -2661,7 +2669,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -7579,8 +7587,16 @@ async function runLineAffordanceScenario(page) {
     beforeEndpoint,
   })
 
-  await page.eval(`document.querySelector('[data-ppt-insert-line="arrow"]').click()`)
-  await delay(20)
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(50)
+
+  const afterArrowShortcut = await getPPTLineState(page)
+
+  record('starts PPT arrow tool from canvas L shortcut', afterArrowShortcut.lineTool === 'arrow' && afterArrowShortcut.arrowToolPressed === 'true' && afterArrowShortcut.arrowToolModel === 'canvas-arrow-tool' && afterArrowShortcut.arrowToolShortcut === 'L', afterArrowShortcut)
 
   const drawArrow = await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell').getBoundingClientRect()
@@ -9167,9 +9183,14 @@ function getPPTLineState(page, elementId = null) {
     const x2 = Number(selected?.getAttribute('data-line-end-x') ?? selectedLine?.getAttribute('x2') ?? 0)
     const y1 = Number(selected?.getAttribute('data-line-start-y') ?? selectedLine?.getAttribute('y1') ?? 0)
     const y2 = Number(selected?.getAttribute('data-line-end-y') ?? selectedLine?.getAttribute('y2') ?? 0)
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
+      arrowToolModel: stage?.getAttribute('data-ppt-arrow-tool-model') ?? '',
+      arrowToolPressed: document.querySelector('[data-ppt-insert-line="arrow"]')?.getAttribute('aria-pressed') ?? '',
+      arrowToolShortcut: stage?.getAttribute('data-ppt-arrow-tool-shortcut') ?? '',
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
+      lineTool: stage?.getAttribute('data-line-tool') ?? '',
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
       hasPath: !!selectedPath,
       inspectorDash: document.querySelector('[data-ppt-style-field="line-stroke-dash"]')?.value ?? '',
