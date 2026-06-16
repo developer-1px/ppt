@@ -4818,6 +4818,7 @@ function App() {
         items: startSlide.elements,
         point,
         preserveAspectRatio: event.shiftKey,
+        resizeFromCenter: event.altKey,
         selection: interaction.selection,
       })
       const syncedElements = syncPPTLineConnections(
@@ -5795,6 +5796,9 @@ function App() {
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
         data-ppt-keyboard-nudge-step="1"
+        data-ppt-resize-aspect-ratio-modifier="Shift"
+        data-ppt-resize-from-center-modifier="Alt"
+        data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}

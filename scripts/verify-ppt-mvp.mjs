@@ -924,6 +924,77 @@ async function runAffordanceScenario(page) {
     expectedAspectRatio,
   })
 
+  const centerResizeBefore = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const shell = document.querySelector('.ppt-stage-shell')
+    const left = parseFloat(element.style.left)
+    const top = parseFloat(element.style.top)
+    const width = parseFloat(element.style.width)
+    const height = parseFloat(element.style.height)
+    const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+
+    return {
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+      handleX: rect.left + rect.width / 2,
+      handleY: rect.top + rect.height / 2,
+      height,
+      left,
+      modifierModel: shell?.getAttribute('data-ppt-resize-modifier-model') ?? '',
+      preserveAspectModifier: shell?.getAttribute('data-ppt-resize-aspect-ratio-modifier') ?? '',
+      resizeFromCenterModifier: shell?.getAttribute('data-ppt-resize-from-center-modifier') ?? '',
+      top,
+      width,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mousePressed',
+    x: centerResizeBefore.handleX,
+    y: centerResizeBefore.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 1,
+    type: 'mouseMoved',
+    x: centerResizeBefore.handleX + 34,
+    y: centerResizeBefore.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mouseReleased',
+    x: centerResizeBefore.handleX + 34,
+    y: centerResizeBefore.handleY,
+  })
+  await delay(50)
+
+  const afterCenterResize = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const left = parseFloat(element.style.left)
+    const top = parseFloat(element.style.top)
+    const width = parseFloat(element.style.width)
+    const height = parseFloat(element.style.height)
+
+    return {
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+      height,
+      left,
+      top,
+      width,
+    }
+  })()`)
+
+  record('resizes selected object from center with Alt resize drag', centerResizeBefore.modifierModel === 'canvas-resize-pointer-modifiers' && centerResizeBefore.preserveAspectModifier === 'Shift' && centerResizeBefore.resizeFromCenterModifier === 'Alt' && afterCenterResize.width > centerResizeBefore.width && afterCenterResize.left < centerResizeBefore.left && nearlyEqual(afterCenterResize.centerX, centerResizeBefore.centerX, 0.75) && nearlyEqual(afterCenterResize.centerY, centerResizeBefore.centerY, 0.75), {
+    afterCenterResize,
+    centerResizeBefore,
+  })
+
   const rotateHandle = await page.eval(`(() => {
     const rect = document.querySelector('[data-ppt-rotate-handle]').getBoundingClientRect()
 
@@ -1088,16 +1159,28 @@ async function runAffordanceScenario(page) {
   const afterDistribute = await page.eval(`(() => {
     const card = document.querySelector('[data-ppt-element="s1-card-1"]')
     const rect = card.getBoundingClientRect()
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => ({
+        id: element.getAttribute('data-ppt-element'),
+        left: parseFloat(element.style.left),
+        right: parseFloat(element.style.left) + parseFloat(element.style.width),
+      }))
+      .sort((left, right) => left.left - right.left)
+    const gaps = selected.slice(1).map((element, index) => element.left - selected[index].right)
+    const gapDelta = Math.max(...gaps) - Math.min(...gaps)
 
     return {
+      gapDelta,
+      gaps,
       left: parseFloat(card.style.left),
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedIds: selected.map((element) => element.id),
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     }
   })()`)
 
-  record('distributes multi-selected objects with canvas command adapter', beforeDistribute.selectedCount === 3 && afterDistribute.selectedCount === 3 && afterDistribute.left !== beforeDistribute.left, {
+  record('distributes multi-selected objects with canvas command adapter', beforeDistribute.selectedCount === 3 && afterDistribute.selectedCount === 3 && afterDistribute.gaps.length === 2 && afterDistribute.gapDelta <= 1, {
     afterDistribute,
     beforeDistribute,
   })
