@@ -343,6 +343,7 @@ import {
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
 import {
+  createCanvasPastePositionKey,
   getCanvasPasteOffsetForBounds,
   getCanvasPastePositionSession,
   type CanvasPastePositionMemory,
@@ -9629,13 +9630,15 @@ function getPPTClipboardPastePositionKey(
   payload: PPTClipboardPayload,
   targetSlideId: string,
 ) {
-  return [
-    payload.operation,
-    payload.sourceSlideId,
-    targetSlideId,
-    payload.selectedObjectIds.join(','),
-    payload.metadata.map((item) => item.objectId).join(','),
-  ].join(':')
+  return createCanvasPastePositionKey({
+    segments: [
+      payload.operation,
+      payload.sourceSlideId,
+      targetSlideId,
+      payload.selectedObjectIds,
+      payload.metadata.map((item) => item.objectId),
+    ],
+  })
 }
 
 function createPPTClipboardPasteCommandEffect({
