@@ -3142,6 +3142,61 @@ async function runTextQuickFormatScenario(page) {
 
   record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.italicPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
 
+  const initialAlignRadio = await readPPTParagraphAlignRadioGroupState(page)
+
+  record(
+    'exposes PPT paragraph align as APG radiogroups',
+    initialAlignRadio.quick.role === 'radiogroup' &&
+      initialAlignRadio.quick.focusModel === 'roving-tabindex' &&
+      initialAlignRadio.quick.keyboardModel === 'arrow-home-end' &&
+      initialAlignRadio.quick.radioCount === 3 &&
+      initialAlignRadio.quick.checkedValues.includes('left') &&
+      initialAlignRadio.quick.tabStopValues.includes('left') &&
+      initialAlignRadio.inspector.role === 'radiogroup' &&
+      initialAlignRadio.inspector.focusModel === 'roving-tabindex' &&
+      initialAlignRadio.inspector.keyboardModel === 'arrow-home-end' &&
+      initialAlignRadio.inspector.radioCount === 3 &&
+      initialAlignRadio.inspector.checkedValues.includes('left') &&
+      initialAlignRadio.inspector.tabStopValues.includes('left'),
+    initialAlignRadio,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-paragraph-align-radiogroup="quick"] [data-ppt-paragraph-align="left"]')?.focus()`)
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(80)
+
+  const afterAlignArrow = await readPPTParagraphAlignRadioGroupState(page)
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(80)
+
+  const afterAlignHome = await readPPTParagraphAlignRadioGroupState(page)
+
+  record(
+    'updates PPT paragraph align radiogroup with Arrow/Home keys',
+    afterAlignArrow.quick.focusedValue === 'center' &&
+      afterAlignArrow.quick.checkedValues.includes('center') &&
+      afterAlignArrow.inspector.checkedValues.includes('center') &&
+      afterAlignArrow.selectedTextAlign === 'center' &&
+      afterAlignHome.quick.focusedValue === 'left' &&
+      afterAlignHome.quick.checkedValues.includes('left') &&
+      afterAlignHome.inspector.checkedValues.includes('left') &&
+      afterAlignHome.selectedTextAlign === 'left',
+    {
+      afterAlignArrow,
+      afterAlignHome,
+      initialAlignRadio,
+    },
+  )
+
   const beforeTextColorSwatch = await getPPTColorSwatchState(page, 'text-color', 's1-title')
 
   await page.eval(`document.querySelector('[data-ppt-color-swatch="text-color"][data-ppt-color-token="ppt-color-accent"]')?.click()`)
@@ -8218,6 +8273,37 @@ async function setTextQuickColor(page, color) {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
   })(${JSON.stringify(color)})`)
+}
+
+async function readPPTParagraphAlignRadioGroupState(page) {
+  return page.eval(`(() => {
+    const readGroup = (surface) => {
+      const group = document.querySelector(\`[data-ppt-paragraph-align-radiogroup="\${surface}"]\`)
+      const radios = group ? [...group.querySelectorAll('[role="radio"]')] : []
+
+      return {
+        checkedValues: radios
+          .filter((radio) => radio.getAttribute('aria-checked') === 'true')
+          .map((radio) => radio.getAttribute('data-ppt-paragraph-align') ?? ''),
+        focusModel: group?.getAttribute('data-ppt-paragraph-align-focus-model') ?? '',
+        focusedValue: document.activeElement?.closest(\`[data-ppt-paragraph-align-radiogroup="\${surface}"]\`)
+          ? document.activeElement?.getAttribute('data-ppt-paragraph-align') ?? ''
+          : '',
+        keyboardModel: group?.getAttribute('data-ppt-paragraph-align-keyboard-model') ?? '',
+        radioCount: radios.length,
+        role: group?.getAttribute('role') ?? '',
+        tabStopValues: radios
+          .filter((radio) => radio.tabIndex === 0)
+          .map((radio) => radio.getAttribute('data-ppt-paragraph-align') ?? ''),
+      }
+    }
+
+    return {
+      inspector: readGroup('inspector'),
+      quick: readGroup('quick'),
+      selectedTextAlign: document.querySelector('[data-selected="true"]')?.style.textAlign ?? '',
+    }
+  })()`)
 }
 
 function getElementCenter(page, elementId) {

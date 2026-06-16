@@ -242,6 +242,7 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
   },
 })
 const PPT_RECENT_COLOR_LIMIT = 8
+const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right'] as const
 
 const PPT_FRAME_GUIDE_CONFIG = Object.freeze({
   columns: {
@@ -7966,24 +7967,106 @@ function PPTTextQuickFormatControls({
       >
         <List size={16} />
       </button>
-      {(['left', 'center', 'right'] as const).map((align) => (
-        <button
-          aria-label={`Align text ${align}`}
-          aria-pressed={state.align === align}
-          className="ppt-floating-command"
-          data-ppt-text-quick={`align-${align}`}
-          key={align}
-          title={`Align text ${align}`}
-          type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onParagraphAlign(align)
-          }}
-        >
-          <PPTTextAlignIcon align={align} size={16} />
-        </button>
-      ))}
+      <PPTParagraphAlignRadioGroup
+        align={state.align}
+        surface="quick"
+        onAlignChange={onParagraphAlign}
+      />
+    </span>
+  )
+}
+
+function PPTParagraphAlignRadioGroup({
+  align,
+  onAlignChange,
+  surface,
+}: {
+  align: NonNullable<PPTParagraph['align']>
+  onAlignChange: (align: NonNullable<PPTParagraph['align']>) => void
+  surface: 'inspector' | 'quick'
+}) {
+  const selectedIndex = Math.max(0, PPT_PARAGRAPH_ALIGN_OPTIONS.indexOf(align))
+
+  function selectAlign(
+    nextAlign: NonNullable<PPTParagraph['align']>,
+    container: HTMLElement | null,
+  ) {
+    onAlignChange(nextAlign)
+    window.requestAnimationFrame(() => {
+      container
+        ?.querySelector<HTMLButtonElement>(`[data-ppt-paragraph-align="${nextAlign}"]`)
+        ?.focus({ preventScroll: true })
+    })
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return
+    }
+
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (selectedIndex + 1) % PPT_PARAGRAPH_ALIGN_OPTIONS.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (selectedIndex - 1 + PPT_PARAGRAPH_ALIGN_OPTIONS.length) %
+        PPT_PARAGRAPH_ALIGN_OPTIONS.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = PPT_PARAGRAPH_ALIGN_OPTIONS.length - 1
+    }
+
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    selectAlign(PPT_PARAGRAPH_ALIGN_OPTIONS[nextIndex], event.currentTarget)
+  }
+
+  return (
+    <span
+      aria-label="Paragraph align"
+      className={surface === 'quick'
+        ? 'ppt-paragraph-align-radio-group ppt-paragraph-align-radio-group--quick'
+        : 'ppt-segmented-control ppt-paragraph-align-radio-group'}
+      data-ppt-paragraph-align-focus-model="roving-tabindex"
+      data-ppt-paragraph-align-keyboard-model="arrow-home-end"
+      data-ppt-paragraph-align-radiogroup={surface}
+      role="radiogroup"
+      onKeyDown={handleKeyDown}
+    >
+      {PPT_PARAGRAPH_ALIGN_OPTIONS.map((option) => {
+        const selected = align === option
+
+        return (
+          <button
+            aria-checked={selected}
+            aria-label={`Align text ${option}`}
+            aria-pressed={selected}
+            className={surface === 'quick' ? 'ppt-floating-command' : undefined}
+            data-ppt-paragraph-align={option}
+            data-ppt-paragraph-align-surface={surface}
+            data-ppt-text-quick={surface === 'quick' ? `align-${option}` : undefined}
+            key={option}
+            role="radio"
+            tabIndex={selected ? 0 : -1}
+            title={`Align text ${option}`}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              selectAlign(option, event.currentTarget.closest('[role="radiogroup"]'))
+            }}
+          >
+            {surface === 'quick'
+              ? <PPTTextAlignIcon align={option} size={16} />
+              : option}
+          </button>
+        )
+      })}
     </span>
   )
 }
@@ -10021,9 +10104,10 @@ function Inspector({
                 </label>
                 <div className="ppt-field">
                   <span>Paragraph</span>
-                  <div className="ppt-segmented-control" role="group" aria-label="Paragraph align">
+                  <div className="ppt-paragraph-control-row">
                     <button
                       aria-pressed={paragraphBullet}
+                      className="ppt-paragraph-bullet-button"
                       data-ppt-paragraph-bullet
                       type="button"
                       onClick={() =>
@@ -10031,17 +10115,12 @@ function Inspector({
                     >
                       bullet
                     </button>
-                    {(['left', 'center', 'right'] as const).map((align) => (
-                      <button
-                        aria-pressed={paragraphAlign === align}
-                        data-ppt-paragraph-align={align}
-                        key={align}
-                        type="button"
-                        onClick={() => onParagraphAlignChange(selectedElement.id, align)}
-                      >
-                        {align}
-                      </button>
-                    ))}
+                    <PPTParagraphAlignRadioGroup
+                      align={paragraphAlign}
+                      surface="inspector"
+                      onAlignChange={(align) =>
+                        onParagraphAlignChange(selectedElement.id, align)}
+                    />
                   </div>
                 </div>
                 <div
