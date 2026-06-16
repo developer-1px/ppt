@@ -11031,6 +11031,19 @@ function Inspector({
         })
         focusLayerPaneRow(intent.objectId)
         return
+      case 'range-select-row':
+        setLayerPaneGroupState((current) => ({
+          ...current,
+          focusedObjectId: intent.objectId,
+          rangeAnchorObjectId: intent.rangeAnchorObjectId,
+        }))
+        runLayerPaneIntent({
+          objectId: intent.objectId,
+          rangeAnchorObjectId: intent.rangeAnchorObjectId,
+          type: 'row-press',
+        })
+        focusLayerPaneRow(intent.objectId)
+        return
       case 'collapse-row':
         setLayerPaneGroupExpanded(intent.objectId, false)
         focusLayerPaneRow(intent.objectId)
@@ -11114,6 +11127,8 @@ function Inspector({
     const intent = getSlideEditLayerPaneKeyboardIntent(layerPaneDescriptor, {
       currentObjectId: row.objectId,
       key: event.key,
+      rangeAnchorObjectId: layerPaneGroupState.rangeAnchorObjectId,
+      shiftKey: event.shiftKey,
     })
 
     if (!intent.preventDefault) {
@@ -12412,7 +12427,7 @@ function Inspector({
           data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
           data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
           data-ppt-layer-pane-keyboard-intent-model={SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL}
-          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space"
+          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space-shift-range"
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
           data-ppt-layer-pane-range-anchor-object-id={layerPaneGroupState.rangeAnchorObjectId ?? ''}
           data-ppt-layer-pane-range-selection-model="row-press-range-anchor"
