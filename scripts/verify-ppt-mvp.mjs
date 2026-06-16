@@ -70,6 +70,7 @@ try {
   await runImageImportScenario(page)
   await runObjectAltTextScenario(page)
   await runTableImportScenario(page)
+  await runTextPasteScenario(page)
   await runCommentReviewScenario(page)
   await runFlipSelectionScenario(page)
   await runSelectionPaneScenario(page)
@@ -7836,6 +7837,125 @@ async function runTableImportScenario(page) {
   })
 }
 
+async function runTextPasteScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const before = await getPPTTextPasteState(page)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/plain', 'Pasted plain text\\nfrom clipboard')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes plain text clipboard data into PPT text box',
+    afterPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterPaste.textPasteImporter === 'ppt-plain-text' &&
+      afterPaste.textPasteSelection === afterPaste.selectedId &&
+      afterPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterPaste.thumbTextCount === before.thumbTextCount + 1 &&
+      afterPaste.selectedKind === 'textBox' &&
+      afterPaste.selectedName === 'Text' &&
+      afterPaste.selectedText.includes('Pasted plain text') &&
+      afterPaste.selectedText.includes('from clipboard') &&
+      afterPaste.selectedLeft >= 0 &&
+      afterPaste.selectedTop >= 0 &&
+      afterPaste.selectedWidth > 0 &&
+      afterPaste.selectedHeight > 0 &&
+      afterPaste.undoEnabled,
+    {
+      afterPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes PPT plain text paste as one history step',
+    afterUndo.textBoxCount === before.textBoxCount &&
+      afterUndo.thumbTextCount === before.thumbTextCount &&
+      afterUndo.redoEnabled,
+    {
+      afterPaste,
+      afterUndo,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await delay(80)
+
+  const afterRedo = await getPPTTextPasteState(page)
+
+  record(
+    'redoes PPT plain text paste with textBody content',
+    afterRedo.textBoxCount === before.textBoxCount + 1 &&
+      afterRedo.selectedId === afterPaste.selectedId &&
+      afterRedo.selectedText.includes('Pasted plain text') &&
+      afterRedo.selectedText.includes('from clipboard'),
+    {
+      afterPaste,
+      afterRedo,
+    },
+  )
+
+  const textPoint = await getElementCenter(page, afterRedo.selectedId)
+
+  await clickMouse(page, textPoint.x, textPoint.y, 2)
+  await delay(80)
+
+  const nativeGuard = await page.eval(`((elementId) => {
+    const selected = document.querySelector(\`[data-ppt-element="\${elementId}"]\`)
+    const editor = selected?.querySelector('.ppt-element-editor')
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/plain', 'Native editor paste')
+
+    const beforeCount = document.querySelectorAll('[data-kind="textBox"]').length
+    const allowed = editor?.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+
+    return {
+      afterCount: document.querySelectorAll('[data-kind="textBox"]').length,
+      beforeCount,
+      editorEditable: editor?.isContentEditable ?? false,
+      eventAllowed: allowed ?? false,
+      selectedText: selected?.textContent ?? '',
+      textPasteImporter: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-text-paste-importer') ?? '',
+    }
+  })(${JSON.stringify(afterRedo.selectedId)})`)
+
+  record(
+    'keeps native PPT text editor paste out of global text import',
+    nativeGuard.editorEditable &&
+      nativeGuard.eventAllowed &&
+      nativeGuard.afterCount === nativeGuard.beforeCount &&
+      nativeGuard.selectedText.includes('Pasted plain text') &&
+      nativeGuard.textPasteImporter === 'ppt-plain-text',
+    nativeGuard,
+  )
+
+  await page.eval(`document.activeElement?.blur()`)
+  await delay(50)
+}
+
 async function runCommentReviewScenario(page) {
   await pressKey(page, {
     code: 'Escape',
@@ -11244,6 +11364,31 @@ function getPPTTableState(page) {
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,
+    }
+  })()`)
+}
+
+function getPPTTextPasteState(page) {
+  return page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
+      selectedHeight: parseFloat(selected?.style.height ?? '0'),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
+      selectedText: selected?.textContent ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      textBoxCount: document.querySelectorAll('[data-kind="textBox"]').length,
+      textPasteImporter: stage?.getAttribute('data-ppt-text-paste-importer') ?? '',
+      textPasteModel: stage?.getAttribute('data-ppt-text-paste-model') ?? '',
+      textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
+      thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
+      undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
     }
   })()`)
 }

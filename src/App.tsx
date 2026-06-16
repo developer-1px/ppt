@@ -446,6 +446,11 @@ import {
   stringifyPPTTableRows,
   type PPTTableImportSource,
 } from './pptTableImport'
+import {
+  createPPTTextPasteElement,
+  getPPTTextPasteSourcesFromDataTransfer,
+  type PPTTextPasteImportResult,
+} from './pptTextPasteImport'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
@@ -1758,6 +1763,7 @@ function App() {
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastTextPasteImport, setLastTextPasteImport] = useState<PPTTextPasteImportResult | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
   const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
@@ -2504,6 +2510,14 @@ function App() {
       if (tableSource) {
         event.preventDefault()
         insertPPTTableSource(tableSource)
+        return
+      }
+
+      for (const source of getPPTTextPasteSourcesFromDataTransfer(event.clipboardData)) {
+        if (insertPPTTextPasteSource(source)) {
+          event.preventDefault()
+          return
+        }
       }
     }
 
@@ -3252,6 +3266,46 @@ function App() {
 
     insertPPTTableSource(source, center)
     return true
+  }
+
+  function insertPPTTextPasteSource(
+    text: string,
+    center = getPPTViewportCenter(),
+  ) {
+    let imported: PPTTextPasteImportResult | null = null
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const result = createPPTTextPasteElement({
+        createId: createPPTElementIdFactory(slide),
+        position: center,
+        text,
+        viewport,
+      })
+
+      if (!result) {
+        return slide
+      }
+
+      imported = result
+      setSelection([result.item.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, result.item],
+      }
+    }))
+
+    setLastTextPasteImport(imported)
+
+    return imported !== null
   }
 
   function handleImageInputChange(event: ReactChangeEvent<HTMLInputElement>) {
@@ -7092,6 +7146,9 @@ function App() {
           .join(' ')}
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
+        data-ppt-text-paste-model="canvas-text-paste-import"
+        data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
         data-ppt-color-swatch-command={lastColorSwatchEffect?.payload.id}
         data-ppt-color-swatch-command-channel={lastColorSwatchEffect?.payload.channelId}
         data-ppt-color-swatch-command-objects={lastColorSwatchEffect?.payload.objectIds.join(' ')}

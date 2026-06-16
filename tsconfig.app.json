@@ -14,6 +14,7 @@
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts"],
       "canvas/app/image-import": ["../canvas/src/canvas/app/affordances/io/image/CanvasImageImport.ts"],
       "canvas/app/table-import": ["../canvas/src/canvas/app/affordances/io/table/CanvasTableImport.ts"],
+      "canvas/app/text-paste-import": ["../canvas/src/canvas/app/affordances/io/text-paste/CanvasTextPasteImport.ts"],
       "canvas/app/keyboard-command-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts"],
       "canvas/app/keyboard-command-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts"],
       "canvas/app/keyboard-nudge-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts"],
