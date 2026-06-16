@@ -155,6 +155,7 @@ import {
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditStyleClipboardCategoryDescriptors,
   getSlideEditStyleClipboardCopyCommandEffect,
+  getSlideEditStyleClipboardKeyboardIntent,
   getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextOverflowIndicatorState,
@@ -192,6 +193,8 @@ import {
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
+  SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
+  SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
@@ -2474,11 +2477,13 @@ function App() {
         return
       }
 
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === 'c'
-      ) {
+      const styleClipboardKeyboardIntent = getSlideEditStyleClipboardKeyboardIntent({
+        event,
+        key: event.key,
+        mod,
+      })
+
+      if (styleClipboardKeyboardIntent?.kind === 'copy-formatting') {
         if (commandAvailability.copyFormatting) {
           event.preventDefault()
           copyFormatting()
@@ -2486,11 +2491,7 @@ function App() {
         return
       }
 
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === 'v'
-      ) {
+      if (styleClipboardKeyboardIntent?.kind === 'paste-formatting') {
         if (commandAvailability.pasteFormatting) {
           event.preventDefault()
           pasteFormatting()
@@ -6648,14 +6649,14 @@ function App() {
     id: 'command:copy-formatting',
     onSelect: copyFormatting,
     section: 'Edit',
-    shortcut: 'Shift+Cmd/Ctrl+C',
+    shortcut: SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
     title: 'Copy formatting',
   }, {
     disabled: !commandAvailability.pasteFormatting,
     id: 'command:paste-formatting',
     onSelect: pasteFormatting,
     section: 'Edit',
-    shortcut: 'Shift+Cmd/Ctrl+V',
+    shortcut: SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
     title: 'Paste formatting',
   }, {
     id: 'command:select-all',
