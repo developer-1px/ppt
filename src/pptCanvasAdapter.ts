@@ -1,12 +1,13 @@
 import {
   clamp,
-  scaleItemBounds,
   type Bounds,
 } from 'canvas/core'
 import {
   createCanvasSceneAdapter,
   type CanvasSceneEntry,
   type CanvasTransformAdapter,
+  resizeCanvasSelectionItems,
+  translateCanvasSelectionItems,
 } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
@@ -34,33 +35,49 @@ export function createPPTCanvasScene(slide: PPTSlide) {
 
 export const pptCanvasTransformAdapter: CanvasTransformAdapter<PPTElement> = {
   resizeSelection({ from, items, selection, to }) {
-    const selected = new Set(selection)
-
-    return items.map((item) => {
-      if (!selected.has(item.id)) {
-        return item
-      }
-
-      const bounds = scaleItemBounds(pptGeometryToBounds(item.geometry), from, to)
-
-      return updatePPTElementGeometry(item, boundsToPPTGeometry(bounds))
+    return resizeCanvasSelectionItems({
+      from,
+      getItemBounds: getPPTElementBounds,
+      getItemId: getPPTElementId,
+      items,
+      selection,
+      to,
+      updateItemBounds: updatePPTElementBounds,
     })
   },
   translateSelection({ dx, dy, items, selection }) {
-    const selected = new Set(selection)
-
-    return items.map((item) => {
-      if (!selected.has(item.id)) {
-        return item
-      }
-
-      return updatePPTElementGeometry(item, {
-        ...item.geometry,
-        x: clamp(item.geometry.x + dx, 0, PPT_SLIDE_WIDTH - item.geometry.w),
-        y: clamp(item.geometry.y + dy, 0, PPT_SLIDE_HEIGHT - item.geometry.h),
-      })
+    return translateCanvasSelectionItems({
+      dx,
+      dy,
+      getItemBounds: getPPTElementBounds,
+      getItemId: getPPTElementId,
+      items,
+      selection,
+      updateItemBounds: updatePPTElementBounds,
     })
   },
+}
+
+function getPPTElementId(element: PPTElement) {
+  return element.id
+}
+
+function getPPTElementBounds(element: PPTElement) {
+  return pptGeometryToBounds(element.geometry)
+}
+
+function updatePPTElementBounds(
+  element: PPTElement,
+  bounds: Bounds,
+) {
+  const geometry = boundsToPPTGeometry(bounds)
+
+  return updatePPTElementGeometry(
+    element,
+    element.geometry.rotation === undefined
+      ? geometry
+      : { ...geometry, rotation: element.geometry.rotation },
+  )
 }
 
 export function pptGeometryToBounds(geometry: PPTGeometry): Bounds {
