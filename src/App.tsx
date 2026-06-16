@@ -404,6 +404,7 @@ import {
 import {
   RESIZE_HANDLES,
   clamp,
+  createCanvasSequentialIdFactory,
   getCanvasViewportScreenPoint,
   handlePoint,
   normalizeBounds,
@@ -17437,16 +17438,10 @@ function getSpacingGuideLabelPoint(guide: CanvasSnapGuides['spacingGuides'][numb
 }
 
 function createPPTSlideId(deck: PPTDeck) {
-  const ids = new Set(deck.slides.map((slide) => slide.id))
-  let next = deck.slides.length + 1
-  let id = `slide-${next}`
-
-  while (ids.has(id)) {
-    next += 1
-    id = `slide-${next}`
-  }
-
-  return id
+  return createCanvasSequentialIdFactory({
+    existingIds: deck.slides.map((slide) => slide.id),
+    startIndex: deck.slides.length + 1,
+  })('slide')
 }
 
 function normalizePPTCommentBody(value: string) {
