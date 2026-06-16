@@ -290,6 +290,10 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  getCanvasFloatingAnchorForBounds,
+  type CanvasFloatingAnchor,
+} from 'canvas/app/floating-anchor'
+import {
   isCanvasKeyboardCommandIntent,
   runCanvasKeyboardCommandIntent,
 } from 'canvas/app/keyboard-command-dispatch'
@@ -1339,9 +1343,7 @@ type PPTSlideDragState = {
   dropPlacement?: PPTSlideDropPlacement
   dropTargetSlideId?: string
 }
-type PPTSelectionCommandAnchor = Point & {
-  placement: 'above' | 'below'
-}
+type PPTSelectionCommandAnchor = CanvasFloatingAnchor
 type PPTTextQuickFormatState = {
   align: NonNullable<PPTParagraph['align']>
   bullet: boolean
@@ -6526,10 +6528,19 @@ function App() {
     !lineCreationMode &&
     !isLaserToolActive &&
     !isEraserToolActive
-    ? getPPTSelectionCommandAnchor({
-        barWidth: selectionCommandBarWidth,
+    ? getCanvasFloatingAnchorForBounds({
         bounds: selectedBounds,
-        stage: stageRef.current,
+        floatingSize: {
+          height: 40,
+          width: selectionCommandBarWidth,
+        },
+        frameBounds: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+          x: 0,
+          y: 0,
+        },
+        stageRect: stageRef.current?.getBoundingClientRect() ?? null,
         viewport,
       })
     : null
@@ -16025,56 +16036,6 @@ function getPPTElementShadowFilter(element: PPTElement) {
     ...getPPTElementShadow(element),
     enabled: hasPPTElementShadow(element),
   })
-}
-
-function getPPTSelectionCommandAnchor({
-  barWidth,
-  bounds,
-  stage,
-  viewport,
-}: {
-  barWidth: number
-  bounds: Bounds
-  stage: HTMLElement | null
-  viewport: Viewport
-}): PPTSelectionCommandAnchor {
-  const scale = viewport.scale
-  const gap = 10 / scale
-  const screenMargin = 8
-  const barHeight = 40
-  const barHalfWidth = barWidth / 2 / scale
-  const centerX = bounds.x + bounds.w / 2
-
-  if (!stage) {
-    return {
-      placement: 'above',
-      x: clamp(centerX, barHalfWidth, PPT_SLIDE_WIDTH - barHalfWidth),
-      y: bounds.y - gap,
-    }
-  }
-
-  const rect = stage.getBoundingClientRect()
-  const visibleLeft = clamp((screenMargin - viewport.x) / scale, 0, PPT_SLIDE_WIDTH)
-  const visibleRight = clamp(
-    (rect.width - screenMargin - viewport.x) / scale,
-    0,
-    PPT_SLIDE_WIDTH,
-  )
-  const minX = Math.min(visibleLeft + barHalfWidth, PPT_SLIDE_WIDTH - barHalfWidth)
-  const maxX = Math.max(minX, visibleRight - barHalfWidth)
-  const aboveY = bounds.y - gap
-  const belowY = bounds.y + bounds.h + gap
-  const aboveScreenY = viewport.y + aboveY * scale
-  const belowScreenY = viewport.y + belowY * scale
-  const aboveFits = aboveScreenY - barHeight >= screenMargin
-  const belowFits = belowScreenY + barHeight <= rect.height - screenMargin
-  const placement = aboveFits || !belowFits ? 'above' : 'below'
-
-  return {
-    placement,
-    x: clamp(centerX, minX, maxX),
-    y: placement === 'above' ? aboveY : belowY,
-  }
 }
 
 function getPPTElementParagraphAlign(element: PPTElement) {
