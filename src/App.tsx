@@ -315,6 +315,7 @@ import {
 } from 'canvas/app/keyboard-viewport-shortcuts'
 import {
   CANVAS_MENU_ITEM_PROPS,
+  getCanvasMenuRovingKeyIndex,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
 import {
@@ -10366,32 +10367,26 @@ function PPTShapeKindMenu({
     setOpen(false)
   }
 
-  function moveFocus(delta: number) {
+  function moveFocus(key: string) {
     const currentIndex = Math.max(
       0,
       PPT_SHAPE_MENU_OPTIONS.findIndex((option) => option.shape === activeShape),
     )
-    const nextOption = PPT_SHAPE_MENU_OPTIONS[
-      (currentIndex + delta + PPT_SHAPE_MENU_OPTIONS.length) %
-        PPT_SHAPE_MENU_OPTIONS.length
-    ]
+    const nextIndex = getCanvasMenuRovingKeyIndex({
+      count: PPT_SHAPE_MENU_OPTIONS.length,
+      currentIndex,
+      key,
+    })
+
+    if (nextIndex === null) {
+      return false
+    }
+
+    const nextOption = PPT_SHAPE_MENU_OPTIONS[nextIndex]
 
     setActiveShape(nextOption.shape)
     focusShape(nextOption.shape)
-  }
-
-  function focusFirst() {
-    const option = PPT_SHAPE_MENU_OPTIONS[0]
-
-    setActiveShape(option.shape)
-    focusShape(option.shape)
-  }
-
-  function focusLast() {
-    const option = PPT_SHAPE_MENU_OPTIONS[PPT_SHAPE_MENU_OPTIONS.length - 1]
-
-    setActiveShape(option.shape)
-    focusShape(option.shape)
+    return true
   }
 
   function commitShape(shape: PPTShapeKind) {
@@ -10412,25 +10407,13 @@ function PPTShapeKindMenu({
     switch (event.key) {
       case 'ArrowDown':
       case 'ArrowRight':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(1)
-        return
       case 'ArrowUp':
       case 'ArrowLeft':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(-1)
-        return
       case 'Home':
-        event.preventDefault()
-        event.stopPropagation()
-        focusFirst()
-        return
       case 'End':
         event.preventDefault()
         event.stopPropagation()
-        focusLast()
+        moveFocus(event.key)
         return
       case 'Escape':
         event.preventDefault()
@@ -10580,46 +10563,31 @@ function PPTAlignmentPopover({
     })
   }
 
-  function moveFocus(delta: number) {
+  function moveFocus(key: string) {
     if (enabledCommands.length === 0) {
-      return
+      return false
     }
 
     const currentIndex = Math.max(
       0,
       enabledCommands.findIndex((command) => command.command === activeCommand),
     )
-    const nextCommand = enabledCommands[
-      (currentIndex + delta + enabledCommands.length) % enabledCommands.length
-    ]
+    const nextIndex = getCanvasMenuRovingKeyIndex({
+      count: enabledCommands.length,
+      currentIndex,
+      key,
+    })
+
+    if (nextIndex === null) {
+      return false
+    }
+
+    const nextCommand = enabledCommands[nextIndex]
 
     setActiveCommand(nextCommand.command)
     onPreviewChange(nextCommand.command)
     focusCommand(nextCommand.command)
-  }
-
-  function focusFirst() {
-    const command = enabledCommands[0]
-
-    if (!command) {
-      return
-    }
-
-    setActiveCommand(command.command)
-    onPreviewChange(command.command)
-    focusCommand(command.command)
-  }
-
-  function focusLast() {
-    const command = enabledCommands.at(-1)
-
-    if (!command) {
-      return
-    }
-
-    setActiveCommand(command.command)
-    onPreviewChange(command.command)
-    focusCommand(command.command)
+    return true
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
@@ -10634,25 +10602,13 @@ function PPTAlignmentPopover({
     switch (event.key) {
       case 'ArrowDown':
       case 'ArrowRight':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(1)
-        return
       case 'ArrowUp':
       case 'ArrowLeft':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(-1)
-        return
       case 'Home':
-        event.preventDefault()
-        event.stopPropagation()
-        focusFirst()
-        return
       case 'End':
         event.preventDefault()
         event.stopPropagation()
-        focusLast()
+        moveFocus(event.key)
         return
       case 'Escape':
         event.preventDefault()
