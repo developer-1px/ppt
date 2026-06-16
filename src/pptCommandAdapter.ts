@@ -8,6 +8,7 @@ import {
   type CanvasCommandAvailability,
   type CanvasDistributeMode,
   type CanvasReorderMode,
+  unionCanvasRectList,
 } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
@@ -201,21 +202,8 @@ export function getPPTSlideBounds(): Bounds {
 }
 
 export function getPPTElementsBounds(elements: PPTElement[]): Bounds | null {
-  if (elements.length === 0) {
-    return null
-  }
-
-  const left = Math.min(...elements.map((element) => element.geometry.x))
-  const top = Math.min(...elements.map((element) => element.geometry.y))
-  const right = Math.max(...elements.map((element) => element.geometry.x + element.geometry.w))
-  const bottom = Math.max(...elements.map((element) => element.geometry.y + element.geometry.h))
-
-  return {
-    h: bottom - top,
-    w: right - left,
-    x: left,
-    y: top,
-  }
+  return unionCanvasRectList(elements.map((element) =>
+    pptGeometryToBounds(element.geometry)))
 }
 
 export function updatePPTElementBounds(
