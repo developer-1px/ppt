@@ -6225,16 +6225,20 @@ function App() {
 
     if (interaction.kind === 'line-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
-      const elements = currentSlide.elements.map((element) =>
-        element.id === interaction.lineId && element.kind === 'line'
-          ? updatePPTLineEndpoint(
-              element,
-              'end',
-              point,
-              currentSlide,
-              interaction.lineId,
-            )
-          : element)
+      const elements = mapPPTElementsByIds(
+        currentSlide.elements,
+        [interaction.lineId],
+        (element) =>
+          element.kind === 'line'
+            ? updatePPTLineEndpoint(
+                element,
+                'end',
+                point,
+                currentSlide,
+                interaction.lineId,
+              )
+            : element,
+      )
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
         elements,
@@ -6248,16 +6252,20 @@ function App() {
     if (interaction.kind === 'freeform-create') {
       const points = appendPPTFreeformPoint(interaction.points, point)
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
-      const elements = currentSlide.elements.map((element) =>
-        element.id === interaction.elementId && element.kind === 'freeform'
-          ? createPPTFreeformElement({
-              id: element.id,
-              name: element.name,
-              opacity: element.opacity ?? 1,
-              points,
-              stroke: element.stroke,
-            })
-          : element)
+      const elements = mapPPTElementsByIds(
+        currentSlide.elements,
+        [interaction.elementId],
+        (element) =>
+          element.kind === 'freeform'
+            ? createPPTFreeformElement({
+                id: element.id,
+                name: element.name,
+                opacity: element.opacity ?? 1,
+                points,
+                stroke: element.stroke,
+              })
+            : element,
+      )
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
         elements,
@@ -6274,15 +6282,17 @@ function App() {
 
     if (interaction.kind === 'element-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
-      const elements = currentSlide.elements.map((element) =>
-        element.id === interaction.elementId
-          ? createPPTElementFromCreationTool({
-              current: point,
-              id: interaction.elementId,
-              start: interaction.startPoint,
-              tool: interaction.tool,
-            })
-          : element)
+      const elements = mapPPTElementsByIds(
+        currentSlide.elements,
+        [interaction.elementId],
+        () =>
+          createPPTElementFromCreationTool({
+            current: point,
+            id: interaction.elementId,
+            start: interaction.startPoint,
+            tool: interaction.tool,
+          }),
+      )
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
         elements,
@@ -6295,10 +6305,14 @@ function App() {
 
     if (interaction.kind === 'line-route') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
-      const elements = currentSlide.elements.map((element) =>
-        element.id === interaction.lineId && element.kind === 'line'
-          ? updatePPTLineRouteBend(element, point)
-          : element)
+      const elements = mapPPTElementsByIds(
+        currentSlide.elements,
+        [interaction.lineId],
+        (element) =>
+          element.kind === 'line'
+            ? updatePPTLineRouteBend(element, point)
+            : element,
+      )
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
         elements,
@@ -6383,16 +6397,20 @@ function App() {
     }
 
     if (interaction.kind === 'line-endpoint') {
-      const elements = startSlide.elements.map((element) =>
-        element.id === interaction.lineId && element.kind === 'line'
-          ? updatePPTLineEndpoint(
-              element,
-              interaction.endpoint,
-              point,
-              startSlide,
-              interaction.lineId,
-            )
-          : element)
+      const elements = mapPPTElementsByIds(
+        startSlide.elements,
+        [interaction.lineId],
+        (element) =>
+          element.kind === 'line'
+            ? updatePPTLineEndpoint(
+                element,
+                interaction.endpoint,
+                point,
+                startSlide,
+                interaction.lineId,
+              )
+            : element,
+      )
 
       const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
         ...slide,
@@ -6408,26 +6426,30 @@ function App() {
       item.elementId,
       item.rotation,
     ]))
-    const elements = startSlide.elements.map((element) => {
-      const startRotation = rotationById.get(element.id)
+    const elements = mapPPTElementsByIds(
+      startSlide.elements,
+      interaction.startRotations.map((item) => item.elementId),
+      (element) => {
+        const startRotation = rotationById.get(element.id)
 
-      if (startRotation === undefined || element.locked === true) {
-        return element
-      }
+        if (startRotation === undefined || element.locked === true) {
+          return element
+        }
 
-      const rawRotation = normalizePPTElementRotation(startRotation + delta)
-      const rotation = event.shiftKey
-        ? Math.round(rawRotation / 15) * 15
-        : rawRotation
+        const rawRotation = normalizePPTElementRotation(startRotation + delta)
+        const rotation = event.shiftKey
+          ? Math.round(rawRotation / 15) * 15
+          : rawRotation
 
-      return {
-        ...element,
-        geometry: {
-          ...element.geometry,
-          rotation: normalizePPTElementRotation(rotation),
-        },
-      }
-    })
+        return {
+          ...element,
+          geometry: {
+            ...element.geometry,
+            rotation: normalizePPTElementRotation(rotation),
+          },
+        }
+      },
+    )
 
     const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
       ...slide,
@@ -6465,16 +6487,20 @@ function App() {
           x: Math.min(PPT_SLIDE_WIDTH, interaction.startPoint.x + 160),
           y: interaction.startPoint.y,
         }
-        const elements = currentSlide.elements.map((element) =>
-          element.id === createdLine.id && element.kind === 'line'
-            ? updatePPTLineEndpoint(
-                element,
-                'end',
-                fallbackEnd,
-                currentSlide,
-                interaction.lineId,
-              )
-            : element)
+        const elements = mapPPTElementsByIds(
+          currentSlide.elements,
+          [createdLine.id],
+          (element) =>
+            element.kind === 'line'
+              ? updatePPTLineEndpoint(
+                  element,
+                  'end',
+                  fallbackEnd,
+                  currentSlide,
+                  interaction.lineId,
+                )
+              : element,
+        )
         const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
           ...slide,
           elements,
@@ -6500,16 +6526,20 @@ function App() {
             y: Math.min(PPT_SLIDE_HEIGHT, interaction.points[0].y + 36),
           },
         ]
-        const elements = currentSlide.elements.map((element) =>
-          element.id === interaction.elementId && element.kind === 'freeform'
-            ? createPPTFreeformElement({
-                id: element.id,
-                name: element.name,
-                opacity: element.opacity ?? 1,
-                points: fallbackPoints,
-                stroke: element.stroke,
-              })
-            : element)
+        const elements = mapPPTElementsByIds(
+          currentSlide.elements,
+          [interaction.elementId],
+          (element) =>
+            element.kind === 'freeform'
+              ? createPPTFreeformElement({
+                  id: element.id,
+                  name: element.name,
+                  opacity: element.opacity ?? 1,
+                  points: fallbackPoints,
+                  stroke: element.stroke,
+                })
+              : element,
+        )
         const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
           ...slide,
           elements,
