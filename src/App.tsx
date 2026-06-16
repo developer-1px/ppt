@@ -395,6 +395,7 @@ import {
 } from 'canvas/core'
 import {
   EMPTY_CANVAS_SNAP_GUIDES,
+  canFlipCanvasSelectionItems,
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
@@ -403,7 +404,10 @@ import {
   normalizeCanvasRotationDegrees,
   resizeCanvasSelection,
   canSelectSameTypeCanvasItems,
+  canTidyCanvasSelectionItems,
+  flipCanvasSelectionItems,
   selectSameTypeCanvasItems,
+  tidyCanvasSelectionItems,
   type CanvasSnapGuides,
 } from 'canvas/foundation'
 import {
@@ -14945,11 +14949,13 @@ function canFlipPPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  if (selection.length === 0) {
-    return false
-  }
-
-  return getPPTFlipSelectionElements(elements, selection).length === selection.length
+  return canFlipCanvasSelectionItems({
+    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
+    getItemId: (element) => element.id,
+    isItemSelectable: isPPTFlipSelectionElement,
+    items: elements,
+    selection,
+  })
 }
 
 function flipPPTSelectionElements(
@@ -14957,39 +14963,27 @@ function flipPPTSelectionElements(
   selection: readonly string[],
   axis: PPTFlipAxis,
 ) {
-  if (!canFlipPPTSelection(elements, selection)) {
-    return elements
-  }
-
-  const selected = new Set(selection)
-  const selectedElements = getPPTFlipSelectionElements(elements, selection)
-  const selectionBounds = getPPTElementsBounds(selectedElements)
-
-  if (!selectionBounds) {
-    return elements
-  }
-
-  const pivot = axis === 'horizontal'
-    ? selectionBounds.x + selectionBounds.w / 2
-    : selectionBounds.y + selectionBounds.h / 2
-
-  return elements.map((element) =>
-    selected.has(element.id) ? flipPPTElement(element, axis, pivot) : element)
+  return flipCanvasSelectionItems({
+    axis,
+    flipItem: ({ item, pivot, reflectedBounds }) =>
+      item.kind === 'line'
+        ? flipPPTLineElement(item, axis, pivot)
+        : flipPPTElementBounds(item, axis, reflectedBounds),
+    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
+    getItemId: (element) => element.id,
+    isItemSelectable: isPPTFlipSelectionElement,
+    items: elements,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
+  })
 }
 
-function flipPPTElement(
+function flipPPTElementBounds(
   element: PPTElement,
   axis: PPTFlipAxis,
-  pivot: number,
+  bounds: Bounds,
 ): PPTElement {
-  if (element.kind === 'line') {
-    return flipPPTLineElement(element, axis, pivot)
-  }
-
-  const bounds = pptGeometryToBounds(element.geometry)
-  const next = updatePPTElementBounds(element, axis === 'horizontal'
-    ? { ...bounds, x: 2 * pivot - (bounds.x + bounds.w) }
-    : { ...bounds, y: 2 * pivot - (bounds.y + bounds.h) })
+  const next = updatePPTElementBounds(element, bounds)
 
   return axis === 'horizontal'
     ? { ...next, flipH: next.flipH !== true }
@@ -15015,84 +15009,40 @@ function flipPPTLineElement(
   })
 }
 
-function getPPTFlipSelectionElements(
-  elements: readonly PPTElement[],
-  selection: readonly string[],
-) {
-  const selected = new Set(selection)
-
-  return elements.filter((element) =>
-    selected.has(element.id) &&
-    element.visible !== false &&
-    element.locked !== true)
+function isPPTFlipSelectionElement(element: PPTElement) {
+  return element.visible !== false && element.locked !== true
 }
 
 function canTidyPPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  if (selection.length < 3) {
-    return false
-  }
-
-  return getPPTTidySelectionElements(elements, selection).length === selection.length
+  return canTidyCanvasSelectionItems({
+    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
+    getItemId: (element) => element.id,
+    isItemSelectable: isPPTTidySelectionElement,
+    items: elements,
+    selection,
+  })
 }
 
 function tidyPPTSelectionElements(
   elements: PPTElement[],
   selection: readonly string[],
 ) {
-  if (!canTidyPPTSelection(elements, selection)) {
-    return elements
-  }
-
-  const selected = getPPTTidySelectionElements(elements, selection)
-  const selectionBounds = getPPTElementsBounds(selected)
-
-  if (!selectionBounds) {
-    return elements
-  }
-
-  const columnCount = Math.ceil(Math.sqrt(selected.length))
-  const boundsList = selected.map((element) => pptGeometryToBounds(element.geometry))
-  const cellWidth = Math.max(...boundsList.map((bounds) => bounds.w)) + PPT_TIDY_GAP
-  const cellHeight = Math.max(...boundsList.map((bounds) => bounds.h)) + PPT_TIDY_GAP
-  const sorted = [...selected].sort((a, b) => {
-    const aBounds = pptGeometryToBounds(a.geometry)
-    const bBounds = pptGeometryToBounds(b.geometry)
-
-    return aBounds.y === bBounds.y
-      ? aBounds.x - bBounds.x
-      : aBounds.y - bBounds.y
+  return tidyCanvasSelectionItems({
+    gap: PPT_TIDY_GAP,
+    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
+    getItemId: (element) => element.id,
+    isItemSelectable: isPPTTidySelectionElement,
+    items: elements,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
   })
-  const tidied = new Map<string, PPTElement>()
-
-  sorted.forEach((element, index) => {
-    const bounds = pptGeometryToBounds(element.geometry)
-    const column = index % columnCount
-    const row = Math.floor(index / columnCount)
-
-    tidied.set(element.id, updatePPTElementBounds(element, {
-      ...bounds,
-      x: selectionBounds.x + column * cellWidth,
-      y: selectionBounds.y + row * cellHeight,
-    }))
-  })
-
-  return elements.map((element) => tidied.get(element.id) ?? element)
 }
 
-function getPPTTidySelectionElements(
-  elements: readonly PPTElement[],
-  selection: readonly string[],
-) {
-  const selected = new Set(selection)
-
-  return elements.filter((element) =>
-    selected.has(element.id) &&
-    element.visible !== false &&
-    element.locked !== true &&
-    element.kind !== 'line')
+function isPPTTidySelectionElement(element: PPTElement) {
+  return isPPTFlipSelectionElement(element) && element.kind !== 'line'
 }
 
 function getPPTCommandSurfaceGroups({
