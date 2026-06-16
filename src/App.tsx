@@ -1199,6 +1199,10 @@ type PPTTextQuickFormatState = {
   isItalic: boolean
   isUnderline: boolean
 }
+type PPTShapeQuickMenuState = {
+  elementId: string
+  shape: PPTShapeKind
+}
 
 const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
   commands: [{
@@ -1385,6 +1389,19 @@ const PPT_ALIGNMENT_POPOVER_COMMANDS = [{
   command: PPTAlignmentPopoverCommand
   dataCommand: string
   label: string
+}[]
+const PPT_SHAPE_MENU_OPTIONS = [{
+  label: 'Rectangle',
+  shape: 'rect',
+}, {
+  label: 'Oval',
+  shape: 'ellipse',
+}, {
+  label: 'Diamond',
+  shape: 'diamond',
+}] as const satisfies readonly {
+  label: string
+  shape: PPTShapeKind
 }[]
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
@@ -1977,6 +1994,15 @@ function App() {
     !hasHiddenSelection
   const textQuickFormatState = canFormatSelectedText
     ? getPPTTextQuickFormatState(selectedTextElements)
+    : null
+  const shapeQuickMenuState = selectedElement?.kind === 'shape' &&
+    selection.length === 1 &&
+    selectedElement.locked !== true &&
+    selectedElement.visible !== false
+    ? {
+        elementId: selectedElement.id,
+        shape: selectedElement.shape,
+      }
     : null
   const commandAvailability = useMemo<PPTCommandAvailability>(() => ({
     ...getPPTCanvasCommandAvailability({
@@ -7297,12 +7323,14 @@ function App() {
               commandAvailability={commandAvailability}
               groups={selectionFloatingCommandGroups}
               scale={viewport.scale}
+              shapeMenu={shapeQuickMenuState}
               textFormat={textQuickFormatState}
               onCommand={runPPTSurfaceCommand}
               onAlignmentPreviewChange={setAlignmentPreviewCommand}
               onFontSizeStep={stepSelectedTextFontSize}
               onParagraphBulletToggle={toggleSelectedParagraphBullet}
               onParagraphAlign={updateSelectedParagraphAlign}
+              onShapeKindChange={updateShapeKind}
               onTextBoldToggle={toggleSelectedTextBold}
               onTextColorChange={updateSelectedTextColor}
               onTextItalicToggle={toggleSelectedTextItalic}
@@ -9406,11 +9434,13 @@ function PPTSelectionFloatingBar({
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
+  onShapeKindChange,
   onTextBoldToggle,
   onTextColorChange,
   onTextItalicToggle,
   onTextUnderlineToggle,
   scale,
+  shapeMenu,
   textFormat,
 }: {
   anchor: PPTSelectionCommandAnchor | null
@@ -9421,14 +9451,16 @@ function PPTSelectionFloatingBar({
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
+  onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   onTextItalicToggle: () => void
   onTextUnderlineToggle: () => void
   scale: number
+  shapeMenu: PPTShapeQuickMenuState | null
   textFormat: PPTTextQuickFormatState | null
 }) {
-  if (!anchor || (groups.length === 0 && !textFormat)) {
+  if (!anchor || (groups.length === 0 && !shapeMenu && !textFormat)) {
     return null
   }
 
@@ -9459,6 +9491,15 @@ function PPTSelectionFloatingBar({
         />
       ) : null}
       {textFormat ? <span className="ppt-command-divider" /> : null}
+      {shapeMenu ? (
+        <>
+          <PPTShapeKindMenu
+            state={shapeMenu}
+            onShapeKindChange={onShapeKindChange}
+          />
+          <span className="ppt-command-divider" />
+        </>
+      ) : null}
       <PPTAlignmentPopover
         availability={commandAvailability}
         onCommand={onCommand}
@@ -9480,6 +9521,202 @@ function PPTSelectionFloatingBar({
       ))}
     </div>
   )
+}
+
+function PPTShapeKindMenu({
+  state,
+  onShapeKindChange,
+}: {
+  state: PPTShapeQuickMenuState
+  onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [activeShape, setActiveShape] = useState<PPTShapeKind>(state.shape)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const itemRefs = useRef(new Map<PPTShapeKind, HTMLButtonElement>())
+  const activeOption = PPT_SHAPE_MENU_OPTIONS.find((option) =>
+    option.shape === activeShape
+  ) ?? PPT_SHAPE_MENU_OPTIONS[0]
+
+  function focusTrigger() {
+    window.requestAnimationFrame(() => {
+      triggerRef.current?.focus({ preventScroll: true })
+    })
+  }
+
+  function focusShape(shape: PPTShapeKind) {
+    window.requestAnimationFrame(() => {
+      itemRefs.current.get(shape)?.focus({ preventScroll: true })
+    })
+  }
+
+  function openMenu(shape = state.shape) {
+    setOpen(true)
+    setActiveShape(shape)
+    focusShape(shape)
+  }
+
+  function closeMenu() {
+    setOpen(false)
+  }
+
+  function moveFocus(delta: number) {
+    const currentIndex = Math.max(
+      0,
+      PPT_SHAPE_MENU_OPTIONS.findIndex((option) => option.shape === activeShape),
+    )
+    const nextOption = PPT_SHAPE_MENU_OPTIONS[
+      (currentIndex + delta + PPT_SHAPE_MENU_OPTIONS.length) %
+        PPT_SHAPE_MENU_OPTIONS.length
+    ]
+
+    setActiveShape(nextOption.shape)
+    focusShape(nextOption.shape)
+  }
+
+  function focusFirst() {
+    const option = PPT_SHAPE_MENU_OPTIONS[0]
+
+    setActiveShape(option.shape)
+    focusShape(option.shape)
+  }
+
+  function focusLast() {
+    const option = PPT_SHAPE_MENU_OPTIONS[PPT_SHAPE_MENU_OPTIONS.length - 1]
+
+    setActiveShape(option.shape)
+    focusShape(option.shape)
+  }
+
+  function commitShape(shape: PPTShapeKind) {
+    onShapeKindChange(state.elementId, shape)
+    closeMenu()
+    focusTrigger()
+  }
+
+  function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      event.stopPropagation()
+      openMenu()
+    }
+  }
+
+  function handleItemKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+        event.preventDefault()
+        event.stopPropagation()
+        moveFocus(1)
+        return
+      case 'ArrowUp':
+      case 'ArrowLeft':
+        event.preventDefault()
+        event.stopPropagation()
+        moveFocus(-1)
+        return
+      case 'Home':
+        event.preventDefault()
+        event.stopPropagation()
+        focusFirst()
+        return
+      case 'End':
+        event.preventDefault()
+        event.stopPropagation()
+        focusLast()
+        return
+      case 'Escape':
+        event.preventDefault()
+        event.stopPropagation()
+        closeMenu()
+        focusTrigger()
+        return
+    }
+  }
+
+  return (
+    <span
+      className="ppt-floating-menu-wrap"
+      data-ppt-shape-menu-open={open ? 'true' : 'false'}
+    >
+      <button
+        aria-controls="ppt-shape-kind-menu"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Shape"
+        className="ppt-floating-command"
+        data-ppt-shape-menu-trigger
+        ref={triggerRef}
+        title="Shape"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (open) {
+            closeMenu()
+          } else {
+            openMenu()
+          }
+        }}
+        onKeyDown={handleTriggerKeyDown}
+      >
+        {renderPPTShapeMenuIcon(state.shape, 16)}
+      </button>
+      {open ? (
+        <div
+          aria-label="Shape"
+          className="ppt-floating-menu"
+          data-ppt-shape-menu
+          data-ppt-shape-menu-active={activeOption.shape}
+          data-ppt-shape-menu-model="canvas-selection-toolbar-dropdown-menu"
+          id="ppt-shape-kind-menu"
+          role="menu"
+        >
+          {PPT_SHAPE_MENU_OPTIONS.map((option) => (
+            <button
+              aria-checked={state.shape === option.shape}
+              className="ppt-floating-menu-item"
+              data-ppt-shape-menu-item={option.shape}
+              key={option.shape}
+              ref={(node) => {
+                if (node) {
+                  itemRefs.current.set(option.shape, node)
+                } else {
+                  itemRefs.current.delete(option.shape)
+                }
+              }}
+              role="menuitemcheckbox"
+              tabIndex={option.shape === activeOption.shape ? 0 : -1}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                commitShape(option.shape)
+              }}
+              onFocus={() => setActiveShape(option.shape)}
+              onKeyDown={handleItemKeyDown}
+              onMouseEnter={() => setActiveShape(option.shape)}
+            >
+              {renderPPTShapeMenuIcon(option.shape, 15)}
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
+  )
+}
+
+function renderPPTShapeMenuIcon(shape: PPTShapeKind, size: number) {
+  switch (shape) {
+    case 'ellipse':
+      return <Circle size={size} />
+    case 'diamond':
+      return <Diamond size={size} />
+    case 'rect':
+      return <Square size={size} />
+  }
 }
 
 function PPTAlignmentPopover({

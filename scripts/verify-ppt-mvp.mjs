@@ -77,6 +77,7 @@ try {
   await runPresentationScenario(page)
   await runExportScenario(page)
   await runAlignmentPopoverScenario(page)
+  await runShapeMenuScenario(page)
   await runSlideManagementScenario(page)
   await runMobileScenario(cdpPort)
 
@@ -5388,6 +5389,138 @@ async function runAlignmentPopoverScenario(page) {
   record('runs PPT alignment command from selection popover', afterPopoverAlign.selectedId === alignmentPopoverOpen.selectedId && afterPopoverAlign.expanded === 'false' && !afterPopoverAlign.open && afterPopoverAlign.left <= 1, {
     afterPopoverAlign,
     alignmentPopoverOpen,
+  })
+}
+
+async function runShapeMenuScenario(page) {
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const point = await page.eval(`(() => {
+    const element =
+      document.querySelector('[data-kind="shape"][data-shape="rect"]:not([data-locked="true"])') ??
+      document.querySelector('[data-kind="shape"]:not([data-locked="true"])')
+
+    if (!(element instanceof HTMLElement)) {
+      return {
+        id: '',
+        shape: '',
+        x: 0,
+        y: 0,
+      }
+    }
+
+    return {
+      id: element.getAttribute('data-ppt-element'),
+      shape: element.getAttribute('data-shape') ?? '',
+    }
+  })()`)
+
+  await selectPPTLayerRows(page, [point.id])
+  await delay(80)
+
+  await page.eval(`document.querySelector('[data-ppt-shape-menu-trigger]')?.click()`)
+  await delay(50)
+
+  const shapeMenuOpen = await page.eval(`(() => {
+    const trigger = document.querySelector('[data-ppt-shape-menu-trigger]')
+    const menu = document.querySelector('[data-ppt-shape-menu]')
+    const items = [...document.querySelectorAll('[data-ppt-shape-menu-item]')]
+
+    return {
+      active: menu?.getAttribute('data-ppt-shape-menu-active') ?? '',
+      checked: items.map((item) => item.getAttribute('aria-checked') ?? ''),
+      checkedShape: items.find((item) => item.getAttribute('aria-checked') === 'true')?.getAttribute('data-ppt-shape-menu-item') ?? '',
+      controls: trigger?.getAttribute('aria-controls') ?? '',
+      expanded: trigger?.getAttribute('aria-expanded') ?? '',
+      hasPopup: trigger?.getAttribute('aria-haspopup') ?? '',
+      itemCount: items.length,
+      itemRoles: items.map((item) => item.getAttribute('role') ?? ''),
+      itemShapes: items.map((item) => item.getAttribute('data-ppt-shape-menu-item') ?? ''),
+      model: menu?.getAttribute('data-ppt-shape-menu-model') ?? '',
+      role: menu?.getAttribute('role') ?? '',
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record('opens PPT Shape menu from selection floating bar', point.id !== '' && shapeMenuOpen.selectedId === point.id && shapeMenuOpen.expanded === 'true' && shapeMenuOpen.hasPopup === 'menu' && shapeMenuOpen.role === 'menu' && shapeMenuOpen.model === 'canvas-selection-toolbar-dropdown-menu' && shapeMenuOpen.controls === 'ppt-shape-kind-menu' && shapeMenuOpen.itemCount === 3 && shapeMenuOpen.itemRoles.every((role) => role === 'menuitemcheckbox') && shapeMenuOpen.itemShapes.join(' ') === 'rect ellipse diamond' && shapeMenuOpen.checkedShape === point.shape, {
+    point,
+    shapeMenuOpen,
+  })
+
+  await page.eval(`document.querySelector('[data-ppt-shape-menu-item="${point.shape}"]')?.focus()`)
+  await delay(40)
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(40)
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(40)
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(40)
+
+  const shapeMenuKeyboard = await page.eval(`(() => ({
+    active: document.querySelector('[data-ppt-shape-menu]')?.getAttribute('data-ppt-shape-menu-active') ?? '',
+    focusedShape: document.activeElement?.getAttribute('data-ppt-shape-menu-item') ?? '',
+  }))()`)
+
+  record('moves PPT Shape menu focus with Arrow Home End keys', shapeMenuKeyboard.active === 'rect' && shapeMenuKeyboard.focusedShape === 'rect', shapeMenuKeyboard)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(40)
+
+  const shapeMenuEscape = await page.eval(`(() => ({
+    expanded: document.querySelector('[data-ppt-shape-menu-trigger]')?.getAttribute('aria-expanded') ?? '',
+    focusedTrigger: document.activeElement?.hasAttribute('data-ppt-shape-menu-trigger') ?? false,
+    open: !!document.querySelector('[data-ppt-shape-menu]'),
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('closes PPT Shape menu with Escape and restores trigger focus', shapeMenuEscape.expanded === 'false' && shapeMenuEscape.focusedTrigger && !shapeMenuEscape.open && shapeMenuEscape.selectedId === point.id, {
+    point,
+    shapeMenuEscape,
+  })
+
+  const targetShape = point.shape === 'ellipse' ? 'diamond' : 'ellipse'
+
+  await page.eval(`document.querySelector('[data-ppt-shape-menu-trigger]')?.click()`)
+  await delay(40)
+  await page.eval(`document.querySelector('[data-ppt-shape-menu-item="${targetShape}"]')?.click()`)
+  await delay(80)
+
+  const afterShapeMenuChange = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const code = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      expanded: document.querySelector('[data-ppt-shape-menu-trigger]')?.getAttribute('aria-expanded') ?? '',
+      exportHasShapeClass: code.includes('ppt-shape-${targetShape}'),
+      exportHasShapeModel: code.includes('"shape": "${targetShape}"'),
+      inspectorShape: document.querySelector('[data-ppt-style-field="shape"]')?.value ?? '',
+      open: !!document.querySelector('[data-ppt-shape-menu]'),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedShape: selected?.getAttribute('data-shape') ?? '',
+    }
+  })()`)
+
+  record('changes selected PPT shape kind from Shape menu', afterShapeMenuChange.selectedId === point.id && afterShapeMenuChange.expanded === 'false' && !afterShapeMenuChange.open && afterShapeMenuChange.selectedShape === targetShape && afterShapeMenuChange.inspectorShape === targetShape && afterShapeMenuChange.exportHasShapeClass && afterShapeMenuChange.exportHasShapeModel, {
+    afterShapeMenuChange,
+    point,
+    targetShape,
   })
 }
 
