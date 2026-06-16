@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/context-menu-position": ["../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts"],
       "canvas/app/eraser-hit-testing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts"],
       "canvas/app/floating-anchor": ["../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts"],
       "canvas/app/pointer-drawing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts"],

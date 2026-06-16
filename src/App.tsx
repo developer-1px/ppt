@@ -290,6 +290,9 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  getCanvasContextMenuPosition,
+} from 'canvas/app/context-menu-position'
+import {
   getCanvasFloatingAnchorForBounds,
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
@@ -5411,16 +5414,16 @@ function App() {
   }
 
   function openPPTContextMenu(x: number, y: number) {
-    const menuWidth = 220
-    const menuHeight = 320
-    const margin = 8
-    const viewportWidth = globalThis.innerWidth || x + menuWidth + margin
-    const viewportHeight = globalThis.innerHeight || y + menuHeight + margin
-
-    setContextMenu({
-      x: clamp(x, margin, Math.max(margin, viewportWidth - menuWidth - margin)),
-      y: clamp(y, margin, Math.max(margin, viewportHeight - menuHeight - margin)),
+    const position = getCanvasContextMenuPosition({
+      menuSize: { height: 320, width: 220 },
+      point: { x, y },
+      viewportSize: {
+        height: globalThis.innerHeight,
+        width: globalThis.innerWidth,
+      },
     })
+
+    setContextMenu(position)
   }
 
   function openPPTContextMenuAtSelection() {
