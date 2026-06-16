@@ -134,7 +134,9 @@ async function runTopToolbarRovingFocusScenario(page) {
       initial.orientation === 'horizontal' &&
       initial.focusModel === 'roving-tabindex' &&
       initial.keyboardModel === 'arrow-home-end' &&
-      initial.itemCount === initial.enabledCount &&
+      initial.model === 'canvas-toolbar-roving-focus' &&
+      initial.canvasEnabledItemCount === initial.enabledCount &&
+      initial.canvasItemCount >= initial.enabledCount &&
       initial.enabledCount > 10,
     initial,
   )
@@ -221,8 +223,14 @@ async function readPPTTopToolbarRovingFocusState(page) {
     const toolbar = document.querySelector('[data-ppt-toolbar]')
     const enabled = toolbar ? [...toolbar.querySelectorAll('.ppt-toolbar-group button:not(:disabled)')] : []
     const disabled = toolbar ? [...toolbar.querySelectorAll('.ppt-toolbar-group button:disabled')] : []
+    const canvasItems = toolbar ? [...toolbar.querySelectorAll('[data-canvas-toolbar-item]')] : []
+    const canvasEnabledItems = canvasItems.filter((button) =>
+      button instanceof HTMLButtonElement
+        ? !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+        : button.getAttribute('aria-disabled') !== 'true'
+    )
     const focusedIndex = enabled.indexOf(document.activeElement)
-    const activeIndex = enabled.findIndex((button) => button.getAttribute('data-ppt-toolbar-active') === 'true')
+    const activeIndex = enabled.findIndex((button) => button.tabIndex === 0)
     const tabStopIndex = enabled.findIndex((button) => button.tabIndex === 0)
     const itemTitles = enabled.map((button) =>
       button.getAttribute('title') ??
@@ -232,15 +240,17 @@ async function readPPTTopToolbarRovingFocusState(page) {
 
     return {
       activeIndex,
+      canvasEnabledItemCount: canvasEnabledItems.length,
+      canvasItemCount: canvasItems.length,
       disabledCount: disabled.length,
       disabledTabStopCount: disabled.filter((button) => button.tabIndex >= 0).length,
       enabledCount: enabled.length,
       focusedIndex,
       focusedTitle: itemTitles[focusedIndex] ?? '',
       focusModel: toolbar?.getAttribute('data-ppt-toolbar-focus-model') ?? '',
-      itemCount: Number(toolbar?.getAttribute('data-ppt-toolbar-item-count') ?? 0),
       keyboardModel: toolbar?.getAttribute('data-ppt-toolbar-keyboard-model') ?? '',
       minusCount: enabled.filter((button) => button.tabIndex === -1).length,
+      model: toolbar?.getAttribute('data-ppt-toolbar-model') ?? '',
       orientation: toolbar?.getAttribute('aria-orientation') ?? '',
       role: toolbar?.getAttribute('role') ?? '',
       tabStopIndex,
