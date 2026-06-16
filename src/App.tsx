@@ -3794,15 +3794,27 @@ function App() {
 
     setLastStyleClipboardEffect(effect)
 
-    const selectedIds = new Set(effect.selection.objectIds)
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
 
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) =>
-          selectedIds.has(element.id)
-            ? applyPPTStyleClipboardToElement(element, styleClipboard)
-            : element),
+        elements: slide.elements.map((element) => {
+          const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+          return appliedCategoryIds
+            ? applyPPTStyleClipboardToElement(
+                element,
+                styleClipboard,
+                appliedCategoryIds,
+              )
+            : element
+        }),
       })),
     )
   }
@@ -15313,79 +15325,57 @@ function getPPTElementSupportedStyleClipboardCategoryIds(
   return categoryIds
 }
 
-function canApplyPPTStyleClipboard(
-  element: PPTElement,
-  clipboard: PPTStyleClipboard,
-) {
-  return getPPTStyleClipboardTargetCategories(element, clipboard).length > 0
-}
-
-function getPPTStyleClipboardTargetCategories(
-  element: PPTElement,
-  clipboard: PPTStyleClipboard,
-) {
-  if (element.locked === true || element.visible === false) {
-    return []
-  }
-
-  const categories: PPTStyleClipboardCategory[] = ['object']
-
-  if (element.kind === 'shape' && clipboard.shape) {
-    categories.push('shape')
-  }
-
-  if (
-    (element.kind === 'shape' ||
-      element.kind === 'line' ||
-      element.kind === 'freeform') &&
-    clipboard.stroke
-  ) {
-    categories.push('stroke')
-  }
-
-  if (isPPTTextElement(element) && clipboard.text) {
-    categories.push('text')
-  }
-
-  if (isPPTTextElement(element) && clipboard.paragraph) {
-    categories.push('paragraph')
-  }
-
-  return categories
-}
-
 function applyPPTStyleClipboardToElement(
   element: PPTElement,
   clipboard: PPTStyleClipboard,
+  appliedCategoryIds: readonly PPTStyleClipboardPackageCategory[],
 ): PPTElement {
-  if (!canApplyPPTStyleClipboard(element, clipboard)) {
+  if (element.locked === true || element.visible === false) {
     return element
   }
 
-  let next: PPTElement = {
-    ...element,
-    opacity: clipboard.object.opacity === 1
-      ? undefined
-      : clipboard.object.opacity,
-    shadow: clipboard.object.shadow
-      ? clonePPTElementShadow(clipboard.object.shadow)
-      : undefined,
+  const appliedCategories = new Set(appliedCategoryIds)
+
+  if (appliedCategories.size === 0) {
+    return element
+  }
+
+  let next: PPTElement = element
+
+  if (appliedCategories.has('object-effect')) {
+    next = {
+      ...next,
+      opacity: clipboard.object.opacity === 1
+        ? undefined
+        : clipboard.object.opacity,
+      shadow: clipboard.object.shadow
+        ? clonePPTElementShadow(clipboard.object.shadow)
+        : undefined,
+    }
   }
 
   if (next.kind === 'shape') {
     if (clipboard.shape) {
-      const cornerRadius = clipboard.shape.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT
-      next = {
-        ...next,
-        cornerRadius: next.shape === 'rect'
-          ? getPPTShapeCornerRadiusModelValue(cornerRadius)
-          : undefined,
-        fill: clonePPTFill(clipboard.shape.fill),
-        stroke: clipboard.shape.stroke
-          ? clonePPTStroke(clipboard.shape.stroke)
-          : undefined,
+      if (appliedCategories.has('shape-fill')) {
+        const cornerRadius = clipboard.shape.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT
+        next = {
+          ...next,
+          cornerRadius: next.shape === 'rect'
+            ? getPPTShapeCornerRadiusModelValue(cornerRadius)
+            : undefined,
+          fill: clonePPTFill(clipboard.shape.fill),
+        }
       }
-    } else if (clipboard.stroke) {
+
+      if (appliedCategories.has('shape-stroke')) {
+        next = {
+          ...next,
+          stroke: clipboard.shape.stroke
+            ? clonePPTStroke(clipboard.shape.stroke)
+            : undefined,
+        }
+      }
+    } else if (clipboard.stroke && appliedCategories.has('line-style')) {
       next = {
         ...next,
         stroke: clonePPTStroke(clipboard.stroke),
@@ -15393,7 +15383,8 @@ function applyPPTStyleClipboardToElement(
     }
   } else if (
     (next.kind === 'line' || next.kind === 'freeform') &&
-    clipboard.stroke
+    clipboard.stroke &&
+    appliedCategories.has('line-style')
   ) {
     next = {
       ...next,
@@ -15401,7 +15392,7 @@ function applyPPTStyleClipboardToElement(
     }
   }
 
-  if (isPPTTextElement(next)) {
+  if (isPPTTextElement(next) && appliedCategories.has('text-style')) {
     const textElement = next
 
     if (clipboard.text) {
