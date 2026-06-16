@@ -8,6 +8,7 @@ import {
   type CanvasCommandAvailability,
   type CanvasDistributeMode,
   type CanvasReorderMode,
+  getCanvasCommandSelectionState,
   unionCanvasRectList,
 } from 'canvas/foundation'
 import {
@@ -140,8 +141,8 @@ export function getPPTCanvasCommandAvailability({
   hasLockedSelection?: boolean
   selection: readonly string[]
 }): PPTCanvasCommandAvailability {
-  const hasSelection = selection.length > 0
-  const canDistribute = selection.length >= 3
+  const selectionState = getCanvasCommandSelectionState({ selection })
+  const { canDistribute, canGroup, hasSelection } = selectionState
   const canEditSelection = hasSelection && !hasLockedSelection
   const canTransformSelection = canEditSelection && !hasHiddenSelection
 
@@ -159,7 +160,7 @@ export function getPPTCanvasCommandAvailability({
     duplicate: canEditSelection,
     distributeHorizontal: canDistribute && !hasLockedSelection,
     distributeVertical: canDistribute && !hasLockedSelection,
-    group: canTransformSelection && selection.length >= 2,
+    group: canTransformSelection && canGroup,
     lockSelection: hasSelection && !hasLockedSelection,
     nudge: canTransformSelection,
     paste: canPaste,
