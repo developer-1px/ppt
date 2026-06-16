@@ -6167,6 +6167,9 @@ function App() {
   const marqueeBounds = interaction?.kind === 'marquee'
     ? normalizeBounds(interaction.startPoint, interaction.currentPoint)
     : null
+  const marqueeSelection = interaction?.kind === 'marquee'
+    ? selection
+    : null
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_CANVAS_SNAP_GUIDES
@@ -7149,6 +7152,17 @@ function App() {
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-model="canvas-text-paste-import"
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
+        data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
+        data-ppt-marquee-additive={interaction?.kind === 'marquee'
+          ? String(interaction.additive)
+          : undefined}
+        data-ppt-marquee-h={marqueeBounds?.h}
+        data-ppt-marquee-history="none"
+        data-ppt-marquee-model="canvas-marquee-selection"
+        data-ppt-marquee-selection={marqueeSelection?.join(' ') ?? undefined}
+        data-ppt-marquee-w={marqueeBounds?.w}
+        data-ppt-marquee-x={marqueeBounds?.x}
+        data-ppt-marquee-y={marqueeBounds?.y}
         data-ppt-color-swatch-command={lastColorSwatchEffect?.payload.id}
         data-ppt-color-swatch-command-channel={lastColorSwatchEffect?.payload.channelId}
         data-ppt-color-swatch-command-objects={lastColorSwatchEffect?.payload.objectIds.join(' ')}

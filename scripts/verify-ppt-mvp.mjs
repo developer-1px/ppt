@@ -41,6 +41,7 @@ try {
   await runFindReplaceScenario(page)
   await runSpacingGuideScenario(page)
   await runSelectionAndDragScenario(page)
+  await runMarqueeSelectionScenario(page)
   await runAltDragDuplicateScenario(page)
   await runAffordanceScenario(page)
   await runCommandSurfaceScenario(page)
@@ -325,6 +326,187 @@ async function runSelectionAndDragScenario(page) {
     before,
   })
   record('records drag in undo history', after.undoEnabled, after)
+}
+
+async function runMarqueeSelectionScenario(page) {
+  const replaceBox = await getPPTMarqueeDragBox(page, ['s1-card-1', 's1-card-2'])
+  const before = await getPPTMarqueeState(page)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: replaceBox.startX,
+    y: replaceBox.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: replaceBox.endX,
+    y: replaceBox.endY,
+  })
+  await delay(50)
+
+  const duringReplace = await getPPTMarqueeState(page)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: replaceBox.endX,
+    y: replaceBox.endY,
+  })
+  await delay(60)
+
+  const afterReplace = await getPPTMarqueeState(page)
+
+  record(
+    'box-selects PPT objects through canvas marquee selection',
+    duringReplace.marqueeModel === 'canvas-marquee-selection' &&
+      duringReplace.marqueeActive === 'true' &&
+      duringReplace.marqueeAdditive === 'false' &&
+      duringReplace.marqueeHistory === 'none' &&
+      duringReplace.marqueeCount === 1 &&
+      duringReplace.marqueeWidth > 0 &&
+      duringReplace.marqueeHeight > 0 &&
+      duringReplace.marqueeSelection.includes('s1-card-1') &&
+      duringReplace.marqueeSelection.includes('s1-card-2') &&
+      afterReplace.selectedIds.includes('s1-card-1') &&
+      afterReplace.selectedIds.includes('s1-card-2'),
+    {
+      afterReplace,
+      before,
+      duringReplace,
+      replaceBox,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterUndo = await getPPTMarqueeState(page)
+
+  record(
+    'keeps PPT marquee selection out of deck undo history',
+    afterUndo.card1Left !== afterReplace.card1Left &&
+      afterUndo.redoEnabled,
+    {
+      afterReplace,
+      afterUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await delay(80)
+
+  const afterRedo = await getPPTMarqueeState(page)
+
+  record(
+    'restores prior PPT deck history after marquee undo probe',
+    afterRedo.card1Left === afterReplace.card1Left,
+    {
+      afterRedo,
+      afterReplace,
+    },
+  )
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+
+  const additiveBox = await getPPTMarqueeDragBox(page, ['s1-card-1'])
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mousePressed',
+    x: additiveBox.startX,
+    y: additiveBox.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 8,
+    type: 'mouseMoved',
+    x: additiveBox.endX,
+    y: additiveBox.endY,
+  })
+  await delay(50)
+
+  const duringAdditive = await getPPTMarqueeState(page)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mouseReleased',
+    x: additiveBox.endX,
+    y: additiveBox.endY,
+  })
+  await delay(60)
+
+  const afterAdditive = await getPPTMarqueeState(page)
+
+  record(
+    'additively box-selects PPT objects with Shift marquee',
+    duringAdditive.marqueeActive === 'true' &&
+      duringAdditive.marqueeAdditive === 'true' &&
+      duringAdditive.marqueeSelection.includes('s1-title') &&
+      duringAdditive.marqueeSelection.includes('s1-card-1') &&
+      afterAdditive.selectedIds.includes('s1-title') &&
+      afterAdditive.selectedIds.includes('s1-card-1'),
+    {
+      additiveBox,
+      afterAdditive,
+      duringAdditive,
+    },
+  )
+
+  await clickMouse(page, titlePoint.x, titlePoint.y, 2)
+  await delay(80)
+
+  const nativeBox = await getPPTMarqueeDragBox(page, ['s1-card-1'])
+  const beforeNativeGuard = await getPPTMarqueeState(page)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: nativeBox.startX,
+    y: nativeBox.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: nativeBox.endX,
+    y: nativeBox.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: nativeBox.endX,
+    y: nativeBox.endY,
+  })
+  await delay(60)
+
+  const afterNativeGuard = await getPPTMarqueeState(page)
+
+  record(
+    'does not start PPT marquee while native text editing is active',
+    beforeNativeGuard.editing &&
+      afterNativeGuard.marqueeActive === 'false' &&
+      afterNativeGuard.selectedIds.join(' ') === beforeNativeGuard.selectedIds.join(' '),
+    {
+      afterNativeGuard,
+      beforeNativeGuard,
+      nativeBox,
+    },
+  )
+
+  await page.eval(`document.activeElement?.blur()`)
+  await delay(50)
 }
 
 async function runSpacingGuideScenario(page) {
@@ -11388,6 +11570,63 @@ function getPPTTextPasteState(page) {
       textPasteModel: stage?.getAttribute('data-ppt-text-paste-model') ?? '',
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
       thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
+      undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
+    }
+  })()`)
+}
+
+function getPPTMarqueeDragBox(page, elementIds) {
+  return page.eval(`((elementIds) => {
+    const slide = document.querySelector('.ppt-slide')?.getBoundingClientRect()
+    const rects = elementIds
+      .map((id) => document.querySelector(\`[data-ppt-element="\${id}"]\`)?.getBoundingClientRect())
+      .filter(Boolean)
+
+    if (!slide || rects.length === 0) {
+      return {
+        endX: 0,
+        endY: 0,
+        startX: 0,
+        startY: 0,
+      }
+    }
+
+    const left = Math.min(...rects.map((rect) => rect.left))
+    const right = Math.max(...rects.map((rect) => rect.right))
+    const top = Math.min(...rects.map((rect) => rect.top))
+    const bottom = Math.max(...rects.map((rect) => rect.bottom))
+
+    return {
+      endX: Math.min(slide.right - 8, right + 24),
+      endY: Math.min(slide.bottom - 8, bottom + 24),
+      startX: Math.max(slide.left + 8, left - 24),
+      startY: Math.max(slide.top + 8, top - 24),
+    }
+  })(${JSON.stringify(elementIds)})`)
+}
+
+function getPPTMarqueeState(page) {
+  return page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const marqueeSelection = (stage?.getAttribute('data-ppt-marquee-selection') ?? '')
+      .split(' ')
+      .filter(Boolean)
+
+    return {
+      card1Left: parseFloat(document.querySelector('[data-ppt-element="s1-card-1"]')?.style.left ?? '0'),
+      editing: !!document.querySelector('.ppt-element-editor[contenteditable="true"]'),
+      marqueeActive: stage?.getAttribute('data-ppt-marquee-active') ?? '',
+      marqueeAdditive: stage?.getAttribute('data-ppt-marquee-additive') ?? '',
+      marqueeCount: document.querySelectorAll('.ppt-marquee').length,
+      marqueeHeight: Number(stage?.getAttribute('data-ppt-marquee-h') ?? 0),
+      marqueeHistory: stage?.getAttribute('data-ppt-marquee-history') ?? '',
+      marqueeModel: stage?.getAttribute('data-ppt-marquee-model') ?? '',
+      marqueeSelection,
+      marqueeWidth: Number(stage?.getAttribute('data-ppt-marquee-w') ?? 0),
+      redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
+      selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element'))
+        .filter(Boolean),
       undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
     }
   })()`)
