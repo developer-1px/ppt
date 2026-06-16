@@ -6470,7 +6470,11 @@ function App() {
       const erasedIds = new Set(interaction.erasedIds)
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
-        elements: slide.elements.filter((element) => !erasedIds.has(element.id)),
+        elements: deleteCanvasSelectionItems({
+          getItemId: (element) => element.id,
+          items: slide.elements,
+          selection: interaction.erasedIds,
+        }),
       }))
 
       deckRef.current = nextDeck
