@@ -402,6 +402,8 @@ import {
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
   resizeCanvasSelection,
+  canSelectSameTypeCanvasItems,
+  selectSameTypeCanvasItems,
   type CanvasSnapGuides,
 } from 'canvas/foundation'
 import {
@@ -14909,36 +14911,26 @@ function selectSameTypePPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ): string[] {
-  const selected = new Set(selection)
-  const selectedTypes = new Set(
-    elements
-      .filter((element) =>
-        selected.has(element.id) && element.visible !== false)
-      .map(getPPTElementTypeKey),
-  )
-
-  if (selectedTypes.size === 0) {
-    return [...selection]
-  }
-
-  return elements
-    .filter((element) =>
-      element.visible !== false && selectedTypes.has(getPPTElementTypeKey(element)))
-    .map((element) => element.id)
+  return selectSameTypeCanvasItems({
+    getItemId: (element) => element.id,
+    getItemType: getPPTElementTypeKey,
+    isItemSelectable: (element) => element.visible !== false,
+    items: elements,
+    selection,
+  })
 }
 
 function canSelectSameTypePPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  if (selection.length === 0) {
-    return false
-  }
-
-  const selected = new Set(selection)
-  const nextSelection = selectSameTypePPTSelection(elements, selection)
-
-  return nextSelection.some((id) => !selected.has(id))
+  return canSelectSameTypeCanvasItems({
+    getItemId: (element) => element.id,
+    getItemType: getPPTElementTypeKey,
+    isItemSelectable: (element) => element.visible !== false,
+    items: elements,
+    selection,
+  })
 }
 
 function getPPTElementTypeKey(element: PPTElement) {
