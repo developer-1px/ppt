@@ -2209,6 +2209,7 @@ async function runCommandPaletteScenario(page) {
     focusedQuery: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
     focusTrap: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-focus-trap') ?? '',
     itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
+    model: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-model') ?? '',
     open: !!document.querySelector('[data-ppt-command-palette]'),
     openerExists: !!document.querySelector('[data-ppt-command-palette-open]'),
     restoreFocus: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-restore-focus') ?? '',
@@ -2220,6 +2221,7 @@ async function runCommandPaletteScenario(page) {
       afterToolbarOpen.open &&
       afterToolbarOpen.focusedQuery &&
       afterToolbarOpen.focusTrap === 'true' &&
+      afterToolbarOpen.model === 'canvas-command-palette-items' &&
       afterToolbarOpen.restoreFocus === 'true' &&
       afterToolbarOpen.itemCount > 0,
     {
@@ -2309,6 +2311,7 @@ async function runCommandPaletteScenario(page) {
     itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
     listboxExists: !!document.getElementById(document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-controls') ?? ''),
     listboxRole: document.getElementById(document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-controls') ?? '')?.getAttribute('role') ?? '',
+    model: document.querySelector('[data-ppt-command-palette]')?.getAttribute('data-ppt-command-palette-model') ?? '',
     open: !!document.querySelector('[data-ppt-command-palette]'),
   }))()`)
 
@@ -2320,6 +2323,7 @@ async function runCommandPaletteScenario(page) {
       afterOpen.controls.length > 0 &&
       afterOpen.listboxExists &&
       afterOpen.listboxRole === 'listbox' &&
+      afterOpen.model === 'canvas-command-palette-items' &&
       afterOpen.activeDescendant.length > 0 &&
       afterOpen.activeDescendant === afterOpen.activeOptionId &&
       afterOpen.activeOptionExists &&

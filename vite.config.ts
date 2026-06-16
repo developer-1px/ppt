@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
+const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
 const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
@@ -16,6 +17,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
+      { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/menu-roving-focus', replacement: canvasMenuRovingFocusEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },

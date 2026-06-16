@@ -204,6 +204,10 @@ import {
   type SlideEditTextVerticalAlignmentHostCommandEffect,
 } from '@interactive-os/slide-edit-affordance'
 import {
+  filterCanvasCommandPaletteItems,
+  type CanvasCommandPaletteItem,
+} from 'canvas/app/command-palette-items'
+import {
   CANVAS_MENU_ITEM_PROPS,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
@@ -866,14 +870,7 @@ type PPTSurfaceCommandViewGroup = {
   commands: PPTSurfaceCommandView[]
   id: string
 }
-type PPTCommandPaletteItem = {
-  disabled?: boolean
-  id: string
-  run: () => void
-  section: string
-  shortcut?: string
-  title: string
-}
+type PPTCommandPaletteItem = CanvasCommandPaletteItem
 type PPTShortcutHelpItem = {
   id: string
   section: string
@@ -5862,447 +5859,447 @@ function App() {
   })
   const commandPaletteItems: PPTCommandPaletteItem[] = [{
     id: 'system:keyboard-shortcuts',
-    run: openShortcutHelp,
+    onSelect: openShortcutHelp,
     section: 'System',
     shortcut: PPT_SHORTCUT_HELP_SHORTCUT,
     title: 'Keyboard shortcuts',
   }, {
     disabled: !commandAvailability.undo,
     id: 'command:undo',
-    run: undo,
+    onSelect: undo,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+Z',
     title: CANVAS_COMMAND_AFFORDANCES.undo.title,
   }, {
     disabled: !commandAvailability.redo,
     id: 'command:redo',
-    run: redo,
+    onSelect: redo,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+Y',
     title: CANVAS_COMMAND_AFFORDANCES.redo.title,
   }, {
     disabled: !commandAvailability.duplicate,
     id: 'command:duplicate',
-    run: duplicateSelection,
+    onSelect: duplicateSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+D',
     title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
   }, {
     disabled: !commandAvailability.delete,
     id: 'command:delete',
-    run: deleteSelection,
+    onSelect: deleteSelection,
     section: 'Edit',
     title: CANVAS_COMMAND_AFFORDANCES.delete.title,
   }, {
     disabled: !commandAvailability.cut,
     id: 'command:cut',
-    run: cutSelection,
+    onSelect: cutSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+X',
     title: CANVAS_COMMAND_AFFORDANCES.cut.title,
   }, {
     disabled: selection.length === 0,
     id: 'command:copy',
-    run: copySelection,
+    onSelect: copySelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+C',
     title: CANVAS_COMMAND_AFFORDANCES.copy.title,
   }, {
     disabled: !commandAvailability.paste,
     id: 'command:paste',
-    run: pasteSelection,
+    onSelect: pasteSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+V',
     title: CANVAS_COMMAND_AFFORDANCES.paste.title,
   }, {
     disabled: !commandAvailability.copyFormatting,
     id: 'command:copy-formatting',
-    run: copyFormatting,
+    onSelect: copyFormatting,
     section: 'Edit',
     shortcut: 'Shift+Cmd/Ctrl+C',
     title: 'Copy formatting',
   }, {
     disabled: !commandAvailability.pasteFormatting,
     id: 'command:paste-formatting',
-    run: pasteFormatting,
+    onSelect: pasteFormatting,
     section: 'Edit',
     shortcut: 'Shift+Cmd/Ctrl+V',
     title: 'Paste formatting',
   }, {
     id: 'command:select-all',
-    run: selectAllElements,
+    onSelect: selectAllElements,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+A',
     title: CANVAS_COMMAND_AFFORDANCES.selectAll.title,
   }, {
     disabled: !commandAvailability.selectSameType,
     id: 'command:select-same-type',
-    run: selectSameTypeElements,
+    onSelect: selectSameTypeElements,
     section: 'Edit',
     title: 'Select same type',
   }, {
     disabled: !commandAvailability.alignLeft,
     id: 'command:align-left',
-    run: () => alignSelection('alignLeft'),
+    onSelect: () => alignSelection('alignLeft'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignLeft.title,
   }, {
     disabled: !commandAvailability.alignCenter,
     id: 'command:align-center',
-    run: () => alignSelection('alignCenter'),
+    onSelect: () => alignSelection('alignCenter'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
   }, {
     disabled: !commandAvailability.alignRight,
     id: 'command:align-right',
-    run: () => alignSelection('alignRight'),
+    onSelect: () => alignSelection('alignRight'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignRight.title,
   }, {
     disabled: !commandAvailability.alignTop,
     id: 'command:align-top',
-    run: () => alignSelection('alignTop'),
+    onSelect: () => alignSelection('alignTop'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignTop.title,
   }, {
     disabled: !commandAvailability.alignMiddle,
     id: 'command:align-middle',
-    run: () => alignSelection('alignMiddle'),
+    onSelect: () => alignSelection('alignMiddle'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignMiddle.title,
   }, {
     disabled: !commandAvailability.alignBottom,
     id: 'command:align-bottom',
-    run: () => alignSelection('alignBottom'),
+    onSelect: () => alignSelection('alignBottom'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.alignBottom.title,
   }, {
     disabled: !commandAvailability.distributeHorizontal,
     id: 'command:distribute-horizontal',
-    run: () => distributeSelection('distributeHorizontal'),
+    onSelect: () => distributeSelection('distributeHorizontal'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.distributeHorizontal.title,
   }, {
     disabled: !commandAvailability.distributeVertical,
     id: 'command:distribute-vertical',
-    run: () => distributeSelection('distributeVertical'),
+    onSelect: () => distributeSelection('distributeVertical'),
     section: 'Arrange',
     title: CANVAS_COMMAND_AFFORDANCES.distributeVertical.title,
   }, {
     disabled: !commandAvailability.tidySelection,
     id: 'command:tidy-selection',
-    run: tidySelection,
+    onSelect: tidySelection,
     section: 'Arrange',
     title: 'Tidy selection',
   }, {
     disabled: !commandAvailability.flipSelection,
     id: 'command:flip-horizontal',
-    run: () => flipSelection('horizontal'),
+    onSelect: () => flipSelection('horizontal'),
     section: 'Arrange',
     title: 'Flip horizontal',
   }, {
     disabled: !commandAvailability.flipSelection,
     id: 'command:flip-vertical',
-    run: () => flipSelection('vertical'),
+    onSelect: () => flipSelection('vertical'),
     section: 'Arrange',
     title: 'Flip vertical',
   }, {
     disabled: !commandAvailability.bringForward,
     id: 'command:bring-forward',
-    run: () => reorderSelection('bringForward'),
+    onSelect: () => reorderSelection('bringForward'),
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+]',
     title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
   }, {
     disabled: !commandAvailability.bringToFront,
     id: 'command:bring-to-front',
-    run: () => reorderSelection('bringToFront'),
+    onSelect: () => reorderSelection('bringToFront'),
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+]',
     title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
   }, {
     disabled: !commandAvailability.sendBackward,
     id: 'command:send-backward',
-    run: () => reorderSelection('sendBackward'),
+    onSelect: () => reorderSelection('sendBackward'),
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+[',
     title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
   }, {
     disabled: !commandAvailability.sendToBack,
     id: 'command:send-to-back',
-    run: () => reorderSelection('sendToBack'),
+    onSelect: () => reorderSelection('sendToBack'),
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+[',
     title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
   }, {
     disabled: !commandAvailability.group,
     id: 'command:group',
-    run: groupSelection,
+    onSelect: groupSelection,
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+G',
     title: CANVAS_COMMAND_AFFORDANCES.group.title,
   }, {
     disabled: !commandAvailability.ungroup,
     id: 'command:ungroup',
-    run: ungroupSelection,
+    onSelect: ungroupSelection,
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+G',
     title: CANVAS_COMMAND_AFFORDANCES.ungroup.title,
   }, {
     disabled: !commandAvailability.lockSelection,
     id: 'command:lock-selection',
-    run: lockSelectedElements,
+    onSelect: lockSelectedElements,
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+L',
     title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
   }, {
     disabled: !commandAvailability.unlockAll,
     id: 'command:unlock-all',
-    run: unlockAllElements,
+    onSelect: unlockAllElements,
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+L',
     title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
   }, {
     id: 'tool:select',
-    run: activateSelectTool,
+    onSelect: activateSelectTool,
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.select.shortcut,
     title: 'Select tool',
   }, {
     id: 'tool:pan',
-    run: activatePanTool,
+    onSelect: activatePanTool,
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.pan.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.pan.ariaLabel,
   }, {
     id: 'tool:laser',
-    run: activateLaserTool,
+    onSelect: activateLaserTool,
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.laser.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.laser.ariaLabel,
   }, {
     id: 'tool:text',
-    run: () => activatePPTCreationTool({ kind: 'text' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'text' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.text.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.text.ariaLabel,
   }, {
     id: 'tool:sticky',
-    run: () => activatePPTCreationTool({ kind: 'sticky' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'sticky' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.sticky.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.sticky.ariaLabel,
   }, {
     id: 'tool:section',
-    run: () => activatePPTCreationTool({ kind: 'section' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'section' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.section.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.section.ariaLabel,
   }, {
     id: 'tool:rect',
-    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'rect' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'rect' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.rect.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.rect.ariaLabel,
   }, {
     id: 'tool:ellipse',
-    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.ellipse.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.ellipse.ariaLabel,
   }, {
     id: 'tool:diamond',
-    run: () => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.diamond.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.diamond.ariaLabel,
   }, {
     id: 'tool:line',
-    run: () => activateLineCreationMode('line'),
+    onSelect: () => activateLineCreationMode('line'),
     section: 'Create',
     title: 'Line tool',
   }, {
     id: 'tool:arrow',
-    run: () => activateLineCreationMode('arrow'),
+    onSelect: () => activateLineCreationMode('arrow'),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.arrow.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel,
   }, {
     id: 'tool:comment',
-    run: () => activatePPTCreationTool({ kind: 'comment' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'comment' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.comment.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.comment.ariaLabel,
   }, {
     id: 'tool:pen',
-    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.pen.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.pen.ariaLabel,
   }, {
     id: 'tool:marker',
-    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.marker.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.marker.ariaLabel,
   }, {
     id: 'tool:highlight',
-    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' }),
+    onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.highlight.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.highlight.ariaLabel,
   }, {
     id: 'tool:eraser',
-    run: activateEraserTool,
+    onSelect: activateEraserTool,
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.eraser.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.eraser.ariaLabel,
   }, {
     id: 'tool:image',
-    run: () => imageInputRef.current?.click(),
+    onSelect: () => imageInputRef.current?.click(),
     section: 'Create',
     title: 'Add image',
   }, {
     id: 'tool:table',
-    run: () => insertPPTTableSource(),
+    onSelect: () => insertPPTTableSource(),
     section: 'Create',
     title: 'Add table',
   }, {
     id: 'slide:add',
-    run: addSlide,
+    onSelect: addSlide,
     section: 'Slides',
     title: 'Add slide',
   }, {
     id: 'slide:duplicate',
-    run: duplicateActiveSlide,
+    onSelect: duplicateActiveSlide,
     section: 'Slides',
     title: 'Duplicate slide',
   }, {
     disabled: !canDeleteSlide,
     id: 'slide:delete',
-    run: deleteActiveSlide,
+    onSelect: deleteActiveSlide,
     section: 'Slides',
     title: 'Delete slide',
   }, {
     disabled: !canMoveActiveSlideUp,
     id: 'slide:move-up',
-    run: () => moveActiveSlide(-1),
+    onSelect: () => moveActiveSlide(-1),
     section: 'Slides',
     title: 'Move slide up',
   }, {
     disabled: !canMoveActiveSlideDown,
     id: 'slide:move-down',
-    run: () => moveActiveSlide(1),
+    onSelect: () => moveActiveSlide(1),
     section: 'Slides',
     title: 'Move slide down',
   }, ...PPT_LAYOUT_DESCRIPTORS.map((layout) => ({
     disabled: activeLayout.layoutId === layout.layoutId,
     id: `slide:layout:${layout.layoutId}`,
-    run: () => applySlideLayout(layout.layoutId),
+    onSelect: () => applySlideLayout(layout.layoutId),
     section: 'Slides',
     title: `Apply ${layout.name}`,
   })), {
     id: 'export:download-slide-svg',
-    run: downloadSlideSVG,
+    onSelect: downloadSlideSVG,
     section: 'Export',
     title: 'Download slide SVG',
   }, {
     disabled: !canExportSelectionSVG,
     id: 'export:download-selection-svg',
-    run: downloadSelectionSVG,
+    onSelect: downloadSelectionSVG,
     section: 'Export',
     title: 'Download selection SVG',
   }, {
     id: 'view:find',
-    run: openFindStrip,
+    onSelect: openFindStrip,
     section: 'View',
     shortcut: 'Cmd/Ctrl+F',
     title: 'Find text',
   }, {
     id: 'view:present',
-    run: () => startPresentation(),
+    onSelect: () => startPresentation(),
     section: 'View',
     title: 'Start presentation',
   }, {
     id: 'view:fit-slide',
-    run: fitSlide,
+    onSelect: fitSlide,
     section: 'View',
     shortcut: '0',
     title: 'Fit slide',
   }, {
     disabled: !canFitSelection,
     id: 'view:fit-selection',
-    run: fitSelection,
+    onSelect: fitSelection,
     section: 'View',
     shortcut: '1',
     title: 'Fit selection',
   }, {
     id: 'view:reset-zoom',
-    run: resetZoom,
+    onSelect: resetZoom,
     section: 'View',
     shortcut: 'Cmd/Ctrl+0',
     title: CANVAS_COMMAND_AFFORDANCES.zoomReset.title,
   }, {
     id: 'view:zoom-in',
-    run: () => zoom('in'),
+    onSelect: () => zoom('in'),
     section: 'View',
     shortcut: 'Cmd/Ctrl+=',
     title: CANVAS_COMMAND_AFFORDANCES.zoomIn.title,
   }, {
     id: 'view:zoom-out',
-    run: () => zoom('out'),
+    onSelect: () => zoom('out'),
     section: 'View',
     shortcut: 'Cmd/Ctrl+-',
     title: CANVAS_COMMAND_AFFORDANCES.zoomOut.title,
   }, {
     id: 'view:toggle-grid',
-    run: () => setShowGrid((current) => !current),
+    onSelect: () => setShowGrid((current) => !current),
     section: 'View',
     title: showGrid ? 'Hide grid' : 'Show grid',
   }, {
     id: 'view:toggle-minimap',
-    run: () => setShowMinimap((current) => !current),
+    onSelect: () => setShowMinimap((current) => !current),
     section: 'View',
     title: showMinimap ? 'Hide minimap' : 'Show minimap',
   }, {
     id: 'view:toggle-frame-guides',
-    run: () => setShowFrameGuides((current) => !current),
+    onSelect: () => setShowFrameGuides((current) => !current),
     section: 'View',
     title: showFrameGuides ? 'Hide frame guides' : 'Show frame guides',
   }, {
     id: 'view:toggle-theme',
-    run: toggleTheme,
+    onSelect: toggleTheme,
     section: 'View',
     title: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:bold',
-    run: toggleSelectedTextBold,
+    onSelect: toggleSelectedTextBold,
     section: 'Format',
     shortcut: 'Cmd/Ctrl+B',
     title: 'Bold text',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:italic',
-    run: toggleSelectedTextItalic,
+    onSelect: toggleSelectedTextItalic,
     section: 'Format',
     title: 'Italic text',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:underline',
-    run: toggleSelectedTextUnderline,
+    onSelect: toggleSelectedTextUnderline,
     section: 'Format',
     title: 'Underline text',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:bullet',
-    run: toggleSelectedParagraphBullet,
+    onSelect: toggleSelectedParagraphBullet,
     section: 'Format',
     title: 'Toggle bullet list',
   }, {
     disabled: !selectedElement || !isPPTTextElement(selectedElement) || !selectedTextOverflow,
     id: 'format:auto-fit-text',
-    run: () => {
+    onSelect: () => {
       if (selectedElement && isPPTTextElement(selectedElement)) {
         autoFitTextElement(selectedElement.id)
       }
@@ -7580,7 +7577,7 @@ function PPTCommandPaletteDialog({
   const dialogRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const filteredItems = useMemo(
-    () => filterPPTCommandPaletteItems(items, query).slice(0, 10),
+    () => filterCanvasCommandPaletteItems(items, query).slice(0, 10),
     [items, query],
   )
   const maxActiveIndex = Math.max(0, filteredItems.length - 1)
@@ -7602,7 +7599,7 @@ function PPTCommandPaletteDialog({
       return
     }
 
-    item.run()
+    item.onSelect()
     onClose()
   }
 
@@ -7670,6 +7667,7 @@ function PPTCommandPaletteDialog({
         className="ppt-command-palette"
         data-ppt-command-palette
         data-ppt-command-palette-focus-trap="true"
+        data-ppt-command-palette-model="canvas-command-palette-items"
         data-ppt-command-palette-restore-focus="true"
         ref={dialogRef}
         role="dialog"
@@ -7736,31 +7734,6 @@ function PPTCommandPaletteDialog({
       </section>
     </div>
   )
-}
-
-function filterPPTCommandPaletteItems(
-  items: readonly PPTCommandPaletteItem[],
-  query: string,
-) {
-  const terms = query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-
-  if (terms.length === 0) {
-    return [...items]
-  }
-
-  return items.filter((item) => {
-    const haystack = [
-      item.title,
-      item.section,
-      item.shortcut ?? '',
-    ].join(' ').toLowerCase()
-
-    return terms.every((term) => haystack.includes(term))
-  })
 }
 
 function getPPTCommandPaletteFocusables(dialog: HTMLElement | null) {
