@@ -424,6 +424,7 @@ import {
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
   isAdditivePointerInput,
+  moveCanvasItemToTargetPlacement,
   moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
@@ -3146,21 +3147,22 @@ function App() {
     placement: PPTSlideDropPlacement,
   ) {
     const currentDeck = deckRef.current
-    const toIndex = getPPTSlideDropIndex(
-      currentDeck.slides,
-      sourceSlideId,
-      targetSlideId,
+    const reorderResult = moveCanvasItemToTargetPlacement({
+      getItemId: (slide) => slide.id,
+      itemId: sourceSlideId,
+      items: currentDeck.slides,
       placement,
-    )
+      targetItemId: targetSlideId,
+    })
 
-    if (toIndex === null) {
+    if (!reorderResult) {
       return
     }
 
     const effect = getSlideEditRailPointerCommandEffect({
       slideId: sourceSlideId,
       slideOrder: currentDeck.slides.map((slide) => slide.id),
-      toIndex,
+      toIndex: reorderResult.toIndex,
       type: 'thumbnail-drop',
     })
 
@@ -3171,30 +3173,21 @@ function App() {
     setLastSlideRailCommandEffect(effect)
 
     commitDeck((current) => {
-      const dropIndex = getPPTSlideDropIndex(
-        current.slides,
-        sourceSlideId,
-        targetSlideId,
+      const result = moveCanvasItemToTargetPlacement({
+        getItemId: (slide) => slide.id,
+        itemId: sourceSlideId,
+        items: current.slides,
         placement,
-      )
+        targetItemId: targetSlideId,
+      })
 
-      if (dropIndex === null) {
+      if (!result) {
         return current
       }
-
-      const sourceIndex = current.slides.findIndex((slide) => slide.id === sourceSlideId)
-
-      if (sourceIndex < 0 || sourceIndex === dropIndex) {
-        return current
-      }
-
-      const slides = [...current.slides]
-      const [slide] = slides.splice(sourceIndex, 1)
-      slides.splice(dropIndex, 0, slide)
 
       return {
         ...current,
-        slides,
+        slides: result.items,
       }
     })
   }
@@ -17403,30 +17396,6 @@ function createPPTSlideId(deck: PPTDeck) {
   }
 
   return id
-}
-
-function getPPTSlideDropIndex(
-  slides: readonly PPTSlide[],
-  sourceSlideId: string,
-  targetSlideId: string,
-  placement: PPTSlideDropPlacement,
-) {
-  const sourceIndex = slides.findIndex((slide) => slide.id === sourceSlideId)
-  const targetIndex = slides.findIndex((slide) => slide.id === targetSlideId)
-
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
-    return null
-  }
-
-  let dropIndex = targetIndex + (placement === 'after' ? 1 : 0)
-
-  if (sourceIndex < dropIndex) {
-    dropIndex -= 1
-  }
-
-  const normalizedDropIndex = Math.max(0, Math.min(slides.length - 1, dropIndex))
-
-  return normalizedDropIndex === sourceIndex ? null : normalizedDropIndex
 }
 
 function normalizePPTCommentBody(value: string) {
