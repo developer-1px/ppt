@@ -430,6 +430,7 @@ import {
   moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
+  removeCanvasSelectionIds,
   resizeCanvasSelection,
   canSelectSameTypeCanvasItems,
   canTidyCanvasSelectionItems,
@@ -5719,7 +5720,8 @@ function App() {
     })
 
     setContextMenu(null)
-    setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
+    setSelection((current) =>
+      removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
     setInteraction({
       currentPoint: points[0],
       erasedIds,
@@ -6207,7 +6209,8 @@ function App() {
         }),
       )
 
-      setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
+      setSelection((current) =>
+        removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
       setInteraction({
         ...interaction,
         currentPoint: clampPPTPointToSlide(point),
@@ -6462,7 +6465,8 @@ function App() {
 
       deckRef.current = nextDeck
       setDeck(nextDeck)
-      setSelection((current) => current.filter((id) => !erasedIds.has(id)))
+      setSelection((current) =>
+        removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
     }
 
     if (interaction.kind === 'line-create') {
