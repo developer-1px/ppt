@@ -3444,8 +3444,8 @@ function App() {
     setLastImageReplaceEffect(effect)
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
-      elements: slide.elements.map((element) => {
-        if (element.id !== elementId || element.kind !== 'image') {
+      elements: mapPPTElementsByIds(slide.elements, [elementId], (element) => {
+        if (element.kind !== 'image') {
           return element
         }
 
@@ -3869,17 +3869,21 @@ function App() {
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) => application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
 
-          return appliedCategoryIds
-            ? applyPPTStyleClipboardToElement(
-                element,
-                styleClipboard,
-                appliedCategoryIds,
-              )
-            : element
-        }),
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
       })),
     )
   }
@@ -4386,11 +4390,7 @@ function App() {
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) => {
-          if (element.id !== elementId) {
-            return element
-          }
-
+        elements: mapPPTElementsByIds(slide.elements, [elementId], (element) => {
           const { field: pptField, value: fieldValue } =
             toPPTElementAnimationUpdate(effect.payload)
 
@@ -4530,6 +4530,19 @@ function App() {
         })),
       })),
     )
+  }
+
+  function mapPPTElementsByIds(
+    elements: PPTElement[],
+    elementIds: readonly string[],
+    mapElement: (element: PPTElement, index: number) => PPTElement,
+  ) {
+    return mapCanvasSelectionItems({
+      getItemId: (element) => element.id,
+      items: elements,
+      mapItem: mapElement,
+      selection: elementIds,
+    })
   }
 
   function mapSelectedPPTTextElements(
@@ -4987,13 +5000,10 @@ function App() {
     commitDeck((current) =>
       updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
         ...slide,
-        elements: slide.elements.map((element) =>
-          objectIds.has(element.id)
-            ? {
-                ...element,
-                visible,
-              }
-            : element),
+        elements: mapPPTElementsByIds(slide.elements, [...objectIds], (element) => ({
+          ...element,
+          visible,
+        })),
       })),
     )
   }
@@ -5030,14 +5040,11 @@ function App() {
         commitDeck((current) =>
           updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
             ...slide,
-            elements: slide.elements.map((element) =>
-              objectIds.has(element.id)
-                ? {
-                    ...element,
-                    ...(visible === null ? {} : { visible }),
-                    ...(locked === null ? {} : { locked }),
-                  }
-                : element),
+            elements: mapPPTElementsByIds(slide.elements, [...objectIds], (element) => ({
+              ...element,
+              ...(visible === null ? {} : { visible }),
+              ...(locked === null ? {} : { locked }),
+            })),
           })),
         )
         return
@@ -6117,11 +6124,7 @@ function App() {
 
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
-      elements: slide.elements.map((element) => {
-        if (!selection.includes(element.id)) {
-          return element
-        }
-
+      elements: mapPPTElementsByIds(slide.elements, selection, (element) => {
         const size = measurePPTElementAutoSize(element)
 
         if (!size) {
