@@ -3807,6 +3807,8 @@ function getPPTColorSwatchState(page, channel, elementId = '') {
     const recentColors = (document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-recent-colors') ?? '')
       .split(/\\s+/)
       .filter(Boolean)
+    const palette = document.querySelector(\`[data-ppt-color-swatch-palette="\${channel}"]\`)
+    const stage = document.querySelector('.ppt-stage-shell')
     const selectedTheme = document.querySelector(\`[data-ppt-color-swatch="\${channel}"][data-ppt-color-source="theme"][aria-pressed="true"]\`)
     const inputSelector = channel === 'shape-fill'
       ? '[data-ppt-style-field="fill"]'
@@ -3819,11 +3821,29 @@ function getPPTColorSwatchState(page, channel, elementId = '') {
     return {
       background: selected?.style.background ?? '',
       borderColor: selected?.style.borderColor ?? '',
+      command: stage?.getAttribute('data-ppt-color-swatch-command') ?? '',
+      commandChannel: stage?.getAttribute('data-ppt-color-swatch-command-channel') ?? '',
+      commandObjects: stage?.getAttribute('data-ppt-color-swatch-command-objects') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-color-swatch-command-slide') ?? '',
+      commandSource: stage?.getAttribute('data-ppt-color-swatch-command-source') ?? '',
+      commandSwatch: stage?.getAttribute('data-ppt-color-swatch-command-swatch') ?? '',
+      commandToken: stage?.getAttribute('data-ppt-color-swatch-command-token') ?? '',
+      commandType: stage?.getAttribute('data-ppt-color-swatch-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-color-swatch-command-value') ?? '',
+      descriptorCommand: palette?.getAttribute('data-ppt-color-swatch-command') ?? '',
+      descriptorControl: palette?.getAttribute('data-ppt-color-swatch-control') ?? '',
+      descriptorDisabled: palette?.getAttribute('data-ppt-color-swatch-disabled') ?? '',
+      descriptorMixed: palette?.getAttribute('data-ppt-color-swatch-mixed') ?? '',
+      descriptorModel: palette?.getAttribute('data-ppt-color-swatch-model') ?? '',
+      descriptorObjectIds: palette?.getAttribute('data-ppt-color-swatch-object-ids') ?? '',
+      descriptorSelectedId: palette?.getAttribute('data-ppt-color-swatch-selected-id') ?? '',
       exportSlice: exportIndex >= 0
         ? exportCode.slice(Math.max(0, exportIndex - 700), exportIndex + 1200)
         : '',
       fillValue: document.querySelector('[data-ppt-style-field="fill"]')?.value ?? '',
       inputValue: document.querySelector(inputSelector)?.value ?? '',
+      model: stage?.getAttribute('data-ppt-color-swatch-model') ?? '',
+      packageChannel: palette?.getAttribute('data-ppt-color-swatch-package-channel') ?? '',
       recentAccentCount: recentColors.filter((color) => color === '#2563eb').length,
       recentColors,
       recentCount: document.querySelectorAll(\`[data-ppt-color-swatch="\${channel}"][data-ppt-color-source="recent"]\`).length,
@@ -4114,6 +4134,20 @@ async function runTextQuickFormatScenario(page) {
   record(
     'applies PPT text theme color swatch to text color model',
     beforeTextColorSwatch.themeCount >= 4 &&
+      afterTextColorSwatch.model === 'slide-edit-color-swatch-palette' &&
+      afterTextColorSwatch.descriptorModel === 'color-swatch-palette' &&
+      afterTextColorSwatch.descriptorCommand === 'apply-color-swatch' &&
+      afterTextColorSwatch.descriptorControl === 'color-swatch-palette' &&
+      afterTextColorSwatch.descriptorDisabled === 'false' &&
+      afterTextColorSwatch.packageChannel === 'text' &&
+      afterTextColorSwatch.command === 'apply-color-swatch' &&
+      afterTextColorSwatch.commandChannel === 'text' &&
+      afterTextColorSwatch.commandObjects.includes('s1-title') &&
+      afterTextColorSwatch.commandSource === 'theme' &&
+      afterTextColorSwatch.commandSwatch === 'theme:ppt-color-accent' &&
+      afterTextColorSwatch.commandToken === 'ppt-color-accent' &&
+      afterTextColorSwatch.commandType === 'slide-command-effect' &&
+      afterTextColorSwatch.commandValue === '#2563eb' &&
       afterTextColorSwatch.inputValue === '#2563eb' &&
       afterTextColorSwatch.styleColor === 'rgb(37, 99, 235)' &&
       afterTextColorSwatch.selectedToken === 'ppt-color-accent' &&
@@ -5231,6 +5265,19 @@ async function runViewAndShapeScenario(page) {
   record(
     'applies PPT shape fill and stroke theme color swatches with undo redo',
     beforeShapeColorSwatch.themeCount >= 4 &&
+      afterShapeColorSwatch.model === 'slide-edit-color-swatch-palette' &&
+      afterShapeColorSwatch.descriptorModel === 'color-swatch-palette' &&
+      afterShapeColorSwatch.descriptorCommand === 'apply-color-swatch' &&
+      afterShapeColorSwatch.descriptorControl === 'color-swatch-palette' &&
+      afterShapeColorSwatch.packageChannel === 'stroke' &&
+      afterShapeColorSwatch.command === 'apply-color-swatch' &&
+      afterShapeColorSwatch.commandChannel === 'stroke' &&
+      afterShapeColorSwatch.commandObjects.includes(afterShapeColorSwatch.selectedId) &&
+      afterShapeColorSwatch.commandSource === 'theme' &&
+      afterShapeColorSwatch.commandSwatch === 'theme:ppt-color-background' &&
+      afterShapeColorSwatch.commandToken === 'ppt-color-background' &&
+      afterShapeColorSwatch.commandType === 'slide-command-effect' &&
+      afterShapeColorSwatch.commandValue === '#f8fafc' &&
       afterShapeColorSwatch.fillValue === '#2563eb' &&
       afterShapeColorSwatch.strokeValue === '#f8fafc' &&
       afterShapeColorSwatch.background.includes('37, 99, 235') &&
@@ -7600,6 +7647,19 @@ async function runLineAffordanceScenario(page) {
   record(
     'applies PPT line stroke theme color swatch',
     beforeLineColorSwatch.themeCount >= 4 &&
+      afterLineColorSwatch.model === 'slide-edit-color-swatch-palette' &&
+      afterLineColorSwatch.descriptorModel === 'color-swatch-palette' &&
+      afterLineColorSwatch.descriptorCommand === 'apply-color-swatch' &&
+      afterLineColorSwatch.descriptorControl === 'color-swatch-palette' &&
+      afterLineColorSwatch.packageChannel === 'line-stroke' &&
+      afterLineColorSwatch.command === 'apply-color-swatch' &&
+      afterLineColorSwatch.commandChannel === 'line-stroke' &&
+      afterLineColorSwatch.commandObjects.includes(lineId) &&
+      afterLineColorSwatch.commandSource === 'theme' &&
+      afterLineColorSwatch.commandSwatch === 'theme:ppt-color-accent' &&
+      afterLineColorSwatch.commandToken === 'ppt-color-accent' &&
+      afterLineColorSwatch.commandType === 'slide-command-effect' &&
+      afterLineColorSwatch.commandValue === '#2563eb' &&
       afterLineColorSwatch.stroke === '#2563eb' &&
       afterLineColorSwatch.inputValue === '#2563eb' &&
       afterLineColorSwatch.recentAccentCount === 1 &&
@@ -8018,6 +8078,19 @@ async function runFreeformScenario(page) {
   record(
     'applies PPT freeform stroke theme color swatch',
     afterFreeformColorSwatch.selectedKind === 'freeform' &&
+      afterFreeformColorSwatch.model === 'slide-edit-color-swatch-palette' &&
+      afterFreeformColorSwatch.descriptorModel === 'color-swatch-palette' &&
+      afterFreeformColorSwatch.descriptorCommand === 'apply-color-swatch' &&
+      afterFreeformColorSwatch.descriptorControl === 'color-swatch-palette' &&
+      afterFreeformColorSwatch.packageChannel === 'line-stroke' &&
+      afterFreeformColorSwatch.command === 'apply-color-swatch' &&
+      afterFreeformColorSwatch.commandChannel === 'line-stroke' &&
+      afterFreeformColorSwatch.commandObjects.includes(freeformId) &&
+      afterFreeformColorSwatch.commandSource === 'theme' &&
+      afterFreeformColorSwatch.commandSwatch === 'theme:ppt-color-accent' &&
+      afterFreeformColorSwatch.commandToken === 'ppt-color-accent' &&
+      afterFreeformColorSwatch.commandType === 'slide-command-effect' &&
+      afterFreeformColorSwatch.commandValue === '#2563eb' &&
       afterFreeformColorSwatch.stroke === '#2563eb' &&
       afterFreeformColorSwatch.inputValue === '#2563eb' &&
       afterFreeformColorSwatch.recentAccentCount === 1 &&

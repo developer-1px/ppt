@@ -92,6 +92,7 @@ import {
   type RefObject,
 } from 'react'
 import {
+  createSlideEditColorSwatchPaletteDescriptor,
   createSlideEditObjectAccessibilityDescriptor,
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
@@ -109,6 +110,8 @@ import {
   createSlideEditTextParagraphSpacingDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
   getSlideEditFrameGuideGeometry,
+  getSlideEditColorSwatchCommandEffect,
+  getSlideEditColorSwatchId,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
@@ -132,6 +135,7 @@ import {
   normalizeSlideEditObjectAnimationDelayMs,
   normalizeSlideEditObjectAnimationDurationMs,
   normalizeSlideEditObjectAnimationOrder,
+  normalizeSlideEditColorSwatchValue,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
@@ -142,6 +146,7 @@ import {
   normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
+  SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
@@ -160,6 +165,10 @@ import {
   type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditBuiltInAnimationTrigger,
+  type SlideEditColorSwatchBuiltInChannelId,
+  type SlideEditColorSwatchHostCommandEffect,
+  type SlideEditColorSwatchPaletteDescriptor,
+  type SlideEditColorSwatchSelection,
   type SlideEditBuiltInAnimationType,
   type SlideEditObjectAnimationDescriptor,
   type SlideEditObjectAnimationHostCommandEffect,
@@ -770,6 +779,26 @@ type PPTColorSwatchChannel =
   | 'shape-fill'
   | 'shape-stroke'
   | 'text-color'
+type PPTColorSwatchPackageChannel = SlideEditColorSwatchBuiltInChannelId
+type PPTColorSwatchDescriptor = SlideEditColorSwatchPaletteDescriptor<
+  string,
+  string,
+  PPTColorSwatchPackageChannel,
+  string
+>
+type PPTColorSwatchHostCommandEffect = SlideEditColorSwatchHostCommandEffect<
+  string,
+  string,
+  PPTColorSwatchPackageChannel,
+  string
+>
+type PPTColorSwatchSelection = SlideEditColorSwatchSelection<string>
+const PPT_COLOR_SWATCH_CHANNEL_MAP = {
+  'line-stroke': 'line-stroke',
+  'shape-fill': 'fill',
+  'shape-stroke': 'stroke',
+  'text-color': 'text',
+} as const satisfies Record<PPTColorSwatchChannel, PPTColorSwatchPackageChannel>
 type PPTSurfaceCommand =
   | 'alignCenter'
   | 'alignLeft'
@@ -1636,6 +1665,7 @@ function App() {
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
+  const [lastColorSwatchEffect, setLastColorSwatchEffect] = useState<PPTColorSwatchHostCommandEffect | null>(null)
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
@@ -4458,6 +4488,52 @@ function App() {
     )
   }
 
+  function applyColorSwatch(
+    elementId: string,
+    channel: PPTColorSwatchChannel,
+    color: string,
+    swatch: PPTColorSwatchSelection,
+  ) {
+    const normalizedColor = normalizePPTSwatchColor(color) ||
+      normalizeSlideEditColorSwatchValue(color) ||
+      ''
+    const effect = getSlideEditColorSwatchCommandEffect({
+      channelId: getPPTColorSwatchPackageChannel(channel),
+      id: 'apply-color-swatch',
+      objectIds: [elementId],
+      slideId: activeSlide.id,
+      swatch: {
+        ...swatch,
+        swatchId: swatch.swatchId || getSlideEditColorSwatchId({
+          source: swatch.source,
+          tokenId: swatch.tokenId,
+          value: normalizedColor,
+        }),
+        value: swatch.value || normalizedColor,
+      },
+    })
+    const nextColor = normalizePPTSwatchColor(effect.payload.swatch.value) ||
+      effect.payload.swatch.value
+
+    if (!nextColor) {
+      return
+    }
+
+    setLastColorSwatchEffect(effect)
+
+    if (channel === 'text-color') {
+      updateElementTextStyle(elementId, 'color', nextColor)
+      return
+    }
+
+    if (channel === 'shape-fill') {
+      updateShapeFill(elementId, 'color', nextColor)
+      return
+    }
+
+    updateElementStroke(elementId, 'color', nextColor)
+  }
+
   function updateParagraphAlign(
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
@@ -6757,6 +6833,16 @@ function App() {
           .join(' ')}
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-color-swatch-command={lastColorSwatchEffect?.payload.id}
+        data-ppt-color-swatch-command-channel={lastColorSwatchEffect?.payload.channelId}
+        data-ppt-color-swatch-command-objects={lastColorSwatchEffect?.payload.objectIds.join(' ')}
+        data-ppt-color-swatch-command-slide={lastColorSwatchEffect?.payload.slideId}
+        data-ppt-color-swatch-command-source={lastColorSwatchEffect?.payload.swatch.source}
+        data-ppt-color-swatch-command-swatch={lastColorSwatchEffect?.payload.swatch.swatchId}
+        data-ppt-color-swatch-command-token={lastColorSwatchEffect?.payload.swatch.tokenId}
+        data-ppt-color-swatch-command-type={lastColorSwatchEffect?.type}
+        data-ppt-color-swatch-command-value={lastColorSwatchEffect?.payload.swatch.value}
+        data-ppt-color-swatch-model="slide-edit-color-swatch-palette"
         data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
         data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
         data-ppt-placeholder-visibility-command-selection={lastPlaceholderVisibilityEffect?.selection.objectIds.join(' ') ?? undefined}
@@ -7059,6 +7145,7 @@ function App() {
         onCommentResolvedChange={updateCommentResolved}
         onCommitText={commitText}
         onCopyHTML={copyHTML}
+        onColorSwatchApply={applyColorSwatch}
         onDownloadHTML={downloadHTML}
         onElementAltTextChange={updateElementAltText}
         onElementAnimationChange={updateElementAnimation}
@@ -10664,75 +10751,86 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
 function PPTColorSwatchStrip({
   channel,
   currentColor,
+  objectIds,
   recentColors,
+  slideId,
   themeColorTokens,
   onSelect,
 }: {
   channel: PPTColorSwatchChannel
   currentColor: string
+  objectIds: readonly string[]
   recentColors: readonly string[]
+  slideId: string
   themeColorTokens: readonly SlideEditThemeColorToken[]
-  onSelect: (color: string) => void
+  onSelect: (color: string, swatch: PPTColorSwatchSelection) => void
 }) {
-  const normalizedCurrent = normalizePPTSwatchColor(currentColor)
-  const normalizedRecentColors = getPPTUniqueSwatchColors(recentColors)
+  const descriptor = getPPTColorSwatchDescriptor({
+    channel,
+    currentColor,
+    objectIds,
+    recentColors,
+    slideId,
+    themeColorTokens,
+  })
+  const swatchCount = descriptor.sections.reduce(
+    (count, section) => count + section.swatches.length,
+    0,
+  )
+  const recentSection = descriptor.sections.find((section) => section.id === 'recent')
 
   return (
     <div
       className="ppt-color-swatch-strip"
       data-ppt-color-swatch-channel={channel}
-      data-ppt-color-swatch-count={themeColorTokens.length + normalizedRecentColors.length}
+      data-ppt-color-swatch-command={descriptor.field.commandId}
+      data-ppt-color-swatch-control={descriptor.field.control}
+      data-ppt-color-swatch-count={swatchCount}
+      data-ppt-color-swatch-disabled={descriptor.state.isDisabled ? 'true' : 'false'}
+      data-ppt-color-swatch-disabled-reason={descriptor.state.disabledReason}
+      data-ppt-color-swatch-mixed={descriptor.state.isMixed ? 'true' : 'false'}
+      data-ppt-color-swatch-model={descriptor.surface}
+      data-ppt-color-swatch-object-ids={descriptor.objectIds.join(' ')}
+      data-ppt-color-swatch-package-channel={descriptor.channel.id}
+      data-ppt-color-swatch-palette={channel}
+      data-ppt-color-swatch-selected-id={descriptor.state.selectedSwatchId}
       data-ppt-color-swatch-strip={channel}
-      data-ppt-recent-color-count={normalizedRecentColors.length}
+      data-ppt-recent-color-count={recentSection?.swatches.length ?? 0}
     >
-      <div className="ppt-color-swatch-group" data-ppt-color-swatch-group="theme">
-        {themeColorTokens.map((token) => {
-          const color = normalizePPTSwatchColor(token.value) || token.value
-          const selected = normalizedCurrent === normalizePPTSwatchColor(color)
-
-          return (
-            <button
-              aria-label={`${token.label} ${channel}`}
-              aria-pressed={selected}
-              className="ppt-color-swatch"
-              data-ppt-color-source="theme"
-              data-ppt-color-swatch={channel}
-              data-ppt-color-swatch-selected={selected ? 'true' : undefined}
-              data-ppt-color-token={token.tokenId}
-              data-ppt-color-value={color}
-              key={token.tokenId}
-              style={{ backgroundColor: color }}
-              title={token.label}
-              type="button"
-              onClick={() => onSelect(color)}
-            />
-          )
-        })}
-      </div>
-      {normalizedRecentColors.length > 0 ? (
-        <div className="ppt-color-swatch-group" data-ppt-color-swatch-group="recent">
-          {normalizedRecentColors.map((color) => {
-            const selected = normalizedCurrent === color
-
-            return (
+      {descriptor.sections.map((section) =>
+        section.swatches.length > 0 ? (
+          <div
+            className="ppt-color-swatch-group"
+            data-ppt-color-swatch-group={section.id}
+            key={section.id}
+          >
+            {section.swatches.map((swatch) => (
               <button
-                aria-label={`Recent ${color} ${channel}`}
-                aria-pressed={selected}
+                aria-label={`${swatch.label} ${channel}`}
+                aria-pressed={swatch.selected}
                 className="ppt-color-swatch"
-                data-ppt-color-source="recent"
+                data-ppt-color-source={swatch.source}
                 data-ppt-color-swatch={channel}
-                data-ppt-color-swatch-selected={selected ? 'true' : undefined}
-                data-ppt-color-value={color}
-                key={color}
-                style={{ backgroundColor: color }}
-                title={color}
+                data-ppt-color-swatch-id={swatch.id}
+                data-ppt-color-swatch-selected={swatch.selected ? 'true' : undefined}
+                data-ppt-color-token={swatch.tokenId}
+                data-ppt-color-value={swatch.value}
+                disabled={descriptor.state.isDisabled}
+                key={swatch.id}
+                style={{ backgroundColor: swatch.value }}
+                title={swatch.label}
                 type="button"
-                onClick={() => onSelect(color)}
+                onClick={() =>
+                  onSelect(swatch.value, {
+                    source: swatch.source,
+                    swatchId: swatch.id,
+                    tokenId: swatch.tokenId,
+                    value: swatch.value,
+                  })}
               />
-            )
-          })}
-        </div>
-      ) : null}
+            ))}
+          </div>
+        ) : null)}
     </div>
   )
 }
@@ -10744,6 +10842,7 @@ function Inspector({
   layoutPlaceholderVisibilityDescriptors,
   layoutPlaceholders,
   lastPlaceholderVisibilityEffect,
+  onColorSwatchApply,
   onCommentBodyChange,
   onCommentResolvedChange,
   onCommitText,
@@ -10797,6 +10896,12 @@ function Inspector({
   layoutPlaceholderVisibilityDescriptors: readonly SlideEditPlaceholderDescriptor<string, string>[]
   layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
   lastPlaceholderVisibilityEffect: PPTLayoutPlaceholderVisibilityHostCommandEffect | null
+  onColorSwatchApply: (
+    elementId: string,
+    channel: PPTColorSwatchChannel,
+    color: string,
+    swatch: PPTColorSwatchSelection,
+  ) => void
   onCommentBodyChange: (elementId: string, value: string) => void
   onCommentResolvedChange: (elementId: string, resolved: boolean) => void
   onCommitText: (elementId: string, text: string) => void
@@ -11819,10 +11924,12 @@ function Inspector({
                     <PPTColorSwatchStrip
                       channel="text-color"
                       currentColor={textStyle?.color ?? '#111827'}
+                      objectIds={[selectedElement.id]}
                       recentColors={recentColors}
+                      slideId={slide.id}
                       themeColorTokens={themeColorTokens}
-                      onSelect={(color) =>
-                        onElementTextStyleChange(selectedElement.id, 'color', color)}
+                      onSelect={(color, swatch) =>
+                        onColorSwatchApply(selectedElement.id, 'text-color', color, swatch)}
                     />
                   </div>
                   <label className="ppt-field">
@@ -12120,10 +12227,12 @@ function Inspector({
                     <PPTColorSwatchStrip
                       channel="shape-fill"
                       currentColor={selectedElement.fill.color}
+                      objectIds={[selectedElement.id]}
                       recentColors={recentColors}
+                      slideId={slide.id}
                       themeColorTokens={themeColorTokens}
-                      onSelect={(color) =>
-                        onShapeFillChange(selectedElement.id, 'color', color)}
+                      onSelect={(color, swatch) =>
+                        onColorSwatchApply(selectedElement.id, 'shape-fill', color, swatch)}
                     />
                   </div>
                   <div className="ppt-color-control" data-ppt-color-control="shape-stroke">
@@ -12144,10 +12253,12 @@ function Inspector({
                     <PPTColorSwatchStrip
                       channel="shape-stroke"
                       currentColor={selectedElement.stroke?.color ?? '#111827'}
+                      objectIds={[selectedElement.id]}
                       recentColors={recentColors}
+                      slideId={slide.id}
                       themeColorTokens={themeColorTokens}
-                      onSelect={(color) =>
-                        onElementStrokeChange(selectedElement.id, 'color', color)}
+                      onSelect={(color, swatch) =>
+                        onColorSwatchApply(selectedElement.id, 'shape-stroke', color, swatch)}
                     />
                   </div>
                 </div>
@@ -12319,10 +12430,12 @@ function Inspector({
                     <PPTColorSwatchStrip
                       channel="line-stroke"
                       currentColor={selectedElement.stroke.color}
+                      objectIds={[selectedElement.id]}
                       recentColors={recentColors}
+                      slideId={slide.id}
                       themeColorTokens={themeColorTokens}
-                      onSelect={(color) =>
-                        onElementStrokeChange(selectedElement.id, 'color', color)}
+                      onSelect={(color, swatch) =>
+                        onColorSwatchApply(selectedElement.id, 'line-stroke', color, swatch)}
                     />
                   </div>
                   <label className="ppt-field">
@@ -13679,28 +13792,65 @@ function normalizePPTColorHex(color: string) {
     : value.toLowerCase()
 }
 
+function getPPTColorSwatchPackageChannel(
+  channel: PPTColorSwatchChannel,
+): PPTColorSwatchPackageChannel {
+  return PPT_COLOR_SWATCH_CHANNEL_MAP[channel]
+}
+
+function getPPTColorSwatchChannelDescriptor(
+  channel: PPTColorSwatchChannel,
+) {
+  const packageChannel = getPPTColorSwatchPackageChannel(channel)
+
+  return SLIDE_EDIT_COLOR_SWATCH_CHANNELS.find((item) =>
+    item.id === packageChannel) ?? {
+    id: packageChannel,
+    label: packageChannel,
+  }
+}
+
+function getPPTColorSwatchDescriptor({
+  channel,
+  currentColor,
+  objectIds,
+  recentColors,
+  slideId,
+  themeColorTokens,
+}: {
+  channel: PPTColorSwatchChannel
+  currentColor: string
+  objectIds: readonly string[]
+  recentColors: readonly string[]
+  slideId: string
+  themeColorTokens: readonly SlideEditThemeColorToken[]
+}): PPTColorSwatchDescriptor {
+  const selectedValue = normalizePPTSwatchColor(currentColor) ||
+    normalizeSlideEditColorSwatchValue(currentColor)
+  const selectedTokenId = selectedValue
+    ? themeColorTokens.find((token) =>
+        normalizePPTSwatchColor(token.value) === selectedValue ||
+        token.value === selectedValue,
+      )?.tokenId ?? null
+    : null
+
+  return createSlideEditColorSwatchPaletteDescriptor({
+    channel: getPPTColorSwatchChannelDescriptor(channel),
+    disabledReason: objectIds.length > 0 ? undefined : 'no-selection',
+    isDisabled: objectIds.length === 0,
+    objectIds,
+    recentColors,
+    selectedTokenId,
+    selectedValue,
+    slideId,
+    themeColorTokens,
+  })
+}
+
 function normalizePPTSwatchColor(color: string) {
   const hex = normalizePPTColorHex(color)
 
   return hex ? `#${hex}` : ''
-}
-
-function getPPTUniqueSwatchColors(colors: readonly string[]) {
-  const seen = new Set<string>()
-  const unique: string[] = []
-
-  for (const color of colors) {
-    const normalized = normalizePPTSwatchColor(color)
-
-    if (!normalized || seen.has(normalized)) {
-      continue
-    }
-
-    seen.add(normalized)
-    unique.push(normalized)
-  }
-
-  return unique
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {
