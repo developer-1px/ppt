@@ -7169,6 +7169,58 @@ async function runImageImportScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-image-replace-input]')
+    const filesSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files').set
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(${createPPTTestImageFileExpression('replacement.svg', '#7c3aed')})
+    filesSetter.call(input, dataTransfer.files)
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(150)
+
+  const afterReplace = await getPPTImageImportState(page)
+
+  record(
+    'replaces selected PPT image source while preserving retouch state',
+    afterReplace.imageCount === afterResetUndo.imageCount &&
+      afterReplace.selectedId === afterResetUndo.selectedId &&
+      afterReplace.selectedName === 'replacement.svg' &&
+      afterReplace.selectedAltText === 'replacement.svg' &&
+      afterReplace.selectedImageSrc !== afterResetUndo.selectedImageSrc &&
+      afterReplace.selectedImageSrc.startsWith('data:image/svg+xml') &&
+      afterReplace.selectedLeft === afterResetUndo.selectedLeft &&
+      afterReplace.selectedTop === afterResetUndo.selectedTop &&
+      afterReplace.selectedWidth === afterResetUndo.selectedWidth &&
+      afterReplace.selectedImageFit === 'contain' &&
+      afterReplace.selectedImagePosition === '25% 70%' &&
+      afterReplace.inspectorImageFit === 'contain' &&
+      afterReplace.inspectorCropX === 25 &&
+      afterReplace.inspectorCropY === 70,
+    {
+      afterReplace,
+      afterResetUndo,
+    },
+  )
+  record(
+    'routes PPT image replacement through slide-edit replace command-effect',
+    afterReplace.imageReplaceModel === 'slide-edit-object-image-replace' &&
+      afterReplace.imageReplaceCommand === 'replace-object-image' &&
+      afterReplace.imageReplaceCommandMime === 'image/svg+xml' &&
+      afterReplace.imageReplaceCommandName === 'replacement.svg' &&
+      afterReplace.imageReplaceCommandObject === afterReplace.selectedId &&
+      afterReplace.imageReplaceCommandSrcPrefix.startsWith('data:image/svg+xml') &&
+      afterReplace.imageReplaceCommandType === 'slide-command-effect' &&
+      afterReplace.imageReplaceDescriptorAttribute === 'data-slide-object-image-replace' &&
+      afterReplace.imageReplaceDescriptorAttributeValue === 'ready' &&
+      afterReplace.imageReplaceDescriptorCommand === 'replace-object-image' &&
+      afterReplace.imageReplaceDescriptorControl === 'image-source-file-input' &&
+      afterReplace.imageReplaceDescriptorField === 'source' &&
+      afterReplace.imageReplaceDescriptorSourceName === 'replacement.svg' &&
+      afterReplace.imageReplaceDescriptorSurface === 'object-image-replace',
+    afterReplace,
+  )
+
   const beforeResize = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
@@ -10725,10 +10777,26 @@ function getPPTImageImportState(page) {
       imageCropYDescriptorCommand: cropYField?.getAttribute('data-ppt-image-crop-command') ?? '',
       imageCropYDescriptorControl: cropYField?.getAttribute('data-ppt-image-crop-control') ?? '',
       imageCropYDescriptorSurface: cropYField?.getAttribute('data-ppt-image-crop-surface') ?? '',
+      imageReplaceCommand: stage?.getAttribute('data-ppt-image-replace-command') ?? '',
+      imageReplaceCommandMime: stage?.getAttribute('data-ppt-image-replace-command-mime') ?? '',
+      imageReplaceCommandName: stage?.getAttribute('data-ppt-image-replace-command-name') ?? '',
+      imageReplaceCommandObject: stage?.getAttribute('data-ppt-image-replace-command-object') ?? '',
+      imageReplaceCommandSlide: stage?.getAttribute('data-ppt-image-replace-command-slide') ?? '',
+      imageReplaceCommandSrcPrefix: stage?.getAttribute('data-ppt-image-replace-command-src-prefix') ?? '',
+      imageReplaceCommandType: stage?.getAttribute('data-ppt-image-replace-command-type') ?? '',
+      imageReplaceDescriptorAttribute: document.querySelector('[data-ppt-image-replace-input]')?.getAttribute('data-ppt-image-replace-attribute') ?? '',
+      imageReplaceDescriptorAttributeValue: document.querySelector('[data-ppt-image-replace-input]')?.getAttribute('data-ppt-image-replace-attribute-value') ?? '',
+      imageReplaceDescriptorCommand: document.querySelector('[data-ppt-image-replace-action]')?.getAttribute('data-ppt-image-replace-command') ?? '',
+      imageReplaceDescriptorControl: document.querySelector('[data-ppt-image-replace-action]')?.getAttribute('data-ppt-image-replace-control') ?? '',
+      imageReplaceDescriptorField: document.querySelector('[data-ppt-image-replace-action]')?.getAttribute('data-ppt-image-replace-field') ?? '',
+      imageReplaceDescriptorSourceName: document.querySelector('[data-ppt-image-replace-input]')?.getAttribute('data-ppt-image-replace-source-name') ?? '',
+      imageReplaceDescriptorSurface: document.querySelector('[data-ppt-image-replace-action]')?.getAttribute('data-ppt-image-replace-surface') ?? '',
+      imageReplaceModel: stage?.getAttribute('data-ppt-image-replace-model') ?? '',
       inspectorCropX: Number(cropXField?.value ?? 0),
       inspectorCropY: Number(cropYField?.value ?? 0),
       inspectorImageFit: fitField?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
+      selectedAltText: selectedImage?.getAttribute('alt') ?? '',
       selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
       selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
@@ -10736,6 +10804,7 @@ function getPPTImageImportState(page) {
       selectedImagePosition: selectedImage?.style.objectPosition ?? '',
       selectedImageSrc: selectedImage?.getAttribute('src') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),

@@ -99,6 +99,7 @@ import {
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
   createSlideEditObjectImageCropDescriptor,
+  createSlideEditObjectImageReplaceDescriptor,
   createSlideEditObjectAnimationDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
@@ -122,6 +123,7 @@ import {
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectImageCropCommandEffect,
+  getSlideEditObjectImageReplaceCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
@@ -185,6 +187,8 @@ import {
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectImageCropDescriptor,
   type SlideEditObjectImageCropHostCommandEffect,
+  type SlideEditObjectImageReplaceDescriptor,
+  type SlideEditObjectImageReplaceHostCommandEffect,
   type SlideEditBuiltInAnimationTrigger,
   type SlideEditColorSwatchBuiltInChannelId,
   type SlideEditColorSwatchHostCommandEffect,
@@ -1668,6 +1672,7 @@ function App() {
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
   const [lastImageCropEffect, setLastImageCropEffect] = useState<SlideEditObjectImageCropHostCommandEffect<string, string> | null>(null)
+  const [lastImageReplaceEffect, setLastImageReplaceEffect] = useState<SlideEditObjectImageReplaceHostCommandEffect<string, string> | null>(null)
   const [lastObjectAnimationEffect, setLastObjectAnimationEffect] = useState<SlideEditObjectAnimationHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
@@ -3042,6 +3047,67 @@ function App() {
     }
 
     insertPPTImageSource(source, center)
+    return true
+  }
+
+  function replacePPTImageSource(
+    elementId: string,
+    source: PPTImageImportSource,
+  ) {
+    const effect = getSlideEditObjectImageReplaceCommandEffect({
+      id: 'replace-object-image',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      source: {
+        altText: source.name,
+        mimeType: source.mimeType,
+        name: source.name,
+        naturalHeight: source.naturalHeight,
+        naturalWidth: source.naturalWidth,
+        src: source.dataUrl,
+      },
+    })
+
+    setLastImageReplaceEffect(effect)
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: slide.elements.map((element) => {
+        if (element.id !== elementId || element.kind !== 'image') {
+          return element
+        }
+
+        return {
+          ...element,
+          alt: effect.payload.source.altText ??
+            effect.payload.source.name ??
+            element.alt,
+          name: effect.payload.source.name ?? element.name,
+          src: effect.payload.source.src,
+        }
+      }),
+    })))
+    setSelection([elementId])
+    setEditingId(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    setContextMenu(null)
+  }
+
+  async function replacePPTImageFile(
+    elementId: string,
+    file: Blob & { name?: string },
+  ) {
+    const source = await readPPTImageFileSource(file)
+
+    if (!source) {
+      return false
+    }
+
+    replacePPTImageSource(elementId, source)
     return true
   }
 
@@ -6926,6 +6992,16 @@ function App() {
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
+        data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
+        data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
+        data-ppt-image-replace-command-name={lastImageReplaceEffect?.payload.source.name}
+        data-ppt-image-replace-command-natural-height={lastImageReplaceEffect?.payload.source.naturalHeight}
+        data-ppt-image-replace-command-natural-width={lastImageReplaceEffect?.payload.source.naturalWidth}
+        data-ppt-image-replace-command-object={lastImageReplaceEffect?.payload.objectId}
+        data-ppt-image-replace-command-slide={lastImageReplaceEffect?.payload.slideId}
+        data-ppt-image-replace-command-src-prefix={lastImageReplaceEffect?.payload.source.src.slice(0, 19)}
+        data-ppt-image-replace-command-type={lastImageReplaceEffect?.type}
+        data-ppt-image-replace-model="slide-edit-object-image-replace"
         data-ppt-object-animation-command={lastObjectAnimationEffect?.payload.id}
         data-ppt-object-animation-command-field={lastObjectAnimationEffect?.payload.fieldId}
         data-ppt-object-animation-command-object={lastObjectAnimationEffect?.payload.objectId}
@@ -7162,6 +7238,7 @@ function App() {
         onImageCropChange={updateImageCrop}
         onImageCropReset={resetImageCrop}
         onImageFitChange={updateImageFit}
+        onImageReplaceFile={replacePPTImageFile}
         onElementNameChange={updateElementName}
         onElementOpacityChange={updateElementOpacity}
         onElementRotationChange={updateElementRotation}
@@ -10660,6 +10737,7 @@ function Inspector({
   onImageCropChange,
   onImageCropReset,
   onImageFitChange,
+  onImageReplaceFile,
   onLayerPaneCommandEffect,
   onLayoutPlaceholderVisibilityChange,
   onLineMarkerChange,
@@ -10751,6 +10829,10 @@ function Inspector({
     elementId: string,
     fit: PPTImageFit,
   ) => void
+  onImageReplaceFile: (
+    elementId: string,
+    file: Blob & { name?: string },
+  ) => Promise<boolean>
   onLayerPaneCommandEffect: (effect: PPTLayerPaneHostCommandEffect) => void
   onLayoutPlaceholderVisibilityChange: (
     placeholderId: string,
@@ -10849,6 +10931,9 @@ function Inspector({
   const imageCropDescriptor = selectedElement?.kind === 'image'
     ? getPPTImageCropDescriptor(slide.id, selectedElement)
     : null
+  const imageReplaceDescriptor = selectedElement?.kind === 'image'
+    ? getPPTImageReplaceDescriptor(slide.id, selectedElement)
+    : null
   const objectOpacityDescriptor = selectedElement
     ? getPPTObjectOpacityDescriptor(slide.id, selectedElement)
     : null
@@ -10876,6 +10961,7 @@ function Inspector({
   const objectAnimationDescriptor = selectedElement
     ? getPPTObjectAnimationDescriptor(slide, selectedElement)
     : null
+  const imageReplaceInputRef = useRef<HTMLInputElement | null>(null)
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -12490,6 +12576,45 @@ function Inspector({
                 >
                   <Undo2 size={15} /> Reset
                 </button>
+                <input
+                  accept={imageReplaceDescriptor?.field.accept ?? 'image/*'}
+                  className="ppt-file-input"
+                  data-ppt-image-replace-attribute={imageReplaceDescriptor?.metadata.attribute}
+                  data-ppt-image-replace-attribute-value={imageReplaceDescriptor?.metadata.attributeValue}
+                  data-ppt-image-replace-command={imageReplaceDescriptor?.field.commandId}
+                  data-ppt-image-replace-control={imageReplaceDescriptor?.field.control}
+                  data-ppt-image-replace-field={imageReplaceDescriptor?.field.id}
+                  data-ppt-image-replace-input
+                  data-ppt-image-replace-source-name={imageReplaceDescriptor?.sourceName}
+                  data-ppt-image-replace-supported={imageReplaceDescriptor?.isSupported ? 'true' : 'false'}
+                  data-ppt-image-replace-surface={imageReplaceDescriptor?.surface}
+                  ref={imageReplaceInputRef}
+                  tabIndex={-1}
+                  type="file"
+                  onChange={(event) => {
+                    const file = getPPTImageFileFromList(event.target.files)
+
+                    if (file) {
+                      void onImageReplaceFile(selectedElement.id, file)
+                    }
+
+                    event.target.value = ''
+                  }}
+                />
+                <button
+                  className="ppt-button"
+                  data-ppt-image-replace-action
+                  data-ppt-image-replace-command={imageReplaceDescriptor?.field.commandId}
+                  data-ppt-image-replace-control={imageReplaceDescriptor?.field.control}
+                  data-ppt-image-replace-field={imageReplaceDescriptor?.field.id}
+                  data-ppt-image-replace-supported={imageReplaceDescriptor?.isSupported ? 'true' : 'false'}
+                  data-ppt-image-replace-surface={imageReplaceDescriptor?.surface}
+                  disabled={imageReplaceDescriptor?.isSupported === false}
+                  type="button"
+                  onClick={() => imageReplaceInputRef.current?.click()}
+                >
+                  <ImagePlus size={15} /> Change
+                </button>
               </>
             ) : null}
             {selectedElement.kind === 'table' ? (
@@ -13706,6 +13831,19 @@ function getPPTImageCropDescriptor(
     fit: getPPTImageFit(element),
     objectId: element.id,
     slideId,
+  })
+}
+
+function getPPTImageReplaceDescriptor(
+  slideId: string,
+  element: PPTImage,
+): SlideEditObjectImageReplaceDescriptor<string, string> {
+  return createSlideEditObjectImageReplaceDescriptor({
+    isSupported: element.locked !== true && element.visible !== false,
+    objectId: element.id,
+    slideId,
+    sourceName: element.name,
+    unsupportedReason: element.locked === true ? 'locked-object' : 'unsupported-object',
   })
 }
 
