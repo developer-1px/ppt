@@ -345,6 +345,7 @@ import {
   updatePPTDeckSlide,
   type PPTDeck,
   type PPTComment,
+  type PPTCommentThreadMessage,
   type PPTElement,
   type PPTElementAccessibility,
   type PPTElementAnimation,
@@ -1126,6 +1127,21 @@ type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
+type PPTCommentThreadCommand = {
+  body: string
+  id: 'add-comment-reply'
+  messageCount: number
+  objectId: string
+  slideId: string
+}
+type PPTCommentThreadHostCommandEffect = {
+  payload: PPTCommentThreadCommand
+  selection: {
+    objectIds: readonly string[]
+    slideId: string
+  }
+  type: 'slide-command-effect'
+}
 type PPTLayerPaneGroupState = {
   collapsedGroupIds: readonly string[]
   focusedObjectId: string | null
@@ -1324,6 +1340,7 @@ const PPT_COMMENT_DEFAULT_BODY = 'Comment'
 const PPT_COMMENT_DEFAULT_AUTHOR = 'You'
 const PPT_COMMENT_DEFAULT_CREATED_AT = 'Just now'
 const PPT_COMMENT_BODY_MAX_LENGTH = 240
+const PPT_COMMENT_REPLY_MAX_LENGTH = 240
 const PPT_COMMENT_BOUNDS = {
   h: 132,
   w: 260,
@@ -1668,6 +1685,7 @@ function App() {
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
   const [lastColorSwatchEffect, setLastColorSwatchEffect] = useState<PPTColorSwatchHostCommandEffect | null>(null)
+  const [lastCommentThreadEffect, setLastCommentThreadEffect] = useState<PPTCommentThreadHostCommandEffect | null>(null)
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
@@ -4364,6 +4382,42 @@ function App() {
     )
   }
 
+  function addCommentReply(
+    elementId: string,
+    value: string,
+  ) {
+    const body = normalizePPTCommentReplyBody(value)
+
+    if (body.trim().length === 0) {
+      return
+    }
+
+    const comment = findPPTElement(activeSlide, elementId)
+
+    if (!comment || comment.kind !== 'comment') {
+      return
+    }
+
+    const thread = getPPTCommentThread(comment)
+    const message = createPPTCommentReplyMessage(comment, body, thread.length)
+    const nextThread = [...thread, message]
+    const effect = toPPTCommentThreadHostCommandEffect({
+      body,
+      id: 'add-comment-reply',
+      messageCount: nextThread.length,
+      objectId: elementId,
+      slideId: activeSlide.id,
+    })
+
+    setLastCommentThreadEffect(effect)
+    commitDeck((current) =>
+      updatePPTDeckElement(current, effect.selection.slideId, elementId, (element) =>
+        element.kind === 'comment'
+          ? { ...element, thread: nextThread }
+          : element),
+    )
+  }
+
   function applyLayerPaneCommandEffect(effect: PPTLayerPaneHostCommandEffect) {
     const payload = effect.payload
 
@@ -6936,6 +6990,14 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}
+        data-ppt-comment-thread-command-body={lastCommentThreadEffect?.payload.body}
+        data-ppt-comment-thread-command-count={lastCommentThreadEffect?.payload.messageCount}
+        data-ppt-comment-thread-command-object={lastCommentThreadEffect?.payload.objectId}
+        data-ppt-comment-thread-command-selection={lastCommentThreadEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-comment-thread-command-slide={lastCommentThreadEffect?.payload.slideId}
+        data-ppt-comment-thread-command-type={lastCommentThreadEffect?.type}
+        data-ppt-comment-thread-model="canvas-comment-thread"
         data-ppt-accessibility-command={lastAccessibilityEffect?.payload.id}
         data-ppt-accessibility-command-field={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
           ? lastAccessibilityEffect.payload.fieldId
@@ -7226,6 +7288,7 @@ function App() {
         slideTransition={activeSlideTransition}
         themeColorTokens={PPT_THEME_DESCRIPTOR.colorTokens}
         onCommentBodyChange={updateCommentBody}
+        onCommentReplyAdd={addCommentReply}
         onCommentResolvedChange={updateCommentResolved}
         onCommitText={commitText}
         onCopyHTML={copyHTML}
@@ -10002,6 +10065,9 @@ function PPTElementView({
       data-ppt-comment-resolved={element.kind === 'comment' && element.resolved === true
         ? 'true'
         : undefined}
+      data-ppt-comment-thread-count={element.kind === 'comment'
+        ? getPPTCommentThread(element).length
+        : undefined}
       data-ppt-eraser-hit={eraserHit ? 'true' : undefined}
       data-line-end-connection={element.kind === 'line'
         ? element.endConnection?.elementId
@@ -10152,12 +10218,14 @@ function PPTElementView({
 function PPTCommentView({ element }: { element: PPTComment }) {
   const author = element.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR
   const createdAt = element.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT
+  const thread = getPPTCommentThread(element)
 
   return (
     <div
       className="ppt-comment-card"
       data-ppt-comment-card
       data-ppt-comment-resolved={element.resolved === true ? 'true' : undefined}
+      data-ppt-comment-thread-count={thread.length}
     >
       <div className="ppt-comment-meta">
         <MessageSquare size={15} />
@@ -10719,6 +10787,7 @@ function Inspector({
   lastPlaceholderVisibilityEffect,
   onColorSwatchApply,
   onCommentBodyChange,
+  onCommentReplyAdd,
   onCommentResolvedChange,
   onCommitText,
   onCopyHTML,
@@ -10780,6 +10849,7 @@ function Inspector({
     swatch: PPTColorSwatchSelection,
   ) => void
   onCommentBodyChange: (elementId: string, value: string) => void
+  onCommentReplyAdd: (elementId: string, value: string) => void
   onCommentResolvedChange: (elementId: string, resolved: boolean) => void
   onCommitText: (elementId: string, text: string) => void
   onCopyHTML: () => void
@@ -10962,6 +11032,14 @@ function Inspector({
     ? getPPTObjectAnimationDescriptor(slide, selectedElement)
     : null
   const imageReplaceInputRef = useRef<HTMLInputElement | null>(null)
+  const [commentReplyDraftById, setCommentReplyDraftById] =
+    useState<Record<string, string>>({})
+  const commentThread = selectedElement?.kind === 'comment'
+    ? getPPTCommentThread(selectedElement)
+    : []
+  const commentReplyDraft = selectedElement?.kind === 'comment'
+    ? commentReplyDraftById[selectedElement.id] ?? ''
+    : ''
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -11054,6 +11132,27 @@ function Inspector({
     previousInspectorSelectionStateRef.current = hasSelectedElement
     setActiveInspectorTabId(hasSelectedElement ? 'selection' : 'slide')
   }, [hasSelectedElement])
+
+  function updateCommentReplyDraft(elementId: string, value: string) {
+    setCommentReplyDraftById((current) => ({
+      ...current,
+      [elementId]: normalizePPTCommentReplyBody(value),
+    }))
+  }
+
+  function commitCommentReplyDraft(elementId: string) {
+    const value = commentReplyDraftById[elementId] ?? ''
+
+    if (value.trim().length === 0) {
+      return
+    }
+
+    onCommentReplyAdd(elementId, value)
+    setCommentReplyDraftById((current) => ({
+      ...current,
+      [elementId]: '',
+    }))
+  }
 
   function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
     const effect = getSlideEditLayerPaneCommandEffect(layerPaneDescriptor, intent)
@@ -12658,6 +12757,56 @@ function Inspector({
                   />
                   <span>Resolved</span>
                 </label>
+                <section
+                  className="ppt-comment-thread"
+                  data-ppt-comment-thread
+                  data-ppt-comment-thread-count={commentThread.length}
+                  data-ppt-comment-thread-model="canvas-comment-thread"
+                  data-ppt-comment-thread-resolved={selectedElement.resolved === true ? 'true' : 'false'}
+                >
+                  <div className="ppt-comment-thread-header">
+                    <span>Thread</span>
+                    <span data-ppt-comment-thread-count-label>{commentThread.length}</span>
+                  </div>
+                  <div className="ppt-comment-thread-list">
+                    {commentThread.map((message, index) => (
+                      <article
+                        className="ppt-comment-thread-message"
+                        data-ppt-comment-thread-message={message.id}
+                        data-ppt-comment-thread-message-index={index}
+                        key={message.id}
+                      >
+                        <div className="ppt-comment-thread-meta">
+                          <span data-ppt-comment-thread-author>{message.authorName}</span>
+                          <span data-ppt-comment-thread-created>{message.createdAt}</span>
+                        </div>
+                        <p data-ppt-comment-thread-body>{message.body}</p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="ppt-comment-reply-row">
+                    <label className="ppt-field">
+                      <span>Reply</span>
+                      <textarea
+                        data-ppt-comment-reply-input
+                        data-ppt-style-field="comment-reply"
+                        maxLength={PPT_COMMENT_REPLY_MAX_LENGTH}
+                        value={commentReplyDraft}
+                        onChange={(event) =>
+                          updateCommentReplyDraft(selectedElement.id, event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="ppt-button"
+                      data-ppt-comment-reply-add
+                      disabled={commentReplyDraft.trim().length === 0}
+                      type="button"
+                      onClick={() => commitCommentReplyDraft(selectedElement.id)}
+                    >
+                      <MessageSquare size={15} /> Add
+                    </button>
+                  </div>
+                </section>
               </>
             ) : null}
             {selectedElement.kind === 'line' || selectedElement.kind === 'freeform' ? (
@@ -16170,24 +16319,60 @@ function normalizePPTCommentBody(value: string) {
   return value.slice(0, PPT_COMMENT_BODY_MAX_LENGTH)
 }
 
+function normalizePPTCommentReplyBody(value: string) {
+  return value.slice(0, PPT_COMMENT_REPLY_MAX_LENGTH)
+}
+
+function getPPTCommentThread(comment: PPTComment): PPTCommentThreadMessage[] {
+  if (comment.thread && comment.thread.length > 0) {
+    return comment.thread
+  }
+
+  return [{
+    authorName: comment.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR,
+    body: comment.body,
+    createdAt: comment.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT,
+    id: `${comment.id}:message-1`,
+  }]
+}
+
 function getPPTCommentThreadWithBody(
   comment: PPTComment,
   body: string,
 ): PPTComment['thread'] {
-  const thread = comment.thread && comment.thread.length > 0
-    ? comment.thread
-    : [{
-        authorName: comment.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR,
-        body: comment.body,
-        createdAt: comment.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT,
-        id: `${comment.id}:message-1`,
-      }]
+  const thread = getPPTCommentThread(comment)
   const [first, ...rest] = thread
 
   return [{
     ...first,
     body,
   }, ...rest]
+}
+
+function createPPTCommentReplyMessage(
+  comment: PPTComment,
+  body: string,
+  currentThreadLength: number,
+): PPTCommentThreadMessage {
+  return {
+    authorName: PPT_COMMENT_DEFAULT_AUTHOR,
+    body,
+    createdAt: PPT_COMMENT_DEFAULT_CREATED_AT,
+    id: `${comment.id}:message-${currentThreadLength + 1}`,
+  }
+}
+
+function toPPTCommentThreadHostCommandEffect(
+  command: PPTCommentThreadCommand,
+): PPTCommentThreadHostCommandEffect {
+  return {
+    payload: command,
+    selection: {
+      objectIds: [command.objectId],
+      slideId: command.slideId,
+    },
+    type: 'slide-command-effect',
+  }
 }
 
 function clonePPTSlide(slide: PPTSlide, id: string): PPTSlide {

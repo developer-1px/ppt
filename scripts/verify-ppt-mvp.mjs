@@ -5038,6 +5038,8 @@ async function runExportScenario(page) {
       hasBulletModel: code.includes('"bullet": "bullet"'),
       hasCommentMarkup: code.includes('class="ppt-element ppt-comment"') && code.includes('data-ppt-comment-resolved="true"') && code.includes('Review CTA wording'),
       hasCommentModel: code.includes('"kind": "comment"') && code.includes('"resolved": true') && code.includes('"body": "Review CTA wording"'),
+      hasCommentThreadMarkup: code.includes('data-ppt-comment-thread-count="2"') && code.includes('data-ppt-comment-thread-body') && code.includes('Looks good after headline edit.'),
+      hasCommentThreadModel: code.includes('"thread"') && code.includes('"body": "Looks good after headline edit."'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
       hasObjectOpacityMarkup: code.includes('data-ppt-opacity="0.42"') && code.includes('opacity:0.42'),
@@ -5116,6 +5118,7 @@ async function runExportScenario(page) {
   record('exports PPT text frame inset markup and model data', state.hasTextFrameInsetMarkup && state.hasTextFrameInsetModel, state)
   record('exports PPT text vertical alignment markup and model data', state.hasTextVerticalAlignMarkup && state.hasTextVerticalAlignModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
+  record('exports PPT comment thread markup and model data', state.hasCommentThreadMarkup && state.hasCommentThreadModel, state)
   record('exports PPT italic and underline run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
@@ -7599,6 +7602,35 @@ async function runCommentReviewScenario(page) {
   record('retouches PPT comment body and resolved state in inspector', afterInspectorEdit.selectedKind === 'comment' && afterInspectorEdit.selectedBody === 'Review CTA wording' && afterInspectorEdit.inspectorBody === 'Review CTA wording' && afterInspectorEdit.selectedResolved === 'true' && afterInspectorEdit.inspectorResolved, {
     afterInspectorEdit,
     afterToolbarInsert,
+  })
+
+  record('shows PPT comment thread in inspector', afterInspectorEdit.commentThreadModel === 'canvas-comment-thread' && afterInspectorEdit.commentThreadCount === 1 && afterInspectorEdit.commentThreadMessageCount === 1 && afterInspectorEdit.commentThreadFirstBody === 'Review CTA wording', {
+    afterInspectorEdit,
+    afterToolbarInsert,
+  })
+
+  await page.eval(`(() => {
+    const textarea = document.querySelector('[data-ppt-style-field="comment-reply"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    valueSetter.call(textarea, 'Looks good after headline edit.')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(40)
+  await page.eval(`document.querySelector('[data-ppt-comment-reply-add]')?.click()`)
+  await delay(100)
+
+  const afterThreadReply = await getPPTCommentState(page)
+
+  record('adds PPT comment thread reply from inspector', afterThreadReply.selectedKind === 'comment' && afterThreadReply.commentThreadCount === 2 && afterThreadReply.commentThreadMessageCount === 2 && afterThreadReply.commentThreadBodies.includes('Looks good after headline edit.') && afterThreadReply.commentThreadCommand === 'add-comment-reply' && afterThreadReply.commentThreadCommandBody === 'Looks good after headline edit.' && afterThreadReply.commentThreadCommandCount === 2 && afterThreadReply.commentThreadCommandObject === afterThreadReply.selectedId && afterThreadReply.commentThreadCommandType === 'slide-command-effect' && afterThreadReply.replyInputValue === '', {
+    afterInspectorEdit,
+    afterThreadReply,
+  })
+
+  record('keeps PPT comment body synced with first thread message', afterThreadReply.selectedBody === 'Review CTA wording' && afterThreadReply.inspectorBody === 'Review CTA wording' && afterThreadReply.commentThreadFirstBody === 'Review CTA wording', {
+    afterInspectorEdit,
+    afterThreadReply,
   })
 
   const beforeMove = await page.eval(`(() => {
@@ -10847,13 +10879,28 @@ function getPPTCommentState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const selectedCard = selected?.querySelector('[data-ppt-comment-card]') ?? null
+    const stage = document.querySelector('.ppt-stage-shell')
+    const thread = document.querySelector('[data-ppt-comment-thread]')
+    const threadBodies = Array.from(document.querySelectorAll('[data-ppt-comment-thread] [data-ppt-comment-thread-body]')).map((node) => node.textContent ?? '')
 
     return {
       commentCount: document.querySelectorAll('[data-kind="comment"]').length,
       creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+      commentThreadCommand: stage?.getAttribute('data-ppt-comment-thread-command') ?? '',
+      commentThreadCommandBody: stage?.getAttribute('data-ppt-comment-thread-command-body') ?? '',
+      commentThreadCommandCount: Number(stage?.getAttribute('data-ppt-comment-thread-command-count') ?? 0),
+      commentThreadCommandObject: stage?.getAttribute('data-ppt-comment-thread-command-object') ?? '',
+      commentThreadCommandSlide: stage?.getAttribute('data-ppt-comment-thread-command-slide') ?? '',
+      commentThreadCommandType: stage?.getAttribute('data-ppt-comment-thread-command-type') ?? '',
+      commentThreadCount: Number(thread?.getAttribute('data-ppt-comment-thread-count') ?? 0),
+      commentThreadFirstBody: threadBodies[0] ?? '',
+      commentThreadBodies: threadBodies,
+      commentThreadMessageCount: document.querySelectorAll('[data-ppt-comment-thread] [data-ppt-comment-thread-message]').length,
+      commentThreadModel: thread?.getAttribute('data-ppt-comment-thread-model') ?? '',
       inspectorBody: document.querySelector('[data-ppt-style-field="comment-body"]')?.value ?? '',
       inspectorResolved: document.querySelector('[data-ppt-style-field="comment-resolved"]')?.checked ?? false,
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      replyInputValue: document.querySelector('[data-ppt-style-field="comment-reply"]')?.value ?? '',
       selectedBody: selectedCard?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',

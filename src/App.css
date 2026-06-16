@@ -1501,6 +1501,76 @@
   resize: vertical;
 }
 
+.ppt-comment-thread {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ppt-comment-thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ppt-comment-thread-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ppt-comment-thread-message {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--field-bg);
+}
+
+.ppt-comment-thread-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.ppt-comment-thread-meta [data-ppt-comment-thread-author],
+.ppt-comment-thread-meta [data-ppt-comment-thread-created] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-comment-thread-message p {
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.ppt-comment-reply-row {
+  display: grid;
+  gap: 6px;
+}
+
+.ppt-comment-reply-row .ppt-field textarea {
+  min-height: 72px;
+}
+
+.ppt-comment-reply-row .ppt-button {
+  justify-self: start;
+}
+
 .ppt-theme-token-strip {
   display: flex;
   align-items: center;

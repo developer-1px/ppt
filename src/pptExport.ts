@@ -2,6 +2,7 @@ import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTComment,
+  type PPTCommentThreadMessage,
   type PPTDeck,
   type PPTElement,
   type PPTElementAccessibility,
@@ -677,17 +678,22 @@ function renderPPTCommentHTML(
 ) {
   const author = element.authorName ?? 'You'
   const createdAt = element.createdAt ?? 'Just now'
+  const thread = getPPTExportCommentThread(element)
   const resolvedAttr = element.resolved === true
     ? ' data-ppt-comment-resolved="true"'
     : ''
+  const threadMarkup = thread.map((message, index) =>
+    `<span data-ppt-comment-thread-message="${escapeHtml(message.id)}" data-ppt-comment-thread-message-index="${index}"><span data-ppt-comment-thread-author>${escapeHtml(message.authorName)}</span><span data-ppt-comment-thread-created>${escapeHtml(message.createdAt)}</span><span data-ppt-comment-thread-body>${escapeHtml(message.body)}</span></span>`
+  ).join('')
 
-  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementAltTextHTMLAttr(element)}${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)}${resolvedAttr} style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p></div>`
+  return `    <div class="ppt-element ppt-comment" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${getPPTElementAltTextHTMLAttr(element)}${getPPTElementHyperlinkHTMLAttr(element)}${getPPTElementOpacityHTMLAttr(element)}${getPPTElementShadowHTMLAttrs(element)}${resolvedAttr} data-ppt-comment-thread-count="${thread.length}" style="${style.filter(Boolean).join(';')}"><div class="ppt-comment-meta"><span>${escapeHtml(author)}</span><span class="ppt-comment-created">${escapeHtml(createdAt)}</span></div><p class="ppt-comment-body">${escapeHtml(element.body)}</p><div class="ppt-comment-thread" data-ppt-comment-thread-count="${thread.length}" hidden>${threadMarkup}</div></div>`
 }
 
 function renderPPTCommentSVG(element: PPTComment) {
   const attrs = [
     getPPTElementSVGAttrs(element),
     element.resolved === true ? 'data-ppt-comment-resolved="true"' : '',
+    `data-ppt-comment-thread-count="${getPPTExportCommentThread(element).length}"`,
   ].filter(Boolean).join(' ')
   const x = element.geometry.x
   const y = element.geometry.y
@@ -703,6 +709,19 @@ function renderPPTCommentSVG(element: PPTComment) {
     `<text data-ppt-comment-body="true" x="${formatNumber(x + 10)}" y="${formatNumber(y + metaHeight + 24)}" fill="#78350f" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="650">${escapeHtml(body)}</text>`,
     '</g>',
   ].join('')
+}
+
+function getPPTExportCommentThread(comment: PPTComment): PPTCommentThreadMessage[] {
+  if (comment.thread && comment.thread.length > 0) {
+    return comment.thread
+  }
+
+  return [{
+    authorName: comment.authorName ?? 'You',
+    body: comment.body,
+    createdAt: comment.createdAt ?? 'Just now',
+    id: `${comment.id}:message-1`,
+  }]
 }
 
 function renderPPTTableHTML(
