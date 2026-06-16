@@ -157,6 +157,7 @@ import {
   getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextOverflowIndicatorState,
+  getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
@@ -15648,6 +15649,7 @@ function getDefaultPPTTextStyle(): PPTTextStyle {
 
 function getPPTTextFontFamilyDescriptorOptions() {
   return PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => ({
+    cssFontFamily: option.css,
     family: option.value,
     isDefault: option.value === PPT_DEFAULT_TEXT_FONT_FAMILY,
     label: option.label,
@@ -15677,10 +15679,11 @@ function normalizePPTTextFontFamily(fontFamily: string | undefined) {
 }
 
 function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
-  const normalized = normalizePPTTextFontFamily(fontFamily)
-
-  return PPT_TEXT_FONT_FAMILY_OPTIONS.find((option) => option.value === normalized)?.css ??
-    PPT_TEXT_FONT_FAMILY_OPTIONS[0].css
+  return getSlideEditTextFontFamilyCSS({
+    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+    fontFamily,
+    options: getPPTTextFontFamilyDescriptorOptions(),
+  })
 }
 
 function getPPTTextElementVerticalAlign(element: PPTElement) {
