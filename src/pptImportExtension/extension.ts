@@ -28,16 +28,12 @@ import type {
 
 export const PPT_IMPORT_CANVAS_FALLBACK_ISSUES = {
   dataImageClipboard: 'canvas#256',
-  htmlTableClipboard: 'canvas#254',
   richTextClipboard: 'canvas#257',
   svgClipboard: 'canvas#255',
-  tsvClipboard: 'canvas#253',
 } as const
 
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [
-    PPT_IMPORT_CANVAS_FALLBACK_ISSUES.tsvClipboard,
-    PPT_IMPORT_CANVAS_FALLBACK_ISSUES.htmlTableClipboard,
     PPT_IMPORT_CANVAS_FALLBACK_ISSUES.svgClipboard,
     PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard,
     PPT_IMPORT_CANVAS_FALLBACK_ISSUES.richTextClipboard,
@@ -242,7 +238,7 @@ export function createPPTTableImportEffect({
 }): PPTTableImportEffect {
   return {
     columnCount: getPPTTableColumnCount(element.rows),
-    fallbackIssue: getPPTTableImportFallbackIssue(source.format),
+    fallbackIssue: getPPTTableImportFallbackIssue(),
     format: source.format ?? 'text-delimited',
     model: 'canvas-table-import',
     name: element.name,
@@ -262,10 +258,6 @@ export function getPPTImageImportFallbackIssue(
     : PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard
 }
 
-export function getPPTTableImportFallbackIssue(
-  format: PPTTableImportFormat | undefined,
-): PPTImportFallbackIssue | undefined {
-  return format === 'text-html'
-    ? PPT_IMPORT_CANVAS_FALLBACK_ISSUES.htmlTableClipboard
-    : undefined
+export function getPPTTableImportFallbackIssue(): PPTImportFallbackIssue | undefined {
+  return undefined
 }

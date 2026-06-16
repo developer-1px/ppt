@@ -8315,7 +8315,7 @@ async function runTableImportScenario(page) {
 
   const afterPaste = await getPPTTableState(page)
 
-  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportFormat === 'text-tsv' && afterPaste.tableImportTsvFallback === 'canvas#253' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
+  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportFormat === 'text-tsv' && afterPaste.tableImportFallbackIssue === '' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
     afterPaletteInsert,
     afterPaste,
   })
@@ -8334,7 +8334,7 @@ async function runTableImportScenario(page) {
 
   const afterHtmlPaste = await getPPTTableState(page)
 
-  record('pastes HTML table clipboard data into PPT table element', afterHtmlPaste.tableImportModel === 'canvas-table-import' && afterHtmlPaste.tableImportFormat === 'text-html' && afterHtmlPaste.tableImportHtmlFallback === 'canvas#254' && afterHtmlPaste.tableImportFallbackIssue === 'canvas#254' && afterHtmlPaste.tableCount === afterPaste.tableCount + 1 && afterHtmlPaste.selectedKind === 'table' && afterHtmlPaste.selectedRows === 3 && afterHtmlPaste.selectedCols === 3 && afterHtmlPaste.tableImportRows === 3 && afterHtmlPaste.tableImportCols === 3 && afterHtmlPaste.cellTexts.includes('Retouch') && afterHtmlPaste.cellTexts.includes('Human'), {
+  record('pastes HTML table clipboard data into PPT table element', afterHtmlPaste.tableImportModel === 'canvas-table-import' && afterHtmlPaste.tableImportFormat === 'text-html' && afterHtmlPaste.tableImportFallbackIssue === '' && afterHtmlPaste.tableCount === afterPaste.tableCount + 1 && afterHtmlPaste.selectedKind === 'table' && afterHtmlPaste.selectedRows === 3 && afterHtmlPaste.selectedCols === 3 && afterHtmlPaste.tableImportRows === 3 && afterHtmlPaste.tableImportCols === 3 && afterHtmlPaste.cellTexts.includes('Retouch') && afterHtmlPaste.cellTexts.includes('Human'), {
     afterHtmlPaste,
     afterPaste,
   })

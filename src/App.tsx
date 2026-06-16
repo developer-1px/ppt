@@ -7790,8 +7790,6 @@ function App() {
         data-ppt-table-import-model="canvas-table-import"
         data-ppt-table-import-name={lastTableImportEffect?.name}
         data-ppt-table-import-rows={lastTableImportEffect?.rowCount}
-        data-ppt-table-import-html-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.htmlTableClipboard}
-        data-ppt-table-import-tsv-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.tsvClipboard}
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
         data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}
         data-ppt-text-overflow-indicator-height={selectedTextAutoFitIndicator?.bounds.h}

@@ -1,7 +1,13 @@
 import { clamp } from 'canvas/core'
 import {
-  getCanvasTableCsvSourceFromText,
-  readCanvasTableCsvFileSource,
+  getCanvasTableFileFromDataTransfer,
+  getCanvasTableFileFromList,
+  getCanvasTableSourceFromDataTransfer,
+  getCanvasTableSourceFromHTML as getCanvasTableSourceFromHTMLValue,
+  getCanvasTableSourceFromText,
+  readCanvasTableFileSource,
+  type CanvasTableImportFormat,
+  type CanvasTableImportSource,
 } from 'canvas/app/table-import'
 import {
   PPT_SLIDE_HEIGHT,
@@ -27,14 +33,6 @@ export const PPT_DEFAULT_TABLE_ROWS = [
   ['Review passes', '4', '1'],
 ]
 
-const PPT_TABLE_TSV_MIME_TYPES = new Set([
-  'text/tab-separated-values',
-])
-const PPT_TABLE_CSV_MIME_TYPES = new Set([
-  'application/vnd.ms-excel',
-  'text/comma-separated-values',
-  'text/csv',
-])
 const PPT_TABLE_MAX_COLUMNS = 8
 const PPT_TABLE_MAX_ROWS = 12
 const PPT_TABLE_MAX_CELL_LENGTH = 80
@@ -77,98 +75,59 @@ export function createPPTTableElement({
 }
 
 export function getPPTTableFileFromList(files: FileList | null) {
-  return Array.from(files ?? [])
-    .find((file) => isPPTTableCsvFile(file) || isPPTTableTsvFile(file)) ?? null
+  return getCanvasTableFileFromList(files)
 }
 
 export function getPPTTableFileFromDataTransfer(dataTransfer: DataTransfer | null) {
-  return getPPTTableFileFromList(dataTransfer?.files ?? null)
+  return getCanvasTableFileFromDataTransfer(dataTransfer)
 }
 
 export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | null) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const tabSeparatedText = dataTransfer.getData('text/tab-separated-values')
-
-  if (tabSeparatedText) {
-    return getPPTTableSourceFromText(tabSeparatedText, {
-      format: 'text-tsv',
-    })
-  }
-
-  const csvText = dataTransfer.getData('text/csv')
-
-  if (csvText) {
-    return getPPTTableSourceFromText(csvText, {
-      format: 'canvas-csv',
-    })
-  }
-
-  const htmlSource = getPPTTableSourceFromHTML(dataTransfer.getData('text/html'))
-
-  if (htmlSource) {
-    return htmlSource
-  }
-
-  return getPPTTableSourceFromText(dataTransfer.getData('text/plain'), {
-    format: 'text-delimited',
-  })
-}
-
-export async function readPPTTableFileSource(file: Blob & { name?: string }) {
-  if (isPPTTableTsvFile(file)) {
-    return getPPTTableSourceFromText(await readPPTBlobAsText(file), {
-      format: 'text-tsv',
-      name: file.name,
-    })
-  }
-
-  const source = await readCanvasTableCsvFileSource(file)
+  const source = getCanvasTableSourceFromDataTransfer(dataTransfer)
 
   if (!source) {
     return null
   }
 
-  return createPPTTableImportSource(source.rows, {
-    format: 'canvas-csv',
-    name: source.name,
-  })
+  return createPPTTableImportSourceFromCanvas(source)
+}
+
+export async function readPPTTableFileSource(file: Blob & { name?: string }) {
+  const source = await readCanvasTableFileSource(file)
+
+  if (!source) {
+    return null
+  }
+
+  return createPPTTableImportSourceFromCanvas(source)
 }
 
 export function getPPTTableSourceFromText(
   text: string,
   options: { format?: PPTTableImportFormat; name?: string } = {},
 ): PPTTableImportSource | null {
-  const source = getCanvasTableCsvSourceFromText(text)
+  const source = getCanvasTableSourceFromText(text, {
+    format: getCanvasTableImportFormat(options.format),
+    name: options.name,
+  })
 
   if (!source) {
     return null
   }
 
-  return createPPTTableImportSource(source.rows, options)
+  return createPPTTableImportSourceFromCanvas(source, {
+    format: options.format,
+  })
 }
 
 export function getPPTTableSourceFromHTML(value: string) {
-  if (!value || typeof DOMParser === 'undefined') {
+  const source = getCanvasTableSourceFromHTMLValue(value)
+
+  if (!source) {
     return null
   }
 
-  const doc = new DOMParser().parseFromString(value, 'text/html')
-  const table = doc.querySelector('table')
-
-  if (!table) {
-    return null
-  }
-
-  const parsedRows = parsePPTTableHTMLRows(table)
-
-  if (!isPPTTableImportRows(parsedRows)) {
-    return null
-  }
-
-  return createPPTTableImportSource(parsedRows, { format: 'text-html' })
+  return createPPTTableImportSourceFromCanvas(source)
 }
 
 export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
@@ -200,20 +159,6 @@ export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
   return Math.max(0, ...rows.map((row) => row.length))
 }
 
-function isPPTTableCsvFile(file: Blob & { name?: string }) {
-  const mimeType = file.type.toLowerCase()
-  const name = file.name?.toLowerCase() ?? ''
-
-  return PPT_TABLE_CSV_MIME_TYPES.has(mimeType) || name.endsWith('.csv')
-}
-
-function isPPTTableTsvFile(file: Blob & { name?: string }) {
-  const mimeType = file.type.toLowerCase()
-  const name = file.name?.toLowerCase() ?? ''
-
-  return PPT_TABLE_TSV_MIME_TYPES.has(mimeType) || name.endsWith('.tsv')
-}
-
 function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
   const nonEmptyRows = rows.filter((row) =>
     row.some((cell) => cell.trim().length > 0),
@@ -221,75 +166,6 @@ function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
   const columnCount = getPPTTableColumnCount(nonEmptyRows)
 
   return nonEmptyRows.length >= 2 && columnCount >= 2
-}
-
-function parsePPTTableHTMLRows(table: Element) {
-  const rows: string[][] = []
-  const tableRows = Array.from(
-    table instanceof HTMLTableElement
-      ? table.rows
-      : table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr, :scope > tr'),
-  )
-
-  for (const [rowIndex, tableRow] of tableRows.entries()) {
-    const row = rows[rowIndex] ?? []
-    const cells = Array.from(tableRow.children).filter((cell) =>
-      cell.tagName.toLowerCase() === 'td' ||
-      cell.tagName.toLowerCase() === 'th',
-    )
-    let columnIndex = 0
-
-    rows[rowIndex] = row
-
-    for (const cell of cells) {
-      while (row[columnIndex] !== undefined) {
-        columnIndex += 1
-      }
-
-      const text = getPPTTableHTMLCellText(cell)
-      const columnSpan = getPPTTableHTMLSpan(cell.getAttribute('colspan'))
-      const rowSpan = getPPTTableHTMLSpan(cell.getAttribute('rowspan'))
-
-      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
-        const targetRowIndex = rowIndex + rowOffset
-        const targetRow = rows[targetRowIndex] ?? []
-
-        rows[targetRowIndex] = targetRow
-
-        for (let columnOffset = 0; columnOffset < columnSpan; columnOffset += 1) {
-          const targetColumnIndex = columnIndex + columnOffset
-
-          targetRow[targetColumnIndex] = rowOffset === 0 && columnOffset === 0
-            ? text
-            : targetRow[targetColumnIndex] ?? ''
-        }
-      }
-
-      columnIndex += columnSpan
-    }
-  }
-
-  return rows
-}
-
-function getPPTTableHTMLSpan(value: string | null) {
-  const span = Number.parseInt(value ?? '1', 10)
-
-  return Number.isFinite(span)
-    ? clamp(span, 1, PPT_TABLE_MAX_COLUMNS)
-    : 1
-}
-
-function getPPTTableHTMLCellText(cell: Element) {
-  const clone = cell.cloneNode(true)
-
-  if (clone instanceof Element) {
-    clone.querySelectorAll('script, style, noscript').forEach((node) => node.remove())
-
-    return normalizePPTTableCell(clone.textContent ?? '')
-  }
-
-  return normalizePPTTableCell(cell.textContent ?? '')
 }
 
 function normalizePPTTableCell(value: string) {
@@ -315,21 +191,48 @@ function getPPTTableImportName(name: string) {
   return name.replace(/\.[^.]+$/, '') || 'Table'
 }
 
-function readPPTBlobAsText(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Expected table text'))
-    })
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Could not read table file'))
-    })
-    reader.readAsText(blob)
+function createPPTTableImportSourceFromCanvas(
+  source: CanvasTableImportSource,
+  options: { format?: PPTTableImportFormat } = {},
+) {
+  return createPPTTableImportSource(source.rows, {
+    format: options.format ?? getPPTTableImportFormat(source.format),
+    name: source.name,
   })
+}
+
+function getCanvasTableImportFormat(
+  format?: PPTTableImportFormat,
+): CanvasTableImportFormat | undefined {
+  if (format === 'canvas-csv') {
+    return 'text-csv'
+  }
+
+  if (
+    format === 'text-delimited' ||
+    format === 'text-html' ||
+    format === 'text-tsv'
+  ) {
+    return format
+  }
+
+  return undefined
+}
+
+function getPPTTableImportFormat(
+  format?: CanvasTableImportFormat,
+): PPTTableImportFormat | undefined {
+  if (format === 'text-csv') {
+    return 'canvas-csv'
+  }
+
+  if (
+    format === 'text-delimited' ||
+    format === 'text-html' ||
+    format === 'text-tsv'
+  ) {
+    return format
+  }
+
+  return undefined
 }
