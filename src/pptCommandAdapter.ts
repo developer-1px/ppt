@@ -16,6 +16,7 @@ import {
   getCanvasSelectableItemIds,
   getCanvasSelectedItemIds,
   getCanvasCommandAvailability,
+  groupCanvasSelectionItems,
   mapCanvasSelectionItems,
   moveCanvasSelection,
   reorderCanvasSelectionItems,
@@ -72,26 +73,14 @@ export function createPPTCanvasCommandAdapter({
       return distributePPTElements(items, selection, mode)
     },
     groupSelection({ groupId, items, selection }) {
-      const selectedItemIds = getCanvasSelectedItemIds({
+      return groupCanvasSelectionItems({
         getItemId: getPPTCommandElementId,
+        groupId,
+        groupItem: ({ groupId, item }) => ({ ...item, groupId }),
         isItemSelectable: isPPTCommandElementGroupable,
         items,
         selection,
       })
-
-      if (selectedItemIds.length < 2) {
-        return { items, selection }
-      }
-
-      return {
-        items: mapCanvasSelectionItems({
-          getItemId: getPPTCommandElementId,
-          items,
-          mapItem: (item) => ({ ...item, groupId }),
-          selection: selectedItemIds,
-        }),
-        selection: selectedItemIds,
-      }
     },
     lockSelection({ items, selection }) {
       return {
