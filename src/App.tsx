@@ -95,6 +95,7 @@ import {
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
+  createSlideEditObjectHyperlinkDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
@@ -102,6 +103,7 @@ import {
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
+  getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleCommandEffect,
@@ -123,6 +125,8 @@ import {
   type SlideEditObjectCornerRadiusHostCommandEffect,
   type SlideEditObjectFillOpacityDescriptor,
   type SlideEditObjectFillOpacityHostCommandEffect,
+  type SlideEditObjectHyperlinkDescriptor,
+  type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectOpacityDescriptor,
   type SlideEditObjectOpacityHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
@@ -1534,6 +1538,7 @@ function App() {
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
+  const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
@@ -3540,9 +3545,30 @@ function App() {
   }
 
   function updateElementHyperlink(elementId: string, url: string) {
+    const trimmedUrl = url.trim()
+    const effect = getSlideEditObjectHyperlinkCommandEffect(
+      trimmedUrl
+        ? {
+            fieldId: 'url',
+            id: 'update-object-hyperlink',
+            objectId: elementId,
+            slideId: activeSlide.id,
+            value: trimmedUrl,
+          }
+        : {
+            id: 'remove-object-hyperlink',
+            objectId: elementId,
+            slideId: activeSlide.id,
+          },
+    )
+
+    setLastHyperlinkEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        const hyperlink = normalizePPTElementHyperlink({ url })
+        const hyperlink = effect.payload.id === 'update-object-hyperlink'
+          ? normalizePPTElementHyperlink({ url: effect.payload.value ?? '' })
+          : null
 
         return {
           ...element,
@@ -6534,6 +6560,17 @@ function App() {
         data-ppt-fill-opacity-command-type={lastFillOpacityEffect?.type}
         data-ppt-fill-opacity-command-value={lastFillOpacityEffect?.payload.value}
         data-ppt-fill-opacity-model="slide-edit-object-fill-opacity"
+        data-ppt-hyperlink-command={lastHyperlinkEffect?.payload.id}
+        data-ppt-hyperlink-command-field={lastHyperlinkEffect?.payload.id === 'update-object-hyperlink'
+          ? lastHyperlinkEffect.payload.fieldId
+          : undefined}
+        data-ppt-hyperlink-command-object={lastHyperlinkEffect?.payload.objectId}
+        data-ppt-hyperlink-command-slide={lastHyperlinkEffect?.payload.slideId}
+        data-ppt-hyperlink-command-type={lastHyperlinkEffect?.type}
+        data-ppt-hyperlink-command-value={lastHyperlinkEffect?.payload.id === 'update-object-hyperlink'
+          ? lastHyperlinkEffect.payload.value
+          : undefined}
+        data-ppt-hyperlink-model="slide-edit-object-hyperlink"
         data-ppt-object-opacity-command={lastObjectOpacityEffect?.payload.id}
         data-ppt-object-opacity-command-field={lastObjectOpacityEffect?.payload.fieldId}
         data-ppt-object-opacity-command-object={lastObjectOpacityEffect?.payload.objectId}
@@ -10340,6 +10377,12 @@ function Inspector({
   const objectOpacityDescriptor = selectedElement
     ? getPPTObjectOpacityDescriptor(slide.id, selectedElement)
     : null
+  const objectHyperlinkDescriptor = selectedElement
+    ? getPPTObjectHyperlinkDescriptor(slide.id, selectedElement)
+    : null
+  const objectHyperlinkUrlField = objectHyperlinkDescriptor?.fields.find((field) =>
+    field.id === 'url'
+  )
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -10815,9 +10858,16 @@ function Inspector({
               <span>Link</span>
               <input
                 data-ppt-style-field="hyperlink"
+                data-ppt-hyperlink-attribute={objectHyperlinkDescriptor?.metadata.attribute}
+                data-ppt-hyperlink-attribute-value={objectHyperlinkDescriptor?.metadata.attributeValue}
+                data-ppt-hyperlink-command={objectHyperlinkUrlField?.commandId}
+                data-ppt-hyperlink-control={objectHyperlinkUrlField?.control}
+                data-ppt-hyperlink-enabled={objectHyperlinkDescriptor?.metadata.isEnabled ? 'true' : 'false'}
+                data-ppt-hyperlink-surface={objectHyperlinkDescriptor?.surface}
+                data-ppt-hyperlink-validation={objectHyperlinkDescriptor?.metadata.validation.reason}
                 maxLength={PPT_HYPERLINK_URL_MAX_LENGTH}
                 placeholder="https://example.com"
-                value={elementHyperlink?.url ?? ''}
+                value={objectHyperlinkDescriptor?.hyperlink.url ?? elementHyperlink?.url ?? ''}
                 onChange={(event) =>
                   onElementHyperlinkChange(
                     selectedElement.id,
@@ -12560,6 +12610,25 @@ function getPPTObjectOpacityDescriptor(
 
 function getPPTElementHyperlink(element: PPTElement) {
   return element.hyperlink ? normalizePPTElementHyperlink(element.hyperlink) : null
+}
+
+function getPPTObjectHyperlinkDescriptor(
+  slideId: string,
+  element: PPTElement,
+): SlideEditObjectHyperlinkDescriptor<string, string> {
+  const hyperlink = getPPTElementHyperlink(element)
+
+  return createSlideEditObjectHyperlinkDescriptor({
+    hyperlink: hyperlink
+      ? {
+          target: 'same-context',
+          title: '',
+          url: hyperlink.url,
+        }
+      : null,
+    objectId: element.id,
+    slideId,
+  })
 }
 
 function getPPTElementAltText(element: PPTElement) {

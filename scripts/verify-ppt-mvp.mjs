@@ -6479,6 +6479,20 @@ async function runObjectHyperlinkScenario(page) {
   record(
     'updates PPT object hyperlink metadata from inspector',
     afterUrl.url === url &&
+      afterUrl.descriptorSurface === 'object-hyperlink' &&
+      afterUrl.descriptorCommand === 'update-object-hyperlink' &&
+      afterUrl.descriptorControl === 'url' &&
+      afterUrl.descriptorAttribute === 'data-slide-object-hyperlink' &&
+      afterUrl.descriptorEnabled === 'true' &&
+      afterUrl.descriptorTarget === 'same-context' &&
+      afterUrl.descriptorUrl === url &&
+      afterUrl.model === 'slide-edit-object-hyperlink' &&
+      afterUrl.command === 'update-object-hyperlink' &&
+      afterUrl.commandField === 'url' &&
+      afterUrl.commandObject === afterUrl.selectedId &&
+      afterUrl.commandSlide === 'slide-1' &&
+      afterUrl.commandType === 'slide-command-effect' &&
+      afterUrl.commandValue === url &&
       afterUrl.selectedUrl === url &&
       afterUrl.thumbUrl === url,
     {
@@ -6564,6 +6578,10 @@ async function runObjectHyperlinkScenario(page) {
   record(
     'removes and restores PPT object hyperlink as one history step',
     afterClear.url === '' &&
+      afterClear.command === 'remove-object-hyperlink' &&
+      afterClear.commandObject === afterClear.selectedId &&
+      afterClear.commandSlide === 'slide-1' &&
+      afterClear.commandType === 'slide-command-effect' &&
       afterClear.selectedUrl === '' &&
       afterClearUndo.url === url &&
       afterClearUndo.selectedUrl === url &&
@@ -9750,12 +9768,40 @@ function getPPTObjectHyperlinkState(page, elementId) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = id || selected?.getAttribute('data-ppt-element') || ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="hyperlink"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+    const descriptorAttributeValue = field?.getAttribute('data-ppt-hyperlink-attribute-value') ?? ''
+    let descriptor = null
+
+    try {
+      descriptor = descriptorAttributeValue && descriptorAttributeValue !== 'none'
+        ? JSON.parse(descriptorAttributeValue)
+        : null
+    } catch {
+      descriptor = null
+    }
 
     return {
+      command: stage?.getAttribute('data-ppt-hyperlink-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-hyperlink-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-hyperlink-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-hyperlink-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-hyperlink-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-hyperlink-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-hyperlink-attribute') ?? '',
+      descriptorAttributeValue,
+      descriptorCommand: field?.getAttribute('data-ppt-hyperlink-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-hyperlink-control') ?? '',
+      descriptorEnabled: field?.getAttribute('data-ppt-hyperlink-enabled') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-hyperlink-surface') ?? '',
+      descriptorTarget: descriptor?.target ?? '',
+      descriptorUrl: descriptor?.url ?? '',
+      descriptorValidation: field?.getAttribute('data-ppt-hyperlink-validation') ?? '',
+      model: stage?.getAttribute('data-ppt-hyperlink-model') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedUrl: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
       thumbUrl: thumb?.getAttribute('data-ppt-thumb-hyperlink-url') ?? '',
-      url: document.querySelector('[data-ppt-style-field="hyperlink"]')?.value ?? '',
+      url: field?.value ?? '',
     }
   })(${JSON.stringify(elementId)})`)
 }
