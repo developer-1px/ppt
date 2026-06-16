@@ -160,6 +160,7 @@ import {
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextParagraphSpacingCommandEffect,
+  getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTransitionUpdateCommandEffect,
@@ -1248,6 +1249,9 @@ type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
   | 'spacingBefore'
+type PPTParagraphCSSStyle = ReturnType<
+  typeof getSlideEditTextParagraphSpacingCSSStyle
+>
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
 type PPTTextInsetField = keyof PPTTextInset
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
@@ -9198,12 +9202,18 @@ function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
   return normalizePPTParagraphSpacing(paragraph.spacingBefore ?? 0)
 }
 
-function getPPTParagraphStyle(paragraph: PPTParagraph): CSSProperties {
-  return {
-    lineHeight: getPPTParagraphLineHeight(paragraph),
-    marginBottom: getPPTParagraphSpacingAfter(paragraph),
-    marginTop: getPPTParagraphSpacingBefore(paragraph),
-  }
+function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
+  return getSlideEditTextParagraphSpacingCSSStyle({
+    lineHeightRatio: getPPTParagraphLineHeight(paragraph),
+    paragraphAfter: {
+      unit: 'px',
+      value: getPPTParagraphSpacingAfter(paragraph),
+    },
+    paragraphBefore: {
+      unit: 'px',
+      value: getPPTParagraphSpacingBefore(paragraph),
+    },
+  })
 }
 
 function getPPTElementAnimationStyle(animation: PPTElementAnimation): CSSProperties {
@@ -17585,11 +17595,12 @@ function measurePPTTextContentSize(
       ? '600'
       : '400'
   element.textBody.paragraphs.forEach((paragraph) => {
+    const paragraphStyle = getPPTParagraphStyle(paragraph)
     const line = document.createElement('span')
     line.style.display = 'block'
-    line.style.lineHeight = String(getPPTParagraphLineHeight(paragraph))
-    line.style.marginBottom = `${getPPTParagraphSpacingAfter(paragraph)}px`
-    line.style.marginTop = `${getPPTParagraphSpacingBefore(paragraph)}px`
+    line.style.lineHeight = String(paragraphStyle.lineHeight)
+    line.style.marginBottom = String(paragraphStyle.marginBottom)
+    line.style.marginTop = String(paragraphStyle.marginTop)
     line.textContent = `${paragraph.bullet === 'bullet' ? '\u2022 ' : ''}${
       paragraph.runs.map((run) => run.text).join('') || ' '
     }`
