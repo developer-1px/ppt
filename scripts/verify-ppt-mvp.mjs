@@ -6613,6 +6613,8 @@ async function runObjectAnimationScenario(page) {
       initial.durationCommand === 'update-object-animation' &&
       initial.delayCommand === 'update-object-animation' &&
       initial.orderCommand === 'update-object-animation' &&
+      initial.buildOrderModel === 'slide-edit-object-animation-build-order' &&
+      initial.buildOrder.split(' ').includes('s1-title') &&
       Number(initial.order) > 0 &&
       initial.selectedType === 'none',
     initial,
@@ -6670,7 +6672,10 @@ async function runObjectAnimationScenario(page) {
       afterFade.commandType === 'slide-command-effect' &&
       afterFade.commandValue === '3' &&
       afterFade.descriptorPackageType === 'fade-in' &&
-      afterFade.descriptorPackageTrigger === 'with-previous',
+      afterFade.descriptorPackageTrigger === 'with-previous' &&
+      afterFade.buildOrderModel === 'slide-edit-object-animation-build-order' &&
+      afterFade.buildOrder.split(' ').includes('s1-title') &&
+      afterFade.buildOrder.split(' ')[0] !== 's1-title',
     {
       afterFade,
       initial,
@@ -6740,7 +6745,9 @@ async function runObjectAnimationScenario(page) {
       preview.trigger === 'withPrevious' &&
       preview.duration === '800' &&
       preview.delay === '200' &&
-      preview.order === '3',
+      preview.order === '3' &&
+      preview.buildOrderModel === 'slide-edit-object-animation-build-order' &&
+      preview.buildOrder.split(' ').includes('s1-title'),
     preview,
   )
 
@@ -11773,6 +11780,8 @@ function getPPTObjectAnimationState(page) {
       commandSlide: stage?.getAttribute('data-ppt-object-animation-command-slide') ?? '',
       commandType: stage?.getAttribute('data-ppt-object-animation-command-type') ?? '',
       commandValue: stage?.getAttribute('data-ppt-object-animation-command-value') ?? '',
+      buildOrder: stage?.getAttribute('data-ppt-object-animation-build-order') ?? '',
+      buildOrderModel: stage?.getAttribute('data-ppt-object-animation-build-order-model') ?? '',
       delay: delay?.value ?? '',
       delayCommand: delay?.getAttribute('data-ppt-animation-command') ?? '',
       descriptorDelayLimit: inspector?.getAttribute('data-ppt-animation-limit-delay-max') ?? '',
@@ -11816,6 +11825,8 @@ function getPPTObjectAnimationPreviewState(page, elementId) {
     const element = overlay?.querySelector(\`[data-ppt-element="\${id}"]\`)
 
     return {
+      buildOrder: overlay?.getAttribute('data-ppt-presentation-animation-build-order') ?? '',
+      buildOrderModel: overlay?.getAttribute('data-ppt-presentation-animation-build-order-model') ?? '',
       delay: element?.getAttribute('data-ppt-animation-delay') ?? '',
       duration: element?.getAttribute('data-ppt-animation-duration') ?? '',
       elementId: element?.getAttribute('data-ppt-element') ?? '',

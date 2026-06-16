@@ -125,6 +125,7 @@ import {
   getSlideEditObjectVisibilityCommandEffect,
   getSlideEditObjectVisibilityState,
   getSlideEditObjectAccessibilityCommandEffect,
+  getSlideEditObjectAnimationBuildOrder,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
@@ -1879,6 +1880,10 @@ function App() {
   )
   const activeSlideTransition = useMemo(
     () => getPPTSlideTransition(activeSlide),
+    [activeSlide],
+  )
+  const activeSlideAnimationBuildOrder = useMemo(
+    () => getPPTSlideAnimationBuildOrder(activeSlide),
     [activeSlide],
   )
   const activeLayoutPlaceholders = useMemo(
@@ -7226,6 +7231,8 @@ function App() {
         data-ppt-object-animation-command-value={lastObjectAnimationEffect
           ? String(lastObjectAnimationEffect.payload.value)
           : undefined}
+        data-ppt-object-animation-build-order={activeSlideAnimationBuildOrder.join(' ')}
+        data-ppt-object-animation-build-order-model="slide-edit-object-animation-build-order"
         data-ppt-object-animation-model="slide-edit-object-animation"
         data-ppt-object-opacity-command={lastObjectOpacityEffect?.payload.id}
         data-ppt-object-opacity-command-field={lastObjectOpacityEffect?.payload.fieldId}
@@ -7810,6 +7817,9 @@ function PPTPresentationOverlay({
   const readableIndex = slideIndex + 1
   const transition = getPPTSlideTransition(slide)
   const transitionDuration = Math.max(1, transition.durationMs)
+  const visibleAnimationBuildOrder = getPPTSlideAnimationBuildOrder(slide, {
+    visibleOnly: true,
+  })
 
   return (
     <div
@@ -7819,6 +7829,8 @@ function PPTPresentationOverlay({
       data-ppt-presentation
       data-ppt-presentation-advance-after={transition.advanceAfterMs ?? ''}
       data-ppt-presentation-advance-on-click={transition.advanceOnClick ? 'true' : 'false'}
+      data-ppt-presentation-animation-build-order={visibleAnimationBuildOrder.join(' ')}
+      data-ppt-presentation-animation-build-order-model="slide-edit-object-animation-build-order"
       data-ppt-presentation-index={`${readableIndex}/${slideCount}`}
       data-ppt-presentation-slide={slide.id}
       data-ppt-presentation-transition={transition.type}
@@ -8389,6 +8401,17 @@ function getPPTObjectAnimationDescriptor(
     trigger: toSlideEditObjectAnimationTrigger(animation.trigger),
     type: toSlideEditObjectAnimationType(animation.type),
   })
+}
+
+function getPPTSlideAnimationBuildOrder(
+  slide: PPTSlide,
+  options: { visibleOnly?: boolean } = {},
+) {
+  return getSlideEditObjectAnimationBuildOrder(
+    slide.elements
+      .filter((element) => !options.visibleOnly || element.visible !== false)
+      .map((element) => getPPTObjectAnimationDescriptor(slide, element)),
+  )
 }
 
 function toSlideEditObjectAnimationCommand({
