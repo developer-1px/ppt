@@ -451,6 +451,10 @@ import {
   pptCanvasTransformAdapter,
 } from './pptCanvasAdapter'
 import {
+  getPPTEraserHitElementIds,
+  mergePPTEraserHitElementIds,
+} from './pptCanvasEraserAdapter'
+import {
   createPPTCanvasCommandAdapter,
   createPPTElementIdFactory,
   getPPTElementIdPrefix,
@@ -1700,7 +1704,6 @@ const PPT_MINIMAP_SLIDE_FRAME_ID = 'ppt-slide-frame'
 const PPT_LASER_POINT_DISTANCE = 3
 const PPT_LASER_TRAIL_MAX_POINTS = 80
 const PPT_ERASER_POINT_DISTANCE = 4
-const PPT_ERASER_HIT_PADDING = 8
 const PPT_LAYER_PANE_GROUP_ROW_PREFIX = 'ppt-layer-group:'
 
 type LineCreationMode = 'arrow' | 'line'
@@ -5613,7 +5616,11 @@ function App() {
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
     const points = [clampPPTPointToSlide(point)]
-    const erasedIds = getPPTEraserHitElementIds(startSlide, points)
+    const erasedIds = getPPTEraserHitElementIds({
+      points,
+      scene: createPPTCanvasScene(startSlide),
+      slide: startSlide,
+    })
 
     setContextMenu(null)
     setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
@@ -6092,9 +6099,13 @@ function App() {
     if (interaction.kind === 'erase') {
       const points = getNextPPTEraserPoints(interaction.points, point)
       const startSlide = findPPTSlide(interaction.startDeck, interaction.slideId)
-      const erasedIds = mergePPTElementIds(
+      const erasedIds = mergePPTEraserHitElementIds(
         interaction.erasedIds,
-        getPPTEraserHitElementIds(startSlide, points),
+        getPPTEraserHitElementIds({
+          points,
+          scene: createPPTCanvasScene(startSlide),
+          slide: startSlide,
+        }),
       )
 
       setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
@@ -17200,66 +17211,6 @@ function getNextPPTEraserPoints(points: Point[], point: Point) {
   })
 
   return [...points, ...sampled]
-}
-
-function getPPTEraserHitElementIds(slide: PPTSlide, eraserPoints: Point[]) {
-  return slide.elements
-    .filter((element): element is PPTFreeform =>
-      element.kind === 'freeform' &&
-      element.visible !== false &&
-      element.locked !== true &&
-      isPPTFreeformHitByEraser(element, eraserPoints))
-    .map((element) => element.id)
-}
-
-function isPPTFreeformHitByEraser(element: PPTFreeform, eraserPoints: Point[]) {
-  const freeformPoints = getPPTFreeformWorldPoints(element)
-  const hitDistance = element.stroke.width / 2 + PPT_ERASER_HIT_PADDING
-
-  return eraserPoints.some((point) =>
-    isPPTPointNearPolyline(point, freeformPoints, hitDistance))
-}
-
-function isPPTPointNearPolyline(point: Point, polyline: Point[], distance: number) {
-  if (polyline.length === 0) {
-    return false
-  }
-
-  if (polyline.length === 1) {
-    return pointDistance(point, polyline[0]) <= distance
-  }
-
-  return polyline.slice(1).some((current, index) =>
-    getPPTPointSegmentDistance(point, polyline[index], current) <= distance)
-}
-
-function getPPTPointSegmentDistance(point: Point, start: Point, end: Point) {
-  const dx = end.x - start.x
-  const dy = end.y - start.y
-  const lengthSquared = dx * dx + dy * dy
-
-  if (lengthSquared === 0) {
-    return pointDistance(point, start)
-  }
-
-  const ratio = clamp(
-    ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
-    0,
-    1,
-  )
-
-  return pointDistance(point, {
-    x: start.x + dx * ratio,
-    y: start.y + dy * ratio,
-  })
-}
-
-function mergePPTElementIds(left: string[], right: string[]) {
-  const ids = new Set(left)
-
-  right.forEach((id) => ids.add(id))
-
-  return Array.from(ids)
 }
 
 function clampPPTPointToSlide(point: Point) {

@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/eraser-hit-testing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts"],
       "canvas/app/image-import": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts"],
       "canvas/app/inline-edit-dom": ["../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts"],
       "canvas/app/keyboard-command-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts"],
