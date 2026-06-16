@@ -1117,6 +1117,10 @@ type PPTLayerPaneGroupState = {
   collapsedGroupIds: readonly string[]
   focusedObjectId: string | null
 }
+type PPTLayerPaneRenameState = {
+  objectId: string
+  value: string
+}
 type PPTMinimapSize = CanvasMinimapSize
 type PPTMinimapItemBounds = CanvasMinimapItemBounds
 type PPTMinimapReadModel = CanvasMinimapReadModel
@@ -9811,6 +9815,7 @@ function PPTElementView({
       data-ppt-bullet-list={textBody && hasPPTTextBodyBullet(textBody) ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
+      data-ppt-element-name={element.name}
       data-rotation={Math.round(element.geometry.rotation ?? 0)}
       data-selected={selected ? 'true' : 'false'}
       data-shape={element.kind === 'shape' ? element.shape : undefined}
@@ -10703,6 +10708,9 @@ function Inspector({
       collapsedGroupIds: [],
       focusedObjectId: null,
     })
+  const [layerPaneRenameState, setLayerPaneRenameState] =
+    useState<PPTLayerPaneRenameState | null>(null)
+  const layerPaneRenameCommitSuppressedRef = useRef(false)
   const collapsedLayerPaneGroupIdSet = useMemo(
     () => new Set(layerPaneGroupState.collapsedGroupIds),
     [layerPaneGroupState.collapsedGroupIds],
@@ -10801,6 +10809,57 @@ function Inspector({
     })
   }
 
+  function focusLayerPaneRenameInput(objectId: string) {
+    window.requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-ppt-layer-pane-rename-input="${objectId}"]`,
+      )
+
+      input?.focus({ preventScroll: true })
+      input?.select()
+    })
+  }
+
+  function startLayerPaneRename(row: PPTLayerPaneRowDescriptor) {
+    if (!row.isRenamable) {
+      return
+    }
+
+    layerPaneRenameCommitSuppressedRef.current = false
+    setLayerPaneFocusedObjectId(row.objectId)
+    setLayerPaneRenameState({
+      objectId: row.objectId,
+      value: row.displayName,
+    })
+    focusLayerPaneRenameInput(row.objectId)
+  }
+
+  function commitLayerPaneRename(objectId: string, value: string) {
+    layerPaneRenameCommitSuppressedRef.current = true
+    setLayerPaneRenameState(null)
+    runLayerPaneIntent({
+      name: value,
+      objectId,
+      type: 'rename-submit',
+    })
+    focusLayerPaneRow(objectId)
+  }
+
+  function cancelLayerPaneRename(objectId: string) {
+    layerPaneRenameCommitSuppressedRef.current = true
+    setLayerPaneRenameState(null)
+    focusLayerPaneRow(objectId)
+  }
+
+  function handleLayerPaneRenameBlur(objectId: string, value: string) {
+    if (layerPaneRenameCommitSuppressedRef.current) {
+      layerPaneRenameCommitSuppressedRef.current = false
+      return
+    }
+
+    commitLayerPaneRename(objectId, value)
+  }
+
   function applyLayerPaneKeyboardIntent(intent: PPTLayerPaneKeyboardIntent) {
     switch (intent.type) {
       case 'focus-row':
@@ -10881,6 +10940,15 @@ function Inspector({
       event.ctrlKey ||
       event.metaKey
     ) {
+      return
+    }
+
+    if (event.key === 'F2') {
+      if (row.isRenamable) {
+        event.preventDefault()
+        event.stopPropagation()
+        startLayerPaneRename(row)
+      }
       return
     }
 
@@ -12190,8 +12258,15 @@ function Inspector({
           data-ppt-layer-pane-selection-model={layerPaneDescriptor.aria.selectionModel}
           role={layerPaneDescriptor.aria.containerRole}
         >
-          {layerPaneDescriptor.rows.map((row) => (
-            <div
+          {layerPaneDescriptor.rows.map((row) => {
+            const activeLayerPaneRename = layerPaneRenameState?.objectId === row.objectId
+              ? layerPaneRenameState
+              : null
+            const isRenaming = activeLayerPaneRename !== null
+            const renameValue = activeLayerPaneRename?.value ?? ''
+
+            return (
+              <div
               aria-disabled={!row.isSelectable}
               aria-expanded={row.ariaExpanded}
               aria-level={row.ariaLevel}
@@ -12245,25 +12320,72 @@ function Inspector({
                   style={{ paddingLeft: Math.max(0, row.ariaLevel - 1) * 12 }}
                 />
               )}
-              <button
-                className="ppt-layer-select"
-                data-ppt-layer-pane-intent="row-press"
-                data-ppt-layer-select={row.objectId}
-                type="button"
-                onClick={(event) => {
-                  setLayerPaneFocusedObjectId(row.objectId)
-                  runLayerPaneIntent({
-                    additive: event.metaKey || event.ctrlKey || event.shiftKey,
-                    objectId: row.objectId,
-                    type: 'row-press',
-                  })
-                }}
-              >
-                <span className="ppt-layer-kind">
-                  {row.isGroup ? <Group size={14} /> : <Layers size={14} />}
-                </span>
-                <span className="ppt-layer-name">{row.displayName}</span>
-              </button>
+              {isRenaming ? (
+                <div className="ppt-layer-select ppt-layer-select--editing">
+                  <span className="ppt-layer-kind">
+                    {row.isGroup ? <Group size={14} /> : <Layers size={14} />}
+                  </span>
+                  <input
+                    aria-label="Rename object"
+                    className="ppt-layer-rename-input"
+                    data-ppt-layer-pane-rename-input={row.objectId}
+                    value={renameValue}
+                    onBlur={() =>
+                      handleLayerPaneRenameBlur(
+                        row.objectId,
+                        renameValue,
+                      )}
+                    onChange={(event) =>
+                      setLayerPaneRenameState({
+                        objectId: row.objectId,
+                        value: event.target.value,
+                      })}
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      event.stopPropagation()
+
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        commitLayerPaneRename(
+                          row.objectId,
+                          renameValue,
+                        )
+                        return
+                      }
+
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        cancelLayerPaneRename(row.objectId)
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  className="ppt-layer-select"
+                  data-ppt-layer-pane-intent="row-press"
+                  data-ppt-layer-select={row.objectId}
+                  type="button"
+                  onDoubleClick={(event) => {
+                    event.stopPropagation()
+                    startLayerPaneRename(row)
+                  }}
+                  onClick={(event) => {
+                    setLayerPaneFocusedObjectId(row.objectId)
+                    runLayerPaneIntent({
+                      additive: event.metaKey || event.ctrlKey || event.shiftKey,
+                      objectId: row.objectId,
+                      type: 'row-press',
+                    })
+                  }}
+                >
+                  <span className="ppt-layer-kind">
+                    {row.isGroup ? <Group size={14} /> : <Layers size={14} />}
+                  </span>
+                  <span className="ppt-layer-name">{row.displayName}</span>
+                </button>
+              )}
               <div className="ppt-layer-actions">
                 <button
                   aria-label={row.isHidden ? 'Show object' : 'Hide object'}
@@ -12300,8 +12422,9 @@ function Inspector({
                   {row.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
                 </button>
               </div>
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       </section>
 

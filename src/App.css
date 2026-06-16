@@ -1778,6 +1778,10 @@
   text-align: left;
 }
 
+.ppt-layer-select--editing {
+  pointer-events: auto;
+}
+
 .ppt-layer-kind {
   display: inline-grid;
   place-items: center;
@@ -1790,6 +1794,18 @@
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ppt-layer-rename-input {
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
 }
 
 .ppt-layer-actions {

@@ -1355,6 +1355,31 @@ async function runAffordanceScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-layer-pane-row-type="group"]')?.focus()`)
   await delay(30)
   await pressKey(page, {
+    code: 'F2',
+    key: 'F2',
+    windowsVirtualKeyCode: 113,
+  })
+  await delay(50)
+  const afterGroupRenameGuard = await page.eval(`(() => {
+    const groupRow = document.querySelector('[data-ppt-layer-pane-row-type="group"]')
+
+    return {
+      focusedRowId: document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      groupRenamable: groupRow?.getAttribute('data-ppt-layer-pane-renamable') ?? '',
+      groupRowId: groupRow?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      renameInputCount: document.querySelectorAll('[data-ppt-layer-pane-rename-input]').length,
+    }
+  })()`)
+
+  record(
+    'does not open PPT layer pane rename for non-renamable group rows',
+    afterGroupRenameGuard.groupRenamable === 'false' &&
+      afterGroupRenameGuard.renameInputCount === 0 &&
+      afterGroupRenameGuard.focusedRowId === afterGroupRenameGuard.groupRowId,
+    afterGroupRenameGuard,
+  )
+
+  await pressKey(page, {
     code: 'ArrowLeft',
     key: 'ArrowLeft',
     windowsVirtualKeyCode: 37,
@@ -8935,6 +8960,71 @@ async function runSelectionPaneScenario(page) {
     },
   )
 
+  await page.eval(`document.querySelector('[data-ppt-layer-pane-row="${layerTargetId}"]')?.focus()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'F2',
+    key: 'F2',
+    windowsVirtualKeyCode: 113,
+  })
+  await delay(50)
+  const afterRenameOpen = await readPPTLayerPaneRenameState(page, layerTargetId)
+
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-layer-pane-rename-input="${layerTargetId}"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(input, 'Layer renamed object')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+  const afterRenameCommit = await readPPTLayerPaneRenameState(page, layerTargetId)
+
+  await page.eval(`document.querySelector('[data-ppt-layer-pane-row="${layerTargetId}"]')?.focus()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'F2',
+    key: 'F2',
+    windowsVirtualKeyCode: 113,
+  })
+  await delay(50)
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-layer-pane-rename-input="${layerTargetId}"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(input, 'Cancelled layer name')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+  const afterRenameCancel = await readPPTLayerPaneRenameState(page, layerTargetId)
+
+  record(
+    'renames PPT object from layer pane rename command-effect',
+    afterRenameOpen.inputOpen &&
+      afterRenameOpen.inputValue.length > 0 &&
+      afterRenameCommit.inputOpen === false &&
+      afterRenameCommit.rowName === 'Layer renamed object' &&
+      afterRenameCommit.inspectorName === 'Layer renamed object' &&
+      afterRenameCommit.stageName === 'Layer renamed object' &&
+      afterRenameCancel.inputOpen === false &&
+      afterRenameCancel.rowName === 'Layer renamed object',
+    {
+      afterRenameCancel,
+      afterRenameCommit,
+      afterRenameOpen,
+    },
+  )
+
   await page.eval(`(() => {
     const name = document.querySelector('[data-ppt-style-field="name"]')
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
@@ -9044,6 +9134,25 @@ async function readPPTLayerPaneKeyboardState(page) {
       treeKeyboardKeys: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
     }
   })()`)
+}
+
+async function readPPTLayerPaneRenameState(page, objectId) {
+  return page.eval(`((objectId) => {
+    const row = document.querySelector(\`[data-ppt-layer-pane-row="\${objectId}"]\`)
+    const input = document.querySelector(\`[data-ppt-layer-pane-rename-input="\${objectId}"]\`)
+    const inspectorName = document.querySelector('[data-ppt-style-field="name"]')
+    const stageElement = document.querySelector(\`[data-ppt-element="\${objectId}"]\`)
+
+    return {
+      focusedRowId: document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      inputOpen: !!input,
+      inputValue: input?.value ?? '',
+      inspectorName: inspectorName?.value ?? '',
+      renamable: row?.getAttribute('data-ppt-layer-pane-renamable') ?? '',
+      rowName: row?.querySelector('.ppt-layer-name')?.textContent ?? '',
+      stageName: stageElement?.getAttribute('data-ppt-element-name') ?? '',
+    }
+  })(${JSON.stringify(objectId)})`)
 }
 
 async function readPPTLayerPaneGroupTreeState(page) {
