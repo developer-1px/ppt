@@ -93,17 +93,20 @@ import {
 } from 'react'
 import {
   createSlideEditLayoutPlaceholderDescriptor,
+  createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectFillOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
@@ -113,6 +116,8 @@ import {
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditObjectCornerRadiusDescriptor,
+  type SlideEditObjectCornerRadiusHostCommandEffect,
   type SlideEditObjectFillOpacityDescriptor,
   type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
@@ -1522,6 +1527,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
@@ -3905,13 +3911,23 @@ function App() {
   }
 
   function updateShapeCornerRadius(elementId: string, cornerRadius: number) {
+    const effect = getSlideEditObjectCornerRadiusCommandEffect({
+      fieldId: 'cornerRadius',
+      id: 'update-object-corner-radius',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      value: normalizeSlideEditObjectCornerRadius(cornerRadius),
+    })
+
+    setLastCornerRadiusEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (element.kind !== 'shape' || element.shape !== 'rect') {
           return element
         }
 
-        const normalized = normalizePPTShapeCornerRadius(cornerRadius)
+        const normalized = normalizePPTShapeCornerRadius(effect.payload.value)
 
         return {
           ...element,
@@ -6488,6 +6504,13 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-corner-radius-command={lastCornerRadiusEffect?.payload.id}
+        data-ppt-corner-radius-command-field={lastCornerRadiusEffect?.payload.fieldId}
+        data-ppt-corner-radius-command-object={lastCornerRadiusEffect?.payload.objectId}
+        data-ppt-corner-radius-command-slide={lastCornerRadiusEffect?.payload.slideId}
+        data-ppt-corner-radius-command-type={lastCornerRadiusEffect?.type}
+        data-ppt-corner-radius-command-value={lastCornerRadiusEffect?.payload.value}
+        data-ppt-corner-radius-model="slide-edit-object-corner-radius"
         data-ppt-fill-opacity-command={lastFillOpacityEffect?.payload.id}
         data-ppt-fill-opacity-command-field={lastFillOpacityEffect?.payload.fieldId}
         data-ppt-fill-opacity-command-object={lastFillOpacityEffect?.payload.objectId}
@@ -10285,6 +10308,9 @@ function Inspector({
   const strokeLineStyleDescriptor = selectedElement
     ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
     : null
+  const cornerRadiusDescriptor = selectedElement?.kind === 'shape'
+    ? getPPTCornerRadiusDescriptor(slide.id, selectedElement)
+    : null
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
@@ -11279,11 +11305,17 @@ function Inspector({
                     <span>Corner radius</span>
                     <input
                       data-ppt-style-field="shape-corner-radius"
-                      max={PPT_SHAPE_CORNER_RADIUS_MAX}
-                      min={PPT_SHAPE_CORNER_RADIUS_MIN}
-                      step={PPT_SHAPE_CORNER_RADIUS_STEP}
+                      data-ppt-corner-radius-attribute={cornerRadiusDescriptor?.metadata.attribute}
+                      data-ppt-corner-radius-attribute-value={cornerRadiusDescriptor?.metadata.attributeValue}
+                      data-ppt-corner-radius-command={cornerRadiusDescriptor?.field.commandId}
+                      data-ppt-corner-radius-control={cornerRadiusDescriptor?.field.control}
+                      data-ppt-corner-radius-supported={cornerRadiusDescriptor?.isSupported ? 'true' : 'false'}
+                      data-ppt-corner-radius-surface={cornerRadiusDescriptor?.surface}
+                      max={cornerRadiusDescriptor?.field.max ?? PPT_SHAPE_CORNER_RADIUS_MAX}
+                      min={cornerRadiusDescriptor?.field.min ?? PPT_SHAPE_CORNER_RADIUS_MIN}
+                      step={cornerRadiusDescriptor?.field.step ?? PPT_SHAPE_CORNER_RADIUS_STEP}
                       type="number"
-                      value={getPPTShapeCornerRadius(selectedElement)}
+                      value={cornerRadiusDescriptor?.value ?? getPPTShapeCornerRadius(selectedElement)}
                       onChange={(event) =>
                         onShapeCornerRadiusChange(
                           selectedElement.id,
@@ -12530,20 +12562,26 @@ function parsePPTShapeCornerRadius(value: string) {
 }
 
 function normalizePPTShapeCornerRadius(value: number) {
-  const finiteValue = Number.isFinite(value)
-    ? value
-    : PPT_SHAPE_CORNER_RADIUS_DEFAULT
-  const clamped = clamp(
-    finiteValue,
-    PPT_SHAPE_CORNER_RADIUS_MIN,
-    PPT_SHAPE_CORNER_RADIUS_MAX,
-  )
-
-  return Math.round(clamped)
+  return normalizeSlideEditObjectCornerRadius(value)
 }
 
 function formatPPTShapeCornerRadius(value: number) {
   return String(normalizePPTShapeCornerRadius(value))
+}
+
+function getPPTCornerRadiusDescriptor(
+  slideId: string,
+  element: PPTShape,
+): SlideEditObjectCornerRadiusDescriptor<string, string> {
+  const isSupported = element.shape === 'rect'
+
+  return createSlideEditObjectCornerRadiusDescriptor({
+    isSupported,
+    objectId: element.id,
+    slideId,
+    unsupportedReason: isSupported ? undefined : 'unsupported-shape',
+    value: getPPTShapeCornerRadius(element),
+  })
 }
 
 function getPPTFillOpacityDescriptor(

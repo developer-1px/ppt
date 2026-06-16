@@ -5343,6 +5343,19 @@ async function runViewAndShapeScenario(page) {
   record(
     'updates and restores PPT shape corner radius from inspector',
     afterCornerRadius.inspectorRadius === '36' &&
+      afterCornerRadius.descriptorSurface === 'object-corner-radius' &&
+      afterCornerRadius.descriptorCommand === 'update-object-corner-radius' &&
+      afterCornerRadius.descriptorControl === 'corner-radius-slider' &&
+      afterCornerRadius.descriptorAttribute === 'data-slide-object-corner-radius' &&
+      afterCornerRadius.descriptorAttributeValue === '36' &&
+      afterCornerRadius.descriptorSupported === 'true' &&
+      afterCornerRadius.model === 'slide-edit-object-corner-radius' &&
+      afterCornerRadius.command === 'update-object-corner-radius' &&
+      afterCornerRadius.commandField === 'cornerRadius' &&
+      afterCornerRadius.commandObject === afterCornerRadius.selectedId &&
+      afterCornerRadius.commandSlide === 'slide-1' &&
+      afterCornerRadius.commandType === 'slide-command-effect' &&
+      afterCornerRadius.commandValue === '36' &&
       afterCornerRadius.selectedCornerRadius === '36' &&
       afterCornerRadius.selectedBorderRadius === '36px' &&
       afterCornerRadius.thumbCornerRadius === '36' &&
@@ -9329,9 +9342,24 @@ function getPPTShapeCornerRadiusState(page) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = selected?.getAttribute('data-ppt-element') ?? ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="shape-corner-radius"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
-      inspectorRadius: document.querySelector('[data-ppt-style-field="shape-corner-radius"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-corner-radius-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-corner-radius-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-corner-radius-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-corner-radius-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-corner-radius-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-corner-radius-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-corner-radius-attribute') ?? '',
+      descriptorAttributeValue: field?.getAttribute('data-ppt-corner-radius-attribute-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-corner-radius-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-corner-radius-control') ?? '',
+      descriptorSupported: field?.getAttribute('data-ppt-corner-radius-supported') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-corner-radius-surface') ?? '',
+      inspectorRadius: field?.value ?? '',
+      model: stage?.getAttribute('data-ppt-corner-radius-model') ?? '',
       selectedBorderRadius: selected?.style.borderRadius ?? '',
       selectedCornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
       selectedId: targetId,
