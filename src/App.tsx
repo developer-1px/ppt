@@ -44,6 +44,7 @@ import {
   MessageSquare,
   Minus,
   Moon,
+  MousePointer2,
   MoveDown,
   MoveUp,
   Paintbrush,
@@ -1337,6 +1338,8 @@ const PPT_MINIMAP_SIZE: PPTMinimapSize = {
 }
 const PPT_MINIMAP_PADDING = 8
 const PPT_MINIMAP_MIN_WORLD_SIZE = 120
+const PPT_LASER_POINT_DISTANCE = 3
+const PPT_LASER_TRAIL_MAX_POINTS = 80
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
@@ -1455,6 +1458,12 @@ type Interaction =
       startPoint: Point
       startViewport: Viewport
     }
+  | {
+      currentPoint: Point
+      kind: 'laser'
+      points: Point[]
+      startPoint: Point
+    }
 
 function App() {
   const [deck, setDeck] = useState(SAMPLE_PPT_DECK)
@@ -1474,6 +1483,8 @@ function App() {
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
   const [isTemporaryPanActive, setIsTemporaryPanActive] = useState(false)
   const [isPanToolActive, setIsPanToolActive] = useState(false)
+  const [isLaserToolActive, setIsLaserToolActive] = useState(false)
+  const [laserTrailPoints, setLaserTrailPoints] = useState<Point[]>([])
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
@@ -1767,6 +1778,8 @@ function App() {
     setCommandPaletteOpen(false)
     setContextMenu(null)
     setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
   }
 
   function exitPresentation() {
@@ -2069,6 +2082,12 @@ function App() {
         return
       }
 
+      if (isPPTLaserToolShortcut(event)) {
+        event.preventDefault()
+        activateLaserTool()
+        return
+      }
+
       if (isPPTSelectToolShortcut(event)) {
         event.preventDefault()
         activateSelectTool()
@@ -2106,6 +2125,8 @@ function App() {
         setIsTemporaryPanActive(false)
         setLineCreationMode(null)
         setCreationTool(null)
+        setIsLaserToolActive(false)
+        setLaserTrailPoints([])
         setContextMenu(null)
         setSelection([])
         return
@@ -2249,6 +2270,8 @@ function App() {
     setEditingId(null)
     setInteraction(null)
     setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setContextMenu(null)
   }
 
@@ -2360,6 +2383,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setContextMenu(null)
 
     if (activeFindMatch) {
@@ -2443,6 +2468,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setContextMenu(null)
   }
 
@@ -2467,6 +2494,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setContextMenu(null)
   }
 
@@ -2481,6 +2510,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setContextMenu(null)
   }
 
@@ -2796,6 +2827,8 @@ function App() {
     setCreationTool((current) => arePPTCreationToolsEqual(current, tool) ? null : tool)
     setLineCreationMode(null)
     setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2804,6 +2837,8 @@ function App() {
     setLineCreationMode((current) => current === mode ? null : mode)
     setCreationTool(null)
     setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2812,6 +2847,21 @@ function App() {
     setIsPanToolActive((current) => !current)
     setCreationTool(null)
     setLineCreationMode(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
+  function activateLaserTool() {
+    const shouldActivate = !isLaserToolActive
+
+    setIsLaserToolActive(shouldActivate)
+    setLaserTrailPoints([])
+    setInteraction((current) => current?.kind === 'laser' ? null : current)
+    setCreationTool(null)
+    setLineCreationMode(null)
+    setIsPanToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2832,6 +2882,8 @@ function App() {
       setLineCreationMode(null)
       setCreationTool(null)
       setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
       setContextMenu(null)
 
       return {
@@ -2873,6 +2925,8 @@ function App() {
       setLineCreationMode(null)
       setCreationTool(null)
       setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
       setContextMenu(null)
 
       return {
@@ -3230,6 +3284,8 @@ function App() {
     setCreationTool(null)
     setLineCreationMode(null)
     setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setEditingId(null)
     setContextMenu(null)
   }
@@ -4391,6 +4447,32 @@ function App() {
     return true
   }
 
+  function beginLaserPointer(
+    event: ReactPointerEvent<HTMLElement>,
+    point: Point,
+  ) {
+    if (!isLaserToolActive || event.button !== 0) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const points = [clampPPTPointToSlide(point)]
+
+    setContextMenu(null)
+    setLaserTrailPoints(points)
+    setInteraction({
+      currentPoint: points[0],
+      kind: 'laser',
+      points,
+      startPoint: points[0],
+    })
+
+    return true
+  }
+
   function beginLineCreation(
     event: ReactPointerEvent<HTMLElement>,
     point: Point,
@@ -4537,6 +4619,10 @@ function App() {
       return
     }
 
+    if (beginLaserPointer(event, screenToWorld(event.nativeEvent))) {
+      return
+    }
+
     if (beginFreeformCreation(event, screenToWorld(event.nativeEvent))) {
       return
     }
@@ -4637,6 +4723,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
 
     if (!selection.includes(elementId)) {
       const nextSelection = getPPTGroupPointerSelection({
@@ -4663,6 +4751,10 @@ function App() {
     const point = screenToWorld(event.nativeEvent)
 
     if (beginTemporaryPan(event)) {
+      return
+    }
+
+    if (beginLaserPointer(event, point)) {
       return
     }
 
@@ -4706,6 +4798,8 @@ function App() {
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     openPPTContextMenu(event.clientX, event.clientY)
   }
 
@@ -4865,6 +4959,18 @@ function App() {
     }
 
     const point = screenToWorld(event.nativeEvent)
+
+    if (interaction.kind === 'laser') {
+      const points = getNextPPTLaserTrailPoints(interaction.points, point)
+
+      setLaserTrailPoints(points)
+      setInteraction({
+        ...interaction,
+        currentPoint: clampPPTPointToSlide(point),
+        points,
+      })
+      return
+    }
 
     if (interaction.kind === 'marquee') {
       const bounds = normalizeBounds(interaction.startPoint, point)
@@ -5189,7 +5295,7 @@ function App() {
   }
 
   function getPPTInteractionHistoryDeck(current: Interaction) {
-    if (current.kind === 'marquee' || current.kind === 'pan') {
+    if (current.kind === 'marquee' || current.kind === 'pan' || current.kind === 'laser') {
       return null
     }
 
@@ -5224,7 +5330,8 @@ function App() {
     !commandPaletteOpen &&
     !contextMenu &&
     !creationTool &&
-    !lineCreationMode
+    !lineCreationMode &&
+    !isLaserToolActive
     ? getPPTSelectionCommandAnchor({
         barWidth: selectionCommandBarWidth,
         bounds: selectedBounds,
@@ -5454,6 +5561,12 @@ function App() {
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.pan.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.pan.ariaLabel,
+  }, {
+    id: 'tool:laser',
+    run: activateLaserTool,
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.laser.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.laser.ariaLabel,
   }, {
     id: 'tool:text',
     run: () => activatePPTCreationTool({ kind: 'text' }),
@@ -5726,6 +5839,18 @@ function App() {
             type="button"
           >
             <Hand size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.laser.ariaLabel}
+            aria-pressed={isLaserToolActive}
+            className="ppt-icon-button"
+            data-ppt-laser-tool
+            data-ppt-tool="laser"
+            onClick={activateLaserTool}
+            title={CANVAS_TOOL_AFFORDANCES.laser.title}
+            type="button"
+          >
+            <MousePointer2 size={17} />
           </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.text.ariaLabel}
@@ -6037,6 +6162,14 @@ function App() {
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
         data-ppt-keyboard-nudge-step="1"
+        data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
+        data-ppt-laser-tool-model="canvas-laser-pointer-tool"
+        data-ppt-laser-tool-shortcut="P"
+        data-ppt-laser-trail-model="canvas-laser-trail-overlay"
+        data-ppt-laser-trail-point-count={laserTrailPoints.length}
+        data-ppt-laser-trail-state={interaction?.kind === 'laser'
+          ? 'active'
+          : laserTrailPoints.length > 0 ? 'idle' : 'empty'}
         data-ppt-pan-tool-active={isPanToolActive ? 'true' : 'false'}
         data-ppt-pan-tool-model="canvas-pan-tool"
         data-ppt-pan-tool-shortcut="H"
@@ -6157,6 +6290,9 @@ function App() {
             ) : null}
             {marqueeBounds ? <Box className="ppt-marquee" bounds={marqueeBounds} /> : null}
             <Guides guides={snapGuides} scale={viewport.scale} />
+            {laserTrailPoints.length > 0 ? (
+              <PPTLaserTrailOverlay points={laserTrailPoints} scale={viewport.scale} />
+            ) : null}
           </div>
         </div>
         <PPTContextCommandMenu
@@ -9467,6 +9603,46 @@ function Box({ bounds, className }: { bounds: Bounds; className: string }) {
   )
 }
 
+function PPTLaserTrailOverlay({
+  points,
+  scale,
+}: {
+  points: Point[]
+  scale: number
+}) {
+  const lastPoint = points.at(-1)
+  const strokeWidth = Math.max(2, 5 / scale)
+  const dotRadius = Math.max(4, 7 / scale)
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="ppt-laser-trail"
+      data-ppt-laser-trail
+      data-ppt-laser-trail-point-count={points.length}
+      height={PPT_SLIDE_HEIGHT}
+      viewBox={`0 0 ${PPT_SLIDE_WIDTH} ${PPT_SLIDE_HEIGHT}`}
+      width={PPT_SLIDE_WIDTH}
+    >
+      <path
+        className="ppt-laser-trail-path"
+        d={getPPTLaserTrailPathData(points)}
+        data-ppt-laser-trail-path
+        strokeWidth={strokeWidth}
+      />
+      {lastPoint ? (
+        <circle
+          className="ppt-laser-trail-dot"
+          cx={lastPoint.x}
+          cy={lastPoint.y}
+          data-ppt-laser-trail-dot
+          r={dotRadius}
+        />
+      ) : null}
+    </svg>
+  )
+}
+
 function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) {
   return (
     <>
@@ -12643,6 +12819,13 @@ function isPPTPanToolShortcut(event: KeyboardEvent) {
     doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pan.keyboardShortcut)
 }
 
+function isPPTLaserToolShortcut(event: KeyboardEvent) {
+  return !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.laser.keyboardShortcut)
+}
+
 function doesEventMatchCanvasToolShortcut(
   event: KeyboardEvent,
   shortcut: {
@@ -13134,6 +13317,17 @@ function appendPPTFreeformPoint(points: Point[], point: Point) {
   return [...points, next]
 }
 
+function getNextPPTLaserTrailPoints(points: Point[], point: Point) {
+  const next = clampPPTPointToSlide(point)
+  const last = points.at(-1)
+
+  if (last && getPointDistance(last, next) < PPT_LASER_POINT_DISTANCE) {
+    return points
+  }
+
+  return [...points, next].slice(-PPT_LASER_TRAIL_MAX_POINTS)
+}
+
 function clampPPTPointToSlide(point: Point) {
   return {
     x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
@@ -13182,6 +13376,20 @@ function getPPTFreeformPathData(points: readonly Point[]) {
       return `Q ${formatPPTPathNumber(control.x)} ${formatPPTPathNumber(control.y)} ${getPPTPathMidpoint(control, point)}`
     }),
     `L ${formatPPTPathNumber(rest[rest.length - 1].x)} ${formatPPTPathNumber(rest[rest.length - 1].y)}`,
+  ].join(' ')
+}
+
+function getPPTLaserTrailPathData(points: readonly Point[]) {
+  const [first, ...rest] = points
+
+  if (!first) {
+    return ''
+  }
+
+  return [
+    `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
+    ...rest.map((point) =>
+      `L ${formatPPTPathNumber(point.x)} ${formatPPTPathNumber(point.y)}`),
   ].join(' ')
 }
 

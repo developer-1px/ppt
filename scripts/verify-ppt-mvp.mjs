@@ -764,6 +764,8 @@ async function runFindReplaceScenario(page) {
   record('does not open PPT find while native text editing is active', afterGuard.editing && !afterGuard.stripOpen, afterGuard)
 
   const beforeNativeShortcutGuard = await page.eval(`(() => ({
+    laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
+    laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
@@ -814,11 +816,19 @@ async function runFindReplaceScenario(page) {
       code: 'KeyH',
       key: 'h',
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyP',
+      key: 'p',
+    }))
   })()`)
   await delay(50)
 
   const afterNativeShortcutGuard = await page.eval(`(() => ({
     editing: document.activeElement?.matches('[data-ppt-element="s2-title"] .ppt-element-editor') === true,
+    laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
+    laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
     order: [...document.querySelectorAll('[data-ppt-element]')]
       .map((element) => element.getAttribute('data-ppt-element')).join(' '),
@@ -828,7 +838,7 @@ async function runFindReplaceScenario(page) {
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange lock viewport or pan shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture, {
+  record('does not run PPT arrange lock viewport pan or laser shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture && afterNativeShortcutGuard.laserToolActive === beforeNativeShortcutGuard.laserToolActive && afterNativeShortcutGuard.laserTrailPointCount === beforeNativeShortcutGuard.laserTrailPointCount, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -2403,6 +2413,9 @@ async function runCommandPaletteScenario(page) {
 
   const alignIds = await readCommandPaletteIds(page, 'align')
   const toolIds = await readCommandPaletteIds(page, 'tool')
+  const panToolIds = await readCommandPaletteIds(page, 'pan tool')
+  const laserToolIds = await readCommandPaletteIds(page, 'laser pointer')
+  const penToolIds = await readCommandPaletteIds(page, 'pen tool')
   const findIds = await readCommandPaletteIds(page, 'find')
   const groupIds = await readCommandPaletteIds(page, 'group')
   const lockIds = await readCommandPaletteIds(page, 'lock')
@@ -2429,8 +2442,9 @@ async function runCommandPaletteScenario(page) {
     hasAlign: alignIds.includes('command:align-left'),
     hasCreate: toolIds.includes('tool:text') &&
       toolIds.includes('tool:arrow') &&
-      toolIds.includes('tool:pan') &&
-      toolIds.includes('tool:pen'),
+      panToolIds.includes('tool:pan') &&
+      laserToolIds.includes('tool:laser') &&
+      penToolIds.includes('tool:pen'),
     hasFind: findIds.includes('view:find'),
     hasFlip: flipIds.includes('command:flip-horizontal') &&
       flipIds.includes('command:flip-vertical'),
@@ -2481,7 +2495,10 @@ async function runCommandPaletteScenario(page) {
       guide: guideIds.length,
       group: groupIds.length,
       lock: lockIds.length,
+      laserTool: laserToolIds.length,
       present: presentIds.length,
+      panTool: panToolIds.length,
+      penTool: penToolIds.length,
       tidy: tidyIds.length,
       tool: toolIds.length,
     },
@@ -2588,7 +2605,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -3255,6 +3272,95 @@ async function runFitSelectionScenario(page) {
     panToolPaletteIds,
   })
 
+  await page.eval(`document.querySelector('[data-ppt-laser-tool]')?.click()`)
+  await delay(80)
+  const afterToolbarLaserTool = await readPPTLaserToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+  const afterLaserSelect = await readPPTLaserToolState(page)
+
+  await pressKey(page, {
+    code: 'KeyK',
+    key: 'k',
+    modifiers: 2,
+    windowsVirtualKeyCode: 75,
+  })
+  await delay(80)
+  const laserToolPaletteIds = await readCommandPaletteIds(page, 'laser pointer')
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+  const afterPaletteLaserTool = await readPPTLaserToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+
+  const beforeLaserDrag = await readPPTLaserToolState(page)
+  const laserStart = await getElementCenter(page, 's1-card-1')
+  await pressKey(page, {
+    code: 'KeyP',
+    key: 'p',
+    windowsVirtualKeyCode: 80,
+  })
+  await delay(80)
+  const afterLaserShortcut = await readPPTLaserToolState(page)
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: laserStart.x,
+    y: laserStart.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: laserStart.x + 44,
+    y: laserStart.y + 22,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: laserStart.x + 92,
+    y: laserStart.y + 38,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: laserStart.x + 92,
+    y: laserStart.y + 38,
+  })
+  await delay(80)
+  const afterLaserDrag = await readPPTLaserToolState(page)
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(50)
+  const afterLaserFinalSelect = await readPPTLaserToolState(page)
+
+  record('activates and previews PPT laser pointer with canvas laser affordance', afterToolbarLaserTool.active === 'true' && afterToolbarLaserTool.toolbarPressed === 'true' && afterLaserSelect.active === 'false' && afterLaserSelect.trailPointCount === 0 && laserToolPaletteIds.includes('tool:laser') && afterPaletteLaserTool.active === 'true' && !afterPaletteLaserTool.paletteOpen && beforeLaserDrag.active === 'false' && afterLaserShortcut.model === 'canvas-laser-pointer-tool' && afterLaserShortcut.shortcut === 'P' && afterLaserShortcut.trailModel === 'canvas-laser-trail-overlay' && afterLaserShortcut.active === 'true' && afterLaserShortcut.cursor === 'crosshair' && afterLaserDrag.trailState === 'idle' && afterLaserDrag.trailPointCount >= 2 && afterLaserDrag.trailRenderedPointCount === afterLaserDrag.trailPointCount && afterLaserDrag.trailPath && afterLaserDrag.trailDot && afterLaserDrag.selectedIds === beforeLaserDrag.selectedIds && afterLaserDrag.elementCount === beforeLaserDrag.elementCount && afterLaserDrag.transform === beforeLaserDrag.transform && afterLaserFinalSelect.active === 'false' && afterLaserFinalSelect.trailPointCount === 0, {
+    afterLaserDrag,
+    afterLaserFinalSelect,
+    afterLaserSelect,
+    afterLaserShortcut,
+    afterPaletteLaserTool,
+    afterToolbarLaserTool,
+    beforeLaserDrag,
+    laserToolPaletteIds,
+  })
+
   await pressKey(page, {
     code: 'Equal',
     key: '=',
@@ -3780,6 +3886,41 @@ async function readPPTPanToolState(page) {
       selectedIds,
       shortcut: shell?.getAttribute('data-ppt-pan-tool-shortcut') ?? '',
       toolbarPressed: document.querySelector('[data-ppt-pan-tool]')?.getAttribute('aria-pressed') ?? '',
+      transform,
+      x: Number(translate?.[1] ?? 0),
+      y: Number(translate?.[2] ?? 0),
+    }
+  })()`)
+}
+
+async function readPPTLaserToolState(page) {
+  return page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const transform = document.querySelector('.ppt-stage-world')?.style.transform ?? ''
+    const scale = Number(transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0)
+    const translate = transform.match(/translate\\(([^p]+)px, ([^p]+)px\\)/)
+    const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element') ?? '')
+      .filter(Boolean)
+      .join(' ')
+    const trail = document.querySelector('[data-ppt-laser-trail]')
+
+    return {
+      active: shell?.getAttribute('data-ppt-laser-tool-active') ?? '',
+      cursor: shell ? getComputedStyle(shell).cursor : '',
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      model: shell?.getAttribute('data-ppt-laser-tool-model') ?? '',
+      paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      scale,
+      selectedIds,
+      shortcut: shell?.getAttribute('data-ppt-laser-tool-shortcut') ?? '',
+      toolbarPressed: document.querySelector('[data-ppt-laser-tool]')?.getAttribute('aria-pressed') ?? '',
+      trailDot: !!document.querySelector('[data-ppt-laser-trail-dot]'),
+      trailModel: shell?.getAttribute('data-ppt-laser-trail-model') ?? '',
+      trailPath: !!document.querySelector('[data-ppt-laser-trail-path]'),
+      trailPointCount: Number(shell?.getAttribute('data-ppt-laser-trail-point-count') ?? 0),
+      trailRenderedPointCount: Number(trail?.getAttribute('data-ppt-laser-trail-point-count') ?? 0),
+      trailState: shell?.getAttribute('data-ppt-laser-trail-state') ?? '',
       transform,
       x: Number(translate?.[1] ?? 0),
       y: Number(translate?.[2] ?? 0),

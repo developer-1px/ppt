@@ -893,6 +893,10 @@
   cursor: grab;
 }
 
+.ppt-stage-shell[data-ppt-laser-tool-active='true'] {
+  cursor: crosshair;
+}
+
 .ppt-stage-shell[data-ppt-temporary-pan-gesture='true'] {
   cursor: grabbing;
 }
@@ -1167,6 +1171,27 @@
 
 .ppt-selection-box {
   border: 1px solid var(--accent);
+}
+
+.ppt-laser-trail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ppt-laser-trail-path {
+  fill: none;
+  stroke: #ef4444;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.86;
+}
+
+.ppt-laser-trail-dot {
+  fill: #ef4444;
+  filter: drop-shadow(0 0 8px rgb(239 68 68 / 64%));
 }
 
 .ppt-size-capsule {
