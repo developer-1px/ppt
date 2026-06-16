@@ -4422,7 +4422,13 @@ async function runTextFontFamilyScenario(page) {
   record(
     'renders PPT font family control in text inspector',
     initial.selectedId === 's1-title' &&
+      initial.descriptorCommand === 'update-text-font-family' &&
+      initial.descriptorControl === 'font-family-select' &&
+      initial.descriptorFallback === 'Inter' &&
+      initial.descriptorOptions === 'Inter Arial Georgia Courier New' &&
+      initial.descriptorSurface === 'text-font-family' &&
       initial.fontFamily === 'Inter' &&
+      initial.model === 'slide-edit-text-font-family' &&
       initial.selectedFontFamily === 'Inter' &&
       initial.thumbFontFamily === 'Inter',
     initial,
@@ -4442,7 +4448,13 @@ async function runTextFontFamilyScenario(page) {
 
   record(
     'updates PPT text font family metadata from inspector',
-    afterGeorgia.fontFamily === 'Georgia' &&
+    afterGeorgia.command === 'update-text-font-family' &&
+      afterGeorgia.commandField === 'fontFamily' &&
+      afterGeorgia.commandObject === 's1-title' &&
+      afterGeorgia.commandSlide === 'slide-1' &&
+      afterGeorgia.commandType === 'slide-command-effect' &&
+      afterGeorgia.commandValue === 'Georgia' &&
+      afterGeorgia.fontFamily === 'Georgia' &&
       afterGeorgia.selectedFontFamily === 'Georgia' &&
       afterGeorgia.selectedStyleFontFamily.includes('Georgia') &&
       afterGeorgia.thumbFontFamily === 'Georgia' &&
@@ -10018,11 +10030,25 @@ function getPPTTextParagraphSpacingState(page) {
 
 function getPPTTextFontFamilyState(page) {
   return page.eval(`(() => {
+    const field = document.querySelector('[data-ppt-style-field="font-family"]')
     const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
 
     return {
-      fontFamily: document.querySelector('[data-ppt-style-field="font-family"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-text-font-family-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-text-font-family-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-text-font-family-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-text-font-family-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-text-font-family-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-text-font-family-command-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-text-font-family-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-text-font-family-control') ?? '',
+      descriptorFallback: field?.getAttribute('data-ppt-text-font-family-fallback') ?? '',
+      descriptorOptions: field?.getAttribute('data-ppt-text-font-family-options') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-text-font-family-surface') ?? '',
+      fontFamily: field?.value ?? '',
+      model: stage?.getAttribute('data-ppt-text-font-family-model') ?? '',
       selectedFontFamily: selected?.getAttribute('data-ppt-font-family') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedStyleFontFamily: selected?.style.fontFamily ?? '',

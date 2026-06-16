@@ -101,6 +101,7 @@ import {
   createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
+  createSlideEditTextFontFamilyDescriptor,
   createSlideEditTextFrameInsetDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
   getSlideEditFrameGuideGeometry,
@@ -116,6 +117,7 @@ import {
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
   normalizeSlideEditObjectCornerRadius,
@@ -123,6 +125,7 @@ import {
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
+  normalizeSlideEditTextFontFamily,
   normalizeSlideEditTextFrameInsetValue,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
@@ -149,6 +152,8 @@ import {
   type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditThemeColorToken,
+  type SlideEditTextFontFamilyDescriptor,
+  type SlideEditTextFontFamilyHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
   type SlideEditTextVerticalAlignmentDescriptor,
@@ -1210,9 +1215,6 @@ const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Georgia, serif', label: 'Georgia', value: 'Georgia' },
   { css: '"Courier New", monospace', label: 'Courier New', value: 'Courier New' },
 ] as const)
-const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
-  PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => option.value),
-)
 const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
 const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
   { css: 'flex-start', label: 'Top', value: 'top' },
@@ -1558,6 +1560,7 @@ function App() {
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
+  const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
   const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
@@ -3706,6 +3709,18 @@ function App() {
       rememberRecentColor(value)
     }
 
+    const textFontFamilyEffect = field === 'fontFamily'
+      ? getSlideEditTextFontFamilyCommandEffect({
+        fieldId: 'fontFamily',
+        id: 'update-text-font-family',
+        objectId: elementId,
+        slideId: activeSlide.id,
+        value: String(value),
+      }, {
+        fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+        options: getPPTTextFontFamilyDescriptorOptions(),
+      })
+      : null
     const textVerticalAlignmentEffect = field === 'verticalAlign'
       ? getSlideEditTextVerticalAlignmentCommandEffect({
         fieldId: 'verticalAlignment',
@@ -3715,6 +3730,10 @@ function App() {
         value: normalizeSlideEditTextVerticalAlignment(String(value)),
       })
       : null
+
+    if (textFontFamilyEffect) {
+      setLastTextFontFamilyEffect(textFontFamilyEffect)
+    }
 
     if (textVerticalAlignmentEffect) {
       setLastTextVerticalAlignmentEffect(textVerticalAlignmentEffect)
@@ -3734,8 +3753,8 @@ function App() {
           ...element.style,
         }
         const nextValue =
-          field === 'fontFamily'
-            ? normalizePPTTextFontFamily(String(value))
+          textFontFamilyEffect
+            ? textFontFamilyEffect.payload.value
             : textVerticalAlignmentEffect
               ? textVerticalAlignmentEffect.payload.value
               : value
@@ -6686,6 +6705,13 @@ function App() {
         data-ppt-stroke-line-style-command-type={lastStrokeLineStyleEffect?.type}
         data-ppt-stroke-line-style-command-value={lastStrokeLineStyleEffect?.payload.value}
         data-ppt-stroke-line-style-model="slide-edit-object-stroke-line-style"
+        data-ppt-text-font-family-command={lastTextFontFamilyEffect?.payload.id}
+        data-ppt-text-font-family-command-field={lastTextFontFamilyEffect?.payload.fieldId}
+        data-ppt-text-font-family-command-object={lastTextFontFamilyEffect?.payload.objectId}
+        data-ppt-text-font-family-command-slide={lastTextFontFamilyEffect?.payload.slideId}
+        data-ppt-text-font-family-command-type={lastTextFontFamilyEffect?.type}
+        data-ppt-text-font-family-command-value={lastTextFontFamilyEffect?.payload.value}
+        data-ppt-text-font-family-model="slide-edit-text-font-family"
         data-ppt-text-inset-command={lastTextFrameInsetEffect?.payload.id}
         data-ppt-text-inset-command-field={lastTextFrameInsetEffect?.payload.fieldId}
         data-ppt-text-inset-command-object={lastTextFrameInsetEffect?.payload.objectId}
@@ -10529,6 +10555,9 @@ function Inspector({
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
+  const textFontFamilyDescriptor = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextFontFamilyDescriptor(slide.id, selectedElement)
+    : null
   const textFrameInsetDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextFrameInsetDescriptor(slide.id, selectedElement)
     : null
@@ -11368,7 +11397,13 @@ function Inspector({
                   <span>Font</span>
                   <select
                     data-ppt-style-field="font-family"
-                    value={normalizePPTTextFontFamily(textStyle?.fontFamily)}
+                    data-ppt-text-font-family-command={textFontFamilyDescriptor?.field.commandId}
+                    data-ppt-text-font-family-control={textFontFamilyDescriptor?.field.control}
+                    data-ppt-text-font-family-fallback={textFontFamilyDescriptor?.fallbackFontFamily}
+                    data-ppt-text-font-family-options={textFontFamilyDescriptor?.options
+                      .map((option) => option.family).join(' ')}
+                    data-ppt-text-font-family-surface={textFontFamilyDescriptor?.surface}
+                    value={textFontFamilyDescriptor?.fontFamily ?? normalizePPTTextFontFamily(textStyle?.fontFamily)}
                     onChange={(event) =>
                       onElementTextStyleChange(
                         selectedElement.id,
@@ -12714,10 +12749,34 @@ function getDefaultPPTTextStyle(): PPTTextStyle {
   }
 }
 
+function getPPTTextFontFamilyDescriptorOptions() {
+  return PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => ({
+    family: option.value,
+    isDefault: option.value === PPT_DEFAULT_TEXT_FONT_FAMILY,
+    label: option.label,
+    source: 'host' as const,
+  }))
+}
+
+function getPPTTextFontFamilyDescriptor(
+  slideId: string,
+  element: PPTTextElement,
+): SlideEditTextFontFamilyDescriptor<string, string> {
+  return createSlideEditTextFontFamilyDescriptor({
+    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+    fontFamily: getPPTTextElementStyle(element).fontFamily,
+    objectId: element.id,
+    options: getPPTTextFontFamilyDescriptorOptions(),
+    slideId,
+  })
+}
+
 function normalizePPTTextFontFamily(fontFamily: string | undefined) {
-  return PPT_TEXT_FONT_FAMILY_VALUES.has(fontFamily ?? '')
-    ? fontFamily ?? PPT_DEFAULT_TEXT_FONT_FAMILY
-    : PPT_DEFAULT_TEXT_FONT_FAMILY
+  return normalizeSlideEditTextFontFamily({
+    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+    fontFamily,
+    options: getPPTTextFontFamilyDescriptorOptions(),
+  })
 }
 
 function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
