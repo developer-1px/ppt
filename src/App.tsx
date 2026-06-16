@@ -90,8 +90,10 @@ import {
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
+  getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
@@ -2137,6 +2139,15 @@ function App() {
     setContextMenu(null)
   }
 
+  function focusPPTSlideThumb(slideId: string) {
+    window.requestAnimationFrame(() => {
+      const thumb = [...document.querySelectorAll<HTMLButtonElement>('.ppt-thumb')]
+        .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.focus({ preventScroll: true })
+    })
+  }
+
   function handleSlideThumbSelect(
     slideId: string,
     event: ReactMouseEvent<HTMLButtonElement>,
@@ -2147,7 +2158,77 @@ function App() {
       return
     }
 
+    setLastSlideRailCommandEffect(toSlideEditRailHostCommandEffect({
+      id: 'select-active-slide',
+      slideId,
+    }))
     selectSlide(slideId)
+  }
+
+  function handleSlideThumbKeyDown(
+    slideId: string,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return
+    }
+
+    const slideOrder = deck.slides.map((slide) => slide.id)
+    let handled = false
+    let targetSlideId: string | null = null
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      handled = true
+      const effect = getSlideEditRailKeyboardCommandEffect({
+        activeSlideId: slideId,
+        direction: 'next',
+        slideOrder,
+        type: 'select-relative',
+      })
+
+      targetSlideId = effect?.payload.id === 'select-active-slide'
+        ? effect.payload.slideId
+        : null
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      handled = true
+      const effect = getSlideEditRailKeyboardCommandEffect({
+        activeSlideId: slideId,
+        direction: 'previous',
+        slideOrder,
+        type: 'select-relative',
+      })
+
+      targetSlideId = effect?.payload.id === 'select-active-slide'
+        ? effect.payload.slideId
+        : null
+    } else if (event.key === 'Home') {
+      handled = true
+      targetSlideId = slideOrder[0] ?? null
+    } else if (event.key === 'End') {
+      handled = true
+      targetSlideId = slideOrder.at(-1) ?? null
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      handled = true
+      targetSlideId = slideId
+    }
+
+    if (!handled) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!targetSlideId) {
+      return
+    }
+
+    setLastSlideRailCommandEffect(toSlideEditRailHostCommandEffect({
+      id: 'select-active-slide',
+      slideId: targetSlideId,
+    }))
+    selectSlide(targetSlideId)
+    focusPPTSlideThumb(targetSlideId)
   }
 
   function activateRelativeSlide(delta: number) {
@@ -5650,6 +5731,8 @@ function App() {
           data-ppt-slide-rail-command-slide={lastSlideRailReorderPayload?.slideId}
           data-ppt-slide-rail-command-to-index={lastSlideRailReorderPayload?.toIndex}
           data-ppt-slide-rail-command-type={lastSlideRailCommandEffect?.type}
+          data-ppt-slide-rail-keyboard-keys="ArrowUp ArrowDown Home End Enter Space"
+          data-ppt-slide-rail-keyboard-model="listbox-roving-focus"
           role="listbox"
         >
           {deck.slides.map((slide, index) => (
@@ -5666,6 +5749,7 @@ function App() {
               onDragOver={(event) => handleSlideThumbDragOver(slide.id, event)}
               onDragStart={(event) => handleSlideThumbDragStart(slide.id, event)}
               onDrop={(event) => handleSlideThumbDrop(slide.id, event)}
+              onKeyDown={(event) => handleSlideThumbKeyDown(slide.id, event)}
               onSelect={(event) => handleSlideThumbSelect(slide.id, event)}
             />
           ))}
@@ -8328,6 +8412,7 @@ function SlideThumb({
   onDragOver,
   onDragStart,
   onDrop,
+  onKeyDown,
   onSelect,
   slide,
 }: {
@@ -8339,6 +8424,7 @@ function SlideThumb({
   onDragOver: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDrop: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
   onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void
   slide: PPTSlide
 }) {
@@ -8346,19 +8432,24 @@ function SlideThumb({
     <button
       aria-current={active ? 'page' : undefined}
       aria-label={`Open ${slide.name}`}
+      aria-selected={active}
       className="ppt-thumb"
+      data-ppt-slide-active={active ? 'true' : undefined}
       data-ppt-slide-dragging={dragging ? 'true' : undefined}
       data-ppt-slide-draggable="true"
       data-ppt-slide-drop-target={dropPlacement}
       data-ppt-slide-id={slide.id}
       data-ppt-slide-index={index}
+      data-ppt-slide-roving-tab-index={active ? '0' : '-1'}
       draggable
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDragStart={onDragStart}
       onDrop={onDrop}
       onClick={onSelect}
+      onKeyDown={onKeyDown}
       role="option"
+      tabIndex={active ? 0 : -1}
       type="button"
     >
       <span className="ppt-thumb-preview" style={{ background: slide.background?.color ?? '#fff' }}>

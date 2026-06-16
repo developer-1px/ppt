@@ -7739,6 +7739,86 @@ async function runSlideManagementScenario(page) {
     afterDelete,
     before,
   })
+
+  await focusPPTSlideThumb(page, afterDelete.activeId)
+  await delay(50)
+
+  const initialKeyboard = await getSlideRailState(page)
+
+  record('exposes PPT slide rail listbox keyboard affordance', initialKeyboard.listRole === 'listbox' && initialKeyboard.keyboardModel === 'listbox-roving-focus' && initialKeyboard.keyboardKeys === 'ArrowUp ArrowDown Home End Enter Space' && initialKeyboard.optionCount === initialKeyboard.count && initialKeyboard.selectedOptionIds.length === 1 && initialKeyboard.selectedOptionIds[0] === initialKeyboard.activeId && initialKeyboard.tabStopIds.length === 1 && initialKeyboard.tabStopIds[0] === initialKeyboard.activeId && initialKeyboard.focusedId === initialKeyboard.activeId, {
+    initialKeyboard,
+  })
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(50)
+
+  const afterRailHome = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(50)
+
+  const afterRailArrowDown = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(50)
+
+  const afterRailEnd = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowUp',
+    key: 'ArrowUp',
+    windowsVirtualKeyCode: 38,
+  })
+  await delay(50)
+
+  const afterRailArrowUp = await getSlideRailState(page)
+
+  record('navigates PPT slide rail listbox with Arrow and Home End keys', afterRailHome.activeIndex === 0 && afterRailHome.focusedId === afterRailHome.activeId && afterRailArrowDown.activeIndex === Math.min(1, afterRailArrowDown.count - 1) && afterRailArrowDown.focusedId === afterRailArrowDown.activeId && afterRailEnd.activeIndex === afterRailEnd.count - 1 && afterRailEnd.focusedId === afterRailEnd.activeId && afterRailArrowUp.activeIndex === Math.max(0, afterRailEnd.count - 2) && afterRailArrowUp.focusedId === afterRailArrowUp.activeId, {
+    afterRailArrowDown,
+    afterRailArrowUp,
+    afterRailEnd,
+    afterRailHome,
+  })
+
+  const spaceTargetId = afterRailArrowUp.ids.find((id) => id !== afterRailArrowUp.activeId) ?? afterRailArrowUp.activeId
+  await focusPPTSlideThumb(page, spaceTargetId)
+  await pressKey(page, {
+    code: 'Space',
+    key: ' ',
+    windowsVirtualKeyCode: 32,
+  })
+  await delay(50)
+
+  const afterRailSpace = await getSlideRailState(page)
+  const enterTargetId = afterRailSpace.ids.find((id) => id !== afterRailSpace.activeId) ?? afterRailSpace.activeId
+  await focusPPTSlideThumb(page, enterTargetId)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
+
+  const afterRailEnter = await getSlideRailState(page)
+
+  record('selects focused PPT slide thumbnail with Enter and Space', afterRailSpace.activeId === spaceTargetId && afterRailSpace.command === 'select-active-slide' && afterRailSpace.commandSelectionSlide === spaceTargetId && afterRailSpace.focusedId === spaceTargetId && afterRailEnter.activeId === enterTargetId && afterRailEnter.command === 'select-active-slide' && afterRailEnter.commandSelectionSlide === enterTargetId && afterRailEnter.focusedId === enterTargetId, {
+    afterRailEnter,
+    afterRailSpace,
+    enterTargetId,
+    spaceTargetId,
+  })
 }
 
 function createPPTTestImageFileExpression(name, color) {
@@ -8466,6 +8546,7 @@ function getSlideRailState(page) {
     const thumbs = [...document.querySelectorAll('.ppt-thumb')]
     const activeIndex = thumbs.findIndex((thumb) => thumb.getAttribute('aria-current') === 'page')
     const activeThumb = thumbs[activeIndex] ?? null
+    const focusedThumb = document.activeElement?.closest('.ppt-thumb')
 
     return {
       activeId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
@@ -8479,11 +8560,32 @@ function getSlideRailState(page) {
       commandType: rail?.getAttribute('data-ppt-slide-rail-command-type') ?? '',
       count: thumbs.length,
       draggableCount: thumbs.filter((thumb) => thumb.getAttribute('data-ppt-slide-draggable') === 'true').length,
+      focusedId: focusedThumb?.getAttribute('data-ppt-slide-id') ?? '',
       ids: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
+      keyboardKeys: rail?.getAttribute('data-ppt-slide-rail-keyboard-keys') ?? '',
+      keyboardModel: rail?.getAttribute('data-ppt-slide-rail-keyboard-model') ?? '',
+      listRole: rail?.getAttribute('role') ?? '',
       names: thumbs.map((thumb) => thumb.querySelector('.ppt-thumb-name')?.textContent ?? ''),
+      optionCount: thumbs.filter((thumb) => thumb.getAttribute('role') === 'option').length,
+      rovingTabIndexes: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-roving-tab-index') ?? ''),
+      selectedOptionIds: thumbs
+        .filter((thumb) => thumb.getAttribute('aria-selected') === 'true')
+        .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       selectedIds: selectedIds.join(','),
+      tabStopIds: thumbs
+        .filter((thumb) => thumb.tabIndex === 0)
+        .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
     }
   })()`)
+}
+
+function focusPPTSlideThumb(page, slideId) {
+  return page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+
+    thumb?.focus()
+  })(${JSON.stringify(slideId)})`)
 }
 
 function getPPTPlaceholderVisibilityState(page, placeholderId = 'media') {
