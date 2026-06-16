@@ -98,6 +98,7 @@ import {
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
+  createSlideEditObjectImageCropDescriptor,
   createSlideEditObjectAnimationDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
@@ -120,6 +121,7 @@ import {
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
+  getSlideEditObjectImageCropCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
@@ -142,6 +144,8 @@ import {
   normalizeSlideEditObjectAnimationOrder,
   normalizeSlideEditColorSwatchValue,
   normalizeSlideEditObjectFillOpacity,
+  normalizeSlideEditObjectImageCropFit,
+  normalizeSlideEditObjectImageCropValue,
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
@@ -179,6 +183,8 @@ import {
   type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectHyperlinkHostCommandEffect,
+  type SlideEditObjectImageCropDescriptor,
+  type SlideEditObjectImageCropHostCommandEffect,
   type SlideEditBuiltInAnimationTrigger,
   type SlideEditColorSwatchBuiltInChannelId,
   type SlideEditColorSwatchHostCommandEffect,
@@ -1661,6 +1667,7 @@ function App() {
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
+  const [lastImageCropEffect, setLastImageCropEffect] = useState<SlideEditObjectImageCropHostCommandEffect<string, string> | null>(null)
   const [lastObjectAnimationEffect, setLastObjectAnimationEffect] = useState<SlideEditObjectAnimationHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
@@ -4163,6 +4170,16 @@ function App() {
     elementId: string,
     fit: PPTImageFit,
   ) {
+    const effect = getSlideEditObjectImageCropCommandEffect({
+      fieldId: 'fit',
+      id: 'update-object-image-crop',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      value: normalizeSlideEditObjectImageCropFit(fit),
+    })
+
+    setLastImageCropEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (element.kind !== 'image') {
@@ -4171,7 +4188,7 @@ function App() {
 
         return {
           ...element,
-          fit,
+          fit: normalizePPTImageFit(String(effect.payload.value)),
         }
       }),
     )
@@ -4182,6 +4199,16 @@ function App() {
     field: keyof PPTImageCrop,
     value: number,
   ) {
+    const effect = getSlideEditObjectImageCropCommandEffect({
+      fieldId: field,
+      id: 'update-object-image-crop',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      value: normalizeSlideEditObjectImageCropValue(value),
+    })
+
+    setLastImageCropEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (element.kind !== 'image') {
@@ -4192,7 +4219,7 @@ function App() {
           ...element,
           crop: {
             ...getPPTImageCrop(element),
-            [field]: clamp(value, 0, 100),
+            [field]: Number(effect.payload.value),
           },
         }
       }),
@@ -6853,6 +6880,15 @@ function App() {
           ? lastHyperlinkEffect.payload.value
           : undefined}
         data-ppt-hyperlink-model="slide-edit-object-hyperlink"
+        data-ppt-image-crop-command={lastImageCropEffect?.payload.id}
+        data-ppt-image-crop-command-field={lastImageCropEffect?.payload.fieldId}
+        data-ppt-image-crop-command-object={lastImageCropEffect?.payload.objectId}
+        data-ppt-image-crop-command-slide={lastImageCropEffect?.payload.slideId}
+        data-ppt-image-crop-command-type={lastImageCropEffect?.type}
+        data-ppt-image-crop-command-value={lastImageCropEffect
+          ? String(lastImageCropEffect.payload.value)
+          : undefined}
+        data-ppt-image-crop-model="slide-edit-object-image-crop"
         data-ppt-object-animation-command={lastObjectAnimationEffect?.payload.id}
         data-ppt-object-animation-command-field={lastObjectAnimationEffect?.payload.fieldId}
         data-ppt-object-animation-command-object={lastObjectAnimationEffect?.payload.objectId}
@@ -10770,6 +10806,9 @@ function Inspector({
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
+  const imageCropDescriptor = selectedElement?.kind === 'image'
+    ? getPPTImageCropDescriptor(slide.id, selectedElement)
+    : null
   const objectOpacityDescriptor = selectedElement
     ? getPPTObjectOpacityDescriptor(slide.id, selectedElement)
     : null
@@ -12339,37 +12378,63 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Fit</span>
                   <select
+                    data-ppt-image-crop-attribute={imageCropDescriptor?.metadata.attribute}
+                    data-ppt-image-crop-attribute-value={imageCropDescriptor?.metadata.attributeValue}
+                    data-ppt-image-crop-command={imageCropDescriptor?.fields.fit.commandId}
+                    data-ppt-image-crop-control={imageCropDescriptor?.fields.fit.control}
+                    data-ppt-image-crop-field="fit"
+                    data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
+                    data-ppt-image-crop-surface={imageCropDescriptor?.surface}
                     data-ppt-style-field="image-fit"
-                    value={getPPTImageFit(selectedElement)}
+                    value={imageCropDescriptor?.fit ?? getPPTImageFit(selectedElement)}
                     onChange={(event) => {
                       if (isPPTImageFit(event.target.value)) {
                         onImageFitChange(selectedElement.id, event.target.value)
                       }
                     }}
                   >
-                    <option value="cover">Cover</option>
-                    <option value="contain">Contain</option>
+                    {(imageCropDescriptor?.fields.fit.options ?? [
+                      { id: 'cover', label: 'Fill' },
+                      { id: 'contain', label: 'Fit' },
+                    ]).map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <div className="ppt-geometry-grid">
-                  {(['x', 'y'] as const).map((field) => (
-                    <label className="ppt-field" key={field}>
-                      <span>Crop {field.toUpperCase()}</span>
-                      <input
-                        data-ppt-style-field={`image-crop-${field}`}
-                        max={100}
-                        min={0}
-                        type="number"
-                        value={Math.round(getPPTImageCrop(selectedElement)[field])}
-                        onChange={(event) =>
-                          onImageCropChange(
-                            selectedElement.id,
-                            field,
-                            Number(event.target.value),
-                          )}
-                      />
-                    </label>
-                  ))}
+                  {(['x', 'y'] as const).map((field) => {
+                    const imageCropField = imageCropDescriptor?.fields[field]
+
+                    return (
+                      <label className="ppt-field" key={field}>
+                        <span>Crop {field.toUpperCase()}</span>
+                        <input
+                          data-ppt-image-crop-attribute={imageCropDescriptor?.metadata.attribute}
+                          data-ppt-image-crop-attribute-value={imageCropDescriptor?.metadata.attributeValue}
+                          data-ppt-image-crop-command={imageCropField?.commandId}
+                          data-ppt-image-crop-control={imageCropField?.control}
+                          data-ppt-image-crop-field={field}
+                          data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
+                          data-ppt-image-crop-surface={imageCropDescriptor?.surface}
+                          data-ppt-image-crop-unit={imageCropField?.unit}
+                          data-ppt-style-field={`image-crop-${field}`}
+                          max={imageCropField?.max ?? 100}
+                          min={imageCropField?.min ?? 0}
+                          step={imageCropField?.step ?? 1}
+                          type="number"
+                          value={Math.round(imageCropDescriptor?.crop[field] ?? getPPTImageCrop(selectedElement)[field])}
+                          onChange={(event) =>
+                            onImageCropChange(
+                              selectedElement.id,
+                              field,
+                              Number(event.target.value),
+                            )}
+                        />
+                      </label>
+                    )
+                  })}
                 </div>
               </>
             ) : null}
@@ -13570,8 +13635,24 @@ function getPPTImageFit(element: PPTImage): PPTImageFit {
   return element.fit ?? 'cover'
 }
 
+function normalizePPTImageFit(value: string | null | undefined): PPTImageFit {
+  return normalizeSlideEditObjectImageCropFit(value)
+}
+
 function getPPTImageCrop(element: PPTImage): PPTImageCrop {
   return element.crop ?? { x: 50, y: 50 }
+}
+
+function getPPTImageCropDescriptor(
+  slideId: string,
+  element: PPTImage,
+): SlideEditObjectImageCropDescriptor<string, string> {
+  return createSlideEditObjectImageCropDescriptor({
+    crop: getPPTImageCrop(element),
+    fit: getPPTImageFit(element),
+    objectId: element.id,
+    slideId,
+  })
 }
 
 function getPPTImageObjectPosition(element: PPTImage) {

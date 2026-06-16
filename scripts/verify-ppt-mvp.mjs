@@ -7067,6 +7067,21 @@ async function runImageImportScenario(page) {
     afterDrop,
     afterFit,
   })
+  record(
+    'routes PPT image fit through slide-edit crop command-effect',
+    afterFit.imageCropModel === 'slide-edit-object-image-crop' &&
+      afterFit.imageCropCommand === 'update-object-image-crop' &&
+      afterFit.imageCropCommandField === 'fit' &&
+      afterFit.imageCropCommandObject === afterFit.selectedId &&
+      afterFit.imageCropCommandType === 'slide-command-effect' &&
+      afterFit.imageCropCommandValue === 'contain' &&
+      afterFit.imageCropFitDescriptorAttribute === 'data-slide-object-image-crop' &&
+      afterFit.imageCropFitDescriptorAttributeValue === 'contain:50,50' &&
+      afterFit.imageCropFitDescriptorCommand === 'update-object-image-crop' &&
+      afterFit.imageCropFitDescriptorControl === 'image-fit-select' &&
+      afterFit.imageCropFitDescriptorSurface === 'object-image-crop',
+    afterFit,
+  )
 
   await page.eval(`(() => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
@@ -7089,6 +7104,24 @@ async function runImageImportScenario(page) {
     afterCrop,
     afterFit,
   })
+  record(
+    'routes PPT image crop position through slide-edit crop command-effect',
+    afterCrop.imageCropModel === 'slide-edit-object-image-crop' &&
+      afterCrop.imageCropCommand === 'update-object-image-crop' &&
+      afterCrop.imageCropCommandField === 'y' &&
+      afterCrop.imageCropCommandObject === afterCrop.selectedId &&
+      afterCrop.imageCropCommandType === 'slide-command-effect' &&
+      afterCrop.imageCropCommandValue === '70' &&
+      afterCrop.imageCropXDescriptorAttributeValue === 'contain:25,70' &&
+      afterCrop.imageCropYDescriptorAttributeValue === 'contain:25,70' &&
+      afterCrop.imageCropXDescriptorCommand === 'update-object-image-crop' &&
+      afterCrop.imageCropYDescriptorCommand === 'update-object-image-crop' &&
+      afterCrop.imageCropXDescriptorControl === 'crop-position-input' &&
+      afterCrop.imageCropYDescriptorControl === 'crop-position-input' &&
+      afterCrop.imageCropXDescriptorSurface === 'object-image-crop' &&
+      afterCrop.imageCropYDescriptorSurface === 'object-image-crop',
+    afterCrop,
+  )
 
   const beforeResize = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
@@ -10614,11 +10647,35 @@ function getPPTImageImportState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const selectedImage = selected?.querySelector('img') ?? null
+    const stage = document.querySelector('.ppt-stage-shell')
+    const fitField = document.querySelector('[data-ppt-style-field="image-fit"]')
+    const cropXField = document.querySelector('[data-ppt-style-field="image-crop-x"]')
+    const cropYField = document.querySelector('[data-ppt-style-field="image-crop-y"]')
 
     return {
-      inspectorCropX: Number(document.querySelector('[data-ppt-style-field="image-crop-x"]')?.value ?? 0),
-      inspectorCropY: Number(document.querySelector('[data-ppt-style-field="image-crop-y"]')?.value ?? 0),
-      inspectorImageFit: document.querySelector('[data-ppt-style-field="image-fit"]')?.value ?? '',
+      imageCropCommand: stage?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropCommandField: stage?.getAttribute('data-ppt-image-crop-command-field') ?? '',
+      imageCropCommandObject: stage?.getAttribute('data-ppt-image-crop-command-object') ?? '',
+      imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
+      imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
+      imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      imageCropFitDescriptorAttribute: fitField?.getAttribute('data-ppt-image-crop-attribute') ?? '',
+      imageCropFitDescriptorAttributeValue: fitField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
+      imageCropFitDescriptorCommand: fitField?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropFitDescriptorControl: fitField?.getAttribute('data-ppt-image-crop-control') ?? '',
+      imageCropFitDescriptorSurface: fitField?.getAttribute('data-ppt-image-crop-surface') ?? '',
+      imageCropModel: stage?.getAttribute('data-ppt-image-crop-model') ?? '',
+      imageCropXDescriptorAttributeValue: cropXField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
+      imageCropXDescriptorCommand: cropXField?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropXDescriptorControl: cropXField?.getAttribute('data-ppt-image-crop-control') ?? '',
+      imageCropXDescriptorSurface: cropXField?.getAttribute('data-ppt-image-crop-surface') ?? '',
+      imageCropYDescriptorAttributeValue: cropYField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
+      imageCropYDescriptorCommand: cropYField?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropYDescriptorControl: cropYField?.getAttribute('data-ppt-image-crop-control') ?? '',
+      imageCropYDescriptorSurface: cropYField?.getAttribute('data-ppt-image-crop-surface') ?? '',
+      inspectorCropX: Number(cropXField?.value ?? 0),
+      inspectorCropY: Number(cropYField?.value ?? 0),
+      inspectorImageFit: fitField?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
       selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
       selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
