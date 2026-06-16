@@ -10,8 +10,12 @@ import {
   type CanvasCommandAvailabilityConfig,
   type CanvasDistributeMode,
   type CanvasReorderMode,
+  deleteCanvasSelectionItems,
   distributeCanvasSelectionItems,
+  getCanvasSelectableItemIds,
+  getCanvasSelectedItemIds,
   getCanvasCommandAvailability,
+  mapCanvasSelectionItems,
   moveCanvasSelection,
   reorderCanvasSelectionItems,
   unionCanvasRectList,
@@ -55,9 +59,12 @@ export function createPPTCanvasCommandAdapter({
       return clonePPTElements(items, ids, createId, offset)
     },
     deleteSelection({ items, selection }) {
-      const selected = new Set(selection)
-
-      return items.filter((item) => !selected.has(item.id) || item.locked === true)
+      return deleteCanvasSelectionItems({
+        getItemId: getPPTCommandElementId,
+        isItemSelectable: isPPTCommandElementEditable,
+        items,
+        selection,
+      })
     },
     distributeSelection({ items, mode, selection }) {
       return distributePPTElements(items, selection, mode)
@@ -79,11 +86,13 @@ export function createPPTCanvasCommandAdapter({
       }
     },
     lockSelection({ items, selection }) {
-      const selected = new Set(selection)
-
       return {
-        items: items.map((item) =>
-          selected.has(item.id) ? { ...item, locked: true } : item),
+        items: mapCanvasSelectionItems({
+          getItemId: getPPTCommandElementId,
+          items,
+          mapItem: (item) => ({ ...item, locked: true }),
+          selection,
+        }),
         selection,
       }
     },
@@ -103,9 +112,11 @@ export function createPPTCanvasCommandAdapter({
       return reorderPPTElements(items, selection, mode)
     },
     selectAll({ items }) {
-      return items
-        .filter((item) => item.visible !== false)
-        .map((item) => item.id)
+      return getCanvasSelectableItemIds({
+        getItemId: getPPTCommandElementId,
+        isItemSelectable: isPPTCommandElementVisible,
+        items,
+      })
     },
     ungroupSelection({ items, selection }) {
       const selectedGroupIds = getSelectedPPTGroupIds(items, selection)
@@ -286,15 +297,24 @@ function isPPTCommandElementEditable(element: PPTElement) {
   return element.locked !== true
 }
 
+function isPPTCommandElementVisible(element: PPTElement) {
+  return element.visible !== false
+}
+
+function getPPTCommandElementId(element: PPTElement) {
+  return element.id
+}
+
 function getEditablePPTSelection(
   items: PPTElement[],
   selection: readonly string[],
 ) {
-  const selected = new Set(selection)
-
-  return items
-    .filter((item) => selected.has(item.id) && isPPTCommandElementEditable(item))
-    .map((item) => item.id)
+  return getCanvasSelectedItemIds({
+    getItemId: getPPTCommandElementId,
+    isItemSelectable: isPPTCommandElementEditable,
+    items,
+    selection,
+  })
 }
 
 function clonePPTElements(
