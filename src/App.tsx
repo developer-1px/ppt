@@ -422,6 +422,7 @@ import {
   EMPTY_CANVAS_SNAP_GUIDES,
   canFlipCanvasSelectionItems,
   getCanvasFullySelectedItemGroupIds,
+  getCanvasGroupExpandedSelectionIds,
   getCanvasGroupedItemSelection,
   getCanvasGroupedItemPointerSelection,
   getCanvasItemGroupIndexRange,
@@ -9918,15 +9919,6 @@ function getPPTLayerPaneGroupIdFromRowId(objectId: string) {
     : null
 }
 
-function getPPTLayerPaneGroupMemberIds(slide: PPTSlide, groupId: string) {
-  return getCanvasItemGroupMemberIdsForGroup({
-    getItemGroupId: (element) => element.groupId,
-    getItemId: (element) => element.id,
-    groupId,
-    items: slide.elements,
-  })
-}
-
 function getPPTLayerPaneFullySelectedGroupIds(
   slide: PPTSlide,
   selectedObjectIds: readonly string[],
@@ -9975,22 +9967,13 @@ function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
 ) {
-  const expanded: string[] = []
-
-  for (const objectId of objectIds) {
-    const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
-
-    if (groupId) {
-      expanded.push(...getPPTLayerPaneGroupMemberIds(slide, groupId))
-      continue
-    }
-
-    if (findPPTElement(slide, objectId)) {
-      expanded.push(objectId)
-    }
-  }
-
-  return unique(expanded)
+  return getCanvasGroupExpandedSelectionIds({
+    getItemGroupId: (element) => element.groupId,
+    getItemId: (element) => element.id,
+    getSelectionGroupId: getPPTLayerPaneGroupIdFromRowId,
+    items: slide.elements,
+    selection: objectIds,
+  })
 }
 
 function getPPTObjectVisibilityDescriptors(
