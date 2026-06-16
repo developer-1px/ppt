@@ -3,6 +3,11 @@ import {
   type Point,
 } from 'canvas/core'
 import {
+  getCanvasImageFileFromDataTransfer,
+  getCanvasImageFileFromList,
+  readCanvasImageFileSource,
+} from 'canvas/app/image-import'
+import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTImage,
@@ -63,39 +68,22 @@ export function createPPTImportedImageElement({
 }
 
 export async function readPPTImageFileSource(file: Blob & { name?: string }) {
-  if (!isPPTImageBlob(file)) {
+  const source = await readCanvasImageFileSource(file)
+
+  if (!source) {
     return null
   }
-
-  const dataUrl = await readPPTBlobAsDataUrl(file)
-  const mimeType = normalizePPTImageMimeType(file.type) ??
-    getPPTImageDataUrlMimeType(dataUrl)
-
-  if (!mimeType) {
-    return null
-  }
-
-  const naturalSize = await readPPTImageDataUrlNaturalSize(dataUrl)
 
   return {
-    dataUrl,
+    ...source,
     format: 'file' as const,
-    mimeType,
-    name: file.name,
-    naturalHeight: naturalSize?.h,
-    naturalWidth: naturalSize?.w,
   }
 }
 
-export function getPPTImageFileFromList(files: FileList | null) {
-  return Array.from(files ?? []).find(isPPTImageBlob) ?? null
-}
+export const getPPTImageFileFromList = getCanvasImageFileFromList
 
-export function getPPTImageFileFromDataTransfer(
-  dataTransfer: DataTransfer | null,
-) {
-  return getPPTImageFileFromList(dataTransfer?.files ?? null)
-}
+export const getPPTImageFileFromDataTransfer =
+  getCanvasImageFileFromDataTransfer
 
 export function getPPTDataImageSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
@@ -389,10 +377,6 @@ function getPPTImportedImageSize({
   }
 }
 
-function isPPTImageBlob(blob: Blob & { name?: string }) {
-  return normalizePPTImageMimeType(blob.type) !== null
-}
-
 function getPPTImageDataUrlMimeType(value: string) {
   const mimeType = value.trim().match(/^data:(image\/[^;,]+)[^,]*,/i)?.[1].toLowerCase()
 
@@ -448,24 +432,5 @@ function readPPTImageDataUrlNaturalSize(dataUrl: string) {
       resolve(null)
     }, { once: true })
     image.src = dataUrl
-  })
-}
-
-function readPPTBlobAsDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Expected image data URL'))
-    })
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Could not read image'))
-    })
-    reader.readAsDataURL(blob)
   })
 }
