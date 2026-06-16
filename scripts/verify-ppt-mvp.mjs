@@ -1207,16 +1207,104 @@ async function runCommandSurfaceScenario(page) {
   await delay(80)
 
   const afterContextOpen = await page.eval(`(() => ({
+    activeCommand: document.activeElement?.getAttribute('data-ppt-context-command') ?? '',
+    activeRole: document.activeElement?.getAttribute('role') ?? '',
     deleteDisabled: document.querySelector('[data-ppt-context-command="delete"]')?.disabled ?? true,
     duplicateDisabled: document.querySelector('[data-ppt-context-command="duplicate"]')?.disabled ?? true,
+    enabledCommands: [...document.querySelectorAll('[data-ppt-context-command]:not(:disabled)')]
+      .map((item) => item.getAttribute('data-ppt-context-command') ?? ''),
     floatingVisible: !!document.querySelector('[data-ppt-selection-floating-bar]'),
+    focusModel: document.querySelector('[data-ppt-context-menu]')?.getAttribute('data-ppt-context-menu-focus-model') ?? '',
     groupDisabled: document.querySelector('[data-ppt-context-command="group"]')?.disabled ?? false,
+    keyboard: document.querySelector('[data-ppt-context-menu]')?.getAttribute('data-ppt-context-menu-keyboard') ?? '',
     menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    menuRole: document.querySelector('[data-ppt-context-menu]')?.getAttribute('role') ?? '',
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
   }))()`)
 
   record('opens PPT context menu with shared command availability', afterContextOpen.menuOpen && !afterContextOpen.floatingVisible && !afterContextOpen.duplicateDisabled && !afterContextOpen.deleteDisabled && afterContextOpen.groupDisabled, afterContextOpen)
+  record(
+    'opens PPT context menu with APG menu focus contract',
+    afterContextOpen.menuRole === 'menu' &&
+      afterContextOpen.keyboard === 'arrow-home-end-enter-escape' &&
+      afterContextOpen.focusModel === 'enabled-menuitem-roving' &&
+      afterContextOpen.activeRole === 'menuitem' &&
+      afterContextOpen.activeCommand === afterContextOpen.enabledCommands[0] &&
+      afterContextOpen.activeCommand === 'duplicate',
+    afterContextOpen,
+  )
 
-  await page.eval(`document.querySelector('[data-ppt-context-command="duplicate"]')?.click()`)
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(20)
+  const afterMenuArrowDown = await page.eval(`(() => ({
+    activeCommand: document.activeElement?.getAttribute('data-ppt-context-command') ?? '',
+    enabledCommands: [...document.querySelectorAll('[data-ppt-context-command]:not(:disabled)')]
+      .map((item) => item.getAttribute('data-ppt-context-command') ?? ''),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(20)
+  const afterMenuEnd = await page.eval(`(() => ({
+    activeCommand: document.activeElement?.getAttribute('data-ppt-context-command') ?? '',
+    enabledCommands: [...document.querySelectorAll('[data-ppt-context-command]:not(:disabled)')]
+      .map((item) => item.getAttribute('data-ppt-context-command') ?? ''),
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(20)
+  const afterMenuHome = await page.eval(`(() => ({
+    activeCommand: document.activeElement?.getAttribute('data-ppt-context-command') ?? '',
+  }))()`)
+
+  record(
+    'moves PPT context menu focus with Arrow/Home/End keys',
+    afterMenuArrowDown.activeCommand === afterContextOpen.enabledCommands[1] &&
+      afterMenuEnd.activeCommand === afterMenuEnd.enabledCommands.at(-1) &&
+      afterMenuHome.activeCommand === afterContextOpen.enabledCommands[0],
+    {
+      afterContextOpen,
+      afterMenuArrowDown,
+      afterMenuEnd,
+      afterMenuHome,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const afterMenuEscape = await page.eval(`(() => ({
+    menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  record('closes PPT context menu with Escape while preserving selection', !afterMenuEscape.menuOpen && afterMenuEscape.selectedId === afterContextOpen.selectedId, {
+    afterContextOpen,
+    afterMenuEscape,
+  })
+
+  await rightClickMouse(page, point.x, point.y)
+  await delay(80)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
   await delay(80)
 
   const afterContextDuplicate = await page.eval(`(() => ({
@@ -1225,7 +1313,7 @@ async function runCommandSurfaceScenario(page) {
     selectedCount: document.querySelectorAll('[data-selected="true"]').length,
   }))()`)
 
-  record('runs duplicate from PPT context menu', afterContextDuplicate.elementCount === initial.elementCount + 1 && afterContextDuplicate.selectedCount >= 1 && !afterContextDuplicate.menuOpen, {
+  record('runs duplicate from PPT context menu keyboard action', afterContextDuplicate.elementCount === initial.elementCount + 1 && afterContextDuplicate.selectedCount >= 1 && !afterContextDuplicate.menuOpen, {
     afterContextDuplicate,
     initial,
   })

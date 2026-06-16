@@ -7799,6 +7799,85 @@ function PPTContextCommandMenu({
   onClose: () => void
   onCommand: (command: PPTSurfaceCommand) => void
 }) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menu) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      getPPTContextMenuItems(menuRef.current)[0]?.focus()
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [menu])
+
+  function focusContextMenuItem(delta: number) {
+    const items = getPPTContextMenuItems(menuRef.current)
+
+    if (items.length === 0) {
+      return
+    }
+
+    const currentIndex = items.findIndex((item) => item === document.activeElement)
+    const nextIndex = currentIndex < 0
+      ? 0
+      : (currentIndex + delta + items.length) % items.length
+
+    items[nextIndex]?.focus()
+  }
+
+  function focusContextMenuBoundary(position: 'first' | 'last') {
+    const items = getPPTContextMenuItems(menuRef.current)
+    const item = position === 'first' ? items[0] : items.at(-1)
+
+    item?.focus()
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+      return
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      focusContextMenuItem(1)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      focusContextMenuItem(-1)
+      return
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault()
+      focusContextMenuBoundary('first')
+      return
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault()
+      focusContextMenuBoundary('last')
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      const focused = document.activeElement
+
+      if (focused instanceof HTMLButtonElement &&
+        focused.closest('[data-ppt-context-menu]')) {
+        event.preventDefault()
+        focused.click()
+      }
+    }
+  }
+
   if (!menu || groups.length === 0) {
     return null
   }
@@ -7808,12 +7887,16 @@ function PPTContextCommandMenu({
       aria-label="Selection commands"
       className="ppt-context-menu"
       data-ppt-context-menu
+      data-ppt-context-menu-focus-model="enabled-menuitem-roving"
+      data-ppt-context-menu-keyboard="arrow-home-end-enter-escape"
+      ref={menuRef}
       role="menu"
       style={{
         left: menu.x,
         top: menu.y,
       }}
       onContextMenu={(event) => event.preventDefault()}
+      onKeyDown={handleKeyDown}
       onPointerDown={(event) => event.stopPropagation()}
     >
       {groups.map((group) => (
@@ -7875,6 +7958,16 @@ function PPTSurfaceCommandButton({
       {surface === 'context-menu' ? <span>{command.label}</span> : null}
     </button>
   )
+}
+
+function getPPTContextMenuItems(menu: HTMLDivElement | null) {
+  if (!menu) {
+    return []
+  }
+
+  return [...menu.querySelectorAll<HTMLButtonElement>(
+    '[role="menuitem"]:not(:disabled)',
+  )]
 }
 
 function PPTSurfaceCommandIcon({
