@@ -98,6 +98,7 @@ import {
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
   createSlideEditObjectOpacityDescriptor,
+  createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
@@ -107,6 +108,7 @@ import {
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
+  getSlideEditObjectShadowCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditRailKeyboardCommandEffect,
@@ -133,6 +135,8 @@ import {
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectOpacityDescriptor,
   type SlideEditObjectOpacityHostCommandEffect,
+  type SlideEditObjectShadowDescriptor,
+  type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditPlaceholderDescriptor,
@@ -1545,6 +1549,7 @@ function App() {
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
+  const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
@@ -3626,12 +3631,24 @@ function App() {
     field: PPTElementShadowUpdateField,
     value: boolean | number | string,
   ) {
+    const effect = getSlideEditObjectShadowCommandEffect({
+      fieldId: field,
+      id: 'update-object-shadow',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      value,
+    })
+
+    setLastShadowEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (field === 'enabled') {
+        const { fieldId, value: fieldValue } = effect.payload
+
+        if (fieldId === 'enabled') {
           return {
             ...element,
-            shadow: value === true ? getPPTElementShadow(element) : undefined,
+            shadow: fieldValue === true ? getPPTElementShadow(element) : undefined,
           }
         }
 
@@ -3639,7 +3656,7 @@ function App() {
           ...element,
           shadow: normalizePPTElementShadow({
             ...getPPTElementShadow(element),
-            [field]: value,
+            [fieldId]: fieldValue,
           }),
         }
       }),
@@ -6619,6 +6636,15 @@ function App() {
         data-ppt-object-opacity-command-type={lastObjectOpacityEffect?.type}
         data-ppt-object-opacity-command-value={lastObjectOpacityEffect?.payload.value}
         data-ppt-object-opacity-model="slide-edit-object-opacity"
+        data-ppt-shadow-command={lastShadowEffect?.payload.id}
+        data-ppt-shadow-command-field={lastShadowEffect?.payload.fieldId}
+        data-ppt-shadow-command-object={lastShadowEffect?.payload.objectId}
+        data-ppt-shadow-command-slide={lastShadowEffect?.payload.slideId}
+        data-ppt-shadow-command-type={lastShadowEffect?.type}
+        data-ppt-shadow-command-value={lastShadowEffect
+          ? String(lastShadowEffect.payload.value)
+          : undefined}
+        data-ppt-shadow-model="slide-edit-object-shadow"
         data-ppt-stroke-line-style-command={lastStrokeLineStyleEffect?.payload.id}
         data-ppt-stroke-line-style-command-field={lastStrokeLineStyleEffect?.payload.fieldId}
         data-ppt-stroke-line-style-command-object={lastStrokeLineStyleEffect?.payload.objectId}
@@ -10430,6 +10456,15 @@ function Inspector({
   const objectAccessibilityAltTextField = objectAccessibilityDescriptor?.fields.find((field) =>
     field.id === 'altText'
   )
+  const objectShadowDescriptor = selectedElement
+    ? getPPTObjectShadowDescriptor(slide.id, selectedElement)
+    : null
+  const objectShadowEnabledField = getPPTObjectShadowField(objectShadowDescriptor, 'enabled')
+  const objectShadowColorField = getPPTObjectShadowField(objectShadowDescriptor, 'color')
+  const objectShadowOpacityField = getPPTObjectShadowField(objectShadowDescriptor, 'opacity')
+  const objectShadowBlurField = getPPTObjectShadowField(objectShadowDescriptor, 'blur')
+  const objectShadowDistanceField = getPPTObjectShadowField(objectShadowDescriptor, 'distance')
+  const objectShadowAngleField = getPPTObjectShadowField(objectShadowDescriptor, 'angle')
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -10442,6 +10477,7 @@ function Inspector({
   const elementShadowEnabled = selectedElement
     ? hasPPTElementShadow(selectedElement)
     : false
+  const objectShadowEnabled = objectShadowDescriptor?.metadata.isEnabled ?? elementShadowEnabled
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
@@ -10943,8 +10979,14 @@ function Inspector({
             </label>
             <label className="ppt-checkbox-field">
               <input
-                checked={elementShadowEnabled}
+                checked={objectShadowEnabled}
+                data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                data-ppt-shadow-command={objectShadowEnabledField?.commandId}
+                data-ppt-shadow-control={objectShadowEnabledField?.control}
+                data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                 data-ppt-shadow-field="enabled"
+                data-ppt-shadow-surface={objectShadowDescriptor?.surface}
                 type="checkbox"
                 onChange={(event) =>
                   onElementShadowChange(
@@ -10957,21 +10999,27 @@ function Inspector({
             </label>
             <div
               className="ppt-geometry-grid"
-              data-ppt-shadow-angle={elementShadow.angle}
-              data-ppt-shadow-blur={elementShadow.blur}
-              data-ppt-shadow-color={elementShadow.color}
-              data-ppt-shadow-distance={elementShadow.distance}
-              data-ppt-shadow-enabled={elementShadowEnabled ? 'true' : 'false'}
+              data-ppt-shadow-angle={objectShadowDescriptor?.shadow.angle ?? elementShadow.angle}
+              data-ppt-shadow-blur={objectShadowDescriptor?.shadow.blur ?? elementShadow.blur}
+              data-ppt-shadow-color={objectShadowDescriptor?.shadow.color ?? elementShadow.color}
+              data-ppt-shadow-distance={objectShadowDescriptor?.shadow.distance ?? elementShadow.distance}
+              data-ppt-shadow-enabled={objectShadowEnabled ? 'true' : 'false'}
               data-ppt-shadow-inspector
-              data-ppt-shadow-opacity={elementShadow.opacity}
+              data-ppt-shadow-opacity={objectShadowDescriptor?.shadow.opacity ?? elementShadow.opacity}
             >
               <label className="ppt-field">
                 <span>Color</span>
                 <input
+                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                  data-ppt-shadow-command={objectShadowColorField?.commandId}
+                  data-ppt-shadow-control={objectShadowColorField?.control}
+                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                   data-ppt-shadow-field="color"
-                  disabled={!elementShadowEnabled}
+                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
+                  disabled={!objectShadowEnabled}
                   type="color"
-                  value={elementShadow.color}
+                  value={objectShadowDescriptor?.shadow.color ?? elementShadow.color}
                   onChange={(event) =>
                     onElementShadowChange(
                       selectedElement.id,
@@ -10983,13 +11031,20 @@ function Inspector({
               <label className="ppt-field">
                 <span>Shadow opacity</span>
                 <input
+                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                  data-ppt-shadow-command={objectShadowOpacityField?.commandId}
+                  data-ppt-shadow-control={objectShadowOpacityField?.control}
+                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                   data-ppt-shadow-field="opacity"
-                  disabled={!elementShadowEnabled}
-                  max={PPT_ELEMENT_SHADOW_OPACITY_MAX}
-                  min={PPT_ELEMENT_SHADOW_OPACITY_MIN}
-                  step={PPT_ELEMENT_SHADOW_OPACITY_STEP}
+                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
+                  data-ppt-shadow-unit={objectShadowOpacityField?.unit}
+                  disabled={!objectShadowEnabled}
+                  max={objectShadowOpacityField?.max ?? PPT_ELEMENT_SHADOW_OPACITY_MAX}
+                  min={objectShadowOpacityField?.min ?? PPT_ELEMENT_SHADOW_OPACITY_MIN}
+                  step={objectShadowOpacityField?.step ?? PPT_ELEMENT_SHADOW_OPACITY_STEP}
                   type="number"
-                  value={elementShadow.opacity}
+                  value={objectShadowDescriptor?.shadow.opacity ?? elementShadow.opacity}
                   onChange={(event) =>
                     onElementShadowChange(
                       selectedElement.id,
@@ -11001,13 +11056,20 @@ function Inspector({
               <label className="ppt-field">
                 <span>Blur</span>
                 <input
+                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                  data-ppt-shadow-command={objectShadowBlurField?.commandId}
+                  data-ppt-shadow-control={objectShadowBlurField?.control}
+                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                   data-ppt-shadow-field="blur"
-                  disabled={!elementShadowEnabled}
-                  max={PPT_ELEMENT_SHADOW_BLUR_MAX}
-                  min={0}
-                  step={1}
+                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
+                  data-ppt-shadow-unit={objectShadowBlurField?.unit}
+                  disabled={!objectShadowEnabled}
+                  max={objectShadowBlurField?.max ?? PPT_ELEMENT_SHADOW_BLUR_MAX}
+                  min={objectShadowBlurField?.min ?? 0}
+                  step={objectShadowBlurField?.step ?? 1}
                   type="number"
-                  value={elementShadow.blur}
+                  value={objectShadowDescriptor?.shadow.blur ?? elementShadow.blur}
                   onChange={(event) =>
                     onElementShadowChange(
                       selectedElement.id,
@@ -11019,13 +11081,20 @@ function Inspector({
               <label className="ppt-field">
                 <span>Distance</span>
                 <input
+                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                  data-ppt-shadow-command={objectShadowDistanceField?.commandId}
+                  data-ppt-shadow-control={objectShadowDistanceField?.control}
+                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                   data-ppt-shadow-field="distance"
-                  disabled={!elementShadowEnabled}
-                  max={PPT_ELEMENT_SHADOW_DISTANCE_MAX}
-                  min={0}
-                  step={1}
+                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
+                  data-ppt-shadow-unit={objectShadowDistanceField?.unit}
+                  disabled={!objectShadowEnabled}
+                  max={objectShadowDistanceField?.max ?? PPT_ELEMENT_SHADOW_DISTANCE_MAX}
+                  min={objectShadowDistanceField?.min ?? 0}
+                  step={objectShadowDistanceField?.step ?? 1}
                   type="number"
-                  value={elementShadow.distance}
+                  value={objectShadowDescriptor?.shadow.distance ?? elementShadow.distance}
                   onChange={(event) =>
                     onElementShadowChange(
                       selectedElement.id,
@@ -11037,13 +11106,20 @@ function Inspector({
               <label className="ppt-field">
                 <span>Angle</span>
                 <input
+                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
+                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
+                  data-ppt-shadow-command={objectShadowAngleField?.commandId}
+                  data-ppt-shadow-control={objectShadowAngleField?.control}
+                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
                   data-ppt-shadow-field="angle"
-                  disabled={!elementShadowEnabled}
-                  max={PPT_ELEMENT_SHADOW_ANGLE_MAX}
-                  min={PPT_ELEMENT_SHADOW_ANGLE_MIN}
-                  step={1}
+                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
+                  data-ppt-shadow-unit={objectShadowAngleField?.unit}
+                  disabled={!objectShadowEnabled}
+                  max={objectShadowAngleField?.max ?? PPT_ELEMENT_SHADOW_ANGLE_MAX}
+                  min={objectShadowAngleField?.min ?? PPT_ELEMENT_SHADOW_ANGLE_MIN}
+                  step={objectShadowAngleField?.step ?? 1}
                   type="number"
-                  value={elementShadow.angle}
+                  value={objectShadowDescriptor?.shadow.angle ?? elementShadow.angle}
                   onChange={(event) =>
                     onElementShadowChange(
                       selectedElement.id,
@@ -13012,6 +13088,27 @@ function hasPPTControlCharacter(value: string) {
 
 function hasPPTElementShadow(element: PPTElement) {
   return element.shadow !== undefined
+}
+
+function getPPTObjectShadowDescriptor(
+  slideId: string,
+  element: PPTElement,
+): SlideEditObjectShadowDescriptor<string, string> {
+  return createSlideEditObjectShadowDescriptor({
+    objectId: element.id,
+    shadow: {
+      ...getPPTElementShadow(element),
+      enabled: hasPPTElementShadow(element),
+    },
+    slideId,
+  })
+}
+
+function getPPTObjectShadowField(
+  descriptor: SlideEditObjectShadowDescriptor<string, string> | null,
+  fieldId: PPTElementShadowUpdateField,
+) {
+  return descriptor?.fields.find((field) => field.id === fieldId)
 }
 
 function getPPTElementShadow(element: PPTElement): PPTElementShadow {

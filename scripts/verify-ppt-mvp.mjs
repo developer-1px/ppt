@@ -6271,8 +6271,15 @@ async function runObjectShadowScenario(page) {
   record(
     'renders PPT object shadow controls in inspector',
     targetId.length > 0 &&
+      initial.descriptorAttribute === 'data-slide-object-shadow' &&
+      initial.descriptorAttributeValue === 'none' &&
+      initial.descriptorCommand === 'update-object-shadow' &&
+      initial.descriptorControl === 'shadow-toggle' &&
+      initial.descriptorEnabled === 'false' &&
+      initial.descriptorSurface === 'object-shadow' &&
       initial.inspectorEnabled === 'false' &&
       initial.enabled === false &&
+      initial.model === 'slide-edit-object-shadow' &&
       initial.opacity === '0.22' &&
       initial.opacityDisabled === true &&
       initial.selectedShadow === '' &&
@@ -6287,8 +6294,21 @@ async function runObjectShadowScenario(page) {
 
   record(
     'enables PPT object shadow metadata from inspector',
-    afterEnable.enabled === true &&
+    afterEnable.command === 'update-object-shadow' &&
+      afterEnable.commandField === 'enabled' &&
+      afterEnable.commandObject === targetId &&
+      afterEnable.commandSlide === 'slide-1' &&
+      afterEnable.commandType === 'slide-command-effect' &&
+      afterEnable.commandValue === 'true' &&
+      afterEnable.descriptorAttribute === 'data-slide-object-shadow' &&
+      afterEnable.descriptorCommand === 'update-object-shadow' &&
+      afterEnable.descriptorControl === 'shadow-toggle' &&
+      afterEnable.descriptorEnabled === 'true' &&
+      afterEnable.descriptorOpacity === '0.22' &&
+      afterEnable.descriptorSurface === 'object-shadow' &&
+      afterEnable.enabled === true &&
       afterEnable.inspectorEnabled === 'true' &&
+      afterEnable.model === 'slide-edit-object-shadow' &&
       afterEnable.selectedShadow === 'true' &&
       afterEnable.selectedOpacity === '0.22' &&
       afterEnable.selectedFilter.includes('drop-shadow') &&
@@ -6355,10 +6375,30 @@ async function runObjectShadowScenario(page) {
   record(
     'updates PPT object shadow fields from inspector',
     afterFields.color === '#334155' &&
+      afterFields.command === 'update-object-shadow' &&
+      afterFields.commandField === 'angle' &&
+      afterFields.commandObject === targetId &&
+      afterFields.commandSlide === 'slide-1' &&
+      afterFields.commandType === 'slide-command-effect' &&
+      afterFields.commandValue === '60' &&
+      afterFields.descriptorAngle === '60' &&
+      afterFields.descriptorBlur === '18' &&
+      afterFields.descriptorColor === '#334155' &&
+      afterFields.descriptorDistance === '12' &&
+      afterFields.descriptorEnabled === 'true' &&
+      afterFields.descriptorOpacity === '0.36' &&
       afterFields.opacity === '0.36' &&
+      afterFields.opacityControl === 'slider' &&
+      afterFields.opacityUnit === 'ratio' &&
       afterFields.blur === '18' &&
+      afterFields.blurControl === 'number' &&
+      afterFields.blurUnit === 'px' &&
       afterFields.distance === '12' &&
+      afterFields.distanceControl === 'number' &&
+      afterFields.distanceUnit === 'px' &&
       afterFields.angle === '60' &&
+      afterFields.angleControl === 'number' &&
+      afterFields.angleUnit === 'deg' &&
       afterFields.selectedColor === '#334155' &&
       afterFields.selectedOpacity === '0.36' &&
       afterFields.selectedBlur === '18' &&
@@ -9753,18 +9793,60 @@ function getPPTObjectShadowState(page, elementId) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = id || selected?.getAttribute('data-ppt-element') || ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const stage = document.querySelector('.ppt-stage-shell')
     const enabled = document.querySelector('[data-ppt-shadow-field="enabled"]')
+    const color = document.querySelector('[data-ppt-shadow-field="color"]')
     const opacity = document.querySelector('[data-ppt-shadow-field="opacity"]')
+    const blur = document.querySelector('[data-ppt-shadow-field="blur"]')
+    const distance = document.querySelector('[data-ppt-shadow-field="distance"]')
+    const angle = document.querySelector('[data-ppt-shadow-field="angle"]')
+    const descriptorAttributeValue = enabled?.getAttribute('data-ppt-shadow-attribute-value') ?? ''
+    let descriptor = null
+
+    try {
+      descriptor = descriptorAttributeValue && descriptorAttributeValue !== 'none'
+        ? JSON.parse(descriptorAttributeValue)
+        : null
+    } catch {
+      descriptor = null
+    }
 
     return {
-      angle: document.querySelector('[data-ppt-shadow-field="angle"]')?.value ?? '',
-      blur: document.querySelector('[data-ppt-shadow-field="blur"]')?.value ?? '',
-      color: document.querySelector('[data-ppt-shadow-field="color"]')?.value ?? '',
-      distance: document.querySelector('[data-ppt-shadow-field="distance"]')?.value ?? '',
+      angle: angle?.value ?? '',
+      angleControl: angle?.getAttribute('data-ppt-shadow-control') ?? '',
+      angleUnit: angle?.getAttribute('data-ppt-shadow-unit') ?? '',
+      blur: blur?.value ?? '',
+      blurControl: blur?.getAttribute('data-ppt-shadow-control') ?? '',
+      blurUnit: blur?.getAttribute('data-ppt-shadow-unit') ?? '',
+      color: color?.value ?? '',
+      colorControl: color?.getAttribute('data-ppt-shadow-control') ?? '',
+      command: stage?.getAttribute('data-ppt-shadow-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-shadow-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-shadow-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-shadow-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-shadow-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-shadow-command-value') ?? '',
+      descriptorAngle: descriptor?.angle === undefined ? '' : String(descriptor.angle),
+      descriptorAttribute: enabled?.getAttribute('data-ppt-shadow-attribute') ?? '',
+      descriptorAttributeValue,
+      descriptorBlur: descriptor?.blur === undefined ? '' : String(descriptor.blur),
+      descriptorColor: descriptor?.color ?? '',
+      descriptorCommand: enabled?.getAttribute('data-ppt-shadow-command') ?? '',
+      descriptorControl: enabled?.getAttribute('data-ppt-shadow-control') ?? '',
+      descriptorDistance: descriptor?.distance === undefined ? '' : String(descriptor.distance),
+      descriptorEnabled: enabled?.getAttribute('data-ppt-shadow-descriptor-enabled') ?? '',
+      descriptorOpacity: descriptor?.opacity === undefined ? '' : String(descriptor.opacity),
+      descriptorSurface: enabled?.getAttribute('data-ppt-shadow-surface') ?? '',
+      distance: distance?.value ?? '',
+      distanceControl: distance?.getAttribute('data-ppt-shadow-control') ?? '',
+      distanceUnit: distance?.getAttribute('data-ppt-shadow-unit') ?? '',
       enabled: enabled?.checked ?? false,
       inspectorEnabled: document.querySelector('[data-ppt-shadow-inspector]')?.getAttribute('data-ppt-shadow-enabled') ?? '',
+      model: stage?.getAttribute('data-ppt-shadow-model') ?? '',
       opacity: opacity?.value ?? '',
+      opacityControl: opacity?.getAttribute('data-ppt-shadow-control') ?? '',
       opacityDisabled: opacity?.disabled ?? false,
+      opacityUnit: opacity?.getAttribute('data-ppt-shadow-unit') ?? '',
       selectedAngle: selected?.getAttribute('data-ppt-shadow-angle') ?? '',
       selectedBlur: selected?.getAttribute('data-ppt-shadow-blur') ?? '',
       selectedColor: selected?.getAttribute('data-ppt-shadow-color') ?? '',
