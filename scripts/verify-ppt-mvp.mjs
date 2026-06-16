@@ -1006,9 +1006,19 @@ async function runAffordanceScenario(page) {
 
   const afterAuto = await page.eval(`(() => {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
+      command: stage?.getAttribute('data-ppt-text-autofit-command') ?? '',
+      commandHandle: stage?.getAttribute('data-ppt-text-autofit-command-handle') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-text-autofit-command-object') ?? '',
+      commandSelection: stage?.getAttribute('data-ppt-text-autofit-command-selection') ?? '',
+      commandSizeMode: stage?.getAttribute('data-ppt-text-autofit-command-size-mode') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-text-autofit-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-text-autofit-command-type') ?? '',
       height: parseFloat(element.style.height),
+      model: stage?.getAttribute('data-ppt-text-autofit-model') ?? '',
+      selectedAutoFit: element?.getAttribute('data-ppt-text-autofit') ?? '',
       width: parseFloat(element.style.width),
     }
   })()`)
@@ -1017,6 +1027,7 @@ async function runAffordanceScenario(page) {
     afterAuto,
     afterResize,
   })
+  record('routes PPT text auto-size double-click through slide-edit command effect', afterAuto.command === 'resize-text-box-to-fit' && afterAuto.commandHandle === 'e' && afterAuto.commandObject === 's1-card-1' && afterAuto.commandSelection === 's1-card-1' && afterAuto.commandSizeMode === 'resize-to-fit' && afterAuto.commandSlide === 'slide-1' && afterAuto.commandType === 'slide-command-effect' && afterAuto.model === 'slide-edit-text-box-auto-fit' && afterAuto.selectedAutoFit === 'resizeShapeToFitText', afterAuto)
 
   const aspectResizeHandle = await page.eval(`(() => {
     const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
@@ -3254,11 +3265,7 @@ async function runFitSelectionScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
   await delay(80)
 
-  const cardPoint = await getElementCenter(page, 's1-card-1')
-  const panelPoint = await getElementCenter(page, 's1-side-panel')
-  await clickMouse(page, cardPoint.x, cardPoint.y, 1)
-  await delay(40)
-  await clickMouse(page, panelPoint.x, panelPoint.y, 1, 8)
+  await selectPPTLayerRows(page, ['s1-card-1', 's1-side-panel'])
   await delay(80)
 
   const beforePaletteFit = await readViewportState(page)
@@ -10631,6 +10638,7 @@ async function runTextOverflowScenario(page) {
     afterCreate,
     afterOverflow,
   })
+  record('exposes PPT text overflow through slide-edit auto-fit indicator metadata', afterOverflow.stageAutoFitModel === 'slide-edit-text-box-auto-fit' && afterOverflow.stageAutoFitSizeModes === 'fixed resize-to-fit shrink-text' && afterOverflow.selectedAutoFitModel === 'slide-edit-text-box-auto-fit' && afterOverflow.selectedAutoFitSizeMode === 'fixed' && afterOverflow.selectedOverflowIndicatorModel === 'slide-edit-text-box-auto-fit' && afterOverflow.selectedOverflowIndicatorSlide === 'slide-1' && afterOverflow.selectedOverflowIndicatorVisible === 'true' && afterOverflow.stageOverflowIndicatorModel === 'slide-edit-text-box-auto-fit' && afterOverflow.stageOverflowIndicatorObject === afterOverflow.selectedId && afterOverflow.stageOverflowIndicatorSizeMode === 'fixed' && afterOverflow.stageOverflowIndicatorSlide === 'slide-1' && afterOverflow.stageOverflowIndicatorVisible === 'true' && afterOverflow.capsuleSizeMode === 'fixed' && afterOverflow.capsuleOverflowIndicatorVisible === 'true' && afterOverflow.inspectorAutoFitModel === 'slide-edit-text-box-auto-fit' && afterOverflow.inspectorAutoFitSizeMode === 'fixed' && afterOverflow.inspectorOverflowIndicatorVisible === 'true' && afterOverflow.selectedOverflowAxis.includes('vertical') && afterOverflow.stageOverflowAxis.includes('vertical') && afterOverflow.capsuleOverflowAxis.includes('vertical') && afterOverflow.inspectorOverflowAxis.includes('vertical'), afterOverflow)
 
   await page.eval(`document.querySelector('[data-ppt-style-action="text-auto-fit"]')?.click()`)
   await delay(220)
@@ -10638,6 +10646,10 @@ async function runTextOverflowScenario(page) {
   const afterAutoFit = await getPPTTextOverflowState(page)
 
   record('auto-fits overflowing PPT text from inspector', afterAutoFit.selectedKind === 'textBox' && afterAutoFit.selectedOverflow !== 'true' && afterAutoFit.selectedAutoFit === 'resizeShapeToFitText' && afterAutoFit.inspectorAutoFit === 'resizeShapeToFitText' && (afterAutoFit.selectedWidth > afterOverflow.selectedWidth || afterAutoFit.selectedHeight > afterOverflow.selectedHeight), {
+    afterAutoFit,
+    afterOverflow,
+  })
+  record('routes PPT inspector text auto-fit through slide-edit command effect', afterAutoFit.stageAutoFitCommand === 'resize-text-box-to-fit' && afterAutoFit.stageAutoFitCommandHandle === 'se' && afterAutoFit.stageAutoFitCommandObject === afterAutoFit.selectedId && afterAutoFit.stageAutoFitCommandSelection === afterAutoFit.selectedId && afterAutoFit.stageAutoFitCommandSizeMode === 'resize-to-fit' && afterAutoFit.stageAutoFitCommandSlide === 'slide-1' && afterAutoFit.stageAutoFitCommandType === 'slide-command-effect' && afterAutoFit.inspectorAutoFitCommand === 'resize-text-box-to-fit' && afterAutoFit.inspectorAutoFitCommandHandle === 'se' && afterAutoFit.inspectorAutoFitCommandObject === afterAutoFit.selectedId && afterAutoFit.inspectorAutoFitCommandSizeMode === 'resize-to-fit' && afterAutoFit.inspectorAutoFitCommandType === 'slide-command-effect' && afterAutoFit.exportHasAutoFit, {
     afterAutoFit,
     afterOverflow,
   })
@@ -10668,7 +10680,7 @@ async function runTextOverflowScenario(page) {
 
   const afterRedo = await getPPTTextOverflowState(page)
 
-  record('redoes PPT text auto-fit with model metadata', afterRedo.selectedId === afterAutoFit.selectedId && afterRedo.selectedOverflow !== 'true' && afterRedo.selectedAutoFit === 'resizeShapeToFitText' && afterRedo.inspectorAutoFit === 'resizeShapeToFitText', {
+  record('redoes PPT text auto-fit with model metadata', afterRedo.selectedId === afterAutoFit.selectedId && afterRedo.selectedOverflow !== 'true' && afterRedo.selectedAutoFit === 'resizeShapeToFitText' && afterRedo.inspectorAutoFit === 'resizeShapeToFitText' && afterRedo.selectedAutoFitSizeMode === 'resize-to-fit' && afterRedo.inspectorAutoFitSizeMode === 'resize-to-fit' && afterRedo.exportHasAutoFit, {
     afterAutoFit,
     afterRedo,
   })
@@ -11467,21 +11479,60 @@ function getPPTTextOverflowState(page) {
     const capsule = document.querySelector('.ppt-size-capsule')
     const inspector = document.querySelector('[data-ppt-text-overflow-inspector]')
     const autoFitButton = document.querySelector('[data-ppt-style-action="text-auto-fit"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+    const selectedId = selected?.getAttribute('data-ppt-element') ?? ''
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
 
     return {
       autoFitDisabled: autoFitButton?.disabled ?? true,
       capsuleOverflow: capsule?.getAttribute('data-ppt-text-overflow') ?? '',
+      capsuleOverflowAxis: capsule?.getAttribute('data-ppt-text-overflow-indicator-axis') ?? '',
+      capsuleOverflowIndicatorVisible: capsule?.getAttribute('data-ppt-text-overflow-indicator-visible') ?? '',
+      capsuleSizeMode: capsule?.getAttribute('data-ppt-text-autofit-size-mode') ?? '',
       capsuleText: capsule?.textContent ?? '',
+      inspectorAutoFitCommand: inspector?.getAttribute('data-ppt-text-autofit-command') ?? '',
+      inspectorAutoFitCommandHandle: inspector?.getAttribute('data-ppt-text-autofit-command-handle') ?? '',
+      inspectorAutoFitCommandObject: inspector?.getAttribute('data-ppt-text-autofit-command-object') ?? '',
+      inspectorAutoFitCommandSizeMode: inspector?.getAttribute('data-ppt-text-autofit-command-size-mode') ?? '',
+      inspectorAutoFitCommandType: inspector?.getAttribute('data-ppt-text-autofit-command-type') ?? '',
+      inspectorAutoFitModel: inspector?.getAttribute('data-ppt-text-autofit-model') ?? '',
+      inspectorAutoFitSizeMode: inspector?.getAttribute('data-ppt-text-autofit-size-mode') ?? '',
       inspectorAutoFit: inspector?.getAttribute('data-ppt-text-autofit') ?? '',
       inspectorOverflow: inspector?.getAttribute('data-ppt-text-overflow') ?? '',
+      inspectorOverflowAxis: inspector?.getAttribute('data-ppt-text-overflow-indicator-axis') ?? '',
+      inspectorOverflowIndicatorVisible: inspector?.getAttribute('data-ppt-text-overflow-indicator-visible') ?? '',
       inspectorText: document.querySelector('[data-ppt-style-field="text"]')?.value ?? '',
+      exportHasAutoFit: selectedId !== '' &&
+        exportCode.includes(\`data-ppt-element="\${selectedId}"\`) &&
+        exportCode.includes('data-ppt-text-autofit="resizeShapeToFitText"'),
       selectedAutoFit: selected?.getAttribute('data-ppt-text-autofit') ?? '',
+      selectedAutoFitModel: selected?.getAttribute('data-ppt-text-autofit-model') ?? '',
+      selectedAutoFitSizeMode: selected?.getAttribute('data-ppt-text-autofit-size-mode') ?? '',
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
-      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedId,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedOverflow: selected?.getAttribute('data-ppt-text-overflow') ?? '',
+      selectedOverflowAxis: selected?.getAttribute('data-ppt-text-overflow-indicator-axis') ?? '',
+      selectedOverflowIndicatorModel: selected?.getAttribute('data-ppt-text-overflow-indicator-model') ?? '',
+      selectedOverflowIndicatorSlide: selected?.getAttribute('data-ppt-text-overflow-indicator-slide') ?? '',
+      selectedOverflowIndicatorVisible: selected?.getAttribute('data-ppt-text-overflow-indicator-visible') ?? '',
       selectedText: selected?.querySelector('.ppt-element-editor')?.textContent ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      stageAutoFitCommand: stage?.getAttribute('data-ppt-text-autofit-command') ?? '',
+      stageAutoFitCommandHandle: stage?.getAttribute('data-ppt-text-autofit-command-handle') ?? '',
+      stageAutoFitCommandObject: stage?.getAttribute('data-ppt-text-autofit-command-object') ?? '',
+      stageAutoFitCommandSelection: stage?.getAttribute('data-ppt-text-autofit-command-selection') ?? '',
+      stageAutoFitCommandSizeMode: stage?.getAttribute('data-ppt-text-autofit-command-size-mode') ?? '',
+      stageAutoFitCommandSlide: stage?.getAttribute('data-ppt-text-autofit-command-slide') ?? '',
+      stageAutoFitCommandType: stage?.getAttribute('data-ppt-text-autofit-command-type') ?? '',
+      stageAutoFitModel: stage?.getAttribute('data-ppt-text-autofit-model') ?? '',
+      stageAutoFitSizeModes: stage?.getAttribute('data-ppt-text-autofit-size-modes') ?? '',
+      stageOverflowAxis: stage?.getAttribute('data-ppt-text-overflow-indicator-axis') ?? '',
+      stageOverflowIndicatorModel: stage?.getAttribute('data-ppt-text-overflow-indicator-model') ?? '',
+      stageOverflowIndicatorObject: stage?.getAttribute('data-ppt-text-overflow-indicator-object') ?? '',
+      stageOverflowIndicatorSizeMode: stage?.getAttribute('data-ppt-text-overflow-indicator-size-mode') ?? '',
+      stageOverflowIndicatorSlide: stage?.getAttribute('data-ppt-text-overflow-indicator-slide') ?? '',
+      stageOverflowIndicatorVisible: stage?.getAttribute('data-ppt-text-overflow-indicator-visible') ?? '',
       textCount: document.querySelectorAll('[data-kind="textBox"]').length,
     }
   })()`)

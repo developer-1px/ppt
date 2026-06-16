@@ -136,6 +136,8 @@ import {
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardPasteAvailability,
+  getSlideEditTextAutoFitGestureCommandEffect,
+  getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextParagraphSpacingCommandEffect,
@@ -162,6 +164,7 @@ import {
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
+  SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
@@ -220,6 +223,11 @@ import {
   type SlideEditTextFontFamilyHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
+  type SlideEditTextAutoFitHostCommandEffect,
+  type SlideEditTextBoxMeasurement,
+  type SlideEditTextBoxSizeMode,
+  type SlideEditTextOverflowIndicatorState,
+  type SlideEditTextResizeHandle,
   type SlideEditTextParagraphSpacingDescriptor,
   type SlideEditTextParagraphSpacingFieldId,
   type SlideEditTextParagraphSpacingHostCommandEffect,
@@ -1767,6 +1775,7 @@ function App() {
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
+  const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
@@ -1878,6 +1887,13 @@ function App() {
   const selectedTextOverflow = selectedElement && isPPTTextElement(selectedElement)
     ? textOverflowById[selectedElement.id] === true
     : false
+  const selectedTextAutoFitIndicator = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextAutoFitIndicatorState(
+        activeSlide.id,
+        selectedElement,
+        selectedTextOverflow,
+      )
+    : null
   const activeLayout = useMemo(
     () => getPPTLayoutDescriptor(activeSlide.layoutId),
     [activeSlide.layoutId],
@@ -3697,7 +3713,25 @@ function App() {
     )
   }
 
-  function autoFitTextElement(elementId: string) {
+  function autoFitTextElement(elementId: string, handle: ResizeHandle = 'se') {
+    const element = findPPTElement(activeSlide, elementId)
+
+    if (!element || !isPPTTextElement(element)) {
+      return
+    }
+
+    const effect = getPPTTextAutoFitCommandEffect({
+      element,
+      handle,
+      hasOverflow: textOverflowById[elementId] === true,
+      slideId: activeSlide.id,
+    })
+
+    if (!effect) {
+      return
+    }
+
+    setLastTextAutoFitEffect(effect)
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (
@@ -3708,18 +3742,9 @@ function App() {
           return element
         }
 
-        const size = measurePPTTextAutoFitSize(element)
-
-        if (!size) {
-          return element
-        }
-
         return {
           ...element,
-          geometry: updatePPTElementBounds(element, {
-            ...pptGeometryToBounds(element.geometry),
-            ...size,
-          }).geometry,
+          geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
           textAutoFit: PPT_TEXT_AUTOFIT,
         }
       }),
@@ -5612,6 +5637,15 @@ function App() {
       return
     }
 
+    if (
+      selection.length === 1 &&
+      selectedElement &&
+      isPPTTextElement(selectedElement)
+    ) {
+      autoFitTextElement(selectedElement.id, handle)
+      return
+    }
+
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
       elements: slide.elements.map((element) => {
@@ -7229,6 +7263,31 @@ function App() {
         data-ppt-text-vertical-align-command-type={lastTextVerticalAlignmentEffect?.type}
         data-ppt-text-vertical-align-command-value={lastTextVerticalAlignmentEffect?.payload.value}
         data-ppt-text-vertical-align-model="slide-edit-text-vertical-alignment"
+        data-ppt-text-autofit-command={lastTextAutoFitEffect?.payload.id}
+        data-ppt-text-autofit-command-handle={lastTextAutoFitEffect?.payload.handle}
+        data-ppt-text-autofit-command-height={lastTextAutoFitEffect?.payload.bounds.h}
+        data-ppt-text-autofit-command-object={lastTextAutoFitEffect?.payload.objectId}
+        data-ppt-text-autofit-command-selection={lastTextAutoFitEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-text-autofit-command-slide={lastTextAutoFitEffect?.selection.slideId}
+        data-ppt-text-autofit-command-size-mode={lastTextAutoFitEffect?.payload.sizeMode}
+        data-ppt-text-autofit-command-type={lastTextAutoFitEffect?.type}
+        data-ppt-text-autofit-command-width={lastTextAutoFitEffect?.payload.bounds.w}
+        data-ppt-text-autofit-model="slide-edit-text-box-auto-fit"
+        data-ppt-text-autofit-size-modes={SLIDE_EDIT_TEXT_BOX_SIZE_MODES
+          .map((mode) => mode.id)
+          .join(' ')}
+        data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
+        data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}
+        data-ppt-text-overflow-indicator-height={selectedTextAutoFitIndicator?.bounds.h}
+        data-ppt-text-overflow-indicator-line-count={selectedTextAutoFitIndicator?.lineCount}
+        data-ppt-text-overflow-indicator-model="slide-edit-text-box-auto-fit"
+        data-ppt-text-overflow-indicator-object={selectedTextAutoFitIndicator?.objectId}
+        data-ppt-text-overflow-indicator-size-mode={selectedTextAutoFitIndicator?.sizeMode}
+        data-ppt-text-overflow-indicator-slide={selectedTextAutoFitIndicator?.slideId}
+        data-ppt-text-overflow-indicator-visible={selectedTextAutoFitIndicator
+          ? String(selectedTextAutoFitIndicator.isVisible)
+          : undefined}
+        data-ppt-text-overflow-indicator-width={selectedTextAutoFitIndicator?.bounds.w}
         data-ppt-keyboard-command-dispatch="canvas-keyboard-command-dispatch"
         data-ppt-keyboard-command-intent="canvas-keyboard-command-shortcut-intent"
         data-ppt-keyboard-viewport-intent="canvas-keyboard-viewport-shortcut-intent"
@@ -7286,6 +7345,10 @@ function App() {
                 findActive={findOpen && activeFindMatch?.elementId === element.id}
                 key={element.id}
                 selected={selection.includes(element.id)}
+                slideId={activeSlide.id}
+                textAutoFitIndicator={selection.includes(element.id)
+                  ? selectedTextAutoFitIndicator
+                  : null}
                 textOverflow={textOverflowById[element.id] === true}
                 onCommitText={commitText}
                 onEdit={() => {
@@ -7312,6 +7375,7 @@ function App() {
                 canResize={canResizeSelection}
                 scale={viewport.scale}
                 selectedElements={selectedElements}
+                textAutoFitIndicator={selectedTextAutoFitIndicator}
                 textOverflow={selectedTextOverflow}
                 onRotatePointerDown={handleRotatePointerDown}
                 onResizeHandleDoubleClick={handleResizeHandleDoubleClick}
@@ -7379,6 +7443,7 @@ function App() {
         layoutPlaceholderVisibilityDescriptors={activeLayoutPlaceholderVisibilityDescriptors}
         layoutPlaceholders={activeLayoutPlaceholders}
         lastPlaceholderVisibilityEffect={lastPlaceholderVisibilityEffect}
+        lastTextAutoFitEffect={lastTextAutoFitEffect}
         recentColors={recentColors}
         selection={selection}
         selectedElement={selectedElement}
@@ -7428,6 +7493,7 @@ function App() {
         onSlideNotesChange={updateSlideNotes}
         onSlideTransitionChange={updateSlideTransition}
         onTableRowsChange={updateTableRows}
+        textAutoFitIndicator={selectedTextAutoFitIndicator}
         selectedTextOverflow={selectedTextOverflow}
       />
       <PPTPresentationOverlay
@@ -7764,6 +7830,8 @@ function PPTPresentationOverlay({
                 hovered={false}
                 key={element.id}
                 selected={false}
+                slideId={slide.id}
+                textAutoFitIndicator={null}
                 textOverflow={false}
                 onCommitText={() => undefined}
                 onContextMenu={(event) => event.preventDefault()}
@@ -10548,6 +10616,8 @@ function PPTElementView({
   onStopEdit,
   onTextOverflowChange,
   selected,
+  slideId,
+  textAutoFitIndicator,
   textOverflow,
 }: {
   editing: boolean
@@ -10564,6 +10634,8 @@ function PPTElementView({
   onStopEdit: () => void
   onTextOverflowChange: (elementId: string, hasOverflow: boolean) => void
   selected: boolean
+  slideId: string
+  textAutoFitIndicator: SlideEditTextOverflowIndicatorState<string, string> | null
   textOverflow: boolean
 }) {
   const animation = getPPTElementAnimation(element)
@@ -10706,7 +10778,23 @@ function PPTElementView({
         ? getPPTTextElementVerticalAlign(element)
         : undefined}
       data-ppt-text-autofit={isPPTTextElement(element) ? element.textAutoFit : undefined}
+      data-ppt-text-autofit-model={isPPTTextElement(element)
+        ? 'slide-edit-text-box-auto-fit'
+        : undefined}
+      data-ppt-text-autofit-size-mode={textAutoFitIndicator?.sizeMode ??
+        (isPPTTextElement(element) ? getPPTTextAutoFitSizeMode(element) : undefined)}
       data-ppt-text-overflow={textOverflow ? 'true' : undefined}
+      data-ppt-text-overflow-indicator-anchor={textAutoFitIndicator?.anchor}
+      data-ppt-text-overflow-indicator-axis={textAutoFitIndicator?.overflowAxis.join(' ')}
+      data-ppt-text-overflow-indicator-height={textAutoFitIndicator?.bounds.h}
+      data-ppt-text-overflow-indicator-model={textAutoFitIndicator
+        ? 'slide-edit-text-box-auto-fit'
+        : undefined}
+      data-ppt-text-overflow-indicator-slide={textAutoFitIndicator?.slideId ?? (isPPTTextElement(element) ? slideId : undefined)}
+      data-ppt-text-overflow-indicator-visible={textAutoFitIndicator
+        ? String(textAutoFitIndicator.isVisible)
+        : undefined}
+      data-ppt-text-overflow-indicator-width={textAutoFitIndicator?.bounds.w}
       data-ppt-image-crop-x={element.kind === 'image'
         ? getPPTImageCrop(element).x
         : undefined}
@@ -10952,6 +11040,7 @@ function SelectionOverlay({
   onResizePointerDown,
   scale,
   selectedElements,
+  textAutoFitIndicator,
   textOverflow,
 }: {
   bounds: Bounds
@@ -10967,6 +11056,7 @@ function SelectionOverlay({
   ) => void
   scale: number
   selectedElements: PPTElement[]
+  textAutoFitIndicator: SlideEditTextOverflowIndicatorState<string, string> | null
   textOverflow: boolean
 }) {
   return (
@@ -10974,7 +11064,15 @@ function SelectionOverlay({
       <Box className="ppt-selection-box" bounds={bounds} />
       <div
         className="ppt-size-capsule"
+        data-ppt-text-autofit-model={textAutoFitIndicator
+          ? 'slide-edit-text-box-auto-fit'
+          : undefined}
+        data-ppt-text-autofit-size-mode={textAutoFitIndicator?.sizeMode}
         data-ppt-text-overflow={textOverflow ? 'true' : undefined}
+        data-ppt-text-overflow-indicator-axis={textAutoFitIndicator?.overflowAxis.join(' ')}
+        data-ppt-text-overflow-indicator-visible={textAutoFitIndicator
+          ? String(textAutoFitIndicator.isVisible)
+          : undefined}
         style={{
           left: bounds.x + bounds.w / 2,
           top: bounds.y + bounds.h + 8,
@@ -11354,6 +11452,7 @@ function Inspector({
   layoutPlaceholderVisibilityDescriptors,
   layoutPlaceholders,
   lastPlaceholderVisibilityEffect,
+  lastTextAutoFitEffect,
   onColorSwatchApply,
   onCommentBodyChange,
   onCommentReplyAdd,
@@ -11398,6 +11497,7 @@ function Inspector({
   selectedElement,
   selectedElementAnimation,
   selectedTextOverflow,
+  textAutoFitIndicator,
   slide,
   slideMetadataDescriptor,
   slideLayoutId,
@@ -11411,6 +11511,7 @@ function Inspector({
   layoutPlaceholderVisibilityDescriptors: readonly SlideEditPlaceholderDescriptor<string, string>[]
   layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
   lastPlaceholderVisibilityEffect: PPTLayoutPlaceholderVisibilityHostCommandEffect | null
+  lastTextAutoFitEffect: SlideEditTextAutoFitHostCommandEffect<string, string> | null
   onColorSwatchApply: (
     elementId: string,
     channel: PPTColorSwatchChannel,
@@ -11524,6 +11625,7 @@ function Inspector({
   selectedElement: PPTElement | null
   selectedElementAnimation: PPTElementAnimation | null
   selectedTextOverflow: boolean
+  textAutoFitIndicator: SlideEditTextOverflowIndicatorState<string, string> | null
   slide: PPTSlide
   slideMetadataDescriptor: PPTSlideMetadataInspectorDescriptor
   slideLayoutId: string
@@ -12990,7 +13092,18 @@ function Inspector({
                 <div
                   className="ppt-text-overflow-control"
                   data-ppt-text-autofit={selectedElement.textAutoFit}
+                  data-ppt-text-autofit-command={lastTextAutoFitEffect?.payload.id}
+                  data-ppt-text-autofit-command-handle={lastTextAutoFitEffect?.payload.handle}
+                  data-ppt-text-autofit-command-object={lastTextAutoFitEffect?.payload.objectId}
+                  data-ppt-text-autofit-command-size-mode={lastTextAutoFitEffect?.payload.sizeMode}
+                  data-ppt-text-autofit-command-type={lastTextAutoFitEffect?.type}
+                  data-ppt-text-autofit-model="slide-edit-text-box-auto-fit"
+                  data-ppt-text-autofit-size-mode={textAutoFitIndicator?.sizeMode ?? getPPTTextAutoFitSizeMode(selectedElement)}
                   data-ppt-text-overflow={selectedTextOverflow ? 'true' : 'false'}
+                  data-ppt-text-overflow-indicator-axis={textAutoFitIndicator?.overflowAxis.join(' ')}
+                  data-ppt-text-overflow-indicator-visible={textAutoFitIndicator
+                    ? String(textAutoFitIndicator.isVisible)
+                    : undefined}
                   data-ppt-text-overflow-inspector
                 >
                   <span>{selectedTextOverflow ? 'Overflow' : 'Fits'}</span>
@@ -16746,11 +16859,7 @@ function measurePPTTextAutoFitSize(element: PPTTextElement) {
     whiteSpace: 'pre',
     width: 'max-content',
   })
-  const width = clamp(
-    Math.ceil(Math.max(element.geometry.w, preferred.w + padding.x + 8)),
-    24,
-    maxWidth,
-  )
+  const width = clamp(Math.ceil(preferred.w + padding.x + 8), 24, maxWidth)
   const contentWidth = Math.max(1, width - padding.x)
   const wrapped = measurePPTTextContentSize(element, {
     whiteSpace: 'pre-wrap',
@@ -16761,6 +16870,66 @@ function measurePPTTextAutoFitSize(element: PPTTextElement) {
     h: clamp(Math.ceil(wrapped.h + padding.y + 8), 24, maxHeight),
     w: width,
   }
+}
+
+function getPPTTextAutoFitCommandEffect({
+  element,
+  handle,
+  hasOverflow,
+  slideId,
+}: {
+  element: PPTTextElement
+  handle: ResizeHandle
+  hasOverflow: boolean
+  slideId: string
+}) {
+  return getSlideEditTextAutoFitGestureCommandEffect({
+    bounds: pptGeometryToBounds(element.geometry),
+    handle: handle as SlideEditTextResizeHandle,
+    maxBounds: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    measurement: getPPTTextAutoFitMeasurement(element, hasOverflow),
+    minSize: {
+      h: 24,
+      w: 24,
+    },
+    objectId: element.id,
+    sizeMode: getPPTTextAutoFitSizeMode(element),
+    slideId,
+    type: 'resize-handle-double-click',
+  })
+}
+
+function getPPTTextAutoFitIndicatorState(
+  slideId: string,
+  element: PPTTextElement,
+  hasOverflow: boolean,
+): SlideEditTextOverflowIndicatorState<string, string> {
+  return getSlideEditTextOverflowIndicatorState({
+    bounds: pptGeometryToBounds(element.geometry),
+    measurement: getPPTTextAutoFitMeasurement(element, hasOverflow),
+    objectId: element.id,
+    sizeMode: getPPTTextAutoFitSizeMode(element),
+    slideId,
+  })
+}
+
+function getPPTTextAutoFitMeasurement(
+  element: PPTTextElement,
+  hasOverflow: boolean,
+): SlideEditTextBoxMeasurement {
+  return {
+    hasOverflow,
+    measuredSize: measurePPTTextAutoFitSize(element),
+  }
+}
+
+function getPPTTextAutoFitSizeMode(element: PPTTextElement): SlideEditTextBoxSizeMode {
+  return element.textAutoFit === PPT_TEXT_AUTOFIT ? 'resize-to-fit' : 'fixed'
 }
 
 function measurePPTTextContentSize(
