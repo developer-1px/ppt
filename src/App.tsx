@@ -130,6 +130,8 @@ import {
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectAnimationBuildOrder,
   getSlideEditObjectCornerRadiusCommandEffect,
+  getSlideEditObjectCornerRadiusCSS,
+  getSlideEditObjectCornerRadiusPreviewCSS,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectImageCropCommandEffect,
@@ -11369,7 +11371,11 @@ function SlideThumb({
                 ? getPPTStrokeDashBorderStyle(element.stroke)
                 : undefined,
               borderRadius: element.kind === 'shape' && element.shape === 'rect'
-                ? getPPTThumbShapeCornerRadiusCSS(element)
+                ? getSlideEditObjectCornerRadiusPreviewCSS({
+                    h: element.geometry.h,
+                    value: getPPTShapeCornerRadius(element),
+                    w: element.geometry.w,
+                  })
                 : undefined,
               backgroundImage: element.kind === 'image'
                 ? `url(${element.src})`
@@ -14823,7 +14829,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
       ? getPPTStrokeDashBorderStyle(element.stroke)
       : undefined,
     borderRadius: element.kind === 'shape' && element.shape === 'rect'
-      ? `${getPPTShapeCornerRadius(element)}px`
+      ? getSlideEditObjectCornerRadiusCSS(getPPTShapeCornerRadius(element))
       : undefined,
     padding: getSlideEditTextFrameInsetPaddingCSS(getPPTTextElementInset(element)),
     textAlign: getPPTElementParagraphAlign(element),
@@ -15837,14 +15843,6 @@ function getPPTShapeCornerRadiusModelValue(value: number) {
   return normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
     ? undefined
     : normalized
-}
-
-function getPPTThumbShapeCornerRadiusCSS(element: PPTShape) {
-  const radius = getPPTShapeCornerRadius(element)
-  const minSize = Math.max(1, Math.min(element.geometry.w, element.geometry.h))
-  const percent = Math.min(50, (radius / minSize) * 100)
-
-  return `${Math.round(percent * 100) / 100}%`
 }
 
 function parsePPTShapeCornerRadius(value: string) {
