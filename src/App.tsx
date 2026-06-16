@@ -155,6 +155,7 @@ import {
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
+  getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTransitionUpdateCommandEffect,
@@ -14831,7 +14832,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     borderRadius: element.kind === 'shape' && element.shape === 'rect'
       ? `${getPPTShapeCornerRadius(element)}px`
       : undefined,
-    padding: getPPTTextInsetCSS(getPPTTextElementInset(element)),
+    padding: getSlideEditTextFrameInsetPaddingCSS(getPPTTextElementInset(element)),
     textAlign: getPPTElementParagraphAlign(element),
   }
 }
@@ -15750,10 +15751,6 @@ function normalizePPTTextInset(value: number) {
   const finiteValue = Number.isFinite(value) ? value : 0
 
   return normalizeSlideEditTextFrameInsetValue(finiteValue)
-}
-
-function getPPTTextInsetCSS(inset: PPTTextInset) {
-  return `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`
 }
 
 function formatPPTTextInsetData(inset: PPTTextInset) {
