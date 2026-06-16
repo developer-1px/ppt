@@ -103,6 +103,7 @@ import {
   createSlideEditThemeDescriptor,
   createSlideEditTextFontFamilyDescriptor,
   createSlideEditTextFrameInsetDescriptor,
+  createSlideEditTextParagraphSpacingDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
@@ -119,6 +120,7 @@ import {
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
+  getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectFillOpacity,
@@ -127,6 +129,8 @@ import {
   normalizeSlideEditObjectStrokeLineStyle,
   normalizeSlideEditTextFontFamily,
   normalizeSlideEditTextFrameInsetValue,
+  normalizeSlideEditTextLineHeightRatio,
+  normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   toSlideEditRailHostCommandEffect,
@@ -156,6 +160,10 @@ import {
   type SlideEditTextFontFamilyHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
+  type SlideEditTextParagraphSpacingDescriptor,
+  type SlideEditTextParagraphSpacingFieldId,
+  type SlideEditTextParagraphSpacingHostCommandEffect,
+  type SlideEditTextParagraphSpacingUpdateCommand,
   type SlideEditTextVerticalAlignmentDescriptor,
   type SlideEditTextVerticalAlignmentHostCommandEffect,
 } from '@interactive-os/slide-edit-affordance'
@@ -1562,6 +1570,7 @@ function App() {
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
   const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
@@ -4390,20 +4399,32 @@ function App() {
     field: PPTParagraphSpacingField,
     value: number,
   ) {
+    const effect = getSlideEditTextParagraphSpacingCommandEffect(
+      toSlideEditParagraphSpacingCommand({
+        elementId,
+        field,
+        slideId: activeSlide.id,
+        value,
+      }),
+    )
+
+    setLastTextParagraphSpacingEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (!isPPTTextElement(element) || element.locked === true) {
           return element
         }
 
+        const { field: pptField, value: fieldValue } =
+          toPPTParagraphSpacingUpdate(effect.payload)
+
         return {
           ...element,
           textBody: {
             paragraphs: element.textBody.paragraphs.map((paragraph) => ({
               ...paragraph,
-              [field]: field === 'lineHeight'
-                ? normalizePPTParagraphLineHeight(value)
-                : normalizePPTParagraphSpacing(value),
+              [pptField]: fieldValue,
             })),
           },
         }
@@ -6719,6 +6740,20 @@ function App() {
         data-ppt-text-inset-command-type={lastTextFrameInsetEffect?.type}
         data-ppt-text-inset-command-value={lastTextFrameInsetEffect?.payload.value}
         data-ppt-text-inset-model="slide-edit-text-frame-inset"
+        data-ppt-text-paragraph-spacing-command={lastTextParagraphSpacingEffect?.payload.id}
+        data-ppt-text-paragraph-spacing-command-field={lastTextParagraphSpacingEffect?.payload.fieldId}
+        data-ppt-text-paragraph-spacing-command-object={lastTextParagraphSpacingEffect?.payload.objectId}
+        data-ppt-text-paragraph-spacing-command-slide={lastTextParagraphSpacingEffect?.payload.slideId}
+        data-ppt-text-paragraph-spacing-command-type={lastTextParagraphSpacingEffect?.type}
+        data-ppt-text-paragraph-spacing-command-unit={lastTextParagraphSpacingEffect?.payload.fieldId === 'lineHeightRatio'
+          ? undefined
+          : lastTextParagraphSpacingEffect?.payload.value.unit}
+        data-ppt-text-paragraph-spacing-command-value={lastTextParagraphSpacingEffect
+          ? lastTextParagraphSpacingEffect.payload.fieldId === 'lineHeightRatio'
+            ? lastTextParagraphSpacingEffect.payload.value
+            : lastTextParagraphSpacingEffect.payload.value.value
+          : undefined}
+        data-ppt-text-paragraph-spacing-model="slide-edit-text-paragraph-spacing"
         data-ppt-text-vertical-align-command={lastTextVerticalAlignmentEffect?.payload.id}
         data-ppt-text-vertical-align-command-field={lastTextVerticalAlignmentEffect?.payload.fieldId}
         data-ppt-text-vertical-align-command-object={lastTextVerticalAlignmentEffect?.payload.objectId}
@@ -7782,22 +7817,97 @@ function getPPTTextElementParagraphSpacing(element: PPTTextElement) {
   }
 }
 
-function normalizePPTParagraphLineHeight(value: number) {
-  const next = clamp(
-    Number.isFinite(value) ? value : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
-    PPT_PARAGRAPH_LINE_HEIGHT_MIN,
-    PPT_PARAGRAPH_LINE_HEIGHT_MAX,
-  )
+function getPPTTextParagraphSpacingDescriptor(
+  slideId: string,
+  element: PPTTextElement,
+): SlideEditTextParagraphSpacingDescriptor<string, string> {
+  const spacing = getPPTTextElementParagraphSpacing(element)
 
-  return Math.round(next * 100) / 100
+  return createSlideEditTextParagraphSpacingDescriptor({
+    lineHeightRatio: spacing.lineHeight,
+    objectId: element.id,
+    paragraphAfter: {
+      unit: 'px',
+      value: spacing.spacingAfter,
+    },
+    paragraphBefore: {
+      unit: 'px',
+      value: spacing.spacingBefore,
+    },
+    slideId,
+  })
+}
+
+function getPPTTextParagraphSpacingField(
+  descriptor: SlideEditTextParagraphSpacingDescriptor<string, string> | null,
+  fieldId: SlideEditTextParagraphSpacingFieldId,
+) {
+  return descriptor?.fields.find((field) => field.id === fieldId)
+}
+
+function toSlideEditParagraphSpacingCommand({
+  elementId,
+  field,
+  slideId,
+  value,
+}: {
+  elementId: string
+  field: PPTParagraphSpacingField
+  slideId: string
+  value: number
+}): SlideEditTextParagraphSpacingUpdateCommand<string, string> {
+  if (field === 'lineHeight') {
+    return {
+      fieldId: 'lineHeightRatio',
+      id: 'update-text-paragraph-spacing',
+      objectId: elementId,
+      slideId,
+      value,
+    }
+  }
+
+  return {
+    fieldId: field === 'spacingBefore' ? 'paragraphBefore' : 'paragraphAfter',
+    id: 'update-text-paragraph-spacing',
+    objectId: elementId,
+    slideId,
+    value: {
+      unit: 'px',
+      value,
+    },
+  }
+}
+
+function toPPTParagraphSpacingUpdate(
+  command: SlideEditTextParagraphSpacingUpdateCommand<string, string>,
+): {
+  field: PPTParagraphSpacingField
+  value: number
+} {
+  if (command.fieldId === 'lineHeightRatio') {
+    return {
+      field: 'lineHeight',
+      value: normalizePPTParagraphLineHeight(command.value),
+    }
+  }
+
+  return {
+    field: command.fieldId === 'paragraphBefore' ? 'spacingBefore' : 'spacingAfter',
+    value: normalizePPTParagraphSpacing(command.value.value),
+  }
+}
+
+function normalizePPTParagraphLineHeight(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT
+
+  return normalizeSlideEditTextLineHeightRatio(finiteValue)
 }
 
 function normalizePPTParagraphSpacing(value: number) {
-  return clamp(
-    Number.isFinite(value) ? Math.round(value) : 0,
-    0,
-    PPT_PARAGRAPH_SPACING_MAX,
-  )
+  return normalizeSlideEditTextParagraphSpacingAmount({
+    unit: 'px',
+    value: Number.isFinite(value) ? value : 0,
+  }).value
 }
 
 function parsePPTParagraphLineHeight(value: string) {
@@ -10506,6 +10616,21 @@ function Inspector({
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
+  const paragraphSpacingDescriptor = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextParagraphSpacingDescriptor(slide.id, selectedElement)
+    : null
+  const paragraphLineHeightField = getPPTTextParagraphSpacingField(
+    paragraphSpacingDescriptor,
+    'lineHeightRatio',
+  )
+  const paragraphBeforeField = getPPTTextParagraphSpacingField(
+    paragraphSpacingDescriptor,
+    'paragraphBefore',
+  )
+  const paragraphAfterField = getPPTTextParagraphSpacingField(
+    paragraphSpacingDescriptor,
+    'paragraphAfter',
+  )
   const strokeLineStyleDescriptor = selectedElement
     ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
     : null
@@ -11528,19 +11653,22 @@ function Inspector({
                 <div
                   className="ppt-paragraph-spacing-grid"
                   data-ppt-paragraph-spacing-inspector
-                  data-ppt-paragraph-line-height={paragraphSpacing.lineHeight}
-                  data-ppt-paragraph-spacing-after={paragraphSpacing.spacingAfter}
-                  data-ppt-paragraph-spacing-before={paragraphSpacing.spacingBefore}
+                  data-ppt-paragraph-spacing-surface={paragraphSpacingDescriptor?.surface}
+                  data-ppt-paragraph-line-height={paragraphSpacingDescriptor?.values.lineHeightRatio ?? paragraphSpacing.lineHeight}
+                  data-ppt-paragraph-spacing-after={paragraphSpacingDescriptor?.values.paragraphAfter.value ?? paragraphSpacing.spacingAfter}
+                  data-ppt-paragraph-spacing-before={paragraphSpacingDescriptor?.values.paragraphBefore.value ?? paragraphSpacing.spacingBefore}
                 >
                   <label className="ppt-field">
                     <span>Line height</span>
                     <input
+                      data-ppt-paragraph-control={paragraphLineHeightField?.control}
+                      data-ppt-paragraph-command={paragraphLineHeightField?.commandId}
                       data-ppt-paragraph-field="lineHeight"
-                      max={PPT_PARAGRAPH_LINE_HEIGHT_MAX}
-                      min={PPT_PARAGRAPH_LINE_HEIGHT_MIN}
-                      step={0.05}
+                      max={paragraphLineHeightField?.max ?? PPT_PARAGRAPH_LINE_HEIGHT_MAX}
+                      min={paragraphLineHeightField?.min ?? PPT_PARAGRAPH_LINE_HEIGHT_MIN}
+                      step={paragraphLineHeightField?.step ?? 0.05}
                       type="number"
-                      value={paragraphSpacing.lineHeight}
+                      value={paragraphSpacingDescriptor?.values.lineHeightRatio ?? paragraphSpacing.lineHeight}
                       onChange={(event) =>
                         onParagraphSpacingChange(
                           selectedElement.id,
@@ -11552,12 +11680,15 @@ function Inspector({
                   <label className="ppt-field">
                     <span>Before</span>
                     <input
+                      data-ppt-paragraph-command={paragraphBeforeField?.commandId}
+                      data-ppt-paragraph-control={paragraphBeforeField?.control}
                       data-ppt-paragraph-field="spacingBefore"
-                      max={PPT_PARAGRAPH_SPACING_MAX}
-                      min={0}
-                      step={2}
+                      data-ppt-paragraph-unit={paragraphBeforeField?.unit}
+                      max={paragraphBeforeField?.max ?? PPT_PARAGRAPH_SPACING_MAX}
+                      min={paragraphBeforeField?.min ?? 0}
+                      step={paragraphBeforeField?.step ?? 2}
                       type="number"
-                      value={paragraphSpacing.spacingBefore}
+                      value={paragraphSpacingDescriptor?.values.paragraphBefore.value ?? paragraphSpacing.spacingBefore}
                       onChange={(event) =>
                         onParagraphSpacingChange(
                           selectedElement.id,
@@ -11569,12 +11700,15 @@ function Inspector({
                   <label className="ppt-field">
                     <span>After</span>
                     <input
+                      data-ppt-paragraph-command={paragraphAfterField?.commandId}
+                      data-ppt-paragraph-control={paragraphAfterField?.control}
                       data-ppt-paragraph-field="spacingAfter"
-                      max={PPT_PARAGRAPH_SPACING_MAX}
-                      min={0}
-                      step={2}
+                      data-ppt-paragraph-unit={paragraphAfterField?.unit}
+                      max={paragraphAfterField?.max ?? PPT_PARAGRAPH_SPACING_MAX}
+                      min={paragraphAfterField?.min ?? 0}
+                      step={paragraphAfterField?.step ?? 2}
                       type="number"
-                      value={paragraphSpacing.spacingAfter}
+                      value={paragraphSpacingDescriptor?.values.paragraphAfter.value ?? paragraphSpacing.spacingAfter}
                       onChange={(event) =>
                         onParagraphSpacingChange(
                           selectedElement.id,

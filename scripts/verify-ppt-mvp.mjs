@@ -4320,10 +4320,18 @@ async function runTextParagraphSpacingScenario(page) {
   record(
     'renders PPT paragraph spacing controls in text inspector',
     initial.inspector &&
+      initial.descriptorSurface === 'text-paragraph-spacing' &&
+      initial.lineHeightControl === 'line-height-ratio' &&
+      initial.lineHeightCommand === 'update-text-paragraph-spacing' &&
+      initial.model === 'slide-edit-text-paragraph-spacing' &&
       initial.selectedId === 's1-title' &&
       initial.lineHeight === '1.14' &&
       initial.spacingBefore === '0' &&
+      initial.spacingBeforeControl === 'paragraph-spacing' &&
+      initial.spacingBeforeUnit === 'px' &&
       initial.spacingAfter === '0' &&
+      initial.spacingAfterControl === 'paragraph-spacing' &&
+      initial.spacingAfterUnit === 'px' &&
       initial.selectedLineHeight === '1.14',
     initial,
   )
@@ -4352,7 +4360,17 @@ async function runTextParagraphSpacingScenario(page) {
 
   record(
     'updates PPT paragraph line height and spacing metadata from inspector',
-    afterSpacing.lineHeight === '1.4' &&
+    afterSpacing.command === 'update-text-paragraph-spacing' &&
+      afterSpacing.commandField === 'paragraphAfter' &&
+      afterSpacing.commandObject === 's1-title' &&
+      afterSpacing.commandSlide === 'slide-1' &&
+      afterSpacing.commandType === 'slide-command-effect' &&
+      afterSpacing.commandUnit === 'px' &&
+      afterSpacing.commandValue === '12' &&
+      afterSpacing.inspectorLineHeight === '1.4' &&
+      afterSpacing.inspectorSpacingBefore === '6' &&
+      afterSpacing.inspectorSpacingAfter === '12' &&
+      afterSpacing.lineHeight === '1.4' &&
       afterSpacing.spacingBefore === '6' &&
       afterSpacing.spacingAfter === '12' &&
       afterSpacing.selectedLineHeight === '1.4' &&
@@ -10006,15 +10024,30 @@ function getPPTObjectAltTextState(page, elementId) {
 function getPPTTextParagraphSpacingState(page) {
   return page.eval(`(() => {
     const inspector = document.querySelector('[data-ppt-paragraph-spacing-inspector]')
+    const lineHeight = document.querySelector('[data-ppt-paragraph-field="lineHeight"]')
     const selected = document.querySelector('[data-selected="true"]')
     const paragraph = selected?.querySelector('.ppt-text-paragraph')
+    const spacingAfter = document.querySelector('[data-ppt-paragraph-field="spacingAfter"]')
+    const spacingBefore = document.querySelector('[data-ppt-paragraph-field="spacingBefore"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
+      command: stage?.getAttribute('data-ppt-text-paragraph-spacing-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-type') ?? '',
+      commandUnit: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-unit') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-text-paragraph-spacing-command-value') ?? '',
+      descriptorSurface: inspector?.getAttribute('data-ppt-paragraph-spacing-surface') ?? '',
       inspector: !!inspector,
       inspectorLineHeight: inspector?.getAttribute('data-ppt-paragraph-line-height') ?? '',
       inspectorSpacingAfter: inspector?.getAttribute('data-ppt-paragraph-spacing-after') ?? '',
       inspectorSpacingBefore: inspector?.getAttribute('data-ppt-paragraph-spacing-before') ?? '',
-      lineHeight: document.querySelector('[data-ppt-paragraph-field="lineHeight"]')?.value ?? '',
+      lineHeight: lineHeight?.value ?? '',
+      lineHeightCommand: lineHeight?.getAttribute('data-ppt-paragraph-command') ?? '',
+      lineHeightControl: lineHeight?.getAttribute('data-ppt-paragraph-control') ?? '',
+      model: stage?.getAttribute('data-ppt-text-paragraph-spacing-model') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedLineHeight: paragraph?.getAttribute('data-ppt-line-height') ?? '',
       selectedSpacingAfter: paragraph?.getAttribute('data-ppt-spacing-after') ?? '',
@@ -10022,8 +10055,14 @@ function getPPTTextParagraphSpacingState(page) {
       selectedStyleLineHeight: paragraph?.style.lineHeight ?? '',
       selectedStyleMarginBottom: paragraph?.style.marginBottom ?? '',
       selectedStyleMarginTop: paragraph?.style.marginTop ?? '',
-      spacingAfter: document.querySelector('[data-ppt-paragraph-field="spacingAfter"]')?.value ?? '',
-      spacingBefore: document.querySelector('[data-ppt-paragraph-field="spacingBefore"]')?.value ?? '',
+      spacingAfter: spacingAfter?.value ?? '',
+      spacingAfterCommand: spacingAfter?.getAttribute('data-ppt-paragraph-command') ?? '',
+      spacingAfterControl: spacingAfter?.getAttribute('data-ppt-paragraph-control') ?? '',
+      spacingAfterUnit: spacingAfter?.getAttribute('data-ppt-paragraph-unit') ?? '',
+      spacingBefore: spacingBefore?.value ?? '',
+      spacingBeforeCommand: spacingBefore?.getAttribute('data-ppt-paragraph-command') ?? '',
+      spacingBeforeControl: spacingBefore?.getAttribute('data-ppt-paragraph-control') ?? '',
+      spacingBeforeUnit: spacingBefore?.getAttribute('data-ppt-paragraph-unit') ?? '',
     }
   })()`)
 }
