@@ -9640,20 +9640,35 @@ async function runSelectionPaneScenario(page) {
   const afterLayerLock = await page.eval(`(() => {
     const selected = document.querySelector('[data-ppt-element="${layerTargetId}"]')
     const row = document.querySelector('[data-ppt-layer-row="${layerTargetId}"]')
+    const visibilityButton = row?.querySelector('[data-ppt-layer-visibility]')
 
     return {
       deleteDisabled: document.querySelector('button[title="Delete"]')?.disabled ?? false,
       lockDisabled: document.querySelector('[data-ppt-command="lock-selection"]')?.disabled ?? false,
       locked: selected?.getAttribute('data-locked') ?? null,
+      rowLayerBlockReason: row?.getAttribute('data-ppt-object-visibility-layer-selection-block-reason') ?? '',
       rowPaneLocked: row?.getAttribute('data-ppt-layer-pane-locked') ?? null,
       resizeHandleCount: document.querySelectorAll('.ppt-resize-handle').length,
       rowLocked: row?.getAttribute('data-locked') ?? null,
+      rowStageBlockReason: row?.getAttribute('data-ppt-object-visibility-stage-selection-block-reason') ?? '',
+      rowVisibilityAvailability: visibilityButton?.getAttribute('data-ppt-object-visibility-availability') ?? '',
+      rowVisibilityModel: row?.getAttribute('data-ppt-object-visibility-model') ?? '',
+      rowVisibilitySelectable: row?.getAttribute('data-ppt-object-visibility-selectable') ?? '',
+      rowVisibilityUnavailable: visibilityButton?.getAttribute('data-ppt-object-visibility-unavailable') ?? '',
       unlockDisabled: document.querySelector('[data-ppt-command="unlock-all"]')?.disabled ?? true,
     }
   })()`)
 
   record('locks selected PPT object from selection pane', afterLayerLock.locked === 'true' && afterLayerLock.rowLocked === 'true' && afterLayerLock.rowPaneLocked === 'true' && afterLayerLock.resizeHandleCount === 0, afterLayerLock)
   record('disables transform commands for locked PPT object', afterLayerLock.deleteDisabled && afterLayerLock.lockDisabled && !afterLayerLock.unlockDisabled, afterLayerLock)
+  record('exposes locked PPT object visibility unavailable metadata',
+    afterLayerLock.rowVisibilityModel === 'slide-edit-object-visibility' &&
+      afterLayerLock.rowVisibilityAvailability === 'false' &&
+      afterLayerLock.rowVisibilityUnavailable === 'locked-selection' &&
+      afterLayerLock.rowLayerBlockReason === 'locked' &&
+      afterLayerLock.rowStageBlockReason === 'locked' &&
+      afterLayerLock.rowVisibilitySelectable === 'false',
+    afterLayerLock)
 
   await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]').click()`)
   await delay(50)
@@ -9676,34 +9691,94 @@ async function runSelectionPaneScenario(page) {
   await delay(50)
 
   const afterHide = await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
     const stageElement = document.querySelector('[data-ppt-element="${layerTargetId}"]')
     const row = document.querySelector('[data-ppt-layer-row="${layerTargetId}"]')
+    const visibilityButton = row?.querySelector('[data-ppt-layer-visibility]')
 
     return {
+      command: stage?.getAttribute('data-ppt-object-visibility-command') ?? '',
+      commandObjects: stage?.getAttribute('data-ppt-object-visibility-command-objects') ?? '',
+      commandSelection: stage?.getAttribute('data-ppt-object-visibility-command-selection') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-object-visibility-command-slide') ?? '',
+      commandTargetCount: stage?.getAttribute('data-ppt-object-visibility-command-target-count') ?? '',
+      commandType: stage?.getAttribute('data-ppt-object-visibility-command-type') ?? '',
       hidden: row?.getAttribute('data-hidden') ?? null,
+      model: stage?.getAttribute('data-ppt-object-visibility-model') ?? '',
+      rowAvailability: visibilityButton?.getAttribute('data-ppt-object-visibility-availability') ?? '',
+      rowCommand: visibilityButton?.getAttribute('data-ppt-object-visibility-command') ?? '',
+      rowModel: row?.getAttribute('data-ppt-object-visibility-model') ?? '',
       rowPaneHidden: row?.getAttribute('data-ppt-layer-pane-hidden') ?? null,
       rowSelected: row?.getAttribute('aria-selected') ?? null,
+      rowStageBlockReason: row?.getAttribute('data-ppt-object-visibility-stage-selection-block-reason') ?? '',
+      rowTargets: visibilityButton?.getAttribute('data-ppt-object-visibility-targets') ?? '',
+      rowVisible: row?.getAttribute('data-ppt-object-visibility-visible') ?? '',
       stageElementExists: !!stageElement,
     }
   })()`)
 
   record('hides selected PPT object from selection pane', afterHide.hidden === 'true' && afterHide.rowPaneHidden === 'true' && afterHide.rowSelected === 'true' && !afterHide.stageElementExists, afterHide)
+  record('routes PPT object hide through slide-edit visibility command effect',
+    afterHide.command === 'hide-objects' &&
+      afterHide.commandObjects === layerTargetId &&
+      afterHide.commandSelection === layerTargetId &&
+      afterHide.commandSlide === 'slide-1' &&
+      afterHide.commandTargetCount === '1' &&
+      afterHide.commandType === 'slide-command-effect' &&
+      afterHide.model === 'slide-edit-object-visibility' &&
+      afterHide.rowModel === 'slide-edit-object-visibility' &&
+      afterHide.rowCommand === 'show-objects' &&
+      afterHide.rowAvailability === 'true' &&
+      afterHide.rowTargets === layerTargetId &&
+      afterHide.rowVisible === 'false' &&
+      afterHide.rowStageBlockReason === 'hidden',
+    afterHide)
 
   await page.eval(`document.querySelector('[data-ppt-layer-row="${layerTargetId}"] [data-ppt-layer-visibility]').click()`)
   await delay(50)
 
   const afterShow = await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
     const stageElement = document.querySelector('[data-ppt-element="${layerTargetId}"]')
     const row = document.querySelector('[data-ppt-layer-row="${layerTargetId}"]')
+    const visibilityButton = row?.querySelector('[data-ppt-layer-visibility]')
 
     return {
+      command: stage?.getAttribute('data-ppt-object-visibility-command') ?? '',
+      commandObjects: stage?.getAttribute('data-ppt-object-visibility-command-objects') ?? '',
+      commandSelection: stage?.getAttribute('data-ppt-object-visibility-command-selection') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-object-visibility-command-slide') ?? '',
+      commandTargetCount: stage?.getAttribute('data-ppt-object-visibility-command-target-count') ?? '',
+      commandType: stage?.getAttribute('data-ppt-object-visibility-command-type') ?? '',
       hidden: row?.getAttribute('data-hidden') ?? null,
+      model: stage?.getAttribute('data-ppt-object-visibility-model') ?? '',
+      rowAvailability: visibilityButton?.getAttribute('data-ppt-object-visibility-availability') ?? '',
+      rowCommand: visibilityButton?.getAttribute('data-ppt-object-visibility-command') ?? '',
+      rowModel: row?.getAttribute('data-ppt-object-visibility-model') ?? '',
       rowPaneHidden: row?.getAttribute('data-ppt-layer-pane-hidden') ?? null,
+      rowStageBlockReason: row?.getAttribute('data-ppt-object-visibility-stage-selection-block-reason') ?? '',
+      rowTargets: visibilityButton?.getAttribute('data-ppt-object-visibility-targets') ?? '',
+      rowVisible: row?.getAttribute('data-ppt-object-visibility-visible') ?? '',
       stageElementExists: !!stageElement,
     }
   })()`)
 
   record('shows hidden PPT object from selection pane', afterShow.hidden === 'false' && afterShow.rowPaneHidden === 'false' && afterShow.stageElementExists, afterShow)
+  record('routes PPT object show through slide-edit visibility command effect',
+    afterShow.command === 'show-objects' &&
+      afterShow.commandObjects === layerTargetId &&
+      afterShow.commandSelection === layerTargetId &&
+      afterShow.commandSlide === 'slide-1' &&
+      afterShow.commandTargetCount === '1' &&
+      afterShow.commandType === 'slide-command-effect' &&
+      afterShow.model === 'slide-edit-object-visibility' &&
+      afterShow.rowModel === 'slide-edit-object-visibility' &&
+      afterShow.rowCommand === 'hide-objects' &&
+      afterShow.rowAvailability === 'true' &&
+      afterShow.rowTargets === layerTargetId &&
+      afterShow.rowVisible === 'true' &&
+      afterShow.rowStageBlockReason === '',
+    afterShow)
 }
 
 async function readPPTLayerPaneKeyboardState(page) {

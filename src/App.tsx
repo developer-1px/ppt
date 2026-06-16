@@ -118,6 +118,9 @@ import {
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
+  getSlideEditObjectVisibilityCommandAvailability,
+  getSlideEditObjectVisibilityCommandEffect,
+  getSlideEditObjectVisibilityState,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
@@ -207,6 +210,12 @@ import {
   type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
+  type SlideEditObjectVisibilityCommandAvailability,
+  type SlideEditObjectVisibilityCommandId,
+  type SlideEditObjectVisibilityDescriptor,
+  type SlideEditObjectVisibilityHostCommandEffect,
+  type SlideEditObjectSelectionPolicy,
+  type SlideEditObjectVisibilityState,
   type SlideEditPlaceholderDescriptor,
   type SlideEditRailListboxOptionDescriptor,
   type SlideEditRailHostCommandEffect,
@@ -1151,6 +1160,8 @@ type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
+type PPTObjectVisibilityDescriptor = SlideEditObjectVisibilityDescriptor<string, string, string>
+type PPTObjectVisibilityHostCommandEffect = SlideEditObjectVisibilityHostCommandEffect<string, string>
 type PPTCommentThreadCommand = {
   body: string
   id: 'add-comment-reply'
@@ -1773,6 +1784,7 @@ function App() {
   const [lastImageReplaceEffect, setLastImageReplaceEffect] = useState<SlideEditObjectImageReplaceHostCommandEffect<string, string> | null>(null)
   const [lastObjectAnimationEffect, setLastObjectAnimationEffect] = useState<SlideEditObjectAnimationHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
+  const [lastObjectVisibilityEffect, setLastObjectVisibilityEffect] = useState<PPTObjectVisibilityHostCommandEffect | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
@@ -4539,6 +4551,36 @@ function App() {
     )
   }
 
+  function applyObjectVisibilityCommandEffect(
+    effect: PPTObjectVisibilityHostCommandEffect,
+  ) {
+    const objectIds = new Set(getPPTLayerPaneActualObjectIds(
+      activeSlide,
+      effect.payload.objectIds,
+    ))
+
+    if (objectIds.size === 0) {
+      return
+    }
+
+    const visible = effect.payload.id === 'show-objects'
+
+    setLastObjectVisibilityEffect(effect)
+    setSelection([...objectIds])
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) =>
+          objectIds.has(element.id)
+            ? {
+                ...element,
+                visible,
+              }
+            : element),
+      })),
+    )
+  }
+
   function applyLayerPaneCommandEffect(effect: PPTLayerPaneHostCommandEffect) {
     const payload = effect.payload
 
@@ -7212,6 +7254,13 @@ function App() {
         data-ppt-object-opacity-command-type={lastObjectOpacityEffect?.type}
         data-ppt-object-opacity-command-value={lastObjectOpacityEffect?.payload.value}
         data-ppt-object-opacity-model="slide-edit-object-opacity"
+        data-ppt-object-visibility-command={lastObjectVisibilityEffect?.payload.id}
+        data-ppt-object-visibility-command-objects={lastObjectVisibilityEffect?.payload.objectIds.join(' ') ?? undefined}
+        data-ppt-object-visibility-command-selection={lastObjectVisibilityEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-object-visibility-command-slide={lastObjectVisibilityEffect?.selection.slideId}
+        data-ppt-object-visibility-command-target-count={lastObjectVisibilityEffect?.payload.objectIds.length}
+        data-ppt-object-visibility-command-type={lastObjectVisibilityEffect?.type}
+        data-ppt-object-visibility-model="slide-edit-object-visibility"
         data-ppt-shadow-command={lastShadowEffect?.payload.id}
         data-ppt-shadow-command-field={lastShadowEffect?.payload.fieldId}
         data-ppt-shadow-command-object={lastShadowEffect?.payload.objectId}
@@ -7474,6 +7523,7 @@ function App() {
         onElementRotationChange={updateElementRotation}
         onElementShadowChange={updateElementShadow}
         onElementTextInsetChange={updateElementTextInset}
+        onObjectVisibilityCommandEffect={applyObjectVisibilityCommandEffect}
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
@@ -9201,6 +9251,51 @@ function getPPTLayerPaneActualObjectIds(
   }
 
   return [...expanded]
+}
+
+function getPPTObjectVisibilityDescriptors(
+  slideId: string,
+  rows: readonly PPTLayerPaneRowDescriptor[],
+): PPTObjectVisibilityDescriptor[] {
+  return rows.map((row) => ({
+    isHidden: row.isHidden,
+    isLocked: row.isLocked,
+    isSelectable: row.isSelectable,
+    objectId: row.objectId,
+    placeholderId: null,
+    slideId,
+  }))
+}
+
+function getPPTObjectVisibilityState(
+  row: PPTLayerPaneRowDescriptor,
+  selectionPolicy: SlideEditObjectSelectionPolicy = 'allow-hidden-selection',
+): SlideEditObjectVisibilityState {
+  return getSlideEditObjectVisibilityState({
+    isHidden: row.isHidden,
+    isLocked: row.isLocked,
+    selectionPolicy,
+  })
+}
+
+function getPPTObjectVisibilityCommandId(
+  row: PPTLayerPaneRowDescriptor,
+): SlideEditObjectVisibilityCommandId {
+  return row.isHidden ? 'show-objects' : 'hide-objects'
+}
+
+function getPPTObjectVisibilityAvailability({
+  descriptors,
+  row,
+}: {
+  descriptors: readonly PPTObjectVisibilityDescriptor[]
+  row: PPTLayerPaneRowDescriptor
+}): SlideEditObjectVisibilityCommandAvailability<string> {
+  return getSlideEditObjectVisibilityCommandAvailability({
+    commandId: getPPTObjectVisibilityCommandId(row),
+    objects: descriptors,
+    selectedObjectIds: [row.objectId],
+  })
 }
 
 function getPPTLayerPaneDropIndex(
@@ -11476,6 +11571,7 @@ function Inspector({
   onImageFitChange,
   onImageReplaceFile,
   onLayerPaneCommandEffect,
+  onObjectVisibilityCommandEffect,
   onLayoutPlaceholderVisibilityChange,
   onLineMarkerChange,
   onLineRouteChange,
@@ -11574,6 +11670,9 @@ function Inspector({
     file: Blob & { name?: string },
   ) => Promise<boolean>
   onLayerPaneCommandEffect: (effect: PPTLayerPaneHostCommandEffect) => void
+  onObjectVisibilityCommandEffect: (
+    effect: PPTObjectVisibilityHostCommandEffect,
+  ) => void
   onLayoutPlaceholderVisibilityChange: (
     placeholderId: string,
     isVisible: boolean,
@@ -11763,6 +11862,10 @@ function Inspector({
     selectedObjectIds: selection,
     slide,
   })
+  const objectVisibilityDescriptors = getPPTObjectVisibilityDescriptors(
+    slide.id,
+    layerPaneDescriptor.rows,
+  )
   const activeLayerPaneObjectId = getPPTLayerPaneResolvedFocusObjectId(
     layerPaneDescriptor,
     layerPaneGroupState.focusedObjectId,
@@ -11826,6 +11929,29 @@ function Inspector({
   }
 
   function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
+    if (intent.type === 'visibility-toggle') {
+      const row = layerPaneDescriptor.rows.find((candidate) =>
+        candidate.objectId === intent.objectId
+      )
+
+      if (!row) {
+        return
+      }
+
+      const effect = getSlideEditObjectVisibilityCommandEffect({
+        commandId: getPPTObjectVisibilityCommandId(row),
+        objects: objectVisibilityDescriptors,
+        selectedObjectIds: [row.objectId],
+        slideId: slide.id,
+      })
+
+      if (effect) {
+        onObjectVisibilityCommandEffect(effect)
+      }
+
+      return
+    }
+
     const effect = getSlideEditLayerPaneCommandEffect(layerPaneDescriptor, intent)
 
     if (effect) {
@@ -13669,6 +13795,12 @@ function Inspector({
             const layerPaneDropToIndex = layerPaneDragState?.dropTargetObjectId === row.objectId
               ? layerPaneDragState.dropToIndex
               : undefined
+            const objectVisibilityState = getPPTObjectVisibilityState(row)
+            const stageObjectVisibilityState = getPPTObjectVisibilityState(row, 'visible-only')
+            const objectVisibilityAvailability = getPPTObjectVisibilityAvailability({
+              descriptors: objectVisibilityDescriptors,
+              row,
+            })
 
             return (
               <div
@@ -13701,6 +13833,13 @@ function Inspector({
               data-ppt-layer-pane-row={row.objectId}
               data-ppt-layer-pane-row-type={row.isGroup ? 'group' : 'object'}
               data-ppt-layer-pane-selected={row.isSelected ? 'true' : 'false'}
+              data-ppt-object-visibility-hidden={objectVisibilityState.isHidden ? 'true' : 'false'}
+              data-ppt-object-visibility-layer-selection-block-reason={objectVisibilityState.selectionBlockReason ?? ''}
+              data-ppt-object-visibility-model="slide-edit-object-visibility"
+              data-ppt-object-visibility-selectable={objectVisibilityState.isSelectable ? 'true' : 'false'}
+              data-ppt-object-visibility-selection-policy="allow-hidden-selection"
+              data-ppt-object-visibility-stage-selection-block-reason={stageObjectVisibilityState.selectionBlockReason ?? ''}
+              data-ppt-object-visibility-visible={objectVisibilityState.isVisible ? 'true' : 'false'}
               data-ppt-layer-row={row.objectId}
               draggable={isDraggable}
               key={row.objectId}
@@ -13803,6 +13942,10 @@ function Inspector({
                   className="ppt-layer-icon-button"
                   data-ppt-layer-pane-intent="visibility-toggle"
                   data-ppt-layer-visibility={row.objectId}
+                  data-ppt-object-visibility-availability={objectVisibilityAvailability.isAvailable ? 'true' : 'false'}
+                  data-ppt-object-visibility-command={objectVisibilityAvailability.commandId}
+                  data-ppt-object-visibility-targets={objectVisibilityAvailability.targetObjectIds.join(' ')}
+                  data-ppt-object-visibility-unavailable={objectVisibilityAvailability.unavailableReason ?? ''}
                   title={row.isHidden ? 'Show object' : 'Hide object'}
                   type="button"
                   onClick={(event) => {
