@@ -408,6 +408,7 @@ import {
   handlePoint,
   normalizeBounds,
   pointDistance,
+  unique,
   type Bounds,
   type Point,
   type ResizeHandle,
@@ -9994,24 +9995,22 @@ function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
 ) {
-  const expanded = new Set<string>()
+  const expanded: string[] = []
 
   for (const objectId of objectIds) {
     const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
 
     if (groupId) {
-      for (const memberId of getPPTLayerPaneGroupMemberIds(slide, groupId)) {
-        expanded.add(memberId)
-      }
+      expanded.push(...getPPTLayerPaneGroupMemberIds(slide, groupId))
       continue
     }
 
     if (findPPTElement(slide, objectId)) {
-      expanded.add(objectId)
+      expanded.push(objectId)
     }
   }
 
-  return [...expanded]
+  return unique(expanded)
 }
 
 function getPPTObjectVisibilityDescriptors(
@@ -15155,7 +15154,7 @@ function getPPTStyleClipboardPackageCategoryIds(
     categoryIds.push('text-style')
   }
 
-  return [...new Set(categoryIds)]
+  return unique(categoryIds)
 }
 
 function getPPTStyleClipboardPackageStyles(
