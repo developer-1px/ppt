@@ -382,6 +382,7 @@ import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   PPT_TITLE_BODY_LAYOUT_ID,
+  PPTElementSchema,
   createPPTElementId,
   createPPTTextBody,
   findPPTElement,
@@ -810,6 +811,47 @@ type PPTClipboardPastePositionEffect = {
 type PPTClipboardPastePositionMemory = {
   key: string
   pasteIndex: number
+}
+const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
+const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
+const PPT_RICH_CLIPBOARD_VERSION = 1
+const PPT_RICH_CLIPBOARD_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.selection+json'
+const PPT_RICH_CLIPBOARD_FORMATS = [
+  PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
+  'text/html',
+  'image/svg+xml',
+  'text/plain',
+] as const
+type PPTRichClipboardImportFormat =
+  | 'custom-json'
+  | 'text-html'
+  | 'text-plain'
+type PPTRichClipboardWriteMode =
+  | 'clipboard-item'
+  | 'pending'
+  | 'unavailable'
+  | 'write-failed'
+  | 'write-text'
+type PPTRichClipboardExportPayload = {
+  kind: typeof PPT_RICH_CLIPBOARD_KIND
+  metadata: {
+    objectCount: number
+    selectedObjectIds: readonly string[]
+    sourceSlideId: string
+  }
+  payload: PPTClipboardPayload
+  version: typeof PPT_RICH_CLIPBOARD_VERSION
+}
+type PPTRichClipboardEffect = {
+  formats: readonly string[]
+  importFormat?: PPTRichClipboardImportFormat
+  imported?: boolean
+  model: typeof PPT_RICH_CLIPBOARD_MODEL
+  objectCount: number
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
 }
 type PPTStyleClipboardCategory =
   | 'object'
@@ -1792,6 +1834,7 @@ function App() {
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
+  const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
@@ -2548,6 +2591,15 @@ function App() {
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (isEditableTarget(event.target)) {
+        return
+      }
+
+      const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
+
+      if (richClipboard && pasteClipboardPayload(richClipboard.payload, {
+        importFormat: richClipboard.format,
+      })) {
+        event.preventDefault()
         return
       }
 
@@ -3653,14 +3705,27 @@ function App() {
       key: getPPTClipboardPastePositionKey(payload, activeSlide.id),
       pasteIndex: 0,
     }
-    void navigator.clipboard?.writeText(JSON.stringify({
-      metadata: payload.metadata,
-      objects: selected,
-      operation: payload.operation,
-      selectedObjectIds: payload.selectedObjectIds,
-      sourceSlideId: payload.sourceSlideId,
-      type: payload.type,
-    })).catch(() => undefined)
+
+    const richClipboardEffect = createPPTRichClipboardEffect(payload, {
+      writeMode: 'pending',
+    })
+
+    setLastRichClipboardEffect(richClipboardEffect)
+
+    void writePPTRichClipboardPayload({
+      payload,
+      selectionSvg: selectionSvgCode,
+    }).then((writeMode) => {
+      setLastRichClipboardEffect((current) =>
+        current &&
+        current.sourceSlideId === payload.sourceSlideId &&
+        current.selectedObjectIds.join(' ') === payload.selectedObjectIds.join(' ')
+          ? {
+              ...current,
+              writeMode,
+            }
+          : current)
+    })
   }
 
   function cutSelection() {
@@ -3677,27 +3742,38 @@ function App() {
       return
     }
 
-    const pasteKey = getPPTClipboardPastePositionKey(clipboard, activeSlide.id)
+    pasteClipboardPayload(clipboard)
+  }
+
+  function pasteClipboardPayload(
+    payload: PPTClipboardPayload,
+    options: { importFormat?: PPTRichClipboardImportFormat } = {},
+  ) {
+    if (payload.objects.length === 0) {
+      return false
+    }
+
+    const pasteKey = getPPTClipboardPastePositionKey(payload, activeSlide.id)
     const pasteIndex = clipboardPastePositionMemoryRef.current?.key === pasteKey
       ? clipboardPastePositionMemoryRef.current.pasteIndex
       : 0
     const viewportCenter = getPPTViewportCenter()
     const pasteAnchor = getCanvasPasteOffset({
-      clipboard: getPPTCanvasPastePositionClipboard(clipboard.objects),
+      clipboard: getPPTCanvasPastePositionClipboard(payload.objects),
       pasteIndex,
       viewportCenter,
     })
     const pastePositionEffect: PPTClipboardPastePositionEffect = {
       anchor: pasteAnchor,
-      clipboardBounds: getPPTElementsBounds([...clipboard.objects]),
-      clipboardObjectCount: clipboard.objects.length,
+      clipboardBounds: getPPTElementsBounds([...payload.objects]),
+      clipboardObjectCount: payload.objects.length,
       model: 'canvas-paste-position',
       pasteIndex,
       viewportCenter,
     }
     const effect = createPPTClipboardPasteCommandEffect({
       createId: createPPTElementIdFactory(activeSlide),
-      payload: clipboard,
+      payload,
       slideFrame: {
         h: PPT_SLIDE_HEIGHT,
         w: PPT_SLIDE_WIDTH,
@@ -3712,11 +3788,18 @@ function App() {
     })
 
     if (!effect) {
-      return
+      return false
     }
 
+    setClipboard(payload)
     setLastClipboardPasteEffect(effect)
     setLastClipboardPastePositionEffect(pastePositionEffect)
+    if (options.importFormat) {
+      setLastRichClipboardEffect(createPPTRichClipboardEffect(payload, {
+        importFormat: options.importFormat,
+        imported: true,
+      }))
+    }
     clipboardPastePositionMemoryRef.current = {
       key: pasteKey,
       pasteIndex: pasteIndex + 1,
@@ -3726,6 +3809,7 @@ function App() {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       return applyPPTClipboardPasteHostCommandEffect(slide, effect)
     }))
+    return true
   }
 
   function selectAllElements() {
@@ -7286,6 +7370,15 @@ function App() {
         data-ppt-clipboard-selection={clipboard?.selectedObjectIds.join(' ') ?? undefined}
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-ppt-clipboard-type={clipboard?.type ?? undefined}
+        data-ppt-rich-clipboard-formats={lastRichClipboardEffect?.formats.join(' ')}
+        data-ppt-rich-clipboard-import-format={lastRichClipboardEffect?.importFormat}
+        data-ppt-rich-clipboard-imported={lastRichClipboardEffect?.imported ? 'true' : undefined}
+        data-ppt-rich-clipboard-json-mime-type={PPT_RICH_CLIPBOARD_JSON_MIME_TYPE}
+        data-ppt-rich-clipboard-model={lastRichClipboardEffect?.model}
+        data-ppt-rich-clipboard-object-count={lastRichClipboardEffect?.objectCount}
+        data-ppt-rich-clipboard-selection={lastRichClipboardEffect?.selectedObjectIds.join(' ')}
+        data-ppt-rich-clipboard-source-slide={lastRichClipboardEffect?.sourceSlideId}
+        data-ppt-rich-clipboard-write-mode={lastRichClipboardEffect?.writeMode}
         data-ppt-style-clipboard-categories={styleClipboard?.categories.join(' ') ?? undefined}
         data-ppt-style-clipboard-command={lastStyleClipboardEffect?.payload.id}
         data-ppt-style-clipboard-command-applications={lastStyleClipboardEffect?.payload.id === 'paste-object-formatting'
@@ -9200,6 +9293,218 @@ function createPPTClipboardPayload({
     selectedObjectIds,
     sourceSlideId,
   })
+}
+
+function createPPTRichClipboardEffect(
+  payload: PPTClipboardPayload,
+  options: {
+    importFormat?: PPTRichClipboardImportFormat
+    imported?: boolean
+    writeMode?: PPTRichClipboardWriteMode
+  } = {},
+): PPTRichClipboardEffect {
+  return {
+    formats: PPT_RICH_CLIPBOARD_FORMATS,
+    importFormat: options.importFormat,
+    imported: options.imported,
+    model: PPT_RICH_CLIPBOARD_MODEL,
+    objectCount: payload.objects.length,
+    selectedObjectIds: payload.selectedObjectIds,
+    sourceSlideId: payload.sourceSlideId,
+    writeMode: options.writeMode,
+  }
+}
+
+function createPPTRichClipboardExportPayload(
+  payload: PPTClipboardPayload,
+): PPTRichClipboardExportPayload {
+  return {
+    kind: PPT_RICH_CLIPBOARD_KIND,
+    metadata: {
+      objectCount: payload.objects.length,
+      selectedObjectIds: payload.selectedObjectIds,
+      sourceSlideId: payload.sourceSlideId,
+    },
+    payload,
+    version: PPT_RICH_CLIPBOARD_VERSION,
+  }
+}
+
+function stringifyPPTRichClipboardPayload(payload: PPTClipboardPayload) {
+  return JSON.stringify(createPPTRichClipboardExportPayload(payload), null, 2)
+}
+
+function createPPTRichClipboardHTML({
+  payload,
+  selectionSvg,
+}: {
+  payload: PPTClipboardPayload
+  selectionSvg: string | null
+}) {
+  const json = stringifyPPTRichClipboardPayload(payload).replace(/</g, '\\u003c')
+
+  return [
+    '<section data-ppt-rich-clipboard="true">',
+    selectionSvg ?? '<p>PPT selection</p>',
+    `<script type="application/json" data-ppt-rich-clipboard-json>${json}</script>`,
+    '</section>',
+  ].join('')
+}
+
+async function writePPTRichClipboardPayload({
+  payload,
+  selectionSvg,
+}: {
+  payload: PPTClipboardPayload
+  selectionSvg: string | null
+}): Promise<PPTRichClipboardWriteMode> {
+  const json = stringifyPPTRichClipboardPayload(payload)
+  const html = createPPTRichClipboardHTML({ payload, selectionSvg })
+  const clipboard = navigator.clipboard
+
+  if (
+    clipboard &&
+    typeof clipboard.write === 'function' &&
+    typeof ClipboardItem !== 'undefined'
+  ) {
+    try {
+      await clipboard.write([
+        new ClipboardItem({
+          [PPT_RICH_CLIPBOARD_JSON_MIME_TYPE]: new Blob([json], {
+            type: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
+          }),
+          'image/svg+xml': new Blob([selectionSvg ?? ''], {
+            type: 'image/svg+xml',
+          }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([json], { type: 'text/plain' }),
+        }),
+      ])
+      return 'clipboard-item'
+    } catch {
+      // Fall through to text fallback; browsers vary in custom MIME support.
+    }
+  }
+
+  if (clipboard && typeof clipboard.writeText === 'function') {
+    try {
+      await clipboard.writeText(json)
+      return 'write-text'
+    } catch {
+      return 'write-failed'
+    }
+  }
+
+  return 'unavailable'
+}
+
+function getPPTRichClipboardFromDataTransfer(dataTransfer: DataTransfer | null) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const customJson = dataTransfer.getData(PPT_RICH_CLIPBOARD_JSON_MIME_TYPE)
+  const customPayload = parsePPTRichClipboardPayload(customJson)
+
+  if (customPayload) {
+    return {
+      format: 'custom-json' as const,
+      payload: customPayload,
+    }
+  }
+
+  const plainPayload = parsePPTRichClipboardPayload(dataTransfer.getData('text/plain'))
+
+  if (plainPayload) {
+    return {
+      format: 'text-plain' as const,
+      payload: plainPayload,
+    }
+  }
+
+  const htmlPayload = parsePPTRichClipboardPayload(
+    getPPTRichClipboardJSONFromHTML(dataTransfer.getData('text/html')),
+  )
+
+  if (htmlPayload) {
+    return {
+      format: 'text-html' as const,
+      payload: htmlPayload,
+    }
+  }
+
+  return null
+}
+
+function getPPTRichClipboardJSONFromHTML(value: string) {
+  if (!value) {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(value, 'text/html')
+
+  return doc
+    .querySelector('script[data-ppt-rich-clipboard-json]')
+    ?.textContent ?? null
+}
+
+function parsePPTRichClipboardPayload(value: string | null) {
+  if (!value) {
+    return null
+  }
+
+  try {
+    return normalizePPTRichClipboardPayload(JSON.parse(value))
+  } catch {
+    return null
+  }
+}
+
+function normalizePPTRichClipboardPayload(value: unknown): PPTClipboardPayload | null {
+  const payloadValue = isPPTRecord(value) &&
+    value.kind === PPT_RICH_CLIPBOARD_KIND &&
+    value.version === PPT_RICH_CLIPBOARD_VERSION
+    ? value.payload
+    : value
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const sourceSlideId = typeof payloadValue.sourceSlideId === 'string'
+    ? payloadValue.sourceSlideId
+    : ''
+  const rawObjects = Array.isArray(payloadValue.objects)
+    ? payloadValue.objects
+    : []
+  const objects = rawObjects.flatMap((item) => {
+    const parsed = PPTElementSchema.safeParse(item)
+
+    return parsed.success ? [parsed.data] : []
+  })
+
+  if (!sourceSlideId || objects.length === 0) {
+    return null
+  }
+
+  const objectIds = new Set(objects.map((object) => object.id))
+  const selectedObjectIds = Array.isArray(payloadValue.selectedObjectIds)
+    ? payloadValue.selectedObjectIds
+        .filter((item): item is string => typeof item === 'string' && objectIds.has(item))
+    : objects.map((object) => object.id)
+
+  return createPPTClipboardPayload({
+    objects,
+    operation: 'copy',
+    selectedObjectIds: selectedObjectIds.length > 0
+      ? selectedObjectIds
+      : objects.map((object) => object.id),
+    sourceSlideId,
+  })
+}
+
+function isPPTRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function getPPTCanvasPastePositionClipboard(

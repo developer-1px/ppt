@@ -2353,6 +2353,9 @@ async function runCrossSlideClipboardScenario(page) {
     afterCopy,
     sourceBefore,
   })
+  record('copies PPT selection as rich clipboard bundle', afterCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' && afterCopy.richClipboardFormats.includes('application/vnd.interactive-os.ppt.selection+json') && afterCopy.richClipboardFormats.includes('text/html') && afterCopy.richClipboardFormats.includes('image/svg+xml') && afterCopy.richClipboardFormats.includes('text/plain') && afterCopy.richClipboardJsonMimeType === 'application/vnd.interactive-os.ppt.selection+json' && afterCopy.richClipboardObjectCount === 1 && afterCopy.richClipboardSelection === 's1-title' && afterCopy.richClipboardSourceSlide === 'slide-1' && ['clipboard-item', 'pending', 'write-failed', 'write-text', 'unavailable'].includes(afterCopy.richClipboardWriteMode), {
+    afterCopy,
+  })
 
   await page.eval(`document.querySelectorAll('.ppt-thumb')[1]?.click()`)
   await delay(80)
@@ -2479,6 +2482,125 @@ async function runCrossSlideClipboardScenario(page) {
     sourceBefore,
     targetBefore,
   })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const payload = {
+      kind: 'interactive-os.ppt.selection',
+      metadata: {
+        objectCount: 1,
+        selectedObjectIds: ['external-rich-shape'],
+        sourceSlideId: 'external-slide',
+      },
+      payload: {
+        metadata: [{
+          groupId: null,
+          objectId: 'external-rich-shape',
+          placeholderId: null,
+        }],
+        objects: [{
+          fill: { color: '#22c55e', opacity: 1 },
+          geometry: { h: 88, w: 180, x: 120, y: 160 },
+          id: 'external-rich-shape',
+          kind: 'shape',
+          name: 'External Clipboard Shape',
+          shape: 'rect',
+          stroke: { color: '#15803d', width: 2 },
+          style: { color: '#052e16', fontSize: 24 },
+          textBody: { paragraphs: [{ runs: [{ text: 'Rich paste' }] }] },
+        }],
+        operation: 'copy',
+        selectedObjectIds: ['external-rich-shape'],
+        sourceSlideId: 'external-slide',
+        type: 'slide-object-clipboard',
+      },
+      version: 1,
+    }
+    const json = JSON.stringify(payload)
+
+    dataTransfer.setData('application/vnd.interactive-os.ppt.selection+json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterRichClipboardPaste = await getPPTCrossSlideClipboardState(page)
+
+  record('pastes PPT rich clipboard custom JSON as object selection', afterRichClipboardPaste.activeSlide === 'slide-1' && afterRichClipboardPaste.stageCount === sourceAfter.stageCount + 1 && afterRichClipboardPaste.selectedCount === 1 && afterRichClipboardPaste.selectedKind === 'shape' && afterRichClipboardPaste.selectedName.includes('External Clipboard Shape Copy') && afterRichClipboardPaste.pasteSourceSlide === 'external-slide' && afterRichClipboardPaste.pasteTargetSlide === 'slide-1' && afterRichClipboardPaste.richClipboardImported === 'true' && afterRichClipboardPaste.richClipboardImportFormat === 'custom-json' && afterRichClipboardPaste.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard', {
+    afterRichClipboardPaste,
+    sourceAfter,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const payload = {
+      kind: 'interactive-os.ppt.selection',
+      metadata: {
+        objectCount: 1,
+        selectedObjectIds: ['external-html-shape'],
+        sourceSlideId: 'html-slide',
+      },
+      payload: {
+        metadata: [{
+          groupId: null,
+          objectId: 'external-html-shape',
+          placeholderId: null,
+        }],
+        objects: [{
+          fill: { color: '#f97316', opacity: 1 },
+          geometry: { h: 76, w: 190, x: 180, y: 210 },
+          id: 'external-html-shape',
+          kind: 'shape',
+          name: 'HTML Clipboard Shape',
+          shape: 'rect',
+          stroke: { color: '#c2410c', width: 2 },
+          style: { color: '#431407', fontSize: 22 },
+          textBody: { paragraphs: [{ runs: [{ text: 'HTML paste' }] }] },
+        }],
+        operation: 'copy',
+        selectedObjectIds: ['external-html-shape'],
+        sourceSlideId: 'html-slide',
+        type: 'slide-object-clipboard',
+      },
+      version: 1,
+    }
+    const json = JSON.stringify(payload).replace(/</g, '\\\\u003c')
+    const html = '<section data-ppt-rich-clipboard="true"><script type="application/json" data-ppt-rich-clipboard-json>' + json + '</script></section>'
+
+    dataTransfer.setData('text/html', html)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterRichHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  record('pastes PPT rich clipboard embedded HTML JSON as object selection', afterRichHTMLPaste.activeSlide === 'slide-1' && afterRichHTMLPaste.stageCount === sourceAfter.stageCount + 1 && afterRichHTMLPaste.selectedKind === 'shape' && afterRichHTMLPaste.selectedName.includes('HTML Clipboard Shape Copy') && afterRichHTMLPaste.pasteSourceSlide === 'html-slide' && afterRichHTMLPaste.richClipboardImported === 'true' && afterRichHTMLPaste.richClipboardImportFormat === 'text-html', {
+    afterRichHTMLPaste,
+    sourceAfter,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 }
 
 async function runSelectSameTypeScenario(page) {
@@ -13342,6 +13464,15 @@ function getPPTCrossSlideClipboardState(page) {
       pasteSourceSlide: stage?.getAttribute('data-ppt-clipboard-paste-source-slide') ?? '',
       pasteTargetSlide: stage?.getAttribute('data-ppt-clipboard-paste-target-slide') ?? '',
       pasteType: stage?.getAttribute('data-ppt-clipboard-paste-type') ?? '',
+      richClipboardFormats: stage?.getAttribute('data-ppt-rich-clipboard-formats') ?? '',
+      richClipboardImported: stage?.getAttribute('data-ppt-rich-clipboard-imported') ?? '',
+      richClipboardImportFormat: stage?.getAttribute('data-ppt-rich-clipboard-import-format') ?? '',
+      richClipboardJsonMimeType: stage?.getAttribute('data-ppt-rich-clipboard-json-mime-type') ?? '',
+      richClipboardModel: stage?.getAttribute('data-ppt-rich-clipboard-model') ?? '',
+      richClipboardObjectCount: Number(stage?.getAttribute('data-ppt-rich-clipboard-object-count') ?? 0),
+      richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
+      richClipboardSourceSlide: stage?.getAttribute('data-ppt-rich-clipboard-source-slide') ?? '',
+      richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
       selectedHeight: Number.parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
