@@ -114,6 +114,7 @@ import {
   getSlideEditColorSwatchId,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayerPaneCommandEffect,
+  getSlideEditLayerPaneKeyboardIntent,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
@@ -155,6 +156,7 @@ import {
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
+  SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
@@ -162,6 +164,7 @@ import {
   type SlideEditLayerPaneDescriptor,
   type SlideEditLayerPaneHostCommandEffect,
   type SlideEditLayerPaneIntent,
+  type SlideEditLayerPaneKeyboardIntent,
   type SlideEditLayerPaneRowDescriptor,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
@@ -1109,6 +1112,7 @@ type PPTLayerPaneDescriptor = SlideEditLayerPaneDescriptor<string, string, strin
 type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
+type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
 type PPTMinimapSize = CanvasMinimapSize
 type PPTMinimapItemBounds = CanvasMinimapItemBounds
 type PPTMinimapReadModel = CanvasMinimapReadModel
@@ -10473,6 +10477,26 @@ function Inspector({
     })
   }
 
+  function applyLayerPaneKeyboardIntent(intent: PPTLayerPaneKeyboardIntent) {
+    switch (intent.type) {
+      case 'focus-row':
+      case 'focus-parent-row':
+      case 'select-row':
+        runLayerPaneIntent({
+          objectId: intent.objectId,
+          type: 'row-press',
+        })
+        focusLayerPaneRow(intent.objectId)
+        return
+      case 'collapse-row':
+      case 'expand-row':
+        focusLayerPaneRow(intent.objectId)
+        return
+      case 'none':
+        return
+    }
+  }
+
   function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
     window.requestAnimationFrame(() => {
       document
@@ -10531,38 +10555,18 @@ function Inspector({
       return
     }
 
-    const rows = layerPaneDescriptor.rows
-    const currentIndex = rows.findIndex((item) => item.objectId === row.objectId)
+    const intent = getSlideEditLayerPaneKeyboardIntent(layerPaneDescriptor, {
+      currentObjectId: row.objectId,
+      key: event.key,
+    })
 
-    if (currentIndex < 0) {
-      return
-    }
-
-    let nextRow: PPTLayerPaneRowDescriptor | null = null
-
-    if (event.key === 'ArrowDown') {
-      nextRow = rows[Math.min(currentIndex + 1, rows.length - 1)] ?? null
-    } else if (event.key === 'ArrowUp') {
-      nextRow = rows[Math.max(currentIndex - 1, 0)] ?? null
-    } else if (event.key === 'Home') {
-      nextRow = rows[0] ?? null
-    } else if (event.key === 'End') {
-      nextRow = rows.at(-1) ?? null
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      nextRow = row
-    }
-
-    if (!nextRow) {
+    if (!intent.preventDefault) {
       return
     }
 
     event.preventDefault()
     event.stopPropagation()
-    runLayerPaneIntent({
-      objectId: nextRow.objectId,
-      type: 'row-press',
-    })
-    focusLayerPaneRow(nextRow.objectId)
+    applyLayerPaneKeyboardIntent(intent)
   }
 
   return (
@@ -11851,7 +11855,8 @@ function Inspector({
           className="ppt-layer-list"
           data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
           data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
-          data-ppt-layer-pane-keyboard-keys="arrow-home-end-enter-space"
+          data-ppt-layer-pane-keyboard-intent-model={SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL}
+          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space"
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
           data-ppt-layer-pane-selection-model={layerPaneDescriptor.aria.selectionModel}
           role={layerPaneDescriptor.aria.containerRole}
@@ -11859,6 +11864,7 @@ function Inspector({
           {layerPaneDescriptor.rows.map((row) => (
             <div
               aria-disabled={!row.isSelectable}
+              aria-expanded={row.ariaExpanded}
               aria-level={row.ariaLevel}
               aria-posinset={row.ariaPosInSet}
               aria-selected={row.isSelected}

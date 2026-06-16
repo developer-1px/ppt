@@ -8712,6 +8712,7 @@ async function runSelectionPaneScenario(page) {
       contractModel: pane?.getAttribute('data-ppt-layer-pane-model') ?? '',
       firstRowKind: rows[0]?.getAttribute('data-ppt-layer-pane-kind') ?? '',
       firstRowOrder: rows[0]?.getAttribute('data-ppt-layer-pane-order') ?? '',
+      keyboardIntentModel: tree?.getAttribute('data-ppt-layer-pane-keyboard-intent-model') ?? '',
       keyboardKeys: tree?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
       keyboardModel: tree?.getAttribute('data-ppt-layer-pane-keyboard-model') ?? '',
       layerCount: document.querySelectorAll('[data-ppt-layer-row]').length,
@@ -8734,7 +8735,8 @@ async function runSelectionPaneScenario(page) {
       initial.treeRole === 'tree' &&
       initial.rowRole === 'treeitem' &&
       initial.keyboardModel === 'roving-tabindex' &&
-      initial.keyboardKeys === 'arrow-home-end-enter-space' &&
+      initial.keyboardIntentModel === 'slide-edit-layer-pane-keyboard-intent' &&
+      initial.keyboardKeys === 'arrow-left-right-home-end-enter-space' &&
       initial.selectionModel === 'host-controlled-multi-select' &&
       initial.selectedRowId === initial.selectedId &&
       initial.rowIds.length === initial.layerCount &&
@@ -8972,6 +8974,7 @@ async function readPPTLayerPaneKeyboardState(page) {
       selectedRowId: selectedRows[0]?.getAttribute('data-ppt-layer-pane-row') ?? '',
       selectedRowIds: selectedRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
       tabStopIds: tabStopRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      treeKeyboardIntentModel: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-intent-model') ?? '',
       treeKeyboardKeys: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
     }
   })()`)
