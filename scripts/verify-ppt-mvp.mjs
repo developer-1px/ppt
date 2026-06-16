@@ -4825,8 +4825,8 @@ async function runExportScenario(page) {
       hasDeckJson: code.includes('data-ppt-deck'),
       hasSlideMarkup: code.includes('data-ppt-slide="slide-1"'),
       hasElementMarkup: code.includes('data-ppt-element="s1-title"'),
-      hasAnimationMarkup: code.includes('data-ppt-animation-type="flyIn"') && code.includes('data-ppt-animation-trigger="withPrevious"') && code.includes('data-ppt-animation-duration="800"') && code.includes('data-ppt-animation-delay="200"') && code.includes('data-ppt-animation-order="2"'),
-      hasAnimationModel: code.includes('"animation"') && code.includes('"type": "flyIn"') && code.includes('"trigger": "withPrevious"') && code.includes('"durationMs": 800') && code.includes('"delayMs": 200') && code.includes('"order": 2'),
+      hasAnimationMarkup: code.includes('data-ppt-animation-type="flyIn"') && code.includes('data-ppt-animation-trigger="withPrevious"') && code.includes('data-ppt-animation-duration="800"') && code.includes('data-ppt-animation-delay="200"') && code.includes('data-ppt-animation-order="3"'),
+      hasAnimationModel: code.includes('"animation"') && code.includes('"type": "flyIn"') && code.includes('"trigger": "withPrevious"') && code.includes('"durationMs": 800') && code.includes('"delayMs": 200') && code.includes('"order": 3'),
       hasBulletMarkup: code.includes('data-ppt-bullet-list="true"') && code.includes('data-ppt-bullet="true"'),
       hasBulletModel: code.includes('"bullet": "bullet"'),
       hasCommentMarkup: code.includes('class="ppt-element ppt-comment"') && code.includes('data-ppt-comment-resolved="true"') && code.includes('Review CTA wording'),
@@ -4937,7 +4937,7 @@ async function runExportScenario(page) {
 
     return {
       download: download.download ?? '',
-      hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="2"'),
+      hasAnimation: text.includes('data-ppt-animation-type="flyIn"') && text.includes('data-ppt-animation-trigger="withPrevious"') && text.includes('data-ppt-animation-duration="800"') && text.includes('data-ppt-animation-delay="200"') && text.includes('data-ppt-animation-order="3"'),
       hasBackground: text.includes('data-ppt-svg-background="true"'),
       hasObjectOpacity: text.includes('data-ppt-opacity="0.42"') && text.includes('opacity="0.42"'),
       hasObjectShadow: text.includes('data-ppt-shadow="true"') && text.includes('data-ppt-shadow-color="#334155"') && text.includes('data-ppt-shadow-opacity="0.36"') && text.includes('filter:drop-shadow'),
@@ -6069,10 +6069,21 @@ async function runObjectAnimationScenario(page) {
     'renders PPT object animation/build order controls in inspector',
     initial.inspector &&
       initial.selectedId === 's1-title' &&
+      initial.model === 'slide-edit-object-animation' &&
+      initial.descriptorModel === 'slide-edit-object-animation' &&
       initial.type === 'none' &&
       initial.trigger === 'onClick' &&
+      initial.descriptorPackageType === 'none' &&
+      initial.descriptorPackageTrigger === 'on-click' &&
+      initial.descriptorTypeOptions === 'none fade-in fly-in' &&
+      initial.descriptorTriggerOptions === 'on-click with-previous' &&
       initial.duration === '400' &&
       initial.delay === '0' &&
+      initial.typeCommand === 'update-object-animation' &&
+      initial.triggerCommand === 'update-object-animation' &&
+      initial.durationCommand === 'update-object-animation' &&
+      initial.delayCommand === 'update-object-animation' &&
+      initial.orderCommand === 'update-object-animation' &&
       Number(initial.order) > 0 &&
       initial.selectedType === 'none',
     initial,
@@ -6103,7 +6114,7 @@ async function runObjectAnimationScenario(page) {
     delay.dispatchEvent(new Event('input', { bubbles: true }))
     delay.dispatchEvent(new Event('change', { bubbles: true }))
 
-    inputSetter.call(order, '2')
+    inputSetter.call(order, '3')
     order.dispatchEvent(new Event('input', { bubbles: true }))
     order.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
@@ -6117,12 +6128,20 @@ async function runObjectAnimationScenario(page) {
       afterFade.trigger === 'withPrevious' &&
       afterFade.duration === '800' &&
       afterFade.delay === '200' &&
-      afterFade.order === '2' &&
+      afterFade.order === '3' &&
       afterFade.selectedType === 'fadeIn' &&
       afterFade.selectedTrigger === 'withPrevious' &&
       afterFade.selectedDuration === '800' &&
       afterFade.selectedDelay === '200' &&
-      afterFade.selectedOrder === '2',
+      afterFade.selectedOrder === '3' &&
+      afterFade.command === 'update-object-animation' &&
+      afterFade.commandField === 'order' &&
+      afterFade.commandObject === 's1-title' &&
+      afterFade.commandSlide === 'slide-1' &&
+      afterFade.commandType === 'slide-command-effect' &&
+      afterFade.commandValue === '3' &&
+      afterFade.descriptorPackageType === 'fade-in' &&
+      afterFade.descriptorPackageTrigger === 'with-previous',
     {
       afterFade,
       initial,
@@ -6164,12 +6183,14 @@ async function runObjectAnimationScenario(page) {
   record(
     'undoes and redoes PPT object animation type as one history step',
     afterFly.type === 'flyIn' &&
+      afterFly.commandField === 'type' &&
+      afterFly.commandValue === 'fly-in' &&
       afterUndo.type === 'fadeIn' &&
       afterRedo.type === 'flyIn' &&
       afterRedo.trigger === 'withPrevious' &&
       afterRedo.duration === '800' &&
       afterRedo.delay === '200' &&
-      afterRedo.order === '2',
+      afterRedo.order === '3',
     {
       afterFade,
       afterFly,
@@ -6190,7 +6211,7 @@ async function runObjectAnimationScenario(page) {
       preview.trigger === 'withPrevious' &&
       preview.duration === '800' &&
       preview.delay === '200' &&
-      preview.order === '2',
+      preview.order === '3',
     preview,
   )
 
@@ -9786,25 +9807,53 @@ function getPPTObjectAnimationState(page) {
   return page.eval(`(() => {
     const inspector = document.querySelector('[data-ppt-object-animation-inspector]')
     const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+    const type = document.querySelector('[data-ppt-animation-field="type"]')
+    const trigger = document.querySelector('[data-ppt-animation-field="trigger"]')
+    const duration = document.querySelector('[data-ppt-animation-field="durationMs"]')
+    const delay = document.querySelector('[data-ppt-animation-field="delayMs"]')
+    const order = document.querySelector('[data-ppt-animation-field="order"]')
 
     return {
-      delay: document.querySelector('[data-ppt-animation-field="delayMs"]')?.value ?? '',
-      duration: document.querySelector('[data-ppt-animation-field="durationMs"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-object-animation-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-object-animation-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-object-animation-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-object-animation-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-object-animation-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-object-animation-command-value') ?? '',
+      delay: delay?.value ?? '',
+      delayCommand: delay?.getAttribute('data-ppt-animation-command') ?? '',
+      descriptorDelayLimit: inspector?.getAttribute('data-ppt-animation-limit-delay-max') ?? '',
+      descriptorDurationLimit: inspector?.getAttribute('data-ppt-animation-limit-duration-max') ?? '',
+      descriptorModel: inspector?.getAttribute('data-ppt-animation-model') ?? '',
+      descriptorOrderLimit: inspector?.getAttribute('data-ppt-animation-limit-order-max') ?? '',
+      descriptorPackageTrigger: inspector?.getAttribute('data-ppt-animation-package-trigger') ?? '',
+      descriptorPackageType: inspector?.getAttribute('data-ppt-animation-package-type') ?? '',
+      descriptorTriggerOptions: inspector?.getAttribute('data-ppt-animation-trigger-options') ?? '',
+      descriptorTypeOptions: inspector?.getAttribute('data-ppt-animation-type-options') ?? '',
+      duration: duration?.value ?? '',
+      durationCommand: duration?.getAttribute('data-ppt-animation-command') ?? '',
       inspector: !!inspector,
       inspectorDelay: inspector?.getAttribute('data-ppt-animation-delay') ?? '',
       inspectorDuration: inspector?.getAttribute('data-ppt-animation-duration') ?? '',
       inspectorOrder: inspector?.getAttribute('data-ppt-animation-order') ?? '',
       inspectorTrigger: inspector?.getAttribute('data-ppt-animation-trigger') ?? '',
       inspectorType: inspector?.getAttribute('data-ppt-animation-type') ?? '',
-      order: document.querySelector('[data-ppt-animation-field="order"]')?.value ?? '',
+      model: stage?.getAttribute('data-ppt-object-animation-model') ?? '',
+      order: order?.value ?? '',
+      orderCommand: order?.getAttribute('data-ppt-animation-command') ?? '',
       selectedDelay: selected?.getAttribute('data-ppt-animation-delay') ?? '',
       selectedDuration: selected?.getAttribute('data-ppt-animation-duration') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedOrder: selected?.getAttribute('data-ppt-animation-order') ?? '',
       selectedTrigger: selected?.getAttribute('data-ppt-animation-trigger') ?? '',
       selectedType: selected?.getAttribute('data-ppt-animation-type') ?? '',
-      trigger: document.querySelector('[data-ppt-animation-field="trigger"]')?.value ?? '',
-      type: document.querySelector('[data-ppt-animation-field="type"]')?.value ?? '',
+      trigger: trigger?.value ?? '',
+      triggerCommand: trigger?.getAttribute('data-ppt-animation-command') ?? '',
+      triggerPackageValue: trigger?.getAttribute('data-ppt-animation-package-value') ?? '',
+      type: type?.value ?? '',
+      typeCommand: type?.getAttribute('data-ppt-animation-command') ?? '',
+      typePackageValue: type?.getAttribute('data-ppt-animation-package-value') ?? '',
     }
   })()`)
 }

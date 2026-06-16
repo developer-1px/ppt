@@ -97,6 +97,7 @@ import {
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
+  createSlideEditObjectAnimationDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
@@ -111,6 +112,7 @@ import {
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
+  getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
@@ -123,6 +125,9 @@ import {
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
   normalizeSlideEditObjectCornerRadius,
+  normalizeSlideEditObjectAnimationDelayMs,
+  normalizeSlideEditObjectAnimationDurationMs,
+  normalizeSlideEditObjectAnimationOrder,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
@@ -132,6 +137,9 @@ import {
   normalizeSlideEditTextLineHeightRatio,
   normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
+  SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
+  SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
+  SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
@@ -146,6 +154,11 @@ import {
   type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectHyperlinkHostCommandEffect,
+  type SlideEditBuiltInAnimationTrigger,
+  type SlideEditBuiltInAnimationType,
+  type SlideEditObjectAnimationDescriptor,
+  type SlideEditObjectAnimationHostCommandEffect,
+  type SlideEditObjectAnimationUpdateCommand,
   type SlideEditObjectOpacityDescriptor,
   type SlideEditObjectOpacityHostCommandEffect,
   type SlideEditObjectShadowDescriptor,
@@ -1323,7 +1336,6 @@ const PPT_DEFAULT_ELEMENT_ANIMATION = Object.freeze({
   trigger: 'onClick',
   type: 'none',
 } as const satisfies PPTElementAnimation)
-const PPT_ELEMENT_ANIMATION_TIME_MAX = 10000
 const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
@@ -1565,6 +1577,7 @@ function App() {
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
+  const [lastObjectAnimationEffect, setLastObjectAnimationEffect] = useState<SlideEditObjectAnimationHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
@@ -3689,6 +3702,17 @@ function App() {
     field: PPTElementAnimationUpdateField,
     value: PPTElementAnimation[PPTElementAnimationUpdateField],
   ) {
+    const effect = getSlideEditObjectAnimationUpdateCommandEffect(
+      toSlideEditObjectAnimationCommand({
+        elementId,
+        field,
+        slideId: activeSlide.id,
+        value,
+      }),
+    )
+
+    setLastObjectAnimationEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
@@ -3697,11 +3721,14 @@ function App() {
             return element
           }
 
+          const { field: pptField, value: fieldValue } =
+            toPPTElementAnimationUpdate(effect.payload)
+
           return {
             ...element,
             animation: normalizePPTElementAnimation({
               ...getPPTElementAnimation(element, slide),
-              [field]: value,
+              [pptField]: fieldValue,
             }, slide, element.id),
           }
         }),
@@ -6703,6 +6730,15 @@ function App() {
           ? lastHyperlinkEffect.payload.value
           : undefined}
         data-ppt-hyperlink-model="slide-edit-object-hyperlink"
+        data-ppt-object-animation-command={lastObjectAnimationEffect?.payload.id}
+        data-ppt-object-animation-command-field={lastObjectAnimationEffect?.payload.fieldId}
+        data-ppt-object-animation-command-object={lastObjectAnimationEffect?.payload.objectId}
+        data-ppt-object-animation-command-slide={lastObjectAnimationEffect?.payload.slideId}
+        data-ppt-object-animation-command-type={lastObjectAnimationEffect?.type}
+        data-ppt-object-animation-command-value={lastObjectAnimationEffect
+          ? String(lastObjectAnimationEffect.payload.value)
+          : undefined}
+        data-ppt-object-animation-model="slide-edit-object-animation"
         data-ppt-object-opacity-command={lastObjectOpacityEffect?.payload.id}
         data-ppt-object-opacity-command-field={lastObjectOpacityEffect?.payload.fieldId}
         data-ppt-object-opacity-command-object={lastObjectOpacityEffect?.payload.objectId}
@@ -7758,6 +7794,165 @@ function normalizePPTElementAnimation(
   }
 }
 
+function getPPTObjectAnimationDescriptor(
+  slide: PPTSlide,
+  element: PPTElement,
+): SlideEditObjectAnimationDescriptor<
+  string,
+  string,
+  SlideEditBuiltInAnimationType,
+  SlideEditBuiltInAnimationTrigger
+> {
+  const animation = getPPTElementAnimation(element, slide)
+
+  return createSlideEditObjectAnimationDescriptor({
+    delayMs: animation.delayMs,
+    durationMs: animation.durationMs,
+    objectId: element.id,
+    order: animation.order,
+    slideId: slide.id,
+    trigger: toSlideEditObjectAnimationTrigger(animation.trigger),
+    type: toSlideEditObjectAnimationType(animation.type),
+  })
+}
+
+function toSlideEditObjectAnimationCommand({
+  elementId,
+  field,
+  slideId,
+  value,
+}: {
+  elementId: string
+  field: PPTElementAnimationUpdateField
+  slideId: string
+  value: PPTElementAnimation[PPTElementAnimationUpdateField]
+}): SlideEditObjectAnimationUpdateCommand<string, string> {
+  if (field === 'type') {
+    return {
+      fieldId: 'type',
+      id: 'update-object-animation',
+      objectId: elementId,
+      slideId,
+      value: toSlideEditObjectAnimationType(value as PPTElementAnimationType),
+    }
+  }
+
+  if (field === 'trigger') {
+    return {
+      fieldId: 'trigger',
+      id: 'update-object-animation',
+      objectId: elementId,
+      slideId,
+      value: toSlideEditObjectAnimationTrigger(value as PPTElementAnimationTrigger),
+    }
+  }
+
+  switch (field) {
+    case 'delayMs':
+      return {
+        fieldId: 'delayMs',
+        id: 'update-object-animation',
+        objectId: elementId,
+        slideId,
+        value: Number(value),
+      }
+    case 'durationMs':
+      return {
+        fieldId: 'durationMs',
+        id: 'update-object-animation',
+        objectId: elementId,
+        slideId,
+        value: Number(value),
+      }
+    case 'order':
+      return {
+        fieldId: 'order',
+        id: 'update-object-animation',
+        objectId: elementId,
+        slideId,
+        value: Number(value),
+      }
+  }
+}
+
+function toPPTElementAnimationUpdate(
+  command: SlideEditObjectAnimationUpdateCommand<string, string>,
+): {
+  field: PPTElementAnimationUpdateField
+  value: PPTElementAnimation[PPTElementAnimationUpdateField]
+} {
+  if (command.fieldId === 'type') {
+    return {
+      field: 'type',
+      value: toPPTElementAnimationType(command.value),
+    }
+  }
+
+  if (command.fieldId === 'trigger') {
+    return {
+      field: 'trigger',
+      value: toPPTElementAnimationTrigger(command.value),
+    }
+  }
+
+  switch (command.fieldId) {
+    case 'delayMs':
+      return {
+        field: 'delayMs',
+        value: normalizeSlideEditObjectAnimationDelayMs(command.value),
+      }
+    case 'durationMs':
+      return {
+        field: 'durationMs',
+        value: normalizeSlideEditObjectAnimationDurationMs(command.value),
+      }
+    case 'order':
+      return {
+        field: 'order',
+        value: normalizeSlideEditObjectAnimationOrder(command.value),
+      }
+  }
+}
+
+function toSlideEditObjectAnimationType(
+  type: PPTElementAnimationType,
+): SlideEditBuiltInAnimationType {
+  switch (type) {
+    case 'fadeIn':
+      return 'fade-in'
+    case 'flyIn':
+      return 'fly-in'
+    case 'none':
+      return 'none'
+  }
+}
+
+function toPPTElementAnimationType(type: string): PPTElementAnimationType {
+  switch (type) {
+    case 'fade-in':
+      return 'fadeIn'
+    case 'fly-in':
+      return 'flyIn'
+    default:
+      return 'none'
+  }
+}
+
+function toSlideEditObjectAnimationTrigger(
+  trigger: PPTElementAnimationTrigger,
+): SlideEditBuiltInAnimationTrigger {
+  switch (trigger) {
+    case 'onClick':
+      return 'on-click'
+    case 'withPrevious':
+      return 'with-previous'
+  }
+}
+
+function toPPTElementAnimationTrigger(trigger: string): PPTElementAnimationTrigger {
+  return trigger === 'with-previous' ? 'withPrevious' : 'onClick'
+}
+
 function getPPTElementDefaultAnimationOrder(
   elementId: string,
   slide?: PPTSlide,
@@ -7768,11 +7963,7 @@ function getPPTElementDefaultAnimationOrder(
 }
 
 function clampPPTElementAnimationTime(value: number) {
-  return clamp(
-    Number.isFinite(value) ? Math.round(value) : 0,
-    0,
-    PPT_ELEMENT_ANIMATION_TIME_MAX,
-  )
+  return normalizeSlideEditObjectAnimationDurationMs(value)
 }
 
 function clampPPTElementAnimationOrder(
@@ -7792,7 +7983,10 @@ function parsePPTElementAnimationTime(value: string) {
 }
 
 function parsePPTElementAnimationOrder(value: string, elementCount: number) {
-  return clampPPTElementAnimationOrder(Number(value), elementCount)
+  return clampPPTElementAnimationOrder(
+    normalizeSlideEditObjectAnimationOrder(Number(value)),
+    elementCount,
+  )
 }
 
 function getDefaultPPTParagraphSpacing() {
@@ -10664,6 +10858,9 @@ function Inspector({
   const objectShadowBlurField = getPPTObjectShadowField(objectShadowDescriptor, 'blur')
   const objectShadowDistanceField = getPPTObjectShadowField(objectShadowDescriptor, 'distance')
   const objectShadowAngleField = getPPTObjectShadowField(objectShadowDescriptor, 'angle')
+  const objectAnimationDescriptor = selectedElement
+    ? getPPTObjectAnimationDescriptor(slide, selectedElement)
+    : null
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -11372,16 +11569,28 @@ function Inspector({
               <div
                 className="ppt-animation-grid"
                 data-ppt-object-animation-inspector
-                data-ppt-animation-delay={selectedElementAnimation.delayMs}
-                data-ppt-animation-duration={selectedElementAnimation.durationMs}
-                data-ppt-animation-order={selectedElementAnimation.order}
+                data-ppt-animation-delay={objectAnimationDescriptor?.delayMs ?? selectedElementAnimation.delayMs}
+                data-ppt-animation-duration={objectAnimationDescriptor?.durationMs ?? selectedElementAnimation.durationMs}
+                data-ppt-animation-limit-delay-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDelayMs}
+                data-ppt-animation-limit-duration-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDurationMs}
+                data-ppt-animation-limit-order-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxBuildOrder}
+                data-ppt-animation-model="slide-edit-object-animation"
+                data-ppt-animation-order={objectAnimationDescriptor?.order ?? selectedElementAnimation.order}
+                data-ppt-animation-package-trigger={objectAnimationDescriptor?.trigger}
+                data-ppt-animation-package-type={objectAnimationDescriptor?.type}
                 data-ppt-animation-trigger={selectedElementAnimation.trigger}
+                data-ppt-animation-trigger-options={SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS
+                  .map((trigger) => trigger.id).join(' ')}
                 data-ppt-animation-type={selectedElementAnimation.type}
+                data-ppt-animation-type-options={SLIDE_EDIT_OBJECT_ANIMATION_TYPES
+                  .map((type) => type.id).join(' ')}
               >
                 <label className="ppt-field">
                   <span>Animation</span>
                   <select
+                    data-ppt-animation-command="update-object-animation"
                     data-ppt-animation-field="type"
+                    data-ppt-animation-package-value={objectAnimationDescriptor?.type}
                     value={selectedElementAnimation.type}
                     onChange={(event) =>
                       onElementAnimationChange(
@@ -11400,7 +11609,9 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Trigger</span>
                   <select
+                    data-ppt-animation-command="update-object-animation"
                     data-ppt-animation-field="trigger"
+                    data-ppt-animation-package-value={objectAnimationDescriptor?.trigger}
                     value={selectedElementAnimation.trigger}
                     onChange={(event) =>
                       onElementAnimationChange(
@@ -11419,12 +11630,13 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Duration</span>
                   <input
+                    data-ppt-animation-command="update-object-animation"
                     data-ppt-animation-field="durationMs"
-                    max={PPT_ELEMENT_ANIMATION_TIME_MAX}
-                    min={0}
+                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDurationMs}
+                    min={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minDurationMs}
                     step={100}
                     type="number"
-                    value={selectedElementAnimation.durationMs}
+                    value={objectAnimationDescriptor?.durationMs ?? selectedElementAnimation.durationMs}
                     onChange={(event) =>
                       onElementAnimationChange(
                         selectedElement.id,
@@ -11436,12 +11648,13 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Delay</span>
                   <input
+                    data-ppt-animation-command="update-object-animation"
                     data-ppt-animation-field="delayMs"
-                    max={PPT_ELEMENT_ANIMATION_TIME_MAX}
-                    min={0}
+                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDelayMs}
+                    min={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minDelayMs}
                     step={100}
                     type="number"
-                    value={selectedElementAnimation.delayMs}
+                    value={objectAnimationDescriptor?.delayMs ?? selectedElementAnimation.delayMs}
                     onChange={(event) =>
                       onElementAnimationChange(
                         selectedElement.id,
@@ -11453,11 +11666,13 @@ function Inspector({
                 <label className="ppt-field">
                   <span>Order</span>
                   <input
+                    data-ppt-animation-command="update-object-animation"
                     data-ppt-animation-field="order"
-                    min={1}
+                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxBuildOrder}
+                    min={Math.max(1, SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minBuildOrder)}
                     step={1}
                     type="number"
-                    value={selectedElementAnimation.order}
+                    value={objectAnimationDescriptor?.order ?? selectedElementAnimation.order}
                     onChange={(event) =>
                       onElementAnimationChange(
                         selectedElement.id,
