@@ -1,4 +1,20 @@
 import {
+  getSlideEditColorWithAlphaCSS,
+  getSlideEditObjectStrokeLineStyleBorderStyle,
+  getSlideEditObjectStrokeLineStyleDashArray,
+  getSlideEditTextFrameInsetPaddingCSS,
+  getSlideEditTextVerticalAlignmentFlexAlignItems,
+  normalizeSlideEditObjectCornerRadius,
+  normalizeSlideEditObjectFillOpacity,
+  normalizeSlideEditObjectOpacity,
+  normalizeSlideEditObjectStrokeLineStyle,
+  normalizeSlideEditTextFrameInsetValue,
+  normalizeSlideEditTextVerticalAlignment,
+  toSlideEditObjectCornerRadiusAttributeValue,
+  toSlideEditObjectFillOpacityAttributeValue,
+  toSlideEditObjectOpacityAttributeValue,
+} from '@interactive-os/slide-edit-affordance'
+import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTComment,
@@ -41,20 +57,7 @@ const PPT_TEXT_FONT_FAMILY_VALUES = new Set<string>(
 )
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
 const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
-const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
-  { css: 'flex-start', value: 'top' },
-  { css: 'center', value: 'middle' },
-  { css: 'flex-end', value: 'bottom' },
-] as const satisfies readonly {
-  css: string
-  value: PPTTextVerticalAlign
-}[])
-const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
-  PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
-)
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
-const PPT_TEXT_INSET_MIN = 0
-const PPT_TEXT_INSET_MAX = 120
 const PPT_DEFAULT_TEXT_BOX_INSET = Object.freeze({
   bottom: 0,
   left: 0,
@@ -67,8 +70,6 @@ const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
   right: 18,
   top: 18,
 } as const satisfies PPTTextInset)
-const PPT_ELEMENT_OPACITY_MIN = 0
-const PPT_ELEMENT_OPACITY_MAX = 1
 const PPT_DEFAULT_ELEMENT_SHADOW = Object.freeze({
   angle: 45,
   blur: 14,
@@ -83,13 +84,8 @@ const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
 const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
-const PPT_FILL_OPACITY_MIN = 0
-const PPT_FILL_OPACITY_MAX = 1
 const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
-const PPT_SHAPE_CORNER_RADIUS_MIN = 0
-const PPT_SHAPE_CORNER_RADIUS_MAX = 120
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
-const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(['solid', 'dash', 'dot'])
 
 export function exportPPTDeckHTML(deck: PPTDeck) {
   const body = deck.slides.map((slide) => {
@@ -1164,16 +1160,16 @@ function normalizePPTTextVerticalAlign(
   verticalAlign: string | undefined,
   fallback: PPTTextVerticalAlign = PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
 ) {
-  return PPT_TEXT_VERTICAL_ALIGN_VALUES.has(verticalAlign ?? '')
-    ? verticalAlign as PPTTextVerticalAlign
-    : fallback
+  const normalizedFallback = normalizeSlideEditTextVerticalAlignment(fallback)
+  const normalizedValue = normalizeSlideEditTextVerticalAlignment(verticalAlign)
+
+  return verticalAlign === undefined ? normalizedFallback : normalizedValue
 }
 
 function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
-  const normalized = normalizePPTTextVerticalAlign(verticalAlign)
-
-  return PPT_TEXT_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === normalized)?.css ??
-    PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
+  return getSlideEditTextVerticalAlignmentFlexAlignItems(
+    normalizePPTTextVerticalAlign(verticalAlign),
+  )
 }
 
 function getPPTElementTextInset(element: PPTElement): PPTTextInset {
@@ -1195,11 +1191,11 @@ function getPPTElementTextInset(element: PPTElement): PPTTextInset {
 function normalizePPTTextInset(value: number) {
   const finiteValue = Number.isFinite(value) ? value : 0
 
-  return Math.min(PPT_TEXT_INSET_MAX, Math.max(PPT_TEXT_INSET_MIN, Math.round(finiteValue)))
+  return normalizeSlideEditTextFrameInsetValue(finiteValue)
 }
 
 function getPPTTextInsetCSS(inset: PPTTextInset) {
-  return `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`
+  return getSlideEditTextFrameInsetPaddingCSS(inset)
 }
 
 function formatPPTTextInsetData(inset: PPTTextInset) {
@@ -1211,14 +1207,11 @@ function getPPTElementOpacity(element: PPTElement) {
 }
 
 function normalizePPTElementOpacity(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : 1
-  const clamped = Math.min(PPT_ELEMENT_OPACITY_MAX, Math.max(PPT_ELEMENT_OPACITY_MIN, finiteValue))
-
-  return Math.round(clamped * 100) / 100
+  return normalizeSlideEditObjectOpacity(value)
 }
 
 function formatPPTElementOpacity(value: number) {
-  return String(normalizePPTElementOpacity(value))
+  return toSlideEditObjectOpacityAttributeValue(value)
 }
 
 function getPPTElementHyperlink(element: PPTElement) {
@@ -1244,32 +1237,11 @@ function getPPTShapeCornerRadius(element: PPTShape) {
 }
 
 function normalizePPTShapeCornerRadius(value: number) {
-  const finiteValue = Number.isFinite(value)
-    ? value
-    : PPT_SHAPE_CORNER_RADIUS_DEFAULT
-  const clamped = Math.min(
-    PPT_SHAPE_CORNER_RADIUS_MAX,
-    Math.max(PPT_SHAPE_CORNER_RADIUS_MIN, finiteValue),
-  )
-
-  return Math.round(clamped)
+  return normalizeSlideEditObjectCornerRadius(value)
 }
 
 function formatPPTShapeCornerRadius(value: number) {
-  return String(normalizePPTShapeCornerRadius(value))
-}
-
-function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
-  const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
-  const normalized = {
-    color: typeof fill.color === 'string' && fill.color
-      ? fill.color
-      : '#ffffff',
-  }
-
-  return opacity === 1
-    ? normalized
-    : { ...normalized, opacity }
+  return toSlideEditObjectCornerRadiusAttributeValue(value)
 }
 
 function getPPTFillOpacity(fill: PPTFill) {
@@ -1277,14 +1249,11 @@ function getPPTFillOpacity(fill: PPTFill) {
 }
 
 function normalizePPTFillOpacity(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : 1
-  const clamped = Math.min(PPT_FILL_OPACITY_MAX, Math.max(PPT_FILL_OPACITY_MIN, finiteValue))
-
-  return Math.round(clamped * 100) / 100
+  return normalizeSlideEditObjectFillOpacity(value)
 }
 
 function formatPPTFillOpacity(value: number) {
-  return String(normalizePPTFillOpacity(value))
+  return toSlideEditObjectFillOpacityAttributeValue(value)
 }
 
 function getPPTFillOpacitySvgAttr(fill: PPTFill) {
@@ -1296,42 +1265,16 @@ function getPPTFillOpacitySvgAttr(fill: PPTFill) {
 }
 
 function getPPTFillColorCSS(fill: PPTFill) {
-  const normalized = normalizePPTFill(fill)
-  const opacity = getPPTFillOpacity(normalized)
+  const opacity = getPPTFillOpacity(fill)
 
   if (opacity === 1) {
-    return normalized.color
+    return fill.color
   }
 
-  return getPPTColorWithAlpha(normalized.color, opacity)
-}
-
-function getPPTColorWithAlpha(color: string, opacity: number) {
-  const hex = normalizePPTColorHex(color)
-
-  if (!hex) {
-    return color
-  }
-
-  const red = Number.parseInt(hex.slice(0, 2), 16)
-  const green = Number.parseInt(hex.slice(2, 4), 16)
-  const blue = Number.parseInt(hex.slice(4, 6), 16)
-
-  return `rgb(${red} ${green} ${blue} / ${formatPPTFillOpacity(opacity)})`
-}
-
-function normalizePPTColorHex(color: string) {
-  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())
-
-  if (!match) {
-    return ''
-  }
-
-  const value = match[1]
-
-  return value.length === 3
-    ? [...value].map((char) => `${char}${char}`).join('').toLowerCase()
-    : value.toLowerCase()
+  return getSlideEditColorWithAlphaCSS({
+    color: fill.color,
+    opacity,
+  })
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {
@@ -1371,38 +1314,25 @@ function getPPTStrokeDash(stroke: PPTStroke | undefined): PPTStrokeDash {
 }
 
 function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
-  return typeof value === 'string' && PPT_STROKE_DASH_VALUES.has(value as PPTStrokeDash)
-    ? value as PPTStrokeDash
-    : 'solid'
+  return normalizeSlideEditObjectStrokeLineStyle(
+    typeof value === 'string' ? value : null,
+  ) as PPTStrokeDash
 }
 
 function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
-  const dash = getPPTStrokeDash(stroke)
-
-  if (dash === 'dash') {
-    return 'dashed'
-  }
-
-  if (dash === 'dot') {
-    return 'dotted'
-  }
-
-  return 'solid'
+  return getSlideEditObjectStrokeLineStyleBorderStyle(getPPTStrokeDash(stroke))
 }
 
 function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
-  const width = normalizePPTStrokeWidth(stroke?.width ?? 2)
-  const dash = getPPTStrokeDash(stroke)
+  const dashArray = getSlideEditObjectStrokeLineStyleDashArray({
+    strokeWidth: normalizePPTStrokeWidth(stroke?.width ?? 2),
+    value: getPPTStrokeDash(stroke),
+  })
 
-  if (dash === 'dash') {
-    return `${formatNumber(Math.max(4, width * 3))} ${formatNumber(Math.max(3, width * 2))}`
-  }
-
-  if (dash === 'dot') {
-    return `1 ${formatNumber(Math.max(3, width * 2))}`
-  }
-
-  return ''
+  return dashArray
+    ?.split(' ')
+    .map((value) => formatNumber(Number(value)))
+    .join(' ') ?? ''
 }
 
 function getPPTStrokeDashArraySvgAttr(stroke: PPTStroke | undefined) {
