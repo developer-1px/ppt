@@ -4243,7 +4243,7 @@ function App() {
         ...element,
         geometry: {
           ...element.geometry,
-          rotation: normalizePPTElementRotation(rotation),
+          rotation: normalizeCanvasRotationDegrees(rotation),
         },
       })),
     )
@@ -6443,7 +6443,7 @@ function App() {
           return element
         }
 
-        const rawRotation = normalizePPTElementRotation(startRotation + delta)
+        const rawRotation = normalizeCanvasRotationDegrees(startRotation + delta)
         const rotation = event.shiftKey
           ? Math.round(rawRotation / 15) * 15
           : rawRotation
@@ -6452,7 +6452,7 @@ function App() {
           ...element,
           geometry: {
             ...element.geometry,
-            rotation: normalizePPTElementRotation(rotation),
+            rotation: normalizeCanvasRotationDegrees(rotation),
           },
         }
       },
@@ -17215,10 +17215,6 @@ function getPPTLineLength(line: PPTLine) {
 
 function getPointAngle(center: Point, point: Point) {
   return Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI
-}
-
-function normalizePPTElementRotation(rotation: number) {
-  return normalizeCanvasRotationDegrees(rotation)
 }
 
 function measurePPTElementAutoSize(element: PPTElement) {
