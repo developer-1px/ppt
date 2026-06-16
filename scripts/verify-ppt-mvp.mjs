@@ -3494,7 +3494,7 @@ async function runMinimapScenario(page) {
 
   const initial = await readPPTMinimapState(page)
 
-  record('renders PPT minimap viewport overview', initial.open && initial.itemCount >= 5 && initial.hasWorld && initial.hasViewport && initial.togglePressed === 'true', initial)
+  record('renders PPT minimap viewport overview', initial.open && initial.model === 'canvas-minimap-read-model' && initial.itemCount >= 5 && initial.hasWorld && initial.hasViewport && initial.togglePressed === 'true', initial)
 
   const point = await getElementCenter(page, 's1-card-1')
   await clickMouse(page, point.x, point.y, 1)
@@ -4052,6 +4052,7 @@ async function readPPTMinimapState(page) {
       hasViewport: !!viewport,
       hasWorld: !!world,
       itemCount: Number(minimap?.getAttribute('data-ppt-minimap-item-count') ?? 0),
+      model: minimap?.getAttribute('data-ppt-minimap-model') ?? '',
       open: !!minimap,
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       scale: Number(document.querySelector('.ppt-stage-world')?.style.transform.match(/scale\\(([^)]+)\\)/)?.[1] ?? 0),
