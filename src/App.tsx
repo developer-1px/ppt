@@ -93,18 +93,25 @@ import {
 } from 'react'
 import {
   createSlideEditLayoutPlaceholderDescriptor,
+  createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
+  getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  isSlideEditObjectStrokeLineStyleValue,
+  normalizeSlideEditObjectStrokeLineStyle,
+  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditObjectStrokeLineStyleDescriptor,
+  type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditPlaceholderDescriptor,
   type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
@@ -1233,17 +1240,17 @@ const PPT_SECTION_BOUNDS = Object.freeze({
   w: 420,
 } as const)
 const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
-const PPT_STROKE_DASH_OPTIONS = Object.freeze([
-  { label: 'Solid', value: 'solid' },
-  { label: 'Dash', value: 'dash' },
-  { label: 'Dot', value: 'dot' },
-] as const satisfies readonly {
+const PPT_STROKE_DASH_OPTIONS = Object.freeze(
+  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS.map((option) => ({
+    id: option.id,
+    label: option.label,
+    value: option.id,
+  })),
+) as readonly {
+  id: PPTStrokeDash
   label: string
   value: PPTStrokeDash
-}[])
-const PPT_STROKE_DASH_VALUES = new Set<PPTStrokeDash>(
-  PPT_STROKE_DASH_OPTIONS.map((option) => option.value),
-)
+}[]
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
   'none',
   'fade',
@@ -1510,6 +1517,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
@@ -4110,6 +4118,22 @@ function App() {
       rememberRecentColor(value)
     }
 
+    const commandValue = field === 'dash'
+      ? getSlideEditObjectStrokeLineStyleCommandEffect({
+        fieldId: 'strokeLineStyle',
+        id: 'update-object-stroke-line-style',
+        objectId: elementId,
+        slideId: activeSlide.id,
+        value: normalizeSlideEditObjectStrokeLineStyle(
+          typeof value === 'string' ? value : null,
+        ),
+      })
+      : null
+
+    if (commandValue) {
+      setLastStrokeLineStyleEffect(commandValue)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (
@@ -4124,7 +4148,7 @@ function App() {
           color: '#111827',
           width: 2,
           ...element.stroke,
-          [field]: value,
+          [field]: commandValue?.payload.value ?? value,
         })
 
         return {
@@ -6442,6 +6466,13 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-stroke-line-style-command={lastStrokeLineStyleEffect?.payload.id}
+        data-ppt-stroke-line-style-command-field={lastStrokeLineStyleEffect?.payload.fieldId}
+        data-ppt-stroke-line-style-command-object={lastStrokeLineStyleEffect?.payload.objectId}
+        data-ppt-stroke-line-style-command-slide={lastStrokeLineStyleEffect?.payload.slideId}
+        data-ppt-stroke-line-style-command-type={lastStrokeLineStyleEffect?.type}
+        data-ppt-stroke-line-style-command-value={lastStrokeLineStyleEffect?.payload.value}
+        data-ppt-stroke-line-style-model="slide-edit-object-stroke-line-style"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
         data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
@@ -10222,6 +10253,9 @@ function Inspector({
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
+  const strokeLineStyleDescriptor = selectedElement
+    ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
+    : null
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -11311,7 +11345,12 @@ function Inspector({
                   <span>Dash</span>
                   <select
                     data-ppt-style-field="stroke-dash"
-                    value={getPPTStrokeDash(selectedElement.stroke)}
+                    data-ppt-stroke-line-style-attribute={strokeLineStyleDescriptor?.metadata.attribute}
+                    data-ppt-stroke-line-style-attribute-value={strokeLineStyleDescriptor?.metadata.attributeValue}
+                    data-ppt-stroke-line-style-command={strokeLineStyleDescriptor?.field.commandId}
+                    data-ppt-stroke-line-style-control={strokeLineStyleDescriptor?.field.control}
+                    data-ppt-stroke-line-style-surface={strokeLineStyleDescriptor?.surface}
+                    value={strokeLineStyleDescriptor?.value ?? getPPTStrokeDash(selectedElement.stroke)}
                     onChange={(event) => {
                       if (isPPTStrokeDash(event.target.value)) {
                         onElementStrokeChange(
@@ -11322,8 +11361,8 @@ function Inspector({
                       }
                     }}
                   >
-                    {PPT_STROKE_DASH_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
+                    {(strokeLineStyleDescriptor?.field.options ?? PPT_STROKE_DASH_OPTIONS).map((option) => (
+                      <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
@@ -11459,7 +11498,12 @@ function Inspector({
                   <span>Dash</span>
                   <select
                     data-ppt-style-field="line-stroke-dash"
-                    value={getPPTStrokeDash(selectedElement.stroke)}
+                    data-ppt-stroke-line-style-attribute={strokeLineStyleDescriptor?.metadata.attribute}
+                    data-ppt-stroke-line-style-attribute-value={strokeLineStyleDescriptor?.metadata.attributeValue}
+                    data-ppt-stroke-line-style-command={strokeLineStyleDescriptor?.field.commandId}
+                    data-ppt-stroke-line-style-control={strokeLineStyleDescriptor?.field.control}
+                    data-ppt-stroke-line-style-surface={strokeLineStyleDescriptor?.surface}
+                    value={strokeLineStyleDescriptor?.value ?? getPPTStrokeDash(selectedElement.stroke)}
                     onChange={(event) => {
                       if (isPPTStrokeDash(event.target.value)) {
                         onElementStrokeChange(
@@ -11470,8 +11514,8 @@ function Inspector({
                       }
                     }}
                   >
-                    {PPT_STROKE_DASH_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
+                    {(strokeLineStyleDescriptor?.field.options ?? PPT_STROKE_DASH_OPTIONS).map((option) => (
+                      <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
@@ -12571,6 +12615,21 @@ function getPPTElementStroke(element: PPTElement): PPTStroke | null {
   return null
 }
 
+function getPPTStrokeLineStyleDescriptor(
+  slideId: string,
+  element: PPTElement,
+): SlideEditObjectStrokeLineStyleDescriptor<string, string> {
+  const stroke = getPPTElementStroke(element)
+
+  return createSlideEditObjectStrokeLineStyleDescriptor({
+    isSupported: Boolean(stroke),
+    objectId: element.id,
+    slideId,
+    unsupportedReason: stroke ? undefined : 'no-stroke',
+    value: getPPTStrokeDash(stroke ?? undefined),
+  })
+}
+
 function normalizePPTStroke(stroke: Partial<PPTStroke>): PPTStroke {
   const dash = normalizePPTStrokeDash(stroke.dash)
   const normalized = {
@@ -12596,9 +12655,9 @@ function getPPTStrokeDash(stroke: PPTStroke | undefined): PPTStrokeDash {
 }
 
 function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
-  return typeof value === 'string' && isPPTStrokeDash(value)
-    ? value as PPTStrokeDash
-    : 'solid'
+  return normalizeSlideEditObjectStrokeLineStyle(
+    typeof value === 'string' ? value : null,
+  ) as PPTStrokeDash
 }
 
 function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
@@ -14598,7 +14657,7 @@ function isPPTLineRoute(value: string): value is PPTLineRoute {
 }
 
 function isPPTStrokeDash(value: string): value is PPTStrokeDash {
-  return PPT_STROKE_DASH_VALUES.has(value as PPTStrokeDash)
+  return isSlideEditObjectStrokeLineStyleValue(value)
 }
 
 function getPPTLayerSelection(

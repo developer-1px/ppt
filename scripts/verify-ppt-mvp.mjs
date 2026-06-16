@@ -5217,6 +5217,18 @@ async function runViewAndShapeScenario(page) {
   record(
     'updates and restores PPT shape outline dash style from inspector',
     afterShapeDash.inspectorDash === 'dash' &&
+      afterShapeDash.descriptorSurface === 'object-stroke-line-style' &&
+      afterShapeDash.descriptorCommand === 'update-object-stroke-line-style' &&
+      afterShapeDash.descriptorControl === 'stroke-line-style-segmented-control' &&
+      afterShapeDash.descriptorAttribute === 'data-slide-object-stroke-line-style' &&
+      afterShapeDash.descriptorAttributeValue === 'dash' &&
+      afterShapeDash.model === 'slide-edit-object-stroke-line-style' &&
+      afterShapeDash.command === 'update-object-stroke-line-style' &&
+      afterShapeDash.commandField === 'strokeLineStyle' &&
+      afterShapeDash.commandObject === afterShapeDash.selectedId &&
+      afterShapeDash.commandSlide === 'slide-1' &&
+      afterShapeDash.commandType === 'slide-command-effect' &&
+      afterShapeDash.commandValue === 'dash' &&
       afterShapeDash.selectedDash === 'dash' &&
       afterShapeDash.selectedBorderStyle === 'dashed' &&
       afterShapeDash.thumbDash === 'dash' &&
@@ -7396,7 +7408,7 @@ async function runLineAffordanceScenario(page) {
 
   const afterStyle = await getPPTLineState(page)
 
-  record('updates PPT line stroke, dash style, and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.inspectorDash === 'dot' && afterStyle.selectedDash === 'dot' && afterStyle.strokeDasharray !== '' && afterStyle.thumbDash === 'dot' && afterStyle.markerEnd.includes('url('), afterStyle)
+  record('updates PPT line stroke, dash style, and arrow marker from inspector', afterStyle.stroke === '#dc2626' && afterStyle.strokeWidth === '7' && afterStyle.inspectorDash === 'dot' && afterStyle.descriptorSurface === 'object-stroke-line-style' && afterStyle.descriptorCommand === 'update-object-stroke-line-style' && afterStyle.descriptorControl === 'stroke-line-style-segmented-control' && afterStyle.descriptorAttribute === 'data-slide-object-stroke-line-style' && afterStyle.descriptorAttributeValue === 'dot' && afterStyle.command === 'update-object-stroke-line-style' && afterStyle.commandField === 'strokeLineStyle' && afterStyle.commandObject === afterStyle.selectedId && afterStyle.commandSlide === 'slide-1' && afterStyle.commandType === 'slide-command-effect' && afterStyle.commandValue === 'dot' && afterStyle.selectedDash === 'dot' && afterStyle.strokeDasharray !== '' && afterStyle.thumbDash === 'dot' && afterStyle.markerEnd.includes('url('), afterStyle)
 
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
@@ -9184,11 +9196,23 @@ function getPPTLineState(page, elementId = null) {
     const y1 = Number(selected?.getAttribute('data-line-start-y') ?? selectedLine?.getAttribute('y1') ?? 0)
     const y2 = Number(selected?.getAttribute('data-line-end-y') ?? selectedLine?.getAttribute('y2') ?? 0)
     const stage = document.querySelector('.ppt-stage-shell')
+    const lineStrokeDashField = document.querySelector('[data-ppt-style-field="line-stroke-dash"]')
 
     return {
       arrowToolModel: stage?.getAttribute('data-ppt-arrow-tool-model') ?? '',
       arrowToolPressed: document.querySelector('[data-ppt-insert-line="arrow"]')?.getAttribute('aria-pressed') ?? '',
       arrowToolShortcut: stage?.getAttribute('data-ppt-arrow-tool-shortcut') ?? '',
+      command: stage?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-stroke-line-style-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-stroke-line-style-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-stroke-line-style-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-stroke-line-style-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-stroke-line-style-command-value') ?? '',
+      descriptorAttribute: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-attribute') ?? '',
+      descriptorAttributeValue: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-attribute-value') ?? '',
+      descriptorCommand: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
+      descriptorControl: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-control') ?? '',
+      descriptorSurface: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-surface') ?? '',
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
       lineTool: stage?.getAttribute('data-line-tool') ?? '',
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
@@ -9227,9 +9251,23 @@ function getPPTShapeStrokeDashState(page) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = selected?.getAttribute('data-ppt-element') ?? ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="stroke-dash"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
-      inspectorDash: document.querySelector('[data-ppt-style-field="stroke-dash"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-stroke-line-style-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-stroke-line-style-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-stroke-line-style-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-stroke-line-style-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-stroke-line-style-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-stroke-line-style-attribute') ?? '',
+      descriptorAttributeValue: field?.getAttribute('data-ppt-stroke-line-style-attribute-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-stroke-line-style-control') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-stroke-line-style-surface') ?? '',
+      inspectorDash: field?.value ?? '',
+      model: stage?.getAttribute('data-ppt-stroke-line-style-model') ?? '',
       selectedBorderStyle: selected?.style.borderStyle ?? '',
       selectedDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
       selectedId: targetId,
