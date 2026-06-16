@@ -332,6 +332,10 @@ import {
   type CanvasPointerClickMemory,
 } from 'canvas/app/pointer-click-memory'
 import {
+  screenPoint as getCanvasPointerScreenPoint,
+  screenToWorld as getCanvasPointerWorldPoint,
+} from 'canvas/app/pointer-geometry'
+import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
@@ -340,7 +344,6 @@ import {
   clamp,
   fitBoundsIntoViewport,
   getCanvasViewportScreenPoint,
-  getCanvasViewportWorldPoint,
   handlePoint,
   normalizeBounds,
   pointDistance,
@@ -5344,9 +5347,9 @@ function App() {
   }
 
   function screenToWorld(event: Pick<PointerEvent, 'clientX' | 'clientY'>) {
-    return getCanvasViewportWorldPoint(
+    return getCanvasPointerWorldPoint(
+      getCanvasPointerScreenPoint(canvasStageElement, event),
       viewport,
-      canvasStageElement.getScreenPoint(event),
     )
   }
 

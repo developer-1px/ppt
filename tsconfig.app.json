@@ -26,6 +26,7 @@
       "canvas/app/modal-focus-lifecycle": ["../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts"],
       "canvas/app/paste-position": ["../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts"],
       "canvas/app/pointer-click-memory": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts"],
+      "canvas/app/pointer-geometry": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
       "canvas/app/tabs-roving-focus": ["../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts"],
       "canvas/app/stage-element": ["../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts"],
