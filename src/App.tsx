@@ -335,6 +335,7 @@ import {
   screenPoint as getCanvasPointerScreenPoint,
   screenToWorld as getCanvasPointerWorldPoint,
 } from 'canvas/app/pointer-geometry'
+import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
   previewCanvasPointerLaserInteraction,
   startCanvasPointerLaserInteraction,
@@ -17175,13 +17176,14 @@ function normalizePPTFreeformWorldPoints(points: Point[]) {
 
 function appendPPTFreeformPoint(points: Point[], point: Point) {
   const next = clampPPTPointToSlide(point)
-  const last = points.at(-1)
+  const start = points[0] ?? next
 
-  if (last && pointDistance(last, next) < 2) {
-    return points
-  }
-
-  return [...points, next]
+  return getNextCanvasDrawingPoints({
+    currentWorld: next,
+    points,
+    shiftKey: false,
+    startWorld: start,
+  })
 }
 
 function getNextPPTEraserPoints(points: Point[], point: Point) {
