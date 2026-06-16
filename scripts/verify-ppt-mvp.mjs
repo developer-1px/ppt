@@ -7771,6 +7771,42 @@ async function runImageImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('image/svg+xml', '<svg width="120" height="80" viewBox="0 0 120 80" onload="alert(1)" xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><rect width="120" height="80" fill="#7c3aed"/></svg>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterSvgMimePaste = await getPPTImageImportState(page)
+
+  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportSvgFallback === 'canvas#255' && afterSvgMimePaste.imageImportFallbackIssue === 'canvas#255' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
+    afterPaste,
+    afterSvgMimePaste,
+  })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('text/html', '<section><svg viewBox="0 0 90 60" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="20" fill="#0ea5e9"/></svg></section>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterSvgHTMLPaste = await getPPTImageImportState(page)
+
+  record('pastes HTML inline SVG clipboard payload into PPT image element', afterSvgHTMLPaste.imageImportModel === 'canvas-image-import' && afterSvgHTMLPaste.imageImportFormat === 'svg-html-inline' && afterSvgHTMLPaste.imageImportFallbackIssue === 'canvas#255' && afterSvgHTMLPaste.imageImportNaturalWidth === 90 && afterSvgHTMLPaste.imageImportNaturalHeight === 60 && afterSvgHTMLPaste.imageCount === afterSvgMimePaste.imageCount + 1 && afterSvgHTMLPaste.selectedKind === 'image' && afterSvgHTMLPaste.selectedImageSrc.startsWith('data:image/svg+xml') && afterSvgHTMLPaste.selectedWidth === 90 && afterSvgHTMLPaste.selectedHeight === 60, {
+    afterSvgHTMLPaste,
+    afterSvgMimePaste,
+  })
+
+  await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
     const rect = stage.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
@@ -7787,9 +7823,9 @@ async function runImageImportScenario(page) {
 
   const afterDrop = await getPPTImageImportState(page)
 
-  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageCount === afterPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageImportFormat === 'file' && afterDrop.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
-    afterPaste,
+    afterSvgHTMLPaste,
   })
 
   await page.eval(`(() => {
@@ -11877,6 +11913,14 @@ function getPPTImageImportState(page) {
     const fitField = document.querySelector('[data-ppt-style-field="image-fit"]')
     const cropXField = document.querySelector('[data-ppt-style-field="image-crop-x"]')
     const cropYField = document.querySelector('[data-ppt-style-field="image-crop-y"]')
+    const selectedImageSrc = selectedImage?.getAttribute('src') ?? ''
+    const selectedImageDecoded = (() => {
+      try {
+        return decodeURIComponent(selectedImageSrc.split(',')[1] ?? '')
+      } catch {
+        return ''
+      }
+    })()
 
     return {
       imageCropCommand: stage?.getAttribute('data-ppt-image-crop-command') ?? '',
@@ -11888,7 +11932,14 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      imageImportFallbackIssue: stage?.getAttribute('data-ppt-image-import-fallback-issue') ?? '',
+      imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
+      imageImportMime: stage?.getAttribute('data-ppt-image-import-mime') ?? '',
       imageImportModel: stage?.getAttribute('data-ppt-image-import-model') ?? '',
+      imageImportName: stage?.getAttribute('data-ppt-image-import-name') ?? '',
+      imageImportNaturalHeight: Number(stage?.getAttribute('data-ppt-image-import-natural-height') ?? 0),
+      imageImportNaturalWidth: Number(stage?.getAttribute('data-ppt-image-import-natural-width') ?? 0),
+      imageImportSvgFallback: stage?.getAttribute('data-ppt-image-import-svg-fallback') ?? '',
       imageCropFitDescriptorAttribute: fitField?.getAttribute('data-ppt-image-crop-attribute') ?? '',
       imageCropFitDescriptorAttributeValue: fitField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
       imageCropFitDescriptorCommand: fitField?.getAttribute('data-ppt-image-crop-command') ?? '',
@@ -11929,9 +11980,10 @@ function getPPTImageImportState(page) {
       selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
       selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedImageDecoded,
       selectedImageFit: selectedImage?.style.objectFit ?? '',
       selectedImagePosition: selectedImage?.style.objectPosition ?? '',
-      selectedImageSrc: selectedImage?.getAttribute('src') ?? '',
+      selectedImageSrc,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedLeft: parseFloat(selected?.style.left ?? '0'),

@@ -446,7 +446,9 @@ import {
   createPPTImportedImageElement,
   getPPTImageFileFromDataTransfer,
   getPPTImageFileFromList,
+  getPPTSVGImageSourceFromDataTransfer,
   readPPTImageFileSource,
+  type PPTImageImportFormat,
   type PPTImageImportSource,
 } from './pptImageImport'
 import {
@@ -820,6 +822,15 @@ type PPTTableImportEffect = {
   model: 'canvas-table-import'
   name: string
   rowCount: number
+}
+type PPTImageImportEffect = {
+  fallbackIssue?: string
+  format: PPTImageImportFormat
+  mimeType: string
+  model: 'canvas-image-import'
+  name: string
+  naturalHeight?: number
+  naturalWidth?: number
 }
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
@@ -1844,6 +1855,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
+  const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
@@ -2621,6 +2633,14 @@ function App() {
         return
       }
 
+      const svgImageSource = getPPTSVGImageSourceFromDataTransfer(event.clipboardData)
+
+      if (svgImageSource) {
+        event.preventDefault()
+        insertPPTImageSource(svgImageSource)
+        return
+      }
+
       const tableSource = getPPTTableSourceFromDataTransfer(event.clipboardData)
 
       if (tableSource) {
@@ -3255,6 +3275,15 @@ function App() {
         source,
       })
 
+      setLastImageImportEffect({
+        fallbackIssue: source.format && source.format !== 'file' ? 'canvas#255' : undefined,
+        format: source.format ?? 'file',
+        mimeType: source.mimeType,
+        model: 'canvas-image-import',
+        name: element.name,
+        naturalHeight: source.naturalHeight,
+        naturalWidth: source.naturalWidth,
+      })
       setSelection([element.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -7570,7 +7599,14 @@ function App() {
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
+        data-ppt-image-import-fallback-issue={lastImageImportEffect?.fallbackIssue}
+        data-ppt-image-import-format={lastImageImportEffect?.format}
+        data-ppt-image-import-mime={lastImageImportEffect?.mimeType}
         data-ppt-image-import-model="canvas-image-import"
+        data-ppt-image-import-name={lastImageImportEffect?.name}
+        data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
+        data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
+        data-ppt-image-import-svg-fallback="canvas#255"
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
         data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
         data-ppt-image-replace-command-name={lastImageReplaceEffect?.payload.source.name}
