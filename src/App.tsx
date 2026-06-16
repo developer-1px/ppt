@@ -7213,6 +7213,7 @@ function App() {
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
+        data-ppt-image-import-model="canvas-image-import"
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
         data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
         data-ppt-image-replace-command-name={lastImageReplaceEffect?.payload.source.name}

@@ -7301,7 +7301,7 @@ async function runImageImportScenario(page) {
 
   const afterUpload = await getPPTImageImportState(page)
 
-  record('inserts PPT image from file picker affordance', afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
+  record('inserts PPT image from file picker affordance', afterUpload.imageImportModel === 'canvas-image-import' && afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
     afterUpload,
     before,
   })
@@ -7319,7 +7319,7 @@ async function runImageImportScenario(page) {
 
   const afterPaste = await getPPTImageImportState(page)
 
-  record('pastes image file into PPT slide from clipboard event', afterPaste.imageCount === afterUpload.imageCount + 1 && afterPaste.selectedKind === 'image' && afterPaste.selectedName === 'paste.svg', {
+  record('pastes image file into PPT slide from clipboard event', afterPaste.imageImportModel === 'canvas-image-import' && afterPaste.imageCount === afterUpload.imageCount + 1 && afterPaste.selectedKind === 'image' && afterPaste.selectedName === 'paste.svg', {
     afterPaste,
     afterUpload,
   })
@@ -7341,7 +7341,7 @@ async function runImageImportScenario(page) {
 
   const afterDrop = await getPPTImageImportState(page)
 
-  record('drops image file onto PPT stage at pointer position', afterDrop.imageCount === afterPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageCount === afterPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
     afterPaste,
   })
@@ -11161,6 +11161,7 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      imageImportModel: stage?.getAttribute('data-ppt-image-import-model') ?? '',
       imageCropFitDescriptorAttribute: fitField?.getAttribute('data-ppt-image-crop-attribute') ?? '',
       imageCropFitDescriptorAttributeValue: fitField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
       imageCropFitDescriptorCommand: fitField?.getAttribute('data-ppt-image-crop-command') ?? '',
