@@ -158,6 +158,7 @@ import {
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
+  getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTransitionUpdateCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectAnimationDelayMs,
@@ -186,6 +187,7 @@ import {
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
+  SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
@@ -1557,15 +1559,6 @@ const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: '"Courier New", monospace', label: 'Courier New', value: 'Courier New' },
 ] as const)
 const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
-const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
-  { css: 'flex-start', label: 'Top', value: 'top' },
-  { css: 'center', label: 'Middle', value: 'middle' },
-  { css: 'flex-end', label: 'Bottom', value: 'bottom' },
-] as const satisfies readonly {
-  css: string
-  label: string
-  value: PPTTextVerticalAlign
-}[])
 const PPT_TEXT_INSET_MIN = 0
 const PPT_TEXT_INSET_MAX = 120
 const PPT_TEXT_INSET_STEP = 2
@@ -13856,8 +13849,8 @@ function Inspector({
                         event.target.value,
                       )}
                   >
-                    {PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
+                    {SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
@@ -15703,10 +15696,9 @@ function normalizePPTTextVerticalAlign(
 }
 
 function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
-  const normalized = normalizePPTTextVerticalAlign(verticalAlign)
-
-  return PPT_TEXT_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === normalized)?.css ??
-    PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
+  return getSlideEditTextVerticalAlignmentFlexAlignItems(
+    normalizePPTTextVerticalAlign(verticalAlign),
+  )
 }
 
 function getPPTTextFrameInsetDescriptor(
