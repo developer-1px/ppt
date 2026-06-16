@@ -2,10 +2,12 @@ import { clamp } from 'canvas/core'
 import {
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
+  getCanvasTableColumnCount,
   getCanvasTableComponentSize,
   getCanvasTableSourceFromDataTransfer,
   getCanvasTableSourceFromHTML as getCanvasTableSourceFromHTMLValue,
   getCanvasTableSourceFromText,
+  normalizeCanvasTableRows,
   readCanvasTableFileSource,
   type CanvasTableImportFormat,
   type CanvasTableImportSource,
@@ -139,26 +141,16 @@ export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
 }
 
 export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
-  const cleaned = rows
-    .map((row) => row
-      .map((cell) => normalizePPTTableCell(cell))
-      .slice(0, PPT_TABLE_MAX_COLUMNS))
-    .filter((row) => row.some((cell) => cell.length > 0))
-    .slice(0, PPT_TABLE_MAX_ROWS)
-  const columnCount = getPPTTableColumnCount(cleaned)
-
-  if (cleaned.length === 0 || columnCount === 0) {
-    return PPT_DEFAULT_TABLE_ROWS
-  }
-
-  return cleaned.map((row) => [
-    ...row,
-    ...Array.from({ length: columnCount - row.length }, () => ''),
-  ])
+  return normalizeCanvasTableRows(rows, {
+    fallbackRows: PPT_DEFAULT_TABLE_ROWS,
+    maxCellLength: PPT_TABLE_MAX_CELL_LENGTH,
+    maxColumns: PPT_TABLE_MAX_COLUMNS,
+    maxRows: PPT_TABLE_MAX_ROWS,
+  })
 }
 
 export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
-  return Math.max(0, ...rows.map((row) => row.length))
+  return getCanvasTableColumnCount(rows)
 }
 
 function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
@@ -168,10 +160,6 @@ function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
   const columnCount = getPPTTableColumnCount(nonEmptyRows)
 
   return nonEmptyRows.length >= 2 && columnCount >= 2
-}
-
-function normalizePPTTableCell(value: string) {
-  return value.trim().slice(0, PPT_TABLE_MAX_CELL_LENGTH)
 }
 
 function createPPTTableImportSource(
