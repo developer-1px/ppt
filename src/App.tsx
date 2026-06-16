@@ -8090,7 +8090,7 @@ function PPTMinimap({
       data-ppt-minimap
       data-ppt-minimap-item-count={itemRects.length}
       data-ppt-minimap-model="canvas-minimap-read-model"
-      data-ppt-minimap-scale={getPPTMinimapScale(readModel.worldBounds, readModel.displayBounds)}
+      data-ppt-minimap-scale={readModel.scale}
       data-ppt-minimap-viewport-h={readModel.viewportWorldBounds.h}
       data-ppt-minimap-viewport-w={readModel.viewportWorldBounds.w}
       data-ppt-minimap-viewport-x={readModel.viewportWorldBounds.x}
@@ -10179,13 +10179,6 @@ function getPPTLayerPaneSelection({
     targetObjectId,
     mode === 'additive',
     slide,
-  )
-}
-
-function getPPTMinimapScale(worldBounds: Bounds, displayBounds: Bounds) {
-  return Math.min(
-    displayBounds.w / Math.max(1, worldBounds.w),
-    displayBounds.h / Math.max(1, worldBounds.h),
   )
 }
 
