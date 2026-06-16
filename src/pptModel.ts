@@ -1,3 +1,4 @@
+import { createCanvasSequentialIdFactory } from 'canvas/core'
 import { z } from 'zod'
 
 export const PPT_SLIDE_WIDTH = 1280
@@ -408,14 +409,9 @@ export function findPPTElement(slide: PPTSlide, elementId: string | null) {
 }
 
 export function createPPTElementId(slide: PPTSlide, prefix: string) {
-  const ids = new Set(slide.elements.map((element) => element.id))
-  let next = slide.elements.length + 1
-  let id = `${slide.id}-${prefix}-${next}`
-
-  while (ids.has(id)) {
-    next += 1
-    id = `${slide.id}-${prefix}-${next}`
-  }
-
-  return id
+  return createCanvasSequentialIdFactory({
+    existingIds: slide.elements.map((element) => element.id),
+    formatId: ({ index, prefix }) => `${slide.id}-${prefix}-${index}`,
+    startIndex: slide.elements.length + 1,
+  })(prefix)
 }

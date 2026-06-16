@@ -1,5 +1,6 @@
 import {
   clamp,
+  createCanvasSequentialIdFactory,
   type Bounds,
 } from 'canvas/core'
 import {
@@ -194,22 +195,11 @@ export function getPPTCanvasCommandAvailability({
 }
 
 export function createPPTElementIdFactory(slide: PPTSlide) {
-  const ids = new Set(slide.elements.map((element) => element.id))
-  let next = slide.elements.length + 1
-
-  return (prefix: string) => {
-    let id = `${slide.id}-${prefix}-${next}`
-
-    while (ids.has(id)) {
-      next += 1
-      id = `${slide.id}-${prefix}-${next}`
-    }
-
-    ids.add(id)
-    next += 1
-
-    return id
-  }
+  return createCanvasSequentialIdFactory({
+    existingIds: slide.elements.map((element) => element.id),
+    formatId: ({ index, prefix }) => `${slide.id}-${prefix}-${index}`,
+    startIndex: slide.elements.length + 1,
+  })
 }
 
 export function getPPTSlideBounds(): Bounds {
