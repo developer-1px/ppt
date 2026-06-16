@@ -7322,6 +7322,8 @@ function App() {
         data-ppt-text-autofit-size-modes={SLIDE_EDIT_TEXT_BOX_SIZE_MODES
           .map((mode) => mode.id)
           .join(' ')}
+        data-ppt-table-import-model="canvas-table-import"
+        data-ppt-table-import-tsv-fallback="canvas#253"
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
         data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}
         data-ppt-text-overflow-indicator-height={selectedTextAutoFitIndicator?.bounds.h}

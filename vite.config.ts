@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/image/CanvasImageImport.ts', import.meta.url))
+const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/table/CanvasTableImport.ts', import.meta.url))
 const canvasKeyboardCommandDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts', import.meta.url))
 const canvasKeyboardCommandShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts', import.meta.url))
 const canvasKeyboardNudgeShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts', import.meta.url))
@@ -28,6 +29,7 @@ export default defineConfig({
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
+      { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/keyboard-command-dispatch', replacement: canvasKeyboardCommandDispatchEntry },
       { find: 'canvas/app/keyboard-command-shortcuts', replacement: canvasKeyboardCommandShortcutsEntry },
       { find: 'canvas/app/keyboard-nudge-shortcuts', replacement: canvasKeyboardNudgeShortcutsEntry },

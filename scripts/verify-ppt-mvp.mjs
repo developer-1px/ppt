@@ -7806,7 +7806,7 @@ async function runTableImportScenario(page) {
 
   const afterPaste = await getPPTTableState(page)
 
-  record('pastes TSV clipboard data into PPT table element', afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
+  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportTsvFallback === 'canvas#253' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
     afterPaletteInsert,
     afterPaste,
   })
@@ -7830,7 +7830,7 @@ async function runTableImportScenario(page) {
 
   const afterDrop = await getPPTTableState(page)
 
-  record('drops CSV file onto PPT stage as table element', afterDrop.tableCount === afterPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops CSV file onto PPT stage as table element', afterDrop.tableImportModel === 'canvas-table-import' && afterDrop.tableCount === afterPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
     afterPaste,
   })
@@ -11225,6 +11225,7 @@ function getPPTImageImportState(page) {
 function getPPTTableState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const tableCells = [...selected?.querySelectorAll('[data-ppt-table-cell]') ?? []]
 
     return {
@@ -11238,6 +11239,8 @@ function getPPTTableState(page) {
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedRows: Number(selected?.getAttribute('data-ppt-table-rows') ?? 0),
+      tableImportModel: stage?.getAttribute('data-ppt-table-import-model') ?? '',
+      tableImportTsvFallback: stage?.getAttribute('data-ppt-table-import-tsv-fallback') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,
