@@ -102,6 +102,7 @@ import {
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
   createSlideEditTextFrameInsetDescriptor,
+  createSlideEditTextVerticalAlignmentDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditObjectAccessibilityCommandEffect,
@@ -116,12 +117,14 @@ import {
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditTextFrameInsetCommandEffect,
+  getSlideEditTextVerticalAlignmentCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
   normalizeSlideEditTextFrameInsetValue,
+  normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
@@ -148,6 +151,8 @@ import {
   type SlideEditThemeColorToken,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
+  type SlideEditTextVerticalAlignmentDescriptor,
+  type SlideEditTextVerticalAlignmentHostCommandEffect,
 } from '@interactive-os/slide-edit-affordance'
 import {
   INITIAL_VIEWPORT,
@@ -1218,9 +1223,6 @@ const PPT_TEXT_VERTICAL_ALIGN_OPTIONS = Object.freeze([
   label: string
   value: PPTTextVerticalAlign
 }[])
-const PPT_TEXT_VERTICAL_ALIGN_VALUES = new Set<string>(
-  PPT_TEXT_VERTICAL_ALIGN_OPTIONS.map((option) => option.value),
-)
 const PPT_TEXT_INSET_MIN = 0
 const PPT_TEXT_INSET_MAX = 120
 const PPT_TEXT_INSET_STEP = 2
@@ -1557,6 +1559,7 @@ function App() {
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
@@ -3703,6 +3706,20 @@ function App() {
       rememberRecentColor(value)
     }
 
+    const textVerticalAlignmentEffect = field === 'verticalAlign'
+      ? getSlideEditTextVerticalAlignmentCommandEffect({
+        fieldId: 'verticalAlignment',
+        id: 'update-text-vertical-alignment',
+        objectId: elementId,
+        slideId: activeSlide.id,
+        value: normalizeSlideEditTextVerticalAlignment(String(value)),
+      })
+      : null
+
+    if (textVerticalAlignmentEffect) {
+      setLastTextVerticalAlignmentEffect(textVerticalAlignmentEffect)
+    }
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (!isPPTTextElement(element)) {
@@ -3719,8 +3736,8 @@ function App() {
         const nextValue =
           field === 'fontFamily'
             ? normalizePPTTextFontFamily(String(value))
-            : field === 'verticalAlign'
-              ? normalizePPTTextVerticalAlign(String(value))
+            : textVerticalAlignmentEffect
+              ? textVerticalAlignmentEffect.payload.value
               : value
 
         return {
@@ -6676,6 +6693,13 @@ function App() {
         data-ppt-text-inset-command-type={lastTextFrameInsetEffect?.type}
         data-ppt-text-inset-command-value={lastTextFrameInsetEffect?.payload.value}
         data-ppt-text-inset-model="slide-edit-text-frame-inset"
+        data-ppt-text-vertical-align-command={lastTextVerticalAlignmentEffect?.payload.id}
+        data-ppt-text-vertical-align-command-field={lastTextVerticalAlignmentEffect?.payload.fieldId}
+        data-ppt-text-vertical-align-command-object={lastTextVerticalAlignmentEffect?.payload.objectId}
+        data-ppt-text-vertical-align-command-slide={lastTextVerticalAlignmentEffect?.payload.slideId}
+        data-ppt-text-vertical-align-command-type={lastTextVerticalAlignmentEffect?.type}
+        data-ppt-text-vertical-align-command-value={lastTextVerticalAlignmentEffect?.payload.value}
+        data-ppt-text-vertical-align-model="slide-edit-text-vertical-alignment"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
         data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
@@ -10508,6 +10532,9 @@ function Inspector({
   const textFrameInsetDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextFrameInsetDescriptor(slide.id, selectedElement)
     : null
+  const textVerticalAlignmentDescriptor = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextVerticalAlignmentDescriptor(slide.id, selectedElement)
+    : null
   const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
   const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
@@ -11360,7 +11387,15 @@ function Inspector({
                   <span>Vertical</span>
                   <select
                     data-ppt-style-field="vertical-align"
-                    value={getPPTTextElementVerticalAlign(selectedElement)}
+                    data-ppt-text-vertical-align-attribute={textVerticalAlignmentDescriptor?.metadata.attribute}
+                    data-ppt-text-vertical-align-attribute-value={textVerticalAlignmentDescriptor?.metadata.value}
+                    data-ppt-text-vertical-align-command={textVerticalAlignmentDescriptor?.field.commandId}
+                    data-ppt-text-vertical-align-control={textVerticalAlignmentDescriptor?.field.control}
+                    data-ppt-text-vertical-align-default-value={textVerticalAlignmentDescriptor?.metadata.defaultValue}
+                    data-ppt-text-vertical-align-options={textVerticalAlignmentDescriptor?.field.options
+                      .map((option) => option.id).join(' ')}
+                    data-ppt-text-vertical-align-surface={textVerticalAlignmentDescriptor?.surface}
+                    value={textVerticalAlignmentDescriptor?.value ?? getPPTTextElementVerticalAlign(selectedElement)}
                     onChange={(event) =>
                       onElementTextStyleChange(
                         selectedElement.id,
@@ -12703,13 +12738,25 @@ function getPPTTextElementVerticalAlign(element: PPTElement) {
   )
 }
 
+function getPPTTextVerticalAlignmentDescriptor(
+  slideId: string,
+  element: PPTTextElement,
+): SlideEditTextVerticalAlignmentDescriptor<string, string> {
+  return createSlideEditTextVerticalAlignmentDescriptor({
+    objectId: element.id,
+    slideId,
+    value: getPPTTextElementVerticalAlign(element),
+  })
+}
+
 function normalizePPTTextVerticalAlign(
   verticalAlign: string | undefined,
   fallback: PPTTextVerticalAlign = PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
 ) {
-  return PPT_TEXT_VERTICAL_ALIGN_VALUES.has(verticalAlign ?? '')
-    ? verticalAlign as PPTTextVerticalAlign
-    : fallback
+  const normalizedFallback = normalizeSlideEditTextVerticalAlignment(fallback)
+  const normalizedValue = normalizeSlideEditTextVerticalAlignment(verticalAlign)
+
+  return verticalAlign === undefined ? normalizedFallback : normalizedValue
 }
 
 function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {

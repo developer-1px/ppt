@@ -4531,6 +4531,14 @@ async function runTextVerticalAlignScenario(page) {
   record(
     'renders PPT text vertical alignment control in text inspector',
     initial.selectedId === 's1-title' &&
+      initial.descriptorAttribute === 'data-slide-text-vertical-align' &&
+      initial.descriptorAttributeValue === 'top' &&
+      initial.descriptorCommand === 'update-text-vertical-alignment' &&
+      initial.descriptorControl === 'vertical-alignment-segmented-control' &&
+      initial.descriptorDefaultValue === 'top' &&
+      initial.descriptorOptions === 'top middle bottom' &&
+      initial.descriptorSurface === 'text-vertical-alignment' &&
+      initial.model === 'slide-edit-text-vertical-alignment' &&
       initial.verticalAlign === 'top' &&
       initial.selectedVerticalAlign === 'top' &&
       initial.thumbVerticalAlign === 'top',
@@ -4551,7 +4559,14 @@ async function runTextVerticalAlignScenario(page) {
 
   record(
     'updates PPT text vertical alignment metadata from inspector',
-    afterMiddle.verticalAlign === 'middle' &&
+    afterMiddle.command === 'update-text-vertical-alignment' &&
+      afterMiddle.commandField === 'verticalAlignment' &&
+      afterMiddle.commandObject === 's1-title' &&
+      afterMiddle.commandSlide === 'slide-1' &&
+      afterMiddle.commandType === 'slide-command-effect' &&
+      afterMiddle.commandValue === 'middle' &&
+      afterMiddle.descriptorAttributeValue === 'middle' &&
+      afterMiddle.verticalAlign === 'middle' &&
       afterMiddle.selectedVerticalAlign === 'middle' &&
       afterMiddle.selectedStyleAlignItems === 'center' &&
       afterMiddle.thumbVerticalAlign === 'middle' &&
@@ -10020,15 +10035,31 @@ function getPPTTextFontFamilyState(page) {
 function getPPTTextVerticalAlignState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const field = document.querySelector('[data-ppt-style-field="vertical-align"]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
 
     return {
+      command: stage?.getAttribute('data-ppt-text-vertical-align-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-text-vertical-align-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-text-vertical-align-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-text-vertical-align-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-text-vertical-align-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-text-vertical-align-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-text-vertical-align-attribute') ?? '',
+      descriptorAttributeValue: field?.getAttribute('data-ppt-text-vertical-align-attribute-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-text-vertical-align-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-text-vertical-align-control') ?? '',
+      descriptorDefaultValue: field?.getAttribute('data-ppt-text-vertical-align-default-value') ?? '',
+      descriptorOptions: field?.getAttribute('data-ppt-text-vertical-align-options') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-text-vertical-align-surface') ?? '',
+      model: stage?.getAttribute('data-ppt-text-vertical-align-model') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedStyleAlignItems: selected?.style.alignItems ?? '',
       selectedVerticalAlign: selected?.getAttribute('data-ppt-vertical-align') ?? '',
       thumbStyleAlignItems: thumb?.style.alignItems ?? '',
       thumbVerticalAlign: thumb?.getAttribute('data-ppt-thumb-vertical-align') ?? '',
-      verticalAlign: document.querySelector('[data-ppt-style-field="vertical-align"]')?.value ?? '',
+      verticalAlign: field?.value ?? '',
     }
   })()`)
 }
