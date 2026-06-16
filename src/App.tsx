@@ -336,6 +336,11 @@ import {
   screenToWorld as getCanvasPointerWorldPoint,
 } from 'canvas/app/pointer-geometry'
 import {
+  previewCanvasPointerPanInteraction,
+  startCanvasPointerPanInteraction,
+  type CanvasPointerPanInteraction,
+} from 'canvas/app/pointer-pan-interaction'
+import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
@@ -1820,9 +1825,7 @@ type Interaction =
     }
   | {
       kind: 'pan'
-      startPoint: Point
-      startViewport: Viewport
-    }
+    } & CanvasPointerPanInteraction
   | {
       currentPoint: Point
       kind: 'laser'
@@ -5469,12 +5472,14 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
-    setContextMenu(null)
-    setInteraction({
-      kind: 'pan',
-      startPoint: getPointerClientPoint(event.nativeEvent),
-      startViewport: viewport,
+    const result = startCanvasPointerPanInteraction({
+      input: event.nativeEvent,
+      startScreen: getPointerClientPoint(event.nativeEvent),
+      viewport,
     })
+
+    setContextMenu(null)
+    setInteraction(result.interaction)
 
     return true
   }
@@ -6058,13 +6063,15 @@ function App() {
     }
 
     if (interaction.kind === 'pan') {
-      const point = getPointerClientPoint(event.nativeEvent)
-
-      setViewport({
-        ...interaction.startViewport,
-        x: interaction.startViewport.x + point.x - interaction.startPoint.x,
-        y: interaction.startViewport.y + point.y - interaction.startPoint.y,
+      const preview = previewCanvasPointerPanInteraction({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        currentScreen: getPointerClientPoint(event.nativeEvent),
+        interaction,
       })
+
+      if (preview.kind === 'preview') {
+        setViewport(preview.viewport)
+      }
       return
     }
 

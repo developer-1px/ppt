@@ -19,6 +19,7 @@ const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canv
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
 const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts', import.meta.url))
+const canvasPointerPanInteractionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasTabsRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts', import.meta.url))
 const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts', import.meta.url))
@@ -53,6 +54,7 @@ export default defineConfig({
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
       { find: 'canvas/app/pointer-geometry', replacement: canvasPointerGeometryEntry },
+      { find: 'canvas/app/pointer-pan-interaction', replacement: canvasPointerPanInteractionEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/tabs-roving-focus', replacement: canvasTabsRovingFocusEntry },
       { find: 'canvas/app/stage-element', replacement: canvasStageElementEntry },
