@@ -293,6 +293,7 @@ import {
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
 import {
+  getCanvasMinimapPointFromViewportOffset,
   getCanvasMinimapReadModel,
   getCanvasMinimapViewportForWorldCenter,
   getCanvasMinimapWorldPoint,
@@ -8023,7 +8024,23 @@ function PPTMinimap({
   )
 
   function navigate(event: ReactPointerEvent<SVGSVGElement>) {
-    const point = getPPTMinimapSvgPoint(event, svgRef.current, readModel)
+    const rect = svgRef.current?.getBoundingClientRect()
+
+    if (!rect) {
+      return
+    }
+
+    const point = getCanvasMinimapPointFromViewportOffset({
+      model: readModel,
+      offset: {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      },
+      viewportSize: {
+        h: rect.height,
+        w: rect.width,
+      },
+    })
 
     if (!point) {
       return
@@ -10152,23 +10169,6 @@ function getPPTLayerPaneSelection({
     mode === 'additive',
     slide,
   )
-}
-
-function getPPTMinimapSvgPoint(
-  event: ReactPointerEvent<SVGSVGElement>,
-  svg: SVGSVGElement | null,
-  model: PPTMinimapReadModel,
-): Point | null {
-  const rect = svg?.getBoundingClientRect()
-
-  if (!rect || rect.width <= 0 || rect.height <= 0) {
-    return null
-  }
-
-  return {
-    x: (event.clientX - rect.left) * model.size.w / rect.width,
-    y: (event.clientY - rect.top) * model.size.h / rect.height,
-  }
 }
 
 function getPPTMinimapScale(worldBounds: Bounds, displayBounds: Bounds) {
