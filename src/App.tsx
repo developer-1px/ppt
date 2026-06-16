@@ -2389,11 +2389,32 @@ function App() {
         return
       }
 
+      const mod = event.metaKey || event.ctrlKey
+      const beforeTypingSystemShortcutIntent = getCanvasKeyboardSystemShortcutIntent({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+        key: event.key,
+        mod,
+        phase: 'before-typing-target',
+      })
+
+      if (beforeTypingSystemShortcutIntent?.kind === 'open-command-palette') {
+        event.preventDefault()
+        openCommandPalette()
+        return
+      }
+
+      if (beforeTypingSystemShortcutIntent?.kind === 'open-find-replace') {
+        event.preventDefault()
+        openFindStrip()
+        return
+      }
+
       const systemShortcutIntent = getCanvasKeyboardSystemShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
-        mod: event.metaKey || event.ctrlKey,
+        mod,
         phase: 'after-typing-target',
       })
 
@@ -2410,15 +2431,9 @@ function App() {
         return
       }
 
-      if (isPPTShortcutHelpShortcut(event)) {
+      if (systemShortcutIntent?.kind === 'open-shortcut-help') {
         event.preventDefault()
         openShortcutHelp()
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        openCommandPalette()
         return
       }
 
@@ -2435,17 +2450,11 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
-        event.preventDefault()
-        openFindStrip()
-        return
-      }
-
       const viewportIntent = getCanvasKeyboardViewportShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
-        mod: event.metaKey || event.ctrlKey,
+        mod,
         selection,
       })
 
@@ -2493,7 +2502,7 @@ function App() {
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
-        mod: event.metaKey || event.ctrlKey,
+        mod,
         selection,
       })
 
@@ -2580,7 +2589,7 @@ function App() {
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
-        mod: event.metaKey || event.ctrlKey,
+        mod,
         selection,
       })
 
@@ -14830,14 +14839,6 @@ function isPPTWheelViewportPassthroughTarget(target: EventTarget | null) {
       '[role="option"]',
       '[role="tab"]',
     ].join(',')))
-}
-
-function isPPTShortcutHelpShortcut(event: KeyboardEvent) {
-  return event.shiftKey &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    (event.key === '?' || event.key === '/' || event.code === 'Slash')
 }
 
 function getPPTInspectorPanelAttributes(
