@@ -7659,7 +7659,6 @@ function App() {
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
-        data-ppt-image-import-fallback-issue={lastImageImportEffect?.fallbackIssue}
         data-ppt-image-import-format={lastImageImportEffect?.format}
         data-ppt-image-import-mime={lastImageImportEffect?.mimeType}
         data-ppt-image-import-model="canvas-image-import"
@@ -7781,7 +7780,6 @@ function App() {
         data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
-        data-ppt-table-import-fallback-issue={lastTableImportEffect?.fallbackIssue}
         data-ppt-table-import-format={lastTableImportEffect?.format}
         data-ppt-table-import-model="canvas-table-import"
         data-ppt-table-import-name={lastTableImportEffect?.name}

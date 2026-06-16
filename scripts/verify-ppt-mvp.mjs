@@ -7783,7 +7783,7 @@ async function runImageImportScenario(page) {
 
   const afterSvgMimePaste = await getPPTImageImportState(page)
 
-  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportFallbackIssue === '' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
+  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
     afterPaste,
     afterSvgMimePaste,
   })
@@ -7801,7 +7801,7 @@ async function runImageImportScenario(page) {
 
   const afterSvgHTMLPaste = await getPPTImageImportState(page)
 
-  record('pastes HTML inline SVG clipboard payload into PPT image element', afterSvgHTMLPaste.imageImportModel === 'canvas-image-import' && afterSvgHTMLPaste.imageImportFormat === 'svg-html-inline' && afterSvgHTMLPaste.imageImportFallbackIssue === '' && afterSvgHTMLPaste.imageImportNaturalWidth === 90 && afterSvgHTMLPaste.imageImportNaturalHeight === 60 && afterSvgHTMLPaste.imageCount === afterSvgMimePaste.imageCount + 1 && afterSvgHTMLPaste.selectedKind === 'image' && afterSvgHTMLPaste.selectedImageSrc.startsWith('data:image/svg+xml') && afterSvgHTMLPaste.selectedWidth === 90 && afterSvgHTMLPaste.selectedHeight === 60, {
+  record('pastes HTML inline SVG clipboard payload into PPT image element', afterSvgHTMLPaste.imageImportModel === 'canvas-image-import' && afterSvgHTMLPaste.imageImportFormat === 'svg-html-inline' && afterSvgHTMLPaste.imageImportNaturalWidth === 90 && afterSvgHTMLPaste.imageImportNaturalHeight === 60 && afterSvgHTMLPaste.imageCount === afterSvgMimePaste.imageCount + 1 && afterSvgHTMLPaste.selectedKind === 'image' && afterSvgHTMLPaste.selectedImageSrc.startsWith('data:image/svg+xml') && afterSvgHTMLPaste.selectedWidth === 90 && afterSvgHTMLPaste.selectedHeight === 60, {
     afterSvgHTMLPaste,
     afterSvgMimePaste,
   })
@@ -7828,7 +7828,7 @@ async function runImageImportScenario(page) {
 
   const afterDataImagePaste = await getPPTImageImportState(page)
 
-  record('pastes HTML data image clipboard payload into PPT image element', afterDataImagePaste.imageImportModel === 'canvas-image-import' && afterDataImagePaste.imageImportFormat === 'data-url-html-img' && afterDataImagePaste.imageImportFallbackIssue === '' && afterDataImagePaste.imageImportMime === 'image/png' && afterDataImagePaste.imageImportNaturalWidth === 96 && afterDataImagePaste.imageImportNaturalHeight === 48 && afterDataImagePaste.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDataImagePaste.selectedKind === 'image' && afterDataImagePaste.selectedName === 'Copied Chart.png' && afterDataImagePaste.selectedImageSrc.startsWith('data:image/png') && afterDataImagePaste.selectedWidth === 96 && afterDataImagePaste.selectedHeight === 48, {
+  record('pastes HTML data image clipboard payload into PPT image element', afterDataImagePaste.imageImportModel === 'canvas-image-import' && afterDataImagePaste.imageImportFormat === 'data-url-html-img' && afterDataImagePaste.imageImportMime === 'image/png' && afterDataImagePaste.imageImportNaturalWidth === 96 && afterDataImagePaste.imageImportNaturalHeight === 48 && afterDataImagePaste.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDataImagePaste.selectedKind === 'image' && afterDataImagePaste.selectedName === 'Copied Chart.png' && afterDataImagePaste.selectedImageSrc.startsWith('data:image/png') && afterDataImagePaste.selectedWidth === 96 && afterDataImagePaste.selectedHeight === 48, {
     afterDataImagePaste,
     afterSvgHTMLPaste,
   })
@@ -8315,7 +8315,7 @@ async function runTableImportScenario(page) {
 
   const afterPaste = await getPPTTableState(page)
 
-  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportFormat === 'text-tsv' && afterPaste.tableImportFallbackIssue === '' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
+  record('pastes TSV clipboard data into PPT table element', afterPaste.tableImportModel === 'canvas-table-import' && afterPaste.tableImportFormat === 'text-tsv' && afterPaste.tableCount === afterPaletteInsert.tableCount + 1 && afterPaste.selectedKind === 'table' && afterPaste.selectedRows === 3 && afterPaste.selectedCols === 2 && afterPaste.cellTexts.includes('Users') && afterPaste.cellTexts.includes('$1M'), {
     afterPaletteInsert,
     afterPaste,
   })
@@ -8334,7 +8334,7 @@ async function runTableImportScenario(page) {
 
   const afterHtmlPaste = await getPPTTableState(page)
 
-  record('pastes HTML table clipboard data into PPT table element', afterHtmlPaste.tableImportModel === 'canvas-table-import' && afterHtmlPaste.tableImportFormat === 'text-html' && afterHtmlPaste.tableImportFallbackIssue === '' && afterHtmlPaste.tableCount === afterPaste.tableCount + 1 && afterHtmlPaste.selectedKind === 'table' && afterHtmlPaste.selectedRows === 3 && afterHtmlPaste.selectedCols === 3 && afterHtmlPaste.tableImportRows === 3 && afterHtmlPaste.tableImportCols === 3 && afterHtmlPaste.cellTexts.includes('Retouch') && afterHtmlPaste.cellTexts.includes('Human'), {
+  record('pastes HTML table clipboard data into PPT table element', afterHtmlPaste.tableImportModel === 'canvas-table-import' && afterHtmlPaste.tableImportFormat === 'text-html' && afterHtmlPaste.tableCount === afterPaste.tableCount + 1 && afterHtmlPaste.selectedKind === 'table' && afterHtmlPaste.selectedRows === 3 && afterHtmlPaste.selectedCols === 3 && afterHtmlPaste.tableImportRows === 3 && afterHtmlPaste.tableImportCols === 3 && afterHtmlPaste.cellTexts.includes('Retouch') && afterHtmlPaste.cellTexts.includes('Human'), {
     afterHtmlPaste,
     afterPaste,
   })
@@ -12017,15 +12017,12 @@ function getPPTImageImportState(page) {
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
       importExtension: stage?.getAttribute('data-ppt-import-extension') ?? '',
       importExtensionInstallUnit: stage?.getAttribute('data-ppt-import-extension-install-unit') ?? '',
-      imageImportDataUrlFallback: stage?.getAttribute('data-ppt-image-import-data-url-fallback') ?? '',
-      imageImportFallbackIssue: stage?.getAttribute('data-ppt-image-import-fallback-issue') ?? '',
       imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
       imageImportMime: stage?.getAttribute('data-ppt-image-import-mime') ?? '',
       imageImportModel: stage?.getAttribute('data-ppt-image-import-model') ?? '',
       imageImportName: stage?.getAttribute('data-ppt-image-import-name') ?? '',
       imageImportNaturalHeight: Number(stage?.getAttribute('data-ppt-image-import-natural-height') ?? 0),
       imageImportNaturalWidth: Number(stage?.getAttribute('data-ppt-image-import-natural-width') ?? 0),
-      imageImportSvgFallback: stage?.getAttribute('data-ppt-image-import-svg-fallback') ?? '',
       imageCropFitDescriptorAttribute: fitField?.getAttribute('data-ppt-image-crop-attribute') ?? '',
       imageCropFitDescriptorAttributeValue: fitField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
       imageCropFitDescriptorCommand: fitField?.getAttribute('data-ppt-image-crop-command') ?? '',
@@ -12105,13 +12102,10 @@ function getPPTTableState(page) {
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedRows: Number(selected?.getAttribute('data-ppt-table-rows') ?? 0),
       tableImportCols: Number(stage?.getAttribute('data-ppt-table-import-cols') ?? 0),
-      tableImportFallbackIssue: stage?.getAttribute('data-ppt-table-import-fallback-issue') ?? '',
       tableImportFormat: stage?.getAttribute('data-ppt-table-import-format') ?? '',
-      tableImportHtmlFallback: stage?.getAttribute('data-ppt-table-import-html-fallback') ?? '',
       tableImportModel: stage?.getAttribute('data-ppt-table-import-model') ?? '',
       tableImportName: stage?.getAttribute('data-ppt-table-import-name') ?? '',
       tableImportRows: Number(stage?.getAttribute('data-ppt-table-import-rows') ?? 0),
-      tableImportTsvFallback: stage?.getAttribute('data-ppt-table-import-tsv-fallback') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,

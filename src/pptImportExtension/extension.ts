@@ -26,8 +26,6 @@ import type {
   PPTTable,
 } from '../pptModel'
 
-export const PPT_IMPORT_CANVAS_FALLBACK_ISSUES = {} as const
-
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
   clipboardActionOrder: [
@@ -49,11 +47,7 @@ export const PPT_IMPORT_EXTENSION = {
   title: 'PPT import extension',
 } as const
 
-export type PPTImportFallbackIssue =
-  (typeof PPT_IMPORT_CANVAS_FALLBACK_ISSUES)[keyof typeof PPT_IMPORT_CANVAS_FALLBACK_ISSUES]
-
 export type PPTImageImportEffect = {
-  fallbackIssue?: PPTImportFallbackIssue
   format: PPTImageImportFormat
   mimeType?: string
   model: 'canvas-image-import'
@@ -64,7 +58,6 @@ export type PPTImageImportEffect = {
 
 export type PPTTableImportEffect = {
   columnCount: number
-  fallbackIssue?: PPTImportFallbackIssue
   format: PPTTableImportFormat
   model: 'canvas-table-import'
   name: string
@@ -211,7 +204,6 @@ export function createPPTImageImportEffect({
   source: PPTImageImportSource
 }): PPTImageImportEffect {
   return {
-    fallbackIssue: getPPTImageImportFallbackIssue(),
     format: source.format ?? 'file',
     mimeType: source.mimeType,
     model: 'canvas-image-import',
@@ -230,18 +222,9 @@ export function createPPTTableImportEffect({
 }): PPTTableImportEffect {
   return {
     columnCount: getPPTTableColumnCount(element.rows),
-    fallbackIssue: getPPTTableImportFallbackIssue(),
     format: source.format ?? 'text-delimited',
     model: 'canvas-table-import',
     name: element.name,
     rowCount: element.rows.length,
   }
-}
-
-export function getPPTImageImportFallbackIssue(): PPTImportFallbackIssue | undefined {
-  return undefined
-}
-
-export function getPPTTableImportFallbackIssue(): PPTImportFallbackIssue | undefined {
-  return undefined
 }
