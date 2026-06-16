@@ -7117,9 +7117,11 @@ async function runSelectionPaneScenario(page) {
       commands: pane?.getAttribute('data-ppt-layer-pane-commands') ?? '',
       firstRowKind: rows[0]?.getAttribute('data-ppt-layer-pane-kind') ?? '',
       firstRowOrder: rows[0]?.getAttribute('data-ppt-layer-pane-order') ?? '',
+      keyboardKeys: tree?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
       keyboardModel: tree?.getAttribute('data-ppt-layer-pane-keyboard-model') ?? '',
       layerCount: document.querySelectorAll('[data-ppt-layer-row]').length,
       pane: !!pane,
+      rowIds: rows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
       rowRole: rows[0]?.getAttribute('role') ?? '',
       selectedId,
       selectedRowId: selectedRow?.getAttribute('data-ppt-layer-pane-row') ?? '',
@@ -7136,8 +7138,10 @@ async function runSelectionPaneScenario(page) {
       initial.treeRole === 'tree' &&
       initial.rowRole === 'treeitem' &&
       initial.keyboardModel === 'roving-tabindex' &&
+      initial.keyboardKeys === 'arrow-home-end-enter-space' &&
       initial.selectionModel === 'host-controlled-multi-select' &&
       initial.selectedRowId === initial.selectedId &&
+      initial.rowIds.length === initial.layerCount &&
       initial.firstRowOrder === '0' &&
       initial.firstRowKind.length > 0,
     initial,
@@ -7148,6 +7152,96 @@ async function runSelectionPaneScenario(page) {
       initial.commandCount === 7 &&
       ['select-objects', 'rename-object', 'hide-objects', 'show-objects', 'lock-objects', 'unlock-objects', 'reorder-object'].every((command) => initial.commands.includes(command)),
     initial,
+  )
+
+  await page.eval(`(() => {
+    const row = document.querySelector('[data-ppt-layer-pane-row][aria-selected="true"]')
+    row?.focus()
+  })()`)
+  await delay(30)
+
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(80)
+  const afterLayerEnd = await readPPTLayerPaneKeyboardState(page)
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(80)
+  const afterLayerHome = await readPPTLayerPaneKeyboardState(page)
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(80)
+  const afterLayerArrowDown = await readPPTLayerPaneKeyboardState(page)
+
+  record(
+    'moves PPT object layer pane treeitem selection with Arrow/Home/End keys',
+    initial.rowIds.length > 2 &&
+      afterLayerEnd.selectedRowId === initial.rowIds.at(-1) &&
+      afterLayerEnd.focusedRowId === initial.rowIds.at(-1) &&
+      afterLayerEnd.tabStopIds.length === 1 &&
+      afterLayerEnd.tabStopIds[0] === initial.rowIds.at(-1) &&
+      afterLayerHome.selectedRowId === initial.rowIds[0] &&
+      afterLayerHome.focusedRowId === initial.rowIds[0] &&
+      afterLayerArrowDown.selectedRowId === initial.rowIds[1] &&
+      afterLayerArrowDown.focusedRowId === initial.rowIds[1],
+    {
+      afterLayerArrowDown,
+      afterLayerEnd,
+      afterLayerHome,
+      initial,
+    },
+  )
+
+  await page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+    rows.at(-1)?.focus()
+  })()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'Space',
+    key: ' ',
+    windowsVirtualKeyCode: 32,
+  })
+  await delay(80)
+  const afterLayerSpace = await readPPTLayerPaneKeyboardState(page)
+
+  await page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+    rows[0]?.focus()
+  })()`)
+  await delay(30)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+  const afterLayerEnter = await readPPTLayerPaneKeyboardState(page)
+
+  record(
+    'selects PPT object layer pane treeitem with Space and Enter',
+    afterLayerSpace.selectedRowId === initial.rowIds.at(-1) &&
+      afterLayerSpace.focusedRowId === initial.rowIds.at(-1) &&
+      afterLayerEnter.selectedRowId === initial.rowIds[0] &&
+      afterLayerEnter.focusedRowId === initial.rowIds[0] &&
+      afterLayerEnter.tabStopIds.length === 1 &&
+      afterLayerEnter.tabStopIds[0] === initial.rowIds[0],
+    {
+      afterLayerEnter,
+      afterLayerSpace,
+      initial,
+    },
   )
 
   await page.eval(`document.querySelector('[data-ppt-layer-select="${initial.alternateRowId}"]')?.click()`)
@@ -7267,6 +7361,24 @@ async function runSelectionPaneScenario(page) {
   })()`)
 
   record('shows hidden PPT object from selection pane', afterShow.hidden === 'false' && afterShow.rowPaneHidden === 'false' && afterShow.stageElementExists, afterShow)
+}
+
+async function readPPTLayerPaneKeyboardState(page) {
+  return page.eval(`(() => {
+    const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row]')]
+    const focusedRow = document.activeElement?.closest('[data-ppt-layer-pane-row]')
+    const selectedRows = rows.filter((row) => row.getAttribute('aria-selected') === 'true')
+    const tabStopRows = rows.filter((row) => row.tabIndex === 0)
+
+    return {
+      focusedRowId: focusedRow?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      rowIds: rows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      selectedRowId: selectedRows[0]?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      selectedRowIds: selectedRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      tabStopIds: tabStopRows.map((row) => row.getAttribute('data-ppt-layer-pane-row') ?? ''),
+      treeKeyboardKeys: document.querySelector('.ppt-layer-list')?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
+    }
+  })()`)
 }
 
 async function runTextOverflowScenario(page) {

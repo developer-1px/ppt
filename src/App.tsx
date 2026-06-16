@@ -9460,6 +9460,61 @@ function Inspector({
     }
   }
 
+  function focusLayerPaneRow(objectId: string) {
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-ppt-layer-pane-row="${objectId}"]`)
+        ?.focus({ preventScroll: true })
+    })
+  }
+
+  function handleLayerPaneRowKeyDown(
+    row: PPTLayerPaneRowDescriptor,
+    event: ReactKeyboardEvent<HTMLElement>,
+  ) {
+    if (
+      event.target !== event.currentTarget ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return
+    }
+
+    const rows = layerPaneDescriptor.rows
+    const currentIndex = rows.findIndex((item) => item.objectId === row.objectId)
+
+    if (currentIndex < 0) {
+      return
+    }
+
+    let nextRow: PPTLayerPaneRowDescriptor | null = null
+
+    if (event.key === 'ArrowDown') {
+      nextRow = rows[Math.min(currentIndex + 1, rows.length - 1)] ?? null
+    } else if (event.key === 'ArrowUp') {
+      nextRow = rows[Math.max(currentIndex - 1, 0)] ?? null
+    } else if (event.key === 'Home') {
+      nextRow = rows[0] ?? null
+    } else if (event.key === 'End') {
+      nextRow = rows.at(-1) ?? null
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      nextRow = row
+    }
+
+    if (!nextRow) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    runLayerPaneIntent({
+      objectId: nextRow.objectId,
+      type: 'row-press',
+    })
+    focusLayerPaneRow(nextRow.objectId)
+  }
+
   return (
     <aside className="ppt-inspector" aria-label="Inspector">
       <div className="ppt-panel-header">
@@ -10573,6 +10628,7 @@ function Inspector({
           className="ppt-layer-list"
           data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
           data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
+          data-ppt-layer-pane-keyboard-keys="arrow-home-end-enter-space"
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
           data-ppt-layer-pane-selection-model={layerPaneDescriptor.aria.selectionModel}
           role={layerPaneDescriptor.aria.containerRole}
@@ -10601,6 +10657,7 @@ function Inspector({
               key={row.objectId}
               role={layerPaneDescriptor.aria.rowRole}
               tabIndex={row.isSelected ? 0 : -1}
+              onKeyDown={(event) => handleLayerPaneRowKeyDown(row, event)}
             >
               <button
                 className="ppt-layer-select"
