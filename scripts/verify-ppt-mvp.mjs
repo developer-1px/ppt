@@ -1012,17 +1012,49 @@ async function runAffordanceScenario(page) {
   await delay(50)
 
   const afterNudge = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
 
     return {
       elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      nudgeEnabled: shell?.getAttribute('data-ppt-keyboard-nudge-enabled') ?? '',
+      nudgeKeys: shell?.getAttribute('data-ppt-keyboard-nudge-keys') ?? '',
+      nudgeLargeStep: shell?.getAttribute('data-ppt-keyboard-nudge-large-step') ?? '',
+      nudgeModel: shell?.getAttribute('data-ppt-keyboard-nudge-model') ?? '',
+      nudgeStep: shell?.getAttribute('data-ppt-keyboard-nudge-step') ?? '',
       left: parseFloat(element.style.left),
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
     }
   })()`)
 
+  record('exposes PPT canvas keyboard nudge shortcut metadata', afterNudge.nudgeEnabled === 'true' && afterNudge.nudgeModel === 'canvas-keyboard-nudge-shortcuts' && afterNudge.nudgeStep === '1' && afterNudge.nudgeLargeStep === '10' && afterNudge.nudgeKeys.includes('ArrowRight') && afterNudge.nudgeKeys.includes('Shift+ArrowRight'), {
+    afterNudge,
+  })
+
   record('nudges selected object with arrow key', afterNudge.left === afterAlign.left + 1, {
     afterAlign,
+    afterNudge,
+  })
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    modifiers: 8,
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(50)
+
+  const afterLargeNudge = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      left: parseFloat(element.style.left),
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+
+  record('large-nudges selected object with Shift Arrow key', nearlyEqual(afterLargeNudge.left, afterNudge.left + 10, 0.001) && afterLargeNudge.selectedCount === afterNudge.selectedCount, {
+    afterLargeNudge,
     afterNudge,
   })
 

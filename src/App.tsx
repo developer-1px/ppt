@@ -5790,6 +5790,11 @@ function App() {
         data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
           ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
           : undefined}
+        data-ppt-keyboard-nudge-enabled={commandAvailability.nudge ? 'true' : 'false'}
+        data-ppt-keyboard-nudge-keys="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"
+        data-ppt-keyboard-nudge-large-step="10"
+        data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
+        data-ppt-keyboard-nudge-step="1"
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
