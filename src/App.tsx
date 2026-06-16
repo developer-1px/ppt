@@ -8725,6 +8725,9 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
       {guides.alignmentGuides.map((guide, index) => (
         <div
           className={`ppt-guide ppt-guide-${guide.orientation}`}
+          data-ppt-alignment-guide="true"
+          data-ppt-alignment-guide-orientation={guide.orientation}
+          data-ppt-alignment-guide-position={guide.position}
           key={`${guide.orientation}-${guide.position}-${index}`}
           style={guide.orientation === 'vertical'
             ? { height: guide.end - guide.start, left: guide.position, top: guide.start }
@@ -8739,12 +8742,19 @@ function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) 
             {guide.segments.map((segment, segmentIndex) => (
               <div
                 className={`ppt-spacing-guide ppt-spacing-guide-${guide.orientation}`}
+                data-ppt-spacing-guide="true"
+                data-ppt-spacing-guide-gap={guide.gap}
+                data-ppt-spacing-guide-orientation={guide.orientation}
+                data-ppt-spacing-guide-segment-index={segmentIndex}
                 key={`${segment.start.x}-${segment.start.y}-${segment.end.x}-${segment.end.y}-${segmentIndex}`}
                 style={getSpacingGuideSegmentStyle(segment)}
               />
             ))}
             <span
               className="ppt-spacing-label"
+              data-ppt-spacing-guide-label="true"
+              data-ppt-spacing-guide-label-gap={guide.gap}
+              data-ppt-spacing-guide-label-orientation={guide.orientation}
               style={{
                 left: labelPoint.x,
                 top: labelPoint.y,

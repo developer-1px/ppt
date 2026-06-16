@@ -38,6 +38,7 @@ try {
   await runFirstScreenScenario(page)
   await runTextEditingScenario(page)
   await runFindReplaceScenario(page)
+  await runSpacingGuideScenario(page)
   await runSelectionAndDragScenario(page)
   await runAltDragDuplicateScenario(page)
   await runAffordanceScenario(page)
@@ -147,8 +148,8 @@ async function runSelectionAndDragScenario(page) {
     y: before.y,
   })
   const duringDrag = await page.eval(`(() => ({
-    alignmentGuideCount: document.querySelectorAll('.ppt-guide').length,
-    spacingLabelCount: document.querySelectorAll('.ppt-spacing-label').length,
+    alignmentGuideCount: document.querySelectorAll('[data-ppt-alignment-guide="true"]').length,
+    spacingLabelCount: document.querySelectorAll('[data-ppt-spacing-guide-label="true"]').length,
   }))()`)
   await page.send('Input.dispatchMouseEvent', {
     button: 'left',
@@ -174,12 +175,121 @@ async function runSelectionAndDragScenario(page) {
   })()`)
 
   record('selects dragged PPT element', after.selected === 'true', after)
-  record('renders canvas snap guides while dragging', duringDrag.alignmentGuideCount > 0 || duringDrag.spacingLabelCount > 0, duringDrag)
+  record(
+    'renders canvas snap guides while dragging',
+    duringDrag.alignmentGuideCount > 0 || duringDrag.spacingLabelCount > 0,
+    duringDrag,
+  )
   record('moves PPT element through canvas transform adapter', after.left !== before.left, {
     after,
     before,
   })
   record('records drag in undo history', after.undoEnabled, after)
+}
+
+async function runSpacingGuideScenario(page) {
+  const before = await page.eval(`(() => {
+    const selected = document.querySelector('[data-ppt-element="s1-card-2"]')
+    const left = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const right = document.querySelector('[data-ppt-element="s1-side-panel"]')
+    const rect = selected.getBoundingClientRect()
+    const selectedLeft = parseFloat(selected.style.left)
+    const selectedWidth = parseFloat(selected.style.width)
+    const leftRight = parseFloat(left.style.left) + parseFloat(left.style.width)
+    const rightLeft = parseFloat(right.style.left)
+    const targetLeft = (leftRight + rightLeft - selectedWidth) / 2
+    const scale = rect.width / selectedWidth
+
+    return {
+      left: selected.style.left,
+      targetX: rect.left + rect.width / 2 + (targetLeft - selectedLeft) * scale,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: before.x,
+    y: before.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: before.targetX,
+    y: before.y,
+  })
+  await delay(50)
+
+  const duringDrag = await page.eval(`(() => {
+    const labels = [...document.querySelectorAll('[data-ppt-spacing-guide-label="true"]')]
+    const segments = [...document.querySelectorAll('[data-ppt-spacing-guide="true"]')]
+
+    return {
+      spacingGaps: labels.map((label) => label.getAttribute('data-ppt-spacing-guide-label-gap') ?? ''),
+      spacingLabelCount: labels.length,
+      spacingOrientations: labels.map((label) => label.getAttribute('data-ppt-spacing-guide-label-orientation') ?? ''),
+      spacingSegmentCount: segments.length,
+      spacingSegmentGaps: segments.map((segment) => segment.getAttribute('data-ppt-spacing-guide-gap') ?? ''),
+      spacingSegmentOrientations: segments.map((segment) => segment.getAttribute('data-ppt-spacing-guide-orientation') ?? ''),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: before.x,
+    y: before.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: before.x,
+    y: before.y,
+  })
+
+  const afterRelease = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-2"]')
+
+    return {
+      left: element.style.left,
+      selected: element.getAttribute('data-selected'),
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  if (afterRelease.left !== before.left) {
+    await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+    await delay(50)
+  }
+
+  const afterRestore = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-2"]')
+
+    return {
+      left: element.style.left,
+      selected: element.getAttribute('data-selected'),
+    }
+  })()`)
+
+  record(
+    'renders PPT spacing guide label metadata while dragging',
+    duringDrag.spacingLabelCount > 0 &&
+      duringDrag.spacingSegmentCount > 0 &&
+      duringDrag.spacingGaps.every(Boolean) &&
+      duringDrag.spacingOrientations.includes('horizontal') &&
+      duringDrag.spacingSegmentGaps.every(Boolean) &&
+      duringDrag.spacingSegmentOrientations.includes('horizontal'),
+    duringDrag,
+  )
+  record('restores PPT spacing guide probe drag before continuing', afterRestore.left === before.left, {
+    afterRelease,
+    afterRestore,
+    before,
+  })
 }
 
 async function runAltDragDuplicateScenario(page) {
