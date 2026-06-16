@@ -113,6 +113,7 @@ import {
   createSlideEditTextFrameInsetDescriptor,
   createSlideEditTextParagraphSpacingDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
+  createSlideEditTransitionDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
@@ -147,6 +148,7 @@ import {
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextVerticalAlignmentCommandEffect,
+  getSlideEditTransitionUpdateCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectAnimationDelayMs,
   normalizeSlideEditObjectAnimationDurationMs,
@@ -163,11 +165,14 @@ import {
   normalizeSlideEditTextLineHeightRatio,
   normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
+  SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
+  SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
+  SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
@@ -252,6 +257,9 @@ import {
   type SlideEditTextParagraphSpacingUpdateCommand,
   type SlideEditTextVerticalAlignmentDescriptor,
   type SlideEditTextVerticalAlignmentHostCommandEffect,
+  type SlideEditSlideTransitionDescriptor,
+  type SlideEditTransitionHostCommandEffect,
+  type SlideEditTransitionUpdateCommand,
 } from '@interactive-os/slide-edit-affordance'
 import {
   filterCanvasCommandPaletteItems,
@@ -1085,6 +1093,12 @@ type PPTSlideTransitionUpdateField =
   | 'advanceOnClick'
   | 'durationMs'
   | 'type'
+type PPTSlideTransitionDescriptor =
+  SlideEditSlideTransitionDescriptor<string, PPTSlideTransitionType>
+type PPTSlideTransitionHostCommandEffect =
+  SlideEditTransitionHostCommandEffect<string, PPTSlideTransitionType>
+type PPTSlideTransitionUpdateCommand =
+  SlideEditTransitionUpdateCommand<string, PPTSlideTransitionType>
 type PPTElementAnimationType = PPTElementAnimation['type']
 type PPTElementAnimationTrigger = PPTElementAnimation['trigger']
 type PPTElementAnimationUpdateField =
@@ -1473,18 +1487,17 @@ const PPT_STROKE_DASH_OPTIONS = Object.freeze(
   label: string
   value: PPTStrokeDash
 }[]
-const PPT_SLIDE_TRANSITION_TYPES = Object.freeze([
-  'none',
-  'fade',
-  'push',
-] as const satisfies readonly PPTSlideTransitionType[])
+const PPT_SLIDE_TRANSITION_TYPES = Object.freeze(
+  SLIDE_EDIT_TRANSITION_TYPES.map((option) => option.id),
+) as readonly PPTSlideTransitionType[]
 const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
   advanceAfterMs: null,
-  advanceOnClick: true,
-  durationMs: 0,
-  type: 'none',
+  advanceOnClick: SLIDE_EDIT_DEFAULT_TRANSITION.advance.onClick,
+  durationMs: SLIDE_EDIT_DEFAULT_TRANSITION.durationMs,
+  type: SLIDE_EDIT_DEFAULT_TRANSITION.type as PPTSlideTransitionType,
 } as const satisfies PPTSlideTransition)
-const PPT_SLIDE_TRANSITION_DURATION_MAX = 10000
+const PPT_SLIDE_TRANSITION_DURATION_MAX = SLIDE_EDIT_TRANSITION_TIMING_LIMITS.maxDurationMs
+const PPT_SLIDE_TRANSITION_ADVANCE_AFTER_MAX = SLIDE_EDIT_TRANSITION_TIMING_LIMITS.maxAdvanceAfterMs
 const PPT_ELEMENT_ANIMATION_TYPES = Object.freeze([
   'none',
   'fadeIn',
@@ -1727,6 +1740,7 @@ function App() {
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastSlideTransitionEffect, setLastSlideTransitionEffect] = useState<PPTSlideTransitionHostCommandEffect | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
   const [lastColorSwatchEffect, setLastColorSwatchEffect] = useState<PPTColorSwatchHostCommandEffect | null>(null)
   const [lastCommentThreadEffect, setLastCommentThreadEffect] = useState<PPTCommentThreadHostCommandEffect | null>(null)
@@ -4882,18 +4896,30 @@ function App() {
     field: PPTSlideTransitionUpdateField,
     value: PPTSlideTransition[PPTSlideTransitionUpdateField],
   ) {
-    commitDeck((current) =>
-      updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-        const transition = getPPTSlideTransition(slide)
+    const effect = getSlideEditTransitionUpdateCommandEffect(
+      getPPTSlideTransitionUpdateCommand({
+        field,
+        slideId: activeSlide.id,
+        transition: activeSlideTransition,
+        value,
+      }),
+    )
 
-        return {
-          ...slide,
-          transition: normalizePPTSlideTransition({
-            ...transition,
-            [field]: value,
-          }),
-        }
-      }))
+    applySlideTransitionCommandEffect(effect)
+  }
+
+  function applySlideTransitionCommandEffect(
+    effect: PPTSlideTransitionHostCommandEffect,
+  ) {
+    setLastSlideTransitionEffect(effect)
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
+        ...slide,
+        transition: applyPPTSlideTransitionUpdateCommand(
+          getPPTSlideTransition(slide),
+          effect.payload,
+        ),
+      })))
   }
 
   function copyHTML() {
@@ -7215,6 +7241,15 @@ function App() {
         data-ppt-object-visibility-command-target-count={lastObjectVisibilityEffect?.payload.objectIds.length}
         data-ppt-object-visibility-command-type={lastObjectVisibilityEffect?.type}
         data-ppt-object-visibility-model="slide-edit-object-visibility"
+        data-ppt-transition-command={lastSlideTransitionEffect?.payload.id}
+        data-ppt-transition-command-field={lastSlideTransitionEffect?.payload.fieldId}
+        data-ppt-transition-command-selection={lastSlideTransitionEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-transition-command-slide={lastSlideTransitionEffect?.selection.slideId}
+        data-ppt-transition-command-type={lastSlideTransitionEffect?.type}
+        data-ppt-transition-command-value={lastSlideTransitionEffect
+          ? getPPTSlideTransitionCommandValue(lastSlideTransitionEffect.payload)
+          : undefined}
+        data-ppt-transition-model="slide-edit-slide-transition-timing"
         data-ppt-shadow-command={lastShadowEffect?.payload.id}
         data-ppt-shadow-command-field={lastShadowEffect?.payload.fieldId}
         data-ppt-shadow-command-object={lastShadowEffect?.payload.objectId}
@@ -7336,6 +7371,7 @@ function App() {
             data-ppt-transition-advance-after={activeSlideTransition.advanceAfterMs ?? ''}
             data-ppt-transition-advance-on-click={activeSlideTransition.advanceOnClick ? 'true' : 'false'}
             data-ppt-transition-duration={activeSlideTransition.durationMs}
+            data-ppt-transition-model="slide-edit-slide-transition-timing"
             data-ppt-transition-type={activeSlideTransition.type}
             style={{ background: activeSlide.background?.color ?? '#ffffff' }}
           >
@@ -8120,30 +8156,165 @@ function groupPPTShortcutHelpItems(
 }
 
 function getPPTSlideTransition(slide: PPTSlide): PPTSlideTransition {
-  return normalizePPTSlideTransition(slide.transition ?? PPT_DEFAULT_SLIDE_TRANSITION)
+  return normalizePPTSlideTransition(
+    slide.transition ?? PPT_DEFAULT_SLIDE_TRANSITION,
+    slide.id,
+  )
 }
 
 function normalizePPTSlideTransition(
   transition: PPTSlideTransition,
+  slideId = 'ppt-slide',
+): PPTSlideTransition {
+  return toPPTSlideTransition(
+    getPPTSlideTransitionDescriptor(slideId, transition),
+  )
+}
+
+function getPPTSlideTransitionDescriptor(
+  slideId: string,
+  transition: PPTSlideTransition,
+): PPTSlideTransitionDescriptor {
+  return createSlideEditTransitionDescriptor({
+    advance: {
+      afterMs: transition.advanceAfterMs ?? undefined,
+      onClick: transition.advanceOnClick ?? true,
+    },
+    durationMs: transition.durationMs,
+    slideId,
+    type: isPPTSlideTransitionType(transition.type)
+      ? transition.type
+      : PPT_DEFAULT_SLIDE_TRANSITION.type,
+  })
+}
+
+function toPPTSlideTransition(
+  descriptor: PPTSlideTransitionDescriptor,
 ): PPTSlideTransition {
   return {
-    advanceAfterMs: transition.advanceAfterMs === null || transition.advanceAfterMs === undefined
-      ? null
-      : clampPPTSlideTransitionDuration(transition.advanceAfterMs),
-    advanceOnClick: transition.advanceOnClick ?? true,
-    durationMs: clampPPTSlideTransitionDuration(transition.durationMs),
-    type: PPT_SLIDE_TRANSITION_TYPES.includes(transition.type)
-      ? transition.type
-      : 'none',
+    advanceAfterMs: descriptor.advance.afterMs ?? null,
+    advanceOnClick: descriptor.advance.onClick,
+    durationMs: descriptor.durationMs,
+    type: isPPTSlideTransitionType(descriptor.type)
+      ? descriptor.type
+      : PPT_DEFAULT_SLIDE_TRANSITION.type,
+  }
+}
+
+function isPPTSlideTransitionType(
+  value: string,
+): value is PPTSlideTransitionType {
+  return (PPT_SLIDE_TRANSITION_TYPES as readonly string[]).includes(value)
+}
+
+function getPPTSlideTransitionUpdateCommand({
+  field,
+  slideId,
+  transition,
+  value,
+}: {
+  field: PPTSlideTransitionUpdateField
+  slideId: string
+  transition: PPTSlideTransition
+  value: PPTSlideTransition[PPTSlideTransitionUpdateField]
+}): PPTSlideTransitionUpdateCommand {
+  switch (field) {
+    case 'type':
+      return {
+        fieldId: 'type',
+        id: 'update-slide-transition',
+        slideId,
+        value: isPPTSlideTransitionType(String(value))
+          ? String(value) as PPTSlideTransitionType
+          : PPT_DEFAULT_SLIDE_TRANSITION.type,
+      }
+    case 'durationMs':
+      return {
+        fieldId: 'durationMs',
+        id: 'update-slide-transition',
+        slideId,
+        value: Number(value),
+      }
+    case 'advanceOnClick':
+      return {
+        fieldId: 'advance',
+        id: 'update-slide-transition',
+        slideId,
+        value: {
+          afterMs: transition.advanceAfterMs ?? undefined,
+          onClick: Boolean(value),
+        },
+      }
+    case 'advanceAfterMs':
+      return {
+        fieldId: 'advance',
+        id: 'update-slide-transition',
+        slideId,
+        value: {
+          afterMs: value === null ? undefined : Number(value),
+          onClick: transition.advanceOnClick ?? true,
+        },
+      }
+  }
+}
+
+function applyPPTSlideTransitionUpdateCommand(
+  transition: PPTSlideTransition,
+  command: PPTSlideTransitionUpdateCommand,
+): PPTSlideTransition {
+  switch (command.fieldId) {
+    case 'advance':
+      return toPPTSlideTransition(createSlideEditTransitionDescriptor({
+        advance: command.value,
+        durationMs: transition.durationMs,
+        slideId: command.slideId,
+        type: transition.type,
+      }))
+    case 'durationMs':
+      return toPPTSlideTransition(createSlideEditTransitionDescriptor({
+        advance: {
+          afterMs: transition.advanceAfterMs ?? undefined,
+          onClick: transition.advanceOnClick,
+        },
+        durationMs: command.value,
+        slideId: command.slideId,
+        type: transition.type,
+      }))
+    case 'type':
+      return toPPTSlideTransition(createSlideEditTransitionDescriptor({
+        advance: {
+          afterMs: transition.advanceAfterMs ?? undefined,
+          onClick: transition.advanceOnClick,
+        },
+        durationMs: transition.durationMs,
+        slideId: command.slideId,
+        type: command.value,
+      }))
+  }
+}
+
+function getPPTSlideTransitionCommandValue(
+  command: PPTSlideTransitionUpdateCommand,
+) {
+  switch (command.fieldId) {
+    case 'advance':
+      return [
+        `onClick:${command.value.onClick ? 'true' : 'false'}`,
+        command.value.afterMs === undefined
+          ? 'afterMs:'
+          : `afterMs:${command.value.afterMs}`,
+      ].join(';')
+    case 'durationMs':
+    case 'type':
+      return String(command.value)
   }
 }
 
 function clampPPTSlideTransitionDuration(value: number) {
-  return clamp(
-    Number.isFinite(value) ? Math.round(value) : 0,
-    0,
-    PPT_SLIDE_TRANSITION_DURATION_MAX,
-  )
+  return createSlideEditTransitionDescriptor({
+    durationMs: value,
+    slideId: 'ppt-transition-parser',
+  }).durationMs
 }
 
 function parsePPTSlideTransitionDuration(value: string) {
@@ -8153,18 +8324,13 @@ function parsePPTSlideTransitionDuration(value: string) {
 function parsePPTSlideTransitionAdvanceAfter(value: string) {
   return value.trim() === ''
     ? null
-    : clampPPTSlideTransitionDuration(Number(value))
-}
-
-function formatPPTSlideTransitionType(type: PPTSlideTransitionType) {
-  switch (type) {
-    case 'fade':
-      return 'Fade'
-    case 'push':
-      return 'Push'
-    case 'none':
-      return 'None'
-  }
+    : createSlideEditTransitionDescriptor({
+        advance: {
+          afterMs: Number(value),
+          onClick: true,
+        },
+        slideId: 'ppt-transition-parser',
+      }).advance.afterMs ?? null
 }
 
 function getPPTElementAnimation(
@@ -11671,6 +11837,10 @@ function Inspector({
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
   const sizeMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'size')
   const orientationMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'orientation')
+  const slideTransitionDescriptor = getPPTSlideTransitionDescriptor(
+    slide.id,
+    slideTransition,
+  )
   const [layerPaneGroupState, setLayerPaneGroupState] =
     useState<PPTLayerPaneGroupState>({
       collapsedGroupIds: [],
@@ -12331,10 +12501,13 @@ function Inspector({
         <div
           className="ppt-slide-transition-fields"
           data-ppt-slide-transition
-          data-ppt-transition-advance-after={slideTransition.advanceAfterMs ?? ''}
-          data-ppt-transition-advance-on-click={slideTransition.advanceOnClick ? 'true' : 'false'}
-          data-ppt-transition-duration={slideTransition.durationMs}
-          data-ppt-transition-type={slideTransition.type}
+          data-ppt-transition-advance-after={slideTransitionDescriptor.advance.afterMs ?? ''}
+          data-ppt-transition-advance-on-click={slideTransitionDescriptor.advance.onClick ? 'true' : 'false'}
+          data-ppt-transition-duration={slideTransitionDescriptor.durationMs}
+          data-ppt-transition-model="slide-edit-slide-transition-timing"
+          data-ppt-transition-slide={slideTransitionDescriptor.slideId}
+          data-ppt-transition-type={slideTransitionDescriptor.type}
+          data-ppt-transition-types={SLIDE_EDIT_TRANSITION_TYPES.map((type) => type.id).join(' ')}
         >
           <label className="ppt-field">
             <span>Transition</span>
@@ -12344,9 +12517,9 @@ function Inspector({
               onChange={(event) =>
                 onSlideTransitionChange('type', event.target.value as PPTSlideTransitionType)}
             >
-              {PPT_SLIDE_TRANSITION_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {formatPPTSlideTransitionType(type)}
+              {SLIDE_EDIT_TRANSITION_TYPES.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.label}
                 </option>
               ))}
             </select>
@@ -12378,7 +12551,7 @@ function Inspector({
             <span>After</span>
             <input
               data-ppt-slide-transition-field="advanceAfterMs"
-              max={PPT_SLIDE_TRANSITION_DURATION_MAX}
+              max={PPT_SLIDE_TRANSITION_ADVANCE_AFTER_MAX}
               min={0}
               placeholder="none"
               step={500}

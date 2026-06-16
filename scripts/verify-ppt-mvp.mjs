@@ -6469,6 +6469,8 @@ async function runSlideTransitionScenario(page) {
       initial.duration === '0' &&
       initial.advanceOnClick === 'true' &&
       initial.advanceAfter === '' &&
+      initial.inspectorModel === 'slide-edit-slide-transition-timing' &&
+      initial.stageModel === 'slide-edit-slide-transition-timing' &&
       initial.stageType === 'none',
     initial,
   )
@@ -6510,7 +6512,12 @@ async function runSlideTransitionScenario(page) {
       afterFade.stageType === 'fade' &&
       afterFade.stageDuration === '650' &&
       afterFade.stageAdvanceOnClick === 'false' &&
-      afterFade.stageAdvanceAfter === '3000',
+      afterFade.stageAdvanceAfter === '3000' &&
+      afterFade.command === 'update-slide-transition' &&
+      afterFade.commandField === 'advance' &&
+      afterFade.commandSlide === 'slide-1' &&
+      afterFade.commandType === 'slide-command-effect' &&
+      afterFade.commandValue === 'onClick:false;afterMs:3000',
     {
       afterFade,
       initial,
@@ -6528,6 +6535,17 @@ async function runSlideTransitionScenario(page) {
   await delay(80)
 
   const afterPush = await getPPTSlideTransitionState(page)
+
+  record(
+    'routes PPT slide transition update through slide-edit command effect',
+    afterPush.command === 'update-slide-transition' &&
+      afterPush.commandField === 'type' &&
+      afterPush.commandSlide === 'slide-1' &&
+      afterPush.commandType === 'slide-command-effect' &&
+      afterPush.commandValue === 'push' &&
+      afterPush.inspectorTypes === 'none fade push',
+    afterPush,
+  )
 
   await pressKey(page, {
     code: 'KeyZ',
@@ -11706,20 +11724,31 @@ function getPPTInspectorTabsState(page) {
 function getPPTSlideTransitionState(page) {
   return page.eval(`(() => {
     const inspector = document.querySelector('[data-ppt-slide-transition]')
+    const shell = document.querySelector('.ppt-stage-shell')
     const stage = document.querySelector('.ppt-stage-world .ppt-slide')
 
     return {
       advanceAfter: document.querySelector('[data-ppt-slide-transition-field="advanceAfterMs"]')?.value ?? '',
       advanceOnClick: document.querySelector('[data-ppt-slide-transition-field="advanceOnClick"]')?.checked ? 'true' : 'false',
+      command: shell?.getAttribute('data-ppt-transition-command') ?? '',
+      commandField: shell?.getAttribute('data-ppt-transition-command-field') ?? '',
+      commandSelection: shell?.getAttribute('data-ppt-transition-command-selection') ?? '',
+      commandSlide: shell?.getAttribute('data-ppt-transition-command-slide') ?? '',
+      commandType: shell?.getAttribute('data-ppt-transition-command-type') ?? '',
+      commandValue: shell?.getAttribute('data-ppt-transition-command-value') ?? '',
       duration: document.querySelector('[data-ppt-slide-transition-field="durationMs"]')?.value ?? '',
       inspector: !!inspector,
       inspectorAdvanceAfter: inspector?.getAttribute('data-ppt-transition-advance-after') ?? '',
       inspectorAdvanceOnClick: inspector?.getAttribute('data-ppt-transition-advance-on-click') ?? '',
       inspectorDuration: inspector?.getAttribute('data-ppt-transition-duration') ?? '',
+      inspectorModel: inspector?.getAttribute('data-ppt-transition-model') ?? '',
+      inspectorSlide: inspector?.getAttribute('data-ppt-transition-slide') ?? '',
       inspectorType: inspector?.getAttribute('data-ppt-transition-type') ?? '',
+      inspectorTypes: inspector?.getAttribute('data-ppt-transition-types') ?? '',
       stageAdvanceAfter: stage?.getAttribute('data-ppt-transition-advance-after') ?? '',
       stageAdvanceOnClick: stage?.getAttribute('data-ppt-transition-advance-on-click') ?? '',
       stageDuration: stage?.getAttribute('data-ppt-transition-duration') ?? '',
+      stageModel: stage?.getAttribute('data-ppt-transition-model') ?? '',
       stageType: stage?.getAttribute('data-ppt-transition-type') ?? '',
       type: document.querySelector('[data-ppt-slide-transition-field="type"]')?.value ?? '',
     }
