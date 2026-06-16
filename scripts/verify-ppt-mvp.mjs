@@ -7807,6 +7807,33 @@ async function runImageImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    const dataTransfer = new DataTransfer()
+
+    canvas.width = 96
+    canvas.height = 48
+    context.fillStyle = '#f59e0b'
+    context.fillRect(0, 0, 96, 48)
+    context.fillStyle = '#111827'
+    context.fillRect(12, 12, 72, 24)
+    dataTransfer.setData('text/html', '<figure><img alt="Copied Chart" src="' + canvas.toDataURL('image/png') + '"></figure>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(180)
+
+  const afterDataImagePaste = await getPPTImageImportState(page)
+
+  record('pastes HTML data image clipboard payload into PPT image element', afterDataImagePaste.imageImportModel === 'canvas-image-import' && afterDataImagePaste.imageImportFormat === 'data-url-html-img' && afterDataImagePaste.imageImportDataUrlFallback === 'canvas#256' && afterDataImagePaste.imageImportFallbackIssue === 'canvas#256' && afterDataImagePaste.imageImportMime === 'image/png' && afterDataImagePaste.imageImportNaturalWidth === 96 && afterDataImagePaste.imageImportNaturalHeight === 48 && afterDataImagePaste.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDataImagePaste.selectedKind === 'image' && afterDataImagePaste.selectedName === 'Copied Chart.png' && afterDataImagePaste.selectedImageSrc.startsWith('data:image/png') && afterDataImagePaste.selectedWidth === 96 && afterDataImagePaste.selectedHeight === 48, {
+    afterDataImagePaste,
+    afterSvgHTMLPaste,
+  })
+
+  await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
     const rect = stage.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
@@ -7823,9 +7850,9 @@ async function runImageImportScenario(page) {
 
   const afterDrop = await getPPTImageImportState(page)
 
-  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageImportFormat === 'file' && afterDrop.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageImportFormat === 'file' && afterDrop.imageCount === afterDataImagePaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
-    afterSvgHTMLPaste,
+    afterDataImagePaste,
   })
 
   await page.eval(`(() => {
@@ -11932,6 +11959,7 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      imageImportDataUrlFallback: stage?.getAttribute('data-ppt-image-import-data-url-fallback') ?? '',
       imageImportFallbackIssue: stage?.getAttribute('data-ppt-image-import-fallback-issue') ?? '',
       imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
       imageImportMime: stage?.getAttribute('data-ppt-image-import-mime') ?? '',

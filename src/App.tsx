@@ -444,10 +444,12 @@ import {
 } from './pptExport'
 import {
   createPPTImportedImageElement,
+  getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
   getPPTImageFileFromList,
   getPPTSVGImageSourceFromDataTransfer,
   readPPTImageFileSource,
+  resolvePPTImageSourceNaturalSize,
   type PPTImageImportFormat,
   type PPTImageImportSource,
 } from './pptImageImport'
@@ -2641,6 +2643,16 @@ function App() {
         return
       }
 
+      const dataImageSource = getPPTDataImageSourceFromDataTransfer(event.clipboardData)
+
+      if (dataImageSource) {
+        event.preventDefault()
+        void resolvePPTImageSourceNaturalSize(dataImageSource).then((source) => {
+          insertPPTImageSource(source)
+        })
+        return
+      }
+
       const tableSource = getPPTTableSourceFromDataTransfer(event.clipboardData)
 
       if (tableSource) {
@@ -3276,7 +3288,7 @@ function App() {
       })
 
       setLastImageImportEffect({
-        fallbackIssue: source.format && source.format !== 'file' ? 'canvas#255' : undefined,
+        fallbackIssue: getPPTImageImportFallbackIssue(source.format),
         format: source.format ?? 'file',
         mimeType: source.mimeType,
         model: 'canvas-image-import',
@@ -7606,6 +7618,7 @@ function App() {
         data-ppt-image-import-name={lastImageImportEffect?.name}
         data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
         data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
+        data-ppt-image-import-data-url-fallback="canvas#256"
         data-ppt-image-import-svg-fallback="canvas#255"
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
         data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
@@ -9353,6 +9366,14 @@ function createPPTClipboardPayload({
     selectedObjectIds,
     sourceSlideId,
   })
+}
+
+function getPPTImageImportFallbackIssue(format: PPTImageImportFormat | undefined) {
+  if (!format || format === 'file') {
+    return undefined
+  }
+
+  return format.startsWith('svg-') ? 'canvas#255' : 'canvas#256'
 }
 
 function createPPTRichClipboardEffect(

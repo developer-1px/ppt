@@ -16,6 +16,8 @@ import {
 } from './pptModel'
 
 export type PPTImageImportFormat =
+  | 'data-url-html-img'
+  | 'data-url-plain'
   | 'file'
   | 'svg-html-img'
   | 'svg-html-inline'
@@ -75,6 +77,38 @@ export async function readPPTImageFileSource(file: Blob & { name?: string }) {
 export const getPPTImageFileFromList = getCanvasImageFileFromList
 export const getPPTImageFileFromDataTransfer = getCanvasImageFileFromDataTransfer
 
+export function getPPTDataImageSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+): PPTImageImportSource | null {
+  if (!dataTransfer) {
+    return null
+  }
+
+  return getPPTDataImageSourceFromHTML(dataTransfer.getData('text/html')) ??
+    getPPTDataImageSourceFromDataUrl(
+      dataTransfer.getData('text/plain'),
+      'data-url-plain',
+    )
+}
+
+export async function resolvePPTImageSourceNaturalSize(
+  source: PPTImageImportSource,
+): Promise<PPTImageImportSource> {
+  if (source.naturalWidth && source.naturalHeight) {
+    return source
+  }
+
+  const naturalSize = await readPPTImageDataUrlNaturalSize(source.dataUrl)
+
+  return naturalSize
+    ? {
+        ...source,
+        naturalHeight: naturalSize.h,
+        naturalWidth: naturalSize.w,
+      }
+    : source
+}
+
 export function getPPTSVGImageSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ): PPTImageImportSource | null {
@@ -101,6 +135,45 @@ export function getPPTSVGImageSourceFromDataTransfer(
     dataTransfer.getData('text/plain'),
     'svg-plain',
   )
+}
+
+function getPPTDataImageSourceFromHTML(value: string) {
+  if (!value || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(value, 'text/html')
+  const dataImage = Array.from(doc.querySelectorAll<HTMLImageElement>('img[src^="data:image/"]'))
+    .find((image) => !isPPTSVGDataUrl(image.src))
+
+  if (!dataImage?.src) {
+    return null
+  }
+
+  return getPPTDataImageSourceFromDataUrl(
+    dataImage.src,
+    'data-url-html-img',
+    dataImage.alt || dataImage.title || undefined,
+  )
+}
+
+function getPPTDataImageSourceFromDataUrl(
+  value: string,
+  format: PPTImageImportFormat,
+  name?: string,
+): PPTImageImportSource | null {
+  const mimeType = getPPTImageDataUrlMimeType(value)
+
+  if (!mimeType || mimeType === 'image/svg+xml') {
+    return null
+  }
+
+  return {
+    dataUrl: value.trim(),
+    format,
+    mimeType,
+    name: getPPTDataImageImportName(name, mimeType),
+  }
 }
 
 function getPPTSVGImageSourceFromHTML(value: string) {
@@ -271,4 +344,56 @@ function getPPTSVGImportName(value?: string) {
   const name = value?.trim()
 
   return name ? `${name.replace(/\.[^.]+$/, '')}.svg` : 'clipboard.svg'
+}
+
+function getPPTImageDataUrlMimeType(value: string) {
+  const mimeType = value.trim().match(/^data:(image\/[^;,]+)[^,]*,/i)?.[1].toLowerCase()
+
+  if (
+    mimeType === 'image/gif' ||
+    mimeType === 'image/jpeg' ||
+    mimeType === 'image/jpg' ||
+    mimeType === 'image/png' ||
+    mimeType === 'image/webp' ||
+    mimeType === 'image/svg+xml'
+  ) {
+    return mimeType === 'image/jpg' ? 'image/jpeg' : mimeType
+  }
+
+  return null
+}
+
+function isPPTSVGDataUrl(value: string) {
+  return getPPTImageDataUrlMimeType(value) === 'image/svg+xml'
+}
+
+function getPPTDataImageImportName(value: string | undefined, mimeType: string) {
+  const name = value?.trim().replace(/\.[^.]+$/, '')
+  const extension = getPPTImageExtension(mimeType)
+
+  return `${name || 'clipboard'}.${extension}`
+}
+
+function getPPTImageExtension(mimeType: string) {
+  if (mimeType === 'image/jpeg') {
+    return 'jpg'
+  }
+
+  return mimeType.replace('image/', '').replace('svg+xml', 'svg')
+}
+
+function readPPTImageDataUrlNaturalSize(dataUrl: string) {
+  return new Promise<{ h: number; w: number } | null>((resolve) => {
+    const image = new Image()
+
+    image.addEventListener('load', () => {
+      resolve(image.naturalWidth > 0 && image.naturalHeight > 0
+        ? { h: image.naturalHeight, w: image.naturalWidth }
+        : null)
+    }, { once: true })
+    image.addEventListener('error', () => {
+      resolve(null)
+    }, { once: true })
+    image.src = dataUrl
+  })
 }
