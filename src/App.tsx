@@ -424,6 +424,7 @@ import {
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
   getCanvasSelectedItems,
+  getCanvasSingleItemSelection,
   deleteCanvasSelectionItems,
   isAdditivePointerInput,
   insertCanvasItemAtTargetPlacement,
@@ -17617,13 +17618,11 @@ function getPPTSingleElementSelection(
   elementId: string,
   additive: boolean,
 ) {
-  if (!additive) {
-    return [elementId]
-  }
-
-  return selection.includes(elementId)
-    ? selection.filter((id) => id !== elementId)
-    : [...selection, elementId]
+  return getCanvasSingleItemSelection({
+    additive,
+    itemId: elementId,
+    selection,
+  })
 }
 
 function getPPTGroupPointerSelection({
