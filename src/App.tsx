@@ -307,6 +307,10 @@ import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
+  getCanvasKeyboardSystemShortcutIntent,
+  shouldReleaseCanvasKeyboardTemporaryPan,
+} from 'canvas/app/keyboard-system-shortcuts'
+import {
   getCanvasKeyboardToolShortcutIntent,
 } from 'canvas/app/keyboard-tool-shortcuts'
 import {
@@ -2385,7 +2389,21 @@ function App() {
         return
       }
 
-      if (isPPTTemporaryPanShortcut(event) && !isPPTTemporaryPanBlockedTarget(event.target)) {
+      const systemShortcutIntent = getCanvasKeyboardSystemShortcutIntent({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+        key: event.key,
+        mod: event.metaKey || event.ctrlKey,
+        phase: 'after-typing-target',
+      })
+
+      if (
+        systemShortcutIntent?.kind === 'temporary-pan' &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !isPPTTemporaryPanBlockedTarget(event.target)
+      ) {
         event.preventDefault()
         setContextMenu(null)
         setIsTemporaryPanActive(true)
@@ -2579,7 +2597,10 @@ function App() {
     }
 
     function onKeyUp(event: KeyboardEvent) {
-      if (isPPTTemporaryPanKey(event)) {
+      if (shouldReleaseCanvasKeyboardTemporaryPan({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        event,
+      })) {
         releaseTemporaryPan()
       }
     }
@@ -14771,17 +14792,6 @@ function isEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement &&
     (target.isContentEditable ||
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-}
-
-function isPPTTemporaryPanKey(event: KeyboardEvent) {
-  return event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar'
-}
-
-function isPPTTemporaryPanShortcut(event: KeyboardEvent) {
-  return isPPTTemporaryPanKey(event) &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey
 }
 
 function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {
