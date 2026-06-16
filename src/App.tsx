@@ -423,6 +423,7 @@ import {
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
+  getCanvasSelectedItems,
   deleteCanvasSelectionItems,
   isAdditivePointerInput,
   insertCanvasItemAtTargetPlacement,
@@ -2044,7 +2045,11 @@ function App() {
     ? getPPTElementAnimation(selectedElement, activeSlide)
     : null
   const selectedElements = useMemo(
-    () => activeSlide.elements.filter((element) => selection.includes(element.id)),
+    () => getCanvasSelectedItems({
+      getItemId: (element) => element.id,
+      items: activeSlide.elements,
+      selection,
+    }),
     [activeSlide.elements, selection],
   )
   const selectedTextElements = useMemo(
@@ -3879,7 +3884,11 @@ function App() {
   }
 
   function copySelection(operation: PPTClipboardOperation = 'copy') {
-    const selected = activeSlide.elements.filter((element) => selection.includes(element.id))
+    const selected = getCanvasSelectedItems({
+      getItemId: (element) => element.id,
+      items: activeSlide.elements,
+      selection,
+    })
 
     if (selected.length === 0) {
       return
