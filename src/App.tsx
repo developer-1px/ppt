@@ -279,6 +279,9 @@ import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
+  getCanvasKeyboardToolShortcutIntent,
+} from 'canvas/app/keyboard-tool-shortcuts'
+import {
   isCanvasKeyboardViewportIntent,
   runCanvasKeyboardViewportIntent,
 } from 'canvas/app/keyboard-viewport-dispatch'
@@ -335,9 +338,11 @@ import {
   getCanvasViewportZoomStepMultiplier,
   handlePoint,
   normalizeBounds,
+  pointDistance,
   type Bounds,
   type Point,
   type ResizeHandle,
+  type Tool,
   type Viewport,
   zoomViewport,
 } from 'canvas/core'
@@ -376,6 +381,10 @@ import {
   type CanvasDistributeMode,
   type CanvasReorderMode,
 } from 'canvas/engine'
+import {
+  createCanvasSvgFreehandPathData,
+  createCanvasSvgPathData,
+} from 'canvas/renderer/svg-drawing-primitives'
 import {
   PPT_DEFAULT_THEME_ID,
   PPT_SPLIT_LAYOUT_ID,
@@ -2491,41 +2500,10 @@ function App() {
         return
       }
 
-      if (isPPTPanToolShortcut(event)) {
-        event.preventDefault()
-        activatePanTool()
-        return
-      }
+      const toolShortcut = getPPTToolShortcutIntent(event)
 
-      if (isPPTEraserToolShortcut(event)) {
+      if (toolShortcut && activatePPTToolShortcut(toolShortcut)) {
         event.preventDefault()
-        activateEraserTool()
-        return
-      }
-
-      const shortcutTool = getPPTCreationToolForShortcut(event)
-
-      if (shortcutTool) {
-        event.preventDefault()
-        activatePPTCreationTool(shortcutTool)
-        return
-      }
-
-      if (isPPTArrowToolShortcut(event)) {
-        event.preventDefault()
-        activateLineCreationMode('arrow')
-        return
-      }
-
-      if (isPPTLaserToolShortcut(event)) {
-        event.preventDefault()
-        activateLaserTool()
-        return
-      }
-
-      if (isPPTSelectToolShortcut(event)) {
-        event.preventDefault()
-        activateSelectTool()
         return
       }
 
@@ -3214,6 +3192,50 @@ function App() {
     setLaserTrailPoints([])
     setEditingId(null)
     setContextMenu(null)
+  }
+
+  function activatePPTToolShortcut(tool: Tool) {
+    switch (tool) {
+      case 'arrow':
+        activateLineCreationMode('arrow')
+        return true
+      case 'comment':
+        activatePPTCreationTool({ kind: 'comment' })
+        return true
+      case 'diamond':
+      case 'ellipse':
+      case 'rect':
+        activatePPTCreationTool({ kind: 'shape', shape: tool })
+        return true
+      case 'eraser':
+        activateEraserTool()
+        return true
+      case 'highlight':
+      case 'marker':
+      case 'pen':
+        activatePPTCreationTool({ kind: 'freeform', tool })
+        return true
+      case 'laser':
+        activateLaserTool()
+        return true
+      case 'pan':
+        activatePanTool()
+        return true
+      case 'section':
+        activatePPTCreationTool({ kind: 'section' })
+        return true
+      case 'select':
+        activateSelectTool()
+        return true
+      case 'sticky':
+        activatePPTCreationTool({ kind: 'sticky' })
+        return true
+      case 'text':
+        activatePPTCreationTool({ kind: 'text' })
+        return true
+      default:
+        return false
+    }
   }
 
   function runPPTClipboardImportAction(action: PPTClipboardImportAction) {
@@ -11873,7 +11895,7 @@ function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
     >
       <path
         data-ppt-freeform-path
-        d={getPPTFreeformPathData(element.points)}
+        d={createCanvasSvgFreehandPathData(element.points)}
         fill="none"
         stroke={element.stroke.color}
         strokeDasharray={getPPTStrokeDashArray(element.stroke)}
@@ -12137,7 +12159,7 @@ function PPTLaserTrailOverlay({
     >
       <path
         className="ppt-laser-trail-path"
-        d={getPPTLaserTrailPathData(points)}
+        d={createCanvasSvgPathData(points)}
         data-ppt-laser-trail-path
         strokeWidth={strokeWidth}
       />
@@ -16642,98 +16664,17 @@ function toPPTShapeKind(shape: CanvasCreatedShapeKind): PPTShapeKind {
   return 'rect'
 }
 
-function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | null {
+function getPPTToolShortcutIntent(event: KeyboardEvent) {
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return null
   }
 
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.text.keyboardShortcut)) {
-    return { kind: 'text' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.sticky.keyboardShortcut)) {
-    return { kind: 'sticky' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.section.keyboardShortcut)) {
-    return { kind: 'section' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.rect.keyboardShortcut)) {
-    return { kind: 'shape', shape: 'rect' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.ellipse.keyboardShortcut)) {
-    return { kind: 'shape', shape: 'ellipse' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.comment.keyboardShortcut)) {
-    return { kind: 'comment' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.marker.keyboardShortcut)) {
-    return { kind: 'freeform', tool: 'marker' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.highlight.keyboardShortcut)) {
-    return { kind: 'freeform', tool: 'highlight' }
-  }
-
-  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pen.keyboardShortcut)) {
-    return { kind: 'freeform', tool: 'pen' }
-  }
-
-  return null
-}
-
-function isPPTSelectToolShortcut(event: KeyboardEvent) {
-  return !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.select.keyboardShortcut)
-}
-
-function isPPTPanToolShortcut(event: KeyboardEvent) {
-  return !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pan.keyboardShortcut)
-}
-
-function isPPTLaserToolShortcut(event: KeyboardEvent) {
-  return !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.laser.keyboardShortcut)
-}
-
-function isPPTArrowToolShortcut(event: KeyboardEvent) {
-  return !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.arrow.keyboardShortcut)
-}
-
-function isPPTEraserToolShortcut(event: KeyboardEvent) {
-  return !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.eraser.keyboardShortcut)
-}
-
-function doesEventMatchCanvasToolShortcut(
-  event: KeyboardEvent,
-  shortcut: {
-    key: string
-    shiftInsensitive?: boolean
-    shiftKey?: boolean
-  } | undefined,
-) {
-  if (!shortcut || event.key.toLowerCase() !== shortcut.key.toLowerCase()) {
-    return false
-  }
-
-  return shortcut.shiftInsensitive || event.shiftKey === Boolean(shortcut.shiftKey)
+  return getCanvasKeyboardToolShortcutIntent({
+    config: PPT_CANVAS_COMMAND_CONFIG,
+    customCreationTools: [],
+    event,
+    key: event.key.toLowerCase(),
+  })
 }
 
 function arePPTCreationToolsEqual(
@@ -17226,7 +17167,7 @@ function appendPPTFreeformPoint(points: Point[], point: Point) {
   const next = clampPPTPointToSlide(point)
   const last = points.at(-1)
 
-  if (last && getPointDistance(last, next) < 2) {
+  if (last && pointDistance(last, next) < 2) {
     return points
   }
 
@@ -17237,7 +17178,7 @@ function getNextPPTLaserTrailPoints(points: Point[], point: Point) {
   const next = clampPPTPointToSlide(point)
   const last = points.at(-1)
 
-  if (last && getPointDistance(last, next) < PPT_LASER_POINT_DISTANCE) {
+  if (last && pointDistance(last, next) < PPT_LASER_POINT_DISTANCE) {
     return points
   }
 
@@ -17252,7 +17193,7 @@ function getNextPPTEraserPoints(points: Point[], point: Point) {
     return [next]
   }
 
-  const distance = getPointDistance(last, next)
+  const distance = pointDistance(last, next)
 
   if (distance < PPT_ERASER_POINT_DISTANCE) {
     return points
@@ -17295,7 +17236,7 @@ function isPPTPointNearPolyline(point: Point, polyline: Point[], distance: numbe
   }
 
   if (polyline.length === 1) {
-    return getPointDistance(point, polyline[0]) <= distance
+    return pointDistance(point, polyline[0]) <= distance
   }
 
   return polyline.slice(1).some((current, index) =>
@@ -17308,7 +17249,7 @@ function getPPTPointSegmentDistance(point: Point, start: Point, end: Point) {
   const lengthSquared = dx * dx + dy * dy
 
   if (lengthSquared === 0) {
-    return getPointDistance(point, start)
+    return pointDistance(point, start)
   }
 
   const ratio = clamp(
@@ -17317,7 +17258,7 @@ function getPPTPointSegmentDistance(point: Point, start: Point, end: Point) {
     1,
   )
 
-  return getPointDistance(point, {
+  return pointDistance(point, {
     x: start.x + dx * ratio,
     y: start.y + dy * ratio,
   })
@@ -17342,7 +17283,7 @@ function getPPTFreeformWorldLength(element: PPTFreeform) {
   const points = getPPTFreeformWorldPoints(element)
 
   return points.slice(1).reduce((length, point, index) =>
-    length + getPointDistance(points[index], point), 0)
+    length + pointDistance(points[index], point), 0)
 }
 
 function getPPTFreeformWorldPoints(element: PPTFreeform) {
@@ -17350,54 +17291,6 @@ function getPPTFreeformWorldPoints(element: PPTFreeform) {
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
   }))
-}
-
-function getPPTFreeformPathData(points: readonly Point[]) {
-  const [first, second, ...rest] = points
-
-  if (!first) {
-    return ''
-  }
-
-  if (!second) {
-    return `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`
-  }
-
-  if (rest.length === 0) {
-    return [
-      `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
-      `L ${formatPPTPathNumber(second.x)} ${formatPPTPathNumber(second.y)}`,
-    ].join(' ')
-  }
-
-  return [
-    `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
-    `Q ${formatPPTPathNumber(second.x)} ${formatPPTPathNumber(second.y)} ${getPPTPathMidpoint(second, rest[0])}`,
-    ...rest.slice(1).map((point, index) => {
-      const control = rest[index]
-
-      return `Q ${formatPPTPathNumber(control.x)} ${formatPPTPathNumber(control.y)} ${getPPTPathMidpoint(control, point)}`
-    }),
-    `L ${formatPPTPathNumber(rest[rest.length - 1].x)} ${formatPPTPathNumber(rest[rest.length - 1].y)}`,
-  ].join(' ')
-}
-
-function getPPTLaserTrailPathData(points: readonly Point[]) {
-  const [first, ...rest] = points
-
-  if (!first) {
-    return ''
-  }
-
-  return [
-    `M ${formatPPTPathNumber(first.x)} ${formatPPTPathNumber(first.y)}`,
-    ...rest.map((point) =>
-      `L ${formatPPTPathNumber(point.x)} ${formatPPTPathNumber(point.y)}`),
-  ].join(' ')
-}
-
-function getPPTPathMidpoint(a: Point, b: Point) {
-  return `${formatPPTPathNumber((a.x + b.x) / 2)} ${formatPPTPathNumber((a.y + b.y) / 2)}`
 }
 
 function formatPPTPathNumber(value: number) {
@@ -17574,7 +17467,7 @@ function getPPTLineAttachment(
     }
 
     for (const anchor of getPPTConnectorAnchors(element)) {
-      const distance = getPointDistance(point, anchor.point)
+      const distance = pointDistance(point, anchor.point)
 
       if (
         distance <= PPT_LINE_CONNECTION_DISTANCE &&
@@ -17716,14 +17609,10 @@ function getPPTConnectionAnchorPoint(
 }
 
 function getPPTLineLength(line: PPTLine) {
-  return getPointDistance(
+  return pointDistance(
     getPPTLineEndpointPoint(line, 'start'),
     getPPTLineEndpointPoint(line, 'end'),
   )
-}
-
-function getPointDistance(a: Point, b: Point) {
-  return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
 function getPointAngle(center: Point, point: Point) {
