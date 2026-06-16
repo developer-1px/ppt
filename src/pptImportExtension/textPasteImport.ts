@@ -4,6 +4,9 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  getCanvasTextPasteSourcesFromDataTransfer,
+} from 'canvas/app/text-paste-import'
+import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -57,30 +60,8 @@ const PPT_TEXT_PASTE_WIDTH = 460
 const PPT_TEXT_PASTE_LINE_HEIGHT = 38
 const PPT_TEXT_PASTE_MIN_HEIGHT = 92
 const PPT_TEXT_PASTE_MAX_HEIGHT = 320
-const PPT_TEXT_PASTE_DATA_TYPES = [
-  'text/plain',
-  'text/html',
-] as const
-
-export function getPPTTextPasteSourcesFromDataTransfer(
-  dataTransfer: DataTransfer | null,
-) {
-  if (!dataTransfer) {
-    return []
-  }
-
-  const sources: string[] = []
-
-  for (const type of PPT_TEXT_PASTE_DATA_TYPES) {
-    const text = dataTransfer.getData(type).trim()
-
-    if (text && !sources.includes(text)) {
-      sources.push(text)
-    }
-  }
-
-  return sources
-}
+export const getPPTTextPasteSourcesFromDataTransfer =
+  getCanvasTextPasteSourcesFromDataTransfer
 
 export function getPPTRichTextPasteSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,

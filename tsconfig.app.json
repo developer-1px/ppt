@@ -26,6 +26,7 @@
       "canvas/app/pointer-click-memory": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
       "canvas/app/tabs-roving-focus": ["../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts"],
+      "canvas/app/text-paste-import": ["../canvas/src/canvas/app/feature-packs/text-paste-import/CanvasTextPasteImport.ts"],
       "canvas/app/toolbar-roving-focus": ["../canvas/src/canvas/app/feature-packs/toolbar/CanvasToolbarRovingFocus.ts"],
       "canvas/engine": ["../canvas/src/canvas/engine/index.ts"],
       "canvas/core": ["../canvas/src/canvas/core/index.ts"],
