@@ -6170,6 +6170,18 @@ async function runObjectOpacityScenario(page) {
   record(
     'updates PPT object opacity metadata from inspector',
     afterOpacity.opacity === '0.42' &&
+      afterOpacity.descriptorSurface === 'object-opacity' &&
+      afterOpacity.descriptorCommand === 'update-object-opacity' &&
+      afterOpacity.descriptorControl === 'opacity-slider' &&
+      afterOpacity.descriptorAttribute === 'data-slide-object-opacity' &&
+      afterOpacity.descriptorAttributeValue === '0.42' &&
+      afterOpacity.model === 'slide-edit-object-opacity' &&
+      afterOpacity.command === 'update-object-opacity' &&
+      afterOpacity.commandField === 'opacity' &&
+      afterOpacity.commandObject === afterOpacity.selectedId &&
+      afterOpacity.commandSlide === 'slide-1' &&
+      afterOpacity.commandType === 'slide-command-effect' &&
+      afterOpacity.commandValue === '0.42' &&
       afterOpacity.selectedOpacity === '0.42' &&
       afterOpacity.selectedStyleOpacity === '0.42' &&
       afterOpacity.thumbOpacity === '0.42' &&
@@ -9675,9 +9687,23 @@ function getPPTObjectOpacityState(page, elementId) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = id || selected?.getAttribute('data-ppt-element') || ''
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="opacity"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
-      opacity: document.querySelector('[data-ppt-style-field="opacity"]')?.value ?? '',
+      command: stage?.getAttribute('data-ppt-object-opacity-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-object-opacity-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-object-opacity-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-object-opacity-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-object-opacity-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-object-opacity-command-value') ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-object-opacity-attribute') ?? '',
+      descriptorAttributeValue: field?.getAttribute('data-ppt-object-opacity-attribute-value') ?? '',
+      descriptorCommand: field?.getAttribute('data-ppt-object-opacity-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-object-opacity-control') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-object-opacity-surface') ?? '',
+      model: stage?.getAttribute('data-ppt-object-opacity-model') ?? '',
+      opacity: field?.value ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedOpacity: selected?.getAttribute('data-ppt-opacity') ?? '',
       selectedStyleOpacity: selected?.style.opacity ?? '',
