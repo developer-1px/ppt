@@ -4311,7 +4311,10 @@ function App() {
             }
           }),
         )
-        setSelection([...effect.selection.objectIds])
+        setSelection(getPPTLayerPaneActualObjectIds(
+          activeSlide,
+          effect.selection.objectIds,
+        ))
         return
       case 'select-objects': {
         const targetObjectId = payload.objectIds.at(-1)
@@ -8660,7 +8663,8 @@ function getPPTLayerPaneObjectInputs({
       isLocked: groupElements.length > 0 &&
         groupElements.every((member) => member.locked === true),
       isRenamable: false,
-      isReorderable: false,
+      isReorderable: groupElements.length > 0 &&
+        groupElements.every((member) => member.locked !== true),
       isSelectable: groupElements.length > 0,
       kindLabel: 'Group',
       objectId: groupRowId,
@@ -8820,6 +8824,23 @@ function getPPTLayerPaneDropIndex(
   targetObjectId: string,
   placement: PPTLayerPaneDropPlacement,
 ) {
+  const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
+
+  if (targetGroupId) {
+    const groupIndexes = slide.elements
+      .map((element, index) => ({ element, index }))
+      .filter(({ element }) => element.groupId === targetGroupId)
+      .map(({ index }) => index)
+
+    if (groupIndexes.length === 0) {
+      return null
+    }
+
+    return placement === 'before'
+      ? Math.min(...groupIndexes)
+      : Math.max(...groupIndexes) + 1
+  }
+
   const targetIndex = slide.elements.findIndex((element) => element.id === targetObjectId)
 
   if (targetIndex < 0) {
@@ -8834,29 +8855,47 @@ function reorderPPTLayerPaneElement(
   objectId: string,
   toIndex: number,
 ) {
-  const fromIndex = elements.findIndex((element) => element.id === objectId)
+  const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
+  const draggedObjectIds = new Set(
+    groupId
+      ? elements
+          .filter((element) => element.groupId === groupId)
+          .map((element) => element.id)
+      : [objectId],
+  )
+  const fromIndex = elements.findIndex((element) => draggedObjectIds.has(element.id))
 
   if (fromIndex < 0) {
     return null
   }
 
   const boundedToIndex = clamp(toIndex, 0, elements.length)
-  const insertionIndex = fromIndex < boundedToIndex
-    ? Math.max(0, boundedToIndex - 1)
-    : boundedToIndex
+  const block = elements.filter((element) => draggedObjectIds.has(element.id))
 
-  if (insertionIndex === fromIndex) {
+  if (block.length === 0) {
     return null
   }
 
-  const next = [...elements]
-  const [element] = next.splice(fromIndex, 1)
+  const removedBeforeDropIndex = elements
+    .slice(0, boundedToIndex)
+    .filter((element) => draggedObjectIds.has(element.id))
+    .length
+  const remaining = elements.filter((element) => !draggedObjectIds.has(element.id))
+  const insertionIndex = clamp(
+    boundedToIndex - removedBeforeDropIndex,
+    0,
+    remaining.length,
+  )
+  const next = [
+    ...remaining.slice(0, insertionIndex),
+    ...block,
+    ...remaining.slice(insertionIndex),
+  ]
 
-  if (!element) {
+  if (next.map((element) => element.id).join('\u0000') ===
+    elements.map((element) => element.id).join('\u0000')) {
     return null
   }
-
-  next.splice(insertionIndex, 0, element)
 
   return next
 }
@@ -10929,7 +10968,7 @@ function Inspector({
   }
 
   function canDragLayerPaneRow(row: PPTLayerPaneRowDescriptor) {
-    return row.isReorderable && !row.isGroup
+    return row.isReorderable
   }
 
   function handleLayerPaneRowPress(
