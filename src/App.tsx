@@ -92,6 +92,7 @@ import {
   type RefObject,
 } from 'react'
 import {
+  createSlideEditObjectAccessibilityDescriptor,
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
@@ -101,6 +102,7 @@ import {
   createSlideEditThemeDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectHyperlinkCommandEffect,
@@ -121,6 +123,8 @@ import {
   type SlideEditFrameGuideGeometry,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
+  type SlideEditObjectAccessibilityDescriptor,
+  type SlideEditObjectAccessibilityHostCommandEffect,
   type SlideEditObjectCornerRadiusDescriptor,
   type SlideEditObjectCornerRadiusHostCommandEffect,
   type SlideEditObjectFillOpacityDescriptor,
@@ -1536,6 +1540,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
   const [lastCornerRadiusEffect, setLastCornerRadiusEffect] = useState<SlideEditObjectCornerRadiusHostCommandEffect<string, string> | null>(null)
   const [lastFillOpacityEffect, setLastFillOpacityEffect] = useState<SlideEditObjectFillOpacityHostCommandEffect<string, string> | null>(null)
   const [lastHyperlinkEffect, setLastHyperlinkEffect] = useState<SlideEditObjectHyperlinkHostCommandEffect<string, string> | null>(null)
@@ -3579,9 +3584,34 @@ function App() {
   }
 
   function updateElementAltText(elementId: string, altText: string) {
+    const trimmedAltText = altText.trim()
+    const effect = getSlideEditObjectAccessibilityCommandEffect(
+      trimmedAltText
+        ? {
+            fieldId: 'altText',
+            id: 'update-object-accessibility',
+            objectId: elementId,
+            slideId: activeSlide.id,
+            value: trimmedAltText,
+          }
+        : {
+            id: 'remove-object-alt-text',
+            objectId: elementId,
+            slideId: activeSlide.id,
+          },
+    )
+
+    setLastAccessibilityEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        const accessibility = normalizePPTElementAccessibility({ altText })
+        const accessibility = effect.payload.id === 'update-object-accessibility'
+          ? normalizePPTElementAccessibility({
+              altText: typeof effect.payload.value === 'string'
+                ? effect.payload.value
+                : '',
+            })
+          : null
 
         return {
           ...element,
@@ -6546,6 +6576,17 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-accessibility-command={lastAccessibilityEffect?.payload.id}
+        data-ppt-accessibility-command-field={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
+          ? lastAccessibilityEffect.payload.fieldId
+          : undefined}
+        data-ppt-accessibility-command-object={lastAccessibilityEffect?.payload.objectId}
+        data-ppt-accessibility-command-slide={lastAccessibilityEffect?.payload.slideId}
+        data-ppt-accessibility-command-type={lastAccessibilityEffect?.type}
+        data-ppt-accessibility-command-value={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
+          ? String(lastAccessibilityEffect.payload.value)
+          : undefined}
+        data-ppt-accessibility-model="slide-edit-object-accessibility"
         data-ppt-corner-radius-command={lastCornerRadiusEffect?.payload.id}
         data-ppt-corner-radius-command-field={lastCornerRadiusEffect?.payload.fieldId}
         data-ppt-corner-radius-command-object={lastCornerRadiusEffect?.payload.objectId}
@@ -10383,6 +10424,12 @@ function Inspector({
   const objectHyperlinkUrlField = objectHyperlinkDescriptor?.fields.find((field) =>
     field.id === 'url'
   )
+  const objectAccessibilityDescriptor = selectedElement
+    ? getPPTObjectAccessibilityDescriptor(slide.id, selectedElement)
+    : null
+  const objectAccessibilityAltTextField = objectAccessibilityDescriptor?.fields.find((field) =>
+    field.id === 'altText'
+  )
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -10879,8 +10926,14 @@ function Inspector({
               <span>Alt text</span>
               <textarea
                 data-ppt-style-field="alt-text"
+                data-ppt-accessibility-attribute={objectAccessibilityDescriptor?.metadata.attribute}
+                data-ppt-accessibility-attribute-value={objectAccessibilityDescriptor?.metadata.attributeValue}
+                data-ppt-accessibility-command={objectAccessibilityAltTextField?.commandId}
+                data-ppt-accessibility-control={objectAccessibilityAltTextField?.control}
+                data-ppt-accessibility-described={objectAccessibilityDescriptor?.metadata.isDescribed ? 'true' : 'false'}
+                data-ppt-accessibility-surface={objectAccessibilityDescriptor?.surface}
                 maxLength={PPT_ALT_TEXT_MAX_LENGTH}
-                value={elementAltText}
+                value={objectAccessibilityDescriptor?.value.altText ?? elementAltText}
                 onChange={(event) =>
                   onElementAltTextChange(
                     selectedElement.id,
@@ -12635,6 +12688,20 @@ function getPPTElementAltText(element: PPTElement) {
   return element.accessibility
     ? normalizePPTElementAccessibility(element.accessibility)?.altText
     : undefined
+}
+
+function getPPTObjectAccessibilityDescriptor(
+  slideId: string,
+  element: PPTElement,
+): SlideEditObjectAccessibilityDescriptor<string, string> {
+  return createSlideEditObjectAccessibilityDescriptor({
+    objectId: element.id,
+    slideId,
+    value: {
+      altText: getPPTElementAltText(element) ?? '',
+      decorative: false,
+    },
+  })
 }
 
 function getPPTElementStrokeDash(element: PPTElement) {

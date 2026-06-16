@@ -6792,6 +6792,19 @@ async function runObjectAltTextScenario(page) {
   record(
     'updates PPT object alt text metadata from inspector',
     afterAltText.altText === PPT_OBJECT_ALT_TEXT &&
+      afterAltText.descriptorSurface === 'object-accessibility' &&
+      afterAltText.descriptorCommand === 'update-object-accessibility' &&
+      afterAltText.descriptorControl === 'multiline-text' &&
+      afterAltText.descriptorAttribute === 'data-slide-object-accessibility' &&
+      afterAltText.descriptorAltText === PPT_OBJECT_ALT_TEXT &&
+      afterAltText.descriptorDescribed === 'true' &&
+      afterAltText.model === 'slide-edit-object-accessibility' &&
+      afterAltText.command === 'update-object-accessibility' &&
+      afterAltText.commandField === 'altText' &&
+      afterAltText.commandObject === imageId &&
+      afterAltText.commandSlide === 'slide-1' &&
+      afterAltText.commandType === 'slide-command-effect' &&
+      afterAltText.commandValue === PPT_OBJECT_ALT_TEXT &&
       afterAltText.selectedAltText === PPT_OBJECT_ALT_TEXT &&
       afterAltText.thumbAltText === PPT_OBJECT_ALT_TEXT &&
       afterAltText.imageAlt === PPT_OBJECT_ALT_TEXT,
@@ -6881,6 +6894,10 @@ async function runObjectAltTextScenario(page) {
   record(
     'removes and restores PPT object alt text as one history step',
     afterClear.altText === '' &&
+      afterClear.command === 'remove-object-alt-text' &&
+      afterClear.commandObject === imageId &&
+      afterClear.commandSlide === 'slide-1' &&
+      afterClear.commandType === 'slide-command-effect' &&
       afterClear.selectedAltText === '' &&
       afterClear.imageAlt === initial.imageAlt &&
       afterClearUndo.altText === PPT_OBJECT_ALT_TEXT &&
@@ -9814,11 +9831,37 @@ function getPPTObjectAltTextState(page, elementId) {
       ? document.querySelector(\`[data-ppt-element="\${targetId}"]\`)
       : selected
     const thumb = document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${targetId}"]\`)
+    const field = document.querySelector('[data-ppt-style-field="alt-text"]')
     const image = target?.querySelector('img') ?? null
+    const stage = document.querySelector('.ppt-stage-shell')
+    const descriptorAttributeValue = field?.getAttribute('data-ppt-accessibility-attribute-value') ?? ''
+    let descriptor = null
+
+    try {
+      descriptor = descriptorAttributeValue && descriptorAttributeValue !== 'none'
+        ? JSON.parse(descriptorAttributeValue)
+        : null
+    } catch {
+      descriptor = null
+    }
 
     return {
-      altText: document.querySelector('[data-ppt-style-field="alt-text"]')?.value ?? '',
+      altText: field?.value ?? '',
+      command: stage?.getAttribute('data-ppt-accessibility-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-accessibility-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-accessibility-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-accessibility-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-accessibility-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-accessibility-command-value') ?? '',
+      descriptorAltText: descriptor?.altText ?? '',
+      descriptorAttribute: field?.getAttribute('data-ppt-accessibility-attribute') ?? '',
+      descriptorAttributeValue,
+      descriptorCommand: field?.getAttribute('data-ppt-accessibility-command') ?? '',
+      descriptorControl: field?.getAttribute('data-ppt-accessibility-control') ?? '',
+      descriptorDescribed: field?.getAttribute('data-ppt-accessibility-described') ?? '',
+      descriptorSurface: field?.getAttribute('data-ppt-accessibility-surface') ?? '',
       imageAlt: image?.getAttribute('alt') ?? '',
+      model: stage?.getAttribute('data-ppt-accessibility-model') ?? '',
       selectedAltText: target?.getAttribute('data-ppt-alt-text') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
