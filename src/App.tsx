@@ -407,6 +407,7 @@ import {
   RESIZE_HANDLES,
   clamp,
   createCanvasSequentialIdFactory,
+  getCanvasBoundsCenter,
   getCanvasViewportScreenPoint,
   handlePoint,
   normalizeBounds,
@@ -6056,7 +6057,7 @@ function App() {
       return
     }
 
-    const center = getBoundsCenter(selectedBounds)
+    const center = getCanvasBoundsCenter(selectedBounds)
     const point = screenToWorld(event.nativeEvent)
 
     setInteraction({
@@ -16710,13 +16711,6 @@ function arePPTTextRunStylesEqual(
     left.italic === right.italic &&
     left.size === right.size &&
     left.underline === right.underline
-}
-
-function getBoundsCenter(bounds: Bounds): Point {
-  return {
-    x: bounds.x + bounds.w / 2,
-    y: bounds.y + bounds.h / 2,
-  }
 }
 
 function getPPTLineEndpointPoint(
