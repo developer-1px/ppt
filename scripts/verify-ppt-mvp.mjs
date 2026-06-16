@@ -764,6 +764,9 @@ async function runFindReplaceScenario(page) {
   record('does not open PPT find while native text editing is active', afterGuard.editing && !afterGuard.stripOpen, afterGuard)
 
   const beforeNativeShortcutGuard = await page.eval(`(() => ({
+    creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+    drawingTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-drawing-tool') ?? '',
+    eraserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-tool-active') ?? '',
     laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
     laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
@@ -822,11 +825,33 @@ async function runFindReplaceScenario(page) {
       code: 'KeyP',
       key: 'p',
     }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyM',
+      key: 'm',
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyM',
+      key: 'M',
+      shiftKey: true,
+    }))
+    editor?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyE',
+      key: 'e',
+    }))
   })()`)
   await delay(50)
 
   const afterNativeShortcutGuard = await page.eval(`(() => ({
+    creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+    drawingTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-drawing-tool') ?? '',
     editing: document.activeElement?.matches('[data-ppt-element="s2-title"] .ppt-element-editor') === true,
+    eraserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-tool-active') ?? '',
     laserToolActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-tool-active') ?? '',
     laserTrailPointCount: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-laser-trail-point-count') ?? '',
     locked: document.querySelector('[data-ppt-element="s2-title"]')?.getAttribute('data-locked') ?? '',
@@ -838,7 +863,7 @@ async function runFindReplaceScenario(page) {
     viewportTransform: document.querySelector('.ppt-stage-world')?.style.transform ?? '',
   }))()`)
 
-  record('does not run PPT arrange lock viewport pan or laser shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture && afterNativeShortcutGuard.laserToolActive === beforeNativeShortcutGuard.laserToolActive && afterNativeShortcutGuard.laserTrailPointCount === beforeNativeShortcutGuard.laserTrailPointCount, {
+  record('does not run PPT arrange lock viewport pan laser or drawing shortcuts while native text editing is active', afterNativeShortcutGuard.editing && afterNativeShortcutGuard.locked === beforeNativeShortcutGuard.locked && afterNativeShortcutGuard.order === beforeNativeShortcutGuard.order && afterNativeShortcutGuard.viewportTransform === beforeNativeShortcutGuard.viewportTransform && afterNativeShortcutGuard.panToolActive === beforeNativeShortcutGuard.panToolActive && afterNativeShortcutGuard.temporaryPanActive === beforeNativeShortcutGuard.temporaryPanActive && afterNativeShortcutGuard.temporaryPanGesture === beforeNativeShortcutGuard.temporaryPanGesture && afterNativeShortcutGuard.laserToolActive === beforeNativeShortcutGuard.laserToolActive && afterNativeShortcutGuard.laserTrailPointCount === beforeNativeShortcutGuard.laserTrailPointCount && afterNativeShortcutGuard.creationTool === beforeNativeShortcutGuard.creationTool && afterNativeShortcutGuard.drawingTool === beforeNativeShortcutGuard.drawingTool && afterNativeShortcutGuard.eraserToolActive === beforeNativeShortcutGuard.eraserToolActive, {
     afterNativeShortcutGuard,
     beforeNativeShortcutGuard,
   })
@@ -2416,6 +2441,9 @@ async function runCommandPaletteScenario(page) {
   const panToolIds = await readCommandPaletteIds(page, 'pan tool')
   const laserToolIds = await readCommandPaletteIds(page, 'laser pointer')
   const penToolIds = await readCommandPaletteIds(page, 'pen tool')
+  const markerToolIds = await readCommandPaletteIds(page, 'marker')
+  const highlighterToolIds = await readCommandPaletteIds(page, 'highlighter')
+  const eraserToolIds = await readCommandPaletteIds(page, 'eraser')
   const findIds = await readCommandPaletteIds(page, 'find')
   const groupIds = await readCommandPaletteIds(page, 'group')
   const lockIds = await readCommandPaletteIds(page, 'lock')
@@ -2444,7 +2472,10 @@ async function runCommandPaletteScenario(page) {
       toolIds.includes('tool:arrow') &&
       panToolIds.includes('tool:pan') &&
       laserToolIds.includes('tool:laser') &&
-      penToolIds.includes('tool:pen'),
+      penToolIds.includes('tool:pen') &&
+      markerToolIds.includes('tool:marker') &&
+      highlighterToolIds.includes('tool:highlight') &&
+      eraserToolIds.includes('tool:eraser'),
     hasFind: findIds.includes('view:find'),
     hasFlip: flipIds.includes('command:flip-horizontal') &&
       flipIds.includes('command:flip-vertical'),
@@ -2494,8 +2525,11 @@ async function runCommandPaletteScenario(page) {
       grid: gridIds.length,
       guide: guideIds.length,
       group: groupIds.length,
+      eraserTool: eraserToolIds.length,
+      highlighterTool: highlighterToolIds.length,
       lock: lockIds.length,
       laserTool: laserToolIds.length,
+      markerTool: markerToolIds.length,
       present: presentIds.length,
       panTool: panToolIds.length,
       penTool: penToolIds.length,
@@ -2605,7 +2639,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -7789,6 +7823,211 @@ async function runFreeformScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(60)
+  await pressKey(page, {
+    code: 'KeyM',
+    key: 'm',
+    windowsVirtualKeyCode: 77,
+  })
+  await delay(80)
+
+  const afterMarkerShortcut = await getPPTFreeformState(page)
+
+  record('starts PPT marker tool from canvas M shortcut', afterMarkerShortcut.creationTool === 'marker' && afterMarkerShortcut.drawingTool === 'marker' && afterMarkerShortcut.markerToolbarPressed === 'true', afterMarkerShortcut)
+
+  const markerDraw = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.42,
+      endY: slide.top + slide.height * 0.52,
+      midX: slide.left + slide.width * 0.34,
+      midY: slide.top + slide.height * 0.47,
+      startX: slide.left + slide.width * 0.25,
+      startY: slide.top + slide.height * 0.50,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: markerDraw.startX,
+    y: markerDraw.startY,
+  }, {
+    x: markerDraw.midX,
+    y: markerDraw.midY,
+  }, {
+    x: markerDraw.endX,
+    y: markerDraw.endY,
+  }])
+  await delay(100)
+
+  const afterMarkerCreate = await getPPTFreeformState(page)
+
+  record('draws PPT marker path with canvas marker stroke style', afterMarkerCreate.freeformCount === afterPalette.freeformCount + 1 && afterMarkerCreate.selectedKind === 'freeform' && afterMarkerCreate.selectedName === 'Marker' && afterMarkerCreate.stroke === '#475569' && afterMarkerCreate.strokeWidth === '4' && afterMarkerCreate.selectedOpacity === '1', {
+    afterMarkerCreate,
+    afterPalette,
+  })
+
+  await pressKey(page, {
+    code: 'KeyM',
+    key: 'M',
+    modifiers: 8,
+    windowsVirtualKeyCode: 77,
+  })
+  await delay(80)
+
+  const afterHighlighterShortcut = await getPPTFreeformState(page)
+
+  record('starts PPT highlighter tool from canvas Shift+M shortcut', afterHighlighterShortcut.creationTool === 'highlight' && afterHighlighterShortcut.drawingTool === 'highlight' && afterHighlighterShortcut.highlighterToolbarPressed === 'true', afterHighlighterShortcut)
+
+  const highlighterDraw = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.73,
+      endY: slide.top + slide.height * 0.49,
+      midX: slide.left + slide.width * 0.63,
+      midY: slide.top + slide.height * 0.45,
+      startX: slide.left + slide.width * 0.53,
+      startY: slide.top + slide.height * 0.48,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: highlighterDraw.startX,
+    y: highlighterDraw.startY,
+  }, {
+    x: highlighterDraw.midX,
+    y: highlighterDraw.midY,
+  }, {
+    x: highlighterDraw.endX,
+    y: highlighterDraw.endY,
+  }])
+  await delay(100)
+
+  const afterHighlighterCreate = await getPPTFreeformState(page)
+  const highlighterId = afterHighlighterCreate.selectedId
+
+  record('draws PPT highlighter path with canvas highlighter stroke style', afterHighlighterCreate.freeformCount === afterMarkerCreate.freeformCount + 1 && afterHighlighterCreate.selectedKind === 'freeform' && afterHighlighterCreate.selectedName === 'Highlighter' && afterHighlighterCreate.stroke === '#fde047' && afterHighlighterCreate.strokeWidth === '18' && afterHighlighterCreate.selectedOpacity === '0.42' && afterHighlighterCreate.selectedStyleOpacity === '0.42', {
+    afterHighlighterCreate,
+    afterMarkerCreate,
+  })
+
+  await pressKey(page, {
+    code: 'KeyE',
+    key: 'e',
+    windowsVirtualKeyCode: 69,
+  })
+  await delay(80)
+
+  const afterEraserShortcut = await getPPTFreeformState(page)
+
+  record('starts PPT eraser tool from canvas E shortcut', afterEraserShortcut.eraserActive === 'true' && afterEraserShortcut.eraserToolbarPressed === 'true' && afterEraserShortcut.creationTool === '', afterEraserShortcut)
+
+  const shapePoint = await getElementCenter(page, 's1-card-1')
+  const beforeNonDrawingErase = await getPPTFreeformState(page)
+
+  await dragMouse(page, [{
+    x: shapePoint.x - 24,
+    y: shapePoint.y - 18,
+  }, {
+    x: shapePoint.x + 24,
+    y: shapePoint.y + 18,
+  }])
+  await delay(100)
+
+  const afterNonDrawingErase = await getPPTFreeformState(page)
+
+  record('keeps non-drawing PPT objects when eraser crosses shapes', afterNonDrawingErase.eraserActive === 'true' && afterNonDrawingErase.shapeCount === beforeNonDrawingErase.shapeCount && afterNonDrawingErase.freeformCount === beforeNonDrawingErase.freeformCount && afterNonDrawingErase.elementCount === beforeNonDrawingErase.elementCount, {
+    afterNonDrawingErase,
+    beforeNonDrawingErase,
+  })
+
+  const highlighterTrace = await page.eval(`(() => {
+    const id = ${JSON.stringify(highlighterId)}
+    const rect = document.querySelector('[data-ppt-element="' + id + '"]').getBoundingClientRect()
+
+    return {
+      endX: rect.left + rect.width * 0.75,
+      endY: rect.top + rect.height * 0.52,
+      midX: rect.left + rect.width / 2,
+      midY: rect.top + rect.height / 2,
+      startX: rect.left + rect.width * 0.25,
+      startY: rect.top + rect.height * 0.48,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: highlighterTrace.startX,
+    y: highlighterTrace.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: highlighterTrace.midX,
+    y: highlighterTrace.midY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: highlighterTrace.endX,
+    y: highlighterTrace.endY,
+  })
+  await delay(50)
+
+  const duringEraserDrag = await getPPTFreeformState(page)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: highlighterTrace.endX,
+    y: highlighterTrace.endY,
+  })
+  await delay(120)
+
+  const afterEraserDelete = await getPPTFreeformState(page)
+
+  record('previews and erases PPT freeform stroke with canvas eraser semantics', duringEraserDrag.eraserHitCount > 0 && duringEraserDrag.eraserHitIds.includes(highlighterId) && afterEraserDelete.freeformCount === afterNonDrawingErase.freeformCount - 1 && !afterEraserDelete.freeformIds.includes(highlighterId) && afterEraserDelete.shapeCount === afterNonDrawingErase.shapeCount, {
+    afterEraserDelete,
+    afterNonDrawingErase,
+    duringEraserDrag,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(120)
+
+  const afterEraserUndo = await getPPTFreeformState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(120)
+
+  const afterEraserRedo = await getPPTFreeformState(page)
+
+  record('records PPT eraser stroke deletion as undoable history step', afterEraserUndo.freeformCount === afterNonDrawingErase.freeformCount && afterEraserUndo.freeformIds.includes(highlighterId) && afterEraserRedo.freeformCount === afterEraserDelete.freeformCount && !afterEraserRedo.freeformIds.includes(highlighterId), {
+    afterEraserDelete,
+    afterEraserRedo,
+    afterEraserUndo,
+    afterNonDrawingErase,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(60)
 }
 
 async function runFlipSelectionScenario(page) {
@@ -8911,8 +9150,22 @@ function getPPTFreeformState(page) {
 
     return {
       creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
+      drawingTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-drawing-tool') ?? '',
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      eraserActive: document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-tool-active') ?? '',
+      eraserHitCount: Number(document.querySelector('.ppt-stage-shell')?.getAttribute('data-ppt-eraser-hit-count') ?? 0),
+      eraserHitIds: [...document.querySelectorAll('[data-ppt-eraser-hit="true"]')]
+        .map((element) => element.getAttribute('data-ppt-element')),
+      eraserToolbarPressed: document.querySelector('[data-ppt-eraser-tool]')?.getAttribute('aria-pressed') ?? '',
       freeformCount: document.querySelectorAll('[data-kind="freeform"]').length,
+      freeformIds: [...document.querySelectorAll('[data-kind="freeform"]')]
+        .map((element) => element.getAttribute('data-ppt-element')),
+      highlighterToolbarPressed: document.querySelector('[data-ppt-insert-tool="highlight"]')?.getAttribute('aria-pressed') ?? '',
+      markerToolbarPressed: document.querySelector('[data-ppt-insert-tool="marker"]')?.getAttribute('aria-pressed') ?? '',
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
+      paletteEraser: !!document.querySelector('[data-ppt-command-palette-item="tool:eraser"]'),
+      paletteHighlight: !!document.querySelector('[data-ppt-command-palette-item="tool:highlight"]'),
+      paletteMarker: !!document.querySelector('[data-ppt-command-palette-item="tool:marker"]'),
       palettePen: !!document.querySelector('[data-ppt-command-palette-item="tool:pen"]'),
       pasteDisabled: document.querySelector('[data-ppt-command="paste-formatting"]')?.disabled ?? true,
       pathD: selectedPath?.getAttribute('d') ?? '',
@@ -8922,10 +9175,13 @@ function getPPTFreeformState(page) {
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: layerName?.textContent ?? '',
+      selectedOpacity: selected?.getAttribute('data-ppt-opacity') ?? '',
       selectedRotation: selected?.getAttribute('data-rotation') ?? '',
+      selectedStyleOpacity: selected?.style.opacity ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedTransform: selected?.style.transform ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      shapeCount: document.querySelectorAll('[data-kind="shape"]').length,
       stroke: selectedPath?.getAttribute('stroke') ?? '',
       strokeDasharray: selectedPath?.getAttribute('stroke-dasharray') ?? '',
       strokeWidth: selectedPath?.getAttribute('stroke-width') ?? '',
@@ -9300,6 +9556,39 @@ async function clickMouse(page, x, y, clickCount, modifiers = 0) {
     type: 'mouseReleased',
     x,
     y,
+  })
+}
+
+async function dragMouse(page, points, modifiers = 0) {
+  const [start, ...rest] = points
+  const end = rest.at(-1) ?? start
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers,
+    type: 'mousePressed',
+    x: start.x,
+    y: start.y,
+  })
+
+  for (const point of rest) {
+    await page.send('Input.dispatchMouseEvent', {
+      button: 'left',
+      modifiers,
+      type: 'mouseMoved',
+      x: point.x,
+      y: point.y,
+    })
+  }
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers,
+    type: 'mouseReleased',
+    x: end.x,
+    y: end.y,
   })
 }
 

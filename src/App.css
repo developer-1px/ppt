@@ -897,6 +897,10 @@
   cursor: crosshair;
 }
 
+.ppt-stage-shell[data-ppt-eraser-tool-active='true'] {
+  cursor: crosshair;
+}
+
 .ppt-stage-shell[data-ppt-temporary-pan-gesture='true'] {
   cursor: grabbing;
 }
@@ -1099,6 +1103,11 @@
 
 .ppt-element[data-selected='true'] {
   outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ppt-element[data-ppt-eraser-hit='true'] {
+  outline: 2px solid #ef4444;
   outline-offset: 2px;
 }
 

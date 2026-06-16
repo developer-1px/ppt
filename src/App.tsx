@@ -25,6 +25,7 @@ import {
   CopyPlus,
   Diamond,
   Download,
+  Eraser,
   Eye,
   EyeOff,
   FilePlus2,
@@ -33,6 +34,7 @@ import {
   Grid2X2,
   Group,
   Hand,
+  Highlighter,
   ImagePlus,
   Italic,
   Keyboard,
@@ -48,6 +50,7 @@ import {
   MoveDown,
   MoveUp,
   Paintbrush,
+  PencilLine,
   PenLine,
   Play,
   Plus,
@@ -1340,9 +1343,12 @@ const PPT_MINIMAP_PADDING = 8
 const PPT_MINIMAP_MIN_WORLD_SIZE = 120
 const PPT_LASER_POINT_DISTANCE = 3
 const PPT_LASER_TRAIL_MAX_POINTS = 80
+const PPT_ERASER_POINT_DISTANCE = 4
+const PPT_ERASER_HIT_PADDING = 8
 
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
+type PPTFreeformTool = 'highlight' | 'marker' | 'pen'
 type PPTCreationTool =
   | {
       kind: 'shape'
@@ -1356,6 +1362,7 @@ type PPTCreationTool =
     }
   | {
       kind: 'freeform'
+      tool: PPTFreeformTool
     }
 type PPTFindMatch = {
   elementId: string
@@ -1464,6 +1471,15 @@ type Interaction =
       points: Point[]
       startPoint: Point
     }
+  | {
+      currentPoint: Point
+      erasedIds: string[]
+      kind: 'erase'
+      points: Point[]
+      slideId: string
+      startDeck: PPTDeck
+      startPoint: Point
+    }
 
 function App() {
   const [deck, setDeck] = useState(SAMPLE_PPT_DECK)
@@ -1485,6 +1501,7 @@ function App() {
   const [isPanToolActive, setIsPanToolActive] = useState(false)
   const [isLaserToolActive, setIsLaserToolActive] = useState(false)
   const [laserTrailPoints, setLaserTrailPoints] = useState<Point[]>([])
+  const [isEraserToolActive, setIsEraserToolActive] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
@@ -1780,6 +1797,7 @@ function App() {
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
   }
 
   function exitPresentation() {
@@ -2074,6 +2092,12 @@ function App() {
         return
       }
 
+      if (isPPTEraserToolShortcut(event)) {
+        event.preventDefault()
+        activateEraserTool()
+        return
+      }
+
       const shortcutTool = getPPTCreationToolForShortcut(event)
 
       if (shortcutTool) {
@@ -2127,6 +2151,7 @@ function App() {
         setCreationTool(null)
         setIsLaserToolActive(false)
         setLaserTrailPoints([])
+        setIsEraserToolActive(false)
         setContextMenu(null)
         setSelection([])
         return
@@ -2272,6 +2297,7 @@ function App() {
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setContextMenu(null)
   }
 
@@ -2385,6 +2411,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setContextMenu(null)
 
     if (activeFindMatch) {
@@ -2470,6 +2497,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setContextMenu(null)
   }
 
@@ -2496,6 +2524,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setContextMenu(null)
   }
 
@@ -2512,6 +2541,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setContextMenu(null)
   }
 
@@ -2829,6 +2859,7 @@ function App() {
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2839,6 +2870,7 @@ function App() {
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2849,6 +2881,7 @@ function App() {
     setLineCreationMode(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2862,6 +2895,21 @@ function App() {
     setCreationTool(null)
     setLineCreationMode(null)
     setIsPanToolActive(false)
+    setIsEraserToolActive(false)
+    setEditingId(null)
+    setContextMenu(null)
+  }
+
+  function activateEraserTool() {
+    const shouldActivate = !isEraserToolActive
+
+    setIsEraserToolActive(shouldActivate)
+    setInteraction((current) => current?.kind === 'erase' ? null : current)
+    setCreationTool(null)
+    setLineCreationMode(null)
+    setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
     setEditingId(null)
     setContextMenu(null)
   }
@@ -2884,6 +2932,7 @@ function App() {
       setIsPanToolActive(false)
       setIsLaserToolActive(false)
       setLaserTrailPoints([])
+      setIsEraserToolActive(false)
       setContextMenu(null)
 
       return {
@@ -2927,6 +2976,7 @@ function App() {
       setIsPanToolActive(false)
       setIsLaserToolActive(false)
       setLaserTrailPoints([])
+      setIsEraserToolActive(false)
       setContextMenu(null)
 
       return {
@@ -3286,6 +3336,7 @@ function App() {
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     setEditingId(null)
     setContextMenu(null)
   }
@@ -4533,10 +4584,13 @@ function App() {
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
     const id = createPPTElementId(startSlide, 'freeform')
     const points = [clampPPTPointToSlide(point)]
+    const style = getPPTFreeformToolStyle(creationTool.tool)
     const element = createPPTFreeformElement({
       id,
-      name: 'Freeform',
+      name: style.name,
+      opacity: style.opacity,
       points,
+      stroke: style.stroke,
     })
     const nextDeck = updatePPTDeckSlide(startDeck, activeSlide.id, (slide) => ({
       ...slide,
@@ -4553,6 +4607,38 @@ function App() {
       points,
       slideId: activeSlide.id,
       startDeck,
+    })
+
+    return true
+  }
+
+  function beginEraser(
+    event: ReactPointerEvent<HTMLElement>,
+    point: Point,
+  ) {
+    if (!isEraserToolActive) {
+      return false
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const startDeck = deckRef.current
+    const startSlide = findPPTSlide(startDeck, activeSlide.id)
+    const points = [clampPPTPointToSlide(point)]
+    const erasedIds = getPPTEraserHitElementIds(startSlide, points)
+
+    setContextMenu(null)
+    setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
+    setInteraction({
+      currentPoint: points[0],
+      erasedIds,
+      kind: 'erase',
+      points,
+      slideId: activeSlide.id,
+      startDeck,
+      startPoint: points[0],
     })
 
     return true
@@ -4616,6 +4702,10 @@ function App() {
     }
 
     if (beginTemporaryPan(event)) {
+      return
+    }
+
+    if (beginEraser(event, screenToWorld(event.nativeEvent))) {
       return
     }
 
@@ -4725,6 +4815,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
 
     if (!selection.includes(elementId)) {
       const nextSelection = getPPTGroupPointerSelection({
@@ -4751,6 +4842,10 @@ function App() {
     const point = screenToWorld(event.nativeEvent)
 
     if (beginTemporaryPan(event)) {
+      return
+    }
+
+    if (beginEraser(event, point)) {
       return
     }
 
@@ -4800,6 +4895,7 @@ function App() {
     setCreationTool(null)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
+    setIsEraserToolActive(false)
     openPPTContextMenu(event.clientX, event.clientY)
   }
 
@@ -4972,6 +5068,24 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'erase') {
+      const points = getNextPPTEraserPoints(interaction.points, point)
+      const startSlide = findPPTSlide(interaction.startDeck, interaction.slideId)
+      const erasedIds = mergePPTElementIds(
+        interaction.erasedIds,
+        getPPTEraserHitElementIds(startSlide, points),
+      )
+
+      setSelection((current) => current.filter((id) => !erasedIds.includes(id)))
+      setInteraction({
+        ...interaction,
+        currentPoint: clampPPTPointToSlide(point),
+        erasedIds,
+        points,
+      })
+      return
+    }
+
     if (interaction.kind === 'marquee') {
       const bounds = normalizeBounds(interaction.startPoint, point)
       const nextSelection = getCanvasMarqueeSelection({
@@ -5019,6 +5133,7 @@ function App() {
           ? createPPTFreeformElement({
               id: element.id,
               name: element.name,
+              opacity: element.opacity ?? 1,
               points,
               stroke: element.stroke,
             })
@@ -5207,6 +5322,18 @@ function App() {
       return
     }
 
+    if (interaction.kind === 'erase' && interaction.erasedIds.length > 0) {
+      const erasedIds = new Set(interaction.erasedIds)
+      const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
+        ...slide,
+        elements: slide.elements.filter((element) => !erasedIds.has(element.id)),
+      }))
+
+      deckRef.current = nextDeck
+      setDeck(nextDeck)
+      setSelection((current) => current.filter((id) => !erasedIds.has(id)))
+    }
+
     if (interaction.kind === 'line-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const createdLine = currentSlide.elements.find((element) =>
@@ -5257,6 +5384,7 @@ function App() {
             ? createPPTFreeformElement({
                 id: element.id,
                 name: element.name,
+                opacity: element.opacity ?? 1,
                 points: fallbackPoints,
                 stroke: element.stroke,
               })
@@ -5331,13 +5459,17 @@ function App() {
     !contextMenu &&
     !creationTool &&
     !lineCreationMode &&
-    !isLaserToolActive
+    !isLaserToolActive &&
+    !isEraserToolActive
     ? getPPTSelectionCommandAnchor({
         barWidth: selectionCommandBarWidth,
         bounds: selectedBounds,
         stage: stageRef.current,
         viewport,
       })
+    : null
+  const eraserHitIds = interaction?.kind === 'erase'
+    ? new Set(interaction.erasedIds)
     : null
   const selectionFloatingCommandGroups = getPPTCommandSurfaceGroups({
     availability: commandAvailability,
@@ -5610,10 +5742,28 @@ function App() {
     title: CANVAS_TOOL_AFFORDANCES.comment.ariaLabel,
   }, {
     id: 'tool:pen',
-    run: () => activatePPTCreationTool({ kind: 'freeform' }),
+    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' }),
     section: 'Create',
     shortcut: CANVAS_TOOL_AFFORDANCES.pen.shortcut,
     title: CANVAS_TOOL_AFFORDANCES.pen.ariaLabel,
+  }, {
+    id: 'tool:marker',
+    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.marker.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.marker.ariaLabel,
+  }, {
+    id: 'tool:highlight',
+    run: () => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' }),
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.highlight.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.highlight.ariaLabel,
+  }, {
+    id: 'tool:eraser',
+    run: activateEraserTool,
+    section: 'Create',
+    shortcut: CANVAS_TOOL_AFFORDANCES.eraser.shortcut,
+    title: CANVAS_TOOL_AFFORDANCES.eraser.ariaLabel,
   }, {
     id: 'tool:image',
     run: () => imageInputRef.current?.click(),
@@ -5907,14 +6057,48 @@ function App() {
           </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.pen.ariaLabel}
-            aria-pressed={creationTool?.kind === 'freeform'}
+            aria-pressed={isPPTFreeformCreationTool(creationTool, 'pen')}
             className="ppt-icon-button"
             data-ppt-insert-tool="pen"
-            onClick={() => activatePPTCreationTool({ kind: 'freeform' })}
+            onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' })}
             title={CANVAS_TOOL_AFFORDANCES.pen.title}
             type="button"
           >
             <PenLine size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.marker.ariaLabel}
+            aria-pressed={isPPTFreeformCreationTool(creationTool, 'marker')}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="marker"
+            onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' })}
+            title={CANVAS_TOOL_AFFORDANCES.marker.title}
+            type="button"
+          >
+            <PencilLine size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.highlight.ariaLabel}
+            aria-pressed={isPPTFreeformCreationTool(creationTool, 'highlight')}
+            className="ppt-icon-button"
+            data-ppt-insert-tool="highlight"
+            onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' })}
+            title={CANVAS_TOOL_AFFORDANCES.highlight.title}
+            type="button"
+          >
+            <Highlighter size={17} />
+          </button>
+          <button
+            aria-label={CANVAS_TOOL_AFFORDANCES.eraser.ariaLabel}
+            aria-pressed={isEraserToolActive}
+            className="ppt-icon-button"
+            data-ppt-eraser-tool
+            data-ppt-tool="eraser"
+            onClick={activateEraserTool}
+            title={CANVAS_TOOL_AFFORDANCES.eraser.title}
+            type="button"
+          >
+            <Eraser size={17} />
           </button>
           <button
             aria-label={CANVAS_TOOL_AFFORDANCES.comment.ariaLabel}
@@ -6162,6 +6346,17 @@ function App() {
         data-ppt-keyboard-nudge-large-step="10"
         data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
         data-ppt-keyboard-nudge-step="1"
+        data-ppt-drawing-tool={creationTool?.kind === 'freeform'
+          ? creationTool.tool
+          : undefined}
+        data-ppt-eraser-hit-count={interaction?.kind === 'erase'
+          ? interaction.erasedIds.length
+          : undefined}
+        data-ppt-eraser-tool-active={isEraserToolActive ? 'true' : 'false'}
+        data-ppt-eraser-tool-model="canvas-eraser-tool"
+        data-ppt-eraser-tool-shortcut="E"
+        data-ppt-highlighter-tool-model="canvas-highlighter-tool"
+        data-ppt-highlighter-tool-shortcut="Shift+M"
         data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
         data-ppt-laser-tool-model="canvas-laser-pointer-tool"
         data-ppt-laser-tool-shortcut="P"
@@ -6173,6 +6368,8 @@ function App() {
         data-ppt-pan-tool-active={isPanToolActive ? 'true' : 'false'}
         data-ppt-pan-tool-model="canvas-pan-tool"
         data-ppt-pan-tool-shortcut="H"
+        data-ppt-marker-tool-model="canvas-marker-tool"
+        data-ppt-marker-tool-shortcut="M"
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
@@ -6221,6 +6418,7 @@ function App() {
               <PPTElementView
                 editing={editingId === element.id}
                 element={element}
+                eraserHit={eraserHitIds?.has(element.id) === true}
                 hovered={hoveredId === element.id}
                 findActive={findOpen && activeFindMatch?.elementId === element.id}
                 key={element.id}
@@ -6687,6 +6885,7 @@ function PPTPresentationOverlay({
               <PPTElementView
                 editing={false}
                 element={element}
+                eraserHit={false}
                 findActive={false}
                 hovered={false}
                 key={element.id}
@@ -8978,6 +9177,7 @@ function SlideThumb({
 function PPTElementView({
   editing,
   element,
+  eraserHit,
   findActive,
   hovered,
   onCommitText,
@@ -8993,6 +9193,7 @@ function PPTElementView({
 }: {
   editing: boolean
   element: PPTElement
+  eraserHit: boolean
   findActive: boolean
   hovered: boolean
   onCommitText: (elementId: string, text: string) => void
@@ -9074,6 +9275,7 @@ function PPTElementView({
       data-ppt-comment-resolved={element.kind === 'comment' && element.resolved === true
         ? 'true'
         : undefined}
+      data-ppt-eraser-hit={eraserHit ? 'true' : undefined}
       data-line-end-connection={element.kind === 'line'
         ? element.endConnection?.elementId
         : undefined}
@@ -9367,7 +9569,6 @@ function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
         data-ppt-freeform-path
         d={getPPTFreeformPathData(element.points)}
         fill="none"
-        opacity={element.opacity ?? 1}
         stroke={element.stroke.color}
         strokeDasharray={getPPTStrokeDashArray(element.stroke)}
         strokeLinecap="round"
@@ -12650,10 +12851,14 @@ function createPPTElementFromCreationTool({
   }
 
   if (tool.kind === 'freeform') {
+    const style = getPPTFreeformToolStyle(tool.tool)
+
     return createPPTFreeformElement({
       id,
-      name: 'Freeform',
+      name: style.name,
+      opacity: style.opacity,
       points: [start, current],
+      stroke: style.stroke,
     })
   }
 
@@ -12798,8 +13003,16 @@ function getPPTCreationToolForShortcut(event: KeyboardEvent): PPTCreationTool | 
     return { kind: 'comment' }
   }
 
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.marker.keyboardShortcut)) {
+    return { kind: 'freeform', tool: 'marker' }
+  }
+
+  if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.highlight.keyboardShortcut)) {
+    return { kind: 'freeform', tool: 'highlight' }
+  }
+
   if (doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.pen.keyboardShortcut)) {
-    return { kind: 'freeform' }
+    return { kind: 'freeform', tool: 'pen' }
   }
 
   return null
@@ -12824,6 +13037,13 @@ function isPPTLaserToolShortcut(event: KeyboardEvent) {
     !event.ctrlKey &&
     !event.altKey &&
     doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.laser.keyboardShortcut)
+}
+
+function isPPTEraserToolShortcut(event: KeyboardEvent) {
+  return !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    doesEventMatchCanvasToolShortcut(event, CANVAS_TOOL_AFFORDANCES.eraser.keyboardShortcut)
 }
 
 function doesEventMatchCanvasToolShortcut(
@@ -12853,6 +13073,10 @@ function arePPTCreationToolsEqual(
     return left.shape === right.shape
   }
 
+  if (left.kind === 'freeform' && right.kind === 'freeform') {
+    return left.tool === right.tool
+  }
+
   return true
 }
 
@@ -12863,9 +13087,20 @@ function isPPTShapeCreationTool(
   return tool?.kind === 'shape' && tool.shape === shape
 }
 
+function isPPTFreeformCreationTool(
+  tool: PPTCreationTool | null,
+  freeformTool: PPTFreeformTool,
+) {
+  return tool?.kind === 'freeform' && tool.tool === freeformTool
+}
+
 function getPPTCreationToolDataValue(tool: PPTCreationTool | null) {
   if (!tool) {
     return undefined
+  }
+
+  if (tool.kind === 'freeform' && tool.tool !== 'pen') {
+    return tool.tool
   }
 
   return getPPTCreationToolIdPrefix(tool)
@@ -12874,6 +13109,10 @@ function getPPTCreationToolDataValue(tool: PPTCreationTool | null) {
 function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
   if (tool.kind === 'shape') {
     return tool.shape
+  }
+
+  if (tool.kind === 'freeform') {
+    return 'freeform'
   }
 
   return tool.kind
@@ -13255,11 +13494,13 @@ function getPPTLinePath(line: PPTLine) {
 function createPPTFreeformElement({
   id,
   name,
+  opacity = 1,
   points,
   stroke = { color: '#2563eb', width: 5 },
 }: {
   id: string
   name: string
+  opacity?: number
   points: Point[]
   stroke?: PPTFreeform['stroke']
 }): PPTFreeform {
@@ -13270,9 +13511,32 @@ function createPPTFreeformElement({
     id,
     kind: 'freeform',
     name,
-    opacity: 1,
+    opacity,
     points: normalized.points,
     stroke,
+  }
+}
+
+function getPPTFreeformToolStyle(tool: PPTFreeformTool) {
+  switch (tool) {
+    case 'highlight':
+      return {
+        name: 'Highlighter',
+        opacity: 0.42,
+        stroke: { color: '#fde047', width: 18 },
+      } satisfies Pick<PPTFreeform, 'name' | 'opacity' | 'stroke'>
+    case 'marker':
+      return {
+        name: 'Marker',
+        opacity: 1,
+        stroke: { color: '#475569', width: 4 },
+      } satisfies Pick<PPTFreeform, 'name' | 'opacity' | 'stroke'>
+    case 'pen':
+      return {
+        name: 'Freeform',
+        opacity: 1,
+        stroke: { color: '#2563eb', width: 5 },
+      } satisfies Pick<PPTFreeform, 'name' | 'opacity' | 'stroke'>
   }
 }
 
@@ -13326,6 +13590,93 @@ function getNextPPTLaserTrailPoints(points: Point[], point: Point) {
   }
 
   return [...points, next].slice(-PPT_LASER_TRAIL_MAX_POINTS)
+}
+
+function getNextPPTEraserPoints(points: Point[], point: Point) {
+  const next = clampPPTPointToSlide(point)
+  const last = points.at(-1)
+
+  if (!last) {
+    return [next]
+  }
+
+  const distance = getPointDistance(last, next)
+
+  if (distance < PPT_ERASER_POINT_DISTANCE) {
+    return points
+  }
+
+  const steps = Math.max(1, Math.floor(distance / PPT_ERASER_POINT_DISTANCE))
+  const sampled = Array.from({ length: steps }, (_, index) => {
+    const ratio = (index + 1) / steps
+
+    return {
+      x: last.x + (next.x - last.x) * ratio,
+      y: last.y + (next.y - last.y) * ratio,
+    }
+  })
+
+  return [...points, ...sampled]
+}
+
+function getPPTEraserHitElementIds(slide: PPTSlide, eraserPoints: Point[]) {
+  return slide.elements
+    .filter((element): element is PPTFreeform =>
+      element.kind === 'freeform' &&
+      element.visible !== false &&
+      element.locked !== true &&
+      isPPTFreeformHitByEraser(element, eraserPoints))
+    .map((element) => element.id)
+}
+
+function isPPTFreeformHitByEraser(element: PPTFreeform, eraserPoints: Point[]) {
+  const freeformPoints = getPPTFreeformWorldPoints(element)
+  const hitDistance = element.stroke.width / 2 + PPT_ERASER_HIT_PADDING
+
+  return eraserPoints.some((point) =>
+    isPPTPointNearPolyline(point, freeformPoints, hitDistance))
+}
+
+function isPPTPointNearPolyline(point: Point, polyline: Point[], distance: number) {
+  if (polyline.length === 0) {
+    return false
+  }
+
+  if (polyline.length === 1) {
+    return getPointDistance(point, polyline[0]) <= distance
+  }
+
+  return polyline.slice(1).some((current, index) =>
+    getPPTPointSegmentDistance(point, polyline[index], current) <= distance)
+}
+
+function getPPTPointSegmentDistance(point: Point, start: Point, end: Point) {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+
+  if (lengthSquared === 0) {
+    return getPointDistance(point, start)
+  }
+
+  const ratio = clamp(
+    ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
+    0,
+    1,
+  )
+
+  return getPointDistance(point, {
+    x: start.x + dx * ratio,
+    y: start.y + dy * ratio,
+  })
+}
+
+function mergePPTElementIds(left: string[], right: string[]) {
+  const ids = new Set(left)
+
+  right.forEach((id) => ids.add(id))
+
+  return Array.from(ids)
 }
 
 function clampPPTPointToSlide(point: Point) {
