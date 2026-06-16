@@ -168,6 +168,7 @@ import {
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
+  mapSlideEditClipboardPasteObjects,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectAnimationDelayMs,
   normalizeSlideEditObjectAnimationDurationMs,
@@ -9649,17 +9650,17 @@ function applyPPTClipboardPasteHostCommandEffect(
   effect: PPTClipboardPasteHostCommandEffect,
 ): PPTSlide {
   const plan = effect.payload.pastePlan
-  const objectById = new Map(effect.payload.payload.objects.map((object) => [object.id, object]))
   const offset = {
     x: plan.anchor.x,
     y: plan.anchor.y,
   }
-  const pasted = plan.mappings.flatMap((mapping) => {
-    const source = objectById.get(mapping.sourceObjectId)
-
-    return source
-      ? [clonePPTElementFromClipboardMapping(source, mapping, offset)]
-      : []
+  const pasted = mapSlideEditClipboardPasteObjects({
+    getObjectId: (object) => object.id,
+    pastePlan: plan,
+    payload: effect.payload.payload,
+    transform: ({ mapping, source }) => {
+      return clonePPTElementFromClipboardMapping(source, mapping, offset)
+    },
   })
 
   if (pasted.length === 0) {
