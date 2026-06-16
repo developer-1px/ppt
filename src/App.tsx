@@ -327,7 +327,7 @@ import {
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
 import {
-  getCanvasPasteOffset,
+  getCanvasPasteOffsetForBounds,
   getCanvasPastePositionSession,
   type CanvasPastePositionMemory,
 } from 'canvas/app/paste-position'
@@ -872,7 +872,6 @@ type PPTClipboardPasteObjectMapping =
   SlideEditClipboardPasteObjectMapping<string, string, string>
 type PPTClipboardPasteHostCommandEffect =
   SlideEditClipboardPasteHostCommandEffect<string, string, PPTElement, string, string>
-type PPTCanvasPastePositionClipboard = Parameters<typeof getCanvasPasteOffset>[0]['clipboard']
 type PPTClipboardPastePositionEffect = {
   anchor: Point
   clipboardBounds: Bounds | null
@@ -3904,14 +3903,15 @@ function App() {
     })
     const pasteIndex = pasteSession.pasteIndex
     const viewportCenter = getPPTViewportCenter()
-    const pasteAnchor = getCanvasPasteOffset({
-      clipboard: getPPTCanvasPastePositionClipboard(payload.objects),
+    const clipboardBounds = getPPTElementsBounds([...payload.objects])
+    const pasteAnchor = getCanvasPasteOffsetForBounds({
+      clipboardBounds,
       pasteIndex,
       viewportCenter,
     })
     const pastePositionEffect: PPTClipboardPastePositionEffect = {
       anchor: pasteAnchor,
-      clipboardBounds: getPPTElementsBounds([...payload.objects]),
+      clipboardBounds,
       clipboardObjectCount: payload.objects.length,
       model: 'canvas-paste-position',
       pasteIndex,
@@ -9584,21 +9584,6 @@ function normalizePPTRichClipboardPayload(value: unknown): PPTClipboardPayload |
 
 function isPPTRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function getPPTCanvasPastePositionClipboard(
-  objects: readonly PPTElement[],
-): PPTCanvasPastePositionClipboard {
-  return objects.map((object) => ({
-    fill: '#ffffff',
-    h: object.geometry.h,
-    id: object.id,
-    stroke: '#000000',
-    type: 'rect',
-    w: object.geometry.w,
-    x: object.geometry.x,
-    y: object.geometry.y,
-  }))
 }
 
 function getPPTClipboardPastePositionKey(
