@@ -170,6 +170,7 @@ import {
   getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
   mapSlideEditClipboardPasteObjects,
+  normalizeSlideEditClipboardSelectedObjectIds,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectAnimationDelayMs,
   normalizeSlideEditObjectAnimationDurationMs,
@@ -9652,18 +9653,18 @@ function normalizePPTRichClipboardPayload(value: unknown): PPTClipboardPayload |
     return null
   }
 
-  const objectIds = new Set(objects.map((object) => object.id))
-  const selectedObjectIds = Array.isArray(payloadValue.selectedObjectIds)
-    ? payloadValue.selectedObjectIds
-        .filter((item): item is string => typeof item === 'string' && objectIds.has(item))
-    : objects.map((object) => object.id)
+  const selectedObjectIds = normalizeSlideEditClipboardSelectedObjectIds({
+    getObjectId: (object) => object.id,
+    objects,
+    selectedObjectIds: Array.isArray(payloadValue.selectedObjectIds)
+      ? payloadValue.selectedObjectIds
+      : null,
+  })
 
   return createPPTClipboardPayload({
     objects,
     operation: 'copy',
-    selectedObjectIds: selectedObjectIds.length > 0
-      ? selectedObjectIds
-      : objects.map((object) => object.id),
+    selectedObjectIds,
     sourceSlideId,
   })
 }
