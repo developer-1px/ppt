@@ -406,6 +406,7 @@ import {
 import {
   RESIZE_HANDLES,
   clamp,
+  clampCanvasBoundsToFrame,
   createCanvasSequentialIdFactory,
   getCanvasBoundsAnchorPoints,
   getCanvasBoundsCenter,
@@ -16318,15 +16319,17 @@ function getPPTCreatedSectionBounds({
 }
 
 function clampPPTCreationBounds(bounds: Bounds): Bounds {
-  const w = clamp(bounds.w, 24, PPT_SLIDE_WIDTH)
-  const h = clamp(bounds.h, 24, PPT_SLIDE_HEIGHT)
-
-  return {
-    h,
-    w,
-    x: clamp(bounds.x, 0, PPT_SLIDE_WIDTH - w),
-    y: clamp(bounds.y, 0, PPT_SLIDE_HEIGHT - h),
-  }
+  return clampCanvasBoundsToFrame({
+    bounds,
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    minHeight: 24,
+    minWidth: 24,
+  })
 }
 
 function toPPTShapeKind(shape: CanvasCreatedShapeKind): PPTShapeKind {
