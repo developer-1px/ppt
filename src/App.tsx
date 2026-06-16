@@ -341,6 +341,7 @@ import {
 } from 'canvas/app/rich-clipboard'
 import {
   centerCanvasViewportAtWorldPoint,
+  fitCanvasViewportToBounds,
   resetCanvasViewport,
   zoomCanvasViewport,
 } from 'canvas/app/viewport-controls'
@@ -386,7 +387,6 @@ import {
 import {
   RESIZE_HANDLES,
   clamp,
-  fitBoundsIntoViewport,
   getCanvasViewportScreenPoint,
   handlePoint,
   normalizeBounds,
@@ -2211,35 +2211,24 @@ function App() {
   const canFitSelection = selectedBounds !== null
 
   const fitSlide = useCallback(() => {
-    const rect = canvasStageElement.getRect()
-
-    if (!rect) {
-      return
-    }
-
-    setViewport(fitBoundsIntoViewport({
-      h: PPT_SLIDE_HEIGHT,
-      w: PPT_SLIDE_WIDTH,
-      x: 0,
-      y: 0,
-    }, {
-      height: rect.height,
-      width: rect.width,
-    }))
+    fitCanvasViewportToBounds({
+      bounds: {
+        h: PPT_SLIDE_HEIGHT,
+        w: PPT_SLIDE_WIDTH,
+        x: 0,
+        y: 0,
+      },
+      setViewport,
+      stageElement: canvasStageElement,
+    })
   }, [canvasStageElement])
 
   const fitSelection = useCallback(() => {
-    const rect = canvasStageElement.getRect()
-    const bounds = scene.getBounds(selection)
-
-    if (!rect || !bounds) {
-      return
-    }
-
-    setViewport(fitBoundsIntoViewport(bounds, {
-      height: rect.height,
-      width: rect.width,
-    }))
+    fitCanvasViewportToBounds({
+      bounds: scene.getBounds(selection),
+      setViewport,
+      stageElement: canvasStageElement,
+    })
   }, [canvasStageElement, scene, selection])
 
   const fitViewportToItems = useCallback((ids?: string[]) => {
@@ -2248,17 +2237,11 @@ function App() {
       return
     }
 
-    const rect = canvasStageElement.getRect()
-    const bounds = scene.getBounds(ids)
-
-    if (!rect || !bounds) {
-      return
-    }
-
-    setViewport(fitBoundsIntoViewport(bounds, {
-      height: rect.height,
-      width: rect.width,
-    }))
+    fitCanvasViewportToBounds({
+      bounds: scene.getBounds(ids),
+      setViewport,
+      stageElement: canvasStageElement,
+    })
   }, [canvasStageElement, fitSlide, scene])
 
   const resetZoom = useCallback(() => {
