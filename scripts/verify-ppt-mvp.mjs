@@ -1889,7 +1889,7 @@ async function runCrossSlideClipboardScenario(page) {
 
   const afterCopy = await getPPTCrossSlideClipboardState(page)
 
-  record('stores PPT clipboard source slide metadata', afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
+  record('stores PPT clipboard source slide metadata', afterCopy.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterCopy.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
     afterCopy,
     sourceBefore,
   })
@@ -1909,7 +1909,7 @@ async function runCrossSlideClipboardScenario(page) {
 
   const afterKeyboardPaste = await getPPTCrossSlideClipboardState(page)
 
-  record('pastes copied PPT object onto another slide with target slide ids', afterKeyboardPaste.activeSlide === 'slide-2' && afterKeyboardPaste.stageCount === targetBefore.stageCount + 1 && afterKeyboardPaste.selectedCount === 1 && afterKeyboardPaste.selectedId.startsWith('slide-2-') && afterKeyboardPaste.selectedName.includes('Copy'), {
+  record('pastes copied PPT object onto another slide with target slide ids', afterKeyboardPaste.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterKeyboardPaste.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterKeyboardPaste.activeSlide === 'slide-2' && afterKeyboardPaste.stageCount === targetBefore.stageCount + 1 && afterKeyboardPaste.selectedCount === 1 && afterKeyboardPaste.selectedId.startsWith('slide-2-') && afterKeyboardPaste.selectedName.includes('Copy'), {
     afterKeyboardPaste,
     targetBefore,
   })
@@ -1938,7 +1938,7 @@ async function runCrossSlideClipboardScenario(page) {
 
   const afterRedo = await getPPTCrossSlideClipboardState(page)
 
-  record('undoes and redoes PPT cross-slide paste as one history step', afterUndo.stageCount === targetBefore.stageCount && afterRedo.stageCount === afterKeyboardPaste.stageCount && afterRedo.selectedId.startsWith('slide-2-'), {
+  record('undoes and redoes PPT cross-slide paste as one history step', afterUndo.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterUndo.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterUndo.stageCount === targetBefore.stageCount && afterRedo.stageCount === afterKeyboardPaste.stageCount && afterRedo.selectedId.startsWith('slide-2-'), {
     afterKeyboardPaste,
     afterRedo,
     afterUndo,
@@ -10770,6 +10770,8 @@ function getPPTCrossSlideClipboardState(page) {
       clipboardSelectedObjectIds: stage?.getAttribute('data-ppt-clipboard-selected-object-ids') ?? '',
       clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
       clipboardType: stage?.getAttribute('data-ppt-clipboard-type') ?? '',
+      keyboardCommandDispatch: stage?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: stage?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       pasteAnchor: stage?.getAttribute('data-ppt-clipboard-paste-anchor') ?? '',
       pasteCommand: stage?.getAttribute('data-ppt-clipboard-paste-command') ?? '',
       pasteMappingCount: Number(stage?.getAttribute('data-ppt-clipboard-paste-mapping-count') ?? 0),

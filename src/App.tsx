@@ -394,12 +394,19 @@ const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
     unlockAll: true,
   },
 })
-const PPT_CANVAS_ARRANGE_COMMAND_INTENT_KINDS = new Set([
+const PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS = new Set([
+  'copy-selection',
+  'cut-selection',
+  'delete-selection',
   'duplicate-selection',
   'group-selection',
   'lock-selection',
+  'paste-selection',
+  'redo-history',
   'reorder-selection',
+  'select-all',
   'ungroup-selection',
+  'undo-history',
   'unlock-all',
 ])
 const PPT_RECENT_COLOR_LIMIT = 8
@@ -2136,27 +2143,6 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault()
-        if (event.shiftKey) {
-          redo()
-        } else {
-          undo()
-        }
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
-        event.preventDefault()
-        redo()
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
-        event.preventDefault()
-        selectAllElements()
-        return
-      }
-
       if (
         (event.metaKey || event.ctrlKey) &&
         event.shiftKey &&
@@ -2166,18 +2152,6 @@ function App() {
           event.preventDefault()
           copyFormatting()
         }
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c') {
-        event.preventDefault()
-        copySelection()
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'x') {
-        event.preventDefault()
-        cutSelection()
         return
       }
 
@@ -2193,15 +2167,7 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') {
-        if (commandAvailability.paste) {
-          event.preventDefault()
-          pasteSelection()
-        }
-        return
-      }
-
-      const arrangeCommandIntent = getCanvasKeyboardBuiltinCommandShortcutIntent({
+      const standardCommandIntent = getCanvasKeyboardBuiltinCommandShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2210,11 +2176,15 @@ function App() {
       })
 
       if (
-        arrangeCommandIntent &&
-        isCanvasKeyboardCommandIntent(arrangeCommandIntent) &&
-        isPPTCanvasArrangeCommandIntentKind(arrangeCommandIntent.kind)
+        standardCommandIntent &&
+        isCanvasKeyboardCommandIntent(standardCommandIntent) &&
+        isPPTCanvasStandardCommandIntentKind(standardCommandIntent.kind)
       ) {
-        if (arrangeCommandIntent.preventDefault) {
+        if (standardCommandIntent.kind === 'paste-selection' && !commandAvailability.paste) {
+          return
+        }
+
+        if (standardCommandIntent.preventDefault) {
           event.preventDefault()
         }
 
@@ -2237,7 +2207,7 @@ function App() {
             ungroupSelection,
             unlockAll: unlockAllElements,
           },
-          intent: arrangeCommandIntent,
+          intent: standardCommandIntent,
         })
         return
       }
@@ -2312,12 +2282,6 @@ function App() {
         setIsEraserToolActive(false)
         setContextMenu(null)
         setSelection([])
-        return
-      }
-
-      if (event.key === 'Backspace' || event.key === 'Delete') {
-        event.preventDefault()
-        deleteSelection()
         return
       }
 
@@ -12173,8 +12137,8 @@ function isPPTShortcutHelpShortcut(event: KeyboardEvent) {
     (event.key === '?' || event.key === '/' || event.code === 'Slash')
 }
 
-function isPPTCanvasArrangeCommandIntentKind(kind: string) {
-  return PPT_CANVAS_ARRANGE_COMMAND_INTENT_KINDS.has(kind)
+function isPPTCanvasStandardCommandIntentKind(kind: string) {
+  return PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS.has(kind)
 }
 
 function noopPPTKeyboardCommandHandler() {}
