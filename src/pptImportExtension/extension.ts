@@ -26,14 +26,10 @@ import type {
   PPTTable,
 } from '../pptModel'
 
-export const PPT_IMPORT_CANVAS_FALLBACK_ISSUES = {
-  richTextClipboard: 'canvas#257',
-} as const
+export const PPT_IMPORT_CANVAS_FALLBACK_ISSUES = {} as const
 
 export const PPT_IMPORT_EXTENSION = {
-  canvasFallbackIssues: [
-    PPT_IMPORT_CANVAS_FALLBACK_ISSUES.richTextClipboard,
-  ],
+  canvasFallbackIssues: [],
   clipboardActionOrder: [
     'image-file',
     'image-source',

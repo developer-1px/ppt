@@ -8386,10 +8386,10 @@ async function runTextPasteScenario(page) {
 
   record(
     'pastes HTML rich text clipboard data into PPT text body',
-    afterRichPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterRichPaste.textPasteModel === 'canvas-text-paste-import' &&
       afterRichPaste.textPasteImporter === 'ppt-rich-html-text' &&
       afterRichPaste.textPasteFormat === 'text-html-rich' &&
-      afterRichPaste.textPasteRichFallback === 'canvas#257' &&
+      afterRichPaste.textPasteRichFallback === '' &&
       afterRichPaste.textPasteBoldRuns >= 2 &&
       afterRichPaste.textPasteUnderlineRuns >= 2 &&
       afterRichPaste.textPasteBulletParagraphs === 2 &&

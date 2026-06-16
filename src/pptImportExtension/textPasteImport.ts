@@ -4,7 +4,9 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  getCanvasRichTextPasteSourceFromDataTransfer,
   getCanvasTextPasteSourcesFromDataTransfer,
+  type CanvasRichTextPasteSource,
 } from 'canvas/app/text-paste-import'
 import {
   createPPTTextBody,
@@ -66,11 +68,9 @@ export const getPPTTextPasteSourcesFromDataTransfer =
 export function getPPTRichTextPasteSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ): PPTRichTextPasteSource | null {
-  if (!dataTransfer) {
-    return null
-  }
+  const source = getCanvasRichTextPasteSourceFromDataTransfer(dataTransfer)
 
-  return getPPTRichTextPasteSourceFromHTML(dataTransfer.getData('text/html'))
+  return source ? createPPTRichTextPasteSource(source) : null
 }
 
 export function createPPTTextPasteElement({
@@ -213,164 +213,32 @@ function isCanvasTextPasteTextItem(
   )
 }
 
-function getPPTRichTextPasteSourceFromHTML(value: string) {
-  if (!value || typeof DOMParser === 'undefined') {
-    return null
-  }
-
-  const doc = new DOMParser().parseFromString(value, 'text/html')
-
-  if (doc.body.querySelector('table, img, svg, video, audio, iframe')) {
-    return null
-  }
-
-  doc.body.querySelectorAll('script, style, noscript').forEach((node) => node.remove())
-
-  const paragraphs = getPPTRichTextParagraphs(doc.body)
-  const textBody = normalizePPTRichTextBody({ paragraphs })
-  const text = textBody.paragraphs
-    .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-    .join('\n')
-
-  if (!text.trim() || !hasPPTRichTextFormatting(textBody)) {
-    return null
+function createPPTRichTextPasteSource(
+  source: CanvasRichTextPasteSource,
+): PPTRichTextPasteSource {
+  const textBody: PPTTextBody = {
+    paragraphs: source.paragraphs.map((paragraph): PPTParagraph => ({
+      ...(paragraph.bullet ? { bullet: paragraph.bullet } : {}),
+      runs: paragraph.runs.map((run): PPTRun => ({
+        ...(run.bold === undefined ? {} : { bold: run.bold }),
+        ...(run.color || run.link ? { color: run.color ?? '#2563eb' } : {}),
+        ...(run.italic === undefined ? {} : { italic: run.italic }),
+        ...(run.underline === undefined ? {} : { underline: run.underline }),
+        text: run.text,
+      })),
+    })),
   }
 
   return {
     boldRunCount: getPPTTextBodyRunCount(textBody, 'bold'),
-    bulletParagraphCount: textBody.paragraphs.filter((paragraph) => paragraph.bullet === 'bullet').length,
-    linkRunCount: getPPTTextBodyRunCount(textBody, 'color'),
-    text,
+    bulletParagraphCount: textBody.paragraphs.filter((paragraph) =>
+      paragraph.bullet === 'bullet').length,
+    linkRunCount: source.paragraphs.reduce((count, paragraph) =>
+      count + paragraph.runs.filter((run) => Boolean(run.link)).length, 0),
+    text: source.text,
     textBody,
     underlineRunCount: getPPTTextBodyRunCount(textBody, 'underline'),
   }
-}
-
-function getPPTRichTextParagraphs(root: HTMLElement): PPTParagraph[] {
-  const blockNodes = Array.from(root.children).filter(isPPTRichTextBlock)
-
-  if (blockNodes.length === 0) {
-    const runs = getPPTRichTextRuns(root, {})
-
-    return runs.length > 0 ? [{ runs }] : []
-  }
-
-  return blockNodes.flatMap((node) => getPPTRichTextParagraphFromBlock(node))
-}
-
-function getPPTRichTextParagraphFromBlock(node: Element): PPTParagraph[] {
-  if (node.tagName.toLowerCase() === 'br') {
-    return []
-  }
-
-  const nestedBlocks = Array.from(node.children).filter((child) =>
-    isPPTRichTextBlock(child) && child.tagName.toLowerCase() !== 'br',
-  )
-
-  if (
-    nestedBlocks.length > 0 &&
-    !['li', 'p'].includes(node.tagName.toLowerCase())
-  ) {
-    return nestedBlocks.flatMap((child) => getPPTRichTextParagraphFromBlock(child))
-  }
-
-  const runs = getPPTRichTextRuns(node, {})
-  const bullet = node.tagName.toLowerCase() === 'li' ? 'bullet' : undefined
-
-  return runs.length > 0
-    ? [{
-        ...(bullet ? { bullet } : {}),
-        runs,
-      }]
-    : []
-}
-
-function getPPTRichTextRuns(
-  node: Node,
-  style: Partial<PPTRun>,
-): PPTRun[] {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const text = node.textContent?.replace(/\s+/g, ' ') ?? ''
-
-    return text.trim().length > 0
-      ? [{
-          ...style,
-          text,
-        }]
-      : []
-  }
-
-  if (!(node instanceof Element)) {
-    return []
-  }
-
-  const tagName = node.tagName.toLowerCase()
-
-  if (tagName === 'br') {
-    return [{ text: '\n' }]
-  }
-
-  const nextStyle = {
-    ...style,
-    ...(['b', 'strong'].includes(tagName) ? { bold: true } : {}),
-    ...(['em', 'i'].includes(tagName) ? { italic: true } : {}),
-    ...(['a', 'u'].includes(tagName) ? { underline: true } : {}),
-    ...(tagName === 'a' ? { color: '#2563eb' } : {}),
-  }
-
-  return Array.from(node.childNodes).flatMap((child) =>
-    getPPTRichTextRuns(child, nextStyle))
-}
-
-function normalizePPTRichTextBody(body: PPTTextBody): PPTTextBody {
-  return {
-    paragraphs: body.paragraphs.flatMap((paragraph) => {
-      const splitParagraphs: PPTParagraph[] = []
-      let runs: PPTRun[] = []
-
-      for (const run of paragraph.runs) {
-        const chunks = run.text.split('\n')
-
-        chunks.forEach((chunk, index) => {
-          if (index > 0) {
-            if (runs.length > 0) {
-              splitParagraphs.push({
-                ...(paragraph.bullet ? { bullet: paragraph.bullet } : {}),
-                runs,
-              })
-            }
-            runs = []
-          }
-
-          if (chunk.trim()) {
-            runs.push({
-              ...run,
-              text: chunk,
-            })
-          }
-        })
-      }
-
-      if (runs.length > 0) {
-        splitParagraphs.push({
-          ...(paragraph.bullet ? { bullet: paragraph.bullet } : {}),
-          runs,
-        })
-      }
-
-      return splitParagraphs
-    }),
-  }
-}
-
-function hasPPTRichTextFormatting(body: PPTTextBody) {
-  return body.paragraphs.some((paragraph) =>
-    paragraph.bullet === 'bullet' ||
-    paragraph.runs.some((run) =>
-      run.bold === true ||
-      run.italic === true ||
-      run.underline === true ||
-      Boolean(run.color)))
 }
 
 function getPPTTextBodyRunCount(
@@ -379,25 +247,4 @@ function getPPTTextBodyRunCount(
 ) {
   return body.paragraphs.reduce((count, paragraph) =>
     count + paragraph.runs.filter((run) => Boolean(run[field])).length, 0)
-}
-
-function isPPTRichTextBlock(node: Element) {
-  return [
-    'article',
-    'blockquote',
-    'br',
-    'div',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'li',
-    'main',
-    'ol',
-    'p',
-    'section',
-    'ul',
-  ].includes(node.tagName.toLowerCase())
 }

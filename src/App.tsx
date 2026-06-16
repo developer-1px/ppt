@@ -504,7 +504,6 @@ import {
 } from './pptExport'
 import {
   PPT_DEFAULT_TABLE_ROWS,
-  PPT_IMPORT_CANVAS_FALLBACK_ISSUES,
   PPT_IMPORT_EXTENSION,
   canHandlePPTStageDropImport,
   createPPTImageImportEffect,
@@ -7528,7 +7527,6 @@ function App() {
         data-ppt-text-paste-model="canvas-text-paste-import"
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
         data-ppt-text-paste-underline-runs={lastTextPasteImport?.underlineRunCount}
-        data-ppt-text-paste-rich-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.richTextClipboard}
         data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
         data-ppt-marquee-additive={interaction?.kind === 'marquee'
           ? String(interaction.additive)
