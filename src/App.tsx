@@ -124,6 +124,7 @@ import {
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
+  getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditObjectVisibilityCommandAvailability,
   getSlideEditObjectVisibilityCommandEffect,
   getSlideEditObjectVisibilityState,
@@ -9970,29 +9971,6 @@ function getPPTLayerPaneDefaultFocusObjectId(
   return firstSelectedObjectId ?? null
 }
 
-function getPPTLayerPaneResolvedFocusObjectId(
-  descriptor: PPTLayerPaneDescriptor,
-  focusedObjectId: string | null,
-  slide: PPTSlide,
-  selection: readonly string[],
-) {
-  const rowIds = new Set(descriptor.rows.map((row) => row.objectId))
-
-  if (focusedObjectId && rowIds.has(focusedObjectId)) {
-    return focusedObjectId
-  }
-
-  const defaultFocusObjectId = getPPTLayerPaneDefaultFocusObjectId(slide, selection)
-
-  if (defaultFocusObjectId && rowIds.has(defaultFocusObjectId)) {
-    return defaultFocusObjectId
-  }
-
-  const selectedRow = descriptor.rows.find((row) => row.isSelected)
-
-  return selectedRow?.objectId ?? descriptor.rows[0]?.objectId ?? null
-}
-
 function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
@@ -12600,9 +12578,13 @@ function Inspector({
     () => new Set(layerPaneGroupState.collapsedGroupIds),
     [layerPaneGroupState.collapsedGroupIds],
   )
+  const defaultLayerPaneFocusObjectId = getPPTLayerPaneDefaultFocusObjectId(
+    slide,
+    selection,
+  )
   const layerPaneDescriptor = createPPTLayerPaneDescriptor({
     activeObjectId: layerPaneGroupState.focusedObjectId ??
-      getPPTLayerPaneDefaultFocusObjectId(slide, selection),
+      defaultLayerPaneFocusObjectId,
     collapsedGroupIds: collapsedLayerPaneGroupIdSet,
     selectedObjectIds: selection,
     slide,
@@ -12611,11 +12593,12 @@ function Inspector({
     slide.id,
     layerPaneDescriptor.rows,
   )
-  const activeLayerPaneObjectId = getPPTLayerPaneResolvedFocusObjectId(
+  const activeLayerPaneObjectId = getSlideEditLayerPaneResolvedFocusObjectId(
     layerPaneDescriptor,
-    layerPaneGroupState.focusedObjectId,
-    slide,
-    selection,
+    {
+      defaultObjectId: defaultLayerPaneFocusObjectId,
+      preferredObjectId: layerPaneGroupState.focusedObjectId,
+    },
   )
   const layerPaneCommandIds = PPT_LAYER_PANE_COMMANDS.map((command) => command.id).join(' ')
   const layoutPlaceholderById = new Map(layoutPlaceholders.map((placeholder) => [
