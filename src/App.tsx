@@ -326,7 +326,11 @@ import {
   trapCanvasModalTabFocus,
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
-import { getCanvasPasteOffset } from 'canvas/app/paste-position'
+import {
+  getCanvasPasteOffset,
+  getCanvasPastePositionSession,
+  type CanvasPastePositionMemory,
+} from 'canvas/app/paste-position'
 import {
   createCanvasRichClipboardHTML,
   readCanvasRichClipboardFromDataTransfer,
@@ -877,10 +881,7 @@ type PPTClipboardPastePositionEffect = {
   pasteIndex: number
   viewportCenter: Point | null
 }
-type PPTClipboardPastePositionMemory = {
-  key: string
-  pasteIndex: number
-}
+type PPTClipboardPastePositionMemory = CanvasPastePositionMemory
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
 const PPT_RICH_CLIPBOARD_VERSION = 1
@@ -3897,9 +3898,11 @@ function App() {
     }
 
     const pasteKey = getPPTClipboardPastePositionKey(payload, activeSlide.id)
-    const pasteIndex = clipboardPastePositionMemoryRef.current?.key === pasteKey
-      ? clipboardPastePositionMemoryRef.current.pasteIndex
-      : 0
+    const pasteSession = getCanvasPastePositionSession({
+      key: pasteKey,
+      memory: clipboardPastePositionMemoryRef.current,
+    })
+    const pasteIndex = pasteSession.pasteIndex
     const viewportCenter = getPPTViewportCenter()
     const pasteAnchor = getCanvasPasteOffset({
       clipboard: getPPTCanvasPastePositionClipboard(payload.objects),
@@ -3943,10 +3946,7 @@ function App() {
         imported: true,
       }))
     }
-    clipboardPastePositionMemoryRef.current = {
-      key: pasteKey,
-      pasteIndex: pasteIndex + 1,
-    }
+    clipboardPastePositionMemoryRef.current = pasteSession.nextMemory
     setSelection([...effect.selection.objectIds])
 
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
