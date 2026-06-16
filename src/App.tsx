@@ -407,6 +407,7 @@ import {
   RESIZE_HANDLES,
   clamp,
   createCanvasSequentialIdFactory,
+  getCanvasBoundsAnchorPoints,
   getCanvasBoundsCenter,
   getCanvasViewportScreenPoint,
   handlePoint,
@@ -17170,19 +17171,14 @@ function getPPTConnectorAnchors(element: PPTElement): Array<{
   anchor: PPTLineConnection['anchor']
   point: Point
 }> {
-  const left = element.geometry.x
-  const top = element.geometry.y
-  const right = element.geometry.x + element.geometry.w
-  const bottom = element.geometry.y + element.geometry.h
-  const centerX = element.geometry.x + element.geometry.w / 2
-  const centerY = element.geometry.y + element.geometry.h / 2
+  const points = getCanvasBoundsAnchorPoints(pptGeometryToBounds(element.geometry))
 
   return [
-    { anchor: 'left', point: { x: left, y: centerY } },
-    { anchor: 'right', point: { x: right, y: centerY } },
-    { anchor: 'top', point: { x: centerX, y: top } },
-    { anchor: 'bottom', point: { x: centerX, y: bottom } },
-    { anchor: 'center', point: { x: centerX, y: centerY } },
+    { anchor: 'left', point: points.left },
+    { anchor: 'right', point: points.right },
+    { anchor: 'top', point: points.top },
+    { anchor: 'bottom', point: points.bottom },
+    { anchor: 'center', point: points.center },
   ]
 }
 
