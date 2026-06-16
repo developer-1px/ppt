@@ -8699,6 +8699,7 @@ async function runSelectionPaneScenario(page) {
       commandCount: Number(pane?.getAttribute('data-ppt-layer-pane-command-count') ?? 0),
       commandSlot: pane?.getAttribute('data-ppt-layer-pane-command-slot') ?? '',
       commands: pane?.getAttribute('data-ppt-layer-pane-commands') ?? '',
+      contractModel: pane?.getAttribute('data-ppt-layer-pane-model') ?? '',
       firstRowKind: rows[0]?.getAttribute('data-ppt-layer-pane-kind') ?? '',
       firstRowOrder: rows[0]?.getAttribute('data-ppt-layer-pane-order') ?? '',
       keyboardKeys: tree?.getAttribute('data-ppt-layer-pane-keyboard-keys') ?? '',
@@ -8719,6 +8720,7 @@ async function runSelectionPaneScenario(page) {
   record(
     'renders PPT object layer pane descriptor contract',
     initial.pane &&
+      initial.contractModel === 'slide-edit-object-layer-pane' &&
       initial.treeRole === 'tree' &&
       initial.rowRole === 'treeitem' &&
       initial.keyboardModel === 'roving-tabindex' &&

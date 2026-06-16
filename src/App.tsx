@@ -94,6 +94,7 @@ import {
   createSlideEditColorSwatchPaletteDescriptor,
   createSlideEditObjectAccessibilityDescriptor,
   createSlideEditLayoutPlaceholderDescriptor,
+  createSlideEditLayerPaneDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
@@ -112,6 +113,7 @@ import {
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
   getSlideEditLayoutApplyCommandEffect,
+  getSlideEditLayerPaneCommandEffect,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectFillOpacityCommandEffect,
@@ -152,9 +154,15 @@ import {
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
+  SLIDE_EDIT_LAYER_PANE_COMMANDS,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
+  type SlideEditLayerPaneCommandDescriptor,
+  type SlideEditLayerPaneDescriptor,
+  type SlideEditLayerPaneHostCommandEffect,
+  type SlideEditLayerPaneIntent,
+  type SlideEditLayerPaneRowDescriptor,
   type SlideEditLayoutDescriptor,
   type SlideEditMasterDescriptor,
   type SlideEditObjectAccessibilityDescriptor,
@@ -1038,105 +1046,11 @@ type PPTParagraphSpacingField =
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
 type PPTTextInsetField = keyof PPTTextInset
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
-type PPTLayerPaneAriaContract = {
-  containerRole: 'tree'
-  keyboardModel: 'roving-tabindex'
-  rowRole: 'treeitem'
-  selectionModel: 'host-controlled-multi-select'
-}
-type PPTLayerPaneRowDescriptor = {
-  ariaLevel: number
-  ariaPosInSet: number
-  ariaSetSize: number
-  displayName: string
-  groupId: string | null
-  isGrouped: boolean
-  isGroup: boolean
-  isHidden: boolean
-  isLocked: boolean
-  isRenamable: boolean
-  isReorderable: boolean
-  isSelectable: boolean
-  isSelected: boolean
-  kindLabel: string
-  objectId: string
-  order: number
-  parentObjectId: string | null
-  slideId: string
-}
-type PPTLayerPaneDescriptor = {
-  activeObjectId: string | null
-  aria: PPTLayerPaneAriaContract
-  rows: readonly PPTLayerPaneRowDescriptor[]
-  selectedObjectIds: readonly string[]
-  slideId: string
-}
-type PPTLayerPaneCommandId =
-  | 'hide-objects'
-  | 'lock-objects'
-  | 'rename-object'
-  | 'reorder-object'
-  | 'select-objects'
-  | 'show-objects'
-  | 'unlock-objects'
-type PPTLayerPaneCommandDescriptor = {
-  id: PPTLayerPaneCommandId
-  requiredAdapterSlot: 'command-effect'
-}
-type PPTLayerPaneCommand =
-  | {
-      id: 'hide-objects' | 'lock-objects' | 'show-objects' | 'unlock-objects'
-      objectIds: readonly string[]
-    }
-  | {
-      id: 'rename-object'
-      name: string
-      objectId: string
-    }
-  | {
-      fromIndex: number
-      id: 'reorder-object'
-      objectId: string
-      toIndex: number
-    }
-  | {
-      id: 'select-objects'
-      mode: 'additive' | 'range' | 'replace'
-      objectIds: readonly string[]
-    }
-type PPTLayerPaneHostCommandEffect = {
-  payload: PPTLayerPaneCommand
-  selection: {
-    objectIds: readonly string[]
-    slideId: string
-  }
-  type: 'slide-command-effect'
-}
-type PPTLayerPaneIntent =
-  | {
-      additive?: boolean
-      objectId: string
-      rangeAnchorObjectId?: string | null
-      type: 'row-press'
-    }
-  | {
-      name: string
-      objectId: string
-      type: 'rename-submit'
-    }
-  | {
-      objectId: string
-      type: 'visibility-toggle'
-    }
-  | {
-      objectId: string
-      type: 'lock-toggle'
-    }
-  | {
-      objectId: string
-      toIndex: number
-      type: 'row-drop'
-    }
+type PPTLayerPaneRowDescriptor = SlideEditLayerPaneRowDescriptor<string, string, string>
+type PPTLayerPaneDescriptor = SlideEditLayerPaneDescriptor<string, string, string>
+type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
+type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
+type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTMinimapSize = CanvasMinimapSize
 type PPTMinimapItemBounds = CanvasMinimapItemBounds
 type PPTMinimapReadModel = CanvasMinimapReadModel
@@ -1494,21 +1408,7 @@ const PPT_SLIDE_METADATA_FIELDS = Object.freeze([
     requiredAdapterSlot: 'command-effect',
   },
 ] as const satisfies readonly PPTSlideMetadataFieldDescriptor[])
-const PPT_LAYER_PANE_ARIA_CONTRACT = Object.freeze({
-  containerRole: 'tree',
-  keyboardModel: 'roving-tabindex',
-  rowRole: 'treeitem',
-  selectionModel: 'host-controlled-multi-select',
-} as const satisfies PPTLayerPaneAriaContract)
-const PPT_LAYER_PANE_COMMANDS = Object.freeze([
-  { id: 'select-objects', requiredAdapterSlot: 'command-effect' },
-  { id: 'rename-object', requiredAdapterSlot: 'command-effect' },
-  { id: 'hide-objects', requiredAdapterSlot: 'command-effect' },
-  { id: 'show-objects', requiredAdapterSlot: 'command-effect' },
-  { id: 'lock-objects', requiredAdapterSlot: 'command-effect' },
-  { id: 'unlock-objects', requiredAdapterSlot: 'command-effect' },
-  { id: 'reorder-object', requiredAdapterSlot: 'command-effect' },
-] as const satisfies readonly PPTLayerPaneCommandDescriptor[])
+const PPT_LAYER_PANE_COMMANDS = SLIDE_EDIT_LAYER_PANE_COMMANDS satisfies readonly PPTLayerPaneCommandDescriptor[]
 const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   h: 112,
   w: 176,
@@ -8648,234 +8548,25 @@ function createPPTLayerPaneDescriptor({
   selectedObjectIds: readonly string[]
   slide: PPTSlide
 }): PPTLayerPaneDescriptor {
-  const selected = new Set(selectedObjectIds)
-  const rowCount = slide.elements.length
-
-  return {
+  return createSlideEditLayerPaneDescriptor({
     activeObjectId,
-    aria: PPT_LAYER_PANE_ARIA_CONTRACT,
-    rows: slide.elements.map((element, index) => ({
-      ariaLevel: 1,
-      ariaPosInSet: index + 1,
-      ariaSetSize: rowCount,
+    objects: slide.elements.map((element, index) => ({
       displayName: element.name,
       groupId: element.groupId ?? null,
-      isGrouped: Boolean(element.groupId),
       isGroup: false,
       isHidden: element.visible === false,
       isLocked: element.locked === true,
       isRenamable: true,
       isReorderable: element.locked !== true,
       isSelectable: true,
-      isSelected: selected.has(element.id),
       kindLabel: getPPTElementKindLabel(element),
       objectId: element.id,
       order: index,
       parentObjectId: null,
-      slideId: slide.id,
     })),
     selectedObjectIds,
     slideId: slide.id,
-  }
-}
-
-function getPPTLayerPaneCommandEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  intent: PPTLayerPaneIntent,
-): PPTLayerPaneHostCommandEffect | null {
-  switch (intent.type) {
-    case 'lock-toggle':
-      return getPPTLayerPaneLockEffect(descriptor, intent.objectId)
-    case 'rename-submit':
-      return getPPTLayerPaneRenameEffect(descriptor, intent)
-    case 'row-drop':
-      return getPPTLayerPaneReorderEffect(descriptor, intent)
-    case 'row-press':
-      return getPPTLayerPaneSelectEffect(descriptor, intent)
-    case 'visibility-toggle':
-      return getPPTLayerPaneVisibilityEffect(descriptor, intent.objectId)
-  }
-}
-
-function getPPTLayerPaneSelectEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  intent: Extract<PPTLayerPaneIntent, { type: 'row-press' }>,
-): PPTLayerPaneHostCommandEffect | null {
-  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
-
-  if (!row?.isSelectable) {
-    return null
-  }
-
-  const objectIds = intent.rangeAnchorObjectId
-    ? getPPTLayerPaneRangeSelection(
-        descriptor,
-        intent.rangeAnchorObjectId,
-        intent.objectId,
-      )
-    : intent.additive === true
-      ? togglePPTLayerPaneSelection(
-          descriptor.selectedObjectIds,
-          intent.objectId,
-        )
-      : [intent.objectId]
-  const mode = intent.rangeAnchorObjectId
-    ? 'range'
-    : intent.additive === true
-      ? 'additive'
-      : 'replace'
-
-  return toPPTLayerPaneHostCommandEffect({
-    descriptor,
-    payload: {
-      id: 'select-objects',
-      mode,
-      objectIds,
-    },
-    selectionObjectIds: objectIds,
   })
-}
-
-function getPPTLayerPaneRenameEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  intent: Extract<PPTLayerPaneIntent, { type: 'rename-submit' }>,
-): PPTLayerPaneHostCommandEffect | null {
-  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
-  const name = intent.name.trim()
-
-  if (!row?.isRenamable || name.length === 0) {
-    return null
-  }
-
-  return toPPTLayerPaneHostCommandEffect({
-    descriptor,
-    payload: {
-      id: 'rename-object',
-      name,
-      objectId: intent.objectId,
-    },
-    selectionObjectIds: [intent.objectId],
-  })
-}
-
-function getPPTLayerPaneVisibilityEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  objectId: string,
-): PPTLayerPaneHostCommandEffect | null {
-  const row = findPPTLayerPaneRow(descriptor, objectId)
-
-  if (!row || row.isLocked) {
-    return null
-  }
-
-  return toPPTLayerPaneHostCommandEffect({
-    descriptor,
-    payload: {
-      id: row.isHidden ? 'show-objects' : 'hide-objects',
-      objectIds: [objectId],
-    },
-    selectionObjectIds: [objectId],
-  })
-}
-
-function getPPTLayerPaneLockEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  objectId: string,
-): PPTLayerPaneHostCommandEffect | null {
-  const row = findPPTLayerPaneRow(descriptor, objectId)
-
-  if (!row) {
-    return null
-  }
-
-  return toPPTLayerPaneHostCommandEffect({
-    descriptor,
-    payload: {
-      id: row.isLocked ? 'unlock-objects' : 'lock-objects',
-      objectIds: [objectId],
-    },
-    selectionObjectIds: [objectId],
-  })
-}
-
-function getPPTLayerPaneReorderEffect(
-  descriptor: PPTLayerPaneDescriptor,
-  intent: Extract<PPTLayerPaneIntent, { type: 'row-drop' }>,
-): PPTLayerPaneHostCommandEffect | null {
-  const row = findPPTLayerPaneRow(descriptor, intent.objectId)
-  const fromIndex = descriptor.rows.findIndex((row) => row.objectId === intent.objectId)
-  const toIndex = Math.max(0, Math.min(intent.toIndex, Math.max(0, descriptor.rows.length - 1)))
-
-  if (!row?.isReorderable || fromIndex < 0 || fromIndex === toIndex) {
-    return null
-  }
-
-  return toPPTLayerPaneHostCommandEffect({
-    descriptor,
-    payload: {
-      fromIndex,
-      id: 'reorder-object',
-      objectId: intent.objectId,
-      toIndex,
-    },
-    selectionObjectIds: [intent.objectId],
-  })
-}
-
-function toPPTLayerPaneHostCommandEffect({
-  descriptor,
-  payload,
-  selectionObjectIds,
-}: {
-  descriptor: PPTLayerPaneDescriptor
-  payload: PPTLayerPaneCommand
-  selectionObjectIds: readonly string[]
-}): PPTLayerPaneHostCommandEffect {
-  return {
-    payload,
-    selection: {
-      objectIds: selectionObjectIds,
-      slideId: descriptor.slideId,
-    },
-    type: 'slide-command-effect',
-  }
-}
-
-function findPPTLayerPaneRow(
-  descriptor: PPTLayerPaneDescriptor,
-  objectId: string,
-) {
-  return descriptor.rows.find((row) => row.objectId === objectId) ?? null
-}
-
-function togglePPTLayerPaneSelection(
-  selectedObjectIds: readonly string[],
-  objectId: string,
-) {
-  return selectedObjectIds.includes(objectId)
-    ? selectedObjectIds.filter((selectedId) => selectedId !== objectId)
-    : [...selectedObjectIds, objectId]
-}
-
-function getPPTLayerPaneRangeSelection(
-  descriptor: PPTLayerPaneDescriptor,
-  anchorObjectId: string,
-  objectId: string,
-) {
-  const anchorIndex = descriptor.rows.findIndex((row) => row.objectId === anchorObjectId)
-  const targetIndex = descriptor.rows.findIndex((row) => row.objectId === objectId)
-
-  if (anchorIndex < 0 || targetIndex < 0) {
-    return [objectId]
-  }
-
-  const start = Math.min(anchorIndex, targetIndex)
-  const end = Math.max(anchorIndex, targetIndex)
-
-  return descriptor.rows
-    .slice(start, end + 1)
-    .filter((row) => row.isSelectable)
-    .map((row) => row.objectId)
 }
 
 function getPPTMinimapSvgPoint(
@@ -10775,7 +10466,7 @@ function Inspector({
   }, [hasSelectedElement])
 
   function runLayerPaneIntent(intent: PPTLayerPaneIntent) {
-    const effect = getPPTLayerPaneCommandEffect(layerPaneDescriptor, intent)
+    const effect = getSlideEditLayerPaneCommandEffect(layerPaneDescriptor, intent)
 
     if (effect) {
       onLayerPaneCommandEffect(effect)
@@ -12182,6 +11873,7 @@ function Inspector({
         data-ppt-layer-pane-command-count={PPT_LAYER_PANE_COMMANDS.length}
         data-ppt-layer-pane-commands={layerPaneCommandIds}
         data-ppt-layer-pane-command-slot="command-effect"
+        data-ppt-layer-pane-model="slide-edit-object-layer-pane"
         data-ppt-layer-pane-row-count={layerPaneDescriptor.rows.length}
         data-ppt-layer-pane-slide-id={layerPaneDescriptor.slideId}
       >
