@@ -423,6 +423,7 @@ import {
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
+  deleteCanvasSelectionItems,
   isAdditivePointerInput,
   insertCanvasItemAtTargetPlacement,
   moveCanvasItemToTargetPlacement,
@@ -3033,7 +3034,11 @@ function App() {
       }
 
       const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
-      const slides = current.slides.filter((slide) => slide.id !== activeSlide.id)
+      const slides = deleteCanvasSelectionItems({
+        getItemId: (slide) => slide.id,
+        items: current.slides,
+        selection: [activeSlide.id],
+      })
       const nextSlide = slides[Math.min(Math.max(index, 0), slides.length - 1)]
 
       if (nextSlide) {
@@ -3056,14 +3061,24 @@ function App() {
         return current
       }
 
-      const slides = [...current.slides]
-      const slide = slides[index]
-      slides[index] = slides[targetIndex]
-      slides[targetIndex] = slide
+      const targetSlide = current.slides[targetIndex]
+      const result = targetSlide
+        ? moveCanvasItemToTargetPlacement({
+            getItemId: (slide) => slide.id,
+            itemId: activeSlide.id,
+            items: current.slides,
+            placement: delta > 0 ? 'after' : 'before',
+            targetItemId: targetSlide.id,
+          })
+        : null
+
+      if (!result) {
+        return current
+      }
 
       return {
         ...current,
-        slides,
+        slides: result.items,
       }
     })
   }
