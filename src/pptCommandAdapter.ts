@@ -19,6 +19,7 @@ import {
   mapCanvasSelectionItems,
   moveCanvasSelection,
   reorderCanvasSelectionItems,
+  ungroupCanvasSelectionItems,
   unionCanvasRectList,
 } from 'canvas/foundation'
 import {
@@ -126,21 +127,13 @@ export function createPPTCanvasCommandAdapter({
       })
     },
     ungroupSelection({ items, selection }) {
-      const selectedGroupIds = getSelectedPPTGroupIds(items, selection)
-
-      if (selectedGroupIds.size === 0) {
-        return { items, selection: [] }
-      }
-
-      return {
-        items: items.map((item) =>
-          item.groupId && selectedGroupIds.has(item.groupId)
-            ? ungroupPPTElement(item)
-            : item),
-        selection: items
-          .filter((item) => item.groupId && selectedGroupIds.has(item.groupId))
-          .map((item) => item.id),
-      }
+      return ungroupCanvasSelectionItems({
+        getItemGroupId: (item) => item.groupId,
+        getItemId: getPPTCommandElementId,
+        items,
+        selection,
+        ungroupItem: ({ item }) => ungroupPPTElement(item),
+      })
     },
     unlockAll({ items, selection }) {
       return {
@@ -427,20 +420,4 @@ function ungroupPPTElement(item: PPTElement): PPTElement {
   delete next.groupId
 
   return next
-}
-
-function getSelectedPPTGroupIds(
-  items: PPTElement[],
-  selection: string[],
-) {
-  const selected = new Set(selection)
-  const groupIds = new Set<string>()
-
-  for (const item of items) {
-    if (selected.has(item.id) && item.groupId) {
-      groupIds.add(item.groupId)
-    }
-  }
-
-  return groupIds
 }
