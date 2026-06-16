@@ -1721,6 +1721,7 @@
 }
 
 .ppt-layer-row {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1746,6 +1747,26 @@
 
 .ppt-layer-row[data-ppt-layer-pane-dragging='true'] {
   opacity: 0.58;
+}
+
+.ppt-layer-row[data-ppt-layer-pane-drop-indicator='before']::before,
+.ppt-layer-row[data-ppt-layer-pane-drop-indicator='after']::after {
+  position: absolute;
+  right: 6px;
+  left: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  content: '';
+  pointer-events: none;
+}
+
+.ppt-layer-row[data-ppt-layer-pane-drop-indicator='before']::before {
+  top: -4px;
+}
+
+.ppt-layer-row[data-ppt-layer-pane-drop-indicator='after']::after {
+  bottom: -4px;
 }
 
 .ppt-layer-row[data-grouped='true'] .ppt-layer-kind {

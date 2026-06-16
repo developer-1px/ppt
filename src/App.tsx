@@ -114,6 +114,7 @@ import {
   getSlideEditColorSwatchId,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayerPaneCommandEffect,
+  getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectCornerRadiusCommandEffect,
@@ -156,12 +157,14 @@ import {
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
+  SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayerPaneCommandDescriptor,
   type SlideEditLayerPaneDescriptor,
+  type SlideEditLayerPaneDropPlacement,
   type SlideEditLayerPaneHostCommandEffect,
   type SlideEditLayerPaneIntent,
   type SlideEditLayerPaneKeyboardIntent,
@@ -1122,7 +1125,11 @@ type PPTLayerPaneRenameState = {
   objectId: string
   value: string
 }
+type PPTLayerPaneDropPlacement = Exclude<SlideEditLayerPaneDropPlacement, 'none'>
 type PPTLayerPaneDragState = {
+  dropPlacement?: PPTLayerPaneDropPlacement
+  dropTargetObjectId?: string
+  dropToIndex?: number
   objectId: string
 }
 type PPTMinimapSize = CanvasMinimapSize
@@ -8808,20 +8815,18 @@ function getPPTLayerPaneActualObjectIds(
   return [...expanded]
 }
 
-function getPPTLayerPaneDropIndex(slide: PPTSlide, targetObjectId: string) {
-  const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
-
-  if (targetGroupId) {
-    const firstGroupElementIndex = slide.elements.findIndex(
-      (element) => element.groupId === targetGroupId,
-    )
-
-    return firstGroupElementIndex < 0 ? null : firstGroupElementIndex
-  }
-
+function getPPTLayerPaneDropIndex(
+  slide: PPTSlide,
+  targetObjectId: string,
+  placement: PPTLayerPaneDropPlacement,
+) {
   const targetIndex = slide.elements.findIndex((element) => element.id === targetObjectId)
 
-  return targetIndex < 0 ? null : targetIndex
+  if (targetIndex < 0) {
+    return null
+  }
+
+  return placement === 'before' ? targetIndex : targetIndex + 1
 }
 
 function reorderPPTLayerPaneElement(
@@ -8835,9 +8840,12 @@ function reorderPPTLayerPaneElement(
     return null
   }
 
-  const boundedToIndex = clamp(toIndex, 0, Math.max(0, elements.length - 1))
+  const boundedToIndex = clamp(toIndex, 0, elements.length)
+  const insertionIndex = fromIndex < boundedToIndex
+    ? Math.max(0, boundedToIndex - 1)
+    : boundedToIndex
 
-  if (fromIndex === boundedToIndex) {
+  if (insertionIndex === fromIndex) {
     return null
   }
 
@@ -8847,10 +8855,6 @@ function reorderPPTLayerPaneElement(
   if (!element) {
     return null
   }
-
-  const insertionIndex = fromIndex < boundedToIndex
-    ? Math.max(0, boundedToIndex - 1)
-    : boundedToIndex
 
   next.splice(insertionIndex, 0, element)
 
@@ -10968,20 +10972,48 @@ function Inspector({
     row: PPTLayerPaneRowDescriptor,
     event: ReactDragEvent<HTMLElement>,
   ) {
-    const draggedObjectId = layerPaneDragState?.objectId
+    const draggedObjectId = layerPaneDragState?.objectId ||
+      event.dataTransfer.getData('text/plain')
 
-    if (draggedObjectId === row.objectId) {
+    if (!draggedObjectId) {
       return
     }
 
-    const dropIndex = getPPTLayerPaneDropIndex(slide, row.objectId)
+    const rowBounds = event.currentTarget.getBoundingClientRect()
+    const dropIndicator = getSlideEditLayerPaneDropIndicator(
+      layerPaneDescriptor,
+      {
+        draggedObjectId,
+        pointerOffsetY: event.clientY - rowBounds.top,
+        rowHeight: rowBounds.height,
+        targetObjectId: row.objectId,
+      },
+    )
+
+    if (dropIndicator.placement === 'none' || dropIndicator.targetObjectId === null) {
+      setLayerPaneDragState({ objectId: draggedObjectId })
+      return
+    }
+
+    const dropIndex = getPPTLayerPaneDropIndex(
+      slide,
+      dropIndicator.targetObjectId,
+      dropIndicator.placement,
+    )
 
     if (dropIndex === null) {
+      setLayerPaneDragState({ objectId: draggedObjectId })
       return
     }
 
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
+    setLayerPaneDragState({
+      dropPlacement: dropIndicator.placement,
+      dropTargetObjectId: dropIndicator.targetObjectId,
+      dropToIndex: dropIndex,
+      objectId: draggedObjectId,
+    })
   }
 
   function handleLayerPaneRowDrop(
@@ -10995,7 +11027,33 @@ function Inspector({
       return
     }
 
-    const dropIndex = getPPTLayerPaneDropIndex(slide, row.objectId)
+    const activeDropIndex = layerPaneDragState?.dropTargetObjectId === row.objectId
+      ? layerPaneDragState.dropToIndex
+      : undefined
+
+    const rowBounds = event.currentTarget.getBoundingClientRect()
+    const dropIndicator = getSlideEditLayerPaneDropIndicator(
+      layerPaneDescriptor,
+      {
+        draggedObjectId,
+        pointerOffsetY: event.clientY - rowBounds.top,
+        rowHeight: rowBounds.height,
+        targetObjectId: row.objectId,
+      },
+    )
+
+    if (
+      activeDropIndex === undefined &&
+      (dropIndicator.placement === 'none' || dropIndicator.targetObjectId === null)
+    ) {
+      return
+    }
+
+    const dropIndex = activeDropIndex ?? getPPTLayerPaneDropIndex(
+      slide,
+      dropIndicator.targetObjectId ?? row.objectId,
+      dropIndicator.placement === 'none' ? 'before' : dropIndicator.placement,
+    )
 
     if (dropIndex === null) {
       return
@@ -12441,6 +12499,12 @@ function Inspector({
             const isRenaming = activeLayerPaneRename !== null
             const renameValue = activeLayerPaneRename?.value ?? ''
             const isDraggable = canDragLayerPaneRow(row)
+            const layerPaneDropPlacement = layerPaneDragState?.dropTargetObjectId === row.objectId
+              ? layerPaneDragState.dropPlacement
+              : undefined
+            const layerPaneDropToIndex = layerPaneDragState?.dropTargetObjectId === row.objectId
+              ? layerPaneDragState.dropToIndex
+              : undefined
 
             return (
               <div
@@ -12459,6 +12523,10 @@ function Inspector({
               data-ppt-layer-pane-hidden={row.isHidden ? 'true' : 'false'}
               data-ppt-layer-pane-draggable={isDraggable ? 'true' : 'false'}
               data-ppt-layer-pane-dragging={layerPaneDragState?.objectId === row.objectId ? 'true' : 'false'}
+              data-ppt-layer-pane-drop-indicator={layerPaneDropPlacement ?? ''}
+              data-ppt-layer-pane-drop-indicator-model={SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL}
+              data-ppt-layer-pane-drop-target={layerPaneDropPlacement ? 'true' : 'false'}
+              data-ppt-layer-pane-drop-to-index={layerPaneDropToIndex ?? ''}
               data-ppt-layer-pane-is-group={row.isGroup ? 'true' : 'false'}
               data-ppt-layer-pane-kind={row.kindLabel}
               data-ppt-layer-pane-locked={row.isLocked ? 'true' : 'false'}

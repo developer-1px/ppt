@@ -9088,8 +9088,12 @@ async function runSelectionPaneScenario(page) {
   const afterLayerReorder = await readPPTLayerPaneReorderState(page)
 
   record(
-    'reorders PPT object from layer pane drag command-effect',
+    'reorders PPT object from layer pane drag command-effect with drop indicator',
     layerReorderDrag.ok &&
+      layerReorderDrag.indicatorModel === 'slide-edit-layer-pane-drop-indicator' &&
+      layerReorderDrag.indicatorPlacement === 'before' &&
+      layerReorderDrag.indicatorTarget === 'true' &&
+      layerReorderDrag.indicatorToIndex === '0' &&
       beforeLayerReorder.draggableObjectRowCount >= 2 &&
       beforeLayerReorder.objectRowIds[0] === layerReorderDrag.targetId &&
       beforeLayerReorder.objectRowIds.at(-1) === layerReorderDrag.sourceId &&
@@ -9100,6 +9104,30 @@ async function runSelectionPaneScenario(page) {
       afterLayerReorder,
       beforeLayerReorder,
       layerReorderDrag,
+    },
+  )
+
+  const beforeLayerReorderToEnd = await readPPTLayerPaneReorderState(page)
+  const layerReorderToEndDrag = await dragPPTLayerPaneRow(page, 'after-end')
+  await delay(80)
+  const afterLayerReorderToEnd = await readPPTLayerPaneReorderState(page)
+
+  record(
+    'moves PPT object to layer pane end with after drop indicator',
+    layerReorderToEndDrag.ok &&
+      layerReorderToEndDrag.indicatorModel === 'slide-edit-layer-pane-drop-indicator' &&
+      layerReorderToEndDrag.indicatorPlacement === 'after' &&
+      layerReorderToEndDrag.indicatorTarget === 'true' &&
+      Number(layerReorderToEndDrag.indicatorToIndex) === beforeLayerReorderToEnd.objectRowIds.length &&
+      beforeLayerReorderToEnd.objectRowIds[0] === layerReorderToEndDrag.sourceId &&
+      beforeLayerReorderToEnd.objectRowIds.at(-1) === layerReorderToEndDrag.targetId &&
+      afterLayerReorderToEnd.objectRowIds.at(-1) === layerReorderToEndDrag.sourceId &&
+      afterLayerReorderToEnd.stageOrder.at(-1) === layerReorderToEndDrag.sourceId &&
+      afterLayerReorderToEnd.selectedId === layerReorderToEndDrag.sourceId,
+    {
+      afterLayerReorderToEnd,
+      beforeLayerReorderToEnd,
+      layerReorderToEndDrag,
     },
   )
   await page.eval(`document.querySelector('[data-ppt-layer-select="${layerTargetId}"]')?.click()`)
@@ -9492,15 +9520,16 @@ async function readPPTLayerPaneReorderState(page) {
   })()`)
 }
 
-async function dragPPTLayerPaneRow(page) {
-  return page.eval(`(() => {
+async function dragPPTLayerPaneRow(page, mode = 'before-start') {
+  return page.eval(`(async (mode) => {
     const rows = [...document.querySelectorAll('[data-ppt-layer-pane-row-type="object"][data-ppt-layer-pane-draggable="true"]')]
-    const source = rows.at(-1)
-    const target = rows[0]
+    const source = mode === 'after-end' ? rows[0] : rows.at(-1)
+    const target = mode === 'after-end' ? rows.at(-1) : rows[0]
 
     if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement) || source === target) {
       return {
         ok: false,
+        mode,
         rowCount: rows.length,
         sourceFound: source instanceof HTMLElement,
         targetFound: target instanceof HTMLElement,
@@ -9511,7 +9540,7 @@ async function dragPPTLayerPaneRow(page) {
 
     const rect = target.getBoundingClientRect()
     const clientX = rect.left + rect.width / 2
-    const clientY = rect.top + 2
+    const clientY = mode === 'after-end' ? rect.bottom - 2 : rect.top + 2
     const dataTransfer = typeof DataTransfer === 'function'
       ? new DataTransfer()
       : {
@@ -9571,15 +9600,25 @@ async function dragPPTLayerPaneRow(page) {
 
     source.dispatchEvent(createDragEvent('dragstart'))
     target.dispatchEvent(createDragEvent('dragover'))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const indicatorModel = target.getAttribute('data-ppt-layer-pane-drop-indicator-model') ?? ''
+    const indicatorPlacement = target.getAttribute('data-ppt-layer-pane-drop-indicator') ?? ''
+    const indicatorTarget = target.getAttribute('data-ppt-layer-pane-drop-target') ?? ''
+    const indicatorToIndex = target.getAttribute('data-ppt-layer-pane-drop-to-index') ?? ''
     target.dispatchEvent(createDragEvent('drop'))
     source.dispatchEvent(createDragEvent('dragend'))
 
     return {
+      indicatorModel,
+      indicatorPlacement,
+      indicatorTarget,
+      indicatorToIndex,
+      mode,
       ok: true,
       sourceId,
       targetId,
     }
-  })()`)
+  })(${JSON.stringify(mode)})`)
 }
 
 async function readPPTLayerPaneGroupTreeState(page) {
