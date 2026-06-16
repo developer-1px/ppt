@@ -1,5 +1,9 @@
 import { clamp } from 'canvas/core'
 import {
+  getCanvasTableCsvSourceFromText,
+  readCanvasTableCsvFileSource,
+} from 'canvas/app/table-import'
+import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTTable,
@@ -114,13 +118,22 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
 }
 
 export async function readPPTTableFileSource(file: Blob & { name?: string }) {
-  if (!isPPTTableCsvFile(file) && !isPPTTableTsvFile(file)) {
+  if (isPPTTableTsvFile(file)) {
+    return getPPTTableSourceFromText(await readPPTBlobAsText(file), {
+      format: 'text-tsv',
+      name: file.name,
+    })
+  }
+
+  const source = await readCanvasTableCsvFileSource(file)
+
+  if (!source) {
     return null
   }
 
-  return getPPTTableSourceFromText(await readPPTBlobAsText(file), {
-    format: isPPTTableTsvFile(file) ? 'text-tsv' : 'canvas-csv',
-    name: file.name,
+  return createPPTTableImportSource(source.rows, {
+    format: 'canvas-csv',
+    name: source.name,
   })
 }
 
@@ -128,23 +141,13 @@ export function getPPTTableSourceFromText(
   text: string,
   options: { format?: PPTTableImportFormat; name?: string } = {},
 ): PPTTableImportSource | null {
-  if (!text.trim()) {
+  const source = getCanvasTableCsvSourceFromText(text)
+
+  if (!source) {
     return null
   }
 
-  const parsedRows = parsePPTTableTextRows(text)
-
-  if (!isPPTTableImportRows(parsedRows)) {
-    return null
-  }
-
-  const rows = normalizePPTTableRows(parsedRows)
-
-  return {
-    ...(options.format === undefined ? {} : { format: options.format }),
-    ...(options.name === undefined ? {} : { name: getPPTTableImportName(options.name) }),
-    rows,
-  }
+  return createPPTTableImportSource(source.rows, options)
 }
 
 export function getPPTTableSourceFromHTML(value: string) {
@@ -165,12 +168,7 @@ export function getPPTTableSourceFromHTML(value: string) {
     return null
   }
 
-  const rows = normalizePPTTableRows(parsedRows)
-
-  return {
-    format: 'text-html' as const,
-    rows,
-  }
+  return createPPTTableImportSource(parsedRows, { format: 'text-html' })
 }
 
 export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
@@ -223,12 +221,6 @@ function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
   const columnCount = getPPTTableColumnCount(nonEmptyRows)
 
   return nonEmptyRows.length >= 2 && columnCount >= 2
-}
-
-function parsePPTTableTextRows(text: string) {
-  const delimiter = text.includes('\t') ? '\t' : ','
-
-  return parsePPTDelimitedRows(text, delimiter)
 }
 
 function parsePPTTableHTMLRows(table: Element) {
@@ -300,54 +292,23 @@ function getPPTTableHTMLCellText(cell: Element) {
   return normalizePPTTableCell(cell.textContent ?? '')
 }
 
-function parsePPTDelimitedRows(text: string, delimiter: string) {
-  const rows: string[][] = []
-  let row: string[] = []
-  let cell = ''
-  let inQuotes = false
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]
-
-    if (inQuotes) {
-      if (char === '"' && text[index + 1] === '"') {
-        cell += '"'
-        index += 1
-      } else if (char === '"') {
-        inQuotes = false
-      } else {
-        cell += char
-      }
-      continue
-    }
-
-    if (char === '"') {
-      inQuotes = true
-    } else if (char === delimiter) {
-      row.push(cell)
-      cell = ''
-    } else if (char === '\r' || char === '\n') {
-      row.push(cell)
-      rows.push(row)
-      row = []
-      cell = ''
-
-      if (char === '\r' && text[index + 1] === '\n') {
-        index += 1
-      }
-    } else {
-      cell += char
-    }
-  }
-
-  row.push(cell)
-  rows.push(row)
-
-  return rows
-}
-
 function normalizePPTTableCell(value: string) {
   return value.trim().slice(0, PPT_TABLE_MAX_CELL_LENGTH)
+}
+
+function createPPTTableImportSource(
+  rows: readonly (readonly string[])[],
+  options: { format?: PPTTableImportFormat; name?: string } = {},
+): PPTTableImportSource | null {
+  if (!isPPTTableImportRows(rows)) {
+    return null
+  }
+
+  return {
+    ...(options.format === undefined ? {} : { format: options.format }),
+    ...(options.name === undefined ? {} : { name: getPPTTableImportName(options.name) }),
+    rows: normalizePPTTableRows(rows),
+  }
 }
 
 function getPPTTableImportName(name: string) {
