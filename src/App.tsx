@@ -416,7 +416,9 @@ import {
 import {
   EMPTY_CANVAS_SNAP_GUIDES,
   canFlipCanvasSelectionItems,
+  getCanvasGroupedItemSelection,
   getCanvasGroupedItemPointerSelection,
+  getCanvasItemGroupMemberIdsForGroup,
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
@@ -9865,9 +9867,12 @@ function getPPTLayerPaneGroupIdFromRowId(objectId: string) {
 }
 
 function getPPTLayerPaneGroupMemberIds(slide: PPTSlide, groupId: string) {
-  return slide.elements
-    .filter((element) => element.groupId === groupId)
-    .map((element) => element.id)
+  return getCanvasItemGroupMemberIdsForGroup({
+    getItemGroupId: (element) => element.groupId,
+    getItemId: (element) => element.id,
+    groupId,
+    items: slide.elements,
+  })
 }
 
 function getPPTLayerPaneSelectedRowIds(
@@ -10135,21 +10140,15 @@ function getPPTLayerPaneSelection({
   const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
 
   if (targetGroupId) {
-    const memberIds = getPPTLayerPaneGroupMemberIds(slide, targetGroupId)
-
-    if (mode !== 'additive') {
-      return memberIds
-    }
-
-    const selected = new Set(currentSelection)
-    const allMembersSelected = memberIds.every((memberId) => selected.has(memberId))
-
-    return allMembersSelected
-      ? currentSelection.filter((objectId) => !memberIds.includes(objectId))
-      : [
-          ...currentSelection,
-          ...memberIds.filter((memberId) => !selected.has(memberId)),
-        ]
+    return getCanvasGroupedItemSelection({
+      additive: mode === 'additive',
+      fallbackSelection: mode === 'additive' ? currentSelection : [],
+      getItemGroupId: (element) => element.groupId,
+      getItemId: (element) => element.id,
+      groupId: targetGroupId,
+      items: slide.elements,
+      selection: currentSelection,
+    })
   }
 
   if (mode === 'range') {
