@@ -7668,8 +7668,6 @@ function App() {
         data-ppt-image-import-name={lastImageImportEffect?.name}
         data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
         data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
-        data-ppt-image-import-data-url-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard}
-        data-ppt-image-import-svg-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.svgClipboard}
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
         data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
         data-ppt-image-replace-command-name={lastImageReplaceEffect?.payload.source.name}

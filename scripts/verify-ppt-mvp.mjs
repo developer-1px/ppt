@@ -7783,7 +7783,7 @@ async function runImageImportScenario(page) {
 
   const afterSvgMimePaste = await getPPTImageImportState(page)
 
-  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportSvgFallback === 'canvas#255' && afterSvgMimePaste.imageImportFallbackIssue === 'canvas#255' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
+  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportFallbackIssue === '' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
     afterPaste,
     afterSvgMimePaste,
   })
@@ -7801,7 +7801,7 @@ async function runImageImportScenario(page) {
 
   const afterSvgHTMLPaste = await getPPTImageImportState(page)
 
-  record('pastes HTML inline SVG clipboard payload into PPT image element', afterSvgHTMLPaste.imageImportModel === 'canvas-image-import' && afterSvgHTMLPaste.imageImportFormat === 'svg-html-inline' && afterSvgHTMLPaste.imageImportFallbackIssue === 'canvas#255' && afterSvgHTMLPaste.imageImportNaturalWidth === 90 && afterSvgHTMLPaste.imageImportNaturalHeight === 60 && afterSvgHTMLPaste.imageCount === afterSvgMimePaste.imageCount + 1 && afterSvgHTMLPaste.selectedKind === 'image' && afterSvgHTMLPaste.selectedImageSrc.startsWith('data:image/svg+xml') && afterSvgHTMLPaste.selectedWidth === 90 && afterSvgHTMLPaste.selectedHeight === 60, {
+  record('pastes HTML inline SVG clipboard payload into PPT image element', afterSvgHTMLPaste.imageImportModel === 'canvas-image-import' && afterSvgHTMLPaste.imageImportFormat === 'svg-html-inline' && afterSvgHTMLPaste.imageImportFallbackIssue === '' && afterSvgHTMLPaste.imageImportNaturalWidth === 90 && afterSvgHTMLPaste.imageImportNaturalHeight === 60 && afterSvgHTMLPaste.imageCount === afterSvgMimePaste.imageCount + 1 && afterSvgHTMLPaste.selectedKind === 'image' && afterSvgHTMLPaste.selectedImageSrc.startsWith('data:image/svg+xml') && afterSvgHTMLPaste.selectedWidth === 90 && afterSvgHTMLPaste.selectedHeight === 60, {
     afterSvgHTMLPaste,
     afterSvgMimePaste,
   })
@@ -7828,7 +7828,7 @@ async function runImageImportScenario(page) {
 
   const afterDataImagePaste = await getPPTImageImportState(page)
 
-  record('pastes HTML data image clipboard payload into PPT image element', afterDataImagePaste.imageImportModel === 'canvas-image-import' && afterDataImagePaste.imageImportFormat === 'data-url-html-img' && afterDataImagePaste.imageImportDataUrlFallback === 'canvas#256' && afterDataImagePaste.imageImportFallbackIssue === 'canvas#256' && afterDataImagePaste.imageImportMime === 'image/png' && afterDataImagePaste.imageImportNaturalWidth === 96 && afterDataImagePaste.imageImportNaturalHeight === 48 && afterDataImagePaste.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDataImagePaste.selectedKind === 'image' && afterDataImagePaste.selectedName === 'Copied Chart.png' && afterDataImagePaste.selectedImageSrc.startsWith('data:image/png') && afterDataImagePaste.selectedWidth === 96 && afterDataImagePaste.selectedHeight === 48, {
+  record('pastes HTML data image clipboard payload into PPT image element', afterDataImagePaste.imageImportModel === 'canvas-image-import' && afterDataImagePaste.imageImportFormat === 'data-url-html-img' && afterDataImagePaste.imageImportFallbackIssue === '' && afterDataImagePaste.imageImportMime === 'image/png' && afterDataImagePaste.imageImportNaturalWidth === 96 && afterDataImagePaste.imageImportNaturalHeight === 48 && afterDataImagePaste.imageCount === afterSvgHTMLPaste.imageCount + 1 && afterDataImagePaste.selectedKind === 'image' && afterDataImagePaste.selectedName === 'Copied Chart.png' && afterDataImagePaste.selectedImageSrc.startsWith('data:image/png') && afterDataImagePaste.selectedWidth === 96 && afterDataImagePaste.selectedHeight === 48, {
     afterDataImagePaste,
     afterSvgHTMLPaste,
   })

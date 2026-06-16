@@ -27,15 +27,11 @@ import type {
 } from '../pptModel'
 
 export const PPT_IMPORT_CANVAS_FALLBACK_ISSUES = {
-  dataImageClipboard: 'canvas#256',
   richTextClipboard: 'canvas#257',
-  svgClipboard: 'canvas#255',
 } as const
 
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [
-    PPT_IMPORT_CANVAS_FALLBACK_ISSUES.svgClipboard,
-    PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard,
     PPT_IMPORT_CANVAS_FALLBACK_ISSUES.richTextClipboard,
   ],
   clipboardActionOrder: [
@@ -219,7 +215,7 @@ export function createPPTImageImportEffect({
   source: PPTImageImportSource
 }): PPTImageImportEffect {
   return {
-    fallbackIssue: getPPTImageImportFallbackIssue(source.format),
+    fallbackIssue: getPPTImageImportFallbackIssue(),
     format: source.format ?? 'file',
     mimeType: source.mimeType,
     model: 'canvas-image-import',
@@ -246,16 +242,8 @@ export function createPPTTableImportEffect({
   }
 }
 
-export function getPPTImageImportFallbackIssue(
-  format: PPTImageImportFormat | undefined,
-): PPTImportFallbackIssue | undefined {
-  if (!format || format === 'file') {
-    return undefined
-  }
-
-  return format.startsWith('svg-')
-    ? PPT_IMPORT_CANVAS_FALLBACK_ISSUES.svgClipboard
-    : PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard
+export function getPPTImageImportFallbackIssue(): PPTImportFallbackIssue | undefined {
+  return undefined
 }
 
 export function getPPTTableImportFallbackIssue(): PPTImportFallbackIssue | undefined {
