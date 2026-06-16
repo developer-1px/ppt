@@ -138,6 +138,7 @@ import {
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
+  normalizeSlideEditObjectAltTextStorageValue,
   normalizeSlideEditObjectHyperlinkStorageUrl,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleBorderStyle,
@@ -4201,15 +4202,15 @@ function App() {
   }
 
   function updateElementAltText(elementId: string, altText: string) {
-    const trimmedAltText = altText.trim()
+    const normalizedAltText = normalizePPTAltText(altText)
     const effect = getSlideEditObjectAccessibilityCommandEffect(
-      trimmedAltText
+      normalizedAltText
         ? {
             fieldId: 'altText',
             id: 'update-object-accessibility',
             objectId: elementId,
             slideId: activeSlide.id,
-            value: trimmedAltText,
+            value: normalizedAltText,
           }
         : {
             id: 'remove-object-alt-text',
@@ -16087,13 +16088,9 @@ function normalizePPTElementAccessibility(
 }
 
 function normalizePPTAltText(value: string) {
-  const normalized = value.trim().slice(0, PPT_ALT_TEXT_MAX_LENGTH)
-
-  if (!normalized || hasPPTControlCharacter(normalized)) {
-    return ''
-  }
-
-  return normalized
+  return normalizeSlideEditObjectAltTextStorageValue(value, {
+    maxLength: PPT_ALT_TEXT_MAX_LENGTH,
+  }) ?? ''
 }
 
 function normalizePPTElementHyperlink(
@@ -16109,14 +16106,6 @@ function normalizePPTElementHyperlinkUrl(url: string) {
     blockedSchemes: ['javascript', 'data', 'vbscript'],
     maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
   }) ?? ''
-}
-
-function hasPPTControlCharacter(value: string) {
-  return [...value].some((char) => {
-    const code = char.charCodeAt(0)
-
-    return code <= 31 || code === 127
-  })
 }
 
 function hasPPTElementShadow(element: PPTElement) {
