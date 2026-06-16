@@ -137,7 +137,9 @@ import {
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
+  getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
+  getSlideEditObjectStrokeLineStyleDashArray,
   createSlideEditRailDescriptor,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailListboxKeyboardIntent,
@@ -181,6 +183,9 @@ import {
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
+  toSlideEditObjectCornerRadiusAttributeValue,
+  toSlideEditObjectFillOpacityAttributeValue,
+  toSlideEditObjectOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
@@ -15763,7 +15768,7 @@ function normalizePPTElementOpacity(value: number) {
 }
 
 function formatPPTElementOpacity(value: number) {
-  return String(normalizePPTElementOpacity(value))
+  return toSlideEditObjectOpacityAttributeValue(value)
 }
 
 function getPPTObjectOpacityDescriptor(
@@ -15857,7 +15862,7 @@ function normalizePPTShapeCornerRadius(value: number) {
 }
 
 function formatPPTShapeCornerRadius(value: number) {
-  return String(normalizePPTShapeCornerRadius(value))
+  return toSlideEditObjectCornerRadiusAttributeValue(value)
 }
 
 function getPPTCornerRadiusDescriptor(
@@ -15912,7 +15917,7 @@ function normalizePPTFillOpacity(value: number) {
 }
 
 function formatPPTFillOpacity(value: number) {
-  return String(normalizePPTFillOpacity(value))
+  return toSlideEditObjectFillOpacityAttributeValue(value)
 }
 
 function getPPTFillColorCSS(fill: PPTFill) {
@@ -16072,32 +16077,14 @@ function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
 }
 
 function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
-  const dash = getPPTStrokeDash(stroke)
-
-  if (dash === 'dash') {
-    return 'dashed'
-  }
-
-  if (dash === 'dot') {
-    return 'dotted'
-  }
-
-  return 'solid'
+  return getSlideEditObjectStrokeLineStyleBorderStyle(getPPTStrokeDash(stroke))
 }
 
 function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
-  const width = normalizePPTStrokeWidth(stroke?.width ?? 2)
-  const dash = getPPTStrokeDash(stroke)
-
-  if (dash === 'dash') {
-    return `${Math.max(4, width * 3)} ${Math.max(3, width * 2)}`
-  }
-
-  if (dash === 'dot') {
-    return `1 ${Math.max(3, width * 2)}`
-  }
-
-  return undefined
+  return getSlideEditObjectStrokeLineStyleDashArray({
+    strokeWidth: normalizePPTStrokeWidth(stroke?.width ?? 2),
+    value: getPPTStrokeDash(stroke),
+  })
 }
 
 function getPPTThumbLineDashStyle(element: PPTElement): CSSProperties {
