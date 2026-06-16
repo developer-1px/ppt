@@ -7123,6 +7123,52 @@ async function runImageImportScenario(page) {
     afterCrop,
   )
 
+  await page.eval(`document.querySelector('[data-ppt-image-crop-reset]')?.click()`)
+  await delay(50)
+
+  const afterReset = await getPPTImageImportState(page)
+
+  record(
+    'resets selected PPT image crop through inspector action',
+    afterReset.inspectorImageFit === 'cover' &&
+      afterReset.inspectorCropX === 50 &&
+      afterReset.inspectorCropY === 50 &&
+      afterReset.selectedImageFit === 'cover' &&
+      afterReset.selectedImagePosition === '50% 50%' &&
+      afterReset.imageCropResetDescriptorCommand === 'reset-object-image-crop' &&
+      afterReset.imageCropResetDescriptorControl === 'image-crop-reset-button' &&
+      afterReset.imageCropResetDescriptorSurface === 'object-image-crop',
+    afterReset,
+  )
+  record(
+    'routes PPT image crop reset through slide-edit crop command-effect',
+    afterReset.imageCropModel === 'slide-edit-object-image-crop' &&
+      afterReset.imageCropCommand === 'reset-object-image-crop' &&
+      afterReset.imageCropCommandObject === afterReset.selectedId &&
+      afterReset.imageCropCommandType === 'slide-command-effect' &&
+      afterReset.imageCropCommandFit === 'cover' &&
+      afterReset.imageCropCommandCropX === '50' &&
+      afterReset.imageCropCommandCropY === '50',
+    afterReset,
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(50)
+
+  const afterResetUndo = await getPPTImageImportState(page)
+
+  record(
+    'undoes PPT image crop reset before export checks',
+    afterResetUndo.inspectorImageFit === 'contain' &&
+      afterResetUndo.inspectorCropX === 25 &&
+      afterResetUndo.inspectorCropY === 70 &&
+      afterResetUndo.selectedImagePosition === '25% 70%',
+    {
+      afterReset,
+      afterResetUndo,
+    },
+  )
+
   const beforeResize = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
@@ -10654,7 +10700,10 @@ function getPPTImageImportState(page) {
 
     return {
       imageCropCommand: stage?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropCommandCropX: stage?.getAttribute('data-ppt-image-crop-command-crop-x') ?? '',
+      imageCropCommandCropY: stage?.getAttribute('data-ppt-image-crop-command-crop-y') ?? '',
       imageCropCommandField: stage?.getAttribute('data-ppt-image-crop-command-field') ?? '',
+      imageCropCommandFit: stage?.getAttribute('data-ppt-image-crop-command-fit') ?? '',
       imageCropCommandObject: stage?.getAttribute('data-ppt-image-crop-command-object') ?? '',
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
@@ -10665,6 +10714,9 @@ function getPPTImageImportState(page) {
       imageCropFitDescriptorControl: fitField?.getAttribute('data-ppt-image-crop-control') ?? '',
       imageCropFitDescriptorSurface: fitField?.getAttribute('data-ppt-image-crop-surface') ?? '',
       imageCropModel: stage?.getAttribute('data-ppt-image-crop-model') ?? '',
+      imageCropResetDescriptorCommand: document.querySelector('[data-ppt-image-crop-reset]')?.getAttribute('data-ppt-image-crop-command') ?? '',
+      imageCropResetDescriptorControl: document.querySelector('[data-ppt-image-crop-reset]')?.getAttribute('data-ppt-image-crop-control') ?? '',
+      imageCropResetDescriptorSurface: document.querySelector('[data-ppt-image-crop-reset]')?.getAttribute('data-ppt-image-crop-surface') ?? '',
       imageCropXDescriptorAttributeValue: cropXField?.getAttribute('data-ppt-image-crop-attribute-value') ?? '',
       imageCropXDescriptorCommand: cropXField?.getAttribute('data-ppt-image-crop-command') ?? '',
       imageCropXDescriptorControl: cropXField?.getAttribute('data-ppt-image-crop-control') ?? '',

@@ -4179,16 +4179,17 @@ function App() {
     })
 
     setLastImageCropEffect(effect)
+    const payload = effect.payload
 
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind !== 'image') {
+        if (element.kind !== 'image' || payload.id !== 'update-object-image-crop') {
           return element
         }
 
         return {
           ...element,
-          fit: normalizePPTImageFit(String(effect.payload.value)),
+          fit: normalizePPTImageFit(String(payload.value)),
         }
       }),
     )
@@ -4208,10 +4209,11 @@ function App() {
     })
 
     setLastImageCropEffect(effect)
+    const payload = effect.payload
 
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (element.kind !== 'image') {
+        if (element.kind !== 'image' || payload.id !== 'update-object-image-crop') {
           return element
         }
 
@@ -4219,8 +4221,32 @@ function App() {
           ...element,
           crop: {
             ...getPPTImageCrop(element),
-            [field]: Number(effect.payload.value),
+            [field]: Number(payload.value),
           },
+        }
+      }),
+    )
+  }
+
+  function resetImageCrop(elementId: string) {
+    const effect = getSlideEditObjectImageCropCommandEffect({
+      id: 'reset-object-image-crop',
+      objectId: elementId,
+      slideId: activeSlide.id,
+    })
+
+    setLastImageCropEffect(effect)
+
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (element.kind !== 'image' || effect.payload.id !== 'reset-object-image-crop') {
+          return element
+        }
+
+        return {
+          ...element,
+          crop: effect.payload.crop,
+          fit: normalizePPTImageFit(effect.payload.fit),
         }
       }),
     )
@@ -6881,11 +6907,22 @@ function App() {
           : undefined}
         data-ppt-hyperlink-model="slide-edit-object-hyperlink"
         data-ppt-image-crop-command={lastImageCropEffect?.payload.id}
-        data-ppt-image-crop-command-field={lastImageCropEffect?.payload.fieldId}
+        data-ppt-image-crop-command-crop-x={lastImageCropEffect?.payload.id === 'reset-object-image-crop'
+          ? lastImageCropEffect.payload.crop.x
+          : undefined}
+        data-ppt-image-crop-command-crop-y={lastImageCropEffect?.payload.id === 'reset-object-image-crop'
+          ? lastImageCropEffect.payload.crop.y
+          : undefined}
+        data-ppt-image-crop-command-field={lastImageCropEffect?.payload.id === 'update-object-image-crop'
+          ? lastImageCropEffect.payload.fieldId
+          : undefined}
+        data-ppt-image-crop-command-fit={lastImageCropEffect?.payload.id === 'reset-object-image-crop'
+          ? lastImageCropEffect.payload.fit
+          : undefined}
         data-ppt-image-crop-command-object={lastImageCropEffect?.payload.objectId}
         data-ppt-image-crop-command-slide={lastImageCropEffect?.payload.slideId}
         data-ppt-image-crop-command-type={lastImageCropEffect?.type}
-        data-ppt-image-crop-command-value={lastImageCropEffect
+        data-ppt-image-crop-command-value={lastImageCropEffect?.payload.id === 'update-object-image-crop'
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
@@ -7123,6 +7160,7 @@ function App() {
         onElementGeometryChange={updateElementGeometry}
         onElementHyperlinkChange={updateElementHyperlink}
         onImageCropChange={updateImageCrop}
+        onImageCropReset={resetImageCrop}
         onImageFitChange={updateImageFit}
         onElementNameChange={updateElementName}
         onElementOpacityChange={updateElementOpacity}
@@ -10620,6 +10658,7 @@ function Inspector({
   onElementTextInsetChange,
   onElementTextStyleChange,
   onImageCropChange,
+  onImageCropReset,
   onImageFitChange,
   onLayerPaneCommandEffect,
   onLayoutPlaceholderVisibilityChange,
@@ -10707,6 +10746,7 @@ function Inspector({
     field: keyof PPTImageCrop,
     value: number,
   ) => void
+  onImageCropReset: (elementId: string) => void
   onImageFitChange: (
     elementId: string,
     fit: PPTImageFit,
@@ -12436,6 +12476,20 @@ function Inspector({
                     )
                   })}
                 </div>
+                <button
+                  className="ppt-button"
+                  data-ppt-image-crop-command={imageCropDescriptor?.fields.reset.commandId}
+                  data-ppt-image-crop-control={imageCropDescriptor?.fields.reset.control}
+                  data-ppt-image-crop-field="reset"
+                  data-ppt-image-crop-reset
+                  data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
+                  data-ppt-image-crop-surface={imageCropDescriptor?.surface}
+                  disabled={imageCropDescriptor?.isSupported === false}
+                  type="button"
+                  onClick={() => onImageCropReset(selectedElement.id)}
+                >
+                  <Undo2 size={15} /> Reset
+                </button>
               </>
             ) : null}
             {selectedElement.kind === 'table' ? (
