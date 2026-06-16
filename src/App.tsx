@@ -420,6 +420,7 @@ import {
   getCanvasFullySelectedItemGroupIds,
   getCanvasGroupedItemSelection,
   getCanvasGroupedItemPointerSelection,
+  getCanvasItemGroupIndexRange,
   getCanvasItemGroupMemberIdsForGroup,
   getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
@@ -10062,18 +10063,19 @@ function getPPTLayerPaneDropIndex(
   const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
 
   if (targetGroupId) {
-    const groupIndexes = slide.elements
-      .map((element, index) => ({ element, index }))
-      .filter(({ element }) => element.groupId === targetGroupId)
-      .map(({ index }) => index)
+    const groupRange = getCanvasItemGroupIndexRange({
+      getItemGroupId: (element) => element.groupId,
+      groupId: targetGroupId,
+      items: slide.elements,
+    })
 
-    if (groupIndexes.length === 0) {
+    if (!groupRange) {
       return null
     }
 
     return placement === 'before'
-      ? Math.min(...groupIndexes)
-      : Math.max(...groupIndexes) + 1
+      ? groupRange.firstIndex
+      : groupRange.lastIndex + 1
   }
 
   const targetIndex = slide.elements.findIndex((element) => element.id === targetObjectId)
