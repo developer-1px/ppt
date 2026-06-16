@@ -424,6 +424,7 @@ import {
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
   isAdditivePointerInput,
+  insertCanvasItemAtTargetPlacement,
   moveCanvasItemToTargetPlacement,
   moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
@@ -2992,8 +2993,7 @@ function App() {
 
   function duplicateActiveSlide() {
     commitDeck((current) => {
-      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
-      const source = current.slides[index]
+      const source = current.slides.find((slide) => slide.id === activeSlide.id)
 
       if (!source) {
         return current
@@ -3001,13 +3001,23 @@ function App() {
 
       const id = createPPTSlideId(current)
       const slide = clonePPTSlide(source, id)
-      const slides = [...current.slides]
-      slides.splice(index + 1, 0, slide)
+      const result = insertCanvasItemAtTargetPlacement({
+        getItemId: (item) => item.id,
+        item: slide,
+        items: current.slides,
+        placement: 'after',
+        targetItemId: activeSlide.id,
+      })
+
+      if (!result) {
+        return current
+      }
+
       selectSlide(slide.id)
 
       return {
         ...current,
-        slides,
+        slides: result.items,
       }
     })
   }
