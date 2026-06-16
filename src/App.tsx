@@ -129,6 +129,7 @@ import {
   getSlideEditObjectVisibilityState,
   getSlideEditObjectAccessibilityCommandEffect,
   getSlideEditObjectAnimationBuildOrder,
+  getSlideEditObjectAnimationCSSStyle,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectCornerRadiusCSS,
   getSlideEditObjectCornerRadiusPreviewCSS,
@@ -1238,6 +1239,9 @@ type PPTElementAnimationUpdateField =
   | 'order'
   | 'trigger'
   | 'type'
+type PPTElementAnimationCSSStyle = ReturnType<
+  typeof getSlideEditObjectAnimationCSSStyle
+>
 type PPTElementShadowUpdateField =
   | 'angle'
   | 'blur'
@@ -9216,11 +9220,13 @@ function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
   })
 }
 
-function getPPTElementAnimationStyle(animation: PPTElementAnimation): CSSProperties {
-  return {
-    '--ppt-animation-delay': `${animation.delayMs}ms`,
-    '--ppt-animation-duration': `${Math.max(1, animation.durationMs)}ms`,
-  } as CSSProperties
+function getPPTElementAnimationStyle(
+  animation: PPTElementAnimation,
+): PPTElementAnimationCSSStyle {
+  return getSlideEditObjectAnimationCSSStyle({
+    delayMs: animation.delayMs,
+    durationMs: animation.durationMs,
+  })
 }
 
 function formatPPTElementAnimationType(type: PPTElementAnimationType) {

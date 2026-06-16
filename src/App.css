@@ -698,13 +698,13 @@
 }
 
 .ppt-presentation-slide .ppt-element[data-ppt-animation-type='fadeIn'] {
-  animation: ppt-object-fade-in var(--ppt-animation-duration, 400ms) ease-out both;
-  animation-delay: var(--ppt-animation-delay, 0ms);
+  animation: ppt-object-fade-in 400ms ease-out both;
+  animation-delay: 0ms;
 }
 
 .ppt-presentation-slide .ppt-element[data-ppt-animation-type='flyIn'] {
-  animation: ppt-object-fly-in var(--ppt-animation-duration, 400ms) ease-out both;
-  animation-delay: var(--ppt-animation-delay, 0ms);
+  animation: ppt-object-fly-in 400ms ease-out both;
+  animation-delay: 0ms;
 }
 
 .ppt-presentation-controls {
