@@ -1642,8 +1642,11 @@ async function runCommandSurfaceScenario(page) {
   await delay(80)
 
   const afterContextOpen = await page.eval(`(() => ({
+    activeCanvasMenuItem: document.activeElement?.hasAttribute('data-canvas-menu-item') ?? false,
     activeCommand: document.activeElement?.getAttribute('data-ppt-context-command') ?? '',
     activeRole: document.activeElement?.getAttribute('role') ?? '',
+    canvasMenuItemCount: document.querySelectorAll('[data-ppt-context-menu] [data-canvas-menu-item]').length,
+    commandItemCount: document.querySelectorAll('[data-ppt-context-command]').length,
     deleteDisabled: document.querySelector('[data-ppt-context-command="delete"]')?.disabled ?? true,
     duplicateDisabled: document.querySelector('[data-ppt-context-command="duplicate"]')?.disabled ?? true,
     enabledCommands: [...document.querySelectorAll('[data-ppt-context-command]:not(:disabled)')]
@@ -1653,6 +1656,7 @@ async function runCommandSurfaceScenario(page) {
     groupDisabled: document.querySelector('[data-ppt-context-command="group"]')?.disabled ?? false,
     keyboard: document.querySelector('[data-ppt-context-menu]')?.getAttribute('data-ppt-context-menu-keyboard') ?? '',
     menuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+    model: document.querySelector('[data-ppt-context-menu]')?.getAttribute('data-ppt-context-menu-model') ?? '',
     menuRole: document.querySelector('[data-ppt-context-menu]')?.getAttribute('role') ?? '',
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
   }))()`)
@@ -1663,6 +1667,10 @@ async function runCommandSurfaceScenario(page) {
     afterContextOpen.menuRole === 'menu' &&
       afterContextOpen.keyboard === 'arrow-home-end-enter-escape' &&
       afterContextOpen.focusModel === 'enabled-menuitem-roving' &&
+      afterContextOpen.model === 'canvas-menu-roving-focus' &&
+      afterContextOpen.canvasMenuItemCount === afterContextOpen.commandItemCount &&
+      afterContextOpen.canvasMenuItemCount >= afterContextOpen.enabledCommands.length &&
+      afterContextOpen.activeCanvasMenuItem &&
       afterContextOpen.activeRole === 'menuitem' &&
       afterContextOpen.activeCommand === afterContextOpen.enabledCommands[0] &&
       afterContextOpen.activeCommand === 'duplicate',
