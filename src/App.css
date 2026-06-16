@@ -686,11 +686,11 @@
 }
 
 .ppt-presentation-slide[data-ppt-transition-type='fade'] {
-  animation: ppt-presentation-fade var(--ppt-transition-duration, 160ms) ease-out;
+  animation: ppt-presentation-fade 160ms ease-out;
 }
 
 .ppt-presentation-slide[data-ppt-transition-type='push'] {
-  animation: ppt-presentation-push var(--ppt-transition-duration, 160ms) ease-out;
+  animation: ppt-presentation-push 160ms ease-out;
 }
 
 .ppt-presentation-slide .ppt-element {

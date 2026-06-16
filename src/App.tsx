@@ -164,6 +164,7 @@ import {
   getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
+  getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectAnimationDelayMs,
@@ -8297,7 +8298,9 @@ function PPTPresentationOverlay({
 
   const readableIndex = slideIndex + 1
   const transition = getPPTSlideTransition(slide)
-  const transitionDuration = Math.max(1, transition.durationMs)
+  const transitionStyle = getSlideEditTransitionCSSStyle({
+    durationMs: transition.durationMs,
+  })
   const visibleAnimationBuildOrder = getPPTSlideAnimationBuildOrder(slide, {
     visibleOnly: true,
   })
@@ -8349,7 +8352,7 @@ function PPTPresentationOverlay({
             data-ppt-transition-type={transition.type}
             style={{
               '--ppt-presentation-scale': String(scale),
-              '--ppt-transition-duration': `${transitionDuration}ms`,
+              ...transitionStyle,
               background: slide.background?.color ?? '#ffffff',
               transform: `scale(${scale})`,
             } as CSSProperties}
