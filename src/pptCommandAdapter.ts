@@ -3,12 +3,14 @@ import {
   type Bounds,
 } from 'canvas/core'
 import {
+  alignCanvasSelectionItems,
   type CanvasAlignMode,
   type CanvasCommandAdapter,
   type CanvasCommandAvailability,
   type CanvasCommandAvailabilityConfig,
   type CanvasDistributeMode,
   type CanvasReorderMode,
+  distributeCanvasSelectionItems,
   getCanvasCommandAvailability,
   unionCanvasRectList,
 } from 'canvas/foundation'
@@ -252,39 +254,15 @@ function alignPPTElements(
   mode: CanvasAlignMode,
   slideFrame: Bounds,
 ) {
-  const selected = new Set(selection)
-  const selectedItems = items.filter((item) => selected.has(item.id))
-  const frame = selectedItems.length === 1
-    ? slideFrame
-    : getPPTElementsBounds(selectedItems)
-
-  if (!frame) {
-    return items
-  }
-
-  return items.map((item) => {
-    if (!selected.has(item.id) || item.locked === true) {
-      return item
-    }
-
-    const bounds = pptGeometryToBounds(item.geometry)
-    const next = { ...bounds }
-
-    if (mode === 'alignLeft') {
-      next.x = frame.x
-    } else if (mode === 'alignCenter') {
-      next.x = frame.x + frame.w / 2 - bounds.w / 2
-    } else if (mode === 'alignRight') {
-      next.x = frame.x + frame.w - bounds.w
-    } else if (mode === 'alignTop') {
-      next.y = frame.y
-    } else if (mode === 'alignMiddle') {
-      next.y = frame.y + frame.h / 2 - bounds.h / 2
-    } else if (mode === 'alignBottom') {
-      next.y = frame.y + frame.h - bounds.h
-    }
-
-    return updatePPTElementBounds(item, next)
+  return alignCanvasSelectionItems({
+    frame: selection.length === 1 ? slideFrame : undefined,
+    getItemBounds: (item) => pptGeometryToBounds(item.geometry),
+    getItemId: (item) => item.id,
+    isItemSelectable: isPPTCommandElementEditable,
+    items,
+    mode,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
   })
 }
 
@@ -293,73 +271,19 @@ function distributePPTElements(
   selection: string[],
   mode: CanvasDistributeMode,
 ) {
-  const selected = new Set(selection)
-  const selectedItems = items.filter((item) =>
-    selected.has(item.id) && item.locked !== true)
-  const distributed = mode === 'distributeHorizontal'
-    ? distributePPTElementsHorizontally(selectedItems)
-    : distributePPTElementsVertically(selectedItems)
-  const byId = new Map(distributed.map((item) => [item.id, item]))
-
-  return items.map((item) => byId.get(item.id) ?? item)
-}
-
-function distributePPTElementsHorizontally(elements: PPTElement[]) {
-  const sorted = [...elements].sort((a, b) => a.geometry.x - b.geometry.x)
-  const first = sorted[0]
-  const last = sorted.at(-1)
-
-  if (!first || !last || sorted.length < 3) {
-    return elements
-  }
-
-  const totalWidth = sorted.reduce((sum, element) => sum + element.geometry.w, 0)
-  const span = last.geometry.x + last.geometry.w - first.geometry.x
-  const gap = (span - totalWidth) / (sorted.length - 1)
-  let nextX = first.geometry.x
-
-  return sorted.map((element, index) => {
-    const x = index === 0
-      ? first.geometry.x
-      : index === sorted.length - 1
-        ? last.geometry.x
-        : nextX
-    nextX = x + element.geometry.w + gap
-
-    return updatePPTElementBounds(element, {
-      ...pptGeometryToBounds(element.geometry),
-      x,
-    })
+  return distributeCanvasSelectionItems({
+    getItemBounds: (item) => pptGeometryToBounds(item.geometry),
+    getItemId: (item) => item.id,
+    isItemSelectable: isPPTCommandElementEditable,
+    items,
+    mode,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
   })
 }
 
-function distributePPTElementsVertically(elements: PPTElement[]) {
-  const sorted = [...elements].sort((a, b) => a.geometry.y - b.geometry.y)
-  const first = sorted[0]
-  const last = sorted.at(-1)
-
-  if (!first || !last || sorted.length < 3) {
-    return elements
-  }
-
-  const totalHeight = sorted.reduce((sum, element) => sum + element.geometry.h, 0)
-  const span = last.geometry.y + last.geometry.h - first.geometry.y
-  const gap = (span - totalHeight) / (sorted.length - 1)
-  let nextY = first.geometry.y
-
-  return sorted.map((element, index) => {
-    const y = index === 0
-      ? first.geometry.y
-      : index === sorted.length - 1
-        ? last.geometry.y
-        : nextY
-    nextY = y + element.geometry.h + gap
-
-    return updatePPTElementBounds(element, {
-      ...pptGeometryToBounds(element.geometry),
-      y,
-    })
-  })
+function isPPTCommandElementEditable(element: PPTElement) {
+  return element.locked !== true
 }
 
 function clonePPTElements(
