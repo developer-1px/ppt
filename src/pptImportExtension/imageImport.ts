@@ -6,6 +6,7 @@ import {
   getCanvasDataImageSourceFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
+  getCanvasImportedImageSize,
   getCanvasSVGImageSourceFromDataTransfer,
   readCanvasImageFileSource,
   resolveCanvasImageSourceNaturalSize,
@@ -21,11 +22,6 @@ import {
 export type PPTImageImportFormat = CanvasImageImportFormat
 export type PPTImageImportSource = CanvasImageImportSource
 
-const PPT_IMPORTED_IMAGE_DEFAULT_WIDTH = 320
-const PPT_IMPORTED_IMAGE_DEFAULT_HEIGHT = 220
-const PPT_IMPORTED_IMAGE_MAX_WIDTH = 520
-const PPT_IMPORTED_IMAGE_MAX_HEIGHT = 360
-
 export function createPPTImportedImageElement({
   center,
   createId,
@@ -35,7 +31,7 @@ export function createPPTImportedImageElement({
   createId: (prefix: string) => string
   source: PPTImageImportSource
 }): PPTImage {
-  const size = getPPTImportedImageSize(source)
+  const size = getCanvasImportedImageSize(source)
   const name = source.name?.trim() || 'Image'
 
   return {
@@ -84,26 +80,3 @@ export const getPPTSVGImageSourceFromDataTransfer =
 
 export const resolvePPTImageSourceNaturalSize =
   resolveCanvasImageSourceNaturalSize
-
-function getPPTImportedImageSize({
-  naturalHeight,
-  naturalWidth,
-}: PPTImageImportSource) {
-  if (!naturalWidth || !naturalHeight) {
-    return {
-      h: PPT_IMPORTED_IMAGE_DEFAULT_HEIGHT,
-      w: PPT_IMPORTED_IMAGE_DEFAULT_WIDTH,
-    }
-  }
-
-  const scale = Math.min(
-    1,
-    PPT_IMPORTED_IMAGE_MAX_WIDTH / naturalWidth,
-    PPT_IMPORTED_IMAGE_MAX_HEIGHT / naturalHeight,
-  )
-
-  return {
-    h: Math.max(1, Math.round(naturalHeight * scale)),
-    w: Math.max(1, Math.round(naturalWidth * scale)),
-  }
-}
