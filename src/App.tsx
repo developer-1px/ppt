@@ -295,7 +295,6 @@ import {
 import {
   getCanvasMinimapPointFromViewportOffset,
   getCanvasMinimapReadModel,
-  getCanvasMinimapViewportForWorldCenter,
   getCanvasMinimapWorldPoint,
   type CanvasMinimapItemBounds,
   type CanvasMinimapReadModel,
@@ -307,6 +306,11 @@ import {
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
 import { getCanvasPasteOffset } from 'canvas/app/paste-position'
+import {
+  centerCanvasViewportAtWorldPoint,
+  resetCanvasViewport,
+  zoomCanvasViewport,
+} from 'canvas/app/viewport-controls'
 import {
   getCanvasRadioTabIndex,
   handleCanvasRadioGroupKeyDown,
@@ -332,13 +336,11 @@ import {
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
 import {
-  INITIAL_VIEWPORT,
   RESIZE_HANDLES,
   clamp,
   fitBoundsIntoViewport,
   getCanvasViewportScreenPoint,
   getCanvasViewportWorldPoint,
-  getCanvasViewportZoomStepMultiplier,
   handlePoint,
   normalizeBounds,
   pointDistance,
@@ -347,7 +349,6 @@ import {
   type ResizeHandle,
   type Tool,
   type Viewport,
-  zoomViewport,
 } from 'canvas/core'
 import {
   EMPTY_CANVAS_SNAP_GUIDES,
@@ -1907,7 +1908,7 @@ function App() {
   const setPPTStageElementRef = useCallback((element: HTMLDivElement | null) => {
     stageRef.current = element
     canvasStageElement.mount.ref(element)
-  }, [canvasStageElement])
+  }, [canvasStageElement.mount])
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
   const {
@@ -2051,7 +2052,7 @@ function App() {
     ],
     [activeSlide.elements],
   )
-  const stageRect = stageRef.current?.getBoundingClientRect()
+  const stageRect = canvasStageElement.getRect()
   const minimapModel = stageRect && showMinimap
     ? getCanvasMinimapReadModel({
         items: minimapItems,
@@ -2172,7 +2173,7 @@ function App() {
   const canFitSelection = selectedBounds !== null
 
   const fitSlide = useCallback(() => {
-    const rect = stageRef.current?.getBoundingClientRect()
+    const rect = canvasStageElement.getRect()
 
     if (!rect) {
       return
@@ -2187,10 +2188,10 @@ function App() {
       height: rect.height,
       width: rect.width,
     }))
-  }, [])
+  }, [canvasStageElement])
 
   const fitSelection = useCallback(() => {
-    const rect = stageRef.current?.getBoundingClientRect()
+    const rect = canvasStageElement.getRect()
     const bounds = scene.getBounds(selection)
 
     if (!rect || !bounds) {
@@ -2201,7 +2202,7 @@ function App() {
       height: rect.height,
       width: rect.width,
     }))
-  }, [scene, selection])
+  }, [canvasStageElement, scene, selection])
 
   const fitViewportToItems = useCallback((ids?: string[]) => {
     if (!ids || ids.length === 0) {
@@ -2209,7 +2210,7 @@ function App() {
       return
     }
 
-    const rect = stageRef.current?.getBoundingClientRect()
+    const rect = canvasStageElement.getRect()
     const bounds = scene.getBounds(ids)
 
     if (!rect || !bounds) {
@@ -2220,25 +2221,19 @@ function App() {
       height: rect.height,
       width: rect.width,
     }))
-  }, [fitSlide, scene])
+  }, [canvasStageElement, fitSlide, scene])
 
   const resetZoom = useCallback(() => {
-    setViewport(INITIAL_VIEWPORT)
+    resetCanvasViewport({ setViewport })
   }, [])
 
   const navigateMinimapToWorldPoint = useCallback((point: Point) => {
-    const rect = stageRef.current?.getBoundingClientRect()
-
-    if (!rect) {
-      return
-    }
-
-    setViewport((current) => getCanvasMinimapViewportForWorldCenter({
-      current,
-      stageRect: rect,
-      worldCenter: point,
-    }))
-  }, [])
+    centerCanvasViewportAtWorldPoint({
+      point,
+      setViewport,
+      stageElement: canvasStageElement,
+    })
+  }, [canvasStageElement])
 
   function startPresentation(slideId = activeSlide.id) {
     setPresentationSlideId(slideId)
@@ -2271,7 +2266,9 @@ function App() {
   }
 
   useLayoutEffect(() => {
-    fitSlide()
+    const frame = window.requestAnimationFrame(fitSlide)
+
+    return () => window.cancelAnimationFrame(frame)
   }, [activeSlideId, fitSlide])
 
   useEffect(() => {
@@ -6449,14 +6446,11 @@ function App() {
   }
 
   function zoom(direction: 'in' | 'out') {
-    const rect = stageRef.current?.getBoundingClientRect()
-    const point = {
-      x: (rect?.width ?? 0) / 2,
-      y: (rect?.height ?? 0) / 2,
-    }
-    const multiplier = getCanvasViewportZoomStepMultiplier(viewport.scale, direction)
-
-    setViewport((current) => zoomViewport(current, point, multiplier))
+    zoomCanvasViewport({
+      direction,
+      setViewport,
+      stageElement: canvasStageElement,
+    })
   }
 
   const marqueeBounds = interaction?.kind === 'marquee'
