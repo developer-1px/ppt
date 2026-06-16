@@ -335,6 +335,7 @@ import {
   RESIZE_HANDLES,
   clamp,
   fitBoundsIntoViewport,
+  getCanvasViewportScreenPoint,
   getCanvasViewportWorldPoint,
   getCanvasViewportZoomStepMultiplier,
   handlePoint,
@@ -5381,10 +5382,11 @@ function App() {
 
   function worldToScreen(point: Point) {
     const rect = stageRef.current?.getBoundingClientRect()
+    const screenPoint = getCanvasViewportScreenPoint(viewport, point)
 
     return {
-      x: (rect?.left ?? 0) + viewport.x + point.x * viewport.scale,
-      y: (rect?.top ?? 0) + viewport.y + point.y * viewport.scale,
+      x: (rect?.left ?? 0) + screenPoint.x,
+      y: (rect?.top ?? 0) + screenPoint.y,
     }
   }
 
