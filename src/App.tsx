@@ -6307,6 +6307,11 @@ function PPTCommandPaletteDialog({
   )
   const maxActiveIndex = Math.max(0, filteredItems.length - 1)
   const activeItemIndex = Math.min(activeIndex, maxActiveIndex)
+  const activeItem = filteredItems[activeItemIndex]
+  const listboxId = 'ppt-command-palette-listbox'
+  const activeOptionId = activeItem
+    ? getPPTCommandPaletteOptionId(activeItem.id)
+    : undefined
 
   useEffect(() => {
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -6393,25 +6398,43 @@ function PPTCommandPaletteDialog({
         onKeyDown={handleKeyDown}
       >
         <input
+          aria-activedescendant={activeOptionId}
+          aria-autocomplete="list"
+          aria-controls={listboxId}
+          aria-expanded="true"
           aria-label="Search commands"
           className="ppt-command-palette-input"
+          data-ppt-command-palette-active-option={activeOptionId}
+          data-ppt-command-palette-combobox="true"
+          data-ppt-command-palette-controls={listboxId}
           data-ppt-command-palette-query
           placeholder="Search commands"
           ref={inputRef}
+          role="combobox"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
             setActiveIndex(0)
           }}
         />
-        <div className="ppt-command-palette-list" role="listbox">
+        <div
+          aria-label="Command results"
+          className="ppt-command-palette-list"
+          data-ppt-command-palette-active-option={activeOptionId}
+          data-ppt-command-palette-listbox
+          id={listboxId}
+          role="listbox"
+        >
           {filteredItems.length > 0 ? filteredItems.map((item, index) => (
             <button
+              aria-disabled={item.disabled ? 'true' : undefined}
               aria-selected={index === activeItemIndex}
               className="ppt-command-palette-item"
               data-ppt-command-palette-active={index === activeItemIndex ? 'true' : undefined}
               data-ppt-command-palette-item={item.id}
+              data-ppt-command-palette-option-id={getPPTCommandPaletteOptionId(item.id)}
               disabled={item.disabled}
+              id={getPPTCommandPaletteOptionId(item.id)}
               key={item.id}
               role="option"
               type="button"
@@ -6470,6 +6493,10 @@ function getPPTCommandPaletteFocusables(dialog: HTMLElement | null) {
   return [...dialog.querySelectorAll<HTMLElement>(
     'input, button:not(:disabled)',
   )]
+}
+
+function getPPTCommandPaletteOptionId(itemId: string) {
+  return `ppt-command-palette-option-${itemId.replace(/[^A-Za-z0-9_-]/g, '-')}`
 }
 
 function syncPPTTopbarToolbarRovingTabIndex(

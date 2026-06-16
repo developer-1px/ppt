@@ -1969,12 +1969,68 @@ async function runCommandPaletteScenario(page) {
   await delay(100)
 
   const afterOpen = await page.eval(`(() => ({
+    activeDescendant: document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-activedescendant') ?? '',
+    activeOptionExists: !!document.getElementById(document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-activedescendant') ?? ''),
+    activeOptionId: document.querySelector('[data-ppt-command-palette-active="true"]')?.id ?? '',
+    activeOptionItem: document.querySelector('[data-ppt-command-palette-active="true"]')?.getAttribute('data-ppt-command-palette-item') ?? '',
+    activeOptionRole: document.querySelector('[data-ppt-command-palette-active="true"]')?.getAttribute('role') ?? '',
+    activeOptionSelected: document.querySelector('[data-ppt-command-palette-active="true"]')?.getAttribute('aria-selected') ?? '',
+    combobox: document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('role') ?? '',
+    controls: document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-controls') ?? '',
+    expanded: document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-expanded') ?? '',
     focused: document.activeElement?.matches('[data-ppt-command-palette-query]') === true,
     itemCount: document.querySelectorAll('[data-ppt-command-palette-item]').length,
+    listboxExists: !!document.getElementById(document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-controls') ?? ''),
+    listboxRole: document.getElementById(document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-controls') ?? '')?.getAttribute('role') ?? '',
     open: !!document.querySelector('[data-ppt-command-palette]'),
   }))()`)
 
   record('opens PPT command palette from keyboard shortcut', afterOpen.open && afterOpen.focused && afterOpen.itemCount >= 10, afterOpen)
+  record(
+    'exposes PPT command palette combobox/listbox active option contract',
+    afterOpen.combobox === 'combobox' &&
+      afterOpen.expanded === 'true' &&
+      afterOpen.controls.length > 0 &&
+      afterOpen.listboxExists &&
+      afterOpen.listboxRole === 'listbox' &&
+      afterOpen.activeDescendant.length > 0 &&
+      afterOpen.activeDescendant === afterOpen.activeOptionId &&
+      afterOpen.activeOptionExists &&
+      afterOpen.activeOptionRole === 'option' &&
+      afterOpen.activeOptionSelected === 'true' &&
+      afterOpen.activeOptionItem.length > 0,
+    afterOpen,
+  )
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(30)
+  const afterComboboxArrowDown = await readPPTCommandPaletteComboboxState(page)
+
+  await pressKey(page, {
+    code: 'ArrowUp',
+    key: 'ArrowUp',
+    windowsVirtualKeyCode: 38,
+  })
+  await delay(30)
+  const afterComboboxArrowUp = await readPPTCommandPaletteComboboxState(page)
+
+  record(
+    'updates PPT command palette aria-activedescendant with Arrow keys',
+    afterComboboxArrowDown.activeDescendant.length > 0 &&
+      afterComboboxArrowDown.activeDescendant === afterComboboxArrowDown.activeOptionId &&
+      afterComboboxArrowDown.activeOptionItem !== afterOpen.activeOptionItem &&
+      afterComboboxArrowUp.activeDescendant === afterComboboxArrowUp.activeOptionId &&
+      afterComboboxArrowUp.activeOptionItem === afterOpen.activeOptionItem,
+    {
+      afterComboboxArrowDown,
+      afterComboboxArrowUp,
+      afterOpen,
+    },
+  )
 
   await page.send('Input.insertText', { text: 'duplicate' })
   await delay(80)
@@ -2042,7 +2098,10 @@ async function runCommandPaletteScenario(page) {
   await delay(80)
 
   const beforeDisabled = await page.eval(`(() => ({
+    activeDescendant: document.querySelector('[data-ppt-command-palette-query]')?.getAttribute('aria-activedescendant') ?? '',
+    groupAriaDisabled: document.querySelector('[data-ppt-command-palette-item="command:group"]')?.getAttribute('aria-disabled') ?? '',
     groupDisabled: document.querySelector('[data-ppt-command-palette-item="command:group"]')?.disabled ?? false,
+    groupOptionId: document.querySelector('[data-ppt-command-palette-item="command:group"]')?.id ?? '',
     groupId: document.querySelector('[data-selected="true"]')?.getAttribute('data-group-id') ?? null,
     selectedCount: document.querySelectorAll('[data-selected="true"]').length,
   }))()`)
@@ -2060,10 +2119,20 @@ async function runCommandPaletteScenario(page) {
     selectedCount: document.querySelectorAll('[data-selected="true"]').length,
   }))()`)
 
-  record('does not run disabled PPT command palette item', beforeDisabled.groupDisabled && beforeDisabled.selectedCount === 1 && afterDisabled.selectedCount === 1 && afterDisabled.groupId === beforeDisabled.groupId && afterDisabled.open, {
-    afterDisabled,
-    beforeDisabled,
-  })
+  record(
+    'does not run disabled PPT command palette item',
+    beforeDisabled.groupDisabled &&
+      beforeDisabled.groupAriaDisabled === 'true' &&
+      beforeDisabled.activeDescendant === beforeDisabled.groupOptionId &&
+      beforeDisabled.selectedCount === 1 &&
+      afterDisabled.selectedCount === 1 &&
+      afterDisabled.groupId === beforeDisabled.groupId &&
+      afterDisabled.open,
+    {
+      afterDisabled,
+      beforeDisabled,
+    },
+  )
 
   await pressKey(page, {
     code: 'Escape',
@@ -2775,6 +2844,24 @@ async function runTidySelectionScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+}
+
+async function readPPTCommandPaletteComboboxState(page) {
+  return page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-command-palette-query]')
+    const activeDescendant = input?.getAttribute('aria-activedescendant') ?? ''
+    const activeOption = activeDescendant ? document.getElementById(activeDescendant) : null
+
+    return {
+      activeDescendant,
+      activeOptionExists: !!activeOption,
+      activeOptionId: document.querySelector('[data-ppt-command-palette-active="true"]')?.id ?? '',
+      activeOptionItem: activeOption?.getAttribute('data-ppt-command-palette-item') ?? '',
+      activeOptionRole: activeOption?.getAttribute('role') ?? '',
+      activeOptionSelected: activeOption?.getAttribute('aria-selected') ?? '',
+      focusedQuery: document.activeElement === input,
+    }
+  })()`)
 }
 
 async function readCommandPaletteIds(page, query) {
