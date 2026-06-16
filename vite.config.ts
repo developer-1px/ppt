@@ -24,6 +24,7 @@ const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/a
 const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
 const canvasPointerPanInteractionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
+const canvasRichClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasRichClipboardIO.ts', import.meta.url))
 const canvasTabsRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts', import.meta.url))
 const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts', import.meta.url))
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts', import.meta.url))
@@ -62,6 +63,7 @@ export default defineConfig({
       { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
       { find: 'canvas/app/pointer-pan-interaction', replacement: canvasPointerPanInteractionEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
+      { find: 'canvas/app/rich-clipboard', replacement: canvasRichClipboardEntry },
       { find: 'canvas/app/tabs-roving-focus', replacement: canvasTabsRovingFocusEntry },
       { find: 'canvas/app/stage-element', replacement: canvasStageElementEntry },
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },

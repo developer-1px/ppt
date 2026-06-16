@@ -32,6 +32,7 @@
       "canvas/app/pointer-laser": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts"],
       "canvas/app/pointer-pan-interaction": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
+      "canvas/app/rich-clipboard": ["../canvas/src/canvas/app/affordances/commands/CanvasRichClipboardIO.ts"],
       "canvas/app/tabs-roving-focus": ["../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts"],
       "canvas/app/stage-element": ["../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts"],
       "canvas/app/table-import": ["../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts"],

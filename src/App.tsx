@@ -327,6 +327,14 @@ import {
 } from 'canvas/app/modal-focus-lifecycle'
 import { getCanvasPasteOffset } from 'canvas/app/paste-position'
 import {
+  createCanvasRichClipboardHTML,
+  readCanvasRichClipboardFromDataTransfer,
+  stringifyCanvasRichClipboardPayload,
+  writeCanvasRichClipboardPayload,
+  type CanvasRichClipboardReadFormat,
+  type CanvasRichClipboardWriteMode,
+} from 'canvas/app/rich-clipboard'
+import {
   centerCanvasViewportAtWorldPoint,
   resetCanvasViewport,
   zoomCanvasViewport,
@@ -872,22 +880,17 @@ const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
 const PPT_RICH_CLIPBOARD_VERSION = 1
 const PPT_RICH_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.selection+json'
+const PPT_RICH_CLIPBOARD_HTML_ROOT_ATTRIBUTE = 'data-ppt-rich-clipboard'
+const PPT_RICH_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE =
+  'data-ppt-rich-clipboard-json'
 const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
   'image/svg+xml',
   'text/plain',
 ] as const
-type PPTRichClipboardImportFormat =
-  | 'custom-json'
-  | 'text-html'
-  | 'text-plain'
-type PPTRichClipboardWriteMode =
-  | 'clipboard-item'
-  | 'pending'
-  | 'unavailable'
-  | 'write-failed'
-  | 'write-text'
+type PPTRichClipboardImportFormat = CanvasRichClipboardReadFormat
+type PPTRichClipboardWriteMode = CanvasRichClipboardWriteMode | 'pending'
 type PPTRichClipboardExportPayload = {
   kind: typeof PPT_RICH_CLIPBOARD_KIND
   metadata: {
@@ -9477,7 +9480,9 @@ function createPPTRichClipboardExportPayload(
 }
 
 function stringifyPPTRichClipboardPayload(payload: PPTClipboardPayload) {
-  return JSON.stringify(createPPTRichClipboardExportPayload(payload), null, 2)
+  return stringifyCanvasRichClipboardPayload(
+    createPPTRichClipboardExportPayload(payload),
+  )
 }
 
 function createPPTRichClipboardHTML({
@@ -9487,14 +9492,12 @@ function createPPTRichClipboardHTML({
   payload: PPTClipboardPayload
   selectionSvg: string | null
 }) {
-  const json = stringifyPPTRichClipboardPayload(payload).replace(/</g, '\\u003c')
-
-  return [
-    '<section data-ppt-rich-clipboard="true">',
-    selectionSvg ?? '<p>PPT selection</p>',
-    `<script type="application/json" data-ppt-rich-clipboard-json>${json}</script>`,
-    '</section>',
-  ].join('')
+  return createCanvasRichClipboardHTML({
+    fallbackHTML: selectionSvg ?? '<p>PPT selection</p>',
+    json: stringifyPPTRichClipboardPayload(payload),
+    rootAttribute: PPT_RICH_CLIPBOARD_HTML_ROOT_ATTRIBUTE,
+    scriptAttribute: PPT_RICH_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE,
+  })
 }
 
 async function writePPTRichClipboardPayload({
@@ -9506,104 +9509,22 @@ async function writePPTRichClipboardPayload({
 }): Promise<PPTRichClipboardWriteMode> {
   const json = stringifyPPTRichClipboardPayload(payload)
   const html = createPPTRichClipboardHTML({ payload, selectionSvg })
-  const clipboard = navigator.clipboard
 
-  if (
-    clipboard &&
-    typeof clipboard.write === 'function' &&
-    typeof ClipboardItem !== 'undefined'
-  ) {
-    try {
-      await clipboard.write([
-        new ClipboardItem({
-          [PPT_RICH_CLIPBOARD_JSON_MIME_TYPE]: new Blob([json], {
-            type: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
-          }),
-          'image/svg+xml': new Blob([selectionSvg ?? ''], {
-            type: 'image/svg+xml',
-          }),
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([json], { type: 'text/plain' }),
-        }),
-      ])
-      return 'clipboard-item'
-    } catch {
-      // Fall through to text fallback; browsers vary in custom MIME support.
-    }
-  }
-
-  if (clipboard && typeof clipboard.writeText === 'function') {
-    try {
-      await clipboard.writeText(json)
-      return 'write-text'
-    } catch {
-      return 'write-failed'
-    }
-  }
-
-  return 'unavailable'
+  return writeCanvasRichClipboardPayload({
+    html,
+    json,
+    jsonMimeType: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
+    selectionSvg: selectionSvg ?? '',
+  })
 }
 
 function getPPTRichClipboardFromDataTransfer(dataTransfer: DataTransfer | null) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const customJson = dataTransfer.getData(PPT_RICH_CLIPBOARD_JSON_MIME_TYPE)
-  const customPayload = parsePPTRichClipboardPayload(customJson)
-
-  if (customPayload) {
-    return {
-      format: 'custom-json' as const,
-      payload: customPayload,
-    }
-  }
-
-  const plainPayload = parsePPTRichClipboardPayload(dataTransfer.getData('text/plain'))
-
-  if (plainPayload) {
-    return {
-      format: 'text-plain' as const,
-      payload: plainPayload,
-    }
-  }
-
-  const htmlPayload = parsePPTRichClipboardPayload(
-    getPPTRichClipboardJSONFromHTML(dataTransfer.getData('text/html')),
-  )
-
-  if (htmlPayload) {
-    return {
-      format: 'text-html' as const,
-      payload: htmlPayload,
-    }
-  }
-
-  return null
-}
-
-function getPPTRichClipboardJSONFromHTML(value: string) {
-  if (!value) {
-    return null
-  }
-
-  const doc = new DOMParser().parseFromString(value, 'text/html')
-
-  return doc
-    .querySelector('script[data-ppt-rich-clipboard-json]')
-    ?.textContent ?? null
-}
-
-function parsePPTRichClipboardPayload(value: string | null) {
-  if (!value) {
-    return null
-  }
-
-  try {
-    return normalizePPTRichClipboardPayload(JSON.parse(value))
-  } catch {
-    return null
-  }
+  return readCanvasRichClipboardFromDataTransfer({
+    dataTransfer,
+    jsonMimeType: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
+    parsePayload: normalizePPTRichClipboardPayload,
+    scriptAttribute: PPT_RICH_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE,
+  })
 }
 
 function normalizePPTRichClipboardPayload(value: unknown): PPTClipboardPayload | null {
