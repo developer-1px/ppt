@@ -336,6 +336,11 @@ import {
   screenToWorld as getCanvasPointerWorldPoint,
 } from 'canvas/app/pointer-geometry'
 import {
+  previewCanvasPointerLaserInteraction,
+  startCanvasPointerLaserInteraction,
+  type CanvasPointerLaserInteraction,
+} from 'canvas/app/pointer-laser'
+import {
   previewCanvasPointerPanInteraction,
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
@@ -1701,8 +1706,6 @@ const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   w: 176,
 }
 const PPT_MINIMAP_SLIDE_FRAME_ID = 'ppt-slide-frame'
-const PPT_LASER_POINT_DISTANCE = 3
-const PPT_LASER_TRAIL_MAX_POINTS = 80
 const PPT_ERASER_POINT_DISTANCE = 4
 const PPT_LAYER_PANE_GROUP_ROW_PREFIX = 'ppt-layer-group:'
 
@@ -1830,11 +1833,8 @@ type Interaction =
       kind: 'pan'
     } & CanvasPointerPanInteraction
   | {
-      currentPoint: Point
       kind: 'laser'
-      points: Point[]
-      startPoint: Point
-    }
+    } & CanvasPointerLaserInteraction
   | {
       currentPoint: Point
       erasedIds: string[]
@@ -5499,16 +5499,22 @@ function App() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    const points = [clampPPTPointToSlide(point)]
+    const startWorld = clampPPTPointToSlide(point)
+    const result = startCanvasPointerLaserInteraction({
+      config: PPT_CANVAS_COMMAND_CONFIG,
+      input: event.nativeEvent,
+      pointerGesture: 'laser',
+      startScreen: getPointerClientPoint(event.nativeEvent),
+      startWorld,
+    })
+
+    if (!result || result.kind !== 'interaction') {
+      return true
+    }
 
     setContextMenu(null)
-    setLaserTrailPoints(points)
-    setInteraction({
-      currentPoint: points[0],
-      kind: 'laser',
-      points,
-      startPoint: points[0],
-    })
+    setLaserTrailPoints(result.laserTrail.points)
+    setInteraction(result.interaction)
 
     return true
   }
@@ -6085,14 +6091,17 @@ function App() {
     const point = screenToWorld(event.nativeEvent)
 
     if (interaction.kind === 'laser') {
-      const points = getNextPPTLaserTrailPoints(interaction.points, point)
-
-      setLaserTrailPoints(points)
-      setInteraction({
-        ...interaction,
-        currentPoint: clampPPTPointToSlide(point),
-        points,
+      const preview = previewCanvasPointerLaserInteraction({
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        currentScreen: getPointerClientPoint(event.nativeEvent),
+        currentWorld: clampPPTPointToSlide(point),
+        interaction,
       })
+
+      if (preview?.kind === 'preview') {
+        setLaserTrailPoints(preview.laserTrail.points)
+        setInteraction(preview.interaction)
+      }
       return
     }
 
@@ -17173,17 +17182,6 @@ function appendPPTFreeformPoint(points: Point[], point: Point) {
   }
 
   return [...points, next]
-}
-
-function getNextPPTLaserTrailPoints(points: Point[], point: Point) {
-  const next = clampPPTPointToSlide(point)
-  const last = points.at(-1)
-
-  if (last && pointDistance(last, next) < PPT_LASER_POINT_DISTANCE) {
-    return points
-  }
-
-  return [...points, next].slice(-PPT_LASER_TRAIL_MAX_POINTS)
 }
 
 function getNextPPTEraserPoints(points: Point[], point: Point) {
