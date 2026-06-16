@@ -1312,6 +1312,12 @@ async function runAffordanceScenario(page) {
       commandType: stage?.getAttribute('data-ppt-text-autofit-command-type') ?? '',
       height: parseFloat(element.style.height),
       model: stage?.getAttribute('data-ppt-text-autofit-model') ?? '',
+      resizeClickDouble: stage?.getAttribute('data-ppt-resize-handle-click-double') ?? '',
+      resizeClickHandle: stage?.getAttribute('data-ppt-resize-handle-click-handle') ?? '',
+      resizeClickId: stage?.getAttribute('data-ppt-resize-handle-click-id') ?? '',
+      resizeClickModel: stage?.getAttribute('data-ppt-resize-handle-click-model') ?? '',
+      resizeClickX: stage?.getAttribute('data-ppt-resize-handle-click-x') ?? '',
+      resizeClickY: stage?.getAttribute('data-ppt-resize-handle-click-y') ?? '',
       selectedAutoFit: element?.getAttribute('data-ppt-text-autofit') ?? '',
       width: parseFloat(element.style.width),
     }
@@ -1321,6 +1327,16 @@ async function runAffordanceScenario(page) {
     afterAuto,
     afterResize,
   })
+  record(
+    'routes PPT resize handle double-click through canvas pointer click memory',
+    afterAuto.resizeClickDouble === 'true' &&
+      afterAuto.resizeClickHandle === 'e' &&
+      afterAuto.resizeClickId === 'slide-1:s1-card-1:e' &&
+      afterAuto.resizeClickModel === 'canvas-pointer-click-memory' &&
+      afterAuto.resizeClickX !== '' &&
+      afterAuto.resizeClickY !== '',
+    afterAuto,
+  )
   record('routes PPT text auto-size double-click through slide-edit command effect', afterAuto.command === 'resize-text-box-to-fit' && afterAuto.commandHandle === 'e' && afterAuto.commandObject === 's1-card-1' && afterAuto.commandSelection === 's1-card-1' && afterAuto.commandSizeMode === 'resize-to-fit' && afterAuto.commandSlide === 'slide-1' && afterAuto.commandType === 'slide-command-effect' && afterAuto.model === 'slide-edit-text-box-auto-fit' && afterAuto.selectedAutoFit === 'resizeShapeToFitText', afterAuto)
 
   const aspectResizeHandle = await page.eval(`(() => {

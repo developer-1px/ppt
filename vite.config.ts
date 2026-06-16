@@ -17,6 +17,7 @@ const canvasKeyboardViewportShortcutsEntry = fileURLToPath(new URL('../canvas/sr
 const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts', import.meta.url))
+const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasTabsRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts', import.meta.url))
 const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
@@ -44,6 +45,7 @@ export default defineConfig({
       { find: 'canvas/app/menu-roving-focus', replacement: canvasMenuRovingFocusEntry },
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
       { find: 'canvas/app/modal-focus-lifecycle', replacement: canvasModalFocusLifecycleEntry },
+      { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/tabs-roving-focus', replacement: canvasTabsRovingFocusEntry },
       { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },

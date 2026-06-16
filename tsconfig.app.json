@@ -25,6 +25,7 @@
       "canvas/app/menu-roving-focus": ["../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts"],
       "canvas/app/minimap-model": ["../canvas/src/canvas/app/affordances/controls/minimap/CanvasMinimapModel.ts"],
       "canvas/app/modal-focus-lifecycle": ["../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts"],
+      "canvas/app/pointer-click-memory": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
       "canvas/app/tabs-roving-focus": ["../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts"],
       "canvas/app/toolbar-roving-focus": ["../canvas/src/canvas/app/affordances/controls/toolbar/CanvasToolbarRovingFocus.ts"],

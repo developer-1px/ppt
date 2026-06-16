@@ -318,6 +318,10 @@ import {
   isInlineEditLineBreakInput,
 } from 'canvas/app/inline-edit-dom'
 import {
+  recordCanvasItemPointerClick,
+  type CanvasPointerClickMemory,
+} from 'canvas/app/pointer-click-memory'
+import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
@@ -1173,6 +1177,13 @@ type PPTInlineEditEffect = {
   model: 'canvas-inline-edit-dom'
   pasteText?: string
 }
+type PPTResizeHandleClickMemoryEffect = {
+  handle: ResizeHandle
+  id: string
+  isDoubleClick: boolean
+  model: 'canvas-pointer-click-memory'
+  point: Point
+}
 type PPTLayerPaneGroupState = {
   collapsedGroupIds: readonly string[]
   focusedObjectId: string | null
@@ -1787,6 +1798,7 @@ function App() {
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
   const [lastInlineEditEffect, setLastInlineEditEffect] = useState<PPTInlineEditEffect | null>(null)
+  const [lastResizeHandleClickMemoryEffect, setLastResizeHandleClickMemoryEffect] = useState<PPTResizeHandleClickMemoryEffect | null>(null)
   const [lastMediaImport, setLastMediaImport] = useState<PPTMediaImportResult | null>(null)
   const [lastTextPasteImport, setLastTextPasteImport] = useState<PPTTextPasteImportResult | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
@@ -1824,6 +1836,7 @@ function App() {
     ref: setTopbarToolbarRoot,
   } = useCanvasToolbarRovingFocus<HTMLElement>()
   const slideDragSuppressClickRef = useRef(false)
+  const resizeHandleClickMemoryRef = useRef<CanvasPointerClickMemory>(null)
   const deckRef = useRef(deck)
 
   useEffect(() => {
@@ -5698,15 +5711,41 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
 
+    const clickId = `${activeSlide.id}:${selection.join(' ')}:${handle}`
+    const point = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+    const clickMemory = recordCanvasItemPointerClick({
+      itemId: clickId,
+      lastClick: resizeHandleClickMemoryRef.current,
+      point,
+      time: event.timeStamp,
+    })
+
+    resizeHandleClickMemoryRef.current = clickMemory.nextClick
+    setLastResizeHandleClickMemoryEffect({
+      handle,
+      id: clickId,
+      isDoubleClick: clickMemory.isDoubleClick,
+      model: 'canvas-pointer-click-memory',
+      point,
+    })
+
+    if (clickMemory.isDoubleClick) {
+      autoSizeSelection(handle)
+      return
+    }
+
     if (event.detail > 1) {
       return
     }
 
-    event.currentTarget.setPointerCapture(event.pointerId)
-
     if (!selectedBounds || !canResizeSelection) {
       return
     }
+
+    event.currentTarget.setPointerCapture(event.pointerId)
 
     setInteraction({
       bounds: selectedBounds,
@@ -5716,15 +5755,6 @@ function App() {
       slideId: activeSlide.id,
       startDeck: deckRef.current,
     })
-  }
-
-  function handleResizeHandleDoubleClick(
-    event: ReactMouseEvent<HTMLButtonElement>,
-    handle: ResizeHandle,
-  ) {
-    event.preventDefault()
-    event.stopPropagation()
-    autoSizeSelection(handle)
   }
 
   function handleRotatePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -7485,6 +7515,12 @@ function App() {
         data-ppt-text-autofit-size-modes={SLIDE_EDIT_TEXT_BOX_SIZE_MODES
           .map((mode) => mode.id)
           .join(' ')}
+        data-ppt-resize-handle-click-double={lastResizeHandleClickMemoryEffect?.isDoubleClick ? 'true' : undefined}
+        data-ppt-resize-handle-click-handle={lastResizeHandleClickMemoryEffect?.handle}
+        data-ppt-resize-handle-click-id={lastResizeHandleClickMemoryEffect?.id}
+        data-ppt-resize-handle-click-model="canvas-pointer-click-memory"
+        data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
+        data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-model="canvas-table-import"
         data-ppt-table-import-tsv-fallback="canvas#253"
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
@@ -7591,7 +7627,6 @@ function App() {
                 textAutoFitIndicator={selectedTextAutoFitIndicator}
                 textOverflow={selectedTextOverflow}
                 onRotatePointerDown={handleRotatePointerDown}
-                onResizeHandleDoubleClick={handleResizeHandleDoubleClick}
                 onResizePointerDown={handleResizePointerDown}
               />
             ) : null}
@@ -11399,7 +11434,6 @@ function SelectionOverlay({
   bounds,
   canResize,
   onRotatePointerDown,
-  onResizeHandleDoubleClick,
   onResizePointerDown,
   scale,
   selectedElements,
@@ -11409,10 +11443,6 @@ function SelectionOverlay({
   bounds: Bounds
   canResize: boolean
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  onResizeHandleDoubleClick: (
-    event: ReactMouseEvent<HTMLButtonElement>,
-    handle: ResizeHandle,
-  ) => void
   onResizePointerDown: (
     event: ReactPointerEvent<HTMLButtonElement>,
     handle: ResizeHandle,
@@ -11472,7 +11502,6 @@ function SelectionOverlay({
             aria-label={`Resize ${handle}`}
             className="ppt-resize-handle"
             key={handle}
-            onDoubleClick={(event) => onResizeHandleDoubleClick(event, handle)}
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             style={{
               cursor: `${handle}-resize`,
