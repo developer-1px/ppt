@@ -36,6 +36,7 @@ try {
   })
 
   await runFirstScreenScenario(page)
+  await runTopToolbarRovingFocusScenario(page)
   await runTextEditingScenario(page)
   await runFindReplaceScenario(page)
   await runSpacingGuideScenario(page)
@@ -121,6 +122,131 @@ async function runFirstScreenScenario(page) {
   record('removes old retouch shell', !state.hasRetouchShell, state)
   record('removes Vite starter copy', !state.hasStarterCopy, state)
   record('does not expose CanvasItem as product text', !state.hasCanvasItemLeak, state)
+}
+
+async function runTopToolbarRovingFocusScenario(page) {
+  const initial = await readPPTTopToolbarRovingFocusState(page)
+
+  record(
+    'exposes PPT top toolbar APG roving focus contract',
+    initial.role === 'toolbar' &&
+      initial.orientation === 'horizontal' &&
+      initial.focusModel === 'roving-tabindex' &&
+      initial.keyboardModel === 'arrow-home-end' &&
+      initial.itemCount === initial.enabledCount &&
+      initial.enabledCount > 10,
+    initial,
+  )
+  record(
+    'keeps one enabled PPT toolbar tab stop',
+    initial.zeroCount === 1 &&
+      initial.minusCount === initial.enabledCount - 1 &&
+      initial.disabledCount > 0 &&
+      initial.disabledTabStopCount === 0,
+    initial,
+  )
+
+  await page.eval(`(() => {
+    const toolbar = document.querySelector('[data-ppt-toolbar]')
+    const enabled = toolbar ? [...toolbar.querySelectorAll('.ppt-toolbar-group button:not(:disabled)')] : []
+    const target = enabled.find((button) => button.tabIndex === 0)
+    target?.focus()
+  })()`)
+  await delay(30)
+
+  const beforeArrow = await readPPTTopToolbarRovingFocusState(page)
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(30)
+  const afterRight = await readPPTTopToolbarRovingFocusState(page)
+
+  await pressKey(page, {
+    code: 'ArrowLeft',
+    key: 'ArrowLeft',
+    windowsVirtualKeyCode: 37,
+  })
+  await delay(30)
+  const afterLeft = await readPPTTopToolbarRovingFocusState(page)
+
+  await pressKey(page, {
+    code: 'End',
+    key: 'End',
+    windowsVirtualKeyCode: 35,
+  })
+  await delay(30)
+  const afterEnd = await readPPTTopToolbarRovingFocusState(page)
+
+  await pressKey(page, {
+    code: 'ArrowRight',
+    key: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+  })
+  await delay(30)
+  const afterWrap = await readPPTTopToolbarRovingFocusState(page)
+
+  await pressKey(page, {
+    code: 'Home',
+    key: 'Home',
+    windowsVirtualKeyCode: 36,
+  })
+  await delay(30)
+  const afterHome = await readPPTTopToolbarRovingFocusState(page)
+
+  record(
+    'moves PPT top toolbar focus with Arrow/Home/End keys',
+    beforeArrow.focusedIndex >= 0 &&
+      afterRight.focusedIndex === (beforeArrow.focusedIndex + 1) % beforeArrow.enabledCount &&
+      afterLeft.focusedIndex === beforeArrow.focusedIndex &&
+      afterEnd.focusedIndex === beforeArrow.enabledCount - 1 &&
+      afterWrap.focusedIndex === 0 &&
+      afterHome.focusedIndex === 0,
+    {
+      afterEnd,
+      afterHome,
+      afterLeft,
+      afterRight,
+      afterWrap,
+      beforeArrow,
+    },
+  )
+}
+
+async function readPPTTopToolbarRovingFocusState(page) {
+  return page.eval(`(() => {
+    const toolbar = document.querySelector('[data-ppt-toolbar]')
+    const enabled = toolbar ? [...toolbar.querySelectorAll('.ppt-toolbar-group button:not(:disabled)')] : []
+    const disabled = toolbar ? [...toolbar.querySelectorAll('.ppt-toolbar-group button:disabled')] : []
+    const focusedIndex = enabled.indexOf(document.activeElement)
+    const activeIndex = enabled.findIndex((button) => button.getAttribute('data-ppt-toolbar-active') === 'true')
+    const tabStopIndex = enabled.findIndex((button) => button.tabIndex === 0)
+    const itemTitles = enabled.map((button) =>
+      button.getAttribute('title') ??
+        button.getAttribute('aria-label') ??
+        button.textContent.trim()
+    )
+
+    return {
+      activeIndex,
+      disabledCount: disabled.length,
+      disabledTabStopCount: disabled.filter((button) => button.tabIndex >= 0).length,
+      enabledCount: enabled.length,
+      focusedIndex,
+      focusedTitle: itemTitles[focusedIndex] ?? '',
+      focusModel: toolbar?.getAttribute('data-ppt-toolbar-focus-model') ?? '',
+      itemCount: Number(toolbar?.getAttribute('data-ppt-toolbar-item-count') ?? 0),
+      keyboardModel: toolbar?.getAttribute('data-ppt-toolbar-keyboard-model') ?? '',
+      minusCount: enabled.filter((button) => button.tabIndex === -1).length,
+      orientation: toolbar?.getAttribute('aria-orientation') ?? '',
+      role: toolbar?.getAttribute('role') ?? '',
+      tabStopIndex,
+      tabStopTitle: itemTitles[tabStopIndex] ?? '',
+      zeroCount: enabled.filter((button) => button.tabIndex === 0).length,
+    }
+  })()`)
 }
 
 async function runSelectionAndDragScenario(page) {

@@ -78,6 +78,7 @@ import {
   type ChangeEvent as ReactChangeEvent,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -1477,6 +1478,8 @@ function App() {
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
   const commandPaletteRestoreFocusRef = useRef<HTMLElement | null>(null)
+  const topbarToolbarRef = useRef<HTMLElement | null>(null)
+  const [topbarToolbarFocusIndex, setTopbarToolbarFocusIndex] = useState(0)
   const slideDragSuppressClickRef = useRef(false)
   const deckRef = useRef(deck)
 
@@ -1487,6 +1490,10 @@ function App() {
   useEffect(() => {
     globalThis.window?.dispatchEvent(new Event('ppt-ready'))
   }, [])
+
+  useLayoutEffect(() => {
+    syncPPTTopbarToolbarRovingTabIndex(topbarToolbarRef.current, topbarToolbarFocusIndex)
+  })
 
   const updateTextOverflowState = useCallback((
     elementId: string,
@@ -2167,6 +2174,64 @@ function App() {
 
   function closeFindStrip() {
     setFindOpen(false)
+  }
+
+  function handleTopbarToolbarFocus(event: ReactFocusEvent<HTMLElement>) {
+    const toolbar = topbarToolbarRef.current
+    const item = getPPTTopbarToolbarItemFromTarget(toolbar, event.target)
+
+    if (!toolbar || !item) {
+      return
+    }
+
+    const items = getPPTTopbarToolbarItems(toolbar)
+    const index = items.indexOf(item)
+
+    if (index >= 0) {
+      setTopbarToolbarFocusIndex(index)
+    }
+  }
+
+  function handleTopbarToolbarKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return
+    }
+
+    const toolbar = topbarToolbarRef.current
+    const item = getPPTTopbarToolbarItemFromTarget(toolbar, event.target)
+
+    if (!toolbar || !item) {
+      return
+    }
+
+    const items = getPPTTopbarToolbarItems(toolbar)
+    const currentIndex = items.indexOf(item)
+
+    if (items.length === 0 || currentIndex < 0) {
+      return
+    }
+
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % items.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + items.length) % items.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = items.length - 1
+    }
+
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    syncPPTTopbarToolbarRovingTabIndex(toolbar, nextIndex)
+    setTopbarToolbarFocusIndex(nextIndex)
+    items[nextIndex]?.focus({ preventScroll: true })
   }
 
   function openCommandPalette() {
@@ -5278,7 +5343,18 @@ function App() {
 
   return (
     <main className="ppt-app" data-ppt-app data-theme={theme}>
-      <header className="ppt-topbar">
+      <header
+        aria-label="PPT editor toolbar"
+        aria-orientation="horizontal"
+        className="ppt-topbar"
+        data-ppt-toolbar
+        data-ppt-toolbar-focus-model="roving-tabindex"
+        data-ppt-toolbar-keyboard-model="arrow-home-end"
+        ref={topbarToolbarRef}
+        role="toolbar"
+        onFocus={handleTopbarToolbarFocus}
+        onKeyDown={handleTopbarToolbarKeyDown}
+      >
         <div className="ppt-brand">
           <strong>PPT</strong>
           <span>{deck.title}</span>
@@ -6394,6 +6470,73 @@ function getPPTCommandPaletteFocusables(dialog: HTMLElement | null) {
   return [...dialog.querySelectorAll<HTMLElement>(
     'input, button:not(:disabled)',
   )]
+}
+
+function syncPPTTopbarToolbarRovingTabIndex(
+  toolbar: HTMLElement | null,
+  focusIndex: number,
+) {
+  if (!toolbar) {
+    return 0
+  }
+
+  const allButtons = [...toolbar.querySelectorAll<HTMLButtonElement>(
+    '.ppt-toolbar-group button',
+  )]
+  const enabledButtons = allButtons.filter((button) => !button.disabled)
+  const nextFocusIndex = enabledButtons.length === 0
+    ? 0
+    : clamp(focusIndex, 0, enabledButtons.length - 1)
+
+  allButtons.forEach((button) => {
+    const enabledIndex = enabledButtons.indexOf(button)
+
+    if (enabledIndex < 0) {
+      button.tabIndex = -1
+      button.dataset.pptToolbarDisabledItem = 'true'
+      button.removeAttribute('data-ppt-toolbar-item')
+      button.removeAttribute('data-ppt-toolbar-focus-index')
+      button.removeAttribute('data-ppt-toolbar-active')
+      return
+    }
+
+    button.tabIndex = enabledIndex === nextFocusIndex ? 0 : -1
+    button.dataset.pptToolbarItem = 'true'
+    button.dataset.pptToolbarFocusIndex = String(enabledIndex)
+    button.dataset.pptToolbarActive = enabledIndex === nextFocusIndex ? 'true' : 'false'
+    delete button.dataset.pptToolbarDisabledItem
+  })
+  toolbar.dataset.pptToolbarItemCount = String(enabledButtons.length)
+  toolbar.dataset.pptToolbarActiveIndex = String(nextFocusIndex)
+
+  return nextFocusIndex
+}
+
+function getPPTTopbarToolbarItems(toolbar: HTMLElement | null) {
+  if (!toolbar) {
+    return []
+  }
+
+  return [...toolbar.querySelectorAll<HTMLButtonElement>(
+    '.ppt-toolbar-group button:not(:disabled)',
+  )]
+}
+
+function getPPTTopbarToolbarItemFromTarget(
+  toolbar: HTMLElement | null,
+  target: EventTarget | null,
+) {
+  if (!toolbar || !(target instanceof HTMLElement)) {
+    return null
+  }
+
+  const button = target.closest<HTMLButtonElement>('.ppt-toolbar-group button')
+
+  if (!button || button.disabled || !toolbar.contains(button)) {
+    return null
+  }
+
+  return button
 }
 
 function getPPTShortcutHelpItems(
