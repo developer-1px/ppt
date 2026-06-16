@@ -12,6 +12,7 @@ import {
   type CanvasReorderMode,
   distributeCanvasSelectionItems,
   getCanvasCommandAvailability,
+  reorderCanvasSelectionItems,
   unionCanvasRectList,
 } from 'canvas/foundation'
 import {
@@ -363,33 +364,13 @@ function reorderPPTElements(
   selection: string[],
   mode: CanvasReorderMode,
 ) {
-  const selected = new Set(
-    items
-      .filter((item) => selection.includes(item.id) && item.locked !== true)
-      .map((item) => item.id),
-  )
-
-  if (selected.size === 0) {
-    return items
-  }
-
-  if (mode === 'bringToFront') {
-    return [
-      ...items.filter((item) => !selected.has(item.id)),
-      ...items.filter((item) => selected.has(item.id)),
-    ]
-  }
-
-  if (mode === 'sendToBack') {
-    return [
-      ...items.filter((item) => selected.has(item.id)),
-      ...items.filter((item) => !selected.has(item.id)),
-    ]
-  }
-
-  return mode === 'bringForward'
-    ? movePPTSelectionForward(items, selected)
-    : movePPTSelectionBackward(items, selected)
+  return reorderCanvasSelectionItems({
+    getItemId: (item) => item.id,
+    isItemSelectable: isPPTCommandElementEditable,
+    items,
+    mode,
+    selection,
+  })
 }
 
 function unlockPPTElement(item: PPTElement): PPTElement {
@@ -428,38 +409,4 @@ function getSelectedPPTGroupIds(
   }
 
   return groupIds
-}
-
-function movePPTSelectionForward(
-  items: PPTElement[],
-  selected: ReadonlySet<string>,
-) {
-  const next = [...items]
-
-  for (let index = next.length - 2; index >= 0; index -= 1) {
-    if (selected.has(next[index].id) && !selected.has(next[index + 1].id)) {
-      const item = next[index]
-      next[index] = next[index + 1]
-      next[index + 1] = item
-    }
-  }
-
-  return next
-}
-
-function movePPTSelectionBackward(
-  items: PPTElement[],
-  selected: ReadonlySet<string>,
-) {
-  const next = [...items]
-
-  for (let index = 1; index < next.length; index += 1) {
-    if (selected.has(next[index].id) && !selected.has(next[index - 1].id)) {
-      const item = next[index]
-      next[index] = next[index - 1]
-      next[index - 1] = item
-    }
-  }
-
-  return next
 }
