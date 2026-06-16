@@ -13,6 +13,7 @@ const canvasKeyboardToolShortcutsEntry = fileURLToPath(new URL('../canvas/src/ca
 const canvasKeyboardViewportDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts', import.meta.url))
 const canvasKeyboardViewportShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportShortcuts.ts', import.meta.url))
 const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
+const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/media-import/CanvasMediaImport.ts', import.meta.url))
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
@@ -43,6 +44,7 @@ export default defineConfig({
       { find: 'canvas/app/keyboard-viewport-dispatch', replacement: canvasKeyboardViewportDispatchEntry },
       { find: 'canvas/app/keyboard-viewport-shortcuts', replacement: canvasKeyboardViewportShortcutsEntry },
       { find: 'canvas/app/menu-roving-focus', replacement: canvasMenuRovingFocusEntry },
+      { find: 'canvas/app/media-import', replacement: canvasMediaImportEntry },
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
       { find: 'canvas/app/modal-focus-lifecycle', replacement: canvasModalFocusLifecycleEntry },
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },

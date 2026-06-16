@@ -21,6 +21,7 @@
       "canvas/app/keyboard-viewport-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts"],
       "canvas/app/keyboard-viewport-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportShortcuts.ts"],
       "canvas/app/menu-roving-focus": ["../canvas/src/canvas/app/feature-packs/toolbar/CanvasMenuRovingFocus.ts"],
+      "canvas/app/media-import": ["../canvas/src/canvas/app/feature-packs/media-import/CanvasMediaImport.ts"],
       "canvas/app/minimap-model": ["../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts"],
       "canvas/app/modal-focus-lifecycle": ["../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts"],
       "canvas/app/paste-position": ["../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts"],

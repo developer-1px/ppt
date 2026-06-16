@@ -4,6 +4,10 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  getCanvasMediaSourceFromDataTransfer,
+  getCanvasMediaSourceFromText,
+} from 'canvas/app/media-import'
+import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -37,20 +41,9 @@ type CanvasMediaLinkItem = {
 
 const PPT_MEDIA_CARD_WIDTH = 440
 const PPT_MEDIA_CARD_HEIGHT = 132
-const PPT_MEDIA_URL_PATTERN = /https?:\/\/[^\s"'<>]+/i
 
-export function getPPTMediaSourceFromDataTransfer(
-  dataTransfer: DataTransfer | null,
-): PPTMediaImportSource | null {
-  if (!dataTransfer) {
-    return null
-  }
-
-  return getPPTMediaSourceFromText(
-    dataTransfer.getData('text/uri-list') ||
-      dataTransfer.getData('text/plain'),
-  )
-}
+export const getPPTMediaSourceFromDataTransfer =
+  getCanvasMediaSourceFromDataTransfer
 
 export function createPPTMediaElement({
   createId,
@@ -65,7 +58,7 @@ export function createPPTMediaElement({
 }): PPTMediaImportResult | null {
   void viewport
 
-  const normalized = getPPTMediaSourceFromText(source.url)
+  const normalized = getCanvasMediaSourceFromText(source.url)
 
   if (!normalized) {
     return null
@@ -124,12 +117,6 @@ export function createPPTMediaElement({
   }
 }
 
-function getPPTMediaSourceFromText(text: string): PPTMediaImportSource | null {
-  const url = normalizePPTMediaUrl(extractPPTMediaUrlText(text))
-
-  return url ? { url } : null
-}
-
 const PPT_LINK_CARD_MEDIA_IMPORTER = {
   id: 'ppt-link-card',
   createItems: ({ createId, position, source }: {
@@ -155,25 +142,6 @@ function getPPTMediaCardText(source: PPTMediaImportSource) {
   return source.title?.trim()
     ? `${source.title.trim()}\n${source.url}`
     : source.url
-}
-
-function extractPPTMediaUrlText(text: string) {
-  const trimmed = text.trim()
-  const match = trimmed.match(PPT_MEDIA_URL_PATTERN)
-
-  return match?.[0] ?? trimmed
-}
-
-function normalizePPTMediaUrl(value: string) {
-  try {
-    const url = new URL(value.trim())
-
-    return url.protocol === 'http:' || url.protocol === 'https:'
-      ? url.toString()
-      : null
-  } catch {
-    return null
-  }
 }
 
 function isCanvasMediaLinkItem(value: unknown): value is CanvasMediaLinkItem {
