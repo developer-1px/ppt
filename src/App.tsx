@@ -101,6 +101,8 @@ import {
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
+  createSlideEditStyleClipboardDescriptor,
+  createSlideEditStyleClipboardPasteCommandEffect,
   createSlideEditThemeDescriptor,
   createSlideEditTextFontFamilyDescriptor,
   createSlideEditTextFrameInsetDescriptor,
@@ -120,6 +122,8 @@ import {
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  getSlideEditStyleClipboardCopyCommandEffect,
+  getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextParagraphSpacingCommandEffect,
@@ -141,6 +145,7 @@ import {
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
+  SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
@@ -168,6 +173,12 @@ import {
   type SlideEditPlaceholderDescriptor,
   type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
+  type SlideEditStyleClipboardBuiltInCategoryId,
+  type SlideEditStyleClipboardCopyFormattingCommand,
+  type SlideEditStyleClipboardDescriptor,
+  type SlideEditStyleClipboardHostCommandEffect,
+  type SlideEditStyleClipboardPasteFormattingCommand,
+  type SlideEditStyleClipboardTargetInput,
   type SlideEditThemeColorToken,
   type SlideEditTextFontFamilyDescriptor,
   type SlideEditTextFontFamilyHostCommandEffect,
@@ -704,6 +715,56 @@ type PPTStyleClipboard = {
   text?: PPTTextStyle
   type: 'slide-style-clipboard'
 }
+type PPTStyleClipboardPackageCategory = SlideEditStyleClipboardBuiltInCategoryId
+type PPTStyleClipboardPackageStyle =
+  | {
+    categoryId: 'line-style'
+    value: PPTStroke
+  }
+  | {
+    categoryId: 'object-effect'
+    value: PPTStyleClipboard['object']
+  }
+  | {
+    categoryId: 'shape-fill'
+    value: Pick<NonNullable<PPTStyleClipboard['shape']>, 'cornerRadius' | 'fill'>
+  }
+  | {
+    categoryId: 'shape-stroke'
+    value: PPTStroke
+  }
+  | {
+    categoryId: 'text-style'
+    value: {
+      paragraph?: PPTStyleClipboardParagraph
+      text?: PPTTextStyle
+    }
+  }
+type PPTStyleClipboardDescriptor = SlideEditStyleClipboardDescriptor<
+  string,
+  string,
+  PPTElement['kind'],
+  PPTStyleClipboardPackageCategory,
+  unknown
+>
+type PPTStyleClipboardHostCommandEffect = SlideEditStyleClipboardHostCommandEffect<
+  string,
+  string,
+  | SlideEditStyleClipboardCopyFormattingCommand<
+    string,
+    string,
+    PPTElement['kind'],
+    PPTStyleClipboardPackageCategory,
+    unknown
+  >
+  | SlideEditStyleClipboardPasteFormattingCommand<
+    string,
+    string,
+    PPTElement['kind'],
+    PPTStyleClipboardPackageCategory,
+    unknown
+  >
+>
 type PPTColorSwatchChannel =
   | 'line-stroke'
   | 'shape-fill'
@@ -1571,6 +1632,7 @@ function App() {
   const [clipboard, setClipboard] = useState<PPTClipboard | null>(null)
   const [styleClipboard, setStyleClipboard] = useState<PPTStyleClipboard | null>(null)
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
+  const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
@@ -1776,9 +1838,13 @@ function App() {
   )
   const canCopyFormatting = selectedElements.length === 1 &&
     canCopyPPTElementFormatting(selectedElements[0])
-  const canPasteFormatting = styleClipboard !== null &&
-    selectedElements.some((element) =>
-      canApplyPPTStyleClipboard(element, styleClipboard))
+  const styleClipboardPasteAvailability = useMemo(
+    () => styleClipboard
+      ? getPPTStyleClipboardPasteAvailability(activeSlide.id, selectedElements, styleClipboard)
+      : null,
+    [activeSlide.id, selectedElements, styleClipboard],
+  )
+  const canPasteFormatting = styleClipboardPasteAvailability?.canPaste ?? false
   const canFormatSelectedText = selectedTextElements.length > 0 &&
     selectedTextElements.length === selectedElements.length &&
     !hasLockedSelection &&
@@ -3281,7 +3347,12 @@ function App() {
       return
     }
 
+    const effect = getSlideEditStyleClipboardCopyCommandEffect(
+      createPPTStyleClipboardDescriptor(activeSlide.id, next),
+    )
+
     setStyleClipboard(next)
+    setLastStyleClipboardEffect(effect)
   }
 
   function pasteFormatting() {
@@ -3289,7 +3360,19 @@ function App() {
       return
     }
 
-    const selectedIds = new Set(selection)
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(selectedElements),
+    })
+
+    if (!effect) {
+      return
+    }
+
+    setLastStyleClipboardEffect(effect)
+
+    const selectedIds = new Set(effect.selection.objectIds)
 
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
@@ -6647,8 +6730,32 @@ function App() {
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-ppt-clipboard-type={clipboard?.type ?? undefined}
         data-ppt-style-clipboard-categories={styleClipboard?.categories.join(' ') ?? undefined}
+        data-ppt-style-clipboard-command={lastStyleClipboardEffect?.payload.id}
+        data-ppt-style-clipboard-command-applications={lastStyleClipboardEffect?.payload.id === 'paste-object-formatting'
+          ? lastStyleClipboardEffect.payload.categoryApplications
+              .map((application) =>
+                `${application.objectId}:${application.appliedCategoryIds.join(',')}`)
+              .join('|')
+          : undefined}
+        data-ppt-style-clipboard-command-selection={lastStyleClipboardEffect?.selection.objectIds.join(' ') ?? undefined}
+        data-ppt-style-clipboard-command-slide={lastStyleClipboardEffect?.selection.slideId}
+        data-ppt-style-clipboard-command-source-id={lastStyleClipboardEffect?.payload.clipboard.source.objectId}
+        data-ppt-style-clipboard-command-targets={lastStyleClipboardEffect?.payload.id === 'paste-object-formatting'
+          ? lastStyleClipboardEffect.payload.targetObjectIds.join(' ')
+          : undefined}
+        data-ppt-style-clipboard-command-type={lastStyleClipboardEffect?.type}
+        data-ppt-style-clipboard-disabled-reason={styleClipboardPasteAvailability?.disabledReason}
+        data-ppt-style-clipboard-model="slide-edit-style-clipboard"
+        data-ppt-style-clipboard-package-categories={styleClipboard
+          ? getPPTStyleClipboardPackageCategoryIds(styleClipboard).join(' ')
+          : undefined}
         data-ppt-style-clipboard-source-id={styleClipboard?.sourceId ?? undefined}
         data-ppt-style-clipboard-source-kind={styleClipboard?.sourceKind ?? undefined}
+        data-ppt-style-clipboard-supported-targets={styleClipboardPasteAvailability?.targets
+          .filter((target) => target.isSupported)
+          .map((target) => target.objectId)
+          .join(' ')}
+        data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
         data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
         data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
@@ -12878,6 +12985,149 @@ function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null 
   }
 
   return clipboard
+}
+
+function createPPTStyleClipboardDescriptor(
+  slideId: string,
+  clipboard: PPTStyleClipboard,
+): PPTStyleClipboardDescriptor {
+  return createSlideEditStyleClipboardDescriptor<
+    string,
+    string,
+    PPTElement['kind'],
+    PPTStyleClipboardPackageCategory,
+    unknown
+  >({
+    categories: getPPTStyleClipboardCategoryDescriptors(clipboard),
+    source: {
+      kind: clipboard.sourceKind,
+      objectId: clipboard.sourceId,
+      slideId,
+    },
+    styles: getPPTStyleClipboardPackageStyles(clipboard),
+  })
+}
+
+function getPPTStyleClipboardCategoryDescriptors(
+  clipboard: PPTStyleClipboard,
+) {
+  const categoryIds = new Set(getPPTStyleClipboardPackageCategoryIds(clipboard))
+
+  return SLIDE_EDIT_STYLE_CLIPBOARD_BUILT_IN_CATEGORIES
+    .filter((category) => categoryIds.has(category.id))
+}
+
+function getPPTStyleClipboardPackageCategoryIds(
+  clipboard: PPTStyleClipboard,
+): PPTStyleClipboardPackageCategory[] {
+  const categoryIds: PPTStyleClipboardPackageCategory[] = ['object-effect']
+
+  if (clipboard.shape) {
+    categoryIds.push('shape-fill')
+
+    if (clipboard.shape.stroke) {
+      categoryIds.push('shape-stroke')
+    }
+  }
+
+  if (clipboard.stroke) {
+    categoryIds.push('line-style')
+  }
+
+  if (clipboard.text || clipboard.paragraph) {
+    categoryIds.push('text-style')
+  }
+
+  return [...new Set(categoryIds)]
+}
+
+function getPPTStyleClipboardPackageStyles(
+  clipboard: PPTStyleClipboard,
+): PPTStyleClipboardPackageStyle[] {
+  const styles: PPTStyleClipboardPackageStyle[] = [{
+    categoryId: 'object-effect',
+    value: clipboard.object,
+  }]
+
+  if (clipboard.shape) {
+    styles.push({
+      categoryId: 'shape-fill',
+      value: {
+        ...(clipboard.shape.cornerRadius !== undefined
+          ? { cornerRadius: clipboard.shape.cornerRadius }
+          : {}),
+        fill: clipboard.shape.fill,
+      },
+    })
+
+    if (clipboard.shape.stroke) {
+      styles.push({
+        categoryId: 'shape-stroke',
+        value: clipboard.shape.stroke,
+      })
+    }
+  }
+
+  if (clipboard.stroke) {
+    styles.push({
+      categoryId: 'line-style',
+      value: clipboard.stroke,
+    })
+  }
+
+  if (clipboard.text || clipboard.paragraph) {
+    styles.push({
+      categoryId: 'text-style',
+      value: {
+        ...(clipboard.paragraph ? { paragraph: clipboard.paragraph } : {}),
+        ...(clipboard.text ? { text: clipboard.text } : {}),
+      },
+    })
+  }
+
+  return styles
+}
+
+function getPPTStyleClipboardPasteAvailability(
+  slideId: string,
+  elements: readonly PPTElement[],
+  clipboard: PPTStyleClipboard,
+) {
+  return getSlideEditStyleClipboardPasteAvailability({
+    clipboard: createPPTStyleClipboardDescriptor(slideId, clipboard),
+    targets: getPPTStyleClipboardTargetInputs(elements),
+  })
+}
+
+function getPPTStyleClipboardTargetInputs(
+  elements: readonly PPTElement[],
+): SlideEditStyleClipboardTargetInput<string, PPTStyleClipboardPackageCategory>[] {
+  return elements.map((element) => ({
+    objectId: element.id,
+    supportedCategoryIds: getPPTElementSupportedStyleClipboardCategoryIds(element),
+  }))
+}
+
+function getPPTElementSupportedStyleClipboardCategoryIds(
+  element: PPTElement,
+): PPTStyleClipboardPackageCategory[] {
+  if (element.locked === true || element.visible === false) {
+    return []
+  }
+
+  const categoryIds: PPTStyleClipboardPackageCategory[] = ['object-effect']
+
+  if (element.kind === 'shape') {
+    categoryIds.push('shape-fill', 'shape-stroke', 'line-style')
+  } else if (element.kind === 'line' || element.kind === 'freeform') {
+    categoryIds.push('line-style')
+  }
+
+  if (isPPTTextElement(element)) {
+    categoryIds.push('text-style')
+  }
+
+  return categoryIds
 }
 
 function canApplyPPTStyleClipboard(

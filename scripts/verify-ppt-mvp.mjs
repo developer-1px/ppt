@@ -5498,10 +5498,18 @@ async function runViewAndShapeScenario(page) {
 
     return {
       categories: shell?.getAttribute('data-ppt-style-clipboard-categories') ?? '',
+      command: shell?.getAttribute('data-ppt-style-clipboard-command') ?? '',
+      commandSelection: shell?.getAttribute('data-ppt-style-clipboard-command-selection') ?? '',
+      commandSlide: shell?.getAttribute('data-ppt-style-clipboard-command-slide') ?? '',
+      commandSourceId: shell?.getAttribute('data-ppt-style-clipboard-command-source-id') ?? '',
+      commandType: shell?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
       copyDisabled: document.querySelector('[data-ppt-command="copy-formatting"]')?.disabled ?? true,
+      model: shell?.getAttribute('data-ppt-style-clipboard-model') ?? '',
+      packageCategories: shell?.getAttribute('data-ppt-style-clipboard-package-categories') ?? '',
       pasteDisabled: document.querySelector('[data-ppt-command="paste-formatting"]')?.disabled ?? true,
       sourceId: shell?.getAttribute('data-ppt-style-clipboard-source-id') ?? '',
       sourceKind: shell?.getAttribute('data-ppt-style-clipboard-source-kind') ?? '',
+      supportedTargets: shell?.getAttribute('data-ppt-style-clipboard-supported-targets') ?? '',
       type: shell?.getAttribute('data-ppt-style-clipboard-type') ?? '',
     }
   })()`)
@@ -5511,10 +5519,20 @@ async function runViewAndShapeScenario(page) {
     !afterCopyFormatting.copyDisabled &&
       !afterCopyFormatting.pasteDisabled &&
       afterCopyFormatting.type === 'slide-style-clipboard' &&
+      afterCopyFormatting.model === 'slide-edit-style-clipboard' &&
       afterCopyFormatting.sourceId === afterCornerRadius.selectedId &&
       afterCopyFormatting.sourceKind === 'shape' &&
+      afterCopyFormatting.command === 'copy-object-formatting' &&
+      afterCopyFormatting.commandSelection === afterCornerRadius.selectedId &&
+      afterCopyFormatting.commandSlide === 'slide-1' &&
+      afterCopyFormatting.commandSourceId === afterCornerRadius.selectedId &&
+      afterCopyFormatting.commandType === 'slide-command-effect' &&
       afterCopyFormatting.categories.includes('shape') &&
-      afterCopyFormatting.categories.includes('stroke'),
+      afterCopyFormatting.categories.includes('stroke') &&
+      afterCopyFormatting.packageCategories.includes('object-effect') &&
+      afterCopyFormatting.packageCategories.includes('shape-fill') &&
+      afterCopyFormatting.packageCategories.includes('shape-stroke') &&
+      afterCopyFormatting.packageCategories.includes('line-style'),
     afterCopyFormatting,
   )
 
@@ -5615,6 +5633,12 @@ async function runViewAndShapeScenario(page) {
       afterShortcutPasteFormatting.strokeDash === 'dash' &&
       afterShortcutPasteFormatting.cornerRadius === '36' &&
       afterShortcutPasteFormatting.borderRadius === '36px' &&
+      afterShortcutPasteFormatting.styleClipboardCommand === 'paste-object-formatting' &&
+      afterShortcutPasteFormatting.styleClipboardCommandApplications.includes(afterShortcutPasteFormatting.selectedId) &&
+      afterShortcutPasteFormatting.styleClipboardCommandApplications.includes('shape-fill') &&
+      afterShortcutPasteFormatting.styleClipboardCommandApplications.includes('object-effect') &&
+      afterShortcutPasteFormatting.styleClipboardCommandSelection.split(' ').includes(afterShortcutPasteFormatting.selectedId) &&
+      afterShortcutPasteFormatting.styleClipboardCommandTargets.split(' ').includes(afterShortcutPasteFormatting.selectedId) &&
       afterShortcutPasteFormattingUndo.fillOpacity === '1' &&
       afterShortcutPasteFormattingUndo.objectOpacity === '1' &&
       afterShortcutPasteFormattingUndo.shadow === '' &&
@@ -9552,6 +9576,7 @@ function getPPTFormatPainterSelectedShapeState(page) {
     const selected = document.querySelector('[data-selected="true"]')
     const targetId = selected?.getAttribute('data-ppt-element') ?? ''
     const layerName = document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')
+    const shell = document.querySelector('.ppt-stage-shell')
 
     return {
       background: selected?.style.background ?? '',
@@ -9571,6 +9596,11 @@ function getPPTFormatPainterSelectedShapeState(page) {
       shadowOpacity: selected?.getAttribute('data-ppt-shadow-opacity') ?? '',
       shape: selected?.getAttribute('data-shape') ?? '',
       styleOpacity: selected?.style.opacity ?? '',
+      styleClipboardCommand: shell?.getAttribute('data-ppt-style-clipboard-command') ?? '',
+      styleClipboardCommandApplications: shell?.getAttribute('data-ppt-style-clipboard-command-applications') ?? '',
+      styleClipboardCommandSelection: shell?.getAttribute('data-ppt-style-clipboard-command-selection') ?? '',
+      styleClipboardCommandTargets: shell?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
+      styleClipboardCommandType: shell?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
       strokeDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
       top: selected?.style.top ?? '',
       width: selected?.style.width ?? '',
