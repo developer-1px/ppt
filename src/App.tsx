@@ -2707,8 +2707,7 @@ function App() {
         ...slide,
         elements: syncPPTLineConnections(
           result.items,
-          new Set(result.selection.filter((id) =>
-            result.items.some((element) => element.id === id && element.kind === 'line'))),
+          getPPTSelectedLineIds(result.items, result.selection),
         ),
       }
     }))
@@ -17160,12 +17159,13 @@ function getPPTSelectedLineIds(
   elements: PPTElement[],
   selection: string[],
 ) {
-  const selected = new Set(selection)
-
   return new Set(
-    elements
-      .filter((element) => selected.has(element.id) && element.kind === 'line')
-      .map((element) => element.id),
+    getCanvasSelectedItems({
+      getItemId: (element) => element.id,
+      isItemSelectable: (element) => element.kind === 'line',
+      items: elements,
+      selection,
+    }).map((element) => element.id),
   )
 }
 
