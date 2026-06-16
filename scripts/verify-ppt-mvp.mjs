@@ -7747,7 +7747,7 @@ async function runImageImportScenario(page) {
 
   const afterUpload = await getPPTImageImportState(page)
 
-  record('inserts PPT image from file picker affordance', afterUpload.imageImportModel === 'canvas-image-import' && afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
+  record('inserts PPT image from file picker affordance', afterUpload.importExtension === 'ppt-import-extension' && afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' && afterUpload.imageImportModel === 'canvas-image-import' && afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
     afterUpload,
     before,
   })
@@ -8369,6 +8369,62 @@ async function runTextPasteScenario(page) {
   await delay(80)
 
   const before = await getPPTTextPasteState(page)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', '<article><p><strong>Bold plan</strong> and <em>italic note</em> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul></article>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterRichPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes HTML rich text clipboard data into PPT text body',
+    afterRichPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterRichPaste.textPasteImporter === 'ppt-rich-html-text' &&
+      afterRichPaste.textPasteFormat === 'text-html-rich' &&
+      afterRichPaste.textPasteRichFallback === 'canvas#257' &&
+      afterRichPaste.textPasteBoldRuns >= 2 &&
+      afterRichPaste.textPasteUnderlineRuns >= 2 &&
+      afterRichPaste.textPasteBulletParagraphs === 2 &&
+      afterRichPaste.textPasteLinkRuns === 1 &&
+      afterRichPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterRichPaste.selectedKind === 'textBox' &&
+      afterRichPaste.selectedName === 'Rich Text' &&
+      afterRichPaste.selectedBoldRunCount >= 2 &&
+      afterRichPaste.selectedItalicRunCount >= 1 &&
+      afterRichPaste.selectedUnderlineRunCount >= 2 &&
+      afterRichPaste.selectedBulletParagraphCount === 2 &&
+      afterRichPaste.selectedText.includes('Bold plan') &&
+      afterRichPaste.selectedText.includes('Second bullet'),
+    {
+      afterRichPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterRichUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes PPT HTML rich text paste as one history step',
+    afterRichUndo.textBoxCount === before.textBoxCount &&
+      afterRichUndo.thumbTextCount === before.thumbTextCount &&
+      afterRichUndo.redoEnabled,
+    {
+      afterRichPaste,
+      afterRichUndo,
+      before,
+    },
+  )
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
@@ -11959,6 +12015,8 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      importExtension: stage?.getAttribute('data-ppt-import-extension') ?? '',
+      importExtensionInstallUnit: stage?.getAttribute('data-ppt-import-extension-install-unit') ?? '',
       imageImportDataUrlFallback: stage?.getAttribute('data-ppt-image-import-data-url-fallback') ?? '',
       imageImportFallbackIssue: stage?.getAttribute('data-ppt-image-import-fallback-issue') ?? '',
       imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
@@ -12068,18 +12126,28 @@ function getPPTTextPasteState(page) {
 
     return {
       redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
+      selectedBoldRunCount: selected?.querySelectorAll('[data-ppt-run-bold="true"]').length ?? 0,
+      selectedBulletParagraphCount: selected?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedItalicRunCount: selected?.querySelectorAll('[data-ppt-run-italic="true"]').length ?? 0,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
       selectedText: selected?.textContent ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedUnderlineRunCount: selected?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       textBoxCount: document.querySelectorAll('[data-kind="textBox"]').length,
+      textPasteBoldRuns: Number(stage?.getAttribute('data-ppt-text-paste-bold-runs') ?? 0),
+      textPasteBulletParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-bullet-paragraphs') ?? 0),
+      textPasteFormat: stage?.getAttribute('data-ppt-text-paste-format') ?? '',
       textPasteImporter: stage?.getAttribute('data-ppt-text-paste-importer') ?? '',
+      textPasteLinkRuns: Number(stage?.getAttribute('data-ppt-text-paste-link-runs') ?? 0),
       textPasteModel: stage?.getAttribute('data-ppt-text-paste-model') ?? '',
+      textPasteRichFallback: stage?.getAttribute('data-ppt-text-paste-rich-fallback') ?? '',
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
+      textPasteUnderlineRuns: Number(stage?.getAttribute('data-ppt-text-paste-underline-runs') ?? 0),
       thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
       undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,
     }

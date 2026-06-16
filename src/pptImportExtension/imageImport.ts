@@ -3,17 +3,10 @@ import {
   type Point,
 } from 'canvas/core'
 import {
-  createCanvasImportedImageItem,
-  getCanvasImageFileFromDataTransfer,
-  getCanvasImageFileFromList,
-  readCanvasImageFileSource,
-  type CanvasImageImportSource,
-} from 'canvas/app/image-import'
-import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTImage,
-} from './pptModel'
+} from '../pptModel'
 
 export type PPTImageImportFormat =
   | 'data-url-html-img'
@@ -23,9 +16,19 @@ export type PPTImageImportFormat =
   | 'svg-html-inline'
   | 'svg-mime'
   | 'svg-plain'
-export type PPTImageImportSource = CanvasImageImportSource & {
+export type PPTImageImportSource = {
+  dataUrl: string
   format?: PPTImageImportFormat
+  mimeType: string
+  name?: string
+  naturalHeight?: number
+  naturalWidth?: number
 }
+
+const PPT_IMPORTED_IMAGE_DEFAULT_WIDTH = 320
+const PPT_IMPORTED_IMAGE_DEFAULT_HEIGHT = 220
+const PPT_IMPORTED_IMAGE_MAX_WIDTH = 520
+const PPT_IMPORTED_IMAGE_MAX_HEIGHT = 360
 
 export function createPPTImportedImageElement({
   center,
@@ -36,46 +39,63 @@ export function createPPTImportedImageElement({
   createId: (prefix: string) => string
   source: PPTImageImportSource
 }): PPTImage {
-  const canvasImage = createCanvasImportedImageItem({
-    center,
-    createId,
-    source,
-  })
-  const name = canvasImage.name?.trim() || 'Image'
+  const size = getPPTImportedImageSize(source)
+  const name = source.name?.trim() || 'Image'
 
   return {
-    alt: canvasImage.alt?.trim() || name,
+    alt: name,
     crop: {
       x: 50,
       y: 50,
     },
     geometry: {
-      h: canvasImage.h,
-      w: canvasImage.w,
-      x: clamp(canvasImage.x, 0, PPT_SLIDE_WIDTH - canvasImage.w),
-      y: clamp(canvasImage.y, 0, PPT_SLIDE_HEIGHT - canvasImage.h),
+      h: size.h,
+      w: size.w,
+      x: clamp(center.x - size.w / 2, 0, PPT_SLIDE_WIDTH - size.w),
+      y: clamp(center.y - size.h / 2, 0, PPT_SLIDE_HEIGHT - size.h),
     },
     fit: 'cover',
-    id: canvasImage.id,
+    id: createId('image'),
     kind: 'image',
     name,
-    src: canvasImage.src,
+    src: source.dataUrl,
   }
 }
 
 export async function readPPTImageFileSource(file: Blob & { name?: string }) {
-  const source = await readCanvasImageFileSource(file)
+  if (!isPPTImageBlob(file)) {
+    return null
+  }
 
-  return source
-    ? {
-        ...source,
-        format: 'file' as const,
-      }
-    : null
+  const dataUrl = await readPPTBlobAsDataUrl(file)
+  const mimeType = normalizePPTImageMimeType(file.type) ??
+    getPPTImageDataUrlMimeType(dataUrl)
+
+  if (!mimeType) {
+    return null
+  }
+
+  const naturalSize = await readPPTImageDataUrlNaturalSize(dataUrl)
+
+  return {
+    dataUrl,
+    format: 'file' as const,
+    mimeType,
+    name: file.name,
+    naturalHeight: naturalSize?.h,
+    naturalWidth: naturalSize?.w,
+  }
 }
 
-export const getPPTImageFileFromList = getCanvasImageFileFromList
-export const getPPTImageFileFromDataTransfer = getCanvasImageFileFromDataTransfer
+export function getPPTImageFileFromList(files: FileList | null) {
+  return Array.from(files ?? []).find(isPPTImageBlob) ?? null
+}
+
+export function getPPTImageFileFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTImageFileFromList(dataTransfer?.files ?? null)
+}
 
 export function getPPTDataImageSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
@@ -346,8 +366,41 @@ function getPPTSVGImportName(value?: string) {
   return name ? `${name.replace(/\.[^.]+$/, '')}.svg` : 'clipboard.svg'
 }
 
+function getPPTImportedImageSize({
+  naturalHeight,
+  naturalWidth,
+}: PPTImageImportSource) {
+  if (!naturalWidth || !naturalHeight) {
+    return {
+      h: PPT_IMPORTED_IMAGE_DEFAULT_HEIGHT,
+      w: PPT_IMPORTED_IMAGE_DEFAULT_WIDTH,
+    }
+  }
+
+  const scale = Math.min(
+    1,
+    PPT_IMPORTED_IMAGE_MAX_WIDTH / naturalWidth,
+    PPT_IMPORTED_IMAGE_MAX_HEIGHT / naturalHeight,
+  )
+
+  return {
+    h: Math.max(1, Math.round(naturalHeight * scale)),
+    w: Math.max(1, Math.round(naturalWidth * scale)),
+  }
+}
+
+function isPPTImageBlob(blob: Blob & { name?: string }) {
+  return normalizePPTImageMimeType(blob.type) !== null
+}
+
 function getPPTImageDataUrlMimeType(value: string) {
   const mimeType = value.trim().match(/^data:(image\/[^;,]+)[^,]*,/i)?.[1].toLowerCase()
+
+  return mimeType ? normalizePPTImageMimeType(mimeType) : null
+}
+
+function normalizePPTImageMimeType(value: string) {
+  const mimeType = value.trim().toLowerCase()
 
   if (
     mimeType === 'image/gif' ||
@@ -395,5 +448,24 @@ function readPPTImageDataUrlNaturalSize(dataUrl: string) {
       resolve(null)
     }, { once: true })
     image.src = dataUrl
+  })
+}
+
+function readPPTBlobAsDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error('Expected image data URL'))
+    })
+    reader.addEventListener('error', () => {
+      reject(reader.error ?? new Error('Could not read image'))
+    })
+    reader.readAsDataURL(blob)
   })
 }

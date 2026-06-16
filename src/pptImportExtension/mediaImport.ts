@@ -4,16 +4,11 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
-  createCanvasMediaImportItems,
-  getCanvasMediaSourceFromDataTransfer,
-  getCanvasMediaSourceFromText,
-} from 'canvas/app/media-import'
-import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTShape,
-} from './pptModel'
+} from '../pptModel'
 
 export type PPTMediaImportSource = {
   title?: string
@@ -42,11 +37,19 @@ type CanvasMediaLinkItem = {
 
 const PPT_MEDIA_CARD_WIDTH = 440
 const PPT_MEDIA_CARD_HEIGHT = 132
+const PPT_MEDIA_URL_PATTERN = /https?:\/\/[^\s"'<>]+/i
 
 export function getPPTMediaSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ): PPTMediaImportSource | null {
-  return getCanvasMediaSourceFromDataTransfer(dataTransfer)
+  if (!dataTransfer) {
+    return null
+  }
+
+  return getPPTMediaSourceFromText(
+    dataTransfer.getData('text/uri-list') ||
+      dataTransfer.getData('text/plain'),
+  )
 }
 
 export function createPPTMediaElement({
@@ -60,7 +63,9 @@ export function createPPTMediaElement({
   source: PPTMediaImportSource
   viewport: Viewport
 }): PPTMediaImportResult | null {
-  const normalized = getCanvasMediaSourceFromText(source.url)
+  void viewport
+
+  const normalized = getPPTMediaSourceFromText(source.url)
 
   if (!normalized) {
     return null
@@ -70,21 +75,20 @@ export function createPPTMediaElement({
     ...source,
     url: normalized.url,
   }
-  const result = createCanvasMediaImportItems({
-    createId,
-    importers: [PPT_LINK_CARD_MEDIA_IMPORTER],
-    position,
-    source: normalizedSource,
-    viewport,
-  })
-  const canvasItem = result?.items.find(isCanvasMediaLinkItem)
+  const canvasItem = PPT_LINK_CARD_MEDIA_IMPORTER
+    .createItems({
+      createId,
+      position,
+      source: normalizedSource,
+    })
+    .find(isCanvasMediaLinkItem)
 
-  if (!result || !canvasItem) {
+  if (!canvasItem) {
     return null
   }
 
   return {
-    importerId: result.importerId,
+    importerId: PPT_LINK_CARD_MEDIA_IMPORTER.id,
     item: {
       cornerRadius: 16,
       fill: { color: canvasItem.fill },
@@ -120,6 +124,12 @@ export function createPPTMediaElement({
   }
 }
 
+function getPPTMediaSourceFromText(text: string): PPTMediaImportSource | null {
+  const url = normalizePPTMediaUrl(extractPPTMediaUrlText(text))
+
+  return url ? { url } : null
+}
+
 const PPT_LINK_CARD_MEDIA_IMPORTER = {
   id: 'ppt-link-card',
   createItems: ({ createId, position, source }: {
@@ -145,6 +155,25 @@ function getPPTMediaCardText(source: PPTMediaImportSource) {
   return source.title?.trim()
     ? `${source.title.trim()}\n${source.url}`
     : source.url
+}
+
+function extractPPTMediaUrlText(text: string) {
+  const trimmed = text.trim()
+  const match = trimmed.match(PPT_MEDIA_URL_PATTERN)
+
+  return match?.[0] ?? trimmed
+}
+
+function normalizePPTMediaUrl(value: string) {
+  try {
+    const url = new URL(value.trim())
+
+    return url.protocol === 'http:' || url.protocol === 'https:'
+      ? url.toString()
+      : null
+  } catch {
+    return null
+  }
 }
 
 function isCanvasMediaLinkItem(value: unknown): value is CanvasMediaLinkItem {

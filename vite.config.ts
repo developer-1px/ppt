@@ -4,18 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
-const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/image/CanvasImageImport.ts', import.meta.url))
 const canvasInlineEditDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts', import.meta.url))
-const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/media/CanvasMediaImport.ts', import.meta.url))
-const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/table/CanvasTableImport.ts', import.meta.url))
-const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/io/text-paste/CanvasTextPasteImport.ts', import.meta.url))
 const canvasKeyboardCommandDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts', import.meta.url))
 const canvasKeyboardCommandShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts', import.meta.url))
 const canvasKeyboardNudgeShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts', import.meta.url))
 const canvasKeyboardViewportDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts', import.meta.url))
 const canvasKeyboardViewportShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportShortcuts.ts', import.meta.url))
 const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
-const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/minimap/CanvasMinimapModel.ts', import.meta.url))
+const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
@@ -33,11 +29,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
-      { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
       { find: 'canvas/app/inline-edit-dom', replacement: canvasInlineEditDomEntry },
-      { find: 'canvas/app/media-import', replacement: canvasMediaImportEntry },
-      { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
-      { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
       { find: 'canvas/app/keyboard-command-dispatch', replacement: canvasKeyboardCommandDispatchEntry },
       { find: 'canvas/app/keyboard-command-shortcuts', replacement: canvasKeyboardCommandShortcutsEntry },
       { find: 'canvas/app/keyboard-nudge-shortcuts', replacement: canvasKeyboardNudgeShortcutsEntry },

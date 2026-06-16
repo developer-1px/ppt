@@ -1,16 +1,9 @@
 import { clamp } from 'canvas/core'
 import {
-  getCanvasTableCsvFileFromDataTransfer,
-  getCanvasTableCsvFileFromList,
-  getCanvasTableCsvSourceFromText,
-  readCanvasTableCsvFileSource,
-  type CanvasTableImportSource,
-} from 'canvas/app/table-import'
-import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTTable,
-} from './pptModel'
+} from '../pptModel'
 
 export type PPTTableImportFormat =
   | 'canvas-csv'
@@ -18,8 +11,10 @@ export type PPTTableImportFormat =
   | 'text-delimited'
   | 'text-html'
   | 'text-tsv'
-export type PPTTableImportSource = CanvasTableImportSource & {
+export type PPTTableImportSource = {
   format?: PPTTableImportFormat
+  name?: string
+  rows: readonly (readonly string[])[]
 }
 
 export const PPT_DEFAULT_TABLE_ROWS = [
@@ -30,6 +25,11 @@ export const PPT_DEFAULT_TABLE_ROWS = [
 
 const PPT_TABLE_TSV_MIME_TYPES = new Set([
   'text/tab-separated-values',
+])
+const PPT_TABLE_CSV_MIME_TYPES = new Set([
+  'application/vnd.ms-excel',
+  'text/comma-separated-values',
+  'text/csv',
 ])
 const PPT_TABLE_MAX_COLUMNS = 8
 const PPT_TABLE_MAX_ROWS = 12
@@ -73,14 +73,12 @@ export function createPPTTableElement({
 }
 
 export function getPPTTableFileFromList(files: FileList | null) {
-  return getCanvasTableCsvFileFromList(files) ??
-    Array.from(files ?? []).find(isPPTTableTsvFile) ??
-    null
+  return Array.from(files ?? [])
+    .find((file) => isPPTTableCsvFile(file) || isPPTTableTsvFile(file)) ?? null
 }
 
 export function getPPTTableFileFromDataTransfer(dataTransfer: DataTransfer | null) {
-  return getCanvasTableCsvFileFromDataTransfer(dataTransfer) ??
-    getPPTTableFileFromList(dataTransfer?.files ?? null)
+  return getPPTTableFileFromList(dataTransfer?.files ?? null)
 }
 
 export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | null) {
@@ -116,18 +114,12 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
 }
 
 export async function readPPTTableFileSource(file: Blob & { name?: string }) {
-  const canvasSource = await readCanvasTableCsvFileSource(file)
-
-  if (canvasSource) {
-    return toPPTTableImportSource(canvasSource, 'canvas-csv')
-  }
-
-  if (!isPPTTableTsvFile(file)) {
+  if (!isPPTTableCsvFile(file) && !isPPTTableTsvFile(file)) {
     return null
   }
 
   return getPPTTableSourceFromText(await readPPTBlobAsText(file), {
-    format: 'text-tsv',
+    format: isPPTTableTsvFile(file) ? 'text-tsv' : 'canvas-csv',
     name: file.name,
   })
 }
@@ -138,12 +130,6 @@ export function getPPTTableSourceFromText(
 ): PPTTableImportSource | null {
   if (!text.trim()) {
     return null
-  }
-
-  const canvasSource = getCanvasTableCsvSourceFromText(text, options)
-
-  if (canvasSource) {
-    return toPPTTableImportSource(canvasSource, options.format ?? 'canvas-csv')
   }
 
   const parsedRows = parsePPTTableTextRows(text)
@@ -216,25 +202,11 @@ export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
   return Math.max(0, ...rows.map((row) => row.length))
 }
 
-function toPPTTableImportSource(
-  source: CanvasTableImportSource | null,
-  format?: PPTTableImportFormat,
-): PPTTableImportSource | null {
-  if (!source) {
-    return null
-  }
+function isPPTTableCsvFile(file: Blob & { name?: string }) {
+  const mimeType = file.type.toLowerCase()
+  const name = file.name?.toLowerCase() ?? ''
 
-  const rows = normalizePPTTableRows(source.rows)
-
-  if (!isPPTTableImportRows(rows)) {
-    return null
-  }
-
-  return {
-    ...(format === undefined ? {} : { format }),
-    ...(source.name === undefined ? {} : { name: getPPTTableImportName(source.name) }),
-    rows,
-  }
+  return PPT_TABLE_CSV_MIME_TYPES.has(mimeType) || name.endsWith('.csv')
 }
 
 function isPPTTableTsvFile(file: Blob & { name?: string }) {

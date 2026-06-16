@@ -443,39 +443,37 @@ import {
   exportPPTSlideSVG,
 } from './pptExport'
 import {
+  PPT_DEFAULT_TABLE_ROWS,
+  PPT_IMPORT_CANVAS_FALLBACK_ISSUES,
+  PPT_IMPORT_EXTENSION,
+  canHandlePPTStageDropImport,
+  createPPTImageImportEffect,
   createPPTImportedImageElement,
-  getPPTDataImageSourceFromDataTransfer,
-  getPPTImageFileFromDataTransfer,
   getPPTImageFileFromList,
-  getPPTSVGImageSourceFromDataTransfer,
-  readPPTImageFileSource,
-  resolvePPTImageSourceNaturalSize,
-  type PPTImageImportFormat,
-  type PPTImageImportSource,
-} from './pptImageImport'
-import {
   createPPTMediaElement,
-  getPPTMediaSourceFromDataTransfer,
+  createPPTTableElement,
+  createPPTTableImportEffect,
+  createPPTRichTextPasteElement,
+  createPPTTextPasteElement,
+  getPPTClipboardImportActions,
+  getPPTStageDropImportAction,
+  getPPTTableColumnCount,
+  normalizePPTTableRows,
+  readPPTImageFileSource,
+  readPPTTableFileSource,
+  resolvePPTImageSourceNaturalSize,
+  type PPTImageImportSource,
+  stringifyPPTTableRows,
+  type PPTClipboardImportAction,
+  type PPTImageImportEffect,
   type PPTMediaImportResult,
   type PPTMediaImportSource,
-} from './pptMediaImport'
-import {
-  PPT_DEFAULT_TABLE_ROWS,
-  createPPTTableElement,
-  getPPTTableColumnCount,
-  getPPTTableFileFromDataTransfer,
-  getPPTTableSourceFromDataTransfer,
-  normalizePPTTableRows,
-  readPPTTableFileSource,
-  stringifyPPTTableRows,
-  type PPTTableImportFormat,
+  type PPTRichTextPasteSource,
+  type PPTStageDropImportAction,
+  type PPTTableImportEffect,
   type PPTTableImportSource,
-} from './pptTableImport'
-import {
-  createPPTTextPasteElement,
-  getPPTTextPasteSourcesFromDataTransfer,
   type PPTTextPasteImportResult,
-} from './pptTextPasteImport'
+} from './pptImportExtension'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
@@ -816,23 +814,6 @@ type PPTClipboardPastePositionEffect = {
 type PPTClipboardPastePositionMemory = {
   key: string
   pasteIndex: number
-}
-type PPTTableImportEffect = {
-  columnCount: number
-  fallbackIssue?: string
-  format: PPTTableImportFormat
-  model: 'canvas-table-import'
-  name: string
-  rowCount: number
-}
-type PPTImageImportEffect = {
-  fallbackIssue?: string
-  format: PPTImageImportFormat
-  mimeType: string
-  model: 'canvas-image-import'
-  name: string
-  naturalHeight?: number
-  naturalWidth?: number
 }
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
@@ -2627,49 +2608,8 @@ function App() {
         return
       }
 
-      const file = getPPTImageFileFromDataTransfer(event.clipboardData)
-
-      if (file) {
-        event.preventDefault()
-        void insertPPTImageFile(file)
-        return
-      }
-
-      const svgImageSource = getPPTSVGImageSourceFromDataTransfer(event.clipboardData)
-
-      if (svgImageSource) {
-        event.preventDefault()
-        insertPPTImageSource(svgImageSource)
-        return
-      }
-
-      const dataImageSource = getPPTDataImageSourceFromDataTransfer(event.clipboardData)
-
-      if (dataImageSource) {
-        event.preventDefault()
-        void resolvePPTImageSourceNaturalSize(dataImageSource).then((source) => {
-          insertPPTImageSource(source)
-        })
-        return
-      }
-
-      const tableSource = getPPTTableSourceFromDataTransfer(event.clipboardData)
-
-      if (tableSource) {
-        event.preventDefault()
-        insertPPTTableSource(tableSource)
-        return
-      }
-
-      const mediaSource = getPPTMediaSourceFromDataTransfer(event.clipboardData)
-
-      if (mediaSource && insertPPTMediaSource(mediaSource)) {
-        event.preventDefault()
-        return
-      }
-
-      for (const source of getPPTTextPasteSourcesFromDataTransfer(event.clipboardData)) {
-        if (insertPPTTextPasteSource(source)) {
+      for (const action of getPPTClipboardImportActions(event.clipboardData)) {
+        if (runPPTClipboardImportAction(action)) {
           event.preventDefault()
           return
         }
@@ -3276,6 +3216,56 @@ function App() {
     setContextMenu(null)
   }
 
+  function runPPTClipboardImportAction(action: PPTClipboardImportAction) {
+    switch (action.kind) {
+      case 'image-file':
+        void insertPPTImageFile(action.file)
+        return true
+      case 'image-source':
+        if (action.resolveNaturalSize) {
+          void resolvePPTImageSourceNaturalSize(action.source).then((source) => {
+            insertPPTImageSource(source)
+          })
+        } else {
+          insertPPTImageSource(action.source)
+        }
+        return true
+      case 'table-source':
+        insertPPTTableSource(action.source)
+        return true
+      case 'media-source':
+        return insertPPTMediaSource(action.source)
+      case 'rich-text-source':
+        return insertPPTRichTextPasteSource(action.source)
+      case 'text-source':
+        return insertPPTTextPasteSource(action.text)
+    }
+  }
+
+  function runPPTStageDropImportAction(
+    action: PPTStageDropImportAction,
+    point: Point,
+  ) {
+    switch (action.kind) {
+      case 'image-file':
+        void insertPPTImageFile(action.file, point)
+        return true
+      case 'table-file':
+        void insertPPTTableFile(action.file, point).then((inserted) => {
+          if (!inserted && action.fallbackSource) {
+            insertPPTTableSource(action.fallbackSource, point)
+          }
+        })
+        return true
+      case 'table-source':
+        insertPPTTableSource(action.source, point)
+        return true
+      case 'media-source':
+        insertPPTMediaSource(action.source, point)
+        return true
+    }
+  }
+
   function insertPPTImageSource(
     source: PPTImageImportSource,
     center = getPPTViewportCenter(),
@@ -3287,15 +3277,7 @@ function App() {
         source,
       })
 
-      setLastImageImportEffect({
-        fallbackIssue: getPPTImageImportFallbackIssue(source.format),
-        format: source.format ?? 'file',
-        mimeType: source.mimeType,
-        model: 'canvas-image-import',
-        name: element.name,
-        naturalHeight: source.naturalHeight,
-        naturalWidth: source.naturalWidth,
-      })
+      setLastImageImportEffect(createPPTImageImportEffect({ element, source }))
       setSelection([element.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -3401,14 +3383,7 @@ function App() {
         rows: source.rows,
       })
 
-      setLastTableImportEffect({
-        columnCount: getPPTTableColumnCount(element.rows),
-        fallbackIssue: source.format === 'text-html' ? 'canvas#254' : undefined,
-        format: source.format ?? 'text-delimited',
-        model: 'canvas-table-import',
-        name: element.name,
-        rowCount: element.rows.length,
-      })
+      setLastTableImportEffect(createPPTTableImportEffect({ element, source }))
       setSelection([element.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -3492,6 +3467,46 @@ function App() {
         createId: createPPTElementIdFactory(slide),
         position: center,
         text,
+        viewport,
+      })
+
+      if (!result) {
+        return slide
+      }
+
+      imported = result
+      setSelection([result.item.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, result.item],
+      }
+    }))
+
+    setLastTextPasteImport(imported)
+
+    return imported !== null
+  }
+
+  function insertPPTRichTextPasteSource(
+    source: PPTRichTextPasteSource,
+    center = getPPTViewportCenter(),
+  ) {
+    let imported: PPTTextPasteImportResult | null = null
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const result = createPPTRichTextPasteElement({
+        createId: createPPTElementIdFactory(slide),
+        position: center,
+        source,
         viewport,
       })
 
@@ -5378,50 +5393,22 @@ function App() {
   }
 
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    if (
-      getPPTImageFileFromDataTransfer(event.dataTransfer) ||
-      getPPTTableFileFromDataTransfer(event.dataTransfer) ||
-      getPPTTableSourceFromDataTransfer(event.dataTransfer) ||
-      getPPTMediaSourceFromDataTransfer(event.dataTransfer)
-    ) {
+    if (canHandlePPTStageDropImport(event.dataTransfer)) {
       event.preventDefault()
     }
   }
 
   function handleStageDrop(event: ReactDragEvent<HTMLDivElement>) {
-    const imageFile = getPPTImageFileFromDataTransfer(event.dataTransfer)
+    const action = getPPTStageDropImportAction(event.dataTransfer)
 
-    if (imageFile) {
-      event.preventDefault()
-      void insertPPTImageFile(imageFile, screenToWorld(event.nativeEvent))
+    if (!action) {
       return
     }
 
-    const tableFile = getPPTTableFileFromDataTransfer(event.dataTransfer)
-    const tableSource = getPPTTableSourceFromDataTransfer(event.dataTransfer)
     const point = screenToWorld(event.nativeEvent)
 
-    if (tableFile) {
+    if (runPPTStageDropImportAction(action, point)) {
       event.preventDefault()
-      void insertPPTTableFile(tableFile, point).then((inserted) => {
-        if (!inserted && tableSource) {
-          insertPPTTableSource(tableSource, point)
-        }
-      })
-      return
-    }
-
-    if (tableSource) {
-      event.preventDefault()
-      insertPPTTableSource(tableSource, point)
-      return
-    }
-
-    const mediaSource = getPPTMediaSourceFromDataTransfer(event.dataTransfer)
-
-    if (mediaSource) {
-      event.preventDefault()
-      insertPPTMediaSource(mediaSource, point)
     }
   }
 
@@ -7466,6 +7453,8 @@ function App() {
           .join(' ')}
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
+        data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
         data-ppt-media-import-importer={lastMediaImport?.importerId}
         data-ppt-media-import-model="canvas-media-import"
         data-ppt-media-import-selection={lastMediaImport?.item.id}
@@ -7476,9 +7465,15 @@ function App() {
         data-ppt-inline-edit-line-break={lastInlineEditEffect?.lineBreak ? 'true' : undefined}
         data-ppt-inline-edit-model="canvas-inline-edit-dom"
         data-ppt-inline-edit-paste-text={lastInlineEditEffect?.pasteText}
+        data-ppt-text-paste-bold-runs={lastTextPasteImport?.boldRunCount}
+        data-ppt-text-paste-bullet-paragraphs={lastTextPasteImport?.bulletParagraphCount}
+        data-ppt-text-paste-format={lastTextPasteImport?.format}
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
+        data-ppt-text-paste-link-runs={lastTextPasteImport?.linkRunCount}
         data-ppt-text-paste-model="canvas-text-paste-import"
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
+        data-ppt-text-paste-underline-runs={lastTextPasteImport?.underlineRunCount}
+        data-ppt-text-paste-rich-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.richTextClipboard}
         data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
         data-ppt-marquee-additive={interaction?.kind === 'marquee'
           ? String(interaction.additive)
@@ -7618,8 +7613,8 @@ function App() {
         data-ppt-image-import-name={lastImageImportEffect?.name}
         data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
         data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
-        data-ppt-image-import-data-url-fallback="canvas#256"
-        data-ppt-image-import-svg-fallback="canvas#255"
+        data-ppt-image-import-data-url-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.dataImageClipboard}
+        data-ppt-image-import-svg-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.svgClipboard}
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}
         data-ppt-image-replace-command-mime={lastImageReplaceEffect?.payload.source.mimeType}
         data-ppt-image-replace-command-name={lastImageReplaceEffect?.payload.source.name}
@@ -7740,8 +7735,8 @@ function App() {
         data-ppt-table-import-model="canvas-table-import"
         data-ppt-table-import-name={lastTableImportEffect?.name}
         data-ppt-table-import-rows={lastTableImportEffect?.rowCount}
-        data-ppt-table-import-html-fallback="canvas#254"
-        data-ppt-table-import-tsv-fallback="canvas#253"
+        data-ppt-table-import-html-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.htmlTableClipboard}
+        data-ppt-table-import-tsv-fallback={PPT_IMPORT_CANVAS_FALLBACK_ISSUES.tsvClipboard}
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
         data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}
         data-ppt-text-overflow-indicator-height={selectedTextAutoFitIndicator?.bounds.h}
@@ -9366,14 +9361,6 @@ function createPPTClipboardPayload({
     selectedObjectIds,
     sourceSlideId,
   })
-}
-
-function getPPTImageImportFallbackIssue(format: PPTImageImportFormat | undefined) {
-  if (!format || format === 'file') {
-    return undefined
-  }
-
-  return format.startsWith('svg-') ? 'canvas#255' : 'canvas#256'
 }
 
 function createPPTRichClipboardEffect(
@@ -11802,6 +11789,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
         >
           {paragraph.runs.map((run, runIndex) => (
             <span
+              data-ppt-run-bold={run.bold === true ? 'true' : undefined}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
               data-ppt-run-underline={run.underline === true ? 'true' : undefined}
               key={runIndex}
