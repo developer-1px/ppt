@@ -4640,9 +4640,23 @@ async function runTextFrameInsetScenario(page) {
   record(
     'renders PPT text frame inset controls in text inspector',
     initial.selectedId === 's1-title' &&
+      initial.descriptorAttribute === 'data-slide-text-frame-inset' &&
+      initial.descriptorAttributeValue === '0 0 0 0' &&
+      initial.descriptorDefaultValue === '0 0 0 0' &&
+      initial.descriptorSurface === 'text-frame-inset' &&
+      initial.leftCommand === 'update-text-frame-inset' &&
+      initial.leftControl === 'inset-number' &&
+      initial.leftUnit === 'px' &&
+      initial.model === 'slide-edit-text-frame-inset' &&
       initial.top === '0' &&
+      initial.topControl === 'inset-number' &&
+      initial.topUnit === 'px' &&
       initial.right === '0' &&
+      initial.rightControl === 'inset-number' &&
+      initial.rightUnit === 'px' &&
       initial.bottom === '0' &&
+      initial.bottomControl === 'inset-number' &&
+      initial.bottomUnit === 'px' &&
       initial.left === '0' &&
       initial.selectedTextInset === '0,0,0,0' &&
       initial.thumbTextInset === '0,0,0,0',
@@ -4671,7 +4685,17 @@ async function runTextFrameInsetScenario(page) {
 
   record(
     'updates PPT text frame inset metadata from inspector',
-    afterInset.top === '10' &&
+    afterInset.command === 'update-text-frame-inset' &&
+      afterInset.commandField === 'left' &&
+      afterInset.commandObject === 's1-title' &&
+      afterInset.commandSlide === 'slide-1' &&
+      afterInset.commandType === 'slide-command-effect' &&
+      afterInset.commandValue === '22' &&
+      afterInset.descriptorAttribute === 'data-slide-text-frame-inset' &&
+      afterInset.descriptorAttributeValue === '10 14 18 22' &&
+      afterInset.descriptorDefaultValue === '0 0 0 0' &&
+      afterInset.descriptorSurface === 'text-frame-inset' &&
+      afterInset.top === '10' &&
       afterInset.right === '14' &&
       afterInset.bottom === '18' &&
       afterInset.left === '22' &&
@@ -10013,23 +10037,48 @@ function getPPTTextFrameInsetState(page) {
   return page.eval(`(() => {
     const inspector = document.querySelector('[data-ppt-text-inset-inspector]')
     const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const thumb = document.querySelector('.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="s1-title"]')
+    const top = document.querySelector('[data-ppt-text-inset-field="top"]')
+    const right = document.querySelector('[data-ppt-text-inset-field="right"]')
+    const bottom = document.querySelector('[data-ppt-text-inset-field="bottom"]')
+    const left = document.querySelector('[data-ppt-text-inset-field="left"]')
 
     return {
-      bottom: document.querySelector('[data-ppt-text-inset-field="bottom"]')?.value ?? '',
+      bottom: bottom?.value ?? '',
+      bottomControl: bottom?.getAttribute('data-ppt-text-inset-control') ?? '',
+      bottomUnit: bottom?.getAttribute('data-ppt-text-inset-unit') ?? '',
+      command: stage?.getAttribute('data-ppt-text-inset-command') ?? '',
+      commandField: stage?.getAttribute('data-ppt-text-inset-command-field') ?? '',
+      commandObject: stage?.getAttribute('data-ppt-text-inset-command-object') ?? '',
+      commandSlide: stage?.getAttribute('data-ppt-text-inset-command-slide') ?? '',
+      commandType: stage?.getAttribute('data-ppt-text-inset-command-type') ?? '',
+      commandValue: stage?.getAttribute('data-ppt-text-inset-command-value') ?? '',
+      descriptorAttribute: inspector?.getAttribute('data-ppt-text-inset-attribute') ?? '',
+      descriptorAttributeValue: inspector?.getAttribute('data-ppt-text-inset-attribute-value') ?? '',
+      descriptorDefaultValue: inspector?.getAttribute('data-ppt-text-inset-default-value') ?? '',
+      descriptorSurface: inspector?.getAttribute('data-ppt-text-inset-surface') ?? '',
       inspectorTextInset: [
         inspector?.getAttribute('data-ppt-text-inset-top') ?? '',
         inspector?.getAttribute('data-ppt-text-inset-right') ?? '',
         inspector?.getAttribute('data-ppt-text-inset-bottom') ?? '',
         inspector?.getAttribute('data-ppt-text-inset-left') ?? '',
       ].join(','),
-      left: document.querySelector('[data-ppt-text-inset-field="left"]')?.value ?? '',
-      right: document.querySelector('[data-ppt-text-inset-field="right"]')?.value ?? '',
+      left: left?.value ?? '',
+      leftCommand: left?.getAttribute('data-ppt-text-inset-command') ?? '',
+      leftControl: left?.getAttribute('data-ppt-text-inset-control') ?? '',
+      leftUnit: left?.getAttribute('data-ppt-text-inset-unit') ?? '',
+      model: stage?.getAttribute('data-ppt-text-inset-model') ?? '',
+      right: right?.value ?? '',
+      rightControl: right?.getAttribute('data-ppt-text-inset-control') ?? '',
+      rightUnit: right?.getAttribute('data-ppt-text-inset-unit') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedStylePadding: selected?.style.padding ?? '',
       selectedTextInset: selected?.getAttribute('data-ppt-text-inset') ?? '',
       thumbTextInset: thumb?.getAttribute('data-ppt-thumb-text-inset') ?? '',
-      top: document.querySelector('[data-ppt-text-inset-field="top"]')?.value ?? '',
+      top: top?.value ?? '',
+      topControl: top?.getAttribute('data-ppt-text-inset-control') ?? '',
+      topUnit: top?.getAttribute('data-ppt-text-inset-unit') ?? '',
     }
   })()`)
 }

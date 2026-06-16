@@ -101,6 +101,7 @@ import {
   createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditThemeDescriptor,
+  createSlideEditTextFrameInsetDescriptor,
   getSlideEditFrameGuideGeometry,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditObjectAccessibilityCommandEffect,
@@ -114,11 +115,13 @@ import {
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailPointerCommandEffect,
   getSlideEditResolvedLayoutPlaceholder,
+  getSlideEditTextFrameInsetCommandEffect,
   normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectOpacity,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
+  normalizeSlideEditTextFrameInsetValue,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   toSlideEditRailHostCommandEffect,
   type SlideEditFrameGuideConfig,
@@ -143,6 +146,8 @@ import {
   type SlideEditRailHostCommandEffect,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditThemeColorToken,
+  type SlideEditTextFrameInsetDescriptor,
+  type SlideEditTextFrameInsetHostCommandEffect,
 } from '@interactive-os/slide-edit-affordance'
 import {
   INITIAL_VIEWPORT,
@@ -1551,6 +1556,7 @@ function App() {
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
+  const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
   const [slideDragState, setSlideDragState] = useState<PPTSlideDragState | null>(null)
   const [lineCreationMode, setLineCreationMode] = useState<LineCreationMode | null>(null)
   const [creationTool, setCreationTool] = useState<PPTCreationTool | null>(null)
@@ -3733,12 +3739,23 @@ function App() {
     field: PPTTextInsetField,
     value: number,
   ) {
+    const effect = getSlideEditTextFrameInsetCommandEffect({
+      fieldId: field,
+      id: 'update-text-frame-inset',
+      objectId: elementId,
+      slideId: activeSlide.id,
+      value,
+    })
+
+    setLastTextFrameInsetEffect(effect)
+
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
         if (!isPPTTextElement(element) || element.locked === true) {
           return element
         }
 
+        const { fieldId, value: fieldValue } = effect.payload
         const inset = getPPTTextElementInset(element)
 
         return {
@@ -3747,7 +3764,7 @@ function App() {
             ...getPPTTextElementStyle(element),
             textInset: {
               ...inset,
-              [field]: normalizePPTTextInset(value),
+              [fieldId]: normalizePPTTextInset(fieldValue),
             },
           },
         }
@@ -6652,6 +6669,13 @@ function App() {
         data-ppt-stroke-line-style-command-type={lastStrokeLineStyleEffect?.type}
         data-ppt-stroke-line-style-command-value={lastStrokeLineStyleEffect?.payload.value}
         data-ppt-stroke-line-style-model="slide-edit-object-stroke-line-style"
+        data-ppt-text-inset-command={lastTextFrameInsetEffect?.payload.id}
+        data-ppt-text-inset-command-field={lastTextFrameInsetEffect?.payload.fieldId}
+        data-ppt-text-inset-command-object={lastTextFrameInsetEffect?.payload.objectId}
+        data-ppt-text-inset-command-slide={lastTextFrameInsetEffect?.payload.slideId}
+        data-ppt-text-inset-command-type={lastTextFrameInsetEffect?.type}
+        data-ppt-text-inset-command-value={lastTextFrameInsetEffect?.payload.value}
+        data-ppt-text-inset-model="slide-edit-text-frame-inset"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
         data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
@@ -10481,6 +10505,9 @@ function Inspector({
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
+  const textFrameInsetDescriptor = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextFrameInsetDescriptor(slide.id, selectedElement)
+    : null
   const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
   const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
   const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
@@ -11350,31 +11377,45 @@ function Inspector({
                 </label>
                 <div
                   className="ppt-paragraph-spacing-grid"
-                  data-ppt-text-inset-bottom={textInset.bottom}
+                  data-ppt-text-inset-attribute={textFrameInsetDescriptor?.metadata.attribute}
+                  data-ppt-text-inset-attribute-value={textFrameInsetDescriptor?.metadata.value}
+                  data-ppt-text-inset-bottom={textFrameInsetDescriptor?.inset.bottom ?? textInset.bottom}
+                  data-ppt-text-inset-default-value={textFrameInsetDescriptor?.metadata.defaultValue}
                   data-ppt-text-inset-inspector
-                  data-ppt-text-inset-left={textInset.left}
-                  data-ppt-text-inset-right={textInset.right}
-                  data-ppt-text-inset-top={textInset.top}
+                  data-ppt-text-inset-left={textFrameInsetDescriptor?.inset.left ?? textInset.left}
+                  data-ppt-text-inset-right={textFrameInsetDescriptor?.inset.right ?? textInset.right}
+                  data-ppt-text-inset-surface={textFrameInsetDescriptor?.surface}
+                  data-ppt-text-inset-top={textFrameInsetDescriptor?.inset.top ?? textInset.top}
                 >
-                  {(['top', 'right', 'bottom', 'left'] as const).map((field) => (
-                    <label className="ppt-field" key={field}>
-                      <span>{field[0].toUpperCase() + field.slice(1)}</span>
-                      <input
-                        data-ppt-text-inset-field={field}
-                        max={PPT_TEXT_INSET_MAX}
-                        min={PPT_TEXT_INSET_MIN}
-                        step={PPT_TEXT_INSET_STEP}
-                        type="number"
-                        value={textInset[field]}
-                        onChange={(event) =>
-                          onElementTextInsetChange(
-                            selectedElement.id,
-                            field,
-                            parsePPTTextInset(event.target.value),
-                          )}
-                      />
-                    </label>
-                  ))}
+                  {(['top', 'right', 'bottom', 'left'] as const).map((field) => {
+                    const textFrameInsetField = getPPTTextFrameInsetField(
+                      textFrameInsetDescriptor,
+                      field,
+                    )
+
+                    return (
+                      <label className="ppt-field" key={field}>
+                        <span>{field[0].toUpperCase() + field.slice(1)}</span>
+                        <input
+                          data-ppt-text-inset-command={textFrameInsetField?.commandId}
+                          data-ppt-text-inset-control={textFrameInsetField?.control}
+                          data-ppt-text-inset-field={field}
+                          data-ppt-text-inset-unit={textFrameInsetField?.unit}
+                          max={textFrameInsetField?.max ?? PPT_TEXT_INSET_MAX}
+                          min={textFrameInsetField?.min ?? PPT_TEXT_INSET_MIN}
+                          step={textFrameInsetField?.step ?? PPT_TEXT_INSET_STEP}
+                          type="number"
+                          value={textFrameInsetDescriptor?.inset[field] ?? textInset[field]}
+                          onChange={(event) =>
+                            onElementTextInsetChange(
+                              selectedElement.id,
+                              field,
+                              parsePPTTextInset(event.target.value),
+                            )}
+                        />
+                      </label>
+                    )
+                  })}
                 </div>
                 <label className="ppt-field">
                   <span>Weight</span>
@@ -12678,6 +12719,24 @@ function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
     PPT_TEXT_VERTICAL_ALIGN_OPTIONS[0].css
 }
 
+function getPPTTextFrameInsetDescriptor(
+  slideId: string,
+  element: PPTTextElement,
+): SlideEditTextFrameInsetDescriptor<string, string> {
+  return createSlideEditTextFrameInsetDescriptor({
+    inset: getPPTTextElementInset(element),
+    objectId: element.id,
+    slideId,
+  })
+}
+
+function getPPTTextFrameInsetField(
+  descriptor: SlideEditTextFrameInsetDescriptor<string, string> | null,
+  fieldId: PPTTextInsetField,
+) {
+  return descriptor?.fields.find((field) => field.id === fieldId)
+}
+
 function getPPTTextElementInset(element: PPTElement): PPTTextInset {
   const fallback = element.kind === 'shape'
     ? PPT_DEFAULT_SHAPE_TEXT_INSET
@@ -12699,7 +12758,9 @@ function parsePPTTextInset(value: string) {
 }
 
 function normalizePPTTextInset(value: number) {
-  return clamp(Math.round(Number.isFinite(value) ? value : 0), PPT_TEXT_INSET_MIN, PPT_TEXT_INSET_MAX)
+  const finiteValue = Number.isFinite(value) ? value : 0
+
+  return normalizeSlideEditTextFrameInsetValue(finiteValue)
 }
 
 function getPPTTextInsetCSS(inset: PPTTextInset) {
