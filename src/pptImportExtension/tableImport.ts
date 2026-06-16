@@ -2,6 +2,7 @@ import { clamp } from 'canvas/core'
 import {
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
+  getCanvasTableComponentSize,
   getCanvasTableSourceFromDataTransfer,
   getCanvasTableSourceFromHTML as getCanvasTableSourceFromHTMLValue,
   getCanvasTableSourceFromText,
@@ -36,12 +37,11 @@ export const PPT_DEFAULT_TABLE_ROWS = [
 const PPT_TABLE_MAX_COLUMNS = 8
 const PPT_TABLE_MAX_ROWS = 12
 const PPT_TABLE_MAX_CELL_LENGTH = 80
-const PPT_TABLE_CELL_WIDTH = 150
-const PPT_TABLE_ROW_HEIGHT = 46
-const PPT_TABLE_MIN_WIDTH = 260
-const PPT_TABLE_MAX_WIDTH = 980
-const PPT_TABLE_MIN_HEIGHT = 120
-const PPT_TABLE_MAX_HEIGHT = 560
+const PPT_TABLE_SIZE_OPTIONS = {
+  cellSize: { h: 46, w: 150 },
+  maxSize: { h: 560, w: 980 },
+  minSize: { h: 120, w: 260 },
+} as const
 
 export function createPPTTableElement({
   id,
@@ -57,15 +57,17 @@ export function createPPTTableElement({
   const normalizedRows = normalizePPTTableRows(rows)
   const columnCount = getPPTTableColumnCount(normalizedRows)
   const rowCount = normalizedRows.length
-  const width = clamp(columnCount * PPT_TABLE_CELL_WIDTH, PPT_TABLE_MIN_WIDTH, PPT_TABLE_MAX_WIDTH)
-  const height = clamp(rowCount * PPT_TABLE_ROW_HEIGHT, PPT_TABLE_MIN_HEIGHT, PPT_TABLE_MAX_HEIGHT)
+  const size = getCanvasTableComponentSize({
+    columnCount,
+    rowCount,
+  }, PPT_TABLE_SIZE_OPTIONS)
 
   return {
     geometry: {
-      h: height,
-      w: width,
-      x: clamp(point.x - width / 2, 0, PPT_SLIDE_WIDTH - width),
-      y: clamp(point.y - height / 2, 0, PPT_SLIDE_HEIGHT - height),
+      h: size.h,
+      w: size.w,
+      x: clamp(point.x - size.w / 2, 0, PPT_SLIDE_WIDTH - size.w),
+      y: clamp(point.y - size.h / 2, 0, PPT_SLIDE_HEIGHT - size.h),
     },
     id,
     kind: 'table',
