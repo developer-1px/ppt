@@ -2039,7 +2039,7 @@ async function runCrossSlideClipboardScenario(page) {
 
   const afterCopy = await getPPTCrossSlideClipboardState(page)
 
-  record('stores PPT clipboard source slide metadata', afterCopy.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterCopy.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
+  record('stores PPT clipboard source slide metadata', afterCopy.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterCopy.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterCopy.clipboardModel === 'slide-edit-clipboard' && afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
     afterCopy,
     sourceBefore,
   })
@@ -12549,6 +12549,7 @@ function getPPTCrossSlideClipboardState(page) {
       activeSlide: slide?.getAttribute('data-ppt-slide') ?? '',
       clipboardCount: Number(stage?.getAttribute('data-ppt-clipboard-count') ?? 0),
       clipboardMetadataCount: Number(stage?.getAttribute('data-ppt-clipboard-metadata-count') ?? 0),
+      clipboardModel: stage?.getAttribute('data-ppt-clipboard-model') ?? '',
       clipboardOperation: stage?.getAttribute('data-ppt-clipboard-operation') ?? '',
       clipboardSelection: stage?.getAttribute('data-ppt-clipboard-selection') ?? '',
       clipboardSelectedObjectIds: stage?.getAttribute('data-ppt-clipboard-selected-object-ids') ?? '',

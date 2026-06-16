@@ -92,6 +92,8 @@ import {
 } from 'react'
 import {
   createSlideEditColorSwatchPaletteDescriptor,
+  createSlideEditClipboardPasteCommandEffect,
+  createSlideEditClipboardPayload,
   createSlideEditObjectAccessibilityDescriptor,
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditLayerPaneDescriptor,
@@ -201,6 +203,13 @@ import {
   type SlideEditColorSwatchPaletteDescriptor,
   type SlideEditColorSwatchSelection,
   type SlideEditBuiltInAnimationType,
+  type SlideEditClipboardObjectMetadata,
+  type SlideEditClipboardOperation,
+  type SlideEditClipboardPasteHostCommandEffect,
+  type SlideEditClipboardPasteObjectMapping,
+  type SlideEditClipboardPasteTarget,
+  type SlideEditClipboardPayload,
+  type SlideEditClipboardRemapPolicy,
   type SlideEditObjectAnimationDescriptor,
   type SlideEditObjectAnimationHostCommandEffect,
   type SlideEditObjectAnimationUpdateCommand,
@@ -747,71 +756,15 @@ const canvasReorderModeAvailabilityKey = {
 >
 
 type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
-type PPTClipboardOperation = 'copy' | 'cut'
-type PPTClipboardObjectMetadata = {
-  groupId?: string | null
-  objectId: string
-  placeholderId?: string | null
-}
-type PPTClipboardPayload = {
-  elements: PPTElement[]
-  metadata: readonly PPTClipboardObjectMetadata[]
-  objects: PPTElement[]
-  operation: PPTClipboardOperation
-  selectedObjectIds: string[]
-  selection: string[]
-  sourceSlideId: string
-  type: 'slide-object-clipboard'
-}
+type PPTClipboardOperation = SlideEditClipboardOperation
+type PPTClipboardObjectMetadata = SlideEditClipboardObjectMetadata<string, string, string>
+type PPTClipboardPayload = SlideEditClipboardPayload<string, string, PPTElement, string, string>
 type PPTClipboard = PPTClipboardPayload
-type PPTClipboardPasteTarget =
-  | {
-      kind: 'active-slide'
-      slideId: string
-    }
-  | {
-      kind: 'pointer-position'
-      pointerPosition: Point
-      slideId: string
-    }
-  | {
-      kind: 'slide-frame-offset'
-      offset: Point
-      slideId: string
-    }
-  | {
-      kind: 'viewport-center'
-      slideId: string
-      viewportCenter: Point
-    }
-type PPTClipboardPasteObjectMapping = {
-  sourceGroupId?: string | null
-  sourceObjectId: string
-  sourcePlaceholderId?: string | null
-  targetGroupId?: string | null
-  targetObjectId: string
-  targetPlaceholderId?: string | null
-}
-type PPTClipboardPastePlan = {
-  anchor: Point
-  mappings: readonly PPTClipboardPasteObjectMapping[]
-  operation: PPTClipboardOperation
-  sourceSlideId: string
-  targetSlideId: string
-}
-type PPTClipboardPasteCommand = {
-  id: 'paste-slide-objects'
-  pastePlan: PPTClipboardPastePlan
-  payload: PPTClipboardPayload
-}
-type PPTClipboardPasteHostCommandEffect = {
-  payload: PPTClipboardPasteCommand
-  selection: {
-    objectIds: readonly string[]
-    slideId: string
-  }
-  type: 'slide-command-effect'
-}
+type PPTClipboardPasteTarget = SlideEditClipboardPasteTarget<string>
+type PPTClipboardPasteObjectMapping =
+  SlideEditClipboardPasteObjectMapping<string, string, string>
+type PPTClipboardPasteHostCommandEffect =
+  SlideEditClipboardPasteHostCommandEffect<string, string, PPTElement, string, string>
 type PPTStyleClipboardCategory =
   | 'object'
   | 'paragraph'
@@ -7064,6 +7017,7 @@ function App() {
         className="ppt-stage-shell"
         data-ppt-clipboard-count={clipboard?.objects.length ?? 0}
         data-ppt-clipboard-metadata-count={clipboard?.metadata.length ?? 0}
+        data-ppt-clipboard-model="slide-edit-clipboard"
         data-ppt-clipboard-operation={clipboard?.operation ?? undefined}
         data-ppt-clipboard-paste-anchor={lastClipboardPasteEffect
           ? `${lastClipboardPasteEffect.payload.pastePlan.anchor.x},${lastClipboardPasteEffect.payload.pastePlan.anchor.y}`
@@ -7076,7 +7030,7 @@ function App() {
         data-ppt-clipboard-paste-target-slide={lastClipboardPasteEffect?.payload.pastePlan.targetSlideId}
         data-ppt-clipboard-paste-type={lastClipboardPasteEffect?.type}
         data-ppt-clipboard-selected-object-ids={clipboard?.selectedObjectIds.join(' ') ?? undefined}
-        data-ppt-clipboard-selection={clipboard?.selection.join(' ') ?? undefined}
+        data-ppt-clipboard-selection={clipboard?.selectedObjectIds.join(' ') ?? undefined}
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-ppt-clipboard-type={clipboard?.type ?? undefined}
         data-ppt-style-clipboard-categories={styleClipboard?.categories.join(' ') ?? undefined}
@@ -8785,14 +8739,13 @@ function createPPTClipboardPayload({
   selectedObjectIds,
   sourceSlideId,
 }: {
-  objects: PPTElement[]
+  objects: readonly PPTElement[]
   operation?: PPTClipboardOperation
-  selectedObjectIds: string[]
+  selectedObjectIds: readonly string[]
   sourceSlideId: string
 }): PPTClipboardPayload {
-  return {
-    elements: objects,
-    metadata: objects.map((object) => ({
+  return createSlideEditClipboardPayload({
+    metadata: objects.map((object): PPTClipboardObjectMetadata => ({
       groupId: object.groupId ?? null,
       objectId: object.id,
       placeholderId: null,
@@ -8800,10 +8753,8 @@ function createPPTClipboardPayload({
     objects,
     operation,
     selectedObjectIds,
-    selection: selectedObjectIds,
     sourceSlideId,
-    type: 'slide-object-clipboard',
-  }
+  })
 }
 
 function createPPTClipboardPasteCommandEffect({
@@ -8817,151 +8768,31 @@ function createPPTClipboardPasteCommandEffect({
   slideFrame: Bounds
   target: PPTClipboardPasteTarget
 }): PPTClipboardPasteHostCommandEffect | null {
-  const pastePlan = createPPTClipboardPastePlan({
-    createId,
+  return createSlideEditClipboardPasteCommandEffect({
     payload,
+    remapPolicy: createPPTClipboardRemapPolicy(createId, payload),
     slideFrame,
     target,
   })
-
-  if (!pastePlan) {
-    return null
-  }
-
-  return {
-    payload: {
-      id: 'paste-slide-objects',
-      pastePlan,
-      payload,
-    },
-    selection: {
-      objectIds: pastePlan.mappings.map((mapping) => mapping.targetObjectId),
-      slideId: pastePlan.targetSlideId,
-    },
-    type: 'slide-command-effect',
-  }
 }
 
-function createPPTClipboardPastePlan({
-  createId,
-  payload,
-  slideFrame,
-  target,
-}: {
-  createId: (prefix: string) => string
-  payload: PPTClipboardPayload
-  slideFrame: Bounds
-  target: PPTClipboardPasteTarget
-}): PPTClipboardPastePlan | null {
-  if (payload.selectedObjectIds.length === 0 || payload.objects.length === 0) {
-    return null
-  }
-
-  const mappings = getPPTClipboardPasteObjectMappings({
-    createId,
-    payload,
-  })
-
-  if (mappings.length === 0) {
-    return null
-  }
-
-  return {
-    anchor: getPPTClipboardPasteAnchor({
-      slideFrame,
-      target,
-    }),
-    mappings,
-    operation: payload.operation,
-    sourceSlideId: payload.sourceSlideId,
-    targetSlideId: target.slideId,
-  }
-}
-
-function getPPTClipboardPasteAnchor({
-  slideFrame,
-  target,
-}: {
-  slideFrame: Bounds
-  target: PPTClipboardPasteTarget
-}): Point {
-  switch (target.kind) {
-    case 'active-slide':
-      return {
-        x: slideFrame.x,
-        y: slideFrame.y,
-      }
-    case 'pointer-position':
-      return target.pointerPosition
-    case 'slide-frame-offset':
-      return {
-        x: slideFrame.x + target.offset.x,
-        y: slideFrame.y + target.offset.y,
-      }
-    case 'viewport-center':
-      return target.viewportCenter
-  }
-}
-
-function getPPTClipboardPasteObjectMappings({
-  createId,
-  payload,
-}: {
-  createId: (prefix: string) => string
-  payload: PPTClipboardPayload
-}): PPTClipboardPasteObjectMapping[] {
+function createPPTClipboardRemapPolicy(
+  createId: (prefix: string) => string,
+  payload: PPTClipboardPayload,
+): SlideEditClipboardRemapPolicy<string, string, string> {
   const objectsById = new Map(payload.objects.map((object) => [object.id, object]))
-  const metadataById = new Map(payload.metadata.map((metadata) => [metadata.objectId, metadata]))
-  const groupIdBySource = new Map<string, string>()
 
-  return payload.selectedObjectIds.flatMap((sourceObjectId) => {
-    const object = objectsById.get(sourceObjectId)
+  return {
+    createGroupId: () => createId('group-copy'),
+    createObjectId: (sourceObjectId, index) => {
+      const object = objectsById.get(sourceObjectId)
 
-    if (!object) {
-      return []
-    }
-
-    const metadata = metadataById.get(sourceObjectId)
-    const sourceGroupId = metadata?.groupId ?? object.groupId ?? null
-
-    return [{
-      sourceGroupId,
-      sourceObjectId,
-      sourcePlaceholderId: metadata?.placeholderId ?? null,
-      targetGroupId: getPPTClipboardTargetGroupId({
-        createId,
-        groupIdBySource,
-        sourceGroupId,
-      }),
-      targetObjectId: createId(getPPTElementIdPrefix(object)),
-      targetPlaceholderId: null,
-    }]
-  })
-}
-
-function getPPTClipboardTargetGroupId({
-  createId,
-  groupIdBySource,
-  sourceGroupId,
-}: {
-  createId: (prefix: string) => string
-  groupIdBySource: Map<string, string>
-  sourceGroupId: string | null
-}) {
-  if (!sourceGroupId) {
-    return null
+      return createId(object
+        ? getPPTElementIdPrefix(object)
+        : `slide-object-copy-${index}`)
+    },
+    createPlaceholderId: () => null,
   }
-
-  const existing = groupIdBySource.get(sourceGroupId)
-
-  if (existing) {
-    return existing
-  }
-
-  const targetGroupId = createId('group-copy')
-  groupIdBySource.set(sourceGroupId, targetGroupId)
-
-  return targetGroupId
 }
 
 function applyPPTClipboardPasteHostCommandEffect(
