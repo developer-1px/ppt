@@ -12847,6 +12847,156 @@ async function runSlideManagementScenario(page) {
     before,
   })
 
+  await page.eval(`(() => {
+    window.__pptSlideClipboardItemTypes = []
+    window.__pptSlideClipboardWriteCount = 0
+    window.__pptSlideClipboardHTML = ''
+    window.__pptSlideClipboardJSON = ''
+    window.__pptSlideClipboardPlainText = ''
+    window.__pptSlideClipboardSVG = ''
+    window.ClipboardItem = class PPTSlideClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptSlideClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        async write(items) {
+          window.__pptSlideClipboardWriteCount = items.length
+          const item = items[0]
+          const jsonMimeType = Object.keys(item.items)
+            .find((type) => type.includes('ppt.slide+json')) ?? ''
+
+          window.__pptSlideClipboardHTML = await item.items['text/html'].text()
+          window.__pptSlideClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptSlideClipboardSVG = await item.items['image/svg+xml'].text()
+          window.__pptSlideClipboardJSON = jsonMimeType
+            ? await item.items[jsonMimeType].text()
+            : ''
+        },
+        async writeText(text) {
+          window.__pptSlideClipboardPlainText = text
+        },
+      },
+    })
+  })()`)
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="copy"]').click()`)
+  await delay(80)
+
+  const afterCopySlide = await getSlideRailState(page)
+  const slideClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptSlideClipboardHTML ?? '',
+    itemTypes: window.__pptSlideClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptSlideClipboardJSON ?? '',
+    plainText: window.__pptSlideClipboardPlainText ?? '',
+    svg: window.__pptSlideClipboardSVG ?? '',
+    writeCount: window.__pptSlideClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies active PPT slide as rich slide clipboard bundle',
+    afterCopySlide.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
+      afterCopySlide.slideClipboardJsonMimeType === 'application/vnd.interactive-os.ppt.slide+json' &&
+      afterCopySlide.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterCopySlide.slideClipboardElementCount > 0 &&
+      afterCopySlide.slideClipboardHTMLLength > 0 &&
+      afterCopySlide.slideClipboardWriteMode === 'clipboard-item' &&
+      slideClipboardWrite.writeCount === 1 &&
+      slideClipboardWrite.itemTypes.includes('application/vnd.interactive-os.ppt.slide+json') &&
+      slideClipboardWrite.itemTypes.includes('text/html') &&
+      slideClipboardWrite.itemTypes.includes('text/plain') &&
+      slideClipboardWrite.itemTypes.includes('image/svg+xml') &&
+      slideClipboardWrite.html.includes('data-ppt-slide-clipboard-json') &&
+      slideClipboardWrite.json.includes('"kind": "interactive-os.ppt.slide"') &&
+      slideClipboardWrite.plainText.includes('Overview') &&
+      slideClipboardWrite.svg.includes('<svg'),
+    {
+      afterCopySlide,
+      afterDuplicate,
+      slideClipboardWrite,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="paste"]').click()`)
+  await delay(80)
+
+  const afterPasteSlideButton = await getSlideRailState(page)
+
+  record(
+    'pastes copied PPT slide from slide rail action',
+    afterPasteSlideButton.count === afterDuplicate.count + 1 &&
+      afterPasteSlideButton.activeId !== afterDuplicate.activeId &&
+      afterPasteSlideButton.activeName.includes('Copy') &&
+      afterPasteSlideButton.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
+      afterPasteSlideButton.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideButton.slideClipboardTargetSlide === afterPasteSlideButton.activeId &&
+      afterPasteSlideButton.slideClipboardImported !== 'true',
+    {
+      afterDuplicate,
+      afterPasteSlideButton,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await delay(60)
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+    thumb?.click()
+  })(${JSON.stringify(afterDuplicate.activeId)})`)
+  await delay(60)
+
+  await page.eval(`((json) => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('application/vnd.interactive-os.ppt.slide+json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(slideClipboardWrite.json)})`)
+  await delay(80)
+
+  const afterPasteSlideCustomJSON = await getSlideRailState(page)
+
+  record(
+    'pastes external PPT slide clipboard custom JSON as slide',
+    afterPasteSlideCustomJSON.count === afterDuplicate.count + 1 &&
+      afterPasteSlideCustomJSON.activeId !== afterDuplicate.activeId &&
+      afterPasteSlideCustomJSON.slideClipboardImported === 'true' &&
+      afterPasteSlideCustomJSON.slideClipboardImportFormat === 'custom-json' &&
+      afterPasteSlideCustomJSON.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideCustomJSON.slideClipboardTargetSlide === afterPasteSlideCustomJSON.activeId,
+    {
+      afterDuplicate,
+      afterPasteSlideCustomJSON,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await delay(60)
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+    thumb?.click()
+  })(${JSON.stringify(afterDuplicate.activeId)})`)
+  await delay(60)
+
+  const afterSlideClipboardCleanup = await getSlideRailState(page)
+
+  record(
+    'restores PPT slide rail after slide clipboard paste probes',
+    afterSlideClipboardCleanup.count === afterDuplicate.count &&
+      afterSlideClipboardCleanup.activeId === afterDuplicate.activeId,
+    {
+      afterDuplicate,
+      afterSlideClipboardCleanup,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-slide-action="move-down"]').click()`)
   await delay(50)
 
@@ -14516,6 +14666,7 @@ function selectEditableContents(page, elementId) {
 function getSlideRailState(page) {
   return page.eval(`(() => {
     const rail = document.querySelector('[data-ppt-slide-list]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const selectedIds = [...document.querySelectorAll('[data-selected="true"]')]
       .map((element) => element.getAttribute('data-ppt-element'))
       .filter(Boolean)
@@ -14567,6 +14718,16 @@ function getSlideRailState(page) {
         .filter((thumb) => thumb.getAttribute('aria-selected') === 'true')
         .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       selectedIds: selectedIds.join(','),
+      slideClipboardElementCount: Number(stage?.getAttribute('data-ppt-slide-clipboard-element-count') ?? 0),
+      slideClipboardHTMLLength: Number(stage?.getAttribute('data-ppt-slide-clipboard-html-length') ?? 0),
+      slideClipboardImportFormat: stage?.getAttribute('data-ppt-slide-clipboard-import-format') ?? '',
+      slideClipboardImported: stage?.getAttribute('data-ppt-slide-clipboard-imported') ?? '',
+      slideClipboardJsonMimeType: stage?.getAttribute('data-ppt-slide-clipboard-json-mime-type') ?? '',
+      slideClipboardModel: stage?.getAttribute('data-ppt-slide-clipboard-model') ?? '',
+      slideClipboardSlideName: stage?.getAttribute('data-ppt-slide-clipboard-slide-name') ?? '',
+      slideClipboardSourceSlide: stage?.getAttribute('data-ppt-slide-clipboard-source-slide') ?? '',
+      slideClipboardTargetSlide: stage?.getAttribute('data-ppt-slide-clipboard-target-slide') ?? '',
+      slideClipboardWriteMode: stage?.getAttribute('data-ppt-slide-clipboard-write-mode') ?? '',
       slideOrder: rail?.getAttribute('data-ppt-slide-rail-slide-order') ?? '',
       tabStopIds: thumbs
         .filter((thumb) => thumb.tabIndex === 0)
