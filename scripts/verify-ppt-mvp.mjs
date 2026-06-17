@@ -2991,6 +2991,80 @@ async function runCrossSlideClipboardScenario(page) {
       afterMultiFallbackUndo,
     },
   )
+
+  const beforeExternalHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  await page.eval(`(() => {
+    const createImage = (color, alt) => {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+
+      canvas.width = 120
+      canvas.height = 72
+      context.fillStyle = color
+      context.fillRect(0, 0, 120, 72)
+      context.fillStyle = '#ffffff'
+      context.fillRect(18, 22, 84, 28)
+
+      return '<figure><img alt="' + alt + '" src="' +
+        canvas.toDataURL('image/png') + '"></figure>'
+    }
+    const dataTransfer = new DataTransfer()
+    const html = '<section>' +
+      createImage('#0f766e', 'North chart') +
+      '<table><tr><th>Metric</th><th>Score</th></tr><tr><td>North</td><td>81</td></tr></table>' +
+      createImage('#7c3aed', 'South chart') +
+      '</section>'
+
+    dataTransfer.setData('text/html', html)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(180)
+
+  const afterExternalHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'pastes external HTML data images and table as editable selection',
+    afterExternalHTMLPaste.stageCount === beforeExternalHTMLPaste.stageCount + 3 &&
+      afterExternalHTMLPaste.selectedCount === 3 &&
+      afterExternalHTMLPaste.selectedKinds.filter((kind) => kind === 'image').length === 2 &&
+      afterExternalHTMLPaste.selectedKinds.includes('table') &&
+      afterExternalHTMLPaste.selectedTexts.some((text) => text.includes('North chart')) &&
+      afterExternalHTMLPaste.selectedTexts.some((text) => text.includes('South chart')) &&
+      afterExternalHTMLPaste.selectedTexts.some((text) => text.includes('Metric')) &&
+      afterExternalHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterExternalHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterExternalHTMLPaste.fallbackHTMLImportKind === 'selection' &&
+      afterExternalHTMLPaste.fallbackHTMLImportCount === 3,
+    {
+      afterExternalHTMLPaste,
+      beforeExternalHTMLPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterExternalHTMLUndo = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'undoes external HTML fallback selection paste as one history step',
+    afterExternalHTMLUndo.stageCount === beforeExternalHTMLPaste.stageCount,
+    {
+      afterExternalHTMLPaste,
+      afterExternalHTMLUndo,
+      beforeExternalHTMLPaste,
+    },
+  )
 }
 
 async function runSelectSameTypeScenario(page) {

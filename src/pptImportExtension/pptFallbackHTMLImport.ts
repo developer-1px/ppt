@@ -142,6 +142,8 @@ const PPT_FALLBACK_TABLE_MAX_HEIGHT = 560
 const PPT_FALLBACK_TEXT_MIN_SIZE = 24
 const PPT_FALLBACK_TEXT_MAX_WIDTH = 980
 const PPT_FALLBACK_TEXT_MAX_HEIGHT = 560
+const PPT_FALLBACK_SELECTION_GRID_GAP = 24
+const PPT_FALLBACK_SELECTION_GRID_MAX_COLUMNS = 2
 
 export function getPPTFallbackHTMLShapeSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
@@ -273,6 +275,17 @@ function getPPTFallbackHTMLSelectionItemSources(
   doc: Document,
   image: PPTImageImportSource | null = null,
 ): PPTFallbackHTMLSelectionItemSource[] {
+  const markedItems = getPPTFallbackHTMLMarkedSelectionItemSources(doc, image)
+
+  return markedItems.length > 0
+    ? markedItems
+    : getPPTFallbackHTMLExternalSelectionItemSources(doc)
+}
+
+function getPPTFallbackHTMLMarkedSelectionItemSources(
+  doc: Document,
+  image: PPTImageImportSource | null = null,
+): PPTFallbackHTMLSelectionItemSource[] {
   return [...doc.querySelectorAll<HTMLElement>(
     '[data-ppt-selection-image], [data-ppt-selection-shape], [data-ppt-selection-table], [data-ppt-selection-text-body]',
   )]
@@ -307,9 +320,40 @@ function getPPTFallbackHTMLSelectionItemSources(
       item !== null)
 }
 
+function getPPTFallbackHTMLExternalSelectionItemSources(
+  doc: Document,
+): PPTFallbackHTMLSelectionItemSource[] {
+  return [...doc.querySelectorAll<HTMLElement>('img[src^="data:image/"], table')]
+    .map((element): PPTFallbackHTMLSelectionItemSource | null => {
+      if (element instanceof HTMLImageElement) {
+        const source = getPPTFallbackHTMLExternalImageSourceFromElement(element)
+
+        return source ? { kind: 'image', source } : null
+      }
+
+      if (element instanceof HTMLTableElement) {
+        const source = getPPTFallbackHTMLTableSourceFromElement(element)
+
+        return source ? { kind: 'table', source } : null
+      }
+
+      return null
+    })
+    .filter((item): item is PPTFallbackHTMLSelectionItemSource =>
+      item !== null)
+}
+
 function isPPTFallbackHTMLStandaloneTextElement(element: HTMLElement) {
   return !element.closest('[data-ppt-selection-shape]') &&
     element.getAttribute('data-ppt-selection-shape') === null
+}
+
+function getPPTFallbackHTMLExternalImageSourceFromElement(
+  element: HTMLImageElement,
+) {
+  const image = getPPTFallbackHTMLImageImportSourceFromHTML(element.outerHTML)
+
+  return getPPTFallbackHTMLImageSourceFromElement(element, image)
 }
 
 function getPPTFallbackHTMLImageSourceFromElement(
@@ -783,6 +827,17 @@ function getPPTFallbackHTMLImageImportSource(
   }
 }
 
+function getPPTFallbackHTMLImageImportSourceFromHTML(
+  html: string,
+): PPTImageImportSource | null {
+  const dataTransfer = {
+    getData: (type: string) => type === 'text/html' ? html : '',
+  } as DataTransfer
+
+  return getPPTSVGImageSourceFromDataTransfer(dataTransfer) ??
+    getPPTDataImageSourceFromDataTransfer(dataTransfer)
+}
+
 function parsePPTFallbackHTMLImageFit(value: string | null): PPTImageFit {
   return value === 'contain' ? 'contain' : 'cover'
 }
@@ -846,10 +901,49 @@ function getPPTFallbackHTMLSelectionItemCenters(
     }))
   }
 
-  return source.items.map((_, index) => ({
-    x: center.x + index * 28,
-    y: center.y + index * 28,
-  }))
+  const columns = Math.min(
+    PPT_FALLBACK_SELECTION_GRID_MAX_COLUMNS,
+    Math.ceil(Math.sqrt(source.items.length)),
+  )
+  const rows = Math.ceil(source.items.length / columns)
+  const columnWidths = Array.from({ length: columns }, (_, column) =>
+    Math.max(
+      ...source.items
+        .filter((_, index) => index % columns === column)
+        .map((item) => item.source.geometry.w),
+    )
+  )
+  const rowHeights = Array.from({ length: rows }, (_, row) =>
+    Math.max(
+      ...source.items
+        .filter((_, index) => Math.floor(index / columns) === row)
+        .map((item) => item.source.geometry.h),
+    )
+  )
+  const totalWidth = columnWidths.reduce((sum, width) => sum + width, 0) +
+    PPT_FALLBACK_SELECTION_GRID_GAP * Math.max(0, columns - 1)
+  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) +
+    PPT_FALLBACK_SELECTION_GRID_GAP * Math.max(0, rows - 1)
+  const origin = {
+    x: center.x - totalWidth / 2,
+    y: center.y - totalHeight / 2,
+  }
+
+  return source.items.map((_, index) => {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+
+    return {
+      x: origin.x +
+        columnWidths.slice(0, column).reduce((sum, width) => sum + width, 0) +
+        PPT_FALLBACK_SELECTION_GRID_GAP * column +
+        columnWidths[column] / 2,
+      y: origin.y +
+        rowHeights.slice(0, row).reduce((sum, height) => sum + height, 0) +
+        PPT_FALLBACK_SELECTION_GRID_GAP * row +
+        rowHeights[row] / 2,
+    }
+  })
 }
 
 function parsePPTFallbackShapeKind(value: string | null): PPTShapeKind | null {
