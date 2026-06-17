@@ -417,7 +417,7 @@ import {
   measureCanvasTextBlocks,
 } from 'canvas/app/text-measurement-dom'
 import {
-  recordCanvasItemPointerClick,
+  getCanvasResizeHandleDoubleClickIntent,
   type CanvasPointerClickMemory,
 } from 'canvas/app/pointer-click-memory'
 import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
@@ -6101,24 +6101,25 @@ function App() {
       x: event.clientX,
       y: event.clientY,
     }
-    const clickMemory = recordCanvasItemPointerClick({
-      itemId: clickId,
+    const resizeHandleIntent = getCanvasResizeHandleDoubleClickIntent({
+      handle,
+      handleId: clickId,
       lastClick: resizeHandleClickMemoryRef.current,
       point,
       time: event.timeStamp,
     })
 
-    resizeHandleClickMemoryRef.current = clickMemory.nextClick
+    resizeHandleClickMemoryRef.current = resizeHandleIntent.nextClick
     setLastResizeHandleClickMemoryEffect({
       handle,
       id: clickId,
-      isDoubleClick: clickMemory.isDoubleClick,
+      isDoubleClick: resizeHandleIntent.isDoubleClick,
       model: 'canvas-pointer-click-memory',
       point,
     })
 
-    if (clickMemory.isDoubleClick) {
-      autoSizeSelection(handle)
+    if (resizeHandleIntent.intent?.kind === 'auto-size-selection') {
+      autoSizeSelection(resizeHandleIntent.intent.handle)
       return
     }
 
