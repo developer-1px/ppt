@@ -452,6 +452,7 @@ import {
   handleCanvasRadioGroupKeyDown,
 } from 'canvas/app/radio-group'
 import {
+  CANVAS_TABS_ROVING_FOCUS_MODEL,
   createCanvasTabsDescriptor,
   getCanvasTabsKeyboardIntent,
   type CanvasTabsDescriptor,
@@ -13272,7 +13273,7 @@ function Inspector({
         data-ppt-inspector-tabs
         data-ppt-inspector-tabs-activation={inspectorTabsDescriptor.activation}
         data-ppt-inspector-tabs-keyboard={inspectorTabsDescriptor.keyboardModel}
-        data-ppt-inspector-tabs-model="canvas-tabs-roving-focus"
+        data-ppt-inspector-tabs-model={CANVAS_TABS_ROVING_FOCUS_MODEL}
         role="tablist"
       >
         {inspectorTabsDescriptor.tabs.map((tab) => {
