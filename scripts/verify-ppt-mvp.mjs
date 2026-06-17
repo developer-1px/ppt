@@ -5106,6 +5106,40 @@ async function readPPTObjectStateImportState(page, elementId) {
   })()`)
 }
 
+async function readPPTObjectLayerImportState(page, elementId) {
+  return page.eval(`(() => {
+    const elementId = ${JSON.stringify(elementId)}
+    const shell = document.querySelector('.ppt-stage-shell')
+    const layerRows = [...document.querySelectorAll('[data-ppt-layer-row][data-ppt-layer-pane-row-type="object"]')]
+    const stageElements = [...document.querySelectorAll('[data-ppt-element]')]
+    const row = document.querySelector('[data-ppt-layer-row="' + elementId + '"]')
+    const stageElement = document.querySelector('[data-ppt-element="' + elementId + '"]')
+    const layerOrder = layerRows.map((candidate) => candidate.getAttribute('data-ppt-layer-row') ?? '')
+    const stageOrder = stageElements.map((candidate) => candidate.getAttribute('data-ppt-element') ?? '')
+
+    return {
+      command: shell?.getAttribute('data-ppt-object-layer-import-command') ?? '',
+      commandType: shell?.getAttribute('data-ppt-object-layer-import-command-type') ?? '',
+      fields: shell?.getAttribute('data-ppt-object-layer-import-fields') ?? '',
+      format: shell?.getAttribute('data-ppt-object-layer-import-format') ?? '',
+      fromIndex: Number(shell?.getAttribute('data-ppt-object-layer-import-from-index') ?? -1),
+      jsonLength: Number(shell?.getAttribute('data-ppt-object-layer-import-json-length') ?? 0),
+      layerIndex: layerOrder.indexOf(elementId),
+      layerOrder,
+      model: shell?.getAttribute('data-ppt-object-layer-import-model') ?? '',
+      objectId: shell?.getAttribute('data-ppt-object-layer-import-object') ?? '',
+      position: shell?.getAttribute('data-ppt-object-layer-import-position') ?? '',
+      rowOrder: Number(row?.getAttribute('data-ppt-layer-pane-order') ?? -1),
+      rowSelected: row?.getAttribute('aria-selected') ?? '',
+      slide: shell?.getAttribute('data-ppt-object-layer-import-slide') ?? '',
+      stageIndex: stageOrder.indexOf(elementId),
+      stageOrder,
+      stageSelected: stageElement?.getAttribute('data-selected') ?? '',
+      toIndex: Number(shell?.getAttribute('data-ppt-object-layer-import-to-index') ?? -1),
+    }
+  })()`)
+}
+
 async function readPPTTidyState(page, ids) {
   return page.eval(`(() => {
     const ids = ${JSON.stringify(ids)}
@@ -14189,6 +14223,120 @@ async function runSelectionPaneScenario(page) {
       afterObjectStateShowUnlock,
       afterObjectStateShowUnlockRedo,
       afterObjectStateShowUnlockUndo,
+    },
+  )
+
+  const beforeObjectLayerImport = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectLayer: {
+        position: 'front',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterObjectLayerFront = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes JSON object layer front state through slide-edit layer pane reorder effect',
+    beforeObjectLayerImport.layerOrder.length >= 2 &&
+      afterObjectLayerFront.model === 'ppt-object-layer-import' &&
+      afterObjectLayerFront.format === 'application-json-ppt-object-layer' &&
+      afterObjectLayerFront.fields === 'position' &&
+      afterObjectLayerFront.command === 'reorder-object' &&
+      afterObjectLayerFront.commandType === 'slide-command-effect' &&
+      afterObjectLayerFront.fromIndex === beforeObjectLayerImport.layerIndex &&
+      afterObjectLayerFront.toIndex === beforeObjectLayerImport.layerOrder.length &&
+      afterObjectLayerFront.objectId === layerTargetId &&
+      afterObjectLayerFront.position === 'front' &&
+      afterObjectLayerFront.slide === 'slide-1' &&
+      afterObjectLayerFront.jsonLength > 30 &&
+      afterObjectLayerFront.layerOrder.at(-1) === layerTargetId &&
+      afterObjectLayerFront.stageOrder.at(-1) === layerTargetId &&
+      afterObjectLayerFront.rowSelected === 'true' &&
+      afterObjectLayerFront.stageSelected === 'true',
+    {
+      afterObjectLayerFront,
+      beforeObjectLayerImport,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      zOrder: {
+        position: 'send-to-back',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterObjectLayerBack = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterObjectLayerBackUndo = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(100)
+
+  const afterObjectLayerBackRedo = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes JSON object layer back state through one PPT history step',
+    afterObjectLayerBack.model === 'ppt-object-layer-import' &&
+      afterObjectLayerBack.fields === 'position' &&
+      afterObjectLayerBack.command === 'reorder-object' &&
+      afterObjectLayerBack.fromIndex === afterObjectLayerFront.layerOrder.length - 1 &&
+      afterObjectLayerBack.toIndex === 0 &&
+      afterObjectLayerBack.objectId === layerTargetId &&
+      afterObjectLayerBack.position === 'back' &&
+      afterObjectLayerBack.layerOrder[0] === layerTargetId &&
+      afterObjectLayerBack.stageOrder[0] === layerTargetId &&
+      afterObjectLayerBackUndo.layerOrder.at(-1) === layerTargetId &&
+      afterObjectLayerBackUndo.stageOrder.at(-1) === layerTargetId &&
+      afterObjectLayerBackRedo.layerOrder[0] === layerTargetId &&
+      afterObjectLayerBackRedo.stageOrder[0] === layerTargetId,
+    {
+      afterObjectLayerBack,
+      afterObjectLayerBackRedo,
+      afterObjectLayerBackUndo,
+      afterObjectLayerFront,
     },
   )
 }

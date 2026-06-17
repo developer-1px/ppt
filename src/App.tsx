@@ -1049,6 +1049,11 @@ const PPT_OBJECT_STATE_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-state' as const
 const PPT_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-state+json'
+const PPT_OBJECT_LAYER_IMPORT_MODEL = 'ppt-object-layer-import' as const
+const PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-layer' as const
+const PPT_OBJECT_LAYER_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-layer+json'
 const PPT_IMAGE_CROP_IMPORT_MODEL = 'ppt-image-crop-import' as const
 const PPT_IMAGE_CROP_JSON_IMPORT_FORMAT =
   'application-json-ppt-image-crop' as const
@@ -1293,6 +1298,23 @@ type PPTObjectStateImportSource = {
   state: {
     locked?: boolean
     visible?: boolean
+  }
+}
+type PPTObjectLayerImportPosition =
+  | 'back'
+  | 'backward'
+  | 'forward'
+  | 'front'
+type PPTObjectLayerImportField =
+  | 'position'
+  | 'toIndex'
+type PPTObjectLayerImportSource = {
+  fields: readonly PPTObjectLayerImportField[]
+  format: typeof PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT
+  jsonLength: number
+  layer: {
+    position?: PPTObjectLayerImportPosition
+    toIndex?: number
   }
 }
 type PPTImageCropImportField =
@@ -1572,6 +1594,19 @@ type PPTObjectStateImportEffect = {
   slideId: string
   visible: string
   visibilityTargets: string
+}
+type PPTObjectLayerImportEffect = {
+  commandId: string
+  commandType: string
+  fields: string
+  format: typeof PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT
+  fromIndex: number
+  jsonLength: number
+  model: typeof PPT_OBJECT_LAYER_IMPORT_MODEL
+  objectId: string
+  position: string
+  slideId: string
+  toIndex: number
 }
 type PPTImageCropImportEffect = {
   commandFields: string
@@ -2727,6 +2762,8 @@ function App() {
     useState<PPTObjectMetadataImportEffect | null>(null)
   const [lastObjectStateImportEffect, setLastObjectStateImportEffect] =
     useState<PPTObjectStateImportEffect | null>(null)
+  const [lastObjectLayerImportEffect, setLastObjectLayerImportEffect] =
+    useState<PPTObjectLayerImportEffect | null>(null)
   const [lastImageCropImportEffect, setLastImageCropImportEffect] =
     useState<PPTImageCropImportEffect | null>(null)
   const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
@@ -3701,6 +3738,17 @@ function App() {
       if (
         objectStateSource &&
         pastePPTObjectStateSource(objectStateSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectLayerSource =
+        getPPTObjectLayerSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectLayerSource &&
+        pastePPTObjectLayerSource(objectLayerSource)
       ) {
         event.preventDefault()
         return
@@ -4908,6 +4956,49 @@ function App() {
           }
         }),
       })))
+
+    return true
+  }
+
+  function pastePPTObjectLayerSource(source: PPTObjectLayerImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) => selection.includes(element.id))
+      .map((element) => element.id)
+
+    if (objectIds.length !== 1) {
+      return false
+    }
+
+    const objectId = objectIds[0]
+    const effect = createPPTObjectLayerImportCommandEffect({
+      objectId,
+      slide: activeSlide,
+      source,
+    })
+
+    if (!effect || effect.payload.id !== 'reorder-object') {
+      return false
+    }
+
+    const payload = effect.payload
+
+    setLastObjectLayerImportEffect(createPPTObjectLayerImportEffect({
+      effect,
+      source,
+    }))
+    setSelection([objectId])
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, effect.selection.slideId, (slide) => {
+        const elements = reorderPPTLayerPaneElement(
+          slide.elements,
+          payload.objectId,
+          payload.toIndex,
+        )
+
+        return elements
+          ? { ...slide, elements }
+          : slide
+      }))
 
     return true
   }
@@ -10828,6 +10919,17 @@ function App() {
         data-ppt-object-state-import-slide={lastObjectStateImportEffect?.slideId}
         data-ppt-object-state-import-visible={lastObjectStateImportEffect?.visible}
         data-ppt-object-state-import-visibility-targets={lastObjectStateImportEffect?.visibilityTargets}
+        data-ppt-object-layer-import-command={lastObjectLayerImportEffect?.commandId}
+        data-ppt-object-layer-import-command-type={lastObjectLayerImportEffect?.commandType}
+        data-ppt-object-layer-import-fields={lastObjectLayerImportEffect?.fields}
+        data-ppt-object-layer-import-format={lastObjectLayerImportEffect?.format}
+        data-ppt-object-layer-import-from-index={lastObjectLayerImportEffect?.fromIndex}
+        data-ppt-object-layer-import-json-length={lastObjectLayerImportEffect?.jsonLength}
+        data-ppt-object-layer-import-model={lastObjectLayerImportEffect?.model}
+        data-ppt-object-layer-import-object={lastObjectLayerImportEffect?.objectId}
+        data-ppt-object-layer-import-position={lastObjectLayerImportEffect?.position}
+        data-ppt-object-layer-import-slide={lastObjectLayerImportEffect?.slideId}
+        data-ppt-object-layer-import-to-index={lastObjectLayerImportEffect?.toIndex}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
         data-ppt-import-extension-last-clipboard-actions={lastClipboardImportActionKinds}
         data-ppt-import-extension-last-drop-action={lastStageDropImportActionKind}
@@ -13688,6 +13790,101 @@ function applyPPTObjectStateVirtualLock(
   }
 }
 
+function createPPTObjectLayerImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTLayerPaneHostCommandEffect
+  source: PPTObjectLayerImportSource
+}): PPTObjectLayerImportEffect {
+  const payload = effect.payload
+
+  return {
+    commandId: payload.id,
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    fromIndex: payload.id === 'reorder-object' ? payload.fromIndex : -1,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_LAYER_IMPORT_MODEL,
+    objectId: payload.id === 'reorder-object' ? payload.objectId : '',
+    position: source.layer.position ?? '',
+    slideId: effect.selection.slideId,
+    toIndex: payload.id === 'reorder-object' ? payload.toIndex : -1,
+  }
+}
+
+function createPPTObjectLayerImportCommandEffect({
+  objectId,
+  slide,
+  source,
+}: {
+  objectId: string
+  slide: PPTSlide
+  source: PPTObjectLayerImportSource
+}): PPTLayerPaneHostCommandEffect | null {
+  const toIndex = getPPTObjectLayerImportTargetIndex({
+    objectId,
+    slide,
+    source,
+  })
+
+  if (toIndex === null) {
+    return null
+  }
+
+  const descriptor = createPPTLayerPaneDescriptor({
+    activeObjectId: objectId,
+    collapsedGroupIds: new Set(),
+    selectedObjectIds: [objectId],
+    slide,
+  })
+
+  return getSlideEditLayerPaneCommandEffect(descriptor, {
+    objectId,
+    toIndex,
+    type: 'row-drop',
+  })
+}
+
+function getPPTObjectLayerImportTargetIndex({
+  objectId,
+  slide,
+  source,
+}: {
+  objectId: string
+  slide: PPTSlide
+  source: PPTObjectLayerImportSource
+}) {
+  const currentIndex = slide.elements.findIndex((element) =>
+    element.id === objectId)
+
+  if (currentIndex < 0) {
+    return null
+  }
+
+  if (source.layer.toIndex !== undefined) {
+    return clampPPTObjectLayerImportIndex(source.layer.toIndex, slide)
+  }
+
+  switch (source.layer.position) {
+    case 'back':
+      return 0
+    case 'backward':
+      return clampPPTObjectLayerImportIndex(currentIndex - 1, slide)
+    case 'forward':
+      return clampPPTObjectLayerImportIndex(currentIndex + 2, slide)
+    case 'front':
+      return slide.elements.length
+    default:
+      return null
+  }
+}
+
+function clampPPTObjectLayerImportIndex(value: number, slide: PPTSlide) {
+  return Math.max(0, Math.min(slide.elements.length, Math.trunc(value)))
+}
+
 function createPPTImageCropImportEffect({
   effects,
   source,
@@ -15667,6 +15864,185 @@ function getPPTObjectStateVisibleFromJSONValue(
 
 function getPPTObjectStateLockedFromJSONValue(value: unknown) {
   return typeof value === 'boolean' ? value : undefined
+}
+
+function getPPTObjectLayerSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_LAYER_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectLayerSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectLayerSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectLayerImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectLayerSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectLayerSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectLayerImportSource | null {
+  const payloadValue = getPPTObjectLayerPayloadValue(value, allowDirect)
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const layer: PPTObjectLayerImportSource['layer'] = {}
+  const fields: PPTObjectLayerImportField[] = []
+  const position = getPPTObjectLayerPositionFromJSONValue(
+    payloadValue.position ?? payloadValue.arrange ?? payloadValue.zOrder,
+  )
+  const toIndex = getPPTObjectLayerToIndexFromJSONValue(
+    payloadValue.toIndex ?? payloadValue.index ?? payloadValue.order,
+  )
+
+  if (position !== undefined) {
+    layer.position = position
+    fields.push('position')
+  }
+
+  if (toIndex !== undefined) {
+    layer.toIndex = toIndex
+    fields.push('toIndex')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT,
+        jsonLength,
+        layer,
+      }
+    : null
+}
+
+function getPPTObjectLayerPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (isPPTRecord(value.objectLayer)) {
+    return value.objectLayer
+  }
+
+  if (isPPTRecord(value.layerOrder)) {
+    return value.layerOrder
+  }
+
+  if (isPPTRecord(value.zOrder)) {
+    return value.zOrder
+  }
+
+  if (
+    value.position !== undefined ||
+    value.arrange !== undefined ||
+    value.toIndex !== undefined ||
+    value.index !== undefined ||
+    value.order !== undefined
+  ) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTObjectLayerPositionFromJSONValue(
+  value: unknown,
+): PPTObjectLayerImportPosition | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  switch (value.trim().toLowerCase().replace(/[\s_-]+/g, '')) {
+    case 'back':
+    case 'sendtoback':
+      return 'back'
+    case 'backward':
+    case 'sendbackward':
+      return 'backward'
+    case 'forward':
+    case 'bringforward':
+      return 'forward'
+    case 'front':
+    case 'bringtofront':
+      return 'front'
+    default:
+      return undefined
+  }
+}
+
+function getPPTObjectLayerToIndexFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return Math.trunc(value)
 }
 
 function getPPTObjectTransformSourceFromDataTransfer(
