@@ -318,6 +318,9 @@ import {
   focusCanvasElementOnNextFrame,
 } from 'canvas/app/deferred-focus'
 import {
+  getCanvasEditableFieldKeyboardIntent,
+} from 'canvas/app/editable-field-keyboard'
+import {
   bindCanvasEventListener,
   bindCanvasEventListeners,
 } from 'canvas/app/event-listener'
@@ -14712,9 +14715,15 @@ function Inspector({
                     onDoubleClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => {
                       event.stopPropagation()
+                      const intent = getCanvasEditableFieldKeyboardIntent({
+                        key: event.key,
+                      })
 
-                      if (event.key === 'Enter') {
+                      if (intent.preventDefault) {
                         event.preventDefault()
+                      }
+
+                      if (intent.kind === 'commit') {
                         commitLayerPaneRename(
                           row.objectId,
                           renameValue,
@@ -14722,8 +14731,7 @@ function Inspector({
                         return
                       }
 
-                      if (event.key === 'Escape') {
-                        event.preventDefault()
+                      if (intent.kind === 'cancel') {
                         cancelLayerPaneRename(row.objectId)
                       }
                     }}

@@ -11,6 +11,7 @@ const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canv
 const canvasDataTransferImportActionsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts', import.meta.url))
 const canvasDataTransferTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts', import.meta.url))
 const canvasDeferredFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts', import.meta.url))
+const canvasEditableFieldKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/editable-field/CanvasEditableFieldKeyboard.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasEventListenerEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts', import.meta.url))
 const canvasInteractionTargetEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts', import.meta.url))
@@ -71,6 +72,7 @@ export default defineConfig({
       { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
       { find: 'canvas/app/data-transfer-text', replacement: canvasDataTransferTextEntry },
       { find: 'canvas/app/deferred-focus', replacement: canvasDeferredFocusEntry },
+      { find: 'canvas/app/editable-field-keyboard', replacement: canvasEditableFieldKeyboardEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/event-listener', replacement: canvasEventListenerEntry },
       { find: 'canvas/app/interaction-target', replacement: canvasInteractionTargetEntry },
