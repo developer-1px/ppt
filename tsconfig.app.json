@@ -18,6 +18,7 @@
       "canvas/app/data-transfer-text": ["../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts"],
       "canvas/app/deferred-focus": ["../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts"],
       "canvas/app/eraser-hit-testing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts"],
+      "canvas/app/event-listener": ["../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts"],
       "canvas/app/floating-anchor": ["../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts"],
       "canvas/app/pointer-drawing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts"],
       "canvas/app/image-import": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts"],

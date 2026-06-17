@@ -312,6 +312,10 @@ import {
   focusCanvasElementOnNextFrame,
 } from 'canvas/app/deferred-focus'
 import {
+  bindCanvasEventListener,
+  bindCanvasEventListeners,
+} from 'canvas/app/event-listener'
+import {
   getCanvasFloatingAnchorForBounds,
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
@@ -2356,9 +2360,15 @@ function App() {
   }, [activeSlideId, fitSlide])
 
   useEffect(() => {
-    window.addEventListener('resize', fitSlide)
+    const cleanup = bindCanvasEventListener({
+      listener: () => fitSlide(),
+      target: window,
+      type: 'resize',
+    })
 
-    return () => window.removeEventListener('resize', fitSlide)
+    return () => {
+      cleanup()
+    }
   }, [fitSlide])
 
   useEffect(() => {
@@ -2379,9 +2389,15 @@ function App() {
       setContextMenu(null)
     }
 
-    document.addEventListener('pointerdown', onPointerDown)
+    const cleanup = bindCanvasEventListener({
+      listener: onPointerDown,
+      target: document,
+      type: 'pointerdown',
+    })
 
-    return () => document.removeEventListener('pointerdown', onPointerDown)
+    return () => {
+      cleanup()
+    }
   }, [contextMenu])
 
   useEffect(() => {
@@ -2672,14 +2688,16 @@ function App() {
       }
     }
 
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    window.addEventListener('blur', releaseTemporaryPan)
+    const cleanup = bindCanvasEventListeners({
+      listeners: [
+        { listener: onKeyDown, target: window, type: 'keydown' },
+        { listener: onKeyUp, target: window, type: 'keyup' },
+        { listener: releaseTemporaryPan, target: window, type: 'blur' },
+      ],
+    })
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-      window.removeEventListener('blur', releaseTemporaryPan)
+      cleanup()
     }
   })
 
@@ -2706,9 +2724,15 @@ function App() {
       }
     }
 
-    window.addEventListener('paste', onPaste)
+    const cleanup = bindCanvasEventListener({
+      listener: onPaste,
+      target: window,
+      type: 'paste',
+    })
 
-    return () => window.removeEventListener('paste', onPaste)
+    return () => {
+      cleanup()
+    }
   })
 
   function commitDeck(update: (current: PPTDeck) => PPTDeck) {
@@ -8551,9 +8575,15 @@ function usePPTPresentationScale() {
     }
 
     updateScale()
-    window.addEventListener('resize', updateScale)
+    const cleanup = bindCanvasEventListener({
+      listener: updateScale,
+      target: window,
+      type: 'resize',
+    })
 
-    return () => window.removeEventListener('resize', updateScale)
+    return () => {
+      cleanup()
+    }
   }, [])
 
   return scale
