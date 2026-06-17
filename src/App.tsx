@@ -407,6 +407,7 @@ import {
   RESIZE_HANDLES,
   clamp,
   clampCanvasBoundsToFrame,
+  clampCanvasPointToBounds,
   createCanvasSequentialIdFactory,
   getCanvasBoundsAnchorPoints,
   getCanvasBoundsCenter,
@@ -6497,10 +6498,10 @@ function App() {
         element.id === interaction.lineId && element.kind === 'line')
 
       if (createdLine?.kind === 'line' && getPPTLineLength(createdLine) < 8) {
-        const fallbackEnd = {
-          x: Math.min(PPT_SLIDE_WIDTH, interaction.startPoint.x + 160),
+        const fallbackEnd = clampPPTPointToSlide({
+          x: interaction.startPoint.x + 160,
           y: interaction.startPoint.y,
-        }
+        })
         const elements = mapPPTElementsByIds(
           currentSlide.elements,
           [createdLine.id],
@@ -6535,10 +6536,10 @@ function App() {
       if (created?.kind === 'freeform' && getPPTFreeformWorldLength(created) < 8) {
         const fallbackPoints = [
           interaction.points[0],
-          {
-            x: Math.min(PPT_SLIDE_WIDTH, interaction.points[0].x + 96),
-            y: Math.min(PPT_SLIDE_HEIGHT, interaction.points[0].y + 36),
-          },
+          clampPPTPointToSlide({
+            x: interaction.points[0].x + 96,
+            y: interaction.points[0].y + 36,
+          }),
         ]
         const elements = mapPPTElementsByIds(
           currentSlide.elements,
@@ -16872,10 +16873,12 @@ function getNextPPTEraserPoints(points: Point[], point: Point) {
 }
 
 function clampPPTPointToSlide(point: Point) {
-  return {
-    x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
-    y: clamp(point.y, 0, PPT_SLIDE_HEIGHT),
-  }
+  return clampCanvasPointToBounds(point, {
+    h: PPT_SLIDE_HEIGHT,
+    w: PPT_SLIDE_WIDTH,
+    x: 0,
+    y: 0,
+  })
 }
 
 function getPPTFreeformWorldLength(element: PPTFreeform) {
@@ -16939,10 +16942,7 @@ function updatePPTLineEndpoint(
 ): PPTLine {
   const currentStart = getPPTLineEndpointPoint(line, 'start')
   const currentEnd = getPPTLineEndpointPoint(line, 'end')
-  const rawPoint = {
-    x: clamp(point.x, 0, PPT_SLIDE_WIDTH),
-    y: clamp(point.y, 0, PPT_SLIDE_HEIGHT),
-  }
+  const rawPoint = clampPPTPointToSlide(point)
   const attachment = getPPTLineAttachment(slide, rawPoint, lineId)
   const nextPoint = attachment?.point ?? rawPoint
   const start = endpoint === 'start' ? nextPoint : currentStart
