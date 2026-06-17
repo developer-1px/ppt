@@ -4,6 +4,7 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  CANVAS_MEDIA_IMPORT_MODEL,
   getCanvasMediaSourceFromDataTransfer,
   getCanvasMediaSourceFromText,
 } from 'canvas/app/media-import'
@@ -41,6 +42,8 @@ type CanvasMediaLinkItem = {
 
 const PPT_MEDIA_CARD_WIDTH = 440
 const PPT_MEDIA_CARD_HEIGHT = 132
+
+export const PPT_MEDIA_IMPORT_MODEL = CANVAS_MEDIA_IMPORT_MODEL
 
 export const getPPTMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer

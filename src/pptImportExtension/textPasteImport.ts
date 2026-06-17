@@ -5,6 +5,7 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  CANVAS_TEXT_PASTE_IMPORT_MODEL,
   createCanvasTextPasteItems,
   getCanvasRichTextPasteSourceFromDataTransfer,
   getCanvasTextPasteSourcesFromDataTransfer,
@@ -57,6 +58,8 @@ const PPT_TEXT_PASTE_WIDTH = 460
 const PPT_TEXT_PASTE_LINE_HEIGHT = 38
 const PPT_TEXT_PASTE_MIN_HEIGHT = 92
 const PPT_TEXT_PASTE_MAX_HEIGHT = 320
+export const PPT_TEXT_PASTE_IMPORT_MODEL = CANVAS_TEXT_PASTE_IMPORT_MODEL
+
 export const getPPTTextPasteSourcesFromDataTransfer =
   getCanvasTextPasteSourcesFromDataTransfer
 

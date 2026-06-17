@@ -31,6 +31,9 @@ import type {
   PPTTable,
 } from '../pptModel'
 
+export const PPT_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL
+export const PPT_TABLE_IMPORT_MODEL = CANVAS_TABLE_IMPORT_MODEL
+
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
   clipboardActionOrder: [
@@ -55,7 +58,7 @@ export const PPT_IMPORT_EXTENSION = {
 export type PPTImageImportEffect = {
   format: PPTImageImportFormat
   mimeType?: string
-  model: typeof CANVAS_IMAGE_IMPORT_MODEL
+  model: typeof PPT_IMAGE_IMPORT_MODEL
   name: string
   naturalHeight?: number
   naturalWidth?: number
@@ -64,7 +67,7 @@ export type PPTImageImportEffect = {
 export type PPTTableImportEffect = {
   columnCount: number
   format: PPTTableImportFormat
-  model: typeof CANVAS_TABLE_IMPORT_MODEL
+  model: typeof PPT_TABLE_IMPORT_MODEL
   name: string
   rowCount: number
 }
@@ -244,7 +247,7 @@ export function createPPTImageImportEffect({
   return {
     format: source.format ?? 'file',
     mimeType: source.mimeType,
-    model: CANVAS_IMAGE_IMPORT_MODEL,
+    model: PPT_IMAGE_IMPORT_MODEL,
     name: element.name,
     naturalHeight: source.naturalHeight,
     naturalWidth: source.naturalWidth,
@@ -261,7 +264,7 @@ export function createPPTTableImportEffect({
   return {
     columnCount: getPPTTableColumnCount(element.rows),
     format: source.format ?? 'text-delimited',
-    model: CANVAS_TABLE_IMPORT_MODEL,
+    model: PPT_TABLE_IMPORT_MODEL,
     name: element.name,
     rowCount: element.rows.length,
   }

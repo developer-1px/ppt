@@ -419,12 +419,6 @@ import {
 import {
   CANVAS_PASTE_POSITION_MODEL,
 } from 'canvas/app/paste-position'
-import { CANVAS_IMAGE_IMPORT_MODEL } from 'canvas/app/image-import'
-import { CANVAS_MEDIA_IMPORT_MODEL } from 'canvas/app/media-import'
-import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
-import {
-  CANVAS_TEXT_PASTE_IMPORT_MODEL,
-} from 'canvas/app/text-paste-import'
 import {
   CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
   CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
@@ -626,11 +620,15 @@ import {
   getPPTTableColumnCount,
   getPPTTextPasteSourcesFromDataTransfer,
   normalizePPTTableRows,
+  PPT_IMAGE_IMPORT_MODEL,
   readPPTImageFileSource,
   readPPTTableFileSource,
   resolvePPTImageSourceNaturalSize,
   type PPTImageImportSource,
   stringifyPPTTableRows,
+  PPT_MEDIA_IMPORT_MODEL,
+  PPT_TABLE_IMPORT_MODEL,
+  PPT_TEXT_PASTE_IMPORT_MODEL,
   type PPTClipboardImportAction,
   type PPTImageImportEffect,
   type PPTMediaImportResult,
@@ -7768,7 +7766,7 @@ function App() {
         data-ppt-import-extension-drop-action-order={PPT_IMPORT_EXTENSION.dropActionOrder.join(' ')}
         data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
         data-ppt-media-import-importer={lastMediaImport?.importerId}
-        data-ppt-media-import-model={CANVAS_MEDIA_IMPORT_MODEL}
+        data-ppt-media-import-model={PPT_MEDIA_IMPORT_MODEL}
         data-ppt-media-import-selection={lastMediaImport?.item.id}
         data-ppt-media-import-url={lastMediaImport?.source.url}
         data-ppt-inline-edit-element={lastInlineEditEffect?.elementId}
@@ -7782,7 +7780,7 @@ function App() {
         data-ppt-text-paste-format={lastTextPasteImport?.format}
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-link-runs={lastTextPasteImport?.linkRunCount}
-        data-ppt-text-paste-model={CANVAS_TEXT_PASTE_IMPORT_MODEL}
+        data-ppt-text-paste-model={PPT_TEXT_PASTE_IMPORT_MODEL}
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
         data-ppt-text-paste-underline-runs={lastTextPasteImport?.underlineRunCount}
         data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
@@ -7919,7 +7917,7 @@ function App() {
         data-ppt-image-crop-model="slide-edit-object-image-crop"
         data-ppt-image-import-format={lastImageImportEffect?.format}
         data-ppt-image-import-mime={lastImageImportEffect?.mimeType}
-        data-ppt-image-import-model={CANVAS_IMAGE_IMPORT_MODEL}
+        data-ppt-image-import-model={PPT_IMAGE_IMPORT_MODEL}
         data-ppt-image-import-name={lastImageImportEffect?.name}
         data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
         data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
@@ -8039,7 +8037,7 @@ function App() {
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
         data-ppt-table-import-format={lastTableImportEffect?.format}
-        data-ppt-table-import-model={CANVAS_TABLE_IMPORT_MODEL}
+        data-ppt-table-import-model={PPT_TABLE_IMPORT_MODEL}
         data-ppt-table-import-name={lastTableImportEffect?.name}
         data-ppt-table-import-rows={lastTableImportEffect?.rowCount}
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
