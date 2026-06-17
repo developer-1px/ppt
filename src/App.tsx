@@ -603,7 +603,7 @@ import {
   createPPTFallbackHTMLTableElement,
   createPPTFallbackHTMLTextElement,
   createPPTImageImportEffect,
-  createPPTImportedImageElement,
+  createPPTImportedImageElements,
   getPPTImageFileFromList,
   createPPTMediaElement,
   createPPTTableElement,
@@ -3904,6 +3904,9 @@ function App() {
 
   function runPPTClipboardImportAction(action: PPTClipboardImportAction) {
     switch (action.kind) {
+      case 'image-file-batch':
+        void insertPPTImageFiles(action.files)
+        return true
       case 'image-file':
         void insertPPTImageFile(action.file)
         return true
@@ -3948,6 +3951,9 @@ function App() {
     point: Point,
   ) {
     switch (action.kind) {
+      case 'image-file-batch':
+        void insertPPTImageFiles(action.files, point)
+        return true
       case 'image-file':
         void insertPPTImageFile(action.file, point)
         return true
@@ -3971,15 +3977,39 @@ function App() {
     source: PPTImageImportSource,
     center = getPPTViewportCenter(),
   ) {
+    insertPPTImageSources([source], center)
+  }
+
+  function insertPPTImageSources(
+    sources: readonly PPTImageImportSource[],
+    center = getPPTViewportCenter(),
+  ) {
+    if (sources.length === 0) {
+      return false
+    }
+
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const element = createPPTImportedImageElement({
+      const elements = createPPTImportedImageElements({
         center,
         createId: createPPTElementIdFactory(slide),
-        source,
+        sources,
       })
+      const lastElement = elements[elements.length - 1]
+      const lastSource = sources[sources.length - 1]
 
-      setLastImageImportEffect(createPPTImageImportEffect({ element, source }))
-      setSelection([element.id])
+      if (!lastElement || !lastSource) {
+        return slide
+      }
+
+      setLastImageImportEffect(createPPTImageImportEffect({
+        batch: {
+          count: elements.length,
+          names: elements.map((element) => element.name),
+        },
+        element: lastElement,
+        source: lastSource,
+      }))
+      setSelection(elements.map((element) => element.id))
       setEditingId(null)
       setLineCreationMode(null)
       setCreationTool(null)
@@ -3991,9 +4021,11 @@ function App() {
 
       return {
         ...slide,
-        elements: [...slide.elements, element],
+        elements: [...slide.elements, ...elements],
       }
     }))
+
+    return true
   }
 
   async function insertPPTImageFile(
@@ -4008,6 +4040,21 @@ function App() {
 
     insertPPTImageSource(source, center)
     return true
+  }
+
+  async function insertPPTImageFiles(
+    files: readonly (Blob & { name?: string })[],
+    center = getPPTViewportCenter(),
+  ) {
+    const sources: PPTImageImportSource[] = []
+
+    for (const source of await Promise.all(files.map(readPPTImageFileSource))) {
+      if (source) {
+        sources.push(source)
+      }
+    }
+
+    return insertPPTImageSources(sources, center)
   }
 
   async function pastePPTClipboardImage() {
@@ -8783,10 +8830,12 @@ function App() {
           ? String(lastImageCropEffect.payload.value)
           : undefined}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
+        data-ppt-image-import-count={lastImageImportEffect?.count}
         data-ppt-image-import-format={lastImageImportEffect?.format}
         data-ppt-image-import-mime={lastImageImportEffect?.mimeType}
         data-ppt-image-import-model={PPT_IMAGE_IMPORT_MODEL}
         data-ppt-image-import-name={lastImageImportEffect?.name}
+        data-ppt-image-import-names={lastImageImportEffect?.names}
         data-ppt-image-import-natural-height={lastImageImportEffect?.naturalHeight}
         data-ppt-image-import-natural-width={lastImageImportEffect?.naturalWidth}
         data-ppt-image-replace-command={lastImageReplaceEffect?.payload.id}

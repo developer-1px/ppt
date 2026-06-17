@@ -4,6 +4,7 @@ import {
 import {
   getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
+  getPPTImageFilesFromDataTransfer,
   getPPTSVGImageSourceFromDataTransfer,
   PPT_IMAGE_IMPORT_MODEL,
   type PPTImageImportFormat,
@@ -49,6 +50,7 @@ import type {
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
   clipboardActionOrder: [
+    'image-file-batch',
     'image-file',
     'fallback-html-selection-source',
     'fallback-html-image-source',
@@ -62,6 +64,7 @@ export const PPT_IMPORT_EXTENSION = {
     'text-source',
   ],
   dropActionOrder: [
+    'image-file-batch',
     'image-file',
     'table-file',
     'table-source',
@@ -73,10 +76,12 @@ export const PPT_IMPORT_EXTENSION = {
 } as const
 
 export type PPTImageImportEffect = {
+  count: number
   format: PPTImageImportFormat
   mimeType?: string
   model: typeof PPT_IMAGE_IMPORT_MODEL
   name: string
+  names: string
   naturalHeight?: number
   naturalWidth?: number
 }
@@ -92,6 +97,10 @@ export type { PPTFallbackHTMLImportEffect }
 export { PPT_FALLBACK_HTML_IMPORT_MODEL }
 
 export type PPTClipboardImportAction =
+  | {
+      files: readonly (Blob & { name?: string })[]
+      kind: 'image-file-batch'
+    }
   | {
       file: Blob & { name?: string }
       kind: 'image-file'
@@ -140,6 +149,10 @@ export type PPTClipboardImportAction =
 
 export type PPTStageDropImportAction =
   | {
+      files: readonly (Blob & { name?: string })[]
+      kind: 'image-file-batch'
+    }
+  | {
       file: Blob & { name?: string }
       kind: 'image-file'
     }
@@ -165,9 +178,16 @@ export function getPPTClipboardImportActions(
       {
         mode: 'exclusive',
         resolve: () => {
-          const file = getPPTImageFileFromDataTransfer(dataTransfer)
+          const files = getPPTImageFilesFromDataTransfer(dataTransfer)
+          const file = files.length === 1
+            ? files[0]
+            : getPPTImageFileFromDataTransfer(dataTransfer)
 
-          return file ? { file, kind: 'image-file' } : null
+          return files.length > 1
+            ? { files, kind: 'image-file-batch' }
+            : file
+              ? { file, kind: 'image-file' }
+              : null
         },
       },
       {
@@ -285,9 +305,16 @@ export function getPPTStageDropImportAction(
         {
           mode: 'exclusive',
           resolve: () => {
-            const file = getPPTImageFileFromDataTransfer(dataTransfer)
+            const files = getPPTImageFilesFromDataTransfer(dataTransfer)
+            const file = files.length === 1
+              ? files[0]
+              : getPPTImageFileFromDataTransfer(dataTransfer)
 
-            return file ? { file, kind: 'image-file' } : null
+            return files.length > 1
+              ? { files, kind: 'image-file-batch' }
+              : file
+                ? { file, kind: 'image-file' }
+                : null
           },
         },
         {
@@ -332,17 +359,24 @@ export function canHandlePPTStageDropImport(dataTransfer: DataTransfer | null) {
 }
 
 export function createPPTImageImportEffect({
+  batch,
   element,
   source,
 }: {
+  batch?: {
+    count: number
+    names: readonly string[]
+  }
   element: PPTImage
   source: PPTImageImportSource
 }): PPTImageImportEffect {
   return {
+    count: batch?.count ?? 1,
     format: source.format ?? 'file',
     mimeType: source.mimeType,
     model: PPT_IMAGE_IMPORT_MODEL,
     name: element.name,
+    names: (batch?.names ?? [element.name]).join(', '),
     naturalHeight: source.naturalHeight,
     naturalWidth: source.naturalWidth,
   }

@@ -118,6 +118,7 @@ import {
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
   getCanvasSVGImageSourceFromDataTransfer,
+  isCanvasImageBlob,
   readCanvasImageFileSource,
   resolveCanvasImageSourceNaturalSize,
   type CanvasImageImportFormat,
@@ -400,6 +401,11 @@ export const readPPTCanvasClipboardImageSource =
 export const getPPTCanvasImageFileFromDataTransfer =
   getCanvasImageFileFromDataTransfer
 export const getPPTCanvasImageFileFromList = getCanvasImageFileFromList
+export function getPPTCanvasImageFilesFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return Array.from(dataTransfer?.files ?? []).filter(isCanvasImageBlob)
+}
 export const getPPTCanvasMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer
 export const getPPTCanvasMediaSourceFromText =

@@ -8464,9 +8464,9 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file-batch image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
-        'image-file table-file table-source media-source' &&
+        'image-file-batch image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
       afterUpload.imageCount === before.imageCount + 1 &&
       afterUpload.selectedKind === 'image' &&
@@ -8497,6 +8497,25 @@ async function runImageImportScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(${createPPTTestImageFileExpression('batch-a.svg', '#f97316')})
+    dataTransfer.items.add(${createPPTTestImageFileExpression('batch-b.svg', '#0f766e')})
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(180)
+
+  const afterMultiPaste = await getPPTImageImportState(page)
+
+  record('pastes multiple image files into PPT slide from one clipboard event', afterMultiPaste.imageImportModel === 'canvas-image-import' && afterMultiPaste.imageImportFormat === 'file' && afterMultiPaste.imageImportCount === 2 && afterMultiPaste.imageImportNames.includes('batch-a.svg') && afterMultiPaste.imageImportNames.includes('batch-b.svg') && afterMultiPaste.imageCount === afterPaste.imageCount + 2 && afterMultiPaste.selectedCount === 2 && afterMultiPaste.selectedKinds === 'image image' && afterMultiPaste.selectedNames.includes('batch-a.svg') && afterMultiPaste.selectedNames.includes('batch-b.svg'), {
+    afterMultiPaste,
+    afterPaste,
+  })
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
     dataTransfer.setData('image/svg+xml', '<svg width="120" height="80" viewBox="0 0 120 80" onload="alert(1)" xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><rect width="120" height="80" fill="#7c3aed"/></svg>')
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
@@ -8508,8 +8527,8 @@ async function runImageImportScenario(page) {
 
   const afterSvgMimePaste = await getPPTImageImportState(page)
 
-  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
-    afterPaste,
+  record('pastes SVG MIME clipboard payload into PPT image element', afterSvgMimePaste.imageImportModel === 'canvas-image-import' && afterSvgMimePaste.imageImportFormat === 'svg-mime' && afterSvgMimePaste.imageImportMime === 'image/svg+xml' && afterSvgMimePaste.imageImportNaturalWidth === 120 && afterSvgMimePaste.imageImportNaturalHeight === 80 && afterSvgMimePaste.imageCount === afterMultiPaste.imageCount + 1 && afterSvgMimePaste.selectedKind === 'image' && afterSvgMimePaste.selectedName === 'clipboard.svg' && afterSvgMimePaste.selectedImageSrc.startsWith('data:image/svg+xml') && !afterSvgMimePaste.selectedImageDecoded.includes('<script') && !afterSvgMimePaste.selectedImageDecoded.includes('onload='), {
+    afterMultiPaste,
     afterSvgMimePaste,
   })
 
@@ -13422,6 +13441,9 @@ function createPPTTestTableFileExpression(name, text) {
 function getPPTImageImportState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const selectedElements = [...document.querySelectorAll('[data-selected="true"]')]
+    const selectedLayerNames = [...document.querySelectorAll('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')]
+      .map((element) => element.textContent ?? '')
     const selectedImage = selected?.querySelector('img') ?? null
     const stage = document.querySelector('.ppt-stage-shell')
     const fitField = document.querySelector('[data-ppt-style-field="image-fit"]')
@@ -13454,10 +13476,12 @@ function getPPTImageImportState(page) {
       importExtensionClipboardActionOrder: stage?.getAttribute('data-ppt-import-extension-clipboard-action-order') ?? '',
       importExtensionDropActionOrder: stage?.getAttribute('data-ppt-import-extension-drop-action-order') ?? '',
       importExtensionInstallUnit: stage?.getAttribute('data-ppt-import-extension-install-unit') ?? '',
+      imageImportCount: Number(stage?.getAttribute('data-ppt-image-import-count') ?? 0),
       imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
       imageImportMime: stage?.getAttribute('data-ppt-image-import-mime') ?? '',
       imageImportModel: stage?.getAttribute('data-ppt-image-import-model') ?? '',
       imageImportName: stage?.getAttribute('data-ppt-image-import-name') ?? '',
+      imageImportNames: stage?.getAttribute('data-ppt-image-import-names') ?? '',
       imageImportNaturalHeight: Number(stage?.getAttribute('data-ppt-image-import-natural-height') ?? 0),
       imageImportNaturalWidth: Number(stage?.getAttribute('data-ppt-image-import-natural-width') ?? 0),
       imageCropFitDescriptorAttribute: fitField?.getAttribute('data-ppt-image-crop-attribute') ?? '',
@@ -13503,6 +13527,7 @@ function getPPTImageImportState(page) {
       richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
       richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       selectedAltText: selectedImage?.getAttribute('alt') ?? '',
+      selectedCount: selectedElements.length,
       selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
       selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
@@ -13511,9 +13536,11 @@ function getPPTImageImportState(page) {
       selectedImagePosition: selectedImage?.style.objectPosition ?? '',
       selectedImageSrc,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedKinds: selectedElements.map((element) => element.getAttribute('data-kind') ?? '').join(' '),
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedNames: selectedLayerNames.join(' '),
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedTransform: selected?.style.transform ?? '',
       selectedWidth: parseFloat(selected?.style.width ?? '0'),

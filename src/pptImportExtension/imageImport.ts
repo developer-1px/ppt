@@ -6,6 +6,7 @@ import {
   getPPTCanvasDataImageSourceFromDataTransfer,
   getPPTCanvasImageFileFromDataTransfer,
   getPPTCanvasImageFileFromList,
+  getPPTCanvasImageFilesFromDataTransfer,
   getPPTCanvasImportedImageSize,
   getPPTCanvasSVGImageSourceFromDataTransfer,
   PPT_CANVAS_IMAGE_IMPORT_MODEL,
@@ -24,6 +25,9 @@ import {
 export type PPTImageImportFormat = PPTCanvasImageImportFormat
 export type PPTImageImportSource = PPTCanvasImageImportSource
 export const PPT_IMAGE_IMPORT_MODEL = PPT_CANVAS_IMAGE_IMPORT_MODEL
+
+const PPT_IMAGE_BATCH_GAP = 24
+const PPT_IMAGE_BATCH_MAX_COLUMNS = 3
 
 export function createPPTImportedImageElement({
   center,
@@ -66,6 +70,70 @@ export function createPPTImportedImageElement({
   }
 }
 
+export function createPPTImportedImageElements({
+  center,
+  createId,
+  sources,
+}: {
+  center: Point
+  createId: (prefix: string) => string
+  sources: readonly PPTImageImportSource[]
+}): PPTImage[] {
+  if (sources.length <= 1) {
+    return sources.map((source) =>
+      createPPTImportedImageElement({ center, createId, source })
+    )
+  }
+
+  const columns = Math.min(
+    PPT_IMAGE_BATCH_MAX_COLUMNS,
+    Math.ceil(Math.sqrt(sources.length)),
+  )
+  const rows = Math.ceil(sources.length / columns)
+  const sizes = sources.map((source) => getPPTCanvasImportedImageSize(source))
+  const columnWidths = Array.from({ length: columns }, (_, column) =>
+    Math.max(
+      ...sizes
+        .filter((_, index) => index % columns === column)
+        .map((size) => size.w),
+    )
+  )
+  const rowHeights = Array.from({ length: rows }, (_, row) =>
+    Math.max(
+      ...sizes
+        .filter((_, index) => Math.floor(index / columns) === row)
+        .map((size) => size.h),
+    )
+  )
+  const totalWidth = columnWidths.reduce((sum, width) => sum + width, 0) +
+    PPT_IMAGE_BATCH_GAP * Math.max(0, columns - 1)
+  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) +
+    PPT_IMAGE_BATCH_GAP * Math.max(0, rows - 1)
+  const origin = {
+    x: center.x - totalWidth / 2,
+    y: center.y - totalHeight / 2,
+  }
+
+  return sources.map((source, index) => {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    const x = origin.x +
+      columnWidths.slice(0, column).reduce((sum, width) => sum + width, 0) +
+      PPT_IMAGE_BATCH_GAP * column +
+      columnWidths[column] / 2
+    const y = origin.y +
+      rowHeights.slice(0, row).reduce((sum, height) => sum + height, 0) +
+      PPT_IMAGE_BATCH_GAP * row +
+      rowHeights[row] / 2
+
+    return createPPTImportedImageElement({
+      center: { x, y },
+      createId,
+      source,
+    })
+  })
+}
+
 export async function readPPTImageFileSource(file: Blob & { name?: string }) {
   const source = await readPPTCanvasImageFileSource(file)
 
@@ -96,6 +164,9 @@ export const getPPTImageFileFromList = getPPTCanvasImageFileFromList
 
 export const getPPTImageFileFromDataTransfer =
   getPPTCanvasImageFileFromDataTransfer
+
+export const getPPTImageFilesFromDataTransfer =
+  getPPTCanvasImageFilesFromDataTransfer
 
 export const getPPTDataImageSourceFromDataTransfer =
   getPPTCanvasDataImageSourceFromDataTransfer
