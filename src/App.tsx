@@ -442,11 +442,6 @@ import {
   type CanvasSnapGuides,
 } from 'canvas/foundation'
 import {
-  createCanvasCssBoundsTransform,
-  createCanvasSvgFreehandPathData,
-  createCanvasSvgPathData,
-} from 'canvas/renderer'
-import {
   PPT_DEFAULT_THEME_ID,
   PPT_SPLIT_LAYOUT_ID,
   PPT_SLIDE_HEIGHT,
@@ -536,6 +531,11 @@ import {
   type PPTCanvasDistributeMode,
   type PPTCanvasReorderMode,
 } from './pptCanvasEngineAdapter'
+import {
+  createPPTCanvasCssBoundsTransform,
+  createPPTCanvasSvgFreehandPathData,
+  createPPTCanvasSvgPathData,
+} from './pptCanvasRendererAdapter'
 import {
   filterPPTCommandPaletteItems,
   getPPTInlineEditHistoryDirectionFromInputType,
@@ -11932,7 +11932,7 @@ function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
     >
       <path
         data-ppt-freeform-path
-        d={createCanvasSvgFreehandPathData(element.points)}
+        d={createPPTCanvasSvgFreehandPathData(element.points)}
         fill="none"
         stroke={element.stroke.color}
         strokeDasharray={getPPTStrokeDashArray(element.stroke)}
@@ -12196,7 +12196,7 @@ function PPTLaserTrailOverlay({
     >
       <path
         className="ppt-laser-trail-path"
-        d={createCanvasSvgPathData(points)}
+        d={createPPTCanvasSvgPathData(points)}
         data-ppt-laser-trail-path
         strokeWidth={strokeWidth}
       />
@@ -14901,7 +14901,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
 }
 
 function getPPTElementTransform(element: PPTElement) {
-  return createCanvasCssBoundsTransform({
+  return createPPTCanvasCssBoundsTransform({
     flipX: element.flipH === true,
     flipY: element.flipV === true,
     rotation: element.geometry.rotation,

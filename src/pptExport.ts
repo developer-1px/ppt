@@ -14,14 +14,6 @@ import {
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
 } from '@interactive-os/slide-edit-affordance'
-import {
-  createCanvasCssBoundsTransform,
-  createCanvasSvgBoundsTransform,
-  createCanvasSvgFreehandPathData,
-  createCanvasSvgPathData,
-  escapeCanvasXmlAttribute,
-  formatCanvasSvgNumber,
-} from 'canvas/renderer'
 import { unionCanvasRectList } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
@@ -48,6 +40,14 @@ import {
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
+import {
+  createPPTCanvasCssBoundsTransform,
+  createPPTCanvasSvgBoundsTransform,
+  createPPTCanvasSvgFreehandPathData,
+  createPPTCanvasSvgPathData,
+  escapePPTCanvasXmlAttribute,
+  formatPPTCanvasSvgNumber,
+} from './pptCanvasRendererAdapter'
 
 const PPT_SELECTION_EXPORT_PADDING = 24
 const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
@@ -802,7 +802,7 @@ function renderPPTTableSVG(element: PPTTable) {
 }
 
 function getPPTElementTransform(element: PPTElement) {
-  return createCanvasCssBoundsTransform({
+  return createPPTCanvasCssBoundsTransform({
     flipX: element.flipH === true,
     flipY: element.flipV === true,
     rotation: element.geometry.rotation,
@@ -1021,7 +1021,7 @@ function getPPTElementAnimationAttrEntries(element: PPTElement) {
 }
 
 function getPPTElementSVGTransform(element: PPTElement) {
-  return createCanvasSvgBoundsTransform({
+  return createPPTCanvasSvgBoundsTransform({
     bounds: element.geometry,
     flipX: element.flipH === true,
     flipY: element.flipV === true,
@@ -1033,7 +1033,7 @@ function getPPTLinePath(element: PPTLine) {
   const bend = Math.min(0.92, Math.max(0.08, element.routeBend ?? 0.5))
   const bendX = element.start.x + (element.end.x - element.start.x) * bend
 
-  return createCanvasSvgPathData([
+  return createPPTCanvasSvgPathData([
     { x: element.start.x, y: element.start.y },
     { x: bendX, y: element.start.y },
     { x: bendX, y: element.end.y },
@@ -1051,18 +1051,18 @@ function getPPTLineSVGPath(element: PPTLine) {
     { x: element.end.x, y: element.end.y },
   ].map((point) => getPPTLineWorldPoint(element, point))
 
-  return createCanvasSvgPathData(points)
+  return createPPTCanvasSvgPathData(points)
 }
 
 function getPPTFreeformWorldPathData(element: PPTFreeform) {
-  return createCanvasSvgFreehandPathData(element.points.map((point) => ({
+  return createPPTCanvasSvgFreehandPathData(element.points.map((point) => ({
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
   })))
 }
 
 function getPPTFreeformPathData(points: readonly PPTLinePoint[]) {
-  return createCanvasSvgFreehandPathData(points)
+  return createPPTCanvasSvgFreehandPathData(points)
 }
 
 function getPPTLineWorldPoint(line: PPTLine, point: PPTLinePoint) {
@@ -1613,11 +1613,11 @@ function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
 }
 
 function formatNumber(value: number) {
-  return formatCanvasSvgNumber(value)
+  return formatPPTCanvasSvgNumber(value)
 }
 
 function escapeHtml(value: string) {
-  return escapeCanvasXmlAttribute(value)
+  return escapePPTCanvasXmlAttribute(value)
 }
 
 function escapeScriptJson(value: string) {
