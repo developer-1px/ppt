@@ -1057,6 +1057,11 @@ const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-line-style' as const
 const PPT_LINE_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.line-style+json'
+const PPT_OBJECT_TRANSFORM_IMPORT_MODEL = 'ppt-object-transform-import' as const
+const PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-transform' as const
+const PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-transform+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1305,6 +1310,20 @@ type PPTLineStyleImportSource = {
   jsonLength: number
   stroke: Partial<PPTStroke>
 }
+type PPTObjectTransformImportField =
+  | 'h'
+  | 'rotation'
+  | 'w'
+  | 'x'
+  | 'y'
+type PPTObjectTransformImportSource = {
+  fields: readonly PPTObjectTransformImportField[]
+  format: typeof PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT
+  jsonLength: number
+  transform: Partial<Pick<Bounds, 'h' | 'w' | 'x' | 'y'> & {
+    rotation: number
+  }>
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1517,6 +1536,19 @@ type PPTLineStyleImportEffect = {
   strokeColor: string
   strokeDash: string
   strokeWidth: string
+}
+type PPTObjectTransformImportEffect = {
+  commandTargets: string
+  fields: string
+  format: typeof PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT
+  h: string
+  jsonLength: number
+  model: typeof PPT_OBJECT_TRANSFORM_IMPORT_MODEL
+  objectIds: string
+  rotation: string
+  w: string
+  x: string
+  y: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2559,6 +2591,8 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
     useState<PPTLineStyleImportEffect | null>(null)
+  const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
+    useState<PPTObjectTransformImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3495,6 +3529,17 @@ function App() {
       if (
         objectMetadataSource &&
         pastePPTObjectMetadataSource(objectMetadataSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectTransformSource =
+        getPPTObjectTransformSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectTransformSource &&
+        pastePPTObjectTransformSource(objectTransformSource)
       ) {
         event.preventDefault()
         return
@@ -4518,6 +4563,38 @@ function App() {
             ),
           )
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectTransformSource(
+    source: PPTObjectTransformImportSource,
+  ) {
+    const objectIds = activeSlide.elements
+      .filter((element) =>
+        selection.includes(element.id) &&
+        element.locked !== true &&
+        element.visible !== false)
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    setLastObjectTransformImportEffect(createPPTObjectTransformImportEffect({
+      objectIds,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          objectIds,
+          (element) => applyPPTObjectTransformSourceToElement(element, source),
+        ),
       })))
 
     return true
@@ -10230,6 +10307,17 @@ function App() {
         data-ppt-line-style-import-stroke-color={lastLineStyleImportEffect?.strokeColor}
         data-ppt-line-style-import-stroke-dash={lastLineStyleImportEffect?.strokeDash}
         data-ppt-line-style-import-stroke-width={lastLineStyleImportEffect?.strokeWidth}
+        data-ppt-object-transform-import-command-targets={lastObjectTransformImportEffect?.commandTargets}
+        data-ppt-object-transform-import-fields={lastObjectTransformImportEffect?.fields}
+        data-ppt-object-transform-import-format={lastObjectTransformImportEffect?.format}
+        data-ppt-object-transform-import-h={lastObjectTransformImportEffect?.h}
+        data-ppt-object-transform-import-json-length={lastObjectTransformImportEffect?.jsonLength}
+        data-ppt-object-transform-import-model={lastObjectTransformImportEffect?.model}
+        data-ppt-object-transform-import-objects={lastObjectTransformImportEffect?.objectIds}
+        data-ppt-object-transform-import-rotation={lastObjectTransformImportEffect?.rotation}
+        data-ppt-object-transform-import-w={lastObjectTransformImportEffect?.w}
+        data-ppt-object-transform-import-x={lastObjectTransformImportEffect?.x}
+        data-ppt-object-transform-import-y={lastObjectTransformImportEffect?.y}
         data-ppt-object-metadata-import-alt-text-length={lastObjectMetadataImportEffect?.altTextLength}
         data-ppt-object-metadata-import-alt-text-present={lastObjectMetadataImportEffect?.altTextPresent}
         data-ppt-object-metadata-import-command-fields={lastObjectMetadataImportEffect?.commandFields}
@@ -12714,6 +12802,66 @@ function createPPTObjectMetadataImportEffect({
   }
 }
 
+function createPPTObjectTransformImportEffect({
+  objectIds,
+  source,
+}: {
+  objectIds: readonly string[]
+  source: PPTObjectTransformImportSource
+}): PPTObjectTransformImportEffect {
+  return {
+    commandTargets: objectIds.join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    h: source.transform.h === undefined ? '' : String(source.transform.h),
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_TRANSFORM_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    rotation: source.transform.rotation === undefined
+      ? ''
+      : String(source.transform.rotation),
+    w: source.transform.w === undefined ? '' : String(source.transform.w),
+    x: source.transform.x === undefined ? '' : String(source.transform.x),
+    y: source.transform.y === undefined ? '' : String(source.transform.y),
+  }
+}
+
+function applyPPTObjectTransformSourceToElement(
+  element: PPTElement,
+  source: PPTObjectTransformImportSource,
+): PPTElement {
+  const bounds = clampPPTCanvasBoundsToFrame({
+    bounds: {
+      ...pptGeometryToBounds(element.geometry),
+      ...(source.transform.h === undefined ? {} : { h: source.transform.h }),
+      ...(source.transform.w === undefined ? {} : { w: source.transform.w }),
+      ...(source.transform.x === undefined ? {} : { x: source.transform.x }),
+      ...(source.transform.y === undefined ? {} : { y: source.transform.y }),
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    minHeight: 24,
+    minWidth: 24,
+  })
+  const next = updatePPTElementBounds(element, bounds)
+
+  return source.transform.rotation === undefined
+    ? next
+    : {
+        ...next,
+        geometry: {
+          ...next.geometry,
+          rotation: normalizePPTCanvasRotationDegrees(
+            source.transform.rotation,
+          ),
+        },
+      }
+}
+
 function getPPTObjectMetadataCommandField(
   effect:
     | SlideEditObjectAccessibilityHostCommandEffect<string, string>
@@ -14261,6 +14409,162 @@ function getPPTObjectMetadataAltTextFromJSONValue(
   }
 
   return normalizePPTAltText(value) || null
+}
+
+function getPPTObjectTransformSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectTransformSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectTransformSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectTransformImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectTransformSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectTransformSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectTransformImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.objectTransform)
+    ? value.objectTransform
+    : isPPTRecord(value) && isPPTRecord(value.objectGeometry)
+      ? value.objectGeometry
+      : isPPTRecord(value) && isPPTRecord(value.transform)
+        ? value.transform
+        : isPPTRecord(value) && isPPTRecord(value.geometry)
+          ? value.geometry
+          : allowDirect
+            ? value
+            : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const transform: PPTObjectTransformImportSource['transform'] = {}
+  const fields: PPTObjectTransformImportField[] = []
+  const x = getPPTObjectTransformNumberFromJSONValue(payloadValue.x)
+  const y = getPPTObjectTransformNumberFromJSONValue(payloadValue.y)
+  const w = getPPTObjectTransformNumberFromJSONValue(
+    payloadValue.w ?? payloadValue.width,
+  )
+  const h = getPPTObjectTransformNumberFromJSONValue(
+    payloadValue.h ?? payloadValue.height,
+  )
+  const rotation = getPPTObjectTransformRotationFromJSONValue(
+    payloadValue.rotation ?? payloadValue.rotate,
+  )
+
+  if (x !== undefined) {
+    transform.x = x
+    fields.push('x')
+  }
+
+  if (y !== undefined) {
+    transform.y = y
+    fields.push('y')
+  }
+
+  if (w !== undefined) {
+    transform.w = w
+    fields.push('w')
+  }
+
+  if (h !== undefined) {
+    transform.h = h
+    fields.push('h')
+  }
+
+  if (rotation !== undefined) {
+    transform.rotation = rotation
+    fields.push('rotation')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
+        jsonLength,
+        transform,
+      }
+    : null
+}
+
+function getPPTObjectTransformNumberFromJSONValue(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined
+}
+
+function getPPTObjectTransformRotationFromJSONValue(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? normalizePPTCanvasRotationDegrees(value)
+    : undefined
 }
 
 function getPPTImageCropSourceFromDataTransfer(

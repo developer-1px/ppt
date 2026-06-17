@@ -1523,6 +1523,88 @@ async function runAffordanceScenario(page) {
 
   record('updates PPT object rotation from inspector', afterRotationInput.rotation === '45' && afterRotationInput.transform.includes('rotate(45deg)'), afterRotationInput)
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectTransform: {
+        h: 138,
+        rotation: 45,
+        w: 360,
+        x: 214,
+        y: 118,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterTransformPaste = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      fieldH: document.querySelector('[data-ppt-geometry-field="h"]')?.value ?? '',
+      fieldRotation: document.querySelector('[data-ppt-geometry-field="rotation"]')?.value ?? '',
+      fieldW: document.querySelector('[data-ppt-geometry-field="w"]')?.value ?? '',
+      fieldX: document.querySelector('[data-ppt-geometry-field="x"]')?.value ?? '',
+      fieldY: document.querySelector('[data-ppt-geometry-field="y"]')?.value ?? '',
+      height: parseFloat(element.style.height),
+      importFields: stage?.getAttribute('data-ppt-object-transform-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-object-transform-import-format') ?? '',
+      importH: stage?.getAttribute('data-ppt-object-transform-import-h') ?? '',
+      importJsonLength: stage?.getAttribute('data-ppt-object-transform-import-json-length') ?? '',
+      importModel: stage?.getAttribute('data-ppt-object-transform-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-object-transform-import-objects') ?? '',
+      importRotation: stage?.getAttribute('data-ppt-object-transform-import-rotation') ?? '',
+      importTargets: stage?.getAttribute('data-ppt-object-transform-import-command-targets') ?? '',
+      importW: stage?.getAttribute('data-ppt-object-transform-import-w') ?? '',
+      importX: stage?.getAttribute('data-ppt-object-transform-import-x') ?? '',
+      importY: stage?.getAttribute('data-ppt-object-transform-import-y') ?? '',
+      left: parseFloat(element.style.left),
+      rotation: element.getAttribute('data-rotation'),
+      top: parseFloat(element.style.top),
+      transform: element.style.transform,
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+
+  record(
+    'pastes JSON object transform into selected PPT object',
+    afterTransformPaste.importModel === 'ppt-object-transform-import' &&
+      afterTransformPaste.importFormat === 'application-json-ppt-object-transform' &&
+      afterTransformPaste.importTargets === 's1-card-1' &&
+      afterTransformPaste.importObjects === 's1-card-1' &&
+      afterTransformPaste.importFields === 'x y w h rotation' &&
+      afterTransformPaste.importX === '214' &&
+      afterTransformPaste.importY === '118' &&
+      afterTransformPaste.importW === '360' &&
+      afterTransformPaste.importH === '138' &&
+      afterTransformPaste.importRotation === '45' &&
+      Number(afterTransformPaste.importJsonLength) > 60 &&
+      afterTransformPaste.left === 214 &&
+      afterTransformPaste.top === 118 &&
+      afterTransformPaste.width === 360 &&
+      afterTransformPaste.height === 138 &&
+      afterTransformPaste.rotation === '45' &&
+      afterTransformPaste.transform.includes('rotate(45deg)') &&
+      afterTransformPaste.fieldX === '214' &&
+      afterTransformPaste.fieldY === '118' &&
+      afterTransformPaste.fieldW === '360' &&
+      afterTransformPaste.fieldH === '138' &&
+      afterTransformPaste.fieldRotation === '45',
+    {
+      afterRotationInput,
+      afterTransformPaste,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-command="align-center-x"]').click()`)
   await delay(50)
 
