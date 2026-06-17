@@ -163,6 +163,7 @@ import {
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
+  getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextParagraphSpacingCommandEffect,
@@ -2654,9 +2655,18 @@ function App() {
         return
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+      const textFormattingKeyboardIntent = getSlideEditTextFormattingKeyboardIntent({
+        altKey: event.altKey,
+        key: event.key,
+        mod,
+        shiftKey: event.shiftKey,
+      })
+
+      if (textFormattingKeyboardIntent?.kind === 'toggle-bold') {
         if (canFormatSelectedText) {
-          event.preventDefault()
+          if (textFormattingKeyboardIntent.preventDefault) {
+            event.preventDefault()
+          }
           toggleSelectedTextBold()
         }
         return
