@@ -6121,6 +6121,91 @@ async function runExportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const html = document.querySelector('.ppt-export-code')?.value ?? ''
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', fallbackHTML)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const deckHTMLFallbackImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const selectedImage = document.querySelector('[data-ppt-element][data-kind="image"] img')
+    const selectedImageSrc = selectedImage?.getAttribute('src') ?? ''
+    const decodedImageSrc = selectedImageSrc.startsWith('data:image/svg+xml')
+      ? decodeURIComponent(selectedImageSrc.split(',').slice(1).join(','))
+      : ''
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      decodedImageSrc,
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-html-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-html-import-format') ?? '',
+      htmlLength: Number(stage?.getAttribute('data-ppt-deck-html-import-html-length') ?? 0),
+      imageCount: document.querySelectorAll('[data-ppt-element][data-kind="image"]').length,
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-html-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-html-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-html-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-html-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-html-import-source-title') ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes script-stripped PPT HTML export as snapshot slides',
+    deckHTMLFallbackImportState.model === 'ppt-deck-html-import' &&
+      deckHTMLFallbackImportState.format === 'text-html-ppt-deck-fallback' &&
+      deckHTMLFallbackImportState.sourceDeck === '' &&
+      deckHTMLFallbackImportState.sourceTitle === 'AI Retouch Demo' &&
+      deckHTMLFallbackImportState.sourceSlideCount === beforeDeckHTMLPaste.slideCount &&
+      deckHTMLFallbackImportState.importedCount === beforeDeckHTMLPaste.slideCount &&
+      deckHTMLFallbackImportState.slideCount === beforeDeckHTMLPaste.slideCount * 2 &&
+      deckHTMLFallbackImportState.activeSlide === deckHTMLFallbackImportState.firstImportedSlideId &&
+      deckHTMLFallbackImportState.activeName.includes('Snapshot') &&
+      deckHTMLFallbackImportState.imageCount === 1 &&
+      deckHTMLFallbackImportState.decodedImageSrc.includes('<foreignObject') &&
+      !deckHTMLFallbackImportState.decodedImageSrc.includes('<script') &&
+      !deckHTMLFallbackImportState.decodedImageSrc.includes('onload='),
+    {
+      beforeDeckHTMLPaste,
+      deckHTMLFallbackImportState,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckHTMLFallbackPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT HTML deck fallback paste probes before export scenario continues',
+    afterDeckHTMLFallbackPasteCleanup.activeSlide === 'slide-1' &&
+      afterDeckHTMLFallbackPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterDeckHTMLFallbackPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptClipboardItemTypes = []
     window.__pptClipboardWriteCount = 0
     window.__pptClipboardWriteText = ''

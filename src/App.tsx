@@ -1001,6 +1001,8 @@ const PPT_HTML_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.html-export+json'
 const PPT_DECK_HTML_IMPORT_MODEL = 'ppt-deck-html-import' as const
 const PPT_DECK_HTML_IMPORT_FORMAT = 'text-html-ppt-deck' as const
+const PPT_DECK_HTML_FALLBACK_IMPORT_FORMAT =
+  'text-html-ppt-deck-fallback' as const
 const PPT_SLIDE_SVG_CLIPBOARD_MODEL = 'canvas-rich-slide-svg-clipboard' as const
 const PPT_SLIDE_SVG_CLIPBOARD_KIND = 'interactive-os.ppt.slide-svg-export' as const
 const PPT_SLIDE_SVG_CLIPBOARD_VERSION = 1
@@ -1093,9 +1095,22 @@ type PPTDeckHTMLImportSource = {
   deck: PPTDeck
   htmlLength: number
 }
+type PPTDeckHTMLFallbackSlideSource = {
+  htmlLength: number
+  name: string
+  sourceSlideId?: string
+  svg: string
+}
+type PPTDeckHTMLFallbackSource = {
+  htmlLength: number
+  slides: PPTDeckHTMLFallbackSlideSource[]
+  title: string
+}
 type PPTDeckHTMLImportEffect = {
   firstImportedSlideId: string
-  format: typeof PPT_DECK_HTML_IMPORT_FORMAT
+  format:
+    | typeof PPT_DECK_HTML_IMPORT_FORMAT
+    | typeof PPT_DECK_HTML_FALLBACK_IMPORT_FORMAT
   htmlLength: number
   importedSlideCount: number
   model: typeof PPT_DECK_HTML_IMPORT_MODEL
@@ -2939,6 +2954,17 @@ function App() {
         return
       }
 
+      const deckFallbackHTMLSource =
+        getPPTDeckFallbackHTMLSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        deckFallbackHTMLSource &&
+        pastePPTDeckFallbackHTMLSource(deckFallbackHTMLSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
 
       if (richClipboard && pasteClipboardPayload(richClipboard.payload, {
@@ -3443,7 +3469,9 @@ function App() {
   }
 
   function pastePPTDeckHTMLSource(source: PPTDeckHTMLImportSource) {
-    let pastedSlides: PPTSlide[] = []
+    if (source.deck.slides.length === 0) {
+      return false
+    }
 
     commitDeck((current) => {
       const targetSlideId = current.slides.some((slide) =>
@@ -3483,7 +3511,6 @@ function App() {
         anchorSlideId = slide.id
       }
 
-      pastedSlides = importedSlides
       setLastDeckHTMLImportEffect(createPPTDeckHTMLImportEffect({
         importedSlides,
         source,
@@ -3496,7 +3523,65 @@ function App() {
       }
     })
 
-    return pastedSlides.length > 0
+    return true
+  }
+
+  function pastePPTDeckFallbackHTMLSource(source: PPTDeckHTMLFallbackSource) {
+    if (source.slides.length === 0) {
+      return false
+    }
+
+    commitDeck((current) => {
+      const targetSlideId = current.slides.some((slide) =>
+        slide.id === activeSlide.id)
+        ? activeSlide.id
+        : current.slides.at(-1)?.id
+
+      if (!targetSlideId) {
+        return current
+      }
+
+      const importedSlides = createPPTSlidesFromDeckFallbackHTMLSource(
+        current,
+        source,
+      )
+
+      if (importedSlides.length === 0) {
+        return current
+      }
+
+      let slides = current.slides
+      let anchorSlideId = targetSlideId
+
+      for (const slide of importedSlides) {
+        const result = insertPPTSlideAtTargetPlacement({
+          placement: 'after',
+          slide,
+          slides,
+          targetSlideId: anchorSlideId,
+        })
+
+        if (!result) {
+          return current
+        }
+
+        slides = result.items
+        anchorSlideId = slide.id
+      }
+
+      setLastDeckHTMLImportEffect(createPPTDeckHTMLFallbackImportEffect({
+        importedSlides,
+        source,
+      }))
+      selectSlide(importedSlides[0].id)
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+
+    return true
   }
 
   function deleteActiveSlide() {
@@ -10622,6 +10707,25 @@ function createPPTDeckHTMLImportEffect({
   }
 }
 
+function createPPTDeckHTMLFallbackImportEffect({
+  importedSlides,
+  source,
+}: {
+  importedSlides: readonly PPTSlide[]
+  source: PPTDeckHTMLFallbackSource
+}): PPTDeckHTMLImportEffect {
+  return {
+    firstImportedSlideId: importedSlides[0]?.id ?? '',
+    format: PPT_DECK_HTML_FALLBACK_IMPORT_FORMAT,
+    htmlLength: source.htmlLength,
+    importedSlideCount: importedSlides.length,
+    model: PPT_DECK_HTML_IMPORT_MODEL,
+    sourceDeckId: '',
+    sourceSlideCount: source.slides.length,
+    sourceTitle: source.title,
+  }
+}
+
 function createPPTSlideSVGClipboardEffect({
   sourceSlideId,
   svg,
@@ -10840,6 +10944,147 @@ function getPPTDeckHTMLSourceFromHTML(
   }
 }
 
+function getPPTDeckFallbackHTMLSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  const html = dataTransfer?.getData('text/html') ?? ''
+  const plainText = dataTransfer?.getData('text/plain') ?? ''
+
+  return getPPTDeckFallbackHTMLSourceFromHTML(html) ??
+    getPPTDeckFallbackHTMLSourceFromHTML(plainText)
+}
+
+function getPPTDeckFallbackHTMLSourceFromHTML(
+  html: string,
+): PPTDeckHTMLFallbackSource | null {
+  if (
+    !html ||
+    typeof DOMParser === 'undefined' ||
+    typeof XMLSerializer === 'undefined'
+  ) {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const slideElements = [...doc.querySelectorAll<HTMLElement>(
+    'section.ppt-slide[data-ppt-slide], section[data-ppt-slide].ppt-slide',
+  )].filter((slide) => slide.querySelector('[data-ppt-element], .ppt-element'))
+
+  if (slideElements.length === 0) {
+    return null
+  }
+
+  const css = createPPTDeckFallbackHTMLSnapshotCSS(doc)
+  const title = doc.querySelector('title')?.textContent?.trim() ||
+    'PPT HTML Deck'
+  const slides = slideElements
+    .map((slide, index): PPTDeckHTMLFallbackSlideSource | null => {
+      const sourceSlideId =
+        slide.getAttribute('data-ppt-slide')?.trim() || undefined
+      const name =
+        slide.getAttribute('data-ppt-slide-name')?.trim() ||
+        (sourceSlideId ? `PPT ${sourceSlideId}` : `PPT Slide ${index + 1}`)
+      const svg = createPPTDeckFallbackHTMLSlideSVG({
+        css,
+        slide,
+        sourceSlideId,
+      })
+
+      return svg
+        ? {
+            htmlLength: slide.outerHTML.length,
+            name,
+            ...(sourceSlideId ? { sourceSlideId } : {}),
+            svg,
+          }
+        : null
+    })
+    .filter((slide): slide is PPTDeckHTMLFallbackSlideSource =>
+      slide !== null)
+
+  return slides.length > 0
+    ? {
+        htmlLength: html.length,
+        slides,
+        title,
+      }
+    : null
+}
+
+function createPPTDeckFallbackHTMLSnapshotCSS(doc: Document) {
+  const css = [...doc.querySelectorAll('style')]
+    .map((style) => style.textContent ?? '')
+    .filter(Boolean)
+    .join('\n')
+  const fallbackCSS = [
+    `*{box-sizing:border-box;}`,
+    `body{margin:0;}`,
+    `.ppt-slide{position:relative;width:${PPT_SLIDE_WIDTH}px;height:${PPT_SLIDE_HEIGHT}px;overflow:hidden;background:#fff;}`,
+    '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;}',
+    '.ppt-image{display:block;padding:0;}',
+  ].join('')
+
+  return [css, fallbackCSS].filter(Boolean).join('\n')
+}
+
+function createPPTDeckFallbackHTMLSlideSVG({
+  css,
+  slide,
+  sourceSlideId,
+}: {
+  css: string
+  slide: HTMLElement
+  sourceSlideId?: string
+}) {
+  const clone = slide.cloneNode(true) as HTMLElement
+
+  sanitizePPTDeckFallbackHTMLElement(clone)
+  clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+
+  const serializedSlide = new XMLSerializer().serializeToString(clone)
+  const sourceSlideAttr = sourceSlideId
+    ? ` data-ppt-deck-fallback-source-slide="${
+      escapePPTCanvasXmlAttribute(sourceSlideId)
+    }"`
+    : ''
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PPT_SLIDE_WIDTH}" height="${PPT_SLIDE_HEIGHT}" viewBox="0 0 ${PPT_SLIDE_WIDTH} ${PPT_SLIDE_HEIGHT}" data-ppt-deck-fallback-slide="true"${sourceSlideAttr}>`,
+    `<foreignObject width="${PPT_SLIDE_WIDTH}" height="${PPT_SLIDE_HEIGHT}">`,
+    '<div xmlns="http://www.w3.org/1999/xhtml">',
+    `<style><![CDATA[${escapePPTDeckFallbackStyleCDATA(css)}]]></style>`,
+    serializedSlide,
+    '</div>',
+    '</foreignObject>',
+    '</svg>',
+  ].join('')
+}
+
+function sanitizePPTDeckFallbackHTMLElement(root: HTMLElement) {
+  root
+    .querySelectorAll('script, iframe, object, embed, link, meta')
+    .forEach((element) => element.remove())
+
+  for (const element of [root, ...root.querySelectorAll('*')]) {
+    for (const attribute of [...element.attributes]) {
+      const name = attribute.name.toLowerCase()
+      const value = attribute.value.trim().toLowerCase()
+
+      if (
+        name.startsWith('on') ||
+        name === 'srcdoc' ||
+        ((name === 'href' || name === 'src') && value.startsWith('javascript:'))
+      ) {
+        element.removeAttribute(attribute.name)
+      }
+    }
+  }
+}
+
+function escapePPTDeckFallbackStyleCDATA(value: string) {
+  return value.replaceAll(']]>', ']]]]><![CDATA[>')
+}
+
 function createPPTSlideFromFallbackHTMLSource(
   deck: PPTDeck,
   source: PPTSlideClipboardFallbackHTMLSource,
@@ -10869,6 +11114,44 @@ function createPPTSlideFromFallbackHTMLSource(
     name: `${source.name} Snapshot`,
     notes: '',
   }
+}
+
+function createPPTSlidesFromDeckFallbackHTMLSource(
+  deck: PPTDeck,
+  source: PPTDeckHTMLFallbackSource,
+): PPTSlide[] {
+  const createId = createPPTCanvasSequentialIdFactory({
+    existingIds: deck.slides.map((slide) => slide.id),
+    startIndex: deck.slides.length + 1,
+  })
+
+  return source.slides.map((slideSource) => {
+    const id = createId('slide')
+    const imageId = `${id}-deck-snapshot`
+
+    return {
+      background: { color: '#ffffff' },
+      elements: [{
+        alt: slideSource.name,
+        fit: 'contain',
+        geometry: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+          x: 0,
+          y: 0,
+        },
+        id: imageId,
+        kind: 'image',
+        name: slideSource.name,
+        src: `data:image/svg+xml;charset=utf-8,${
+          encodeURIComponent(slideSource.svg)
+        }`,
+      }],
+      id,
+      name: `${slideSource.name} Snapshot`,
+      notes: '',
+    }
+  })
 }
 
 function createPPTRichClipboardFallback({
