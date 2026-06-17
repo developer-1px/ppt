@@ -5182,21 +5182,58 @@ function getPPTTextFormatPainterState(page, elementId) {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
     const layerName = document.querySelector(\`[data-ppt-layer-row="\${id}"] .ppt-layer-name\`)
     const paragraph = element?.querySelector('.ppt-text-paragraph')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
       bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
       color: element?.style.color ?? '',
+      fontFamily: element?.getAttribute('data-ppt-font-family') ?? '',
       fontSize: element?.style.fontSize ?? '',
+      fontWeight: element?.style.fontWeight ?? '',
       height: element?.style.height ?? '',
       left: element?.style.left ?? '',
       name: layerName?.textContent ?? '',
+      numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
       paragraphBullet: paragraph?.getAttribute('data-ppt-bullet') === 'true'
         ? paragraph.textContent ?? ''
         : '',
+      paragraphLineHeight: paragraph?.getAttribute('data-ppt-line-height') ?? '',
+      paragraphList: paragraph?.getAttribute('data-ppt-list') ?? '',
+      paragraphSpacingAfter: paragraph?.getAttribute('data-ppt-spacing-after') ?? '',
+      paragraphSpacingBefore: paragraph?.getAttribute('data-ppt-spacing-before') ?? '',
       selected: element?.getAttribute('data-selected') ?? '',
+      styleAlignItems: element?.style.alignItems ?? '',
+      styleClipboardCommand: stage?.getAttribute('data-ppt-style-clipboard-command') ?? '',
+      styleClipboardCommandApplications: stage?.getAttribute('data-ppt-style-clipboard-command-applications') ?? '',
+      styleClipboardCommandTargets: stage?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
+      styleClipboardCommandType: stage?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
+      styleFontFamily: element?.style.fontFamily ?? '',
+      stylePadding: element?.style.padding ?? '',
       text: element?.textContent ?? '',
       textAlign: element?.style.textAlign ?? '',
+      textInset: element?.getAttribute('data-ppt-text-inset') ?? '',
+      textStyleImportCategories: stage?.getAttribute('data-ppt-text-style-import-categories') ?? '',
+      textStyleImportColor: stage?.getAttribute('data-ppt-text-style-import-color') ?? '',
+      textStyleImportCommand: stage?.getAttribute('data-ppt-text-style-import-command') ?? '',
+      textStyleImportCommandTargets: stage?.getAttribute('data-ppt-text-style-import-command-targets') ?? '',
+      textStyleImportCommandType: stage?.getAttribute('data-ppt-text-style-import-command-type') ?? '',
+      textStyleImportFields: stage?.getAttribute('data-ppt-text-style-import-fields') ?? '',
+      textStyleImportFontFamily: stage?.getAttribute('data-ppt-text-style-import-font-family') ?? '',
+      textStyleImportFontSize: stage?.getAttribute('data-ppt-text-style-import-font-size') ?? '',
+      textStyleImportFontWeight: stage?.getAttribute('data-ppt-text-style-import-font-weight') ?? '',
+      textStyleImportFormat: stage?.getAttribute('data-ppt-text-style-import-format') ?? '',
+      textStyleImportJsonLength: stage?.getAttribute('data-ppt-text-style-import-json-length') ?? '',
+      textStyleImportModel: stage?.getAttribute('data-ppt-text-style-import-model') ?? '',
+      textStyleImportObjects: stage?.getAttribute('data-ppt-text-style-import-objects') ?? '',
+      textStyleImportParagraphAlign: stage?.getAttribute('data-ppt-text-style-import-paragraph-align') ?? '',
+      textStyleImportParagraphBullet: stage?.getAttribute('data-ppt-text-style-import-paragraph-bullet') ?? '',
+      textStyleImportParagraphLineHeight: stage?.getAttribute('data-ppt-text-style-import-paragraph-line-height') ?? '',
+      textStyleImportParagraphSpacingAfter: stage?.getAttribute('data-ppt-text-style-import-paragraph-spacing-after') ?? '',
+      textStyleImportParagraphSpacingBefore: stage?.getAttribute('data-ppt-text-style-import-paragraph-spacing-before') ?? '',
+      textStyleImportTextInset: stage?.getAttribute('data-ppt-text-style-import-text-inset') ?? '',
+      textStyleImportVerticalAlign: stage?.getAttribute('data-ppt-text-style-import-vertical-align') ?? '',
       top: element?.style.top ?? '',
+      verticalAlign: element?.getAttribute('data-ppt-vertical-align') ?? '',
       width: element?.style.width ?? '',
     }
   })(${JSON.stringify(elementId)})`)
@@ -5583,6 +5620,100 @@ async function runTextQuickFormatScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  const summaryBeforeTextStylePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textStyle: {
+        color: '#7c3aed',
+        fontFamily: 'Georgia',
+        fontSize: 34,
+        fontWeight: 'semibold',
+        paragraph: {
+          align: 'center',
+          bullet: 'numbered',
+          lineHeight: 1.32,
+          spacingAfter: 10,
+          spacingBefore: 4,
+        },
+        textInset: {
+          bottom: 12,
+          left: 14,
+          right: 10,
+          top: 8,
+        },
+        verticalAlign: 'middle',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextStylePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes JSON text style into selected PPT text object',
+    summaryBeforeTextStylePaste.text === summaryAfterTextStylePaste.text &&
+      summaryBeforeTextStylePaste.name === summaryAfterTextStylePaste.name &&
+      summaryBeforeTextStylePaste.left === summaryAfterTextStylePaste.left &&
+      summaryBeforeTextStylePaste.top === summaryAfterTextStylePaste.top &&
+      summaryBeforeTextStylePaste.width === summaryAfterTextStylePaste.width &&
+      summaryBeforeTextStylePaste.height === summaryAfterTextStylePaste.height &&
+      summaryAfterTextStylePaste.selected === 'true' &&
+      summaryAfterTextStylePaste.textStyleImportModel === 'ppt-text-style-import' &&
+      summaryAfterTextStylePaste.textStyleImportFormat === 'application-json-ppt-text-style' &&
+      summaryAfterTextStylePaste.textStyleImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextStylePaste.textStyleImportCommandTargets === 's1-summary' &&
+      summaryAfterTextStylePaste.textStyleImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextStylePaste.textStyleImportObjects === 's1-summary' &&
+      summaryAfterTextStylePaste.textStyleImportCategories.includes('object-effect') &&
+      summaryAfterTextStylePaste.textStyleImportCategories.includes('text-style') &&
+      summaryAfterTextStylePaste.textStyleImportFields === 'color fontSize fontFamily fontWeight verticalAlign textInset paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter' &&
+      summaryAfterTextStylePaste.textStyleImportColor === '#7c3aed' &&
+      summaryAfterTextStylePaste.textStyleImportFontFamily === 'Georgia' &&
+      summaryAfterTextStylePaste.textStyleImportFontSize === '34' &&
+      summaryAfterTextStylePaste.textStyleImportFontWeight === 'semibold' &&
+      summaryAfterTextStylePaste.textStyleImportVerticalAlign === 'middle' &&
+      summaryAfterTextStylePaste.textStyleImportTextInset === '8,10,12,14' &&
+      summaryAfterTextStylePaste.textStyleImportParagraphAlign === 'center' &&
+      summaryAfterTextStylePaste.textStyleImportParagraphBullet === 'numbered' &&
+      summaryAfterTextStylePaste.textStyleImportParagraphLineHeight === '1.32' &&
+      summaryAfterTextStylePaste.textStyleImportParagraphSpacingAfter === '10' &&
+      summaryAfterTextStylePaste.textStyleImportParagraphSpacingBefore === '4' &&
+      Number(summaryAfterTextStylePaste.textStyleImportJsonLength) > 180 &&
+      summaryAfterTextStylePaste.color === 'rgb(124, 58, 237)' &&
+      summaryAfterTextStylePaste.fontFamily === 'Georgia' &&
+      summaryAfterTextStylePaste.styleFontFamily.includes('Georgia') &&
+      summaryAfterTextStylePaste.fontSize === '34px' &&
+      summaryAfterTextStylePaste.fontWeight === '600' &&
+      summaryAfterTextStylePaste.verticalAlign === 'middle' &&
+      summaryAfterTextStylePaste.styleAlignItems === 'center' &&
+      summaryAfterTextStylePaste.textInset === '8,10,12,14' &&
+      summaryAfterTextStylePaste.stylePadding === '8px 10px 12px 14px' &&
+      summaryAfterTextStylePaste.textAlign === 'center' &&
+      summaryAfterTextStylePaste.numberedList === 'true' &&
+      summaryAfterTextStylePaste.paragraphList === 'numbered' &&
+      summaryAfterTextStylePaste.paragraphLineHeight === '1.32' &&
+      summaryAfterTextStylePaste.paragraphSpacingAfter === '10' &&
+      summaryAfterTextStylePaste.paragraphSpacingBefore === '4' &&
+      summaryAfterTextStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      summaryAfterTextStylePaste.styleClipboardCommandTargets === 's1-summary' &&
+      summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('s1-summary') &&
+      summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('text-style'),
+    {
+      summaryAfterTextStylePaste,
+      summaryBeforeTextStylePaste,
+    },
+  )
 
   await pressKey(page, {
     code: 'Escape',

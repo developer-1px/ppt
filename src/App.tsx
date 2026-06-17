@@ -1047,6 +1047,11 @@ const PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-shape-style' as const
 const PPT_SHAPE_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.shape-style+json'
+const PPT_TEXT_STYLE_IMPORT_MODEL = 'ppt-text-style-import' as const
+const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-style' as const
+const PPT_TEXT_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-style+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1256,6 +1261,35 @@ type PPTShapeStyleImportSource = {
     stroke?: PPTStroke
   }
 }
+type PPTTextStyleImportField =
+  | 'color'
+  | 'fontFamily'
+  | 'fontSize'
+  | 'fontWeight'
+  | 'paragraphAlign'
+  | 'paragraphBullet'
+  | 'paragraphLineHeight'
+  | 'paragraphSpacingAfter'
+  | 'paragraphSpacingBefore'
+  | 'textInset'
+  | 'verticalAlign'
+type PPTTextStyleImportText = Partial<Omit<PPTTextStyle, 'textInset'>> & {
+  textInset?: Partial<NonNullable<PPTTextStyle['textInset']>>
+}
+type PPTTextStyleImportParagraph = {
+  align?: PPTParagraph['align']
+  bullet?: PPTParagraph['bullet'] | null
+  lineHeight?: PPTParagraph['lineHeight']
+  spacingAfter?: PPTParagraph['spacingAfter']
+  spacingBefore?: PPTParagraph['spacingBefore']
+}
+type PPTTextStyleImportSource = {
+  fields: readonly PPTTextStyleImportField[]
+  format: typeof PPT_TEXT_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  paragraph?: PPTTextStyleImportParagraph
+  text?: PPTTextStyleImportText
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1432,6 +1466,28 @@ type PPTShapeStyleImportEffect = {
   strokeColor: string
   strokeDash: string
   strokeWidth: string
+}
+type PPTTextStyleImportEffect = {
+  categories: string
+  color: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  fontFamily: string
+  fontSize: string
+  fontWeight: string
+  format: typeof PPT_TEXT_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_STYLE_IMPORT_MODEL
+  objectIds: string
+  paragraphAlign: string
+  paragraphBullet: string
+  paragraphLineHeight: string
+  paragraphSpacingAfter: string
+  paragraphSpacingBefore: string
+  textInset: string
+  verticalAlign: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2470,6 +2526,8 @@ function App() {
     useState<PPTImageCropImportEffect | null>(null)
   const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
     useState<PPTShapeStyleImportEffect | null>(null)
+  const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
+    useState<PPTTextStyleImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3423,6 +3481,14 @@ function App() {
         getPPTShapeStyleSourceFromDataTransfer(event.clipboardData)
 
       if (shapeStyleSource && pastePPTShapeStyleSource(shapeStyleSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const textStyleSource =
+        getPPTTextStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (textStyleSource && pastePPTTextStyleSource(textStyleSource)) {
         event.preventDefault()
         return
       }
@@ -4526,6 +4592,112 @@ function App() {
     setStyleClipboard(styleClipboard)
     setLastStyleClipboardEffect(effect)
     setLastShapeStyleImportEffect(createPPTShapeStyleImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextStyleSource(source: PPTTextStyleImportSource) {
+    const textElements = selectedElements.filter(isPPTTextElement)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = textElements[0]
+    const categories: PPTStyleClipboardCategory[] = ['object']
+    const currentTextStyle = getPPTTextElementStyle(sourceElement)
+    const currentTextInset = getPPTTextElementInset(sourceElement)
+    let nextTextStyle: PPTTextStyle | undefined
+
+    if (source.text) {
+      const { textInset, ...textStyleFields } = source.text
+
+      nextTextStyle = clonePPTTextStyle({
+        ...currentTextStyle,
+        ...textStyleFields,
+        ...(textInset
+          ? {
+              textInset: {
+                ...currentTextInset,
+                ...textInset,
+              },
+            }
+          : {}),
+      })
+    }
+
+    const nextParagraph = getPPTTextStyleImportParagraph(
+      sourceElement,
+      source,
+    )
+
+    if (nextTextStyle) {
+      categories.push('text')
+    }
+
+    if (nextParagraph) {
+      categories.push('paragraph')
+    }
+
+    const styleClipboard: PPTStyleClipboard = {
+      categories,
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      ...(nextParagraph ? { paragraph: nextParagraph } : {}),
+      sourceId: 'ppt-text-style-json',
+      sourceKind: sourceElement.kind,
+      ...(nextTextStyle ? { text: nextTextStyle } : {}),
+      type: 'slide-style-clipboard',
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(textElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastTextStyleImportEffect(createPPTTextStyleImportEffect({
       effect,
       source,
     }))
@@ -9911,6 +10083,26 @@ function App() {
         data-ppt-shape-style-import-stroke-color={lastShapeStyleImportEffect?.strokeColor}
         data-ppt-shape-style-import-stroke-dash={lastShapeStyleImportEffect?.strokeDash}
         data-ppt-shape-style-import-stroke-width={lastShapeStyleImportEffect?.strokeWidth}
+        data-ppt-text-style-import-categories={lastTextStyleImportEffect?.categories}
+        data-ppt-text-style-import-color={lastTextStyleImportEffect?.color}
+        data-ppt-text-style-import-command={lastTextStyleImportEffect?.commandId}
+        data-ppt-text-style-import-command-targets={lastTextStyleImportEffect?.commandTargets}
+        data-ppt-text-style-import-command-type={lastTextStyleImportEffect?.commandType}
+        data-ppt-text-style-import-fields={lastTextStyleImportEffect?.fields}
+        data-ppt-text-style-import-font-family={lastTextStyleImportEffect?.fontFamily}
+        data-ppt-text-style-import-font-size={lastTextStyleImportEffect?.fontSize}
+        data-ppt-text-style-import-font-weight={lastTextStyleImportEffect?.fontWeight}
+        data-ppt-text-style-import-format={lastTextStyleImportEffect?.format}
+        data-ppt-text-style-import-json-length={lastTextStyleImportEffect?.jsonLength}
+        data-ppt-text-style-import-model={lastTextStyleImportEffect?.model}
+        data-ppt-text-style-import-objects={lastTextStyleImportEffect?.objectIds}
+        data-ppt-text-style-import-paragraph-align={lastTextStyleImportEffect?.paragraphAlign}
+        data-ppt-text-style-import-paragraph-bullet={lastTextStyleImportEffect?.paragraphBullet}
+        data-ppt-text-style-import-paragraph-line-height={lastTextStyleImportEffect?.paragraphLineHeight}
+        data-ppt-text-style-import-paragraph-spacing-after={lastTextStyleImportEffect?.paragraphSpacingAfter}
+        data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
+        data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
+        data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
         data-ppt-object-metadata-import-alt-text-length={lastObjectMetadataImportEffect?.altTextLength}
         data-ppt-object-metadata-import-alt-text-present={lastObjectMetadataImportEffect?.altTextPresent}
         data-ppt-object-metadata-import-command-fields={lastObjectMetadataImportEffect?.commandFields}
@@ -12658,6 +12850,95 @@ function createPPTShapeStyleImportEffect({
   }
 }
 
+function createPPTTextStyleImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTTextStyleImportSource
+}): PPTTextStyleImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+  const text = source.text
+  const paragraph = source.paragraph
+
+  return {
+    categories,
+    color: text?.color ?? '',
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    fontFamily: text?.fontFamily ?? '',
+    fontSize: text?.fontSize === undefined ? '' : String(text.fontSize),
+    fontWeight: text?.fontWeight ?? '',
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_STYLE_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+    paragraphAlign: paragraph?.align ?? '',
+    paragraphBullet: paragraph?.bullet ?? '',
+    paragraphLineHeight: paragraph?.lineHeight === undefined
+      ? ''
+      : String(paragraph.lineHeight),
+    paragraphSpacingAfter: paragraph?.spacingAfter === undefined
+      ? ''
+      : String(paragraph.spacingAfter),
+    paragraphSpacingBefore: paragraph?.spacingBefore === undefined
+      ? ''
+      : String(paragraph.spacingBefore),
+    textInset: text?.textInset
+      ? formatPPTTextStyleImportInsetData(text.textInset)
+      : '',
+    verticalAlign: text?.verticalAlign ?? '',
+  }
+}
+
+function formatPPTTextStyleImportInsetData(
+  inset: Partial<NonNullable<PPTTextStyle['textInset']>>,
+) {
+  return (['top', 'right', 'bottom', 'left'] as const)
+    .map((field) => inset[field] === undefined ? '' : String(inset[field]))
+    .join(',')
+}
+
+function getPPTTextStyleImportParagraph(
+  element: PPTTextElement,
+  source: PPTTextStyleImportSource,
+): PPTStyleClipboardParagraph | undefined {
+  const importedParagraph = source.paragraph
+
+  if (!importedParagraph) {
+    return undefined
+  }
+
+  const paragraph = element.textBody.paragraphs[0]
+  const bullet = source.fields.includes('paragraphBullet')
+    ? importedParagraph.bullet ?? undefined
+    : paragraph?.bullet
+
+  return {
+    align: importedParagraph.align ?? paragraph?.align ?? 'left',
+    ...(bullet ? { bullet } : {}),
+    lineHeight: importedParagraph.lineHeight ??
+      (paragraph
+        ? getPPTParagraphLineHeight(paragraph)
+        : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT),
+    spacingAfter: importedParagraph.spacingAfter ??
+      (paragraph ? getPPTParagraphSpacingAfter(paragraph) : 0),
+    spacingBefore: importedParagraph.spacingBefore ??
+      (paragraph ? getPPTParagraphSpacingBefore(paragraph) : 0),
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -14151,6 +14432,315 @@ function getPPTShapeStyleCornerRadiusFromJSONValue(value: unknown) {
   }
 
   return normalizePPTShapeCornerRadius(value)
+}
+
+function getPPTTextStyleSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_STYLE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextStyleSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextStyleSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextStyleImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextStyleSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextStyleSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextStyleImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.textStyle)
+    ? value.textStyle
+    : allowDirect
+      ? value
+      : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const text: PPTTextStyleImportText = {}
+  const paragraph: PPTTextStyleImportParagraph = {}
+  const fields: PPTTextStyleImportField[] = []
+  const paragraphValue = isPPTRecord(payloadValue.paragraph)
+    ? payloadValue.paragraph
+    : isPPTRecord(payloadValue.paragraphStyle)
+      ? payloadValue.paragraphStyle
+      : payloadValue
+  const color = getPPTTextStyleColorFromJSONValue(payloadValue.color)
+  const fontSize = getPPTTextStyleFontSizeFromJSONValue(
+    payloadValue.fontSize ?? payloadValue.size,
+  )
+  const fontFamily = getPPTTextStyleFontFamilyFromJSONValue(
+    payloadValue.fontFamily ?? payloadValue.font,
+  )
+  const fontWeight = getPPTTextStyleFontWeightFromJSONValue(
+    payloadValue.fontWeight ?? payloadValue.weight,
+  ) ?? getPPTTextStyleBoldFromJSONValue(payloadValue.bold)
+  const verticalAlign = getPPTTextStyleVerticalAlignFromJSONValue(
+    payloadValue.verticalAlign,
+  )
+  const textInset = getPPTTextStyleInsetFromJSONValue(
+    payloadValue.textInset ?? payloadValue.inset,
+  )
+  const align = getPPTTextStyleParagraphAlignFromJSONValue(
+    paragraphValue.align,
+  )
+  const bullet = getPPTTextStyleParagraphBulletFromJSONValue(
+    paragraphValue.bullet ?? paragraphValue.list,
+  )
+  const lineHeight = getPPTTextStyleParagraphLineHeightFromJSONValue(
+    paragraphValue.lineHeight,
+  )
+  const spacingBefore = getPPTTextStyleParagraphSpacingFromJSONValue(
+    paragraphValue.spacingBefore,
+  )
+  const spacingAfter = getPPTTextStyleParagraphSpacingFromJSONValue(
+    paragraphValue.spacingAfter,
+  )
+
+  if (color !== undefined) {
+    text.color = color
+    fields.push('color')
+  }
+
+  if (fontSize !== undefined) {
+    text.fontSize = fontSize
+    fields.push('fontSize')
+  }
+
+  if (fontFamily !== undefined) {
+    text.fontFamily = fontFamily
+    fields.push('fontFamily')
+  }
+
+  if (fontWeight !== undefined) {
+    text.fontWeight = fontWeight
+    fields.push('fontWeight')
+  }
+
+  if (verticalAlign !== undefined) {
+    text.verticalAlign = verticalAlign
+    fields.push('verticalAlign')
+  }
+
+  if (textInset !== undefined) {
+    text.textInset = textInset
+    fields.push('textInset')
+  }
+
+  if (align !== undefined) {
+    paragraph.align = align
+    fields.push('paragraphAlign')
+  }
+
+  if (bullet !== undefined) {
+    paragraph.bullet = bullet
+    fields.push('paragraphBullet')
+  }
+
+  if (lineHeight !== undefined) {
+    paragraph.lineHeight = lineHeight
+    fields.push('paragraphLineHeight')
+  }
+
+  if (spacingBefore !== undefined) {
+    paragraph.spacingBefore = spacingBefore
+    fields.push('paragraphSpacingBefore')
+  }
+
+  if (spacingAfter !== undefined) {
+    paragraph.spacingAfter = spacingAfter
+    fields.push('paragraphSpacingAfter')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_TEXT_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        ...(Object.keys(paragraph).length > 0 ? { paragraph } : {}),
+        ...(Object.keys(text).length > 0 ? { text } : {}),
+      }
+    : null
+}
+
+function getPPTTextStyleColorFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  return normalizePPTSwatchColor(value) || undefined
+}
+
+function getPPTTextStyleFontSizeFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return clampPPTCanvasValue(
+    value,
+    PPT_TEXT_FONT_SIZE_MIN,
+    PPT_TEXT_FONT_SIZE_MAX,
+  )
+}
+
+function getPPTTextStyleFontFamilyFromJSONValue(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+
+  return normalizePPTTextFontFamily(value)
+}
+
+function getPPTTextStyleFontWeightFromJSONValue(
+  value: unknown,
+): PPTTextStyle['fontWeight'] | undefined {
+  return value === 'regular' || value === 'semibold' || value === 'bold'
+    ? value
+    : undefined
+}
+
+function getPPTTextStyleBoldFromJSONValue(
+  value: unknown,
+): PPTTextStyle['fontWeight'] | undefined {
+  if (typeof value !== 'boolean') {
+    return undefined
+  }
+
+  return value ? 'bold' : 'regular'
+}
+
+function getPPTTextStyleVerticalAlignFromJSONValue(
+  value: unknown,
+): PPTTextVerticalAlign | undefined {
+  return value === 'top' || value === 'middle' || value === 'bottom'
+    ? value
+    : undefined
+}
+
+function getPPTTextStyleInsetFromJSONValue(
+  value: unknown,
+): Partial<NonNullable<PPTTextStyle['textInset']>> | undefined {
+  if (!isPPTRecord(value)) {
+    return undefined
+  }
+
+  const inset: Partial<NonNullable<PPTTextStyle['textInset']>> = {}
+
+  for (const field of ['top', 'right', 'bottom', 'left'] as const) {
+    const fieldValue = value[field]
+
+    if (typeof fieldValue === 'number' && Number.isFinite(fieldValue)) {
+      inset[field] = normalizePPTTextInset(fieldValue)
+    }
+  }
+
+  return Object.keys(inset).length > 0 ? inset : undefined
+}
+
+function getPPTTextStyleParagraphAlignFromJSONValue(
+  value: unknown,
+): PPTParagraph['align'] | undefined {
+  return value === 'left' || value === 'center' || value === 'right'
+    ? value
+    : undefined
+}
+
+function getPPTTextStyleParagraphBulletFromJSONValue(
+  value: unknown,
+): PPTParagraph['bullet'] | null | undefined {
+  if (value === null || value === false || value === 'none') {
+    return null
+  }
+
+  if (value === true) {
+    return 'bullet'
+  }
+
+  return value === 'bullet' || value === 'numbered'
+    ? value
+    : undefined
+}
+
+function getPPTTextStyleParagraphLineHeightFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTParagraphLineHeight(value)
+}
+
+function getPPTTextStyleParagraphSpacingFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTParagraphSpacing(value)
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
