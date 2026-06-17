@@ -523,6 +523,7 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  CANVAS_MARQUEE_SELECTION_MODEL,
   EMPTY_CANVAS_SNAP_GUIDES,
   canFlipCanvasSelectionItems,
   getCanvasFullySelectedItemGroupIds,
@@ -7831,7 +7832,7 @@ function App() {
           : undefined}
         data-ppt-marquee-h={marqueeBounds?.h}
         data-ppt-marquee-history="none"
-        data-ppt-marquee-model="canvas-marquee-selection"
+        data-ppt-marquee-model={CANVAS_MARQUEE_SELECTION_MODEL}
         data-ppt-marquee-selection={marqueeSelection?.join(' ') ?? undefined}
         data-ppt-marquee-w={marqueeBounds?.w}
         data-ppt-marquee-x={marqueeBounds?.x}
