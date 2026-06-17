@@ -15,6 +15,10 @@ import {
   toSlideEditObjectOpacityAttributeValue,
 } from '@interactive-os/slide-edit-affordance'
 import {
+  createCanvasSvgFreehandPathData,
+  createCanvasSvgPathData,
+} from 'canvas/renderer/svg-drawing-primitives'
+import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTComment,
@@ -1038,12 +1042,12 @@ function getPPTLinePath(element: PPTLine) {
   const bend = Math.min(0.92, Math.max(0.08, element.routeBend ?? 0.5))
   const bendX = element.start.x + (element.end.x - element.start.x) * bend
 
-  return [
-    `M ${element.start.x} ${element.start.y}`,
-    `L ${bendX} ${element.start.y}`,
-    `L ${bendX} ${element.end.y}`,
-    `L ${element.end.x} ${element.end.y}`,
-  ].join(' ')
+  return createCanvasSvgPathData([
+    { x: element.start.x, y: element.start.y },
+    { x: bendX, y: element.start.y },
+    { x: bendX, y: element.end.y },
+    { x: element.end.x, y: element.end.y },
+  ])
 }
 
 function getPPTLineSVGPath(element: PPTLine) {
@@ -1056,53 +1060,18 @@ function getPPTLineSVGPath(element: PPTLine) {
     { x: element.end.x, y: element.end.y },
   ].map((point) => getPPTLineWorldPoint(element, point))
 
-  return [
-    `M ${formatNumber(points[0].x)} ${formatNumber(points[0].y)}`,
-    `L ${formatNumber(points[1].x)} ${formatNumber(points[1].y)}`,
-    `L ${formatNumber(points[2].x)} ${formatNumber(points[2].y)}`,
-    `L ${formatNumber(points[3].x)} ${formatNumber(points[3].y)}`,
-  ].join(' ')
+  return createCanvasSvgPathData(points)
 }
 
 function getPPTFreeformWorldPathData(element: PPTFreeform) {
-  return getPPTFreeformPathData(element.points.map((point) => ({
+  return createCanvasSvgFreehandPathData(element.points.map((point) => ({
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
   })))
 }
 
 function getPPTFreeformPathData(points: readonly PPTLinePoint[]) {
-  const [first, second, ...rest] = points
-
-  if (!first) {
-    return ''
-  }
-
-  if (!second) {
-    return `M ${formatNumber(first.x)} ${formatNumber(first.y)}`
-  }
-
-  if (rest.length === 0) {
-    return [
-      `M ${formatNumber(first.x)} ${formatNumber(first.y)}`,
-      `L ${formatNumber(second.x)} ${formatNumber(second.y)}`,
-    ].join(' ')
-  }
-
-  return [
-    `M ${formatNumber(first.x)} ${formatNumber(first.y)}`,
-    `Q ${formatNumber(second.x)} ${formatNumber(second.y)} ${getPPTPathMidpoint(second, rest[0])}`,
-    ...rest.slice(1).map((point, index) => {
-      const control = rest[index]
-
-      return `Q ${formatNumber(control.x)} ${formatNumber(control.y)} ${getPPTPathMidpoint(control, point)}`
-    }),
-    `L ${formatNumber(rest[rest.length - 1].x)} ${formatNumber(rest[rest.length - 1].y)}`,
-  ].join(' ')
-}
-
-function getPPTPathMidpoint(a: PPTLinePoint, b: PPTLinePoint) {
-  return `${formatNumber((a.x + b.x) / 2)} ${formatNumber((a.y + b.y) / 2)}`
+  return createCanvasSvgFreehandPathData(points)
 }
 
 function getPPTLineWorldPoint(line: PPTLine, point: PPTLinePoint) {
