@@ -344,6 +344,7 @@ import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   PPT_TITLE_BODY_LAYOUT_ID,
+  PPTDeckSchema,
   PPTElementSchema,
   PPTSlideSchema,
   createPPTElementId,
@@ -998,6 +999,8 @@ const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
 const PPT_HTML_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.html-export+json'
+const PPT_DECK_HTML_IMPORT_MODEL = 'ppt-deck-html-import' as const
+const PPT_DECK_HTML_IMPORT_FORMAT = 'text-html-ppt-deck' as const
 const PPT_SLIDE_SVG_CLIPBOARD_MODEL = 'canvas-rich-slide-svg-clipboard' as const
 const PPT_SLIDE_SVG_CLIPBOARD_KIND = 'interactive-os.ppt.slide-svg-export' as const
 const PPT_SLIDE_SVG_CLIPBOARD_VERSION = 1
@@ -1085,6 +1088,20 @@ type PPTHTMLClipboardEffect = {
   model: typeof PPT_HTML_CLIPBOARD_MODEL
   sourceSlideId: string
   writeMode?: PPTRichClipboardWriteMode
+}
+type PPTDeckHTMLImportSource = {
+  deck: PPTDeck
+  htmlLength: number
+}
+type PPTDeckHTMLImportEffect = {
+  firstImportedSlideId: string
+  format: typeof PPT_DECK_HTML_IMPORT_FORMAT
+  htmlLength: number
+  importedSlideCount: number
+  model: typeof PPT_DECK_HTML_IMPORT_MODEL
+  sourceDeckId: string
+  sourceSlideCount: number
+  sourceTitle: string
 }
 type PPTSlideSVGClipboardEffect = {
   jsonMimeType: typeof PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE
@@ -2086,6 +2103,8 @@ function App() {
   const [lastSlideClipboardEffect, setLastSlideClipboardEffect] =
     useState<PPTSlideClipboardEffect | null>(null)
   const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
+  const [lastDeckHTMLImportEffect, setLastDeckHTMLImportEffect] =
+    useState<PPTDeckHTMLImportEffect | null>(null)
   const [lastSlideSVGClipboardEffect, setLastSlideSVGClipboardEffect] =
     useState<PPTSlideSVGClipboardEffect | null>(null)
   const [lastSelectionSVGClipboardEffect, setLastSelectionSVGClipboardEffect] =
@@ -2912,6 +2931,14 @@ function App() {
         return
       }
 
+      const deckHTMLSource =
+        getPPTDeckHTMLSourceFromDataTransfer(event.clipboardData)
+
+      if (deckHTMLSource && pastePPTDeckHTMLSource(deckHTMLSource)) {
+        event.preventDefault()
+        return
+      }
+
       const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
 
       if (richClipboard && pasteClipboardPayload(richClipboard.payload, {
@@ -3413,6 +3440,63 @@ function App() {
     })
 
     return pastedSlide !== null
+  }
+
+  function pastePPTDeckHTMLSource(source: PPTDeckHTMLImportSource) {
+    let pastedSlides: PPTSlide[] = []
+
+    commitDeck((current) => {
+      const targetSlideId = current.slides.some((slide) =>
+        slide.id === activeSlide.id)
+        ? activeSlide.id
+        : current.slides.at(-1)?.id
+
+      if (!targetSlideId) {
+        return current
+      }
+
+      const importedSlides = clonePPTDeckSlidesForImport(
+        current,
+        source.deck.slides,
+      )
+
+      if (importedSlides.length === 0) {
+        return current
+      }
+
+      let slides = current.slides
+      let anchorSlideId = targetSlideId
+
+      for (const slide of importedSlides) {
+        const result = insertPPTSlideAtTargetPlacement({
+          placement: 'after',
+          slide,
+          slides,
+          targetSlideId: anchorSlideId,
+        })
+
+        if (!result) {
+          return current
+        }
+
+        slides = result.items
+        anchorSlideId = slide.id
+      }
+
+      pastedSlides = importedSlides
+      setLastDeckHTMLImportEffect(createPPTDeckHTMLImportEffect({
+        importedSlides,
+        source,
+      }))
+      selectSlide(importedSlides[0].id)
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+
+    return pastedSlides.length > 0
   }
 
   function deleteActiveSlide() {
@@ -8385,6 +8469,14 @@ function App() {
         data-ppt-html-clipboard-model={lastHTMLClipboardEffect?.model}
         data-ppt-html-clipboard-source-slide={lastHTMLClipboardEffect?.sourceSlideId}
         data-ppt-html-clipboard-write-mode={lastHTMLClipboardEffect?.writeMode}
+        data-ppt-deck-html-import-first-slide={lastDeckHTMLImportEffect?.firstImportedSlideId}
+        data-ppt-deck-html-import-format={lastDeckHTMLImportEffect?.format}
+        data-ppt-deck-html-import-html-length={lastDeckHTMLImportEffect?.htmlLength}
+        data-ppt-deck-html-import-imported-count={lastDeckHTMLImportEffect?.importedSlideCount}
+        data-ppt-deck-html-import-model={lastDeckHTMLImportEffect?.model}
+        data-ppt-deck-html-import-source-deck={lastDeckHTMLImportEffect?.sourceDeckId}
+        data-ppt-deck-html-import-source-slide-count={lastDeckHTMLImportEffect?.sourceSlideCount}
+        data-ppt-deck-html-import-source-title={lastDeckHTMLImportEffect?.sourceTitle}
         data-ppt-slide-svg-clipboard-json-mime-type={lastSlideSVGClipboardEffect?.jsonMimeType}
         data-ppt-slide-svg-clipboard-model={lastSlideSVGClipboardEffect?.model}
         data-ppt-slide-svg-clipboard-source-slide={lastSlideSVGClipboardEffect?.sourceSlideId}
@@ -10511,6 +10603,25 @@ function createPPTHTMLClipboardEffect({
   }
 }
 
+function createPPTDeckHTMLImportEffect({
+  importedSlides,
+  source,
+}: {
+  importedSlides: readonly PPTSlide[]
+  source: PPTDeckHTMLImportSource
+}): PPTDeckHTMLImportEffect {
+  return {
+    firstImportedSlideId: importedSlides[0]?.id ?? '',
+    format: PPT_DECK_HTML_IMPORT_FORMAT,
+    htmlLength: source.htmlLength,
+    importedSlideCount: importedSlides.length,
+    model: PPT_DECK_HTML_IMPORT_MODEL,
+    sourceDeckId: source.deck.id,
+    sourceSlideCount: source.deck.slides.length,
+    sourceTitle: source.deck.title,
+  }
+}
+
 function createPPTSlideSVGClipboardEffect({
   sourceSlideId,
   svg,
@@ -10683,6 +10794,49 @@ function getPPTSlideFallbackHTMLSourceFromHTML(
     name,
     ...(sourceSlideId ? { sourceSlideId } : {}),
     svg: svg.outerHTML,
+  }
+}
+
+function getPPTDeckHTMLSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  const html = dataTransfer?.getData('text/html') ?? ''
+  const plainText = dataTransfer?.getData('text/plain') ?? ''
+
+  return getPPTDeckHTMLSourceFromHTML(html) ??
+    getPPTDeckHTMLSourceFromHTML(plainText)
+}
+
+function getPPTDeckHTMLSourceFromHTML(
+  html: string,
+): PPTDeckHTMLImportSource | null {
+  if (!html || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const script = doc.querySelector<HTMLScriptElement>(
+    'script[type="application/json"][data-ppt-deck],script[data-ppt-deck]',
+  )
+  const json = script?.textContent?.trim() ?? ''
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    const parsed = PPTDeckSchema.safeParse(JSON.parse(json))
+
+    if (!parsed.success) {
+      return null
+    }
+
+    return {
+      deck: parsed.data,
+      htmlLength: html.length,
+    }
+  } catch {
+    return null
   }
 }
 
@@ -18962,6 +19116,18 @@ function createPPTSlideId(deck: PPTDeck) {
   })('slide')
 }
 
+function clonePPTDeckSlidesForImport(
+  deck: PPTDeck,
+  slides: readonly PPTSlide[],
+) {
+  const createId = createPPTCanvasSequentialIdFactory({
+    existingIds: deck.slides.map((slide) => slide.id),
+    startIndex: deck.slides.length + 1,
+  })
+
+  return slides.map((slide) => clonePPTSlide(slide, createId('slide')))
+}
+
 function normalizePPTCommentBody(value: string) {
   return value.slice(0, PPT_COMMENT_BODY_MAX_LENGTH)
 }
@@ -19023,16 +19189,79 @@ function toPPTCommentThreadHostCommandEffect(
 }
 
 function clonePPTSlide(slide: PPTSlide, id: string): PPTSlide {
+  const elementIdBySourceId = new Map<string, string>()
+  const elements = slide.elements.map((element, index) => {
+    const nextId = createPPTSlideElementId(id, element, index)
+
+    elementIdBySourceId.set(element.id, nextId)
+
+    return {
+      ...element,
+      id: nextId,
+      name: element.name,
+    }
+  })
+
   return {
     ...slide,
-    elements: slide.elements.map((element, index) => ({
-      ...element,
-      id: createPPTSlideElementId(id, element, index),
-      name: element.name,
-    })),
+    elements: elements.map((element) =>
+      remapPPTSlideCloneElementReferences(element, elementIdBySourceId)),
     id,
     name: `${slide.name} Copy`,
   }
+}
+
+function remapPPTSlideCloneElementReferences(
+  element: PPTElement,
+  elementIdBySourceId: ReadonlyMap<string, string>,
+): PPTElement {
+  if (element.kind !== 'line') {
+    return element
+  }
+
+  const startConnection = remapPPTSlideCloneLineConnection(
+    element.startConnection,
+    elementIdBySourceId,
+  )
+  const endConnection = remapPPTSlideCloneLineConnection(
+    element.endConnection,
+    elementIdBySourceId,
+  )
+  const next: PPTLine = {
+    ...element,
+  }
+
+  if (startConnection) {
+    next.startConnection = startConnection
+  } else {
+    delete next.startConnection
+  }
+
+  if (endConnection) {
+    next.endConnection = endConnection
+  } else {
+    delete next.endConnection
+  }
+
+  return next
+}
+
+function remapPPTSlideCloneLineConnection(
+  connection: PPTLineConnection | undefined,
+  elementIdBySourceId: ReadonlyMap<string, string>,
+): PPTLineConnection | undefined {
+  if (!connection) {
+    return undefined
+  }
+
+  const elementId = elementIdBySourceId.get(connection.elementId)
+
+  return elementId
+    ? {
+        ...connection,
+        elementId,
+      }
+    : undefined
 }
 
 function createPPTSlideElementId(

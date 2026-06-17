@@ -6042,6 +6042,84 @@ async function runExportScenario(page) {
     htmlClipboardState,
   )
 
+  const beforeDeckHTMLPaste = await page.eval(`(() => ({
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  await page.eval(`(() => {
+    const html = document.querySelector('.ppt-export-code')?.value ?? ''
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', html)
+    dataTransfer.setData('text/plain', html)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const deckHTMLImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-html-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-html-import-format') ?? '',
+      htmlLength: Number(stage?.getAttribute('data-ppt-deck-html-import-html-length') ?? 0),
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-html-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-html-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-html-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-html-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-html-import-source-title') ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes PPT HTML export back as imported deck slides',
+    deckHTMLImportState.model === 'ppt-deck-html-import' &&
+      deckHTMLImportState.format === 'text-html-ppt-deck' &&
+      deckHTMLImportState.sourceDeck === 'deck-ai-retouch' &&
+      deckHTMLImportState.sourceTitle === 'AI Retouch Demo' &&
+      deckHTMLImportState.sourceSlideCount === beforeDeckHTMLPaste.slideCount &&
+      deckHTMLImportState.importedCount === beforeDeckHTMLPaste.slideCount &&
+      deckHTMLImportState.slideCount === beforeDeckHTMLPaste.slideCount * 2 &&
+      deckHTMLImportState.activeSlide === deckHTMLImportState.firstImportedSlideId &&
+      deckHTMLImportState.activeName.includes('Copy') &&
+      deckHTMLImportState.htmlLength > 1000,
+    {
+      beforeDeckHTMLPaste,
+      deckHTMLImportState,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckHTMLPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT HTML deck paste probes before export scenario continues',
+    afterDeckHTMLPasteCleanup.activeSlide === 'slide-1' &&
+      afterDeckHTMLPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterDeckHTMLPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
   await page.eval(`(() => {
     window.__pptClipboardItemTypes = []
     window.__pptClipboardWriteCount = 0
@@ -6148,7 +6226,13 @@ async function runExportScenario(page) {
   record('exports PPT placeholder visibility metadata into slide SVG', slideSvgState.hasPlaceholderVisibility, slideSvgState)
   record('exports PPT slide transition metadata into slide SVG', slideSvgState.hasTransition, slideSvgState)
 
-  const imageId = await page.eval(`(() => [...document.querySelectorAll('[data-kind="image"]')].at(-1)?.getAttribute('data-ppt-element') ?? '')()`)
+  const imageId = await page.eval(`(() => {
+    const image =
+      document.querySelector('[data-kind="image"][data-ppt-image-fit="contain"][data-ppt-image-crop-x="25"][data-ppt-image-crop-y="70"][data-ppt-flip-h="true"]') ??
+      [...document.querySelectorAll('[data-kind="image"]')].at(-1)
+
+    return image?.getAttribute('data-ppt-element') ?? ''
+  })()`)
   await selectPPTLayerRows(page, [imageId])
   await delay(80)
 
