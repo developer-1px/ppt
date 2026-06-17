@@ -1103,6 +1103,11 @@ const PPT_TABLE_CLIPBOARD_KIND = 'interactive-os.ppt.table-export' as const
 const PPT_TABLE_CLIPBOARD_VERSION = 1
 const PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.table-export+json'
+const PPT_TABLE_ROWS_IMPORT_MODEL = 'ppt-table-rows-import' as const
+const PPT_TABLE_ROWS_JSON_IMPORT_FORMAT =
+  'application-json-ppt-table-rows' as const
+const PPT_TABLE_ROWS_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.table-rows+json'
 const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
@@ -1608,6 +1613,20 @@ type PPTTableClipboardEffect = {
   rowCount: number
   sourceSlideId: string
   writeMode?: PPTRichClipboardWriteMode
+}
+type PPTTableRowsImportSource = {
+  format: typeof PPT_TABLE_ROWS_JSON_IMPORT_FORMAT
+  jsonLength: number
+  rows: readonly (readonly string[])[]
+}
+type PPTTableRowsImportEffect = {
+  columnCount: number
+  commandTargets: string
+  format: typeof PPT_TABLE_ROWS_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TABLE_ROWS_IMPORT_MODEL
+  objectIds: string
+  rowCount: number
 }
 type PPTStyleClipboardCategory =
   | 'object'
@@ -2630,6 +2649,8 @@ function App() {
     useState<PPTSelectionSVGClipboardEffect | null>(null)
   const [lastTableClipboardEffect, setLastTableClipboardEffect] =
     useState<PPTTableClipboardEffect | null>(null)
+  const [lastTableRowsImportEffect, setLastTableRowsImportEffect] =
+    useState<PPTTableRowsImportEffect | null>(null)
   const [lastFallbackHTMLImportEffect, setLastFallbackHTMLImportEffect] =
     useState<PPTFallbackHTMLImportEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
@@ -3574,6 +3595,14 @@ function App() {
         getPPTTextBodySourceFromDataTransfer(event.clipboardData)
 
       if (textBodySource && pastePPTTextBodySource(textBodySource)) {
+        event.preventDefault()
+        return
+      }
+
+      const tableRowsSource =
+        getPPTTableRowsSourceFromDataTransfer(event.clipboardData)
+
+      if (tableRowsSource && pastePPTTableRowsSource(tableRowsSource)) {
         event.preventDefault()
         return
       }
@@ -4662,6 +4691,41 @@ function App() {
                 ...element,
                 textBody: clonePPTTextBody(source.textBody),
               }
+            : element,
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTableRowsSource(source: PPTTableRowsImportSource) {
+    const rows = normalizePPTTableRows(source.rows)
+    const objectIds = activeSlide.elements
+      .filter((element) =>
+        selection.includes(element.id) &&
+        element.kind === 'table' &&
+        element.locked !== true &&
+        element.visible !== false)
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    setLastTableRowsImportEffect(createPPTTableRowsImportEffect({
+      objectIds,
+      rows,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          objectIds,
+          (element) => element.kind === 'table'
+            ? { ...element, rows }
             : element,
         ),
       })))
@@ -10274,6 +10338,13 @@ function App() {
         data-ppt-table-clipboard-rows={lastTableClipboardEffect?.rowCount}
         data-ppt-table-clipboard-source-slide={lastTableClipboardEffect?.sourceSlideId}
         data-ppt-table-clipboard-write-mode={lastTableClipboardEffect?.writeMode}
+        data-ppt-table-rows-import-cols={lastTableRowsImportEffect?.columnCount}
+        data-ppt-table-rows-import-command-targets={lastTableRowsImportEffect?.commandTargets}
+        data-ppt-table-rows-import-format={lastTableRowsImportEffect?.format}
+        data-ppt-table-rows-import-json-length={lastTableRowsImportEffect?.jsonLength}
+        data-ppt-table-rows-import-model={lastTableRowsImportEffect?.model}
+        data-ppt-table-rows-import-objects={lastTableRowsImportEffect?.objectIds}
+        data-ppt-table-rows-import-rows={lastTableRowsImportEffect?.rowCount}
         data-ppt-rich-clipboard-formats={lastRichClipboardEffect?.formats.join(' ')}
         data-ppt-rich-clipboard-html-length={lastRichClipboardEffect?.htmlLength}
         data-ppt-rich-clipboard-import-format={lastRichClipboardEffect?.importFormat}
@@ -13458,6 +13529,26 @@ function createPPTTableClipboardEffect({
   }
 }
 
+function createPPTTableRowsImportEffect({
+  objectIds,
+  rows,
+  source,
+}: {
+  objectIds: readonly string[]
+  rows: readonly (readonly string[])[]
+  source: PPTTableRowsImportSource
+}): PPTTableRowsImportEffect {
+  return {
+    columnCount: getPPTTableColumnCount(rows),
+    commandTargets: objectIds.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TABLE_ROWS_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    rowCount: rows.length,
+  }
+}
+
 function createPPTRichClipboardExportPayload(
   payload: PPTClipboardPayload,
 ): PPTRichClipboardExportPayload {
@@ -15634,6 +15725,211 @@ function normalizePPTImportedTextBody(body: PPTTextBody): PPTTextBody {
         : [{ text: '' }],
     })),
   }
+}
+
+function getPPTTableRowsSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TABLE_ROWS_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTableRowsSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTableRowsSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTableRowsImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTableRowsSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTableRowsSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTableRowsImportSource | null {
+  const rows = getPPTTableRowsFromJSONValue(
+    getPPTTableRowsPayloadValue(value, allowDirect),
+  )
+
+  return rows
+    ? {
+        format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+        jsonLength,
+        rows: normalizePPTTableRows(rows),
+      }
+    : null
+}
+
+function getPPTTableRowsPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (Array.isArray(value.tableRows) || isPPTRecord(value.tableRows)) {
+    return value.tableRows
+  }
+
+  if (isPPTRecord(value.table) && Array.isArray(value.table.rows)) {
+    return value.table
+  }
+
+  if (Array.isArray(value.rows)) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTTableRowsFromJSONValue(
+  value: unknown,
+): readonly (readonly string[])[] | null {
+  if (Array.isArray(value)) {
+    return getPPTTableRowsFromJSONArray(value)
+  }
+
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  const rowsValue = value.rows
+  const columns = getPPTTableColumnsFromJSONValue(
+    value.columns ?? value.headers,
+  )
+  const rows = Array.isArray(rowsValue)
+    ? getPPTTableRowsFromJSONArray(rowsValue, columns)
+    : null
+
+  if (!rows) {
+    return null
+  }
+
+  return columns.length > 0
+    ? [columns, ...rows]
+    : rows
+}
+
+function getPPTTableRowsFromJSONArray(
+  value: readonly unknown[],
+  columns: readonly string[] = [],
+): readonly (readonly string[])[] | null {
+  const rows = value
+    .map((row) => getPPTTableRowFromJSONValue(row, columns))
+    .filter((row): row is string[] => row !== null)
+
+  return isPPTTableRowsJSONValue(rows) ? rows : null
+}
+
+function getPPTTableColumnsFromJSONValue(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .map(getPPTTableCellFromJSONValue)
+        .filter((cell) => cell.trim().length > 0)
+    : []
+}
+
+function getPPTTableRowFromJSONValue(
+  value: unknown,
+  columns: readonly string[],
+) {
+  if (Array.isArray(value)) {
+    const row = value.map(getPPTTableCellFromJSONValue)
+
+    return row.some((cell) => cell.trim().length > 0) ? row : null
+  }
+
+  if (isPPTRecord(value)) {
+    const keys = columns.length > 0 ? columns : Object.keys(value)
+    const row = keys.map((key) => getPPTTableCellFromJSONValue(value[key]))
+
+    return row.some((cell) => cell.trim().length > 0) ? row : null
+  }
+
+  return null
+}
+
+function getPPTTableCellFromJSONValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  return typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+    ? String(value)
+    : ''
+}
+
+function isPPTTableRowsJSONValue(
+  rows: readonly (readonly string[])[],
+) {
+  return rows.length > 0 &&
+    rows.some((row) => row.some((cell) => cell.trim().length > 0)) &&
+    getPPTTableColumnCount(rows) > 0
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(

@@ -10760,6 +10760,79 @@ async function runTableImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      tableRows: {
+        columns: ['Metric', 'Actual', 'Target'],
+        rows: [
+          { Metric: 'Revenue', Actual: '12', Target: '15' },
+          { Metric: 'Margin', Actual: '45%', Target: '50%' },
+          { Metric: 'Retention', Actual: '91%', Target: '94%' },
+        ],
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterJSONRowsPaste = await getPPTTableState(page)
+
+  record(
+    'pastes JSON table rows into selected PPT table',
+    afterJSONRowsPaste.tableRowsImportModel === 'ppt-table-rows-import' &&
+      afterJSONRowsPaste.tableRowsImportFormat === 'application-json-ppt-table-rows' &&
+      afterJSONRowsPaste.tableRowsImportObjects === afterInspectorEdit.selectedId &&
+      afterJSONRowsPaste.tableRowsImportTargets === afterInspectorEdit.selectedId &&
+      afterJSONRowsPaste.tableRowsImportRows === 4 &&
+      afterJSONRowsPaste.tableRowsImportCols === 3 &&
+      afterJSONRowsPaste.tableRowsImportJsonLength > 160 &&
+      afterJSONRowsPaste.tableCount === afterInspectorEdit.tableCount &&
+      afterJSONRowsPaste.selectedId === afterInspectorEdit.selectedId &&
+      afterJSONRowsPaste.selectedRows === 4 &&
+      afterJSONRowsPaste.selectedCols === 3 &&
+      afterJSONRowsPaste.inspectorSize === '4 x 3' &&
+      afterJSONRowsPaste.cellTexts.includes('Retention') &&
+      afterJSONRowsPaste.cellTexts.includes('94%'),
+    {
+      afterInspectorEdit,
+      afterJSONRowsPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONRowsUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table rows JSON paste as one history step',
+    afterJSONRowsUndo.tableCount === afterInspectorEdit.tableCount &&
+      afterJSONRowsUndo.selectedId === afterInspectorEdit.selectedId &&
+      afterJSONRowsUndo.selectedRows === 3 &&
+      afterJSONRowsUndo.selectedCols === 3 &&
+      afterJSONRowsUndo.cellTexts.includes('Revenue') &&
+      afterJSONRowsUndo.cellTexts.includes('45%') &&
+      !afterJSONRowsUndo.cellTexts.includes('Retention'),
+    {
+      afterInspectorEdit,
+      afterJSONRowsPaste,
+      afterJSONRowsUndo,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptTableClipboardItemTypes = []
     window.__pptTableClipboardWriteCount = 0
     window.__pptTableClipboardHTML = ''
@@ -15546,6 +15619,13 @@ function getPPTTableState(page) {
       tableClipboardRows: Number(stage?.getAttribute('data-ppt-table-clipboard-rows') ?? 0),
       tableClipboardSourceSlide: stage?.getAttribute('data-ppt-table-clipboard-source-slide') ?? '',
       tableClipboardWriteMode: stage?.getAttribute('data-ppt-table-clipboard-write-mode') ?? '',
+      tableRowsImportCols: Number(stage?.getAttribute('data-ppt-table-rows-import-cols') ?? 0),
+      tableRowsImportFormat: stage?.getAttribute('data-ppt-table-rows-import-format') ?? '',
+      tableRowsImportJsonLength: Number(stage?.getAttribute('data-ppt-table-rows-import-json-length') ?? 0),
+      tableRowsImportModel: stage?.getAttribute('data-ppt-table-rows-import-model') ?? '',
+      tableRowsImportObjects: stage?.getAttribute('data-ppt-table-rows-import-objects') ?? '',
+      tableRowsImportRows: Number(stage?.getAttribute('data-ppt-table-rows-import-rows') ?? 0),
+      tableRowsImportTargets: stage?.getAttribute('data-ppt-table-rows-import-command-targets') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
