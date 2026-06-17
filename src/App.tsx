@@ -299,6 +299,11 @@ import {
   getCanvasContextMenuPosition,
 } from 'canvas/app/context-menu-position'
 import {
+  getCanvasDataTransferText,
+  setCanvasDataTransferDropEffect,
+  setCanvasDataTransferText,
+} from 'canvas/app/data-transfer-text'
+import {
   getCanvasFloatingAnchorForBounds,
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
@@ -3132,8 +3137,11 @@ function App() {
     slideId: string,
     event: ReactDragEvent<HTMLButtonElement>,
   ) {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', slideId)
+    setCanvasDataTransferText({
+      dataTransfer: event.dataTransfer,
+      effectAllowed: 'move',
+      text: slideId,
+    })
     setContextMenu(null)
     setSlideDragState({ draggingSlideId: slideId })
   }
@@ -3149,7 +3157,10 @@ function App() {
     }
 
     event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
+    setCanvasDataTransferDropEffect({
+      dataTransfer: event.dataTransfer,
+      dropEffect: 'move',
+    })
 
     if (sourceSlideId === targetSlideId) {
       setSlideDragState({ draggingSlideId: sourceSlideId })
@@ -3170,7 +3181,7 @@ function App() {
     event.preventDefault()
 
     const sourceSlideId = slideDragState?.draggingSlideId ||
-      event.dataTransfer.getData('text/plain')
+      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
     const dropPlacement = slideDragState?.dropTargetSlideId === targetSlideId
       ? slideDragState.dropPlacement ?? getSlideThumbDropPlacement(event)
       : getSlideThumbDropPlacement(event)
@@ -12817,8 +12828,11 @@ function Inspector({
 
     setLayerPaneFocusedObjectId(row.objectId)
     setLayerPaneDragState({ objectId: row.objectId })
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', row.objectId)
+    setCanvasDataTransferText({
+      dataTransfer: event.dataTransfer,
+      effectAllowed: 'move',
+      text: row.objectId,
+    })
   }
 
   function handleLayerPaneRowDragOver(
@@ -12826,7 +12840,7 @@ function Inspector({
     event: ReactDragEvent<HTMLElement>,
   ) {
     const draggedObjectId = layerPaneDragState?.objectId ||
-      event.dataTransfer.getData('text/plain')
+      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
 
     if (!draggedObjectId) {
       return
@@ -12860,7 +12874,10 @@ function Inspector({
     }
 
     event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
+    setCanvasDataTransferDropEffect({
+      dataTransfer: event.dataTransfer,
+      dropEffect: 'move',
+    })
     setLayerPaneDragState({
       dropPlacement: dropIndicator.placement,
       dropTargetObjectId: dropIndicator.targetObjectId,
@@ -12874,7 +12891,7 @@ function Inspector({
     event: ReactDragEvent<HTMLElement>,
   ) {
     const draggedObjectId = layerPaneDragState?.objectId ||
-      event.dataTransfer.getData('text/plain')
+      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
 
     if (!draggedObjectId || draggedObjectId === row.objectId) {
       return
