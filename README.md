@@ -5,8 +5,8 @@ Lightweight PPT subset editor for AI-generated decks and final retouching.
 ## Architecture
 
 - Source of truth: `PPTDeck`, `PPTSlide`, `PPTElement`
-- Canvas usage: optional headless tools from `canvas/core` and `canvas/foundation`
-- Not used as product model: `CanvasItem`, `CanvasApp`
+- Canvas usage: local PPT adapters wrap `canvas/core`, `canvas/foundation`, `canvas/app`, `canvas/engine`, and `canvas/renderer`
+- Product model: PPT types only. `CanvasItem` and `CanvasApp` stay package-side concepts.
 
 ## Run
 
