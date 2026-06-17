@@ -7841,8 +7841,8 @@ function App() {
         data-ppt-keyboard-nudge-large-step={String(CANVAS_KEYBOARD_NUDGE_LARGE_STEP)}
         data-ppt-keyboard-nudge-model={CANVAS_KEYBOARD_NUDGE_MODEL}
         data-ppt-keyboard-nudge-step={String(CANVAS_KEYBOARD_NUDGE_STEP)}
-        data-ppt-arrow-tool-model="canvas-arrow-tool"
-        data-ppt-arrow-tool-shortcut="L"
+        data-ppt-arrow-tool-model={CANVAS_TOOL_AFFORDANCES.arrow.model}
+        data-ppt-arrow-tool-shortcut={CANVAS_TOOL_AFFORDANCES.arrow.shortcut}
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
           ? creationTool.tool
           : undefined}
@@ -7850,25 +7850,25 @@ function App() {
           ? interaction.erasedIds.length
           : undefined}
         data-ppt-eraser-tool-active={isEraserToolActive ? 'true' : 'false'}
-        data-ppt-eraser-tool-model="canvas-eraser-tool"
-        data-ppt-eraser-tool-shortcut="E"
-        data-ppt-highlighter-tool-model="canvas-highlighter-tool"
-        data-ppt-highlighter-tool-shortcut="Shift+M"
+        data-ppt-eraser-tool-model={CANVAS_TOOL_AFFORDANCES.eraser.model}
+        data-ppt-eraser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.eraser.shortcut}
+        data-ppt-highlighter-tool-model={CANVAS_TOOL_AFFORDANCES.highlight.model}
+        data-ppt-highlighter-tool-shortcut={CANVAS_TOOL_AFFORDANCES.highlight.shortcut}
         data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
-        data-ppt-laser-tool-model="canvas-laser-pointer-tool"
-        data-ppt-laser-tool-shortcut="P"
+        data-ppt-laser-tool-model={CANVAS_TOOL_AFFORDANCES.laser.model}
+        data-ppt-laser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.laser.shortcut}
         data-ppt-laser-trail-model="canvas-laser-trail-overlay"
         data-ppt-laser-trail-point-count={laserTrailPoints.length}
         data-ppt-laser-trail-state={interaction?.kind === 'laser'
           ? 'active'
           : laserTrailPoints.length > 0 ? 'idle' : 'empty'}
         data-ppt-pan-tool-active={isPanToolActive ? 'true' : 'false'}
-        data-ppt-pan-tool-model="canvas-pan-tool"
-        data-ppt-pan-tool-shortcut="H"
-        data-ppt-marker-tool-model="canvas-marker-tool"
-        data-ppt-marker-tool-shortcut="M"
-        data-ppt-section-tool-model="canvas-section-tool"
-        data-ppt-section-tool-shortcut="Shift+S"
+        data-ppt-pan-tool-model={CANVAS_TOOL_AFFORDANCES.pan.model}
+        data-ppt-pan-tool-shortcut={CANVAS_TOOL_AFFORDANCES.pan.shortcut}
+        data-ppt-marker-tool-model={CANVAS_TOOL_AFFORDANCES.marker.model}
+        data-ppt-marker-tool-shortcut={CANVAS_TOOL_AFFORDANCES.marker.shortcut}
+        data-ppt-section-tool-model={CANVAS_TOOL_AFFORDANCES.section.model}
+        data-ppt-section-tool-shortcut={CANVAS_TOOL_AFFORDANCES.section.shortcut}
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
@@ -8080,8 +8080,8 @@ function App() {
         data-ppt-keyboard-tool-dispatch={CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL}
         data-ppt-keyboard-viewport-intent={CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL}
         data-ppt-keyboard-viewport-model={CANVAS_KEYBOARD_VIEWPORT_MODEL}
-        data-ppt-sticky-tool-model="canvas-sticky-note-tool"
-        data-ppt-sticky-tool-shortcut="S"
+        data-ppt-sticky-tool-model={CANVAS_TOOL_AFFORDANCES.sticky.model}
+        data-ppt-sticky-tool-shortcut={CANVAS_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
         data-ppt-temporary-pan-model="canvas-temporary-pan-shortcut"
