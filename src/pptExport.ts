@@ -19,6 +19,8 @@ import {
   createCanvasSvgBoundsTransform,
   createCanvasSvgFreehandPathData,
   createCanvasSvgPathData,
+  escapeCanvasXmlAttribute,
+  formatCanvasSvgNumber,
 } from 'canvas/renderer'
 import { unionCanvasRectList } from 'canvas/foundation'
 import {
@@ -1611,16 +1613,11 @@ function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
 }
 
 function formatNumber(value: number) {
-  return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(3))}`
+  return formatCanvasSvgNumber(value)
 }
 
 function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
+  return escapeCanvasXmlAttribute(value)
 }
 
 function escapeScriptJson(value: string) {
