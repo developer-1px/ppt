@@ -407,6 +407,7 @@ import {
 } from 'canvas/app/pointer-click-memory'
 import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
 import {
+  getCanvasPointerLocalGeometry,
   screenPoint as getCanvasPointerScreenPoint,
   screenToWorld as getCanvasPointerWorldPoint,
 } from 'canvas/app/pointer-geometry'
@@ -3154,9 +3155,18 @@ function App() {
   function getSlideThumbDropPlacement(
     event: ReactDragEvent<HTMLButtonElement>,
   ): PPTSlideDropPlacement {
-    const rect = event.currentTarget.getBoundingClientRect()
+    const localGeometry = getCanvasPointerLocalGeometry({
+      event,
+      target: event.currentTarget,
+    })
 
-    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    if (!localGeometry) {
+      return 'after'
+    }
+
+    return localGeometry.point.y < localGeometry.rect.height / 2
+      ? 'before'
+      : 'after'
   }
 
   function clearSlideDragState({
@@ -8214,21 +8224,21 @@ function PPTMinimap({
   )
 
   function navigate(event: ReactPointerEvent<SVGSVGElement>) {
-    const rect = svgRef.current?.getBoundingClientRect()
+    const localGeometry = getCanvasPointerLocalGeometry({
+      event,
+      target: svgRef.current,
+    })
 
-    if (!rect) {
+    if (!localGeometry) {
       return
     }
 
     const point = getCanvasMinimapPointFromViewportOffset({
       model: readModel,
-      offset: {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      },
+      offset: localGeometry.point,
       viewportSize: {
-        h: rect.height,
-        w: rect.width,
+        h: localGeometry.rect.height,
+        w: localGeometry.rect.width,
       },
     })
 
@@ -12896,13 +12906,22 @@ function Inspector({
       return
     }
 
-    const rowBounds = event.currentTarget.getBoundingClientRect()
+    const rowGeometry = getCanvasPointerLocalGeometry({
+      event,
+      target: event.currentTarget,
+    })
+
+    if (!rowGeometry) {
+      setLayerPaneDragState({ objectId: draggedObjectId })
+      return
+    }
+
     const dropIndicator = getSlideEditLayerPaneDropIndicator(
       layerPaneDescriptor,
       {
         draggedObjectId,
-        pointerOffsetY: event.clientY - rowBounds.top,
-        rowHeight: rowBounds.height,
+        pointerOffsetY: rowGeometry.point.y,
+        rowHeight: rowGeometry.rect.height,
         targetObjectId: row.objectId,
       },
     )
@@ -12951,13 +12970,21 @@ function Inspector({
       ? layerPaneDragState.dropToIndex
       : undefined
 
-    const rowBounds = event.currentTarget.getBoundingClientRect()
+    const rowGeometry = getCanvasPointerLocalGeometry({
+      event,
+      target: event.currentTarget,
+    })
+
+    if (!rowGeometry) {
+      return
+    }
+
     const dropIndicator = getSlideEditLayerPaneDropIndicator(
       layerPaneDescriptor,
       {
         draggedObjectId,
-        pointerOffsetY: event.clientY - rowBounds.top,
-        rowHeight: rowBounds.height,
+        pointerOffsetY: rowGeometry.point.y,
+        rowHeight: rowGeometry.rect.height,
         targetObjectId: row.objectId,
       },
     )
