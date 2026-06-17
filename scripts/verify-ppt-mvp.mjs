@@ -9509,6 +9509,26 @@ async function runTableImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/markdown', '| Workstream | Owner | Status |\\n| --- | --- | --- |\\n| Outline | AI | Draft |\\n| Retouch | Human | Ready |')
+    dataTransfer.setData('text/plain', '| Workstream | Owner | Status |\\n| --- | --- | --- |\\n| Outline | AI | Draft |\\n| Retouch | Human | Ready |')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterMarkdownPaste = await getPPTTableState(page)
+
+  record('pastes Markdown table clipboard data into PPT table element', afterMarkdownPaste.tableImportModel === 'canvas-table-import' && afterMarkdownPaste.tableImportFormat === 'text-markdown' && afterMarkdownPaste.tableCount === afterHtmlPaste.tableCount + 1 && afterMarkdownPaste.importExtensionLastClipboardActions === 'table-source' && afterMarkdownPaste.selectedKind === 'table' && afterMarkdownPaste.selectedRows === 3 && afterMarkdownPaste.selectedCols === 3 && afterMarkdownPaste.tableImportRows === 3 && afterMarkdownPaste.tableImportCols === 3 && afterMarkdownPaste.cellTexts.includes('Workstream') && afterMarkdownPaste.cellTexts.includes('Ready'), {
+    afterHtmlPaste,
+    afterMarkdownPaste,
+  })
+
+  await page.eval(`(() => {
     const files = [
       ${createPPTTestTableFileExpression('pipeline.csv', 'Stage,Owner\nDraft,AI\nRetouch,Human')},
       ${createPPTTestTableFileExpression('scores.tsv', 'Name\tScore\nFit\t92\nTone\t88')},
@@ -9535,9 +9555,9 @@ async function runTableImportScenario(page) {
 
   const afterFilePaste = await getPPTTableState(page)
 
-  record('pastes multiple CSV/TSV files into PPT tables from one clipboard event', afterFilePaste.tableImportModel === 'canvas-table-import' && afterFilePaste.tableImportCount === 2 && afterFilePaste.tableImportFormat === 'text-tsv' && afterFilePaste.tableImportNames.includes('pipeline') && afterFilePaste.tableImportNames.includes('scores') && afterFilePaste.tableCount === afterHtmlPaste.tableCount + 2 && afterFilePaste.selectedCount === 2 && afterFilePaste.selectedKinds === 'table table' && afterFilePaste.selectedNames.includes('pipeline') && afterFilePaste.selectedNames.includes('scores'), {
+  record('pastes multiple CSV/TSV files into PPT tables from one clipboard event', afterFilePaste.tableImportModel === 'canvas-table-import' && afterFilePaste.tableImportCount === 2 && afterFilePaste.tableImportFormat === 'text-tsv' && afterFilePaste.tableImportNames.includes('pipeline') && afterFilePaste.tableImportNames.includes('scores') && afterFilePaste.tableCount === afterMarkdownPaste.tableCount + 2 && afterFilePaste.selectedCount === 2 && afterFilePaste.selectedKinds === 'table table' && afterFilePaste.selectedNames.includes('pipeline') && afterFilePaste.selectedNames.includes('scores'), {
     afterFilePaste,
-    afterHtmlPaste,
+    afterMarkdownPaste,
   })
 
   await page.eval(`(() => {
