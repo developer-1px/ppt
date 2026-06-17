@@ -350,6 +350,7 @@ import {
   getCanvasPastePositionSession,
   type CanvasPastePositionMemory,
 } from 'canvas/app/paste-position'
+import { downloadCanvasTextFile } from 'canvas/app/file-download'
 import {
   createCanvasRichClipboardHTML,
   readCanvasRichClipboardFromDataTransfer,
@@ -5432,14 +5433,11 @@ function App() {
     filename: string
     type: string
   }) {
-    const url = URL.createObjectURL(new Blob([content], {
+    downloadCanvasTextFile({
+      content,
+      filename,
       type,
-    }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = filename
-    anchor.click()
-    URL.revokeObjectURL(url)
+    })
   }
 
   function toggleTheme() {

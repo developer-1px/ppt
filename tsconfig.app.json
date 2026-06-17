@@ -31,6 +31,7 @@
       "canvas/app/minimap-model": ["../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts"],
       "canvas/app/modal-focus-lifecycle": ["../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts"],
       "canvas/app/paste-position": ["../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts"],
+      "canvas/app/file-download": ["../canvas/src/canvas/app/affordances/commands/CanvasFileDownload.ts"],
       "canvas/app/pointer-click-memory": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts"],
       "canvas/app/pointer-geometry": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts"],
       "canvas/app/pointer-laser": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts"],

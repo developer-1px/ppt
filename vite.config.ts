@@ -23,6 +23,7 @@ const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/f
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
+const canvasFileDownloadEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasFileDownload.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
 const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts', import.meta.url))
 const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
@@ -66,6 +67,7 @@ export default defineConfig({
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
       { find: 'canvas/app/modal-focus-lifecycle', replacement: canvasModalFocusLifecycleEntry },
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
+      { find: 'canvas/app/file-download', replacement: canvasFileDownloadEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
       { find: 'canvas/app/pointer-geometry', replacement: canvasPointerGeometryEntry },
       { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
