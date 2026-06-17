@@ -310,6 +310,7 @@ import {
 } from 'canvas/app/data-transfer-text'
 import {
   cancelCanvasDeferredFocus,
+  focusCanvasElementBySelectorOnNextFrame,
   focusCanvasElementOnNextFrame,
 } from 'canvas/app/deferred-focus'
 import {
@@ -2823,11 +2824,11 @@ function App() {
   }
 
   function focusPPTSlideThumb(slideId: string) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () =>
-        [...document.querySelectorAll<HTMLButtonElement>('.ppt-thumb')]
-          .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
-          ?? null,
+    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+      match: ({ element }) =>
+        element.getAttribute('data-ppt-slide-id') === slideId,
+      root: document,
+      selector: '.ppt-thumb',
     })
   }
 
@@ -10995,10 +10996,11 @@ function PPTParagraphAlignRadioGroup({
     container: HTMLElement | null,
   ) {
     onAlignChange(nextAlign)
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => container
-        ?.querySelector<HTMLButtonElement>(`[data-ppt-paragraph-align="${nextAlign}"]`)
-        ?? null,
+    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+      match: ({ element }) =>
+        element.getAttribute('data-ppt-paragraph-align') === nextAlign,
+      root: container,
+      selector: '[data-ppt-paragraph-align]',
     })
   }
 
@@ -12767,9 +12769,11 @@ function Inspector({
   }
 
   function focusLayerPaneRow(objectId: string) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => document
-        .querySelector<HTMLElement>(`[data-ppt-layer-pane-row="${objectId}"]`)
+    focusCanvasElementBySelectorOnNextFrame<HTMLElement>({
+      match: ({ element }) =>
+        element.getAttribute('data-ppt-layer-pane-row') === objectId,
+      root: document,
+      selector: '[data-ppt-layer-pane-row]',
     })
   }
 
@@ -12811,11 +12815,12 @@ function Inspector({
   }
 
   function focusLayerPaneRenameInput(objectId: string) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => document.querySelector<HTMLInputElement>(
-        `[data-ppt-layer-pane-rename-input="${objectId}"]`,
-      ),
+    focusCanvasElementBySelectorOnNextFrame<HTMLInputElement>({
+      match: ({ element }) =>
+        element.getAttribute('data-ppt-layer-pane-rename-input') === objectId,
+      root: document,
       select: true,
+      selector: '[data-ppt-layer-pane-rename-input]',
     })
   }
 
@@ -13092,9 +13097,11 @@ function Inspector({
   }
 
   function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => document
-        .querySelector<HTMLButtonElement>(`[data-ppt-inspector-tab="${tabId}"]`)
+    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+      match: ({ element }) =>
+        element.getAttribute('data-ppt-inspector-tab') === tabId,
+      root: document,
+      selector: '[data-ppt-inspector-tab]',
     })
   }
 
