@@ -1,6 +1,8 @@
 import {
   createCanvasDataTransferImportActionPlan,
 } from 'canvas/app/data-transfer-import-actions'
+import { CANVAS_IMAGE_IMPORT_MODEL } from 'canvas/app/image-import'
+import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
 import {
   getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
@@ -53,7 +55,7 @@ export const PPT_IMPORT_EXTENSION = {
 export type PPTImageImportEffect = {
   format: PPTImageImportFormat
   mimeType?: string
-  model: 'canvas-image-import'
+  model: typeof CANVAS_IMAGE_IMPORT_MODEL
   name: string
   naturalHeight?: number
   naturalWidth?: number
@@ -62,7 +64,7 @@ export type PPTImageImportEffect = {
 export type PPTTableImportEffect = {
   columnCount: number
   format: PPTTableImportFormat
-  model: 'canvas-table-import'
+  model: typeof CANVAS_TABLE_IMPORT_MODEL
   name: string
   rowCount: number
 }
@@ -242,7 +244,7 @@ export function createPPTImageImportEffect({
   return {
     format: source.format ?? 'file',
     mimeType: source.mimeType,
-    model: 'canvas-image-import',
+    model: CANVAS_IMAGE_IMPORT_MODEL,
     name: element.name,
     naturalHeight: source.naturalHeight,
     naturalWidth: source.naturalWidth,
@@ -259,7 +261,7 @@ export function createPPTTableImportEffect({
   return {
     columnCount: getPPTTableColumnCount(element.rows),
     format: source.format ?? 'text-delimited',
-    model: 'canvas-table-import',
+    model: CANVAS_TABLE_IMPORT_MODEL,
     name: element.name,
     rowCount: element.rows.length,
   }
