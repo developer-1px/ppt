@@ -9920,6 +9920,127 @@ async function runTextPasteScenario(page) {
     },
   )
 
+  const htmlLinkUrl = 'https://example.com/source-brief'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', '<p><a href="' + url + '">Source brief</a></p>')
+    dataTransfer.setData('text/plain', 'Source brief')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(htmlLinkUrl)})`)
+  await delay(120)
+
+  const afterHTMLLinkPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes single HTML link as PPT linked text box',
+    afterHTMLLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterHTMLLinkPaste.textPasteImporter === 'ppt-rich-html-text' &&
+      afterHTMLLinkPaste.textPasteFormat === 'text-html-rich' &&
+      afterHTMLLinkPaste.textPasteHyperlinkUrl === htmlLinkUrl &&
+      afterHTMLLinkPaste.selectedHyperlink === htmlLinkUrl &&
+      afterHTMLLinkPaste.textPasteLinkRuns === 1 &&
+      afterHTMLLinkPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterHTMLLinkPaste.selectedKind === 'textBox' &&
+      afterHTMLLinkPaste.selectedName === 'Rich Text' &&
+      afterHTMLLinkPaste.selectedText.includes('Source brief') &&
+      afterHTMLLinkPaste.selectedUnderlineRunCount >= 1 &&
+      afterHTMLLinkPaste.exportCode.includes(`data-ppt-hyperlink-url="${htmlLinkUrl}"`) &&
+      afterHTMLLinkPaste.exportCode.includes(`"url": "${htmlLinkUrl}"`),
+    {
+      afterHTMLLinkPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const markdownLinkUrl = 'https://example.com/review-brief'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+    const markdown = '[Review brief](' + url + ')'
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(markdownLinkUrl)})`)
+  await delay(120)
+
+  const afterMarkdownLinkPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes single Markdown link as PPT linked text box',
+    afterMarkdownLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterMarkdownLinkPaste.importExtensionLastClipboardActions === 'rich-text-source' &&
+      afterMarkdownLinkPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
+      afterMarkdownLinkPaste.textPasteFormat === 'text-markdown-rich' &&
+      afterMarkdownLinkPaste.textPasteHyperlinkUrl === markdownLinkUrl &&
+      afterMarkdownLinkPaste.selectedHyperlink === markdownLinkUrl &&
+      afterMarkdownLinkPaste.textPasteLinkRuns === 1 &&
+      afterMarkdownLinkPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterMarkdownLinkPaste.selectedKind === 'textBox' &&
+      afterMarkdownLinkPaste.selectedName === 'Markdown Text' &&
+      afterMarkdownLinkPaste.selectedText.includes('Review brief') &&
+      afterMarkdownLinkPaste.exportCode.includes(`data-ppt-hyperlink-url="${markdownLinkUrl}"`) &&
+      afterMarkdownLinkPaste.exportCode.includes(`"url": "${markdownLinkUrl}"`),
+    {
+      afterMarkdownLinkPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const markdown = '[Trap](javascript:alert)'
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterUnsafeMarkdownLinkPaste = await getPPTTextPasteState(page)
+
+  record(
+    'blocks unsafe Markdown link paste from PPT hyperlink metadata',
+    afterUnsafeMarkdownLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterUnsafeMarkdownLinkPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
+      afterUnsafeMarkdownLinkPaste.textPasteFormat === 'text-markdown-rich' &&
+      afterUnsafeMarkdownLinkPaste.textPasteHyperlinkUrl === '' &&
+      afterUnsafeMarkdownLinkPaste.selectedHyperlink === '' &&
+      afterUnsafeMarkdownLinkPaste.textPasteLinkRuns === 1 &&
+      afterUnsafeMarkdownLinkPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterUnsafeMarkdownLinkPaste.selectedKind === 'textBox' &&
+      afterUnsafeMarkdownLinkPaste.selectedName === 'Markdown Text' &&
+      afterUnsafeMarkdownLinkPaste.selectedText.includes('Trap') &&
+      !afterUnsafeMarkdownLinkPaste.exportCode.includes('javascript:alert'),
+    {
+      afterUnsafeMarkdownLinkPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
     const markdown = '# Launch plan\\n- **Draft** with _notes_\\n1. [Review](https://example.com/review) handoff'
@@ -13996,6 +14117,7 @@ function getPPTTextPasteState(page) {
       : []
 
     return {
+      exportCode: document.querySelector('.ppt-export-code')?.value ?? '',
       fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
       fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
@@ -14006,6 +14128,7 @@ function getPPTTextPasteState(page) {
       selectedBulletParagraphCount: selected?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
       selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
+      selectedHyperlink: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedItalicRunCount: selected?.querySelectorAll('[data-ppt-run-italic="true"]').length ?? 0,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
@@ -14032,6 +14155,7 @@ function getPPTTextPasteState(page) {
       textPasteBoldRuns: Number(stage?.getAttribute('data-ppt-text-paste-bold-runs') ?? 0),
       textPasteBulletParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-bullet-paragraphs') ?? 0),
       textPasteFormat: stage?.getAttribute('data-ppt-text-paste-format') ?? '',
+      textPasteHyperlinkUrl: stage?.getAttribute('data-ppt-text-paste-hyperlink-url') ?? '',
       textPasteImporter: stage?.getAttribute('data-ppt-text-paste-importer') ?? '',
       textPasteLinkRuns: Number(stage?.getAttribute('data-ppt-text-paste-link-runs') ?? 0),
       textPasteModel: stage?.getAttribute('data-ppt-text-paste-model') ?? '',

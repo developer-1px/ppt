@@ -39,6 +39,7 @@ export type PPTTextPasteImportResult = {
   boldRunCount?: number
   bulletParagraphCount?: number
   format: 'text-html-rich' | 'text-markdown-rich' | 'text-plain'
+  hyperlinkUrl?: string
   importerId: string
   italicRunCount?: number
   item: PPTTextBox
@@ -50,6 +51,7 @@ export type PPTRichTextPasteSource = {
   boldRunCount: number
   bulletParagraphCount: number
   format?: 'text-html-rich' | 'text-markdown-rich'
+  hyperlinkUrl?: string
   importerId?: string
   linkRunCount: number
   name?: string
@@ -81,6 +83,12 @@ const PPT_HTML_RICH_TEXT_BLOCK_TAGS = new Set([
   'section',
   'ul',
 ])
+const PPT_RICH_TEXT_HYPERLINK_ALLOWED_SCHEMES = new Set([
+  'http',
+  'https',
+  'mailto',
+])
+const PPT_RICH_TEXT_HYPERLINK_MAX_LENGTH = 2048
 export const PPT_TEXT_PASTE_IMPORT_MODEL = PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL
 
 export const getPPTTextPasteSourcesFromDataTransfer =
@@ -203,9 +211,11 @@ export function createPPTRichTextPasteElement({
     italicRunCount: getPPTTextBodyRunCount(source.textBody, 'italic'),
     item: {
       ...result.item,
+      ...(source.hyperlinkUrl ? { hyperlink: { url: source.hyperlinkUrl } } : {}),
       name: source.name ?? 'Rich Text',
       textBody: source.textBody,
     },
+    ...(source.hyperlinkUrl ? { hyperlinkUrl: source.hyperlinkUrl } : {}),
     linkRunCount: source.linkRunCount,
     numberedParagraphCount: source.numberedParagraphCount,
     underlineRunCount: source.underlineRunCount,
@@ -260,6 +270,7 @@ function createPPTRichTextPasteSource(
   options: { html?: string } = {},
 ): PPTRichTextPasteSource {
   const listKinds = getPPTHTMLRichTextParagraphListKinds(options.html ?? '')
+  const hyperlinkUrl = getPPTRichTextSingleHyperlinkUrl(source)
   const textBody: PPTTextBody = {
     paragraphs: source.paragraphs.map((paragraph, index): PPTParagraph => {
       const bullet = listKinds[index] ?? paragraph.bullet
@@ -281,6 +292,7 @@ function createPPTRichTextPasteSource(
     boldRunCount: getPPTTextBodyRunCount(textBody, 'bold'),
     bulletParagraphCount: textBody.paragraphs.filter((paragraph) =>
       paragraph.bullet === 'bullet').length,
+    ...(hyperlinkUrl ? { hyperlinkUrl } : {}),
     linkRunCount: source.paragraphs.reduce((count, paragraph) =>
       count + paragraph.runs.filter((run) => Boolean(run.link)).length, 0),
     numberedParagraphCount: textBody.paragraphs.filter((paragraph) =>
@@ -301,12 +313,14 @@ function getPPTMarkdownTextPasteSourceFromText(
   }
 
   const textBody = { paragraphs }
+  const hyperlinkUrl = getPPTMarkdownTextSingleHyperlinkUrl(text)
 
   return {
     boldRunCount: getPPTTextBodyRunCount(textBody, 'bold'),
     bulletParagraphCount: textBody.paragraphs.filter((paragraph) =>
       paragraph.bullet === 'bullet').length,
     format: 'text-markdown-rich',
+    ...(hyperlinkUrl ? { hyperlinkUrl } : {}),
     importerId: 'ppt-rich-markdown-text',
     linkRunCount: getPPTTextBodyRunCount(textBody, 'color'),
     name: 'Markdown Text',
@@ -476,6 +490,65 @@ function getPPTHTMLRichTextParagraphListKindFromBlock(
 
 function isPPTHTMLRichTextBlock(node: Element) {
   return PPT_HTML_RICH_TEXT_BLOCK_TAGS.has(node.tagName.toLowerCase())
+}
+
+function getPPTRichTextSingleHyperlinkUrl(
+  source: PPTCanvasRichTextPasteSource,
+) {
+  const textRuns = source.paragraphs.flatMap((paragraph) => paragraph.runs)
+    .filter((run) => run.text.trim())
+
+  if (textRuns.length === 0) {
+    return null
+  }
+
+  const normalizedUrls = new Set<string>()
+
+  for (const run of textRuns) {
+    const url = normalizePPTRichTextHyperlinkUrl(run.link)
+
+    if (!url) {
+      return null
+    }
+
+    normalizedUrls.add(url)
+  }
+
+  return normalizedUrls.size === 1 ? [...normalizedUrls][0] : null
+}
+
+function getPPTMarkdownTextSingleHyperlinkUrl(text: string) {
+  const match = text.trim().match(/^\[([^\]]+)]\(([^)\s]+)\)$/)
+
+  return match ? normalizePPTRichTextHyperlinkUrl(match[2]) : null
+}
+
+function normalizePPTRichTextHyperlinkUrl(value: string | null | undefined) {
+  const url = value?.trim()
+
+  if (!url || url.length > PPT_RICH_TEXT_HYPERLINK_MAX_LENGTH) {
+    return null
+  }
+
+  if (hasPPTRichTextHyperlinkControlCharacter(url)) {
+    return null
+  }
+
+  const scheme = url.match(/^([a-z][a-z0-9+.-]*):/i)?.[1]?.toLowerCase()
+
+  if (!scheme || !PPT_RICH_TEXT_HYPERLINK_ALLOWED_SCHEMES.has(scheme)) {
+    return null
+  }
+
+  return url
+}
+
+function hasPPTRichTextHyperlinkControlCharacter(value: string) {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0)
+
+    return code <= 31 || code === 127
+  })
 }
 
 function getPPTTextBodyRunCount(

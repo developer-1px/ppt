@@ -8876,6 +8876,7 @@ function App() {
         data-ppt-text-paste-bold-runs={lastTextPasteImport?.boldRunCount}
         data-ppt-text-paste-bullet-paragraphs={lastTextPasteImport?.bulletParagraphCount}
         data-ppt-text-paste-format={lastTextPasteImport?.format}
+        data-ppt-text-paste-hyperlink-url={lastTextPasteImport?.hyperlinkUrl}
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-link-runs={lastTextPasteImport?.linkRunCount}
         data-ppt-text-paste-model={PPT_TEXT_PASTE_IMPORT_MODEL}
