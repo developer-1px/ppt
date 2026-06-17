@@ -1,5 +1,6 @@
 import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
+  getPPTCanvasDataTransferFiles,
   getPPTCanvasTableColumnCount,
   getPPTCanvasTableComponentSize,
   getPPTCanvasTableFileFromDataTransfer,
@@ -46,6 +47,16 @@ const PPT_TABLE_SIZE_OPTIONS = {
   maxSize: { h: 560, w: 980 },
   minSize: { h: 120, w: 260 },
 } as const
+const PPT_TABLE_BATCH_GAP = 24
+const PPT_TABLE_BATCH_MAX_COLUMNS = 2
+const PPT_TABLE_CSV_MIME_TYPES = new Set([
+  'application/vnd.ms-excel',
+  'text/comma-separated-values',
+  'text/csv',
+])
+const PPT_TABLE_TSV_MIME_TYPES = new Set([
+  'text/tab-separated-values',
+])
 
 export function createPPTTableElement({
   id,
@@ -89,12 +100,86 @@ export function createPPTTableElement({
   }
 }
 
+export function createPPTTableElements({
+  center,
+  createId,
+  sources,
+}: {
+  center: { x: number; y: number }
+  createId: (prefix: string) => string
+  sources: readonly PPTTableImportSource[]
+}) {
+  if (sources.length <= 1) {
+    return sources.map((source) =>
+      createPPTTableElement({
+        id: createId('table'),
+        name: source.name ?? 'Table',
+        point: center,
+        rows: source.rows,
+      })
+    )
+  }
+
+  const columns = Math.min(
+    PPT_TABLE_BATCH_MAX_COLUMNS,
+    Math.ceil(Math.sqrt(sources.length)),
+  )
+  const rows = Math.ceil(sources.length / columns)
+  const sizes = sources.map(getPPTTableImportSourceSize)
+  const columnWidths = Array.from({ length: columns }, (_, column) =>
+    Math.max(
+      ...sizes
+        .filter((_, index) => index % columns === column)
+        .map((size) => size.w),
+    )
+  )
+  const rowHeights = Array.from({ length: rows }, (_, row) =>
+    Math.max(
+      ...sizes
+        .filter((_, index) => Math.floor(index / columns) === row)
+        .map((size) => size.h),
+    )
+  )
+  const totalWidth = columnWidths.reduce((sum, width) => sum + width, 0) +
+    PPT_TABLE_BATCH_GAP * Math.max(0, columns - 1)
+  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) +
+    PPT_TABLE_BATCH_GAP * Math.max(0, rows - 1)
+  const origin = {
+    x: center.x - totalWidth / 2,
+    y: center.y - totalHeight / 2,
+  }
+
+  return sources.map((source, index) => {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    const x = origin.x +
+      columnWidths.slice(0, column).reduce((sum, width) => sum + width, 0) +
+      PPT_TABLE_BATCH_GAP * column +
+      columnWidths[column] / 2
+    const y = origin.y +
+      rowHeights.slice(0, row).reduce((sum, height) => sum + height, 0) +
+      PPT_TABLE_BATCH_GAP * row +
+      rowHeights[row] / 2
+
+    return createPPTTableElement({
+      id: createId('table'),
+      name: source.name ?? 'Table',
+      point: { x, y },
+      rows: source.rows,
+    })
+  })
+}
+
 export function getPPTTableFileFromList(files: FileList | null) {
   return getPPTCanvasTableFileFromList(files)
 }
 
 export function getPPTTableFileFromDataTransfer(dataTransfer: DataTransfer | null) {
   return getPPTCanvasTableFileFromDataTransfer(dataTransfer)
+}
+
+export function getPPTTableFilesFromDataTransfer(dataTransfer: DataTransfer | null) {
+  return getPPTCanvasDataTransferFiles(dataTransfer).filter(isPPTTableFileBlob)
 }
 
 export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | null) {
@@ -162,6 +247,25 @@ export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
 
 export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
   return getPPTCanvasTableColumnCount(rows)
+}
+
+function getPPTTableImportSourceSize(source: PPTTableImportSource) {
+  const normalizedRows = normalizePPTTableRows(source.rows)
+
+  return getPPTCanvasTableComponentSize({
+    columnCount: getPPTTableColumnCount(normalizedRows),
+    rowCount: normalizedRows.length,
+  }, PPT_TABLE_SIZE_OPTIONS)
+}
+
+function isPPTTableFileBlob(file: Blob & { name?: string }) {
+  const mimeType = file.type.toLowerCase()
+  const name = file.name?.toLowerCase() ?? ''
+
+  return PPT_TABLE_CSV_MIME_TYPES.has(mimeType) ||
+    PPT_TABLE_TSV_MIME_TYPES.has(mimeType) ||
+    name.endsWith('.csv') ||
+    name.endsWith('.tsv')
 }
 
 function isPPTTableImportRows(rows: readonly (readonly string[])[]) {

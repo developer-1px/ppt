@@ -8464,9 +8464,9 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file-batch image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file-batch image-file table-file-batch table-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
-        'image-file-batch image-file table-file table-source media-source' &&
+        'image-file-batch image-file table-file-batch table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
       afterUpload.imageCount === before.imageCount + 1 &&
       afterUpload.selectedKind === 'image' &&
@@ -9435,11 +9435,43 @@ async function runTableImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const files = [
+      ${createPPTTestTableFileExpression('pipeline.csv', 'Stage,Owner\nDraft,AI\nRetouch,Human')},
+      ${createPPTTestTableFileExpression('scores.tsv', 'Name\tScore\nFit\t92\nTone\t88')},
+    ]
+    const dataTransfer = {
+      files,
+      getData: () => '',
+      items: files.map((file) => ({
+        getAsFile: () => file,
+        kind: 'file',
+        type: file.type,
+      })),
+      types: [],
+    }
+    const event = new Event('paste', {
+      bubbles: true,
+      cancelable: true,
+    })
+
+    Object.defineProperty(event, 'clipboardData', { value: dataTransfer })
+    window.dispatchEvent(event)
+  })()`)
+  await delay(220)
+
+  const afterFilePaste = await getPPTTableState(page)
+
+  record('pastes multiple CSV/TSV files into PPT tables from one clipboard event', afterFilePaste.tableImportModel === 'canvas-table-import' && afterFilePaste.tableImportCount === 2 && afterFilePaste.tableImportFormat === 'text-tsv' && afterFilePaste.tableImportNames.includes('pipeline') && afterFilePaste.tableImportNames.includes('scores') && afterFilePaste.tableCount === afterHtmlPaste.tableCount + 2 && afterFilePaste.selectedCount === 2 && afterFilePaste.selectedKinds === 'table table' && afterFilePaste.selectedNames.includes('pipeline') && afterFilePaste.selectedNames.includes('scores'), {
+    afterFilePaste,
+    afterHtmlPaste,
+  })
+
+  await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
     const rect = stage.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
 
-    dataTransfer.items.add(${createPPTTestTableFileExpression('metrics.csv', 'Region,Score\\nNA,88\\nEU,91')})
+    dataTransfer.items.add(${createPPTTestTableFileExpression('metrics.csv', 'Region,Score\nNA,88\nEU,91')})
     dataTransfer.setData('text/csv', 'Region,Score\\nNA,88\\nEU,91')
     stage.dispatchEvent(new DragEvent('drop', {
       bubbles: true,
@@ -9453,9 +9485,45 @@ async function runTableImportScenario(page) {
 
   const afterDrop = await getPPTTableState(page)
 
-  record('drops CSV file onto PPT stage as table element', afterDrop.tableImportModel === 'canvas-table-import' && afterDrop.tableImportFormat === 'canvas-csv' && afterDrop.tableCount === afterHtmlPaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops CSV file onto PPT stage as table element', afterDrop.tableImportModel === 'canvas-table-import' && afterDrop.tableImportFormat === 'canvas-csv' && afterDrop.tableCount === afterFilePaste.tableCount + 1 && afterDrop.selectedKind === 'table' && ['metrics', 'Table'].includes(afterDrop.selectedName) && afterDrop.selectedRows === 3 && afterDrop.selectedCols === 2 && afterDrop.cellTexts.includes('Region') && afterDrop.cellTexts.includes('EU') && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
-    afterHtmlPaste,
+    afterFilePaste,
+  })
+
+  await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const rect = stage.getBoundingClientRect()
+    const files = [
+      ${createPPTTestTableFileExpression('north.csv', 'Region,Score\nNorth,81\nSouth,79')},
+      ${createPPTTestTableFileExpression('quality.tsv', 'Metric\tValue\nPass\t97\nWarn\t3')},
+    ]
+    const dataTransfer = {
+      files,
+      getData: () => '',
+      items: files.map((file) => ({
+        getAsFile: () => file,
+        kind: 'file',
+        type: file.type,
+      })),
+      types: [],
+    }
+    const event = new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width * 0.62,
+      clientY: rect.top + rect.height * 0.58,
+    })
+
+    Object.defineProperty(event, 'dataTransfer', { value: dataTransfer })
+    stage.dispatchEvent(event)
+  })()`)
+  await delay(220)
+
+  const afterMultiDrop = await getPPTTableState(page)
+
+  record('drops multiple CSV/TSV files onto PPT stage as selected tables', afterMultiDrop.tableImportModel === 'canvas-table-import' && afterMultiDrop.tableImportCount === 2 && afterMultiDrop.tableImportFormat === 'text-tsv' && afterMultiDrop.tableImportNames.includes('north') && afterMultiDrop.tableImportNames.includes('quality') && afterMultiDrop.tableCount === afterDrop.tableCount + 2 && afterMultiDrop.selectedCount === 2 && afterMultiDrop.selectedKinds === 'table table' && afterMultiDrop.selectedNames.includes('north') && afterMultiDrop.selectedNames.includes('quality'), {
+    afterDrop,
+    afterMultiDrop,
   })
 }
 
@@ -9780,8 +9848,8 @@ async function runMediaImportScenario(page) {
   await page.eval(`((url) => {
     const dataTransfer = new DataTransfer()
 
-    dataTransfer.items.add(url, 'text/plain')
-    dataTransfer.items.add(url, 'text/uri-list')
+    dataTransfer.setData('text/uri-list', url)
+    dataTransfer.setData('text/plain', url)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -13557,6 +13625,9 @@ function getPPTImageImportState(page) {
 function getPPTTableState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const selectedElements = [...document.querySelectorAll('[data-selected="true"]')]
+    const selectedLayerNames = [...document.querySelectorAll('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')]
+      .map((element) => element.textContent ?? '')
     const stage = document.querySelector('.ppt-stage-shell')
     const tableCells = [...selected?.querySelectorAll('[data-ppt-table-cell]') ?? []]
 
@@ -13568,18 +13639,25 @@ function getPPTTableState(page) {
       fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
       fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
+      importExtensionLastClipboardActions: stage?.getAttribute('data-ppt-import-extension-last-clipboard-actions') ?? '',
+      importExtensionLastDropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       selectedCols: Number(selected?.getAttribute('data-ppt-table-cols') ?? 0),
+      selectedCount: selectedElements.length,
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedKinds: selectedElements.map((element) => element.getAttribute('data-kind') ?? '').join(' '),
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedNames: selectedLayerNames.join(' '),
       selectedRows: Number(selected?.getAttribute('data-ppt-table-rows') ?? 0),
       tableImportCols: Number(stage?.getAttribute('data-ppt-table-import-cols') ?? 0),
+      tableImportCount: Number(stage?.getAttribute('data-ppt-table-import-count') ?? 0),
       tableImportFormat: stage?.getAttribute('data-ppt-table-import-format') ?? '',
       tableImportModel: stage?.getAttribute('data-ppt-table-import-model') ?? '',
       tableImportName: stage?.getAttribute('data-ppt-table-import-name') ?? '',
+      tableImportNames: stage?.getAttribute('data-ppt-table-import-names') ?? '',
       tableImportRows: Number(stage?.getAttribute('data-ppt-table-import-rows') ?? 0),
       tableClipboardCols: Number(stage?.getAttribute('data-ppt-table-clipboard-cols') ?? 0),
       tableClipboardHtmlLength: Number(stage?.getAttribute('data-ppt-table-clipboard-html-length') ?? 0),
@@ -13614,6 +13692,7 @@ function getPPTTextPasteState(page) {
       fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
       fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
+      importExtensionLastClipboardActions: stage?.getAttribute('data-ppt-import-extension-last-clipboard-actions') ?? '',
       redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
       selectedBoldRunCount: selected?.querySelectorAll('[data-ppt-run-bold="true"]').length ?? 0,
       selectedBulletParagraphCount: selected?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
@@ -13688,6 +13767,7 @@ function getPPTMediaImportState(page) {
     return {
       editing: !!document.querySelector('.ppt-element-editor[contenteditable="true"]'),
       exportCode: document.querySelector('.ppt-export-code')?.value ?? '',
+      importExtensionLastClipboardActions: stage?.getAttribute('data-ppt-import-extension-last-clipboard-actions') ?? '',
       mediaImportImporter: stage?.getAttribute('data-ppt-media-import-importer') ?? '',
       mediaImportModel: stage?.getAttribute('data-ppt-media-import-model') ?? '',
       mediaImportSelection: stage?.getAttribute('data-ppt-media-import-selection') ?? '',

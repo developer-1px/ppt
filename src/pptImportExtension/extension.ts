@@ -32,6 +32,7 @@ import {
 import {
   getPPTTableColumnCount,
   getPPTTableFileFromDataTransfer,
+  getPPTTableFilesFromDataTransfer,
   getPPTTableSourceFromDataTransfer,
   PPT_TABLE_IMPORT_MODEL,
   type PPTTableImportFormat,
@@ -52,6 +53,8 @@ export const PPT_IMPORT_EXTENSION = {
   clipboardActionOrder: [
     'image-file-batch',
     'image-file',
+    'table-file-batch',
+    'table-file',
     'fallback-html-selection-source',
     'fallback-html-image-source',
     'fallback-html-shape-source',
@@ -66,6 +69,7 @@ export const PPT_IMPORT_EXTENSION = {
   dropActionOrder: [
     'image-file-batch',
     'image-file',
+    'table-file-batch',
     'table-file',
     'table-source',
     'media-source',
@@ -88,9 +92,11 @@ export type PPTImageImportEffect = {
 
 export type PPTTableImportEffect = {
   columnCount: number
+  count: number
   format: PPTTableImportFormat
   model: typeof PPT_TABLE_IMPORT_MODEL
   name: string
+  names: string
   rowCount: number
 }
 export type { PPTFallbackHTMLImportEffect }
@@ -104,6 +110,14 @@ export type PPTClipboardImportAction =
   | {
       file: Blob & { name?: string }
       kind: 'image-file'
+    }
+  | {
+      files: readonly (Blob & { name?: string })[]
+      kind: 'table-file-batch'
+    }
+  | {
+      file: Blob & { name?: string }
+      kind: 'table-file'
     }
   | {
       kind: 'image-source'
@@ -157,6 +171,10 @@ export type PPTStageDropImportAction =
       kind: 'image-file'
     }
   | {
+      files: readonly (Blob & { name?: string })[]
+      kind: 'table-file-batch'
+    }
+  | {
       fallbackSource: PPTTableImportSource | null
       file: Blob & { name?: string }
       kind: 'table-file'
@@ -187,6 +205,21 @@ export function getPPTClipboardImportActions(
             ? { files, kind: 'image-file-batch' }
             : file
               ? { file, kind: 'image-file' }
+              : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const files = getPPTTableFilesFromDataTransfer(dataTransfer)
+          const file = files.length === 1
+            ? files[0]
+            : getPPTTableFileFromDataTransfer(dataTransfer)
+
+          return files.length > 1
+            ? { files, kind: 'table-file-batch' }
+            : file
+              ? { file, kind: 'table-file' }
               : null
         },
       },
@@ -272,7 +305,7 @@ export function getPPTClipboardImportActions(
         },
       },
       {
-        mode: 'append',
+        mode: 'exclusive',
         resolve: () => {
           const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
 
@@ -280,7 +313,7 @@ export function getPPTClipboardImportActions(
         },
       },
       {
-        mode: 'append',
+        mode: 'exclusive',
         resolve: () => {
           const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
 
@@ -315,6 +348,16 @@ export function getPPTStageDropImportAction(
               : file
                 ? { file, kind: 'image-file' }
                 : null
+          },
+        },
+        {
+          mode: 'exclusive',
+          resolve: () => {
+            const files = getPPTTableFilesFromDataTransfer(dataTransfer)
+
+            return files.length > 1
+              ? { files, kind: 'table-file-batch' }
+              : null
           },
         },
         {
@@ -383,17 +426,24 @@ export function createPPTImageImportEffect({
 }
 
 export function createPPTTableImportEffect({
+  batch,
   element,
   source,
 }: {
+  batch?: {
+    count: number
+    names: readonly string[]
+  }
   element: PPTTable
   source: PPTTableImportSource
 }): PPTTableImportEffect {
   return {
     columnCount: getPPTTableColumnCount(element.rows),
+    count: batch?.count ?? 1,
     format: source.format ?? 'text-delimited',
     model: PPT_TABLE_IMPORT_MODEL,
     name: element.name,
+    names: (batch?.names ?? [element.name]).join(', '),
     rowCount: element.rows.length,
   }
 }

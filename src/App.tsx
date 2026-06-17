@@ -606,7 +606,7 @@ import {
   createPPTImportedImageElements,
   getPPTImageFileFromList,
   createPPTMediaElement,
-  createPPTTableElement,
+  createPPTTableElements,
   createPPTTableImportEffect,
   createPPTRichTextPasteElement,
   createPPTTextPasteElement,
@@ -2120,6 +2120,10 @@ function App() {
   const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
   const [lastDeckHTMLImportEffect, setLastDeckHTMLImportEffect] =
     useState<PPTDeckHTMLImportEffect | null>(null)
+  const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
+    useState('')
+  const [lastStageDropImportActionKind, setLastStageDropImportActionKind] =
+    useState('')
   const [lastSlideSVGClipboardEffect, setLastSlideSVGClipboardEffect] =
     useState<PPTSlideSVGClipboardEffect | null>(null)
   const [lastSelectionSVGClipboardEffect, setLastSelectionSVGClipboardEffect] =
@@ -2974,7 +2978,12 @@ function App() {
         return
       }
 
-      for (const action of getPPTClipboardImportActions(event.clipboardData)) {
+      const importActions = getPPTClipboardImportActions(event.clipboardData)
+      setLastClipboardImportActionKinds(
+        importActions.map((action) => action.kind).join(' '),
+      )
+
+      for (const action of importActions) {
         if (runPPTClipboardImportAction(action)) {
           event.preventDefault()
           return
@@ -3910,6 +3919,12 @@ function App() {
       case 'image-file':
         void insertPPTImageFile(action.file)
         return true
+      case 'table-file-batch':
+        void insertPPTTableFiles(action.files)
+        return true
+      case 'table-file':
+        void insertPPTTableFile(action.file)
+        return true
       case 'image-source':
         if (action.resolveNaturalSize) {
           void resolvePPTImageSourceNaturalSize(action.source).then((source) => {
@@ -3956,6 +3971,9 @@ function App() {
         return true
       case 'image-file':
         void insertPPTImageFile(action.file, point)
+        return true
+      case 'table-file-batch':
+        void insertPPTTableFiles(action.files, point)
         return true
       case 'table-file':
         void insertPPTTableFile(action.file, point).then((inserted) => {
@@ -4293,17 +4311,39 @@ function App() {
     source: PPTTableImportSource = { format: 'default', rows: PPT_DEFAULT_TABLE_ROWS },
     center = getPPTViewportCenter(),
   ) {
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const id = createPPTElementId(slide, 'table')
-      const element = createPPTTableElement({
-        id,
-        name: source.name ?? 'Table',
-        point: center,
-        rows: source.rows,
-      })
+    return insertPPTTableSources([source], center)
+  }
 
-      setLastTableImportEffect(createPPTTableImportEffect({ element, source }))
-      setSelection([element.id])
+  function insertPPTTableSources(
+    sources: readonly PPTTableImportSource[],
+    center = getPPTViewportCenter(),
+  ) {
+    if (sources.length === 0) {
+      return false
+    }
+
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const elements = createPPTTableElements({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        sources,
+      })
+      const lastElement = elements[elements.length - 1]
+      const lastSource = sources[sources.length - 1]
+
+      if (!lastElement || !lastSource) {
+        return slide
+      }
+
+      setLastTableImportEffect(createPPTTableImportEffect({
+        batch: {
+          count: elements.length,
+          names: elements.map((element) => element.name),
+        },
+        element: lastElement,
+        source: lastSource,
+      }))
+      setSelection(elements.map((element) => element.id))
       setEditingId(null)
       setLineCreationMode(null)
       setCreationTool(null)
@@ -4315,9 +4355,11 @@ function App() {
 
       return {
         ...slide,
-        elements: [...slide.elements, element],
+        elements: [...slide.elements, ...elements],
       }
     }))
+
+    return true
   }
 
   async function insertPPTTableFile(
@@ -4334,12 +4376,25 @@ function App() {
     return true
   }
 
+  async function insertPPTTableFiles(
+    files: readonly (Blob & { name?: string })[],
+    center = getPPTViewportCenter(),
+  ) {
+    const sources: PPTTableImportSource[] = []
+
+    for (const source of await Promise.all(files.map(readPPTTableFileSource))) {
+      if (source) {
+        sources.push(source)
+      }
+    }
+
+    return insertPPTTableSources(sources, center)
+  }
+
   function insertPPTMediaSource(
     source: PPTMediaImportSource,
     center = getPPTViewportCenter(),
   ) {
-    let imported: PPTMediaImportResult | null = null
-
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTMediaElement({
         createId: createPPTElementIdFactory(slide),
@@ -4352,7 +4407,6 @@ function App() {
         return slide
       }
 
-      imported = result
       setLastMediaImport(result)
       setSelection([result.item.id])
       setEditingId(null)
@@ -4370,17 +4424,13 @@ function App() {
       }
     }))
 
-    setLastMediaImport(imported)
-
-    return imported !== null
+    return true
   }
 
   function insertPPTTextPasteSource(
     text: string,
     center = getPPTViewportCenter(),
   ) {
-    let imported: PPTTextPasteImportResult | null = null
-
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTTextPasteElement({
         createId: createPPTElementIdFactory(slide),
@@ -4393,7 +4443,7 @@ function App() {
         return slide
       }
 
-      imported = result
+      setLastTextPasteImport(result)
       setSelection([result.item.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -4410,17 +4460,13 @@ function App() {
       }
     }))
 
-    setLastTextPasteImport(imported)
-
-    return imported !== null
+    return true
   }
 
   function insertPPTRichTextPasteSource(
     source: PPTRichTextPasteSource,
     center = getPPTViewportCenter(),
   ) {
-    let imported: PPTTextPasteImportResult | null = null
-
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTRichTextPasteElement({
         createId: createPPTElementIdFactory(slide),
@@ -4433,7 +4479,7 @@ function App() {
         return slide
       }
 
-      imported = result
+      setLastTextPasteImport(result)
       setSelection([result.item.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -4450,9 +4496,7 @@ function App() {
       }
     }))
 
-    setLastTextPasteImport(imported)
-
-    return imported !== null
+    return true
   }
 
   function handleImageInputChange(event: ReactChangeEvent<HTMLInputElement>) {
@@ -6439,6 +6483,7 @@ function App() {
 
   function handleStageDrop(event: ReactDragEvent<HTMLDivElement>) {
     const action = getPPTStageDropImportAction(event.dataTransfer)
+    setLastStageDropImportActionKind(action?.kind ?? '')
 
     if (!action) {
       return
@@ -8669,6 +8714,8 @@ function App() {
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
+        data-ppt-import-extension-last-clipboard-actions={lastClipboardImportActionKinds}
+        data-ppt-import-extension-last-drop-action={lastStageDropImportActionKind}
         data-ppt-import-extension-clipboard-action-order={PPT_IMPORT_EXTENSION.clipboardActionOrder.join(' ')}
         data-ppt-import-extension-drop-action-order={PPT_IMPORT_EXTENSION.dropActionOrder.join(' ')}
         data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
@@ -8953,9 +9000,11 @@ function App() {
         data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
+        data-ppt-table-import-count={lastTableImportEffect?.count}
         data-ppt-table-import-format={lastTableImportEffect?.format}
         data-ppt-table-import-model={PPT_TABLE_IMPORT_MODEL}
         data-ppt-table-import-name={lastTableImportEffect?.name}
+        data-ppt-table-import-names={lastTableImportEffect?.names}
         data-ppt-table-import-rows={lastTableImportEffect?.rowCount}
         data-ppt-text-overflow-indicator-anchor={selectedTextAutoFitIndicator?.anchor}
         data-ppt-text-overflow-indicator-axis={selectedTextAutoFitIndicator?.overflowAxis.join(' ')}
