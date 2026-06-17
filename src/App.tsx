@@ -299,110 +299,6 @@ import {
   type SlideEditTransitionUpdateCommand,
 } from '@interactive-os/slide-edit-affordance'
 import {
-  CANVAS_COMMENT_THREAD_MODEL,
-  CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL,
-  CANVAS_KEYBOARD_COMMAND_INTENT_MODEL,
-  CANVAS_KEYBOARD_NUDGE_INTENT_MODEL,
-  CANVAS_KEYBOARD_NUDGE_KEYS,
-  CANVAS_KEYBOARD_NUDGE_LARGE_STEP,
-  CANVAS_KEYBOARD_NUDGE_MODEL,
-  CANVAS_KEYBOARD_NUDGE_STEP,
-  CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
-  CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
-  CANVAS_KEYBOARD_VIEWPORT_MODEL,
-  CANVAS_MENU_FOCUS_MODEL,
-  CANVAS_MENU_ITEM_PROPS,
-  CANVAS_MENU_KEYBOARD_KEYS,
-  CANVAS_MENU_ROVING_FOCUS_MODEL,
-  CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
-  CANVAS_RADIO_GROUP_FOCUS_MODEL,
-  CANVAS_RADIO_GROUP_KEYBOARD_MODEL,
-  CANVAS_RADIO_GROUP_MODEL,
-  CANVAS_RESIZE_POINTER_MODIFIERS_MODEL,
-  CANVAS_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL,
-  CANVAS_TABS_ROVING_FOCUS_MODEL,
-  CANVAS_TOOLBAR_FOCUS_MODEL,
-  CANVAS_TOOLBAR_ITEM_PROPS,
-  CANVAS_TOOLBAR_KEYBOARD_MODEL,
-  CANVAS_TOOLBAR_ROVING_FOCUS_MODEL,
-  bindCanvasEventListener,
-  bindCanvasEventListeners,
-  cancelCanvasAnimationFrameTask,
-  cancelCanvasDeferredFocus,
-  captureCanvasPointerFromEvent,
-  centerCanvasViewportAtWorldPoint,
-  createCanvasPastePositionKey,
-  createCanvasRichClipboardHTML,
-  createCanvasTabsDescriptor,
-  downloadCanvasTextFile,
-  fitCanvasViewportToBounds,
-  focusCanvasElement,
-  focusCanvasElementBySelectorOnNextFrame,
-  focusCanvasElementOnNextFrame,
-  getCanvasClientViewportSize,
-  getCanvasCommandPaletteKeyboardIntent,
-  getCanvasContextMenuKeyboardIntent,
-  getCanvasContextMenuPosition,
-  getCanvasDataTransferText,
-  getCanvasEditableFieldKeyboardIntent,
-  getCanvasFindInputKeyboardIntent,
-  getCanvasFloatingAnchorForBounds,
-  getCanvasInlineEditKeyboardIntent,
-  getCanvasKeyboardBuiltinCommandShortcutIntent,
-  getCanvasKeyboardNudgeShortcutIntent,
-  getCanvasKeyboardSystemShortcutIntent,
-  getCanvasKeyboardToolShortcutIntent,
-  getCanvasKeyboardViewportShortcutIntent,
-  getCanvasMenuTriggerKeyboardIntent,
-  getCanvasModalBackdropPointerIntent,
-  getCanvasModalKeyboardIntent,
-  getCanvasPasteOffsetForBounds,
-  getCanvasPastePositionSession,
-  getCanvasPresentationKeyboardIntent,
-  getCanvasPointerLocalGeometry,
-  getCanvasPointerTransformModifierState,
-  getCanvasRadioTabIndex,
-  getCanvasResizeHandleDoubleClickIntent,
-  getCanvasSelectionListModifierState,
-  getCanvasTabsKeyboardIntent,
-  getCanvasWorldClientPoint,
-  handleCanvasRadioGroupKeyDown,
-  isCanvasControlTarget,
-  isCanvasKeyboardCommandIntent,
-  isCanvasKeyboardToolIntent,
-  isCanvasKeyboardTypingTarget,
-  isCanvasKeyboardViewportIntent,
-  isCanvasTargetWithinSelector,
-  isCanvasWheelPassthroughTarget,
-  measureCanvasElementOverflow,
-  measureCanvasTextBlocks,
-  readCanvasRichClipboardFromDataTransfer,
-  resetCanvasViewport,
-  runCanvasKeyboardCommandIntent,
-  runCanvasKeyboardToolIntent,
-  runCanvasKeyboardViewportIntent,
-  scheduleCanvasAnimationFrameTask,
-  scheduleCanvasTimeoutTask,
-  setCanvasDataTransferDropEffect,
-  setCanvasDataTransferText,
-  shouldReleaseCanvasKeyboardTemporaryPan,
-  stringifyCanvasRichClipboardPayload,
-  trapCanvasModalTabFocus,
-  useCanvasMenuRovingFocus,
-  useCanvasModalFocusLifecycle,
-  useCanvasToolbarRovingFocus,
-  writeCanvasClipboardText,
-  writeCanvasRichClipboardPayload,
-  zoomCanvasViewport,
-  type CanvasFloatingAnchor,
-  type CanvasKeyboardToolIntent,
-  type CanvasPastePositionMemory,
-  type CanvasPointerClickMemory,
-  type CanvasRichClipboardReadFormat,
-  type CanvasRichClipboardWriteMode,
-  type CanvasTabsDescriptor,
-} from 'canvas/app'
-import {
   PPT_RESIZE_HANDLES,
   clampPPTCanvasBoundsToFrame,
   clampPPTCanvasPointToBounds,
@@ -537,13 +433,90 @@ import {
   createPPTCanvasSvgPathData,
 } from './pptCanvasRendererAdapter'
 import {
+  PPT_COMMENT_THREAD_MODEL,
+  PPT_KEYBOARD_COMMAND_DISPATCH_MODEL,
+  PPT_KEYBOARD_COMMAND_INTENT_MODEL,
+  PPT_KEYBOARD_NUDGE_INTENT_MODEL,
+  PPT_KEYBOARD_NUDGE_KEYS,
+  PPT_KEYBOARD_NUDGE_LARGE_STEP,
+  PPT_KEYBOARD_NUDGE_MODEL,
+  PPT_KEYBOARD_NUDGE_STEP,
+  PPT_KEYBOARD_TOOL_DISPATCH_MODEL,
+  PPT_KEYBOARD_VIEWPORT_INTENT_MODEL,
+  PPT_KEYBOARD_VIEWPORT_MODEL,
+  PPT_MENU_FOCUS_MODEL,
+  PPT_MENU_ITEM_PROPS,
+  PPT_MENU_KEYBOARD_KEYS,
+  PPT_MENU_ROVING_FOCUS_MODEL,
+  PPT_MODAL_FOCUS_LIFECYCLE_MODEL,
+  PPT_RADIO_GROUP_FOCUS_MODEL,
+  PPT_RADIO_GROUP_KEYBOARD_MODEL,
+  PPT_RADIO_GROUP_MODEL,
+  PPT_RESIZE_POINTER_MODIFIERS_MODEL,
+  PPT_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL,
+  PPT_TABS_ROVING_FOCUS_MODEL,
+  PPT_TOOLBAR_FOCUS_MODEL,
+  PPT_TOOLBAR_ITEM_PROPS,
+  PPT_TOOLBAR_KEYBOARD_MODEL,
+  PPT_TOOLBAR_ROVING_FOCUS_MODEL,
+  bindPPTCanvasEventListener,
+  bindPPTCanvasEventListeners,
+  cancelPPTCanvasAnimationFrameTask,
+  cancelPPTCanvasDeferredFocus,
+  capturePPTCanvasPointerFromEvent,
+  centerPPTCanvasViewportAtWorldPoint,
+  createPPTCanvasPastePositionKey,
+  createPPTCanvasRichClipboardHTML,
+  createPPTCanvasTabsDescriptor,
+  downloadPPTCanvasTextFile,
   filterPPTCommandPaletteItems,
+  fitPPTCanvasViewportToBounds,
+  focusPPTCanvasElement,
+  focusPPTCanvasElementBySelectorOnNextFrame,
+  focusPPTCanvasElementOnNextFrame,
   getPPTInlineEditHistoryDirectionFromInputType,
+  getPPTCanvasClientViewportSize,
+  getPPTCanvasCommandPaletteKeyboardIntent,
+  getPPTCanvasContextMenuKeyboardIntent,
+  getPPTCanvasContextMenuPosition,
+  getPPTCanvasDataTransferText,
+  getPPTCanvasEditableFieldKeyboardIntent,
+  getPPTCanvasFindInputKeyboardIntent,
+  getPPTCanvasFloatingAnchorForBounds,
+  getPPTCanvasInlineEditKeyboardIntent,
+  getPPTCanvasKeyboardBuiltinCommandShortcutIntent,
+  getPPTCanvasKeyboardNudgeShortcutIntent,
+  getPPTCanvasKeyboardSystemShortcutIntent,
+  getPPTCanvasKeyboardToolShortcutIntent,
+  getPPTCanvasKeyboardViewportShortcutIntent,
+  getPPTCanvasMenuTriggerKeyboardIntent,
   getPPTMinimapPointFromViewportOffset,
   getPPTMinimapReadModel,
   getPPTMinimapWorldPoint,
+  getPPTCanvasModalBackdropPointerIntent,
+  getPPTCanvasModalKeyboardIntent,
+  getPPTCanvasPasteOffsetForBounds,
+  getPPTCanvasPastePositionSession,
+  getPPTCanvasPointerLocalGeometry,
+  getPPTCanvasPointerTransformModifierState,
+  getPPTCanvasPresentationKeyboardIntent,
+  getPPTCanvasRadioTabIndex,
+  getPPTCanvasResizeHandleDoubleClickIntent,
+  getPPTCanvasSelectionListModifierState,
+  getPPTCanvasTabsKeyboardIntent,
+  getPPTCanvasWorldClientPoint,
+  handlePPTCanvasRadioGroupKeyDown,
   insertPPTInlineEditText,
+  isPPTCanvasControlTarget,
+  isPPTCanvasKeyboardCommandIntent,
+  isPPTCanvasKeyboardToolIntent,
+  isPPTCanvasKeyboardTypingTarget,
+  isPPTCanvasKeyboardViewportIntent,
+  isPPTCanvasTargetWithinSelector,
+  isPPTCanvasWheelPassthroughTarget,
   isPPTInlineEditLineBreakInput,
+  measurePPTCanvasElementOverflow,
+  measurePPTCanvasTextBlocks,
   PPT_COMMAND_PALETTE_ITEMS_MODEL,
   PPT_INLINE_EDIT_DOM_MODEL,
   PPT_KEYBOARD_TEMPORARY_PAN_MODEL,
@@ -555,6 +528,31 @@ import {
   PPT_WHEEL_VIEWPORT_MODEL,
   PPT_WHEEL_VIEWPORT_PAN_MODE,
   PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
+  readPPTCanvasRichClipboardFromDataTransfer,
+  resetPPTCanvasViewport,
+  runPPTCanvasKeyboardCommandIntent,
+  runPPTCanvasKeyboardToolIntent,
+  runPPTCanvasKeyboardViewportIntent,
+  schedulePPTCanvasAnimationFrameTask,
+  schedulePPTCanvasTimeoutTask,
+  setPPTCanvasDataTransferDropEffect,
+  setPPTCanvasDataTransferText,
+  shouldReleasePPTCanvasKeyboardTemporaryPan,
+  stringifyPPTCanvasRichClipboardPayload,
+  trapPPTCanvasModalTabFocus,
+  usePPTCanvasMenuRovingFocus,
+  usePPTCanvasModalFocusLifecycle,
+  usePPTCanvasToolbarRovingFocus,
+  writePPTCanvasClipboardText,
+  writePPTCanvasRichClipboardPayload,
+  zoomPPTCanvasViewport,
+  type PPTCanvasFloatingAnchor,
+  type PPTCanvasKeyboardToolIntent,
+  type PPTCanvasPastePositionMemory,
+  type PPTCanvasPointerClickMemory,
+  type PPTCanvasRichClipboardReadFormat,
+  type PPTCanvasRichClipboardWriteMode,
+  type PPTCanvasTabsDescriptor,
   type PPTCommandPaletteItemBase,
   type PPTMinimapItemBounds as PPTMinimapItemBoundsBase,
   type PPTMinimapReadModel as PPTMinimapReadModelBase,
@@ -961,7 +959,7 @@ type PPTClipboardPastePositionEffect = {
   pasteIndex: number
   viewportCenter: Point | null
 }
-type PPTClipboardPastePositionMemory = CanvasPastePositionMemory
+type PPTClipboardPastePositionMemory = PPTCanvasPastePositionMemory
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
 const PPT_RICH_CLIPBOARD_VERSION = 1
@@ -976,8 +974,8 @@ const PPT_RICH_CLIPBOARD_FORMATS = [
   'image/svg+xml',
   'text/plain',
 ] as const
-type PPTRichClipboardImportFormat = CanvasRichClipboardReadFormat
-type PPTRichClipboardWriteMode = CanvasRichClipboardWriteMode | 'pending'
+type PPTRichClipboardImportFormat = PPTCanvasRichClipboardReadFormat
+type PPTRichClipboardWriteMode = PPTCanvasRichClipboardWriteMode | 'pending'
 type PPTRichClipboardExportPayload = {
   kind: typeof PPT_RICH_CLIPBOARD_KIND
   metadata: {
@@ -1420,7 +1418,7 @@ type PPTSlideDragState = {
   dropPlacement?: PPTSlideDropPlacement
   dropTargetSlideId?: string
 }
-type PPTSelectionCommandAnchor = CanvasFloatingAnchor
+type PPTSelectionCommandAnchor = PPTCanvasFloatingAnchor
 type PPTTextQuickFormatState = {
   align: NonNullable<PPTParagraph['align']>
   bullet: boolean
@@ -2031,10 +2029,10 @@ function App() {
     onFocus: handleTopbarToolbarFocus,
     onKeyDown: handleTopbarToolbarKeyDown,
     ref: setTopbarToolbarRoot,
-  } = useCanvasToolbarRovingFocus<HTMLElement>()
+  } = usePPTCanvasToolbarRovingFocus<HTMLElement>()
   const slideDragSuppressClickRef = useRef(false)
   const clipboardPastePositionMemoryRef = useRef<PPTClipboardPastePositionMemory | null>(null)
-  const resizeHandleClickMemoryRef = useRef<CanvasPointerClickMemory>(null)
+  const resizeHandleClickMemoryRef = useRef<PPTCanvasPointerClickMemory>(null)
   const deckRef = useRef(deck)
 
   useEffect(() => {
@@ -2294,7 +2292,7 @@ function App() {
   const canFitSelection = selectedBounds !== null
 
   const fitSlide = useCallback(() => {
-    fitCanvasViewportToBounds({
+    fitPPTCanvasViewportToBounds({
       bounds: {
         h: PPT_SLIDE_HEIGHT,
         w: PPT_SLIDE_WIDTH,
@@ -2307,7 +2305,7 @@ function App() {
   }, [canvasStageElement])
 
   const fitSelection = useCallback(() => {
-    fitCanvasViewportToBounds({
+    fitPPTCanvasViewportToBounds({
       bounds: scene.getBounds(selection),
       setViewport,
       stageElement: canvasStageElement,
@@ -2320,7 +2318,7 @@ function App() {
       return
     }
 
-    fitCanvasViewportToBounds({
+    fitPPTCanvasViewportToBounds({
       bounds: scene.getBounds(ids),
       setViewport,
       stageElement: canvasStageElement,
@@ -2328,11 +2326,11 @@ function App() {
   }, [canvasStageElement, fitSlide, scene])
 
   const resetZoom = useCallback(() => {
-    resetCanvasViewport({ setViewport })
+    resetPPTCanvasViewport({ setViewport })
   }, [])
 
   const navigateMinimapToWorldPoint = useCallback((point: Point) => {
-    centerCanvasViewportAtWorldPoint({
+    centerPPTCanvasViewportAtWorldPoint({
       point,
       setViewport,
       stageElement: canvasStageElement,
@@ -2370,17 +2368,17 @@ function App() {
   }
 
   useLayoutEffect(() => {
-    const frame = scheduleCanvasAnimationFrameTask({
+    const frame = schedulePPTCanvasAnimationFrameTask({
       task: () => fitSlide(),
     })
 
     return () => {
-      cancelCanvasAnimationFrameTask({ frame })
+      cancelPPTCanvasAnimationFrameTask({ frame })
     }
   }, [activeSlideId, fitSlide])
 
   useEffect(() => {
-    const cleanup = bindCanvasEventListener({
+    const cleanup = bindPPTCanvasEventListener({
       listener: () => fitSlide(),
       target: window,
       type: 'resize',
@@ -2401,7 +2399,7 @@ function App() {
     }
 
     function onPointerDown(event: PointerEvent) {
-      if (isCanvasTargetWithinSelector({
+      if (isPPTCanvasTargetWithinSelector({
         selectors: '[data-ppt-context-menu]',
         target: event.target,
       })) {
@@ -2411,7 +2409,7 @@ function App() {
       setContextMenu(null)
     }
 
-    const cleanup = bindCanvasEventListener({
+    const cleanup = bindPPTCanvasEventListener({
       listener: onPointerDown,
       target: document,
       type: 'pointerdown',
@@ -2427,13 +2425,13 @@ function App() {
       return
     }
 
-    const frame = focusCanvasElementOnNextFrame({
+    const frame = focusPPTCanvasElementOnNextFrame({
       resolveElement: () => findInputRef.current,
       select: true,
     })
 
     return () => {
-      cancelCanvasDeferredFocus({ frame })
+      cancelPPTCanvasDeferredFocus({ frame })
     }
   }, [findOpen])
 
@@ -2451,7 +2449,7 @@ function App() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (presentationSlideId) {
-        const presentationKeyboardIntent = getCanvasPresentationKeyboardIntent({
+        const presentationKeyboardIntent = getPPTCanvasPresentationKeyboardIntent({
           key: event.key,
         })
 
@@ -2472,12 +2470,12 @@ function App() {
         }
       }
 
-      if (isCanvasKeyboardTypingTarget(event.target)) {
+      if (isPPTCanvasKeyboardTypingTarget(event.target)) {
         return
       }
 
       if (shortcutHelpOpen) {
-        const shortcutHelpKeyboardIntent = getCanvasModalKeyboardIntent({
+        const shortcutHelpKeyboardIntent = getPPTCanvasModalKeyboardIntent({
           key: event.key,
         })
 
@@ -2491,7 +2489,7 @@ function App() {
       }
 
       const mod = event.metaKey || event.ctrlKey
-      const beforeTypingSystemShortcutIntent = getCanvasKeyboardSystemShortcutIntent({
+      const beforeTypingSystemShortcutIntent = getPPTCanvasKeyboardSystemShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2511,7 +2509,7 @@ function App() {
         return
       }
 
-      const systemShortcutIntent = getCanvasKeyboardSystemShortcutIntent({
+      const systemShortcutIntent = getPPTCanvasKeyboardSystemShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2544,7 +2542,7 @@ function App() {
         return
       }
 
-      const contextMenuKeyboardIntent = getCanvasContextMenuKeyboardIntent({
+      const contextMenuKeyboardIntent = getPPTCanvasContextMenuKeyboardIntent({
         event,
         key: event.key,
       })
@@ -2556,7 +2554,7 @@ function App() {
         return
       }
 
-      const viewportIntent = getCanvasKeyboardViewportShortcutIntent({
+      const viewportIntent = getPPTCanvasKeyboardViewportShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2564,12 +2562,12 @@ function App() {
         selection,
       })
 
-      if (viewportIntent && isCanvasKeyboardViewportIntent(viewportIntent)) {
+      if (viewportIntent && isPPTCanvasKeyboardViewportIntent(viewportIntent)) {
         if (viewportIntent.preventDefault) {
           event.preventDefault()
         }
 
-        runCanvasKeyboardViewportIntent({
+        runPPTCanvasKeyboardViewportIntent({
           handlers: {
             fitToItems: fitViewportToItems,
             resetViewport: resetZoom,
@@ -2602,7 +2600,7 @@ function App() {
         return
       }
 
-      const standardCommandIntent = getCanvasKeyboardBuiltinCommandShortcutIntent({
+      const standardCommandIntent = getPPTCanvasKeyboardBuiltinCommandShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2612,7 +2610,7 @@ function App() {
 
       if (
         standardCommandIntent &&
-        isCanvasKeyboardCommandIntent(standardCommandIntent) &&
+        isPPTCanvasKeyboardCommandIntent(standardCommandIntent) &&
         isPPTCanvasStandardCommandIntentKind(standardCommandIntent.kind)
       ) {
         if (standardCommandIntent.kind === 'paste-selection' && !commandAvailability.paste) {
@@ -2623,7 +2621,7 @@ function App() {
           event.preventDefault()
         }
 
-        runCanvasKeyboardCommandIntent({
+        runPPTCanvasKeyboardCommandIntent({
           handlers: {
             copySelection,
             cutSelection,
@@ -2666,8 +2664,8 @@ function App() {
 
       const toolShortcutIntent = getPPTToolShortcutIntent(event)
 
-      if (toolShortcutIntent && isCanvasKeyboardToolIntent(toolShortcutIntent)) {
-        runCanvasKeyboardToolIntent({
+      if (toolShortcutIntent && isPPTCanvasKeyboardToolIntent(toolShortcutIntent)) {
+        runPPTCanvasKeyboardToolIntent({
           handlers: {
             setTool: activatePPTToolShortcut,
           },
@@ -2710,7 +2708,7 @@ function App() {
         return
       }
 
-      const nudgeIntent = getCanvasKeyboardNudgeShortcutIntent({
+      const nudgeIntent = getPPTCanvasKeyboardNudgeShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
         key: event.key,
@@ -2731,7 +2729,7 @@ function App() {
     }
 
     function onKeyUp(event: KeyboardEvent) {
-      if (shouldReleaseCanvasKeyboardTemporaryPan({
+      if (shouldReleasePPTCanvasKeyboardTemporaryPan({
         config: PPT_CANVAS_COMMAND_CONFIG,
         event,
       })) {
@@ -2739,7 +2737,7 @@ function App() {
       }
     }
 
-    const cleanup = bindCanvasEventListeners({
+    const cleanup = bindPPTCanvasEventListeners({
       listeners: [
         { listener: onKeyDown, target: window, type: 'keydown' },
         { listener: onKeyUp, target: window, type: 'keyup' },
@@ -2754,7 +2752,7 @@ function App() {
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
-      if (isCanvasKeyboardTypingTarget(event.target)) {
+      if (isPPTCanvasKeyboardTypingTarget(event.target)) {
         return
       }
 
@@ -2775,7 +2773,7 @@ function App() {
       }
     }
 
-    const cleanup = bindCanvasEventListener({
+    const cleanup = bindPPTCanvasEventListener({
       listener: onPaste,
       target: window,
       type: 'paste',
@@ -2866,7 +2864,7 @@ function App() {
   }
 
   function focusPPTSlideThumb(slideId: string) {
-    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+    focusPPTCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
       match: ({ element }) =>
         element.getAttribute('data-ppt-slide-id') === slideId,
       root: document,
@@ -3059,7 +3057,7 @@ function App() {
   }
 
   function handleFindKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    const intent = getCanvasFindInputKeyboardIntent({
+    const intent = getPPTCanvasFindInputKeyboardIntent({
       key: event.key,
       shiftKey: event.shiftKey,
     })
@@ -3199,7 +3197,7 @@ function App() {
   function getSlideThumbDropPlacement(
     event: ReactDragEvent<HTMLButtonElement>,
   ): PPTSlideDropPlacement {
-    const localGeometry = getCanvasPointerLocalGeometry({
+    const localGeometry = getPPTCanvasPointerLocalGeometry({
       event,
       target: event.currentTarget,
     })
@@ -3220,7 +3218,7 @@ function App() {
   } = {}) {
     if (suppressClick) {
       slideDragSuppressClickRef.current = true
-      const timeout = scheduleCanvasTimeoutTask({
+      const timeout = schedulePPTCanvasTimeoutTask({
         delayMs: 120,
         task: () => {
           slideDragSuppressClickRef.current = false
@@ -3239,7 +3237,7 @@ function App() {
     slideId: string,
     event: ReactDragEvent<HTMLButtonElement>,
   ) {
-    setCanvasDataTransferText({
+    setPPTCanvasDataTransferText({
       dataTransfer: event.dataTransfer,
       effectAllowed: 'move',
       text: slideId,
@@ -3259,7 +3257,7 @@ function App() {
     }
 
     event.preventDefault()
-    setCanvasDataTransferDropEffect({
+    setPPTCanvasDataTransferDropEffect({
       dataTransfer: event.dataTransfer,
       dropEffect: 'move',
     })
@@ -3283,7 +3281,7 @@ function App() {
     event.preventDefault()
 
     const sourceSlideId = slideDragState?.draggingSlideId ||
-      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
+      getPPTCanvasDataTransferText({ dataTransfer: event.dataTransfer })
     const dropPlacement = slideDragState?.dropTargetSlideId === targetSlideId
       ? slideDragState.dropPlacement ?? getSlideThumbDropPlacement(event)
       : getSlideThumbDropPlacement(event)
@@ -4087,14 +4085,14 @@ function App() {
     }
 
     const pasteKey = getPPTClipboardPastePositionKey(payload, activeSlide.id)
-    const pasteSession = getCanvasPastePositionSession({
+    const pasteSession = getPPTCanvasPastePositionSession({
       key: pasteKey,
       memory: clipboardPastePositionMemoryRef.current,
     })
     const pasteIndex = pasteSession.pasteIndex
     const viewportCenter = getPPTViewportCenter()
     const clipboardBounds = getPPTElementsBounds([...payload.objects])
-    const pasteAnchor = getCanvasPasteOffsetForBounds({
+    const pasteAnchor = getPPTCanvasPasteOffsetForBounds({
       clipboardBounds,
       pasteIndex,
       viewportCenter,
@@ -5508,7 +5506,7 @@ function App() {
   }
 
   function copyHTML() {
-    void writeCanvasClipboardText({ text: exportCode })
+    void writePPTCanvasClipboardText({ text: exportCode })
   }
 
   function downloadHTML() {
@@ -5548,7 +5546,7 @@ function App() {
     filename: string
     type: string
   }) {
-    downloadCanvasTextFile({
+    downloadPPTCanvasTextFile({
       content,
       filename,
       type,
@@ -5587,7 +5585,7 @@ function App() {
   }
 
   function worldToScreen(point: Point) {
-    return getCanvasWorldClientPoint({
+    return getPPTCanvasWorldClientPoint({
       point,
       stageElement: canvasStageElement,
       viewport,
@@ -5595,8 +5593,8 @@ function App() {
   }
 
   function openPPTContextMenu(x: number, y: number) {
-    const viewportSize = getCanvasClientViewportSize()
-    const position = getCanvasContextMenuPosition({
+    const viewportSize = getPPTCanvasClientViewportSize()
+    const position = getPPTCanvasContextMenuPosition({
       menuSize: { height: 320, width: 220 },
       point: { x, y },
       viewportSize,
@@ -5622,7 +5620,7 @@ function App() {
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
     if (canHandlePPTStageDropImport(event.dataTransfer)) {
       event.preventDefault()
-      setCanvasDataTransferDropEffect({
+      setPPTCanvasDataTransferDropEffect({
         dataTransfer: event.dataTransfer,
         dropEffect: 'copy',
       })
@@ -5646,7 +5644,7 @@ function App() {
   function handleStageWheel(event: WheelEvent) {
     if (
       editingId ||
-      isCanvasKeyboardTypingTarget(event.target) ||
+      isPPTCanvasKeyboardTypingTarget(event.target) ||
       isPPTWheelViewportPassthroughTarget(event.target)
     ) {
       return
@@ -5687,7 +5685,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
     const projection = getPPTPointerProjection(event.nativeEvent)
     const result = startPPTPointerPanInteraction({
       input: event.nativeEvent,
@@ -5708,7 +5706,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const projection = getPPTPointerProjection(event.nativeEvent)
     const startWorld = clampPPTPointToSlide(projection.startWorld)
@@ -5741,7 +5739,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5785,7 +5783,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5829,7 +5827,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5866,7 +5864,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5902,7 +5900,7 @@ function App() {
   }
 
   function focusStageShell() {
-    focusCanvasElement({ element: stageRef.current })
+    focusPPTCanvasElement({ element: stageRef.current })
   }
 
   function handleElementPointerDown(
@@ -5945,7 +5943,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
@@ -6022,7 +6020,7 @@ function App() {
     event: ReactMouseEvent<HTMLDivElement>,
     elementId: string,
   ) {
-    if (editingId || isCanvasKeyboardTypingTarget(event.target)) {
+    if (editingId || isPPTCanvasKeyboardTypingTarget(event.target)) {
       return
     }
 
@@ -6056,7 +6054,7 @@ function App() {
     }
 
     focusStageShell()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
     const additive = isAdditivePPTPointerInput(event)
     const point = screenToWorld(event.nativeEvent)
 
@@ -6099,7 +6097,7 @@ function App() {
   }
 
   function handleStageContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
-    if (editingId || isCanvasKeyboardTypingTarget(event.target)) {
+    if (editingId || isPPTCanvasKeyboardTypingTarget(event.target)) {
       return
     }
 
@@ -6130,7 +6128,7 @@ function App() {
       x: event.clientX,
       y: event.clientY,
     }
-    const resizeHandleIntent = getCanvasResizeHandleDoubleClickIntent({
+    const resizeHandleIntent = getPPTCanvasResizeHandleDoubleClickIntent({
       handle,
       handleId: clickId,
       lastClick: resizeHandleClickMemoryRef.current,
@@ -6160,7 +6158,7 @@ function App() {
       return
     }
 
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     setInteraction({
       bounds: selectedBounds,
@@ -6175,7 +6173,7 @@ function App() {
   function handleRotatePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     if (!selectedBounds || !canResizeSelection) {
       return
@@ -6205,7 +6203,7 @@ function App() {
   ) {
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     if (!selectedLineElement || !canResizeSelection) {
       return
@@ -6225,7 +6223,7 @@ function App() {
   ) {
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
 
     if (!selectedLineElement || !canResizeSelection) {
       return
@@ -6505,7 +6503,7 @@ function App() {
     }
 
     if (interaction.kind === 'resize') {
-      const transformModifierState = getCanvasPointerTransformModifierState(event)
+      const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
       const elements = resizePPTCanvasSelection({
         adapter: pptCanvasTransformAdapter,
         bounds: interaction.bounds,
@@ -6559,7 +6557,7 @@ function App() {
       item.elementId,
       item.rotation,
     ]))
-    const transformModifierState = getCanvasPointerTransformModifierState(event)
+    const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
     const elements = mapPPTElementsByIds(
       startSlide.elements,
       interaction.startRotations.map((item) => item.elementId),
@@ -6724,7 +6722,7 @@ function App() {
   }
 
   function zoom(direction: 'in' | 'out') {
-    zoomCanvasViewport({
+    zoomPPTCanvasViewport({
       direction,
       setViewport,
       stageElement: canvasStageElement,
@@ -6750,7 +6748,7 @@ function App() {
     !lineCreationMode &&
     !isLaserToolActive &&
     !isEraserToolActive
-    ? getCanvasFloatingAnchorForBounds({
+    ? getPPTCanvasFloatingAnchorForBounds({
         bounds: selectedBounds,
         floatingSize: {
           height: 40,
@@ -7236,9 +7234,9 @@ function App() {
         aria-orientation="horizontal"
         className="ppt-topbar"
         data-ppt-toolbar
-        data-ppt-toolbar-focus-model={CANVAS_TOOLBAR_FOCUS_MODEL}
-        data-ppt-toolbar-keyboard-model={CANVAS_TOOLBAR_KEYBOARD_MODEL}
-        data-ppt-toolbar-model={CANVAS_TOOLBAR_ROVING_FOCUS_MODEL}
+        data-ppt-toolbar-focus-model={PPT_TOOLBAR_FOCUS_MODEL}
+        data-ppt-toolbar-keyboard-model={PPT_TOOLBAR_KEYBOARD_MODEL}
+        data-ppt-toolbar-model={PPT_TOOLBAR_ROVING_FOCUS_MODEL}
         ref={setTopbarToolbarRoot}
         role="toolbar"
         onFocus={handleTopbarToolbarFocus}
@@ -7249,25 +7247,25 @@ function App() {
           <span>{deck.title}</span>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.undo} onClick={undo} title={PPT_COMMAND_AFFORDANCES.undo.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.undo} onClick={undo} title={PPT_COMMAND_AFFORDANCES.undo.title} type="button">
             <Undo2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={PPT_COMMAND_AFFORDANCES.redo.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={PPT_COMMAND_AFFORDANCES.redo.title} type="button">
             <Redo2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
             <Search size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
             <Command size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="copy-formatting" disabled={!commandAvailability.copyFormatting} onClick={copyFormatting} title="Copy formatting" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="copy-formatting" disabled={!commandAvailability.copyFormatting} onClick={copyFormatting} title="Copy formatting" type="button">
             <Paintbrush size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} onClick={pasteFormatting} title="Paste formatting" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} onClick={pasteFormatting} title="Paste formatting" type="button">
             <Paintbrush size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-shortcut-help-open onClick={openShortcutHelp} title="Keyboard shortcuts" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-shortcut-help-open onClick={openShortcutHelp} title="Keyboard shortcuts" type="button">
             <Keyboard size={17} />
           </button>
         </div>
@@ -7290,7 +7288,7 @@ function App() {
         ) : null}
         <div className="ppt-toolbar-group">
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.pan.ariaLabel}
             aria-pressed={isPanToolActive}
             className="ppt-icon-button"
@@ -7303,7 +7301,7 @@ function App() {
             <Hand size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.laser.ariaLabel}
             aria-pressed={isLaserToolActive}
             className="ppt-icon-button"
@@ -7316,7 +7314,7 @@ function App() {
             <MousePointer2 size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.text.ariaLabel}
             aria-pressed={creationTool?.kind === 'text'}
             className="ppt-icon-button"
@@ -7328,7 +7326,7 @@ function App() {
             <Type size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.sticky.ariaLabel}
             aria-pressed={creationTool?.kind === 'sticky'}
             className="ppt-icon-button"
@@ -7340,7 +7338,7 @@ function App() {
             <StickyNote size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.section.ariaLabel}
             aria-pressed={creationTool?.kind === 'section'}
             className="ppt-icon-button"
@@ -7352,7 +7350,7 @@ function App() {
             <Frame size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.rect.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'rect')}
             className="ppt-icon-button"
@@ -7365,7 +7363,7 @@ function App() {
             <Square size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.ellipse.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'ellipse')}
             className="ppt-icon-button"
@@ -7378,7 +7376,7 @@ function App() {
             <Circle size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.diamond.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'diamond')}
             className="ppt-icon-button"
@@ -7390,11 +7388,11 @@ function App() {
           >
             <Diamond size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
             <Minus size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.arrow.ariaLabel}
             aria-pressed={lineCreationMode === 'arrow'}
             className="ppt-icon-button"
@@ -7407,7 +7405,7 @@ function App() {
             <ArrowRight size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.pen.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'pen')}
             className="ppt-icon-button"
@@ -7419,7 +7417,7 @@ function App() {
             <PenLine size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.marker.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'marker')}
             className="ppt-icon-button"
@@ -7431,7 +7429,7 @@ function App() {
             <PencilLine size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.highlight.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'highlight')}
             className="ppt-icon-button"
@@ -7443,7 +7441,7 @@ function App() {
             <Highlighter size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.eraser.ariaLabel}
             aria-pressed={isEraserToolActive}
             className="ppt-icon-button"
@@ -7456,7 +7454,7 @@ function App() {
             <Eraser size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={PPT_TOOL_AFFORDANCES.comment.ariaLabel}
             aria-pressed={creationTool?.kind === 'comment'}
             className="ppt-icon-button"
@@ -7468,10 +7466,10 @@ function App() {
           >
             <MessageSquare size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
             <ImagePlus size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
             <Table2 size={17} />
           </button>
           <input
@@ -7483,100 +7481,100 @@ function App() {
             type="file"
             onChange={handleImageInputChange}
           />
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={PPT_COMMAND_AFFORDANCES.delete.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={PPT_COMMAND_AFFORDANCES.delete.title} type="button">
             <Trash2 size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} onClick={() => alignSelection('alignLeft')} title={PPT_COMMAND_AFFORDANCES.alignLeft.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} onClick={() => alignSelection('alignLeft')} title={PPT_COMMAND_AFFORDANCES.alignLeft.title} type="button">
             <AlignStartVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} onClick={() => alignSelection('alignCenter')} title={PPT_COMMAND_AFFORDANCES.alignCenter.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} onClick={() => alignSelection('alignCenter')} title={PPT_COMMAND_AFFORDANCES.alignCenter.title} type="button">
             <AlignCenterVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-right" disabled={!commandAvailability.alignRight} onClick={() => alignSelection('alignRight')} title={PPT_COMMAND_AFFORDANCES.alignRight.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-right" disabled={!commandAvailability.alignRight} onClick={() => alignSelection('alignRight')} title={PPT_COMMAND_AFFORDANCES.alignRight.title} type="button">
             <AlignEndVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-top" disabled={!commandAvailability.alignTop} onClick={() => alignSelection('alignTop')} title={PPT_COMMAND_AFFORDANCES.alignTop.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-top" disabled={!commandAvailability.alignTop} onClick={() => alignSelection('alignTop')} title={PPT_COMMAND_AFFORDANCES.alignTop.title} type="button">
             <AlignStartHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} onClick={() => alignSelection('alignMiddle')} title={PPT_COMMAND_AFFORDANCES.alignMiddle.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} onClick={() => alignSelection('alignMiddle')} title={PPT_COMMAND_AFFORDANCES.alignMiddle.title} type="button">
             <AlignCenterHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} onClick={() => alignSelection('alignBottom')} title={PPT_COMMAND_AFFORDANCES.alignBottom.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} onClick={() => alignSelection('alignBottom')} title={PPT_COMMAND_AFFORDANCES.alignBottom.title} type="button">
             <AlignEndHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} onClick={() => distributeSelection('distributeHorizontal')} title={PPT_COMMAND_AFFORDANCES.distributeHorizontal.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} onClick={() => distributeSelection('distributeHorizontal')} title={PPT_COMMAND_AFFORDANCES.distributeHorizontal.title} type="button">
             <AlignHorizontalDistributeCenter size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={PPT_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={PPT_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
             <AlignVerticalDistributeCenter size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
             <Grid2X2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-horizontal" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('horizontal')} title="Flip horizontal" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-horizontal" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('horizontal')} title="Flip horizontal" type="button">
             <FlipHorizontal2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-vertical" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('vertical')} title="Flip vertical" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-vertical" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('vertical')} title="Flip vertical" type="button">
             <FlipVertical2 size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} onClick={() => reorderSelection('bringForward')} title={PPT_COMMAND_AFFORDANCES.bringForward.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} onClick={() => reorderSelection('bringForward')} title={PPT_COMMAND_AFFORDANCES.bringForward.title} type="button">
             <MoveUp size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} onClick={() => reorderSelection('bringToFront')} title={PPT_COMMAND_AFFORDANCES.bringToFront.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} onClick={() => reorderSelection('bringToFront')} title={PPT_COMMAND_AFFORDANCES.bringToFront.title} type="button">
             <BringToFront size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} onClick={() => reorderSelection('sendBackward')} title={PPT_COMMAND_AFFORDANCES.sendBackward.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} onClick={() => reorderSelection('sendBackward')} title={PPT_COMMAND_AFFORDANCES.sendBackward.title} type="button">
             <MoveDown size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} onClick={() => reorderSelection('sendToBack')} title={PPT_COMMAND_AFFORDANCES.sendToBack.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} onClick={() => reorderSelection('sendToBack')} title={PPT_COMMAND_AFFORDANCES.sendToBack.title} type="button">
             <SendToBack size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={PPT_COMMAND_AFFORDANCES.group.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={PPT_COMMAND_AFFORDANCES.group.title} type="button">
             <Group size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={PPT_COMMAND_AFFORDANCES.ungroup.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={PPT_COMMAND_AFFORDANCES.ungroup.title} type="button">
             <Ungroup size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={PPT_COMMAND_AFFORDANCES.lockSelection.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={PPT_COMMAND_AFFORDANCES.lockSelection.title} type="button">
             <Lock size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={PPT_COMMAND_AFFORDANCES.unlockAll.title} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={PPT_COMMAND_AFFORDANCES.unlockAll.title} type="button">
             <Unlock size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-present-start onClick={() => startPresentation()} title="Start presentation" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-present-start onClick={() => startPresentation()} title="Start presentation" type="button">
             <Play size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
             <ZoomOut size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-slide onClick={fitSlide} title="Fit slide" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-slide onClick={fitSlide} title="Fit slide" type="button">
             <Maximize2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-selection disabled={!canFitSelection} onClick={fitSelection} title="Fit selection" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-selection disabled={!canFitSelection} onClick={fitSelection} title="Fit selection" type="button">
             <Maximize2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('in')} title="Zoom in" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('in')} title="Zoom in" type="button">
             <ZoomIn size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
             <Grid2X2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} className="ppt-icon-button" data-ppt-view-minimap onClick={() => setShowMinimap((current) => !current)} title="Toggle minimap" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} className="ppt-icon-button" data-ppt-view-minimap onClick={() => setShowMinimap((current) => !current)} title="Toggle minimap" type="button">
             <MapIcon size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} className="ppt-icon-button" data-ppt-view-frame-guides onClick={() => setShowFrameGuides((current) => !current)} title="Toggle frame guides" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} className="ppt-icon-button" data-ppt-view-frame-guides onClick={() => setShowFrameGuides((current) => !current)} title="Toggle frame guides" type="button">
             <Ruler size={17} />
           </button>
           <button
-            {...CANVAS_TOOLBAR_ITEM_PROPS}
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             aria-pressed={theme === 'dark'}
             className="ppt-icon-button"
@@ -7590,16 +7588,16 @@ function App() {
           <span className="ppt-zoom-label">{Math.round(viewport.scale * 100)}%</span>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
             <Copy size={16} /> HTML
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
             <Download size={16} /> HTML
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
             <Download size={16} /> SVG
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} aria-label="Download selection SVG" className="ppt-button" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG} type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download selection SVG" className="ppt-button" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG} type="button">
             <Download size={16} /> Sel SVG
           </button>
         </div>
@@ -7795,11 +7793,11 @@ function App() {
           ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
           : undefined}
         data-ppt-keyboard-nudge-enabled={commandAvailability.nudge ? 'true' : 'false'}
-        data-ppt-keyboard-nudge-intent={CANVAS_KEYBOARD_NUDGE_INTENT_MODEL}
-        data-ppt-keyboard-nudge-keys={CANVAS_KEYBOARD_NUDGE_KEYS}
-        data-ppt-keyboard-nudge-large-step={String(CANVAS_KEYBOARD_NUDGE_LARGE_STEP)}
-        data-ppt-keyboard-nudge-model={CANVAS_KEYBOARD_NUDGE_MODEL}
-        data-ppt-keyboard-nudge-step={String(CANVAS_KEYBOARD_NUDGE_STEP)}
+        data-ppt-keyboard-nudge-intent={PPT_KEYBOARD_NUDGE_INTENT_MODEL}
+        data-ppt-keyboard-nudge-keys={PPT_KEYBOARD_NUDGE_KEYS}
+        data-ppt-keyboard-nudge-large-step={String(PPT_KEYBOARD_NUDGE_LARGE_STEP)}
+        data-ppt-keyboard-nudge-model={PPT_KEYBOARD_NUDGE_MODEL}
+        data-ppt-keyboard-nudge-step={String(PPT_KEYBOARD_NUDGE_STEP)}
         data-ppt-arrow-tool-model={PPT_TOOL_AFFORDANCES.arrow.model}
         data-ppt-arrow-tool-shortcut={PPT_TOOL_AFFORDANCES.arrow.shortcut}
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
@@ -7830,7 +7828,7 @@ function App() {
         data-ppt-section-tool-shortcut={PPT_TOOL_AFFORDANCES.section.shortcut}
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
-        data-ppt-resize-modifier-model={CANVAS_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-resize-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-alignment-popover-preview={alignmentPreviewCommand ?? undefined}
         data-ppt-alignment-popover-preview-model={CANVAS_DOM_ALIGNMENT_PREVIEW_GUIDE_MODEL}
         data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}
@@ -7840,7 +7838,7 @@ function App() {
         data-ppt-comment-thread-command-selection={lastCommentThreadEffect?.selection.objectIds.join(' ') ?? undefined}
         data-ppt-comment-thread-command-slide={lastCommentThreadEffect?.payload.slideId}
         data-ppt-comment-thread-command-type={lastCommentThreadEffect?.type}
-        data-ppt-comment-thread-model={CANVAS_COMMENT_THREAD_MODEL}
+        data-ppt-comment-thread-model={PPT_COMMENT_THREAD_MODEL}
         data-ppt-accessibility-command={lastAccessibilityEffect?.payload.id}
         data-ppt-accessibility-command-field={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
           ? lastAccessibilityEffect.payload.fieldId
@@ -8034,11 +8032,11 @@ function App() {
           ? String(selectedTextAutoFitIndicator.isVisible)
           : undefined}
         data-ppt-text-overflow-indicator-width={selectedTextAutoFitIndicator?.bounds.w}
-        data-ppt-keyboard-command-dispatch={CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL}
-        data-ppt-keyboard-command-intent={CANVAS_KEYBOARD_COMMAND_INTENT_MODEL}
-        data-ppt-keyboard-tool-dispatch={CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL}
-        data-ppt-keyboard-viewport-intent={CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL}
-        data-ppt-keyboard-viewport-model={CANVAS_KEYBOARD_VIEWPORT_MODEL}
+        data-ppt-keyboard-command-dispatch={PPT_KEYBOARD_COMMAND_DISPATCH_MODEL}
+        data-ppt-keyboard-command-intent={PPT_KEYBOARD_COMMAND_INTENT_MODEL}
+        data-ppt-keyboard-tool-dispatch={PPT_KEYBOARD_TOOL_DISPATCH_MODEL}
+        data-ppt-keyboard-viewport-intent={PPT_KEYBOARD_VIEWPORT_INTENT_MODEL}
+        data-ppt-keyboard-viewport-model={PPT_KEYBOARD_VIEWPORT_MODEL}
         data-ppt-sticky-tool-model={PPT_TOOL_AFFORDANCES.sticky.model}
         data-ppt-sticky-tool-shortcut={PPT_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
@@ -8287,7 +8285,7 @@ function PPTMinimap({
   )
 
   function navigate(event: ReactPointerEvent<SVGSVGElement>) {
-    const localGeometry = getCanvasPointerLocalGeometry({
+    const localGeometry = getPPTCanvasPointerLocalGeometry({
       event,
       target: svgRef.current,
     })
@@ -8315,7 +8313,7 @@ function PPTMinimap({
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     event.preventDefault()
     event.stopPropagation()
-    captureCanvasPointerFromEvent(event)
+    capturePPTCanvasPointerFromEvent(event)
     setActivePointerId(event.pointerId)
     navigate(event)
   }
@@ -8422,12 +8420,12 @@ function PPTShortcutHelpDialog({
   const dialogRef = useRef<HTMLElement | null>(null)
   const groups = useMemo(() => groupPPTShortcutHelpItems(items), [items])
 
-  useCanvasModalFocusLifecycle({
+  usePPTCanvasModalFocusLifecycle({
     initialFocusRef: closeButtonRef,
   })
 
   function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    const backdropPointerIntent = getCanvasModalBackdropPointerIntent({
+    const backdropPointerIntent = getPPTCanvasModalBackdropPointerIntent({
       currentTarget: event.currentTarget,
       target: event.target,
     })
@@ -8438,7 +8436,7 @@ function PPTShortcutHelpDialog({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    const modalKeyboardIntent = getCanvasModalKeyboardIntent({ key: event.key })
+    const modalKeyboardIntent = getPPTCanvasModalKeyboardIntent({ key: event.key })
 
     if (modalKeyboardIntent.kind === 'close') {
       if (modalKeyboardIntent.preventDefault) {
@@ -8452,7 +8450,7 @@ function PPTShortcutHelpDialog({
     }
 
     if (modalKeyboardIntent.kind === 'trap-focus') {
-      trapCanvasModalTabFocus({
+      trapPPTCanvasModalTabFocus({
         event,
         root: dialogRef.current,
       })
@@ -8470,7 +8468,7 @@ function PPTShortcutHelpDialog({
         aria-modal="true"
         className="ppt-shortcut-help"
         data-ppt-shortcut-help
-        data-ppt-shortcut-help-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
+        data-ppt-shortcut-help-focus-lifecycle={PPT_MODAL_FOCUS_LIFECYCLE_MODEL}
         ref={dialogRef}
         role="dialog"
         onKeyDown={handleKeyDown}
@@ -8661,7 +8659,7 @@ function usePPTPresentationScale() {
     }
 
     updateScale()
-    const cleanup = bindCanvasEventListener({
+    const cleanup = bindPPTCanvasEventListener({
       listener: updateScale,
       target: window,
       type: 'resize',
@@ -8676,7 +8674,7 @@ function usePPTPresentationScale() {
 }
 
 function getPPTPresentationScale() {
-  const viewportSize = getCanvasClientViewportSize()
+  const viewportSize = getPPTCanvasClientViewportSize()
 
   if (!viewportSize) {
     return 0.75
@@ -8731,7 +8729,7 @@ function PPTCommandPaletteDialog({
     ? getPPTCommandPaletteOptionId(activeItem.id)
     : undefined
 
-  useCanvasModalFocusLifecycle({
+  usePPTCanvasModalFocusLifecycle({
     initialFocusRef: inputRef,
   })
 
@@ -8745,7 +8743,7 @@ function PPTCommandPaletteDialog({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    const modalKeyboardIntent = getCanvasModalKeyboardIntent({ key: event.key })
+    const modalKeyboardIntent = getPPTCanvasModalKeyboardIntent({ key: event.key })
 
     if (modalKeyboardIntent.kind === 'close') {
       if (modalKeyboardIntent.preventDefault) {
@@ -8759,14 +8757,14 @@ function PPTCommandPaletteDialog({
     }
 
     if (modalKeyboardIntent.kind === 'trap-focus') {
-      trapCanvasModalTabFocus({
+      trapPPTCanvasModalTabFocus({
         event,
         root: dialogRef.current,
       })
       return
     }
 
-    const keyboardIntent = getCanvasCommandPaletteKeyboardIntent({
+    const keyboardIntent = getPPTCanvasCommandPaletteKeyboardIntent({
       activeIndex: activeItemIndex,
       itemCount: filteredItems.length,
       key: event.key,
@@ -8788,7 +8786,7 @@ function PPTCommandPaletteDialog({
   }
 
   function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    const backdropPointerIntent = getCanvasModalBackdropPointerIntent({
+    const backdropPointerIntent = getPPTCanvasModalBackdropPointerIntent({
       currentTarget: event.currentTarget,
       target: event.target,
     })
@@ -8809,7 +8807,7 @@ function PPTCommandPaletteDialog({
         aria-modal="true"
         className="ppt-command-palette"
         data-ppt-command-palette
-        data-ppt-command-palette-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
+        data-ppt-command-palette-focus-lifecycle={PPT_MODAL_FOCUS_LIFECYCLE_MODEL}
         data-ppt-command-palette-focus-trap="true"
         data-ppt-command-palette-model={PPT_COMMAND_PALETTE_ITEMS_MODEL}
         data-ppt-command-palette-restore-focus="true"
@@ -9741,7 +9739,7 @@ function createPPTRichClipboardExportPayload(
 }
 
 function stringifyPPTRichClipboardPayload(payload: PPTClipboardPayload) {
-  return stringifyCanvasRichClipboardPayload(
+  return stringifyPPTCanvasRichClipboardPayload(
     createPPTRichClipboardExportPayload(payload),
   )
 }
@@ -9753,7 +9751,7 @@ function createPPTRichClipboardHTML({
   payload: PPTClipboardPayload
   selectionSvg: string | null
 }) {
-  return createCanvasRichClipboardHTML({
+  return createPPTCanvasRichClipboardHTML({
     fallbackHTML: selectionSvg ?? '<p>PPT selection</p>',
     json: stringifyPPTRichClipboardPayload(payload),
     rootAttribute: PPT_RICH_CLIPBOARD_HTML_ROOT_ATTRIBUTE,
@@ -9771,7 +9769,7 @@ async function writePPTRichClipboardPayload({
   const json = stringifyPPTRichClipboardPayload(payload)
   const html = createPPTRichClipboardHTML({ payload, selectionSvg })
 
-  return writeCanvasRichClipboardPayload({
+  return writePPTCanvasRichClipboardPayload({
     html,
     json,
     jsonMimeType: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
@@ -9780,7 +9778,7 @@ async function writePPTRichClipboardPayload({
 }
 
 function getPPTRichClipboardFromDataTransfer(dataTransfer: DataTransfer | null) {
-  return readCanvasRichClipboardFromDataTransfer({
+  return readPPTCanvasRichClipboardFromDataTransfer({
     dataTransfer,
     jsonMimeType: PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
     parsePayload: normalizePPTRichClipboardPayload,
@@ -9839,7 +9837,7 @@ function getPPTClipboardPastePositionKey(
   payload: PPTClipboardPayload,
   targetSlideId: string,
 ) {
-  return createCanvasPastePositionKey({
+  return createPPTCanvasPastePositionKey({
     segments: [
       payload.operation,
       payload.sourceSlideId,
@@ -10538,7 +10536,7 @@ function PPTShapeKindMenu({
     onFocus: handleMenuFocus,
     onKeyDown: handleMenuKeyDown,
     ref: setMenuRoot,
-  } = useCanvasMenuRovingFocus<HTMLDivElement>({
+  } = usePPTCanvasMenuRovingFocus<HTMLDivElement>({
     initialActiveIndex: initialActiveShapeIndex,
     onClose: () => {
       closeMenu()
@@ -10547,7 +10545,7 @@ function PPTShapeKindMenu({
   })
 
   function focusTrigger() {
-    focusCanvasElementOnNextFrame({
+    focusPPTCanvasElementOnNextFrame({
       resolveElement: () => triggerRef.current,
     })
   }
@@ -10572,7 +10570,7 @@ function PPTShapeKindMenu({
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    const intent = getCanvasMenuTriggerKeyboardIntent({ key: event.key })
+    const intent = getPPTCanvasMenuTriggerKeyboardIntent({ key: event.key })
 
     if (intent.preventDefault) {
       event.preventDefault()
@@ -10618,7 +10616,7 @@ function PPTShapeKindMenu({
           className="ppt-floating-menu"
           data-ppt-shape-menu
           data-ppt-shape-menu-active={activeOption.shape}
-          data-ppt-shape-menu-model={CANVAS_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL}
+          data-ppt-shape-menu-model={PPT_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL}
           id="ppt-shape-kind-menu"
           ref={setMenuRoot}
           role="menu"
@@ -10627,7 +10625,7 @@ function PPTShapeKindMenu({
         >
           {PPT_SHAPE_MENU_OPTIONS.map((option) => (
             <button
-              {...CANVAS_MENU_ITEM_PROPS}
+              {...PPT_MENU_ITEM_PROPS}
               aria-checked={state.shape === option.shape}
               className="ppt-floating-menu-item"
               data-ppt-shape-menu-item={option.shape}
@@ -10692,7 +10690,7 @@ function PPTAlignmentPopover({
     onFocus: handleMenuFocus,
     onKeyDown: handleMenuKeyDown,
     ref: setMenuRoot,
-  } = useCanvasMenuRovingFocus<HTMLDivElement>({
+  } = usePPTCanvasMenuRovingFocus<HTMLDivElement>({
     initialActiveIndex: initialActiveCommandIndex,
     onClose: () => {
       closePopover()
@@ -10724,13 +10722,13 @@ function PPTAlignmentPopover({
   }
 
   function focusTrigger() {
-    focusCanvasElementOnNextFrame({
+    focusPPTCanvasElementOnNextFrame({
       resolveElement: () => triggerRef.current,
     })
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    const intent = getCanvasMenuTriggerKeyboardIntent({ key: event.key })
+    const intent = getPPTCanvasMenuTriggerKeyboardIntent({ key: event.key })
 
     if (intent.preventDefault) {
       event.preventDefault()
@@ -10787,7 +10785,7 @@ function PPTAlignmentPopover({
         >
           {commands.map((command) => (
             <button
-              {...CANVAS_MENU_ITEM_PROPS}
+              {...PPT_MENU_ITEM_PROPS}
               aria-disabled={command.disabled}
               className="ppt-alignment-popover-item"
               data-ppt-alignment-popover-command={command.dataCommand}
@@ -10995,7 +10993,7 @@ function PPTParagraphAlignRadioGroup({
     container: HTMLElement | null,
   ) {
     onAlignChange(nextAlign)
-    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+    focusPPTCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
       match: ({ element }) =>
         element.getAttribute('data-ppt-paragraph-align') === nextAlign,
       root: container,
@@ -11009,12 +11007,12 @@ function PPTParagraphAlignRadioGroup({
       className={surface === 'quick'
         ? 'ppt-paragraph-align-radio-group ppt-paragraph-align-radio-group--quick'
         : 'ppt-segmented-control ppt-paragraph-align-radio-group'}
-      data-ppt-paragraph-align-focus-model={CANVAS_RADIO_GROUP_FOCUS_MODEL}
-      data-ppt-paragraph-align-keyboard-model={CANVAS_RADIO_GROUP_KEYBOARD_MODEL}
-      data-ppt-paragraph-align-model={CANVAS_RADIO_GROUP_MODEL}
+      data-ppt-paragraph-align-focus-model={PPT_RADIO_GROUP_FOCUS_MODEL}
+      data-ppt-paragraph-align-keyboard-model={PPT_RADIO_GROUP_KEYBOARD_MODEL}
+      data-ppt-paragraph-align-model={PPT_RADIO_GROUP_MODEL}
       data-ppt-paragraph-align-radiogroup={surface}
       role="radiogroup"
-      onKeyDown={handleCanvasRadioGroupKeyDown}
+      onKeyDown={handlePPTCanvasRadioGroupKeyDown}
     >
       {PPT_PARAGRAPH_ALIGN_OPTIONS.map((option) => {
         const selected = align === option
@@ -11030,7 +11028,7 @@ function PPTParagraphAlignRadioGroup({
             data-ppt-text-quick={surface === 'quick' ? `align-${option}` : undefined}
             key={option}
             role="radio"
-            tabIndex={getCanvasRadioTabIndex({
+            tabIndex={getPPTCanvasRadioTabIndex({
               checked: selected,
               disabled: false,
             })}
@@ -11084,7 +11082,7 @@ function PPTContextCommandMenu({
     onFocus: handleMenuFocus,
     onKeyDown: handleMenuKeyDown,
     ref: setMenuRoot,
-  } = useCanvasMenuRovingFocus<HTMLDivElement>({ onClose })
+  } = usePPTCanvasMenuRovingFocus<HTMLDivElement>({ onClose })
 
   if (!menu || groups.length === 0) {
     return null
@@ -11095,9 +11093,9 @@ function PPTContextCommandMenu({
       aria-label="Selection commands"
       className="ppt-context-menu"
       data-ppt-context-menu
-      data-ppt-context-menu-focus-model={CANVAS_MENU_FOCUS_MODEL}
-      data-ppt-context-menu-keyboard={CANVAS_MENU_KEYBOARD_KEYS}
-      data-ppt-context-menu-model={CANVAS_MENU_ROVING_FOCUS_MODEL}
+      data-ppt-context-menu-focus-model={PPT_MENU_FOCUS_MODEL}
+      data-ppt-context-menu-keyboard={PPT_MENU_KEYBOARD_KEYS}
+      data-ppt-context-menu-model={PPT_MENU_ROVING_FOCUS_MODEL}
       ref={setMenuRoot}
       role="menu"
       style={{
@@ -11139,7 +11137,7 @@ function PPTSurfaceCommandButton({
 }) {
   const dataAttribute = surface === 'context-menu'
     ? {
-        ...CANVAS_MENU_ITEM_PROPS,
+        ...PPT_MENU_ITEM_PROPS,
         'data-ppt-context-command': command.dataCommand,
       }
     : { 'data-ppt-floating-command': command.dataCommand }
@@ -11473,7 +11471,7 @@ function PPTElementView({
       return
     }
 
-    focusCanvasElement({
+    focusPPTCanvasElement({
       element: editorRef.current,
       preventScroll: false,
     })
@@ -11491,7 +11489,7 @@ function PPTElementView({
     }
 
     const updateOverflow = () => {
-      const measurement = measureCanvasElementOverflow({
+      const measurement = measurePPTCanvasElementOverflow({
         container: editor.parentElement,
         element: editor,
         epsilon: PPT_TEXT_OVERFLOW_EPSILON,
@@ -11501,12 +11499,12 @@ function PPTElementView({
     }
 
     updateOverflow()
-    const frame = scheduleCanvasAnimationFrameTask({
+    const frame = schedulePPTCanvasAnimationFrameTask({
       task: updateOverflow,
     })
 
     return () => {
-      cancelCanvasAnimationFrameTask({ frame })
+      cancelPPTCanvasAnimationFrameTask({ frame })
     }
   }, [
     editing,
@@ -11552,7 +11550,7 @@ function PPTElementView({
       return
     }
 
-    const intent = getCanvasInlineEditKeyboardIntent({
+    const intent = getPPTCanvasInlineEditKeyboardIntent({
       altKey: event.altKey,
       ctrlKey: event.ctrlKey,
       key: event.key,
@@ -12704,7 +12702,7 @@ function Inspector({
     hasSelectedElement ? 'selection' : 'slide',
   )
   const previousInspectorSelectionStateRef = useRef(hasSelectedElement)
-  const inspectorTabsDescriptor = createCanvasTabsDescriptor({
+  const inspectorTabsDescriptor = createPPTCanvasTabsDescriptor({
     activation: 'automatic',
     activeId: activeInspectorTabId,
     tabs: PPT_INSPECTOR_TABS,
@@ -12780,7 +12778,7 @@ function Inspector({
   }
 
   function focusLayerPaneRow(objectId: string) {
-    focusCanvasElementBySelectorOnNextFrame<HTMLElement>({
+    focusPPTCanvasElementBySelectorOnNextFrame<HTMLElement>({
       match: ({ element }) =>
         element.getAttribute('data-ppt-layer-pane-row') === objectId,
       root: document,
@@ -12826,7 +12824,7 @@ function Inspector({
   }
 
   function focusLayerPaneRenameInput(objectId: string) {
-    focusCanvasElementBySelectorOnNextFrame<HTMLInputElement>({
+    focusPPTCanvasElementBySelectorOnNextFrame<HTMLInputElement>({
       match: ({ element }) =>
         element.getAttribute('data-ppt-layer-pane-rename-input') === objectId,
       root: document,
@@ -12886,7 +12884,7 @@ function Inspector({
     const rangeAnchorObjectId = event.shiftKey
       ? layerPaneGroupState.rangeAnchorObjectId ?? activeLayerPaneObjectId
       : null
-    const selectionModifierState = getCanvasSelectionListModifierState({
+    const selectionModifierState = getPPTCanvasSelectionListModifierState({
       ctrlKey: event.ctrlKey,
       hasRangeAnchor: Boolean(rangeAnchorObjectId),
       metaKey: event.metaKey,
@@ -12916,7 +12914,7 @@ function Inspector({
 
     setLayerPaneFocusedObjectId(row.objectId)
     setLayerPaneDragState({ objectId: row.objectId })
-    setCanvasDataTransferText({
+    setPPTCanvasDataTransferText({
       dataTransfer: event.dataTransfer,
       effectAllowed: 'move',
       text: row.objectId,
@@ -12928,13 +12926,13 @@ function Inspector({
     event: ReactDragEvent<HTMLElement>,
   ) {
     const draggedObjectId = layerPaneDragState?.objectId ||
-      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
+      getPPTCanvasDataTransferText({ dataTransfer: event.dataTransfer })
 
     if (!draggedObjectId) {
       return
     }
 
-    const rowGeometry = getCanvasPointerLocalGeometry({
+    const rowGeometry = getPPTCanvasPointerLocalGeometry({
       event,
       target: event.currentTarget,
     })
@@ -12971,7 +12969,7 @@ function Inspector({
     }
 
     event.preventDefault()
-    setCanvasDataTransferDropEffect({
+    setPPTCanvasDataTransferDropEffect({
       dataTransfer: event.dataTransfer,
       dropEffect: 'move',
     })
@@ -12988,7 +12986,7 @@ function Inspector({
     event: ReactDragEvent<HTMLElement>,
   ) {
     const draggedObjectId = layerPaneDragState?.objectId ||
-      getCanvasDataTransferText({ dataTransfer: event.dataTransfer })
+      getPPTCanvasDataTransferText({ dataTransfer: event.dataTransfer })
 
     if (!draggedObjectId || draggedObjectId === row.objectId) {
       return
@@ -12998,7 +12996,7 @@ function Inspector({
       ? layerPaneDragState.dropToIndex
       : undefined
 
-    const rowGeometry = getCanvasPointerLocalGeometry({
+    const rowGeometry = getPPTCanvasPointerLocalGeometry({
       event,
       target: event.currentTarget,
     })
@@ -13124,7 +13122,7 @@ function Inspector({
   }
 
   function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
-    focusCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
+    focusPPTCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
       match: ({ element }) =>
         element.getAttribute('data-ppt-inspector-tab') === tabId,
       root: document,
@@ -13149,7 +13147,7 @@ function Inspector({
       return
     }
 
-    const intent = getCanvasTabsKeyboardIntent({
+    const intent = getPPTCanvasTabsKeyboardIntent({
       activation: inspectorTabsDescriptor.activation,
       currentId: tabId,
       key: event.key,
@@ -13211,7 +13209,7 @@ function Inspector({
         data-ppt-inspector-tabs
         data-ppt-inspector-tabs-activation={inspectorTabsDescriptor.activation}
         data-ppt-inspector-tabs-keyboard={inspectorTabsDescriptor.keyboardModel}
-        data-ppt-inspector-tabs-model={CANVAS_TABS_ROVING_FOCUS_MODEL}
+        data-ppt-inspector-tabs-model={PPT_TABS_ROVING_FOCUS_MODEL}
         role="tablist"
       >
         {inspectorTabsDescriptor.tabs.map((tab) => {
@@ -14423,7 +14421,7 @@ function Inspector({
                   className="ppt-comment-thread"
                   data-ppt-comment-thread
                   data-ppt-comment-thread-count={commentThread.length}
-                  data-ppt-comment-thread-model={CANVAS_COMMENT_THREAD_MODEL}
+                  data-ppt-comment-thread-model={PPT_COMMENT_THREAD_MODEL}
                   data-ppt-comment-thread-resolved={selectedElement.resolved === true ? 'true' : 'false'}
                 >
                   <div className="ppt-comment-thread-header">
@@ -14753,7 +14751,7 @@ function Inspector({
                     onDoubleClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => {
                       event.stopPropagation()
-                      const intent = getCanvasEditableFieldKeyboardIntent({
+                      const intent = getPPTCanvasEditableFieldKeyboardIntent({
                         key: event.key,
                       })
 
@@ -14951,21 +14949,21 @@ const PPT_WHEEL_VIEWPORT_PASSTHROUGH_TARGET_SELECTORS = [
 ] as const
 
 function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {
-  return isCanvasControlTarget({
+  return isPPTCanvasControlTarget({
     extraSelectors: PPT_TEMPORARY_PAN_BLOCKED_TARGET_SELECTORS,
     target,
   })
 }
 
 function isPPTWheelViewportPassthroughTarget(target: EventTarget | null) {
-  return isCanvasControlTarget({
+  return isPPTCanvasControlTarget({
     extraSelectors: PPT_WHEEL_VIEWPORT_PASSTHROUGH_TARGET_SELECTORS,
     target,
-  }) || isCanvasWheelPassthroughTarget(target)
+  }) || isPPTCanvasWheelPassthroughTarget(target)
 }
 
 function getPPTInspectorPanelAttributes(
-  descriptor: CanvasTabsDescriptor<PPTInspectorTabId>,
+  descriptor: PPTCanvasTabsDescriptor<PPTInspectorTabId>,
   tabId: PPTInspectorTabId,
 ) {
   const panel = descriptor.panels.find((item) => item.id === tabId)
@@ -16440,12 +16438,12 @@ function toPPTShapeKind(shape: PPTCanvasCreatedShapeKind): PPTShapeKind {
   return 'rect'
 }
 
-function getPPTToolShortcutIntent(event: KeyboardEvent): CanvasKeyboardToolIntent | null {
+function getPPTToolShortcutIntent(event: KeyboardEvent): PPTCanvasKeyboardToolIntent | null {
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return null
   }
 
-  const tool = getCanvasKeyboardToolShortcutIntent({
+  const tool = getPPTCanvasKeyboardToolShortcutIntent({
     config: PPT_CANVAS_COMMAND_CONFIG,
     customCreationTools: [],
     event,
@@ -17407,7 +17405,7 @@ function measurePPTTextContentSize(
   },
 ) {
   const style = element.style
-  const size = measureCanvasTextBlocks({
+  const size = measurePPTCanvasTextBlocks({
     blocks: element.textBody.paragraphs.map((paragraph) => {
       const paragraphStyle = getPPTParagraphStyle(paragraph)
 
