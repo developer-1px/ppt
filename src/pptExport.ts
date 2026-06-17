@@ -18,6 +18,7 @@ import {
   createCanvasSvgFreehandPathData,
   createCanvasSvgPathData,
 } from 'canvas/renderer/svg-drawing-primitives'
+import { unionCanvasRectList } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -1546,21 +1547,7 @@ function getVisiblePPTElements(elements: PPTElement[]) {
 }
 
 function getPPTElementsExportBounds(elements: PPTElement[]) {
-  if (elements.length === 0) {
-    return null
-  }
-
-  const minX = Math.min(...elements.map((element) => element.geometry.x))
-  const minY = Math.min(...elements.map((element) => element.geometry.y))
-  const maxX = Math.max(...elements.map((element) => element.geometry.x + element.geometry.w))
-  const maxY = Math.max(...elements.map((element) => element.geometry.y + element.geometry.h))
-
-  return {
-    h: maxY - minY,
-    w: maxX - minX,
-    x: minX,
-    y: minY,
-  }
+  return unionCanvasRectList(elements.map((element) => element.geometry))
 }
 
 function getPPTSvgImageAlignX(value: number) {
