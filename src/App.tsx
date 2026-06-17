@@ -442,31 +442,6 @@ import {
   type CanvasSnapGuides,
 } from 'canvas/foundation'
 import {
-  CANVAS_COMMAND_AFFORDANCES,
-  CANVAS_TOOL_AFFORDANCES,
-  alignCanvasCommand,
-  createCanvasShape,
-  createCanvasText,
-  createCanvasAffordanceConfig,
-  deleteCanvasCommand,
-  distributeCanvasCommand,
-  duplicateCanvasCommand,
-  getCanvasWheelViewport,
-  groupCanvasCommand,
-  lockCanvasCommand,
-  nudgeCanvasCommand,
-  reorderCanvasCommand,
-  selectAllCanvasCommand,
-  ungroupCanvasCommand,
-  unlockAllCanvasCommand,
-  type CanvasAlignMode,
-  type CanvasCommandItemsResult,
-  type CanvasCreatedShapeKind,
-  type CanvasCreationAdapter,
-  type CanvasDistributeMode,
-  type CanvasReorderMode,
-} from 'canvas/engine'
-import {
   createCanvasCssBoundsTransform,
   createCanvasSvgFreehandPathData,
   createCanvasSvgPathData,
@@ -536,6 +511,31 @@ import {
   flipPPTElements,
   tidyPPTElements,
 } from './pptCanvasAdapter'
+import {
+  alignPPTCanvasCommand,
+  createPPTCanvasAffordanceConfig,
+  createPPTCanvasShape,
+  createPPTCanvasText,
+  deletePPTCanvasCommand,
+  distributePPTCanvasCommand,
+  duplicatePPTCanvasCommand,
+  getPPTCanvasWheelViewport,
+  groupPPTCanvasCommand,
+  lockPPTCanvasCommand,
+  nudgePPTCanvasCommand,
+  PPT_COMMAND_AFFORDANCES,
+  PPT_TOOL_AFFORDANCES,
+  reorderPPTCanvasCommand,
+  selectAllPPTCanvasCommand,
+  ungroupPPTCanvasCommand,
+  unlockAllPPTCanvasCommand,
+  type PPTCanvasAlignMode,
+  type PPTCanvasCommandItemsResult,
+  type PPTCanvasCreatedShapeKind,
+  type PPTCanvasCreationAdapter,
+  type PPTCanvasDistributeMode,
+  type PPTCanvasReorderMode,
+} from './pptCanvasEngineAdapter'
 import {
   filterPPTCommandPaletteItems,
   getPPTInlineEditHistoryDirectionFromInputType,
@@ -627,7 +627,7 @@ import {
 } from './pptImportExtension'
 import './App.css'
 
-const PPT_CANVAS_COMMAND_CONFIG = createCanvasAffordanceConfig({
+const PPT_CANVAS_COMMAND_CONFIG = createPPTCanvasAffordanceConfig({
   commands: {
     group: true,
     lockSelection: true,
@@ -921,7 +921,7 @@ const canvasAlignModeAvailabilityKey = {
   alignRight: 'alignRight',
   alignTop: 'alignTop',
 } as const satisfies Record<
-  CanvasAlignMode,
+  PPTCanvasAlignMode,
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
@@ -929,7 +929,7 @@ const canvasDistributeModeAvailabilityKey = {
   distributeHorizontal: 'distributeHorizontal',
   distributeVertical: 'distributeVertical',
 } as const satisfies Record<
-  CanvasDistributeMode,
+  PPTCanvasDistributeMode,
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
@@ -939,7 +939,7 @@ const canvasReorderModeAvailabilityKey = {
   sendBackward: 'sendBackward',
   sendToBack: 'sendToBack',
 } as const satisfies Record<
-  CanvasReorderMode,
+  PPTCanvasReorderMode,
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
@@ -1442,7 +1442,7 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'duplicate',
     label: 'Duplicate',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+    title: PPT_COMMAND_AFFORDANCES.duplicate.title,
   }, {
     availability: 'copyFormatting',
     command: 'copyFormatting',
@@ -1491,7 +1491,7 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'delete',
     label: 'Delete',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.delete.title,
+    title: PPT_COMMAND_AFFORDANCES.delete.title,
   }],
   id: 'edit',
 }, {
@@ -1501,21 +1501,21 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'align-left',
     label: 'Align left',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.alignLeft.title,
+    title: PPT_COMMAND_AFFORDANCES.alignLeft.title,
   }, {
     availability: 'alignCenter',
     command: 'alignCenter',
     dataCommand: 'align-center-x',
     label: 'Align center',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
+    title: PPT_COMMAND_AFFORDANCES.alignCenter.title,
   }, {
     availability: 'alignRight',
     command: 'alignRight',
     dataCommand: 'align-right',
     label: 'Align right',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.alignRight.title,
+    title: PPT_COMMAND_AFFORDANCES.alignRight.title,
   }],
   id: 'align',
 }, {
@@ -1525,28 +1525,28 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'bring-forward',
     label: 'Bring forward',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
+    title: PPT_COMMAND_AFFORDANCES.bringForward.title,
   }, {
     availability: 'bringToFront',
     command: 'bringToFront',
     dataCommand: 'bring-to-front',
     label: 'Bring to front',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
+    title: PPT_COMMAND_AFFORDANCES.bringToFront.title,
   }, {
     availability: 'sendBackward',
     command: 'sendBackward',
     dataCommand: 'send-backward',
     label: 'Send backward',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
+    title: PPT_COMMAND_AFFORDANCES.sendBackward.title,
   }, {
     availability: 'sendToBack',
     command: 'sendToBack',
     dataCommand: 'send-to-back',
     label: 'Send to back',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
+    title: PPT_COMMAND_AFFORDANCES.sendToBack.title,
   }],
   id: 'order',
 }, {
@@ -1556,14 +1556,14 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'group',
     label: 'Group',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.group.title,
+    title: PPT_COMMAND_AFFORDANCES.group.title,
   }, {
     availability: 'ungroup',
     command: 'ungroup',
     dataCommand: 'ungroup',
     label: 'Ungroup',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.ungroup.title,
+    title: PPT_COMMAND_AFFORDANCES.ungroup.title,
   }],
   id: 'group',
 }, {
@@ -1573,14 +1573,14 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     dataCommand: 'lock-selection',
     label: 'Lock',
     surfaces: ['context-menu', 'selection-floating-bar'],
-    title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
+    title: PPT_COMMAND_AFFORDANCES.lockSelection.title,
   }, {
     availability: 'unlockAll',
     command: 'unlockAll',
     dataCommand: 'unlock-all',
     label: 'Unlock all',
     surfaces: ['context-menu'],
-    title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
+    title: PPT_COMMAND_AFFORDANCES.unlockAll.title,
   }],
   id: 'lock',
 }]
@@ -2802,7 +2802,7 @@ function App() {
   }
 
   function commitElementCommand(
-    run: (slide: PPTSlide) => CanvasCommandItemsResult<PPTElement> | null,
+    run: (slide: PPTSlide) => PPTCanvasCommandItemsResult<PPTElement> | null,
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = run(slide)
@@ -3791,7 +3791,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      deleteCanvasCommand({
+      deletePPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3805,7 +3805,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      duplicateCanvasCommand({
+      duplicatePPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         createId: createPPTElementIdFactory(slide),
@@ -3820,7 +3820,7 @@ function App() {
     }
 
     commitElementCommand((slide) => {
-      const items = nudgeCanvasCommand({
+      const items = nudgePPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         dx,
@@ -3833,7 +3833,7 @@ function App() {
     })
   }
 
-  function alignSelection(mode: CanvasAlignMode) {
+  function alignSelection(mode: PPTCanvasAlignMode) {
     if (!commandAvailability[canvasAlignModeAvailabilityKey[mode]]) {
       return
     }
@@ -3850,7 +3850,7 @@ function App() {
         }
       }
 
-      return alignCanvasCommand({
+      return alignPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3860,13 +3860,13 @@ function App() {
     })
   }
 
-  function distributeSelection(mode: CanvasDistributeMode) {
+  function distributeSelection(mode: PPTCanvasDistributeMode) {
     if (!commandAvailability[canvasDistributeModeAvailabilityKey[mode]]) {
       return
     }
 
     commitElementCommand((slide) =>
-      distributeCanvasCommand({
+      distributePPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3881,7 +3881,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      groupCanvasCommand({
+      groupPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         createId: createPPTElementIdFactory(slide),
@@ -3896,7 +3896,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      ungroupCanvasCommand({
+      ungroupPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3904,13 +3904,13 @@ function App() {
       }))
   }
 
-  function reorderSelection(mode: CanvasReorderMode) {
+  function reorderSelection(mode: PPTCanvasReorderMode) {
     if (!commandAvailability[canvasReorderModeAvailabilityKey[mode]]) {
       return
     }
 
     commitElementCommand((slide) =>
-      reorderCanvasCommand({
+      reorderPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3925,7 +3925,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      lockCanvasCommand({
+      lockPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -3939,7 +3939,7 @@ function App() {
     }
 
     commitElementCommand((slide) =>
-      unlockAllCanvasCommand({
+      unlockAllPPTCanvasCommand({
         adapter: commandAdapter,
         config: PPT_CANVAS_COMMAND_CONFIG,
         items: slide.elements,
@@ -4146,7 +4146,7 @@ function App() {
   }
 
   function selectAllElements() {
-    const nextSelection = selectAllCanvasCommand({
+    const nextSelection = selectAllPPTCanvasCommand({
       adapter: commandAdapter,
       config: PPT_CANVAS_COMMAND_CONFIG,
       items: activeSlide.elements,
@@ -5658,7 +5658,7 @@ function App() {
       return
     }
 
-    const nextViewport = getCanvasWheelViewport({
+    const nextViewport = getPPTCanvasWheelViewport({
       config: PPT_CANVAS_COMMAND_CONFIG,
       input: {
         ctrlKey: event.ctrlKey,
@@ -6789,48 +6789,48 @@ function App() {
     onSelect: undo,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+Z',
-    title: CANVAS_COMMAND_AFFORDANCES.undo.title,
+    title: PPT_COMMAND_AFFORDANCES.undo.title,
   }, {
     disabled: !commandAvailability.redo,
     id: 'command:redo',
     onSelect: redo,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+Y',
-    title: CANVAS_COMMAND_AFFORDANCES.redo.title,
+    title: PPT_COMMAND_AFFORDANCES.redo.title,
   }, {
     disabled: !commandAvailability.duplicate,
     id: 'command:duplicate',
     onSelect: duplicateSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+D',
-    title: CANVAS_COMMAND_AFFORDANCES.duplicate.title,
+    title: PPT_COMMAND_AFFORDANCES.duplicate.title,
   }, {
     disabled: !commandAvailability.delete,
     id: 'command:delete',
     onSelect: deleteSelection,
     section: 'Edit',
-    title: CANVAS_COMMAND_AFFORDANCES.delete.title,
+    title: PPT_COMMAND_AFFORDANCES.delete.title,
   }, {
     disabled: !commandAvailability.cut,
     id: 'command:cut',
     onSelect: cutSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+X',
-    title: CANVAS_COMMAND_AFFORDANCES.cut.title,
+    title: PPT_COMMAND_AFFORDANCES.cut.title,
   }, {
     disabled: selection.length === 0,
     id: 'command:copy',
     onSelect: copySelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+C',
-    title: CANVAS_COMMAND_AFFORDANCES.copy.title,
+    title: PPT_COMMAND_AFFORDANCES.copy.title,
   }, {
     disabled: !commandAvailability.paste,
     id: 'command:paste',
     onSelect: pasteSelection,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+V',
-    title: CANVAS_COMMAND_AFFORDANCES.paste.title,
+    title: PPT_COMMAND_AFFORDANCES.paste.title,
   }, {
     disabled: !commandAvailability.copyFormatting,
     id: 'command:copy-formatting',
@@ -6850,7 +6850,7 @@ function App() {
     onSelect: selectAllElements,
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+A',
-    title: CANVAS_COMMAND_AFFORDANCES.selectAll.title,
+    title: PPT_COMMAND_AFFORDANCES.selectAll.title,
   }, {
     disabled: !commandAvailability.selectSameType,
     id: 'command:select-same-type',
@@ -6862,49 +6862,49 @@ function App() {
     id: 'command:align-left',
     onSelect: () => alignSelection('alignLeft'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignLeft.title,
+    title: PPT_COMMAND_AFFORDANCES.alignLeft.title,
   }, {
     disabled: !commandAvailability.alignCenter,
     id: 'command:align-center',
     onSelect: () => alignSelection('alignCenter'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignCenter.title,
+    title: PPT_COMMAND_AFFORDANCES.alignCenter.title,
   }, {
     disabled: !commandAvailability.alignRight,
     id: 'command:align-right',
     onSelect: () => alignSelection('alignRight'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignRight.title,
+    title: PPT_COMMAND_AFFORDANCES.alignRight.title,
   }, {
     disabled: !commandAvailability.alignTop,
     id: 'command:align-top',
     onSelect: () => alignSelection('alignTop'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignTop.title,
+    title: PPT_COMMAND_AFFORDANCES.alignTop.title,
   }, {
     disabled: !commandAvailability.alignMiddle,
     id: 'command:align-middle',
     onSelect: () => alignSelection('alignMiddle'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignMiddle.title,
+    title: PPT_COMMAND_AFFORDANCES.alignMiddle.title,
   }, {
     disabled: !commandAvailability.alignBottom,
     id: 'command:align-bottom',
     onSelect: () => alignSelection('alignBottom'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.alignBottom.title,
+    title: PPT_COMMAND_AFFORDANCES.alignBottom.title,
   }, {
     disabled: !commandAvailability.distributeHorizontal,
     id: 'command:distribute-horizontal',
     onSelect: () => distributeSelection('distributeHorizontal'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.distributeHorizontal.title,
+    title: PPT_COMMAND_AFFORDANCES.distributeHorizontal.title,
   }, {
     disabled: !commandAvailability.distributeVertical,
     id: 'command:distribute-vertical',
     onSelect: () => distributeSelection('distributeVertical'),
     section: 'Arrange',
-    title: CANVAS_COMMAND_AFFORDANCES.distributeVertical.title,
+    title: PPT_COMMAND_AFFORDANCES.distributeVertical.title,
   }, {
     disabled: !commandAvailability.tidySelection,
     id: 'command:tidy-selection',
@@ -6929,110 +6929,110 @@ function App() {
     onSelect: () => reorderSelection('bringForward'),
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+]',
-    title: CANVAS_COMMAND_AFFORDANCES.bringForward.title,
+    title: PPT_COMMAND_AFFORDANCES.bringForward.title,
   }, {
     disabled: !commandAvailability.bringToFront,
     id: 'command:bring-to-front',
     onSelect: () => reorderSelection('bringToFront'),
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+]',
-    title: CANVAS_COMMAND_AFFORDANCES.bringToFront.title,
+    title: PPT_COMMAND_AFFORDANCES.bringToFront.title,
   }, {
     disabled: !commandAvailability.sendBackward,
     id: 'command:send-backward',
     onSelect: () => reorderSelection('sendBackward'),
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+[',
-    title: CANVAS_COMMAND_AFFORDANCES.sendBackward.title,
+    title: PPT_COMMAND_AFFORDANCES.sendBackward.title,
   }, {
     disabled: !commandAvailability.sendToBack,
     id: 'command:send-to-back',
     onSelect: () => reorderSelection('sendToBack'),
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+[',
-    title: CANVAS_COMMAND_AFFORDANCES.sendToBack.title,
+    title: PPT_COMMAND_AFFORDANCES.sendToBack.title,
   }, {
     disabled: !commandAvailability.group,
     id: 'command:group',
     onSelect: groupSelection,
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+G',
-    title: CANVAS_COMMAND_AFFORDANCES.group.title,
+    title: PPT_COMMAND_AFFORDANCES.group.title,
   }, {
     disabled: !commandAvailability.ungroup,
     id: 'command:ungroup',
     onSelect: ungroupSelection,
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+G',
-    title: CANVAS_COMMAND_AFFORDANCES.ungroup.title,
+    title: PPT_COMMAND_AFFORDANCES.ungroup.title,
   }, {
     disabled: !commandAvailability.lockSelection,
     id: 'command:lock-selection',
     onSelect: lockSelectedElements,
     section: 'Arrange',
     shortcut: 'Cmd/Ctrl+L',
-    title: CANVAS_COMMAND_AFFORDANCES.lockSelection.title,
+    title: PPT_COMMAND_AFFORDANCES.lockSelection.title,
   }, {
     disabled: !commandAvailability.unlockAll,
     id: 'command:unlock-all',
     onSelect: unlockAllElements,
     section: 'Arrange',
     shortcut: 'Shift+Cmd/Ctrl+L',
-    title: CANVAS_COMMAND_AFFORDANCES.unlockAll.title,
+    title: PPT_COMMAND_AFFORDANCES.unlockAll.title,
   }, {
     id: 'tool:select',
     onSelect: activateSelectTool,
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.select.shortcut,
+    shortcut: PPT_TOOL_AFFORDANCES.select.shortcut,
     title: 'Select tool',
   }, {
     id: 'tool:pan',
     onSelect: activatePanTool,
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.pan.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.pan.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.pan.shortcut,
+    title: PPT_TOOL_AFFORDANCES.pan.ariaLabel,
   }, {
     id: 'tool:laser',
     onSelect: activateLaserTool,
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.laser.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.laser.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.laser.shortcut,
+    title: PPT_TOOL_AFFORDANCES.laser.ariaLabel,
   }, {
     id: 'tool:text',
     onSelect: () => activatePPTCreationTool({ kind: 'text' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.text.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.text.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.text.shortcut,
+    title: PPT_TOOL_AFFORDANCES.text.ariaLabel,
   }, {
     id: 'tool:sticky',
     onSelect: () => activatePPTCreationTool({ kind: 'sticky' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.sticky.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.sticky.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.sticky.shortcut,
+    title: PPT_TOOL_AFFORDANCES.sticky.ariaLabel,
   }, {
     id: 'tool:section',
     onSelect: () => activatePPTCreationTool({ kind: 'section' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.section.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.section.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.section.shortcut,
+    title: PPT_TOOL_AFFORDANCES.section.ariaLabel,
   }, {
     id: 'tool:rect',
     onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'rect' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.rect.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.rect.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.rect.shortcut,
+    title: PPT_TOOL_AFFORDANCES.rect.ariaLabel,
   }, {
     id: 'tool:ellipse',
     onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.ellipse.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.ellipse.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.ellipse.shortcut,
+    title: PPT_TOOL_AFFORDANCES.ellipse.ariaLabel,
   }, {
     id: 'tool:diamond',
     onSelect: () => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.diamond.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.diamond.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.diamond.shortcut,
+    title: PPT_TOOL_AFFORDANCES.diamond.ariaLabel,
   }, {
     id: 'tool:line',
     onSelect: () => activateLineCreationMode('line'),
@@ -7042,38 +7042,38 @@ function App() {
     id: 'tool:arrow',
     onSelect: () => activateLineCreationMode('arrow'),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.arrow.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.arrow.shortcut,
+    title: PPT_TOOL_AFFORDANCES.arrow.ariaLabel,
   }, {
     id: 'tool:comment',
     onSelect: () => activatePPTCreationTool({ kind: 'comment' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.comment.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.comment.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.comment.shortcut,
+    title: PPT_TOOL_AFFORDANCES.comment.ariaLabel,
   }, {
     id: 'tool:pen',
     onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.pen.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.pen.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.pen.shortcut,
+    title: PPT_TOOL_AFFORDANCES.pen.ariaLabel,
   }, {
     id: 'tool:marker',
     onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.marker.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.marker.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.marker.shortcut,
+    title: PPT_TOOL_AFFORDANCES.marker.ariaLabel,
   }, {
     id: 'tool:highlight',
     onSelect: () => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' }),
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.highlight.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.highlight.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.highlight.shortcut,
+    title: PPT_TOOL_AFFORDANCES.highlight.ariaLabel,
   }, {
     id: 'tool:eraser',
     onSelect: activateEraserTool,
     section: 'Create',
-    shortcut: CANVAS_TOOL_AFFORDANCES.eraser.shortcut,
-    title: CANVAS_TOOL_AFFORDANCES.eraser.ariaLabel,
+    shortcut: PPT_TOOL_AFFORDANCES.eraser.shortcut,
+    title: PPT_TOOL_AFFORDANCES.eraser.ariaLabel,
   }, {
     id: 'tool:image',
     onSelect: () => imageInputRef.current?.click(),
@@ -7158,19 +7158,19 @@ function App() {
     onSelect: resetZoom,
     section: 'View',
     shortcut: 'Cmd/Ctrl+0',
-    title: CANVAS_COMMAND_AFFORDANCES.zoomReset.title,
+    title: PPT_COMMAND_AFFORDANCES.zoomReset.title,
   }, {
     id: 'view:zoom-in',
     onSelect: () => zoom('in'),
     section: 'View',
     shortcut: 'Cmd/Ctrl+=',
-    title: CANVAS_COMMAND_AFFORDANCES.zoomIn.title,
+    title: PPT_COMMAND_AFFORDANCES.zoomIn.title,
   }, {
     id: 'view:zoom-out',
     onSelect: () => zoom('out'),
     section: 'View',
     shortcut: 'Cmd/Ctrl+-',
-    title: CANVAS_COMMAND_AFFORDANCES.zoomOut.title,
+    title: PPT_COMMAND_AFFORDANCES.zoomOut.title,
   }, {
     id: 'view:toggle-grid',
     onSelect: () => setShowGrid((current) => !current),
@@ -7249,10 +7249,10 @@ function App() {
           <span>{deck.title}</span>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.undo} onClick={undo} title={CANVAS_COMMAND_AFFORDANCES.undo.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.undo} onClick={undo} title={PPT_COMMAND_AFFORDANCES.undo.title} type="button">
             <Undo2 size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={CANVAS_COMMAND_AFFORDANCES.redo.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={PPT_COMMAND_AFFORDANCES.redo.title} type="button">
             <Redo2 size={17} />
           </button>
           <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
@@ -7291,101 +7291,101 @@ function App() {
         <div className="ppt-toolbar-group">
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.pan.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.pan.ariaLabel}
             aria-pressed={isPanToolActive}
             className="ppt-icon-button"
             data-ppt-pan-tool
             data-ppt-tool="pan"
             onClick={activatePanTool}
-            title={CANVAS_TOOL_AFFORDANCES.pan.title}
+            title={PPT_TOOL_AFFORDANCES.pan.title}
             type="button"
           >
             <Hand size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.laser.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.laser.ariaLabel}
             aria-pressed={isLaserToolActive}
             className="ppt-icon-button"
             data-ppt-laser-tool
             data-ppt-tool="laser"
             onClick={activateLaserTool}
-            title={CANVAS_TOOL_AFFORDANCES.laser.title}
+            title={PPT_TOOL_AFFORDANCES.laser.title}
             type="button"
           >
             <MousePointer2 size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.text.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.text.ariaLabel}
             aria-pressed={creationTool?.kind === 'text'}
             className="ppt-icon-button"
             data-ppt-insert-tool="text"
             onClick={() => activatePPTCreationTool({ kind: 'text' })}
-            title={CANVAS_TOOL_AFFORDANCES.text.title}
+            title={PPT_TOOL_AFFORDANCES.text.title}
             type="button"
           >
             <Type size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.sticky.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.sticky.ariaLabel}
             aria-pressed={creationTool?.kind === 'sticky'}
             className="ppt-icon-button"
             data-ppt-insert-tool="sticky"
             onClick={() => activatePPTCreationTool({ kind: 'sticky' })}
-            title={CANVAS_TOOL_AFFORDANCES.sticky.title}
+            title={PPT_TOOL_AFFORDANCES.sticky.title}
             type="button"
           >
             <StickyNote size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.section.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.section.ariaLabel}
             aria-pressed={creationTool?.kind === 'section'}
             className="ppt-icon-button"
             data-ppt-insert-tool="section"
             onClick={() => activatePPTCreationTool({ kind: 'section' })}
-            title={CANVAS_TOOL_AFFORDANCES.section.title}
+            title={PPT_TOOL_AFFORDANCES.section.title}
             type="button"
           >
             <Frame size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.rect.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.rect.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'rect')}
             className="ppt-icon-button"
             data-ppt-insert-shape="rect"
             data-ppt-insert-tool="rect"
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'rect' })}
-            title={CANVAS_TOOL_AFFORDANCES.rect.title}
+            title={PPT_TOOL_AFFORDANCES.rect.title}
             type="button"
           >
             <Square size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.ellipse.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.ellipse.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'ellipse')}
             className="ppt-icon-button"
             data-ppt-insert-shape="ellipse"
             data-ppt-insert-tool="ellipse"
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' })}
-            title={CANVAS_TOOL_AFFORDANCES.ellipse.title}
+            title={PPT_TOOL_AFFORDANCES.ellipse.title}
             type="button"
           >
             <Circle size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.diamond.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.diamond.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'diamond')}
             className="ppt-icon-button"
             data-ppt-insert-shape="diamond"
             data-ppt-insert-tool="diamond"
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' })}
-            title={CANVAS_TOOL_AFFORDANCES.diamond.title}
+            title={PPT_TOOL_AFFORDANCES.diamond.title}
             type="button"
           >
             <Diamond size={17} />
@@ -7395,75 +7395,75 @@ function App() {
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.arrow.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.arrow.ariaLabel}
             aria-pressed={lineCreationMode === 'arrow'}
             className="ppt-icon-button"
             data-ppt-insert-line="arrow"
             data-ppt-insert-tool="arrow"
             onClick={() => activateLineCreationMode('arrow')}
-            title={CANVAS_TOOL_AFFORDANCES.arrow.title}
+            title={PPT_TOOL_AFFORDANCES.arrow.title}
             type="button"
           >
             <ArrowRight size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.pen.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.pen.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'pen')}
             className="ppt-icon-button"
             data-ppt-insert-tool="pen"
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' })}
-            title={CANVAS_TOOL_AFFORDANCES.pen.title}
+            title={PPT_TOOL_AFFORDANCES.pen.title}
             type="button"
           >
             <PenLine size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.marker.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.marker.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'marker')}
             className="ppt-icon-button"
             data-ppt-insert-tool="marker"
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' })}
-            title={CANVAS_TOOL_AFFORDANCES.marker.title}
+            title={PPT_TOOL_AFFORDANCES.marker.title}
             type="button"
           >
             <PencilLine size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.highlight.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.highlight.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'highlight')}
             className="ppt-icon-button"
             data-ppt-insert-tool="highlight"
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' })}
-            title={CANVAS_TOOL_AFFORDANCES.highlight.title}
+            title={PPT_TOOL_AFFORDANCES.highlight.title}
             type="button"
           >
             <Highlighter size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.eraser.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.eraser.ariaLabel}
             aria-pressed={isEraserToolActive}
             className="ppt-icon-button"
             data-ppt-eraser-tool
             data-ppt-tool="eraser"
             onClick={activateEraserTool}
-            title={CANVAS_TOOL_AFFORDANCES.eraser.title}
+            title={PPT_TOOL_AFFORDANCES.eraser.title}
             type="button"
           >
             <Eraser size={17} />
           </button>
           <button
             {...CANVAS_TOOLBAR_ITEM_PROPS}
-            aria-label={CANVAS_TOOL_AFFORDANCES.comment.ariaLabel}
+            aria-label={PPT_TOOL_AFFORDANCES.comment.ariaLabel}
             aria-pressed={creationTool?.kind === 'comment'}
             className="ppt-icon-button"
             data-ppt-insert-comment
             data-ppt-insert-tool="comment"
             onClick={() => activatePPTCreationTool({ kind: 'comment' })}
-            title={CANVAS_TOOL_AFFORDANCES.comment.title}
+            title={PPT_TOOL_AFFORDANCES.comment.title}
             type="button"
           >
             <MessageSquare size={17} />
@@ -7483,33 +7483,33 @@ function App() {
             type="file"
             onChange={handleImageInputChange}
           />
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={CANVAS_COMMAND_AFFORDANCES.delete.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={PPT_COMMAND_AFFORDANCES.delete.title} type="button">
             <Trash2 size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} onClick={() => alignSelection('alignLeft')} title={CANVAS_COMMAND_AFFORDANCES.alignLeft.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} onClick={() => alignSelection('alignLeft')} title={PPT_COMMAND_AFFORDANCES.alignLeft.title} type="button">
             <AlignStartVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} onClick={() => alignSelection('alignCenter')} title={CANVAS_COMMAND_AFFORDANCES.alignCenter.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} onClick={() => alignSelection('alignCenter')} title={PPT_COMMAND_AFFORDANCES.alignCenter.title} type="button">
             <AlignCenterVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-right" disabled={!commandAvailability.alignRight} onClick={() => alignSelection('alignRight')} title={CANVAS_COMMAND_AFFORDANCES.alignRight.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-right" disabled={!commandAvailability.alignRight} onClick={() => alignSelection('alignRight')} title={PPT_COMMAND_AFFORDANCES.alignRight.title} type="button">
             <AlignEndVertical size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-top" disabled={!commandAvailability.alignTop} onClick={() => alignSelection('alignTop')} title={CANVAS_COMMAND_AFFORDANCES.alignTop.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-top" disabled={!commandAvailability.alignTop} onClick={() => alignSelection('alignTop')} title={PPT_COMMAND_AFFORDANCES.alignTop.title} type="button">
             <AlignStartHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} onClick={() => alignSelection('alignMiddle')} title={CANVAS_COMMAND_AFFORDANCES.alignMiddle.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} onClick={() => alignSelection('alignMiddle')} title={PPT_COMMAND_AFFORDANCES.alignMiddle.title} type="button">
             <AlignCenterHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} onClick={() => alignSelection('alignBottom')} title={CANVAS_COMMAND_AFFORDANCES.alignBottom.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} onClick={() => alignSelection('alignBottom')} title={PPT_COMMAND_AFFORDANCES.alignBottom.title} type="button">
             <AlignEndHorizontal size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} onClick={() => distributeSelection('distributeHorizontal')} title={CANVAS_COMMAND_AFFORDANCES.distributeHorizontal.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} onClick={() => distributeSelection('distributeHorizontal')} title={PPT_COMMAND_AFFORDANCES.distributeHorizontal.title} type="button">
             <AlignHorizontalDistributeCenter size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={CANVAS_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={PPT_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
             <AlignVerticalDistributeCenter size={17} />
           </button>
           <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
@@ -7523,30 +7523,30 @@ function App() {
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} onClick={() => reorderSelection('bringForward')} title={CANVAS_COMMAND_AFFORDANCES.bringForward.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} onClick={() => reorderSelection('bringForward')} title={PPT_COMMAND_AFFORDANCES.bringForward.title} type="button">
             <MoveUp size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} onClick={() => reorderSelection('bringToFront')} title={CANVAS_COMMAND_AFFORDANCES.bringToFront.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} onClick={() => reorderSelection('bringToFront')} title={PPT_COMMAND_AFFORDANCES.bringToFront.title} type="button">
             <BringToFront size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} onClick={() => reorderSelection('sendBackward')} title={CANVAS_COMMAND_AFFORDANCES.sendBackward.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} onClick={() => reorderSelection('sendBackward')} title={PPT_COMMAND_AFFORDANCES.sendBackward.title} type="button">
             <MoveDown size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} onClick={() => reorderSelection('sendToBack')} title={CANVAS_COMMAND_AFFORDANCES.sendToBack.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} onClick={() => reorderSelection('sendToBack')} title={PPT_COMMAND_AFFORDANCES.sendToBack.title} type="button">
             <SendToBack size={17} />
           </button>
         </div>
         <div className="ppt-toolbar-group">
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={CANVAS_COMMAND_AFFORDANCES.group.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={PPT_COMMAND_AFFORDANCES.group.title} type="button">
             <Group size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={CANVAS_COMMAND_AFFORDANCES.ungroup.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={PPT_COMMAND_AFFORDANCES.ungroup.title} type="button">
             <Ungroup size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={CANVAS_COMMAND_AFFORDANCES.lockSelection.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={PPT_COMMAND_AFFORDANCES.lockSelection.title} type="button">
             <Lock size={17} />
           </button>
-          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={CANVAS_COMMAND_AFFORDANCES.unlockAll.title} type="button">
+          <button {...CANVAS_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={PPT_COMMAND_AFFORDANCES.unlockAll.title} type="button">
             <Unlock size={17} />
           </button>
         </div>
@@ -7800,8 +7800,8 @@ function App() {
         data-ppt-keyboard-nudge-large-step={String(CANVAS_KEYBOARD_NUDGE_LARGE_STEP)}
         data-ppt-keyboard-nudge-model={CANVAS_KEYBOARD_NUDGE_MODEL}
         data-ppt-keyboard-nudge-step={String(CANVAS_KEYBOARD_NUDGE_STEP)}
-        data-ppt-arrow-tool-model={CANVAS_TOOL_AFFORDANCES.arrow.model}
-        data-ppt-arrow-tool-shortcut={CANVAS_TOOL_AFFORDANCES.arrow.shortcut}
+        data-ppt-arrow-tool-model={PPT_TOOL_AFFORDANCES.arrow.model}
+        data-ppt-arrow-tool-shortcut={PPT_TOOL_AFFORDANCES.arrow.shortcut}
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
           ? creationTool.tool
           : undefined}
@@ -7809,25 +7809,25 @@ function App() {
           ? interaction.erasedIds.length
           : undefined}
         data-ppt-eraser-tool-active={isEraserToolActive ? 'true' : 'false'}
-        data-ppt-eraser-tool-model={CANVAS_TOOL_AFFORDANCES.eraser.model}
-        data-ppt-eraser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.eraser.shortcut}
-        data-ppt-highlighter-tool-model={CANVAS_TOOL_AFFORDANCES.highlight.model}
-        data-ppt-highlighter-tool-shortcut={CANVAS_TOOL_AFFORDANCES.highlight.shortcut}
+        data-ppt-eraser-tool-model={PPT_TOOL_AFFORDANCES.eraser.model}
+        data-ppt-eraser-tool-shortcut={PPT_TOOL_AFFORDANCES.eraser.shortcut}
+        data-ppt-highlighter-tool-model={PPT_TOOL_AFFORDANCES.highlight.model}
+        data-ppt-highlighter-tool-shortcut={PPT_TOOL_AFFORDANCES.highlight.shortcut}
         data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
-        data-ppt-laser-tool-model={CANVAS_TOOL_AFFORDANCES.laser.model}
-        data-ppt-laser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.laser.shortcut}
+        data-ppt-laser-tool-model={PPT_TOOL_AFFORDANCES.laser.model}
+        data-ppt-laser-tool-shortcut={PPT_TOOL_AFFORDANCES.laser.shortcut}
         data-ppt-laser-trail-model={PPT_LASER_TRAIL_OVERLAY_MODEL}
         data-ppt-laser-trail-point-count={laserTrailPoints.length}
         data-ppt-laser-trail-state={interaction?.kind === 'laser'
           ? 'active'
           : laserTrailPoints.length > 0 ? 'idle' : 'empty'}
         data-ppt-pan-tool-active={isPanToolActive ? 'true' : 'false'}
-        data-ppt-pan-tool-model={CANVAS_TOOL_AFFORDANCES.pan.model}
-        data-ppt-pan-tool-shortcut={CANVAS_TOOL_AFFORDANCES.pan.shortcut}
-        data-ppt-marker-tool-model={CANVAS_TOOL_AFFORDANCES.marker.model}
-        data-ppt-marker-tool-shortcut={CANVAS_TOOL_AFFORDANCES.marker.shortcut}
-        data-ppt-section-tool-model={CANVAS_TOOL_AFFORDANCES.section.model}
-        data-ppt-section-tool-shortcut={CANVAS_TOOL_AFFORDANCES.section.shortcut}
+        data-ppt-pan-tool-model={PPT_TOOL_AFFORDANCES.pan.model}
+        data-ppt-pan-tool-shortcut={PPT_TOOL_AFFORDANCES.pan.shortcut}
+        data-ppt-marker-tool-model={PPT_TOOL_AFFORDANCES.marker.model}
+        data-ppt-marker-tool-shortcut={PPT_TOOL_AFFORDANCES.marker.shortcut}
+        data-ppt-section-tool-model={PPT_TOOL_AFFORDANCES.section.model}
+        data-ppt-section-tool-shortcut={PPT_TOOL_AFFORDANCES.section.shortcut}
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model={CANVAS_RESIZE_POINTER_MODIFIERS_MODEL}
@@ -8039,8 +8039,8 @@ function App() {
         data-ppt-keyboard-tool-dispatch={CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL}
         data-ppt-keyboard-viewport-intent={CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL}
         data-ppt-keyboard-viewport-model={CANVAS_KEYBOARD_VIEWPORT_MODEL}
-        data-ppt-sticky-tool-model={CANVAS_TOOL_AFFORDANCES.sticky.model}
-        data-ppt-sticky-tool-shortcut={CANVAS_TOOL_AFFORDANCES.sticky.shortcut}
+        data-ppt-sticky-tool-model={PPT_TOOL_AFFORDANCES.sticky.model}
+        data-ppt-sticky-tool-shortcut={PPT_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
         data-ppt-temporary-pan-model={PPT_KEYBOARD_TEMPORARY_PAN_MODEL}
@@ -16115,7 +16115,7 @@ function getPPTElementParagraphAlign(element: PPTElement) {
   return element.textBody?.paragraphs[0]?.align ?? 'left'
 }
 
-const PPT_CANVAS_CREATION_ADAPTER: CanvasCreationAdapter<PPTElement> = {
+const PPT_CANVAS_CREATION_ADAPTER: PPTCanvasCreationAdapter<PPTElement> = {
   createArrow: () => throwUnsupportedPPTCreationTool(),
   createHighlight: () => throwUnsupportedPPTCreationTool(),
   createMarker: () => throwUnsupportedPPTCreationTool(),
@@ -16154,7 +16154,7 @@ function createPPTElementFromCreationTool({
   tool: PPTCreationTool
 }): PPTElement {
   if (tool.kind === 'text') {
-    const created = createCanvasText({
+    const created = createPPTCanvasText({
       adapter: PPT_CANVAS_CREATION_ADAPTER,
       createId: () => id,
       point: start,
@@ -16214,7 +16214,7 @@ function createPPTElementFromCreationTool({
     })
   }
 
-  return createCanvasShape({
+  return createPPTCanvasShape({
     adapter: PPT_CANVAS_CREATION_ADAPTER,
     createId: () => id,
     currentWorld: current,
@@ -16432,7 +16432,7 @@ function clampPPTCreationBounds(bounds: Bounds): Bounds {
   })
 }
 
-function toPPTShapeKind(shape: CanvasCreatedShapeKind): PPTShapeKind {
+function toPPTShapeKind(shape: PPTCanvasCreatedShapeKind): PPTShapeKind {
   if (shape === 'ellipse' || shape === 'diamond') {
     return shape
   }
