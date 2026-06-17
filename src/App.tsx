@@ -422,25 +422,25 @@ import {
   type Viewport,
 } from './pptCanvasCoreAdapter'
 import {
-  CANVAS_MARQUEE_SELECTION_MODEL,
-  EMPTY_CANVAS_SNAP_GUIDES,
-  getCanvasFullySelectedItemGroupIds,
-  getCanvasGroupExpandedSelectionIds,
-  getCanvasGroupedItemSelection,
-  getCanvasGroupedItemPointerSelection,
-  getCanvasMarqueeSelection,
-  getCanvasMoveSnap,
-  getCanvasSelectedItems,
-  getCanvasSingleItemSelection,
-  deleteCanvasSelectionItems,
-  isAdditivePointerInput,
-  mapCanvasSelectionItems,
-  moveCanvasSelection,
-  normalizeCanvasRotationDegrees,
-  removeCanvasSelectionIds,
-  resizeCanvasSelection,
-  type CanvasSnapGuides,
-} from 'canvas/foundation'
+  EMPTY_PPT_CANVAS_SNAP_GUIDES,
+  PPT_MARQUEE_SELECTION_MODEL,
+  deletePPTCanvasSelectionItems,
+  getPPTCanvasFullySelectedItemGroupIds,
+  getPPTCanvasGroupExpandedSelectionIds,
+  getPPTCanvasGroupedItemPointerSelection,
+  getPPTCanvasGroupedItemSelection,
+  getPPTCanvasMarqueeSelection,
+  getPPTCanvasMoveSnap,
+  getPPTCanvasSelectedItems,
+  getPPTCanvasSingleItemSelection,
+  isAdditivePPTPointerInput,
+  mapPPTCanvasSelectionItems,
+  movePPTCanvasSelection,
+  normalizePPTCanvasRotationDegrees,
+  removePPTCanvasSelectionIds,
+  resizePPTCanvasSelection,
+  type PPTCanvasSnapGuides,
+} from './pptCanvasFoundationAdapter'
 import {
   PPT_DEFAULT_THEME_ID,
   PPT_SPLIT_LAYOUT_ID,
@@ -1867,7 +1867,7 @@ type Interaction =
       kind: 'move'
       selection: string[]
       slideId: string
-      snapGuides: CanvasSnapGuides
+      snapGuides: PPTCanvasSnapGuides
       startDeck: PPTDeck
       startPoint: Point
     }
@@ -2099,7 +2099,7 @@ function App() {
     ? getPPTElementAnimation(selectedElement, activeSlide)
     : null
   const selectedElements = useMemo(
-    () => getCanvasSelectedItems({
+    () => getPPTCanvasSelectedItems({
       getItemId: (element) => element.id,
       items: activeSlide.elements,
       selection,
@@ -3148,7 +3148,7 @@ function App() {
       }
 
       const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
-      const slides = deleteCanvasSelectionItems({
+      const slides = deletePPTCanvasSelectionItems({
         getItemId: (slide) => slide.id,
         items: current.slides,
         selection: [activeSlide.id],
@@ -4014,7 +4014,7 @@ function App() {
   }
 
   function copySelection(operation: PPTClipboardOperation = 'copy') {
-    const selected = getCanvasSelectedItems({
+    const selected = getPPTCanvasSelectedItems({
       getItemId: (element) => element.id,
       items: activeSlide.elements,
       selection,
@@ -4365,7 +4365,7 @@ function App() {
         ...element,
         geometry: {
           ...element.geometry,
-          rotation: normalizeCanvasRotationDegrees(rotation),
+          rotation: normalizePPTCanvasRotationDegrees(rotation),
         },
       })),
     )
@@ -4665,7 +4665,7 @@ function App() {
     elementIds: readonly string[],
     mapElement: (element: PPTElement, index: number) => PPTElement,
   ) {
-    return mapCanvasSelectionItems({
+    return mapPPTCanvasSelectionItems({
       getItemId: (element) => element.id,
       items: elements,
       mapItem: mapElement,
@@ -4677,7 +4677,7 @@ function App() {
     elements: PPTElement[],
     mapTextElement: (element: PPTTextElement, index: number) => PPTTextElement,
   ) {
-    return mapCanvasSelectionItems({
+    return mapPPTCanvasSelectionItems({
       getItemId: (element) => element.id,
       isItemSelectable: (element) =>
         isPPTTextElement(element) &&
@@ -5842,7 +5842,7 @@ function App() {
 
     setContextMenu(null)
     setSelection((current) =>
-      removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
+      removePPTCanvasSelectionIds({ ids: erasedIds, selection: current }))
     setInteraction({
       currentPoint: points[0],
       erasedIds,
@@ -5947,7 +5947,7 @@ function App() {
     event.stopPropagation()
     captureCanvasPointerFromEvent(event)
 
-    const additive = isAdditivePointerInput(event)
+    const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
       elementId,
@@ -6012,7 +6012,7 @@ function App() {
       kind: 'move',
       selection: interactionSelection,
       slideId: activeSlide.id,
-      snapGuides: EMPTY_CANVAS_SNAP_GUIDES,
+      snapGuides: EMPTY_PPT_CANVAS_SNAP_GUIDES,
       startDeck: interactionStartDeck,
       startPoint: screenToWorld(event.nativeEvent),
     })
@@ -6057,7 +6057,7 @@ function App() {
 
     focusStageShell()
     captureCanvasPointerFromEvent(event)
-    const additive = isAdditivePointerInput(event)
+    const additive = isAdditivePPTPointerInput(event)
     const point = screenToWorld(event.nativeEvent)
 
     if (beginTemporaryPan(event)) {
@@ -6328,7 +6328,7 @@ function App() {
       )
 
       setSelection((current) =>
-        removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
+        removePPTCanvasSelectionIds({ ids: erasedIds, selection: current }))
       setInteraction({
         ...interaction,
         currentPoint: clampPPTPointToSlide(point),
@@ -6340,7 +6340,7 @@ function App() {
 
     if (interaction.kind === 'marquee') {
       const bounds = normalizePPTCanvasBounds(interaction.startPoint, point)
-      const nextSelection = getCanvasMarqueeSelection({
+      const nextSelection = getPPTCanvasMarqueeSelection({
         additive: interaction.additive,
         baseSelection: interaction.baseSelection,
         bounds,
@@ -6461,7 +6461,7 @@ function App() {
       const startScene = createPPTCanvasScene(startSlide)
       const dx = point.x - interaction.startPoint.x
       const dy = point.y - interaction.startPoint.y
-      const snap = getCanvasMoveSnap({
+      const snap = getPPTCanvasMoveSnap({
         bounds: interaction.bounds,
         config: {
           gestures: {
@@ -6476,7 +6476,7 @@ function App() {
         selection: interaction.selection,
         viewport,
       })
-      const elements = moveCanvasSelection({
+      const elements = movePPTCanvasSelection({
         adapter: pptCanvasTransformAdapter,
         dx: snap.dx,
         dy: snap.dy,
@@ -6506,7 +6506,7 @@ function App() {
 
     if (interaction.kind === 'resize') {
       const transformModifierState = getCanvasPointerTransformModifierState(event)
-      const elements = resizeCanvasSelection({
+      const elements = resizePPTCanvasSelection({
         adapter: pptCanvasTransformAdapter,
         bounds: interaction.bounds,
         handle: interaction.handle,
@@ -6570,7 +6570,7 @@ function App() {
           return element
         }
 
-        const rawRotation = normalizeCanvasRotationDegrees(startRotation + delta)
+        const rawRotation = normalizePPTCanvasRotationDegrees(startRotation + delta)
         const rotation = transformModifierState.constrainAngle
           ? Math.round(rawRotation / 15) * 15
           : rawRotation
@@ -6579,7 +6579,7 @@ function App() {
           ...element,
           geometry: {
             ...element.geometry,
-            rotation: normalizeCanvasRotationDegrees(rotation),
+            rotation: normalizePPTCanvasRotationDegrees(rotation),
           },
         }
       },
@@ -6602,7 +6602,7 @@ function App() {
       const erasedIds = new Set(interaction.erasedIds)
       const nextDeck = updatePPTDeckSlide(deckRef.current, interaction.slideId, (slide) => ({
         ...slide,
-        elements: deleteCanvasSelectionItems({
+        elements: deletePPTCanvasSelectionItems({
           getItemId: (element) => element.id,
           items: slide.elements,
           selection: interaction.erasedIds,
@@ -6612,7 +6612,7 @@ function App() {
       deckRef.current = nextDeck
       setDeck(nextDeck)
       setSelection((current) =>
-        removeCanvasSelectionIds({ ids: erasedIds, selection: current }))
+        removePPTCanvasSelectionIds({ ids: erasedIds, selection: current }))
     }
 
     if (interaction.kind === 'line-create') {
@@ -6739,7 +6739,7 @@ function App() {
     : null
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
-    : EMPTY_CANVAS_SNAP_GUIDES
+    : EMPTY_PPT_CANVAS_SNAP_GUIDES
   const selectionCommandBarWidth = textQuickFormatState ? 516 : 332
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
@@ -7771,7 +7771,7 @@ function App() {
           : undefined}
         data-ppt-marquee-h={marqueeBounds?.h}
         data-ppt-marquee-history="none"
-        data-ppt-marquee-model={CANVAS_MARQUEE_SELECTION_MODEL}
+        data-ppt-marquee-model={PPT_MARQUEE_SELECTION_MODEL}
         data-ppt-marquee-selection={marqueeSelection?.join(' ') ?? undefined}
         data-ppt-marquee-w={marqueeBounds?.w}
         data-ppt-marquee-x={marqueeBounds?.x}
@@ -10093,7 +10093,7 @@ function getPPTLayerPaneFullySelectedGroupIds(
   slide: PPTSlide,
   selectedObjectIds: readonly string[],
 ) {
-  return getCanvasFullySelectedItemGroupIds({
+  return getPPTCanvasFullySelectedItemGroupIds({
     getItemGroupId: (element) => element.groupId,
     getItemId: (element) => element.id,
     items: slide.elements,
@@ -10137,7 +10137,7 @@ function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
 ) {
-  return uniquePPTCanvasValues(getCanvasGroupExpandedSelectionIds({
+  return uniquePPTCanvasValues(getPPTCanvasGroupExpandedSelectionIds({
     getItemGroupId: (element) => element.groupId,
     getItemId: (element) => element.id,
     getSelectionGroupId: getPPTLayerPaneGroupIdFromRowId,
@@ -10290,7 +10290,7 @@ function getPPTLayerPaneSelection({
   const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
 
   if (targetGroupId) {
-    return getCanvasGroupedItemSelection({
+    return getPPTCanvasGroupedItemSelection({
       additive: mode === 'additive',
       fallbackSelection: mode === 'additive' ? currentSelection : [],
       getItemGroupId: (element) => element.groupId,
@@ -12213,7 +12213,7 @@ function PPTLaserTrailOverlay({
   )
 }
 
-function Guides({ guides, scale }: { guides: CanvasSnapGuides; scale: number }) {
+function Guides({ guides, scale }: { guides: PPTCanvasSnapGuides; scale: number }) {
   return (
     <>
       {guides.alignmentGuides.map((guide, index) => (
@@ -17252,7 +17252,7 @@ function getPPTSelectedLineIds(
   selection: string[],
 ) {
   return new Set(
-    getCanvasSelectedItems({
+    getPPTCanvasSelectedItems({
       getItemId: (element) => element.id,
       isItemSelectable: (element) => element.kind === 'line',
       items: elements,
@@ -17468,7 +17468,7 @@ function getSpacingGuideSegmentStyle(segment: {
       }
 }
 
-function getSpacingGuideLabelPoint(guide: CanvasSnapGuides['spacingGuides'][number]) {
+function getSpacingGuideLabelPoint(guide: PPTCanvasSnapGuides['spacingGuides'][number]) {
   const points = guide.segments.flatMap((segment) => [segment.start, segment.end])
   const x = points.reduce((sum, point) => sum + point.x, 0) / points.length
   const y = points.reduce((sum, point) => sum + point.y, 0) / points.length
@@ -17690,7 +17690,7 @@ function getPPTSingleElementSelection(
   elementId: string,
   additive: boolean,
 ) {
-  return getCanvasSingleItemSelection({
+  return getPPTCanvasSingleItemSelection({
     additive,
     itemId: elementId,
     selection,
@@ -17712,7 +17712,7 @@ function getPPTGroupPointerSelection({
   selection: string[]
   slide: PPTSlide
 }) {
-  return getCanvasGroupedItemPointerSelection({
+  return getPPTCanvasGroupedItemPointerSelection({
     additive,
     fallbackSelection,
     getItemGroupId: (element) => element.groupId,
