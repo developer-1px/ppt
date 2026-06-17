@@ -420,6 +420,7 @@ import {
 import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
 import {
   getCanvasPointerLocalGeometry,
+  getCanvasWorldClientPoint,
   screenPoint as getCanvasPointerScreenPoint,
 } from 'canvas/app/pointer-geometry'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
@@ -446,7 +447,6 @@ import {
   createCanvasSequentialIdFactory,
   getCanvasBoundsAnchorPoints,
   getCanvasBoundsCenter,
-  getCanvasViewportScreenPoint,
   handlePoint,
   normalizeBounds,
   normalizeCanvasPointsToLocalBounds,
@@ -5554,13 +5554,11 @@ function App() {
   }
 
   function worldToScreen(point: Point) {
-    const rect = canvasStageElement.getRect()
-    const screenPoint = getCanvasViewportScreenPoint(viewport, point)
-
-    return {
-      x: (rect?.left ?? 0) + screenPoint.x,
-      y: (rect?.top ?? 0) + screenPoint.y,
-    }
+    return getCanvasWorldClientPoint({
+      point,
+      stageElement: canvasStageElement,
+      viewport,
+    })
   }
 
   function openPPTContextMenu(x: number, y: number) {
