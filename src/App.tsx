@@ -319,6 +319,10 @@ import {
   bindCanvasEventListeners,
 } from 'canvas/app/event-listener'
 import {
+  isCanvasControlTarget,
+  isCanvasWheelPassthroughTarget,
+} from 'canvas/app/interaction-target'
+import {
   getCanvasFloatingAnchorForBounds,
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
@@ -14918,42 +14922,32 @@ function pptTextRunStyle(run: PPTRun): CSSProperties {
   }
 }
 
+const PPT_TEMPORARY_PAN_BLOCKED_TARGET_SELECTORS = [
+  '[data-ppt-command-palette]',
+  '[data-ppt-context-menu]',
+  '[data-ppt-shortcut-help]',
+] as const
+
+const PPT_WHEEL_VIEWPORT_PASSTHROUGH_TARGET_SELECTORS = [
+  '[data-ppt-command-palette]',
+  '[data-ppt-context-menu]',
+  '[data-ppt-minimap]',
+  '[data-ppt-shortcut-help]',
+  '[data-ppt-wheel-passthrough="true"]',
+] as const
+
 function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {
-  return target instanceof Element &&
-    Boolean(target.closest([
-      'button',
-      'input',
-      'select',
-      'textarea',
-      '[contenteditable="true"]',
-      '[data-ppt-command-palette]',
-      '[data-ppt-context-menu]',
-      '[data-ppt-shortcut-help]',
-      '[role="button"]',
-      '[role="menuitem"]',
-      '[role="option"]',
-      '[role="tab"]',
-    ].join(',')))
+  return isCanvasControlTarget({
+    extraSelectors: PPT_TEMPORARY_PAN_BLOCKED_TARGET_SELECTORS,
+    target,
+  })
 }
 
 function isPPTWheelViewportPassthroughTarget(target: EventTarget | null) {
-  return target instanceof Element &&
-    Boolean(target.closest([
-      'button',
-      'input',
-      'select',
-      'textarea',
-      '[contenteditable="true"]',
-      '[data-ppt-command-palette]',
-      '[data-ppt-context-menu]',
-      '[data-ppt-minimap]',
-      '[data-ppt-shortcut-help]',
-      '[data-ppt-wheel-passthrough="true"]',
-      '[role="button"]',
-      '[role="menuitem"]',
-      '[role="option"]',
-      '[role="tab"]',
-    ].join(',')))
+  return isCanvasControlTarget({
+    extraSelectors: PPT_WHEEL_VIEWPORT_PASSTHROUGH_TARGET_SELECTORS,
+    target,
+  }) || isCanvasWheelPassthroughTarget(target)
 }
 
 function getPPTInspectorPanelAttributes(

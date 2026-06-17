@@ -12,6 +12,7 @@ const canvasDataTransferTextEntry = fileURLToPath(new URL('../canvas/src/canvas/
 const canvasDeferredFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasEventListenerEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts', import.meta.url))
+const canvasInteractionTargetEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts', import.meta.url))
 const canvasFloatingAnchorEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
@@ -66,6 +67,7 @@ export default defineConfig({
       { find: 'canvas/app/deferred-focus', replacement: canvasDeferredFocusEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/event-listener', replacement: canvasEventListenerEntry },
+      { find: 'canvas/app/interaction-target', replacement: canvasInteractionTargetEntry },
       { find: 'canvas/app/floating-anchor', replacement: canvasFloatingAnchorEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
