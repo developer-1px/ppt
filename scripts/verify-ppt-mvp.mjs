@@ -8828,6 +8828,77 @@ async function runViewAndShapeScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      slideLayout: {
+        layoutId: 'ppt-layout-title-body',
+        themeId: 'ppt-theme-default',
+        visiblePlaceholderIds: ['title'],
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterSlideLayoutPaste = await getPPTSlideLayoutImportState(page, 'body')
+
+  record(
+    'pastes JSON slide layout and placeholder visibility into active PPT slide',
+    afterSlideLayoutPaste.importModel === 'ppt-slide-layout-import' &&
+      afterSlideLayoutPaste.importFormat === 'application-json-ppt-slide-layout' &&
+      afterSlideLayoutPaste.importSlide === 'slide-1' &&
+      afterSlideLayoutPaste.importFields === 'layoutId themeId hiddenPlaceholderIds' &&
+      afterSlideLayoutPaste.importCommands ===
+        'apply-layout update-placeholder-visibility update-placeholder-visibility' &&
+      afterSlideLayoutPaste.commandFields === 'layoutId title body' &&
+      afterSlideLayoutPaste.commandTypes ===
+        'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterSlideLayoutPaste.importLayout === 'ppt-layout-title-body' &&
+      afterSlideLayoutPaste.importTheme === 'ppt-theme-default' &&
+      afterSlideLayoutPaste.importHiddenPlaceholders === 'body' &&
+      afterSlideLayoutPaste.importPlaceholderCommandCount === 2 &&
+      afterSlideLayoutPaste.importJsonLength > 100 &&
+      afterSlideLayoutPaste.layout === 'ppt-layout-title-body' &&
+      afterSlideLayoutPaste.theme === 'ppt-theme-default' &&
+      afterSlideLayoutPaste.placeholderId === 'body' &&
+      afterSlideLayoutPaste.visible === 'false' &&
+      afterSlideLayoutPaste.hiddenCount === 1 &&
+      afterSlideLayoutPaste.slideHiddenPlaceholders === 'body' &&
+      afterSlideLayoutPaste.command === 'update-placeholder-visibility' &&
+      afterSlideLayoutPaste.commandPlaceholder === 'body' &&
+      afterSlideLayoutPaste.commandVisible === 'false',
+    {
+      afterPlaceholderRehide,
+      afterSlideLayoutPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterSlideLayoutPasteUndo = await getPPTPlaceholderVisibilityState(page)
+
+  record(
+    'undoes PPT slide layout JSON paste as one history step',
+    afterSlideLayoutPasteUndo.layout === 'ppt-layout-split' &&
+      afterSlideLayoutPasteUndo.visible === 'false' &&
+      afterSlideLayoutPasteUndo.slideHiddenPlaceholders.split(' ').includes('media') &&
+      afterSlideLayoutPasteUndo.selectedIds === beforePlaceholderVisibility.selectedIds,
+    {
+      afterSlideLayoutPaste,
+      afterSlideLayoutPasteUndo,
+      beforePlaceholderVisibility,
+    },
+  )
+
+  await page.eval(`(() => {
     const notes = document.querySelector('[data-ppt-slide-field="notes"]')
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
 
@@ -17271,6 +17342,40 @@ function getPPTPlaceholderVisibilityState(page, placeholderId = 'media') {
       slideHiddenPlaceholders: slide?.getAttribute('data-ppt-hidden-placeholders') ?? '',
       slideId: placeholder?.getAttribute('data-ppt-placeholder-slide') ?? '',
       toggleDisabled: toggle?.disabled ?? null,
+      visible: placeholder?.getAttribute('data-ppt-placeholder-visible') ?? '',
+    }
+  })(${JSON.stringify(placeholderId)})`)
+}
+
+function getPPTSlideLayoutImportState(page, placeholderId = 'body') {
+  return page.eval(`((placeholderId) => {
+    const list = document.querySelector('[data-ppt-layout-placeholder-count]')
+    const placeholder = document.querySelector(\`[data-ppt-layout-placeholder="\${placeholderId}"]\`)
+    const stage = document.querySelector('.ppt-stage-shell')
+    const slide = document.querySelector('.ppt-slide')
+
+    return {
+      command: stage?.getAttribute('data-ppt-placeholder-visibility-command') ?? '',
+      commandFields: stage?.getAttribute('data-ppt-slide-layout-import-command-fields') ?? '',
+      commandPlaceholder: stage?.getAttribute('data-ppt-placeholder-visibility-command-placeholder') ?? '',
+      commandTypes: stage?.getAttribute('data-ppt-slide-layout-import-command-types') ?? '',
+      commandVisible: stage?.getAttribute('data-ppt-placeholder-visibility-command-visible') ?? '',
+      count: Number(list?.getAttribute('data-ppt-layout-placeholder-count') ?? 0),
+      hiddenCount: Number(list?.getAttribute('data-ppt-layout-placeholder-hidden-count') ?? 0),
+      importCommands: stage?.getAttribute('data-ppt-slide-layout-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-slide-layout-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-slide-layout-import-format') ?? '',
+      importHiddenPlaceholders: stage?.getAttribute('data-ppt-slide-layout-import-hidden-placeholders') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-slide-layout-import-json-length') ?? 0),
+      importLayout: stage?.getAttribute('data-ppt-slide-layout-import-layout') ?? '',
+      importModel: stage?.getAttribute('data-ppt-slide-layout-import-model') ?? '',
+      importPlaceholderCommandCount: Number(stage?.getAttribute('data-ppt-slide-layout-import-placeholder-command-count') ?? 0),
+      importSlide: stage?.getAttribute('data-ppt-slide-layout-import-slide') ?? '',
+      importTheme: stage?.getAttribute('data-ppt-slide-layout-import-theme') ?? '',
+      layout: slide?.getAttribute('data-ppt-layout-id') ?? '',
+      placeholderId: placeholder?.getAttribute('data-ppt-layout-placeholder') ?? '',
+      slideHiddenPlaceholders: slide?.getAttribute('data-ppt-hidden-placeholders') ?? '',
+      theme: slide?.getAttribute('data-ppt-theme-id') ?? '',
       visible: placeholder?.getAttribute('data-ppt-placeholder-visible') ?? '',
     }
   })(${JSON.stringify(placeholderId)})`)
