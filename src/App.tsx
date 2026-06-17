@@ -348,6 +348,7 @@ import {
   PPTDeckSchema,
   PPTElementSchema,
   PPTSlideSchema,
+  PPTTextBodySchema,
   createPPTElementId,
   createPPTTextBody,
   findPPTElement,
@@ -1052,6 +1053,11 @@ const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-style' as const
 const PPT_TEXT_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-style+json'
+const PPT_TEXT_BODY_IMPORT_MODEL = 'ppt-text-body-import' as const
+const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-body' as const
+const PPT_TEXT_BODY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-body+json'
 const PPT_LINE_STYLE_IMPORT_MODEL = 'ppt-line-style-import' as const
 const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-line-style' as const
@@ -1300,6 +1306,12 @@ type PPTTextStyleImportSource = {
   paragraph?: PPTTextStyleImportParagraph
   text?: PPTTextStyleImportText
 }
+type PPTTextBodyImportSource = {
+  format: typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
+  jsonLength: number
+  mode: 'plain-text' | 'text-body'
+  textBody: PPTTextBody
+}
 type PPTLineStyleImportField =
   | 'color'
   | 'dash'
@@ -1522,6 +1534,17 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingBefore: string
   textInset: string
   verticalAlign: string
+}
+type PPTTextBodyImportEffect = {
+  commandTargets: string
+  format: typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
+  jsonLength: number
+  mode: PPTTextBodyImportSource['mode']
+  model: typeof PPT_TEXT_BODY_IMPORT_MODEL
+  objectIds: string
+  paragraphCount: number
+  runCount: number
+  textLength: number
 }
 type PPTLineStyleImportEffect = {
   categories: string
@@ -2589,6 +2612,8 @@ function App() {
     useState<PPTShapeStyleImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
     useState<PPTTextStyleImportEffect | null>(null)
+  const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
+    useState<PPTTextBodyImportEffect | null>(null)
   const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
     useState<PPTLineStyleImportEffect | null>(null)
   const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
@@ -3541,6 +3566,14 @@ function App() {
         objectTransformSource &&
         pastePPTObjectTransformSource(objectTransformSource)
       ) {
+        event.preventDefault()
+        return
+      }
+
+      const textBodySource =
+        getPPTTextBodySourceFromDataTransfer(event.clipboardData)
+
+      if (textBodySource && pastePPTTextBodySource(textBodySource)) {
         event.preventDefault()
         return
       }
@@ -4594,6 +4627,42 @@ function App() {
           slide.elements,
           objectIds,
           (element) => applyPPTObjectTransformSourceToElement(element, source),
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextBodySource(source: PPTTextBodyImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) =>
+        selection.includes(element.id) &&
+        isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    setLastTextBodyImportEffect(createPPTTextBodyImportEffect({
+      objectIds,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          objectIds,
+          (element) => isPPTTextElement(element)
+            ? {
+                ...element,
+                textBody: clonePPTTextBody(source.textBody),
+              }
+            : element,
         ),
       })))
 
@@ -10295,6 +10364,15 @@ function App() {
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
         data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
         data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
+        data-ppt-text-body-import-command-targets={lastTextBodyImportEffect?.commandTargets}
+        data-ppt-text-body-import-format={lastTextBodyImportEffect?.format}
+        data-ppt-text-body-import-json-length={lastTextBodyImportEffect?.jsonLength}
+        data-ppt-text-body-import-mode={lastTextBodyImportEffect?.mode}
+        data-ppt-text-body-import-model={lastTextBodyImportEffect?.model}
+        data-ppt-text-body-import-objects={lastTextBodyImportEffect?.objectIds}
+        data-ppt-text-body-import-paragraphs={lastTextBodyImportEffect?.paragraphCount}
+        data-ppt-text-body-import-runs={lastTextBodyImportEffect?.runCount}
+        data-ppt-text-body-import-text-length={lastTextBodyImportEffect?.textLength}
         data-ppt-line-style-import-categories={lastLineStyleImportEffect?.categories}
         data-ppt-line-style-import-command={lastLineStyleImportEffect?.commandId}
         data-ppt-line-style-import-command-targets={lastLineStyleImportEffect?.commandTargets}
@@ -13185,6 +13263,38 @@ function formatPPTTextStyleImportInsetData(
     .join(',')
 }
 
+function createPPTTextBodyImportEffect({
+  objectIds,
+  source,
+}: {
+  objectIds: readonly string[]
+  source: PPTTextBodyImportSource
+}): PPTTextBodyImportEffect {
+  return {
+    commandTargets: objectIds.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    mode: source.mode,
+    model: PPT_TEXT_BODY_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    paragraphCount: source.textBody.paragraphs.length,
+    runCount: source.textBody.paragraphs.reduce(
+      (count, paragraph) => count + paragraph.runs.length,
+      0,
+    ),
+    textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function clonePPTTextBody(body: PPTTextBody): PPTTextBody {
+  return {
+    paragraphs: body.paragraphs.map((paragraph) => ({
+      ...paragraph,
+      runs: paragraph.runs.map((run) => ({ ...run })),
+    })),
+  }
+}
+
 function getPPTTextStyleImportParagraph(
   element: PPTTextElement,
   source: PPTTextStyleImportSource,
@@ -15363,6 +15473,167 @@ function getPPTTextStyleParagraphSpacingFromJSONValue(value: unknown) {
   }
 
   return normalizePPTParagraphSpacing(value)
+}
+
+function getPPTTextBodySourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_BODY_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextBodySourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextBodySourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextBodyImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextBodySourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextBodySourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextBodyImportSource | null {
+  const payloadValue = getPPTTextBodyPayloadValue(value, allowDirect)
+
+  if (typeof payloadValue === 'string') {
+    const text = payloadValue.replace(/\r\n?/g, '\n')
+
+    return text
+      ? {
+          format: PPT_TEXT_BODY_JSON_IMPORT_FORMAT,
+          jsonLength,
+          mode: 'plain-text',
+          textBody: createPPTTextBody(text),
+        }
+      : null
+  }
+
+  const textBody = getPPTTextBodyFromJSONValue(payloadValue)
+
+  return textBody
+    ? {
+        format: PPT_TEXT_BODY_JSON_IMPORT_FORMAT,
+        jsonLength,
+        mode: 'text-body',
+        textBody,
+      }
+    : null
+}
+
+function getPPTTextBodyPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.textBody) || typeof value.textBody === 'string') {
+    return value.textBody
+  }
+
+  if (isPPTRecord(value.body) || typeof value.body === 'string') {
+    return value.body
+  }
+
+  if (isPPTRecord(value.content) || typeof value.content === 'string') {
+    return value.content
+  }
+
+  if (typeof value.text === 'string') {
+    return value.text
+  }
+
+  if (typeof value.plainText === 'string') {
+    return value.plainText
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTTextBodyFromJSONValue(value: unknown): PPTTextBody | null {
+  const parsed = PPTTextBodySchema.safeParse(value)
+
+  if (!parsed.success) {
+    return null
+  }
+
+  return normalizePPTImportedTextBody(parsed.data)
+}
+
+function normalizePPTImportedTextBody(body: PPTTextBody): PPTTextBody {
+  const paragraphs = body.paragraphs.length > 0
+    ? body.paragraphs
+    : [{ runs: [{ text: '' }] }]
+
+  return {
+    paragraphs: paragraphs.map((paragraph) => ({
+      ...paragraph,
+      runs: paragraph.runs.length > 0
+        ? paragraph.runs.map((run) => ({ ...run }))
+        : [{ text: '' }],
+    })),
+  }
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(

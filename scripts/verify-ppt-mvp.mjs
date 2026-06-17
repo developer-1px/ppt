@@ -11507,6 +11507,92 @@ async function runTextPasteScenario(page) {
   await page.eval(`document.activeElement?.blur()`)
   await delay(50)
 
+  const beforeTextBodyJSONPaste = await getPPTTextPasteState(page)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textBody: {
+        paragraphs: [
+          {
+            align: 'center',
+            runs: [
+              { bold: true, color: '#dc2626', text: 'AI revised headline ' },
+              { italic: true, size: 28, text: 'needs final polish' },
+            ],
+            spacingAfter: 8,
+            spacingBefore: 4,
+          },
+          {
+            bullet: 'bullet',
+            runs: [{ text: 'Retouch copy as PPT text' }],
+          },
+          {
+            bullet: 'numbered',
+            runs: [{ text: 'Keep structure editable', underline: true }],
+          },
+        ],
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterTextBodyJSONPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes JSON textBody into selected PPT text object',
+    afterTextBodyJSONPaste.textBodyImportModel === 'ppt-text-body-import' &&
+      afterTextBodyJSONPaste.textBodyImportFormat === 'application-json-ppt-text-body' &&
+      afterTextBodyJSONPaste.textBodyImportMode === 'text-body' &&
+      afterTextBodyJSONPaste.textBodyImportObjects === beforeTextBodyJSONPaste.selectedId &&
+      afterTextBodyJSONPaste.textBodyImportTargets === beforeTextBodyJSONPaste.selectedId &&
+      afterTextBodyJSONPaste.textBodyImportParagraphs === 3 &&
+      afterTextBodyJSONPaste.textBodyImportRuns === 4 &&
+      afterTextBodyJSONPaste.textBodyImportTextLength > 70 &&
+      afterTextBodyJSONPaste.textBodyImportJsonLength > 180 &&
+      afterTextBodyJSONPaste.textBoxCount === beforeTextBodyJSONPaste.textBoxCount &&
+      afterTextBodyJSONPaste.selectedId === beforeTextBodyJSONPaste.selectedId &&
+      afterTextBodyJSONPaste.selectedText.includes('AI revised headline') &&
+      afterTextBodyJSONPaste.selectedText.includes('Retouch copy as PPT text') &&
+      afterTextBodyJSONPaste.selectedText.includes('Keep structure editable') &&
+      afterTextBodyJSONPaste.selectedBoldRunCount >= 1 &&
+      afterTextBodyJSONPaste.selectedItalicRunCount >= 1 &&
+      afterTextBodyJSONPaste.selectedUnderlineRunCount >= 1 &&
+      afterTextBodyJSONPaste.selectedBulletParagraphCount === 1 &&
+      afterTextBodyJSONPaste.selectedNumberedParagraphCount === 1,
+    {
+      afterTextBodyJSONPaste,
+      beforeTextBodyJSONPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterTextBodyJSONUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes PPT textBody JSON paste as one history step',
+    afterTextBodyJSONUndo.textBoxCount === beforeTextBodyJSONPaste.textBoxCount &&
+      afterTextBodyJSONUndo.selectedId === beforeTextBodyJSONPaste.selectedId &&
+      afterTextBodyJSONUndo.selectedText.includes('Pasted plain text') &&
+      afterTextBodyJSONUndo.selectedText.includes('from clipboard') &&
+      afterTextBodyJSONUndo.redoEnabled,
+    {
+      afterTextBodyJSONPaste,
+      afterTextBodyJSONUndo,
+      beforeTextBodyJSONPaste,
+    },
+  )
+
   const beforeStyledFallbackPaste = await getPPTTextPasteState(page)
 
   await page.eval(`(() => {
@@ -15515,6 +15601,15 @@ function getPPTTextPasteState(page) {
       richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
       richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       textBoxCount: document.querySelectorAll('[data-kind="textBox"]').length,
+      textBodyImportFormat: stage?.getAttribute('data-ppt-text-body-import-format') ?? '',
+      textBodyImportJsonLength: Number(stage?.getAttribute('data-ppt-text-body-import-json-length') ?? 0),
+      textBodyImportMode: stage?.getAttribute('data-ppt-text-body-import-mode') ?? '',
+      textBodyImportModel: stage?.getAttribute('data-ppt-text-body-import-model') ?? '',
+      textBodyImportObjects: stage?.getAttribute('data-ppt-text-body-import-objects') ?? '',
+      textBodyImportParagraphs: Number(stage?.getAttribute('data-ppt-text-body-import-paragraphs') ?? 0),
+      textBodyImportRuns: Number(stage?.getAttribute('data-ppt-text-body-import-runs') ?? 0),
+      textBodyImportTargets: stage?.getAttribute('data-ppt-text-body-import-command-targets') ?? '',
+      textBodyImportTextLength: Number(stage?.getAttribute('data-ppt-text-body-import-text-length') ?? 0),
       textPasteBoldRuns: Number(stage?.getAttribute('data-ppt-text-paste-bold-runs') ?? 0),
       textPasteBulletParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-bullet-paragraphs') ?? 0),
       textPasteFormat: stage?.getAttribute('data-ppt-text-paste-format') ?? '',
