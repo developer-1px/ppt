@@ -4,55 +4,22 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
-const canvasCommandPaletteKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteKeyboard.ts', import.meta.url))
-const canvasAnimationFrameTaskEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/frame/CanvasAnimationFrameTask.ts', import.meta.url))
-const canvasClientViewportSizeEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/viewport/CanvasClientViewportSize.ts', import.meta.url))
-const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts', import.meta.url))
-const canvasDataTransferImportActionsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts', import.meta.url))
-const canvasDataTransferTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts', import.meta.url))
-const canvasDeferredFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts', import.meta.url))
-const canvasEditableFieldKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/editable-field/CanvasEditableFieldKeyboard.ts', import.meta.url))
-const canvasPresentationKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/presentation/CanvasPresentationKeyboard.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
-const canvasEventListenerEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts', import.meta.url))
-const canvasInteractionTargetEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts', import.meta.url))
-const canvasFloatingAnchorEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts', import.meta.url))
-const canvasFindReplaceKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/find-replace/CanvasFindReplaceKeyboard.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
 const canvasInlineEditDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts', import.meta.url))
-const canvasKeyboardCommandDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts', import.meta.url))
-const canvasKeyboardCommandShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts', import.meta.url))
-const canvasKeyboardNudgeShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts', import.meta.url))
-const canvasKeyboardShortcutIntentEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardShortcutIntent.ts', import.meta.url))
 const canvasKeyboardSystemShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardSystemShortcuts.ts', import.meta.url))
-const canvasKeyboardToolShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardToolShortcutIntent.ts', import.meta.url))
-const canvasKeyboardViewportDispatchEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts', import.meta.url))
-const canvasKeyboardViewportShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportShortcuts.ts', import.meta.url))
-const canvasMenuRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/toolbar/CanvasMenuRovingFocus.ts', import.meta.url))
 const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/media-import/CanvasMediaImport.ts', import.meta.url))
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
-const canvasModalFocusLifecycleEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/modal/CanvasModalFocusLifecycle.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
-const canvasFileDownloadEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasFileDownload.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
-const canvasPointerCaptureEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerCapture.ts', import.meta.url))
 const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts', import.meta.url))
 const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
 const canvasPointerPanInteractionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts', import.meta.url))
-const canvasPointerInputEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasAppPointerInput.ts', import.meta.url))
 const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts', import.meta.url))
-const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
-const canvasRichClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasRichClipboardIO.ts', import.meta.url))
-const canvasClipboardTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasClipboardTextIO.ts', import.meta.url))
-const canvasSelectionListRangeEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/selection-list/CanvasSelectionListRange.ts', import.meta.url))
-const canvasTabsRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/tabs/CanvasTabsRovingFocus.ts', import.meta.url))
 const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts', import.meta.url))
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts', import.meta.url))
 const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/text-paste-import/CanvasTextPasteImport.ts', import.meta.url))
-const canvasTextMeasurementDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasTextMeasurementDom.ts', import.meta.url))
-const canvasTimeoutTaskEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/frame/CanvasTimeoutTask.ts', import.meta.url))
-const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
 const canvasViewportControlsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/viewport/CanvasViewportControlExecution.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
@@ -66,56 +33,23 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
-      { find: 'canvas/app/animation-frame-task', replacement: canvasAnimationFrameTaskEntry },
-      { find: 'canvas/app/client-viewport-size', replacement: canvasClientViewportSizeEntry },
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
-      { find: 'canvas/app/command-palette-keyboard', replacement: canvasCommandPaletteKeyboardEntry },
-      { find: 'canvas/app/context-menu-position', replacement: canvasContextMenuPositionEntry },
-      { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
-      { find: 'canvas/app/data-transfer-text', replacement: canvasDataTransferTextEntry },
-      { find: 'canvas/app/deferred-focus', replacement: canvasDeferredFocusEntry },
-      { find: 'canvas/app/editable-field-keyboard', replacement: canvasEditableFieldKeyboardEntry },
-      { find: 'canvas/app/presentation-keyboard', replacement: canvasPresentationKeyboardEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
-      { find: 'canvas/app/event-listener', replacement: canvasEventListenerEntry },
-      { find: 'canvas/app/interaction-target', replacement: canvasInteractionTargetEntry },
-      { find: 'canvas/app/floating-anchor', replacement: canvasFloatingAnchorEntry },
-      { find: 'canvas/app/find-replace-keyboard', replacement: canvasFindReplaceKeyboardEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
       { find: 'canvas/app/inline-edit-dom', replacement: canvasInlineEditDomEntry },
-      { find: 'canvas/app/keyboard-command-dispatch', replacement: canvasKeyboardCommandDispatchEntry },
-      { find: 'canvas/app/keyboard-command-shortcuts', replacement: canvasKeyboardCommandShortcutsEntry },
-      { find: 'canvas/app/keyboard-nudge-shortcuts', replacement: canvasKeyboardNudgeShortcutsEntry },
-      { find: 'canvas/app/keyboard-shortcut-intent', replacement: canvasKeyboardShortcutIntentEntry },
       { find: 'canvas/app/keyboard-system-shortcuts', replacement: canvasKeyboardSystemShortcutsEntry },
-      { find: 'canvas/app/keyboard-tool-shortcuts', replacement: canvasKeyboardToolShortcutsEntry },
-      { find: 'canvas/app/keyboard-viewport-dispatch', replacement: canvasKeyboardViewportDispatchEntry },
-      { find: 'canvas/app/keyboard-viewport-shortcuts', replacement: canvasKeyboardViewportShortcutsEntry },
-      { find: 'canvas/app/menu-roving-focus', replacement: canvasMenuRovingFocusEntry },
       { find: 'canvas/app/media-import', replacement: canvasMediaImportEntry },
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
-      { find: 'canvas/app/modal-focus-lifecycle', replacement: canvasModalFocusLifecycleEntry },
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
-      { find: 'canvas/app/file-download', replacement: canvasFileDownloadEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
-      { find: 'canvas/app/pointer-capture', replacement: canvasPointerCaptureEntry },
       { find: 'canvas/app/pointer-geometry', replacement: canvasPointerGeometryEntry },
       { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
       { find: 'canvas/app/pointer-pan-interaction', replacement: canvasPointerPanInteractionEntry },
-      { find: 'canvas/app/pointer-input', replacement: canvasPointerInputEntry },
       { find: 'canvas/app/pointer-start-session', replacement: canvasPointerStartSessionEntry },
-      { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
-      { find: 'canvas/app/rich-clipboard', replacement: canvasRichClipboardEntry },
-      { find: 'canvas/app/clipboard-text', replacement: canvasClipboardTextEntry },
-      { find: 'canvas/app/selection-list-range', replacement: canvasSelectionListRangeEntry },
-      { find: 'canvas/app/tabs-roving-focus', replacement: canvasTabsRovingFocusEntry },
       { find: 'canvas/app/stage-element', replacement: canvasStageElementEntry },
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
-      { find: 'canvas/app/text-measurement-dom', replacement: canvasTextMeasurementDomEntry },
-      { find: 'canvas/app/timeout-task', replacement: canvasTimeoutTaskEntry },
-      { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },
       { find: 'canvas/app/viewport-controls', replacement: canvasViewportControlsEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },
