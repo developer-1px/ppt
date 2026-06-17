@@ -463,6 +463,7 @@ import {
   measureCanvasTextBlocks,
 } from 'canvas/app/text-measurement-dom'
 import {
+  CANVAS_POINTER_CLICK_MEMORY_MODEL,
   getCanvasResizeHandleDoubleClickIntent,
   type CanvasPointerClickMemory,
 } from 'canvas/app/pointer-click-memory'
@@ -1437,7 +1438,7 @@ type PPTResizeHandleClickMemoryEffect = {
   handle: ResizeHandle
   id: string
   isDoubleClick: boolean
-  model: 'canvas-pointer-click-memory'
+  model: typeof CANVAS_POINTER_CLICK_MEMORY_MODEL
   point: Point
 }
 type PPTLayerPaneGroupState = {
@@ -6193,7 +6194,7 @@ function App() {
       handle,
       id: clickId,
       isDoubleClick: resizeHandleIntent.isDoubleClick,
-      model: 'canvas-pointer-click-memory',
+      model: CANVAS_POINTER_CLICK_MEMORY_MODEL,
       point,
     })
 
@@ -8064,7 +8065,7 @@ function App() {
         data-ppt-resize-handle-click-double={lastResizeHandleClickMemoryEffect?.isDoubleClick ? 'true' : undefined}
         data-ppt-resize-handle-click-handle={lastResizeHandleClickMemoryEffect?.handle}
         data-ppt-resize-handle-click-id={lastResizeHandleClickMemoryEffect?.id}
-        data-ppt-resize-handle-click-model="canvas-pointer-click-memory"
+        data-ppt-resize-handle-click-model={CANVAS_POINTER_CLICK_MEMORY_MODEL}
         data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
