@@ -6243,6 +6243,251 @@ async function runExportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const deck = {
+      id: 'deck-ai-json-draft',
+      size: { h: 720, w: 1280 },
+      slides: [
+        {
+          background: { color: '#ffffff' },
+          elements: [
+            {
+              geometry: { h: 82, w: 1040, x: 92, y: 72 },
+              id: 'ai-json-title',
+              kind: 'textBox',
+              name: 'Title',
+              style: { color: '#111827', fontSize: 42, fontWeight: 'bold' },
+              textBody: { paragraphs: [{ runs: [{ text: 'AI JSON Draft' }] }] },
+              textAutoFit: 'resizeShapeToFitText',
+            },
+            {
+              geometry: { h: 210, w: 940, x: 104, y: 184 },
+              id: 'ai-json-body',
+              kind: 'textBox',
+              name: 'Body',
+              style: { color: '#1f2937', fontSize: 28 },
+              textBody: {
+                paragraphs: [
+                  { bullet: 'bullet', runs: [{ text: 'Editable generated slide' }] },
+                  { bullet: 'numbered', runs: [{ text: 'Retouch the final wording' }] },
+                ],
+              },
+            },
+          ],
+          id: 'ai-json-slide-1',
+          layoutId: 'ppt-layout-title-body',
+          name: 'AI JSON Opening',
+          notes: 'AI generated speaker note',
+          themeId: 'ppt-theme-default',
+        },
+        {
+          background: { color: '#f8fafc' },
+          elements: [
+            {
+              fill: { color: '#eff6ff' },
+              geometry: { h: 136, w: 520, x: 120, y: 124 },
+              hyperlink: { url: 'https://example.com/json-source' },
+              id: 'ai-json-link-card',
+              kind: 'shape',
+              name: 'JSON Link',
+              shape: 'rect',
+              stroke: { color: '#2563eb', width: 2 },
+              style: { color: '#1e3a8a', fontSize: 26, fontWeight: 'semibold' },
+              textBody: { paragraphs: [{ runs: [{ text: 'JSON source link' }] }] },
+            },
+          ],
+          id: 'ai-json-slide-2',
+          name: 'AI JSON Source',
+          themeId: 'ppt-theme-default',
+        },
+      ],
+      title: 'AI JSON Deck',
+    }
+    const json = JSON.stringify(deck)
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const deckJSONImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const body = document.querySelector('.ppt-slide [data-ppt-element-name="Body"]')
+    const title = document.querySelector('.ppt-slide [data-ppt-element-name="Title"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      bodyText: body?.textContent ?? '',
+      exportHasHyperlink: exportCode.includes('https://example.com/json-source') && exportCode.includes('data-ppt-hyperlink-url='),
+      exportHasNotes: exportCode.includes('AI generated speaker note'),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-json-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-json-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-json-import-imported-count') ?? 0),
+      jsonLength: Number(stage?.getAttribute('data-ppt-deck-json-import-json-length') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-json-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-json-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-json-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-json-import-source-title') ?? '',
+      titleText: title?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes raw PPT deck JSON as editable slides',
+    deckJSONImportState.model === 'ppt-deck-json-import' &&
+      deckJSONImportState.format === 'application-json-ppt-deck' &&
+      deckJSONImportState.sourceDeck === 'deck-ai-json-draft' &&
+      deckJSONImportState.sourceTitle === 'AI JSON Deck' &&
+      deckJSONImportState.sourceSlideCount === 2 &&
+      deckJSONImportState.importedCount === 2 &&
+      deckJSONImportState.slideCount === beforeDeckHTMLPaste.slideCount + 2 &&
+      deckJSONImportState.activeSlide === deckJSONImportState.firstImportedSlideId &&
+      deckJSONImportState.activeName.includes('AI JSON Opening Copy') &&
+      deckJSONImportState.titleText.includes('AI JSON Draft') &&
+      deckJSONImportState.bodyText.includes('Editable generated slide') &&
+      deckJSONImportState.bodyText.includes('Retouch the final wording') &&
+      deckJSONImportState.exportHasNotes &&
+      deckJSONImportState.exportHasHyperlink &&
+      deckJSONImportState.jsonLength > 100,
+    {
+      beforeDeckHTMLPaste,
+      deckJSONImportState,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckJSONPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT deck JSON paste probes before export scenario continues',
+    afterDeckJSONPasteCleanup.activeSlide === 'slide-1' &&
+      afterDeckJSONPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterDeckJSONPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const payload = {
+      deck: {
+        id: 'deck-ai-fenced-json',
+        size: { h: 720, w: 1280 },
+        slides: [
+          {
+            background: { color: '#ffffff' },
+            elements: [
+              {
+                geometry: { h: 96, w: 980, x: 112, y: 86 },
+                id: 'ai-fenced-title',
+                kind: 'textBox',
+                name: 'Title',
+                style: { color: '#111827', fontSize: 44, fontWeight: 'bold' },
+                textBody: { paragraphs: [{ runs: [{ text: 'Fenced JSON Draft' }] }] },
+              },
+            ],
+            id: 'ai-fenced-slide-1',
+            name: 'Fenced JSON',
+            themeId: 'ppt-theme-default',
+          },
+        ],
+        title: 'AI Fenced JSON Deck',
+      },
+    }
+    const fence = String.fromCharCode(96, 96, 96)
+    const markdown = fence + 'json\\n' + JSON.stringify(payload, null, 2) +
+      '\\n' + fence
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const deckFencedJSONImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const title = document.querySelector('.ppt-slide [data-ppt-element-name="Title"]')
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-json-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-json-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-json-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-json-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-json-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-json-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-json-import-source-title') ?? '',
+      titleText: title?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes fenced AI PPT deck JSON as editable slide',
+    deckFencedJSONImportState.model === 'ppt-deck-json-import' &&
+      deckFencedJSONImportState.format === 'text-json-ppt-deck' &&
+      deckFencedJSONImportState.sourceDeck === 'deck-ai-fenced-json' &&
+      deckFencedJSONImportState.sourceTitle === 'AI Fenced JSON Deck' &&
+      deckFencedJSONImportState.sourceSlideCount === 1 &&
+      deckFencedJSONImportState.importedCount === 1 &&
+      deckFencedJSONImportState.slideCount === beforeDeckHTMLPaste.slideCount + 1 &&
+      deckFencedJSONImportState.activeSlide === deckFencedJSONImportState.firstImportedSlideId &&
+      deckFencedJSONImportState.activeName.includes('Fenced JSON Copy') &&
+      deckFencedJSONImportState.titleText.includes('Fenced JSON Draft'),
+    {
+      beforeDeckHTMLPaste,
+      deckFencedJSONImportState,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckFencedJSONPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT fenced deck JSON paste probe before export scenario continues',
+    afterDeckFencedJSONPasteCleanup.activeSlide === 'slide-1' &&
+      afterDeckFencedJSONPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterDeckFencedJSONPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     const html = document.querySelector('.ppt-export-code')?.value ?? ''
     const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
     const dataTransfer = new DataTransfer()
