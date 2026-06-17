@@ -2742,6 +2742,44 @@ async function runCrossSlideClipboardScenario(page) {
       shapeRichClipboardWrite,
     },
   )
+
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(shapeRichClipboardWrite.html)}, ${JSON.stringify(shapeRichClipboardWrite.plainText)})`)
+  await delay(120)
+
+  const afterShapeFallbackHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'pastes PPT shape fallback HTML without embedded JSON as editable shape',
+    afterShapeFallbackHTMLPaste.stageCount === afterShapeCopy.stageCount + 1 &&
+      afterShapeFallbackHTMLPaste.selectedKind === 'shape' &&
+      afterShapeFallbackHTMLPaste.selectedShape === 'rect' &&
+      afterShapeFallbackHTMLPaste.selectedText.includes('Fast draft') &&
+      afterShapeFallbackHTMLPaste.selectedText.includes('Small edits') &&
+      afterShapeFallbackHTMLPaste.selectedFill.includes('224, 242, 254') &&
+      afterShapeFallbackHTMLPaste.selectedBorderColor === 'rgb(14, 165, 233)' &&
+      afterShapeFallbackHTMLPaste.selectedCornerRadius === '24' &&
+      afterShapeFallbackHTMLPaste.selectedWidth > 0 &&
+      afterShapeFallbackHTMLPaste.selectedHeight > 0 &&
+      afterShapeFallbackHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterShapeFallbackHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterShapeFallbackHTMLPaste.fallbackHTMLImportShape === 'rect' &&
+      afterShapeFallbackHTMLPaste.fallbackHTMLImportSourceObject === afterShapeCopy.selectedId,
+    {
+      afterShapeCopy,
+      afterShapeFallbackHTMLPaste,
+    },
+  )
 }
 
 async function runSelectSameTypeScenario(page) {
@@ -8046,7 +8084,7 @@ async function runImageImportScenario(page) {
     afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file image-source table-source media-source rich-text-source text-source' &&
+        'image-file fallback-html-shape-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -14240,6 +14278,11 @@ function getPPTCrossSlideClipboardState(page) {
       clipboardSelectedObjectIds: stage?.getAttribute('data-ppt-clipboard-selected-object-ids') ?? '',
       clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
       clipboardType: stage?.getAttribute('data-ppt-clipboard-type') ?? '',
+      fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
+      fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
+      fallbackHTMLImportName: stage?.getAttribute('data-ppt-fallback-html-import-name') ?? '',
+      fallbackHTMLImportShape: stage?.getAttribute('data-ppt-fallback-html-import-shape') ?? '',
+      fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       keyboardCommandDispatch: stage?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
       keyboardCommandIntent: stage?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       pasteAnchor: stage?.getAttribute('data-ppt-clipboard-paste-anchor') ?? '',
@@ -14271,10 +14314,14 @@ function getPPTCrossSlideClipboardState(page) {
       richClipboardSourceSlide: stage?.getAttribute('data-ppt-rich-clipboard-source-slide') ?? '',
       richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      selectedBorderColor: selected ? getComputedStyle(selected).borderColor : '',
+      selectedCornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
+      selectedFill: selected ? getComputedStyle(selected).background : '',
       selectedHeight: Number.parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedShape: selected?.getAttribute('data-shape') ?? '',
       selectedText: selected?.querySelector('.ppt-element-editor, [data-ppt-comment-body], .ppt-table-grid')?.textContent?.trim() ?? selected?.getAttribute('data-ppt-alt-text') ?? selected?.getAttribute('data-ppt-element-name') ?? '',
       selectedWidth: Number.parseFloat(selected?.style.width ?? '0'),
       selectedX: Number.parseFloat(selected?.style.left ?? '0'),

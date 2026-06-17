@@ -590,8 +590,11 @@ import {
 } from './pptExport'
 import {
   PPT_DEFAULT_TABLE_ROWS,
+  PPT_FALLBACK_HTML_IMPORT_MODEL,
   PPT_IMPORT_EXTENSION,
   canHandlePPTStageDropImport,
+  createPPTFallbackHTMLImportEffect,
+  createPPTFallbackHTMLShapeElement,
   createPPTImageImportEffect,
   createPPTImportedImageElement,
   getPPTImageFileFromList,
@@ -616,6 +619,8 @@ import {
   PPT_TABLE_IMPORT_MODEL,
   PPT_TEXT_PASTE_IMPORT_MODEL,
   type PPTClipboardImportAction,
+  type PPTFallbackHTMLImportEffect,
+  type PPTFallbackHTMLShapeSource,
   type PPTImageImportEffect,
   type PPTMediaImportResult,
   type PPTMediaImportSource,
@@ -2034,6 +2039,8 @@ function App() {
     useState<PPTSelectionSVGClipboardEffect | null>(null)
   const [lastTableClipboardEffect, setLastTableClipboardEffect] =
     useState<PPTTableClipboardEffect | null>(null)
+  const [lastFallbackHTMLImportEffect, setLastFallbackHTMLImportEffect] =
+    useState<PPTFallbackHTMLImportEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
@@ -3540,6 +3547,9 @@ function App() {
           insertPPTImageSource(action.source)
         }
         return true
+      case 'fallback-html-shape-source':
+        insertPPTFallbackHTMLShapeSource(action.source)
+        return true
       case 'table-source':
         insertPPTTableSource(action.source)
         return true
@@ -3628,6 +3638,38 @@ function App() {
 
     insertPPTImageSource(source)
     return true
+  }
+
+  function insertPPTFallbackHTMLShapeSource(
+    source: PPTFallbackHTMLShapeSource,
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const element = createPPTFallbackHTMLShapeElement({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        source,
+      })
+
+      setLastFallbackHTMLImportEffect(createPPTFallbackHTMLImportEffect({
+        element,
+        source,
+      }))
+      setSelection([element.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
   }
 
   function replacePPTImageSource(
@@ -8037,6 +8079,11 @@ function App() {
         data-ppt-import-extension-clipboard-action-order={PPT_IMPORT_EXTENSION.clipboardActionOrder.join(' ')}
         data-ppt-import-extension-drop-action-order={PPT_IMPORT_EXTENSION.dropActionOrder.join(' ')}
         data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
+        data-ppt-fallback-html-import-format={lastFallbackHTMLImportEffect?.format}
+        data-ppt-fallback-html-import-model={lastFallbackHTMLImportEffect?.model ?? PPT_FALLBACK_HTML_IMPORT_MODEL}
+        data-ppt-fallback-html-import-name={lastFallbackHTMLImportEffect?.name}
+        data-ppt-fallback-html-import-shape={lastFallbackHTMLImportEffect?.shape}
+        data-ppt-fallback-html-import-source-object={lastFallbackHTMLImportEffect?.sourceObjectId}
         data-ppt-media-import-importer={lastMediaImport?.importerId}
         data-ppt-media-import-model={PPT_MEDIA_IMPORT_MODEL}
         data-ppt-media-import-selection={lastMediaImport?.item.id}

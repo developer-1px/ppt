@@ -14,6 +14,13 @@ import {
   type PPTMediaImportSource,
 } from './mediaImport'
 import {
+  createPPTFallbackHTMLImportEffect,
+  getPPTFallbackHTMLShapeSourceFromDataTransfer,
+  PPT_FALLBACK_HTML_IMPORT_MODEL,
+  type PPTFallbackHTMLImportEffect,
+  type PPTFallbackHTMLShapeSource,
+} from './pptFallbackHTMLImport'
+import {
   getPPTTableColumnCount,
   getPPTTableFileFromDataTransfer,
   getPPTTableSourceFromDataTransfer,
@@ -35,6 +42,7 @@ export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
   clipboardActionOrder: [
     'image-file',
+    'fallback-html-shape-source',
     'image-source',
     'table-source',
     'media-source',
@@ -68,6 +76,8 @@ export type PPTTableImportEffect = {
   name: string
   rowCount: number
 }
+export type { PPTFallbackHTMLImportEffect }
+export { PPT_FALLBACK_HTML_IMPORT_MODEL }
 
 export type PPTClipboardImportAction =
   | {
@@ -78,6 +88,10 @@ export type PPTClipboardImportAction =
       kind: 'image-source'
       resolveNaturalSize?: boolean
       source: PPTImageImportSource
+    }
+  | {
+      kind: 'fallback-html-shape-source'
+      source: PPTFallbackHTMLShapeSource
     }
   | {
       kind: 'table-source'
@@ -126,6 +140,17 @@ export function getPPTClipboardImportActions(
           const file = getPPTImageFileFromDataTransfer(dataTransfer)
 
           return file ? { file, kind: 'image-file' } : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source =
+            getPPTFallbackHTMLShapeSourceFromDataTransfer(dataTransfer)
+
+          return source
+            ? { kind: 'fallback-html-shape-source', source }
+            : null
         },
       },
       {
@@ -266,3 +291,5 @@ export function createPPTTableImportEffect({
     rowCount: element.rows.length,
   }
 }
+
+export { createPPTFallbackHTMLImportEffect }
