@@ -402,7 +402,10 @@ import {
   insertInlineEditText,
   isInlineEditLineBreakInput,
 } from 'canvas/app/inline-edit-dom'
-import { measureCanvasTextBlocks } from 'canvas/app/text-measurement-dom'
+import {
+  measureCanvasElementOverflow,
+  measureCanvasTextBlocks,
+} from 'canvas/app/text-measurement-dom'
 import {
   recordCanvasItemPointerClick,
   type CanvasPointerClickMemory,
@@ -11484,18 +11487,13 @@ function PPTElementView({
     }
 
     const updateOverflow = () => {
-      const container = editor.parentElement
-      const editorRect = editor.getBoundingClientRect()
-      const containerRect = container?.getBoundingClientRect()
-      const hasOverflow =
-        editor.scrollWidth > editor.clientWidth + PPT_TEXT_OVERFLOW_EPSILON ||
-        editor.scrollHeight > editor.clientHeight + PPT_TEXT_OVERFLOW_EPSILON ||
-        (containerRect
-          ? editorRect.width > containerRect.width + PPT_TEXT_OVERFLOW_EPSILON ||
-            editorRect.height > containerRect.height + PPT_TEXT_OVERFLOW_EPSILON
-          : false)
+      const measurement = measureCanvasElementOverflow({
+        container: editor.parentElement,
+        element: editor,
+        epsilon: PPT_TEXT_OVERFLOW_EPSILON,
+      })
 
-      onTextOverflowChange(element.id, hasOverflow)
+      onTextOverflowChange(element.id, measurement?.hasOverflow === true)
     }
 
     updateOverflow()
