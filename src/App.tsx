@@ -421,7 +421,6 @@ import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
 import {
   getCanvasPointerLocalGeometry,
   screenPoint as getCanvasPointerScreenPoint,
-  screenToWorld as getCanvasPointerWorldPoint,
 } from 'canvas/app/pointer-geometry'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
@@ -434,6 +433,7 @@ import {
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
 } from 'canvas/app/pointer-pan-interaction'
+import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
   CANVAS_TOOLBAR_ITEM_PROPS,
   useCanvasToolbarRovingFocus,
@@ -5527,17 +5527,23 @@ function App() {
   }
 
   function screenToWorld(event: Pick<PointerEvent, 'clientX' | 'clientY'>) {
-    return getCanvasPointerWorldPoint(
-      getCanvasPointerScreenPoint(canvasStageElement, event),
-      viewport,
-    )
+    return getPPTPointerProjection(event).startWorld
   }
 
-  function getPointerClientPoint(event: Pick<PointerEvent, 'clientX' | 'clientY'>): Point {
-    return {
-      x: event.clientX,
-      y: event.clientY,
-    }
+  function getPPTPointerProjection(
+    event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getCanvasPointerStartProjection({
+      event,
+      stageElement: canvasStageElement,
+      viewport,
+    })
+  }
+
+  function getPPTPointerScreenPoint(
+    event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getCanvasPointerScreenPoint(canvasStageElement, event)
   }
 
   function getPPTViewportCenter() {
@@ -5647,9 +5653,10 @@ function App() {
     event.preventDefault()
     event.stopPropagation()
     captureCanvasPointerFromEvent(event)
+    const projection = getPPTPointerProjection(event.nativeEvent)
     const result = startCanvasPointerPanInteraction({
       input: event.nativeEvent,
-      startScreen: getPointerClientPoint(event.nativeEvent),
+      startScreen: projection.startScreen,
       viewport,
     })
 
@@ -5659,10 +5666,7 @@ function App() {
     return true
   }
 
-  function beginLaserPointer(
-    event: ReactPointerEvent<HTMLElement>,
-    point: Point,
-  ) {
+  function beginLaserPointer(event: ReactPointerEvent<HTMLElement>) {
     if (!isLaserToolActive || event.button !== 0) {
       return false
     }
@@ -5671,12 +5675,13 @@ function App() {
     event.stopPropagation()
     captureCanvasPointerFromEvent(event)
 
-    const startWorld = clampPPTPointToSlide(point)
+    const projection = getPPTPointerProjection(event.nativeEvent)
+    const startWorld = clampPPTPointToSlide(projection.startWorld)
     const result = startCanvasPointerLaserInteraction({
       config: PPT_CANVAS_COMMAND_CONFIG,
       input: event.nativeEvent,
       pointerGesture: 'laser',
-      startScreen: getPointerClientPoint(event.nativeEvent),
+      startScreen: projection.startScreen,
       startWorld,
     })
 
@@ -5887,7 +5892,7 @@ function App() {
       return
     }
 
-    if (beginLaserPointer(event, screenToWorld(event.nativeEvent))) {
+    if (beginLaserPointer(event)) {
       return
     }
 
@@ -6028,7 +6033,7 @@ function App() {
       return
     }
 
-    if (beginLaserPointer(event, point)) {
+    if (beginLaserPointer(event)) {
       return
     }
 
@@ -6247,7 +6252,7 @@ function App() {
     if (interaction.kind === 'pan') {
       const preview = previewCanvasPointerPanInteraction({
         config: PPT_CANVAS_COMMAND_CONFIG,
-        currentScreen: getPointerClientPoint(event.nativeEvent),
+        currentScreen: getPPTPointerScreenPoint(event.nativeEvent),
         interaction,
       })
 
@@ -6262,7 +6267,7 @@ function App() {
     if (interaction.kind === 'laser') {
       const preview = previewCanvasPointerLaserInteraction({
         config: PPT_CANVAS_COMMAND_CONFIG,
-        currentScreen: getPointerClientPoint(event.nativeEvent),
+        currentScreen: getPPTPointerScreenPoint(event.nativeEvent),
         currentWorld: clampPPTPointToSlide(point),
         interaction,
       })

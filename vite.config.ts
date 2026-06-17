@@ -36,6 +36,7 @@ const canvasPointerCaptureEntry = fileURLToPath(new URL('../canvas/src/canvas/ap
 const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts', import.meta.url))
 const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
 const canvasPointerPanInteractionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts', import.meta.url))
+const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts', import.meta.url))
 const canvasRadioGroupEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts', import.meta.url))
 const canvasRichClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasRichClipboardIO.ts', import.meta.url))
 const canvasClipboardTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasClipboardTextIO.ts', import.meta.url))
@@ -91,6 +92,7 @@ export default defineConfig({
       { find: 'canvas/app/pointer-geometry', replacement: canvasPointerGeometryEntry },
       { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
       { find: 'canvas/app/pointer-pan-interaction', replacement: canvasPointerPanInteractionEntry },
+      { find: 'canvas/app/pointer-start-session', replacement: canvasPointerStartSessionEntry },
       { find: 'canvas/app/radio-group', replacement: canvasRadioGroupEntry },
       { find: 'canvas/app/rich-clipboard', replacement: canvasRichClipboardEntry },
       { find: 'canvas/app/clipboard-text', replacement: canvasClipboardTextEntry },
