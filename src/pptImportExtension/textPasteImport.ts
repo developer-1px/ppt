@@ -5,6 +5,7 @@ import {
   type Viewport,
 } from 'canvas/core'
 import {
+  createCanvasTextPasteItems,
   getCanvasRichTextPasteSourceFromDataTransfer,
   getCanvasTextPasteSourcesFromDataTransfer,
   type CanvasRichTextPasteSource,
@@ -30,6 +31,9 @@ type CanvasTextPasteTextItem = {
   y: number
 }
 
+type PPTTextPasteImporter =
+  Parameters<typeof createCanvasTextPasteItems>[0]['importers'][number]
+
 export type PPTTextPasteImportResult = {
   boldRunCount?: number
   bulletParagraphCount?: number
@@ -47,16 +51,6 @@ export type PPTRichTextPasteSource = {
   text: string
   textBody: PPTTextBody
   underlineRunCount: number
-}
-
-type PPTTextPasteImporter = {
-  createItems: (context: {
-    createId: (prefix: string) => string
-    position: Point
-    text: string
-    viewport: Viewport
-  }) => CanvasTextPasteTextItem[]
-  id: string
 }
 
 const PPT_TEXT_PASTE_WIDTH = 460
@@ -85,26 +79,19 @@ export function createPPTTextPasteElement({
   text: string
   viewport: Viewport
 }): PPTTextPasteImportResult | null {
-  const trimmedText = text.trim()
+  const result = createCanvasTextPasteItems({
+    createId,
+    importers: [PPT_TEXT_PASTE_IMPORTER],
+    position,
+    text,
+    viewport,
+  })
 
-  if (!trimmedText) {
+  if (!result) {
     return null
   }
 
-  let items: CanvasTextPasteTextItem[] | null
-
-  try {
-    items = PPT_TEXT_PASTE_IMPORTER.createItems({
-      createId,
-      position,
-      text: trimmedText,
-      viewport,
-    })
-  } catch {
-    items = null
-  }
-
-  const canvasItem = items?.find(isCanvasTextPasteTextItem)
+  const canvasItem = result.items.find(isCanvasTextPasteTextItem)
 
   if (!canvasItem) {
     return null
@@ -127,7 +114,7 @@ export function createPPTTextPasteElement({
 
   return {
     format: 'text-plain',
-    importerId: PPT_TEXT_PASTE_IMPORTER.id,
+    importerId: result.importerId,
     item: {
       geometry,
       id: canvasItem.id,
