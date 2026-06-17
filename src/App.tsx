@@ -429,7 +429,6 @@ import {
   CANVAS_WHEEL_VIEWPORT_PAN_MODE,
   CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER,
 } from 'canvas/app/viewport-controls'
-import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import {
   CANVAS_INLINE_EDIT_DOM_MODEL,
   inlineEditHistoryDirectionFromInputType,
@@ -439,19 +438,6 @@ import {
 import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
 } from 'canvas/app/pointer-click-memory'
-import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
-import {
-  CANVAS_LASER_TRAIL_OVERLAY_MODEL,
-  previewCanvasPointerLaserInteraction,
-  startCanvasPointerLaserInteraction,
-  type CanvasPointerLaserInteraction,
-} from 'canvas/app/pointer-laser'
-import {
-  previewCanvasPointerPanInteraction,
-  startCanvasPointerPanInteraction,
-  type CanvasPointerPanInteraction,
-} from 'canvas/app/pointer-pan-interaction'
-import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
   RESIZE_HANDLES,
   clamp,
@@ -586,6 +572,18 @@ import {
   pptGeometryToBounds,
   pptCanvasTransformAdapter,
 } from './pptCanvasAdapter'
+import {
+  getNextPPTDrawingPoints,
+  getPPTPointerStartProjection,
+  PPT_LASER_TRAIL_OVERLAY_MODEL,
+  previewPPTPointerLaserInteraction,
+  previewPPTPointerPanInteraction,
+  startPPTPointerLaserInteraction,
+  startPPTPointerPanInteraction,
+  usePPTCanvasStageElement,
+  type PPTPointerLaserInteraction,
+  type PPTPointerPanInteraction,
+} from './pptCanvasInteractionAdapter'
 import {
   getPPTEraserHitElementIds,
   mergePPTEraserHitElementIds,
@@ -1952,10 +1950,10 @@ type Interaction =
     }
   | {
       kind: 'pan'
-    } & CanvasPointerPanInteraction
+    } & PPTPointerPanInteraction
   | {
       kind: 'laser'
-    } & CanvasPointerLaserInteraction
+    } & PPTPointerLaserInteraction
   | {
       currentPoint: Point
       erasedIds: string[]
@@ -2034,7 +2032,7 @@ function App() {
   const [past, setPast] = useState<PPTDeck[]>([])
   const [future, setFuture] = useState<PPTDeck[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const canvasStageElement = useCanvasAppStageElement()
+  const canvasStageElement = usePPTCanvasStageElement()
   const setPPTStageElementRef = useCallback((element: HTMLDivElement | null) => {
     stageRef.current = element
     canvasStageElement.mount.ref(element)
@@ -5584,7 +5582,7 @@ function App() {
   function getPPTPointerProjection(
     event: Pick<PointerEvent, 'clientX' | 'clientY'>,
   ) {
-    return getCanvasPointerStartProjection({
+    return getPPTPointerStartProjection({
       event,
       stageElement: canvasStageElement,
       viewport,
@@ -5707,7 +5705,7 @@ function App() {
     event.stopPropagation()
     captureCanvasPointerFromEvent(event)
     const projection = getPPTPointerProjection(event.nativeEvent)
-    const result = startCanvasPointerPanInteraction({
+    const result = startPPTPointerPanInteraction({
       input: event.nativeEvent,
       startScreen: projection.startScreen,
       viewport,
@@ -5730,7 +5728,7 @@ function App() {
 
     const projection = getPPTPointerProjection(event.nativeEvent)
     const startWorld = clampPPTPointToSlide(projection.startWorld)
-    const result = startCanvasPointerLaserInteraction({
+    const result = startPPTPointerLaserInteraction({
       config: PPT_CANVAS_COMMAND_CONFIG,
       input: event.nativeEvent,
       pointerGesture: 'laser',
@@ -6304,7 +6302,7 @@ function App() {
     }
 
     if (interaction.kind === 'pan') {
-      const preview = previewCanvasPointerPanInteraction({
+      const preview = previewPPTPointerPanInteraction({
         config: PPT_CANVAS_COMMAND_CONFIG,
         currentScreen: getPPTPointerScreenPoint(event.nativeEvent),
         interaction,
@@ -6319,7 +6317,7 @@ function App() {
     const point = screenToWorld(event.nativeEvent)
 
     if (interaction.kind === 'laser') {
-      const preview = previewCanvasPointerLaserInteraction({
+      const preview = previewPPTPointerLaserInteraction({
         config: PPT_CANVAS_COMMAND_CONFIG,
         currentScreen: getPPTPointerScreenPoint(event.nativeEvent),
         currentWorld: clampPPTPointToSlide(point),
@@ -7834,7 +7832,7 @@ function App() {
         data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
         data-ppt-laser-tool-model={CANVAS_TOOL_AFFORDANCES.laser.model}
         data-ppt-laser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.laser.shortcut}
-        data-ppt-laser-trail-model={CANVAS_LASER_TRAIL_OVERLAY_MODEL}
+        data-ppt-laser-trail-model={PPT_LASER_TRAIL_OVERLAY_MODEL}
         data-ppt-laser-trail-point-count={laserTrailPoints.length}
         data-ppt-laser-trail-state={interaction?.kind === 'laser'
           ? 'active'
@@ -16984,7 +16982,7 @@ function appendPPTFreeformPoint(points: Point[], point: Point) {
   const next = clampPPTPointToSlide(point)
   const start = points[0] ?? next
 
-  return getNextCanvasDrawingPoints({
+  return getNextPPTDrawingPoints({
     currentWorld: next,
     points,
     shiftKey: false,
