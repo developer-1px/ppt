@@ -2496,8 +2496,14 @@ function App() {
       }
 
       if (shortcutHelpOpen) {
-        if (event.key === 'Escape') {
-          event.preventDefault()
+        const shortcutHelpKeyboardIntent = getCanvasModalKeyboardIntent({
+          key: event.key,
+        })
+
+        if (shortcutHelpKeyboardIntent.kind === 'close') {
+          if (shortcutHelpKeyboardIntent.preventDefault) {
+            event.preventDefault()
+          }
           closeShortcutHelp()
         }
         return
