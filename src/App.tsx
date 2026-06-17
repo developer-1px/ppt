@@ -356,7 +356,6 @@ import {
 } from 'canvas/app/keyboard-viewport-shortcuts'
 import {
   CANVAS_MENU_ITEM_PROPS,
-  getCanvasMenuRovingKeyIndex,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
 import { getCanvasSelectionListModifierState } from 'canvas/app/selection-list-range'
@@ -10475,11 +10474,22 @@ function PPTShapeKindMenu({
 }) {
   const [open, setOpen] = useState(false)
   const [activeShape, setActiveShape] = useState<PPTShapeKind>(state.shape)
+  const [initialActiveShapeIndex, setInitialActiveShapeIndex] = useState(0)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const itemRefs = useRef(new Map<PPTShapeKind, HTMLButtonElement>())
   const activeOption = PPT_SHAPE_MENU_OPTIONS.find((option) =>
     option.shape === activeShape
   ) ?? PPT_SHAPE_MENU_OPTIONS[0]
+  const {
+    onFocus: handleMenuFocus,
+    onKeyDown: handleMenuKeyDown,
+    ref: setMenuRoot,
+  } = useCanvasMenuRovingFocus<HTMLDivElement>({
+    initialActiveIndex: initialActiveShapeIndex,
+    onClose: () => {
+      closeMenu()
+      focusTrigger()
+    },
+  })
 
   function focusTrigger() {
     focusCanvasElementOnNextFrame({
@@ -10487,42 +10497,17 @@ function PPTShapeKindMenu({
     })
   }
 
-  function focusShape(shape: PPTShapeKind) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => itemRefs.current.get(shape) ?? null,
-    })
-  }
-
   function openMenu(shape = state.shape) {
+    setInitialActiveShapeIndex(Math.max(
+      0,
+      PPT_SHAPE_MENU_OPTIONS.findIndex((option) => option.shape === shape),
+    ))
     setOpen(true)
     setActiveShape(shape)
-    focusShape(shape)
   }
 
   function closeMenu() {
     setOpen(false)
-  }
-
-  function moveFocus(key: string) {
-    const currentIndex = Math.max(
-      0,
-      PPT_SHAPE_MENU_OPTIONS.findIndex((option) => option.shape === activeShape),
-    )
-    const nextIndex = getCanvasMenuRovingKeyIndex({
-      count: PPT_SHAPE_MENU_OPTIONS.length,
-      currentIndex,
-      key,
-    })
-
-    if (nextIndex === null) {
-      return false
-    }
-
-    const nextOption = PPT_SHAPE_MENU_OPTIONS[nextIndex]
-
-    setActiveShape(nextOption.shape)
-    focusShape(nextOption.shape)
-    return true
   }
 
   function commitShape(shape: PPTShapeKind) {
@@ -10536,27 +10521,6 @@ function PPTShapeKindMenu({
       event.preventDefault()
       event.stopPropagation()
       openMenu()
-    }
-  }
-
-  function handleItemKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowRight':
-      case 'ArrowUp':
-      case 'ArrowLeft':
-      case 'Home':
-      case 'End':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(event.key)
-        return
-      case 'Escape':
-        event.preventDefault()
-        event.stopPropagation()
-        closeMenu()
-        focusTrigger()
-        return
     }
   }
 
@@ -10596,7 +10560,10 @@ function PPTShapeKindMenu({
           data-ppt-shape-menu-active={activeOption.shape}
           data-ppt-shape-menu-model="canvas-selection-toolbar-dropdown-menu"
           id="ppt-shape-kind-menu"
+          ref={setMenuRoot}
           role="menu"
+          onFocus={handleMenuFocus}
+          onKeyDown={handleMenuKeyDown}
         >
           {PPT_SHAPE_MENU_OPTIONS.map((option) => (
             <button
@@ -10605,13 +10572,6 @@ function PPTShapeKindMenu({
               className="ppt-floating-menu-item"
               data-ppt-shape-menu-item={option.shape}
               key={option.shape}
-              ref={(node) => {
-                if (node) {
-                  itemRefs.current.set(option.shape, node)
-                } else {
-                  itemRefs.current.delete(option.shape)
-                }
-              }}
               role="menuitemcheckbox"
               tabIndex={option.shape === activeOption.shape ? 0 : -1}
               type="button"
@@ -10621,7 +10581,6 @@ function PPTShapeKindMenu({
                 commitShape(option.shape)
               }}
               onFocus={() => setActiveShape(option.shape)}
-              onKeyDown={handleItemKeyDown}
               onMouseEnter={() => setActiveShape(option.shape)}
             >
               {renderPPTShapeMenuIcon(option.shape, 15)}
@@ -10657,8 +10616,8 @@ function PPTAlignmentPopover({
   const [open, setOpen] = useState(false)
   const [activeCommand, setActiveCommand] =
     useState<PPTAlignmentPopoverCommand>('alignCenter')
+  const [initialActiveCommandIndex, setInitialActiveCommandIndex] = useState(0)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const itemRefs = useRef(new Map<PPTAlignmentPopoverCommand, HTMLButtonElement>())
   const commands = PPT_ALIGNMENT_POPOVER_COMMANDS.map((command) => ({
     ...command,
     disabled: !availability[command.command],
@@ -10669,24 +10628,34 @@ function PPTAlignmentPopover({
     command.command === activeCommand
   ) ?? enabledCommands[0] ?? null
   const activeEnabledCommandId = activeEnabledCommand?.command ?? null
+  const {
+    onFocus: handleMenuFocus,
+    onKeyDown: handleMenuKeyDown,
+    ref: setMenuRoot,
+  } = useCanvasMenuRovingFocus<HTMLDivElement>({
+    initialActiveIndex: initialActiveCommandIndex,
+    onClose: () => {
+      closePopover()
+      focusTrigger()
+    },
+  })
 
   useEffect(() => () => onPreviewChange(null), [onPreviewChange])
-
-  function focusCommand(command: PPTAlignmentPopoverCommand) {
-    focusCanvasElementOnNextFrame({
-      resolveElement: () => itemRefs.current.get(command) ?? null,
-    })
-  }
 
   function openPopover(command = activeEnabledCommand?.command) {
     if (!command) {
       return
     }
 
+    setInitialActiveCommandIndex(Math.max(
+      0,
+      enabledCommands.findIndex((enabledCommand) =>
+        enabledCommand.command === command
+      ),
+    ))
     setOpen(true)
     setActiveCommand(command)
     onPreviewChange(command)
-    focusCommand(command)
   }
 
   function closePopover() {
@@ -10700,59 +10669,11 @@ function PPTAlignmentPopover({
     })
   }
 
-  function moveFocus(key: string) {
-    if (enabledCommands.length === 0) {
-      return false
-    }
-
-    const currentIndex = Math.max(
-      0,
-      enabledCommands.findIndex((command) => command.command === activeCommand),
-    )
-    const nextIndex = getCanvasMenuRovingKeyIndex({
-      count: enabledCommands.length,
-      currentIndex,
-      key,
-    })
-
-    if (nextIndex === null) {
-      return false
-    }
-
-    const nextCommand = enabledCommands[nextIndex]
-
-    setActiveCommand(nextCommand.command)
-    onPreviewChange(nextCommand.command)
-    focusCommand(nextCommand.command)
-    return true
-  }
-
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.stopPropagation()
       openPopover()
-    }
-  }
-
-  function handleItemKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowRight':
-      case 'ArrowUp':
-      case 'ArrowLeft':
-      case 'Home':
-      case 'End':
-        event.preventDefault()
-        event.stopPropagation()
-        moveFocus(event.key)
-        return
-      case 'Escape':
-        event.preventDefault()
-        event.stopPropagation()
-        closePopover()
-        focusTrigger()
-        return
     }
   }
 
@@ -10793,7 +10714,10 @@ function PPTAlignmentPopover({
           data-ppt-alignment-popover-active={activeEnabledCommandId ?? activeCommand}
           data-ppt-alignment-popover-model="canvas-dom-alignment-popover"
           id="ppt-alignment-popover-menu"
+          ref={setMenuRoot}
           role="menu"
+          onFocus={handleMenuFocus}
+          onKeyDown={handleMenuKeyDown}
           onMouseLeave={() => onPreviewChange(null)}
         >
           {commands.map((command) => (
@@ -10805,13 +10729,6 @@ function PPTAlignmentPopover({
               data-ppt-alignment-popover-item
               disabled={command.disabled}
               key={command.command}
-              ref={(node) => {
-                if (node) {
-                  itemRefs.current.set(command.command, node)
-                } else {
-                  itemRefs.current.delete(command.command)
-                }
-              }}
               role="menuitem"
               tabIndex={command.command === activeEnabledCommand?.command ? 0 : -1}
               type="button"
@@ -10830,7 +10747,6 @@ function PPTAlignmentPopover({
                 setActiveCommand(command.command)
                 onPreviewChange(command.command)
               }}
-              onKeyDown={handleItemKeyDown}
               onMouseEnter={() => {
                 setActiveCommand(command.command)
                 onPreviewChange(command.command)
