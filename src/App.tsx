@@ -452,6 +452,7 @@ import {
 } from 'canvas/app/tabs-roving-focus'
 import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import {
+  CANVAS_INLINE_EDIT_DOM_MODEL,
   getCanvasInlineEditKeyboardIntent,
   inlineEditHistoryDirectionFromInputType,
   insertInlineEditText,
@@ -1429,7 +1430,7 @@ type PPTInlineEditEffect = {
   historyDirection?: PPTInlineEditHistoryDirection
   inputType?: string
   lineBreak?: boolean
-  model: 'canvas-inline-edit-dom'
+  model: typeof CANVAS_INLINE_EDIT_DOM_MODEL
   pasteText?: string
 }
 type PPTResizeHandleClickMemoryEffect = {
@@ -7804,7 +7805,7 @@ function App() {
         data-ppt-inline-edit-history-direction={lastInlineEditEffect?.historyDirection}
         data-ppt-inline-edit-input-type={lastInlineEditEffect?.inputType}
         data-ppt-inline-edit-line-break={lastInlineEditEffect?.lineBreak ? 'true' : undefined}
-        data-ppt-inline-edit-model="canvas-inline-edit-dom"
+        data-ppt-inline-edit-model={CANVAS_INLINE_EDIT_DOM_MODEL}
         data-ppt-inline-edit-paste-text={lastInlineEditEffect?.pasteText}
         data-ppt-text-paste-bold-runs={lastTextPasteImport?.boldRunCount}
         data-ppt-text-paste-bullet-paragraphs={lastTextPasteImport?.bulletParagraphCount}
@@ -11575,7 +11576,7 @@ function PPTElementView({
   function recordInlineEditEffect(effect: Omit<PPTInlineEditEffect, 'elementId' | 'model'>) {
     onInlineEditEffect({
       elementId: element.id,
-      model: 'canvas-inline-edit-dom',
+      model: CANVAS_INLINE_EDIT_DOM_MODEL,
       ...effect,
     })
   }
@@ -11812,7 +11813,7 @@ function PPTElementView({
           className="ppt-element-editor"
           contentEditable={editing}
           data-ppt-inline-edit-active={editing ? 'true' : 'false'}
-          data-ppt-inline-edit-model="canvas-inline-edit-dom"
+          data-ppt-inline-edit-model={CANVAS_INLINE_EDIT_DOM_MODEL}
           ref={editorRef}
           suppressContentEditableWarning={true}
           onBeforeInput={handleInlineEditBeforeInput}
