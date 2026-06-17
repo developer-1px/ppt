@@ -403,6 +403,11 @@ import {
   type CanvasRichClipboardReadFormat,
   type CanvasRichClipboardWriteMode,
 } from 'canvas/app/rich-clipboard'
+import {
+  isCanvasKeyboardToolIntent,
+  runCanvasKeyboardToolIntent,
+  type CanvasKeyboardToolIntent,
+} from 'canvas/app'
 import { getCanvasTextPasteSourcesFromDataTransfer } from 'canvas/app/text-paste-import'
 import { scheduleCanvasTimeoutTask } from 'canvas/app/timeout-task'
 import {
@@ -2672,9 +2677,15 @@ function App() {
         return
       }
 
-      const toolShortcut = getPPTToolShortcutIntent(event)
+      const toolShortcutIntent = getPPTToolShortcutIntent(event)
 
-      if (toolShortcut && activatePPTToolShortcut(toolShortcut)) {
+      if (toolShortcutIntent && isCanvasKeyboardToolIntent(toolShortcutIntent)) {
+        runCanvasKeyboardToolIntent({
+          handlers: {
+            setTool: activatePPTToolShortcut,
+          },
+          intent: toolShortcutIntent,
+        })
         event.preventDefault()
         return
       }
@@ -8037,6 +8048,7 @@ function App() {
         data-ppt-text-overflow-indicator-width={selectedTextAutoFitIndicator?.bounds.w}
         data-ppt-keyboard-command-dispatch="canvas-keyboard-command-dispatch"
         data-ppt-keyboard-command-intent="canvas-keyboard-command-shortcut-intent"
+        data-ppt-keyboard-tool-dispatch="canvas-keyboard-tool-dispatch"
         data-ppt-keyboard-viewport-intent="canvas-keyboard-viewport-shortcut-intent"
         data-ppt-keyboard-viewport-model="canvas-keyboard-viewport-shortcuts"
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
@@ -16468,17 +16480,25 @@ function toPPTShapeKind(shape: CanvasCreatedShapeKind): PPTShapeKind {
   return 'rect'
 }
 
-function getPPTToolShortcutIntent(event: KeyboardEvent) {
+function getPPTToolShortcutIntent(event: KeyboardEvent): CanvasKeyboardToolIntent | null {
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return null
   }
 
-  return getCanvasKeyboardToolShortcutIntent({
+  const tool = getCanvasKeyboardToolShortcutIntent({
     config: PPT_CANVAS_COMMAND_CONFIG,
     customCreationTools: [],
     event,
     key: event.key.toLowerCase(),
   })
+
+  return tool
+    ? {
+        kind: 'set-tool',
+        preventDefault: false,
+        tool,
+      }
+    : null
 }
 
 function arePPTCreationToolsEqual(
