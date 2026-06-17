@@ -44,6 +44,7 @@
       "canvas/app/pointer-geometry": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts"],
       "canvas/app/pointer-laser": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts"],
       "canvas/app/pointer-pan-interaction": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts"],
+      "canvas/app/pointer-input": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasAppPointerInput.ts"],
       "canvas/app/pointer-start-session": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts"],
       "canvas/app/radio-group": ["../canvas/src/canvas/app/affordances/controls/radio/CanvasRadioGroup.ts"],
       "canvas/app/rich-clipboard": ["../canvas/src/canvas/app/affordances/commands/CanvasRichClipboardIO.ts"],

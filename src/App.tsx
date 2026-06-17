@@ -434,6 +434,7 @@ import {
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
 } from 'canvas/app/pointer-pan-interaction'
+import { getCanvasPointerTransformModifierState } from 'canvas/app/pointer-input'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
   CANVAS_TOOLBAR_ITEM_PROPS,
@@ -6467,14 +6468,15 @@ function App() {
     }
 
     if (interaction.kind === 'resize') {
+      const transformModifierState = getCanvasPointerTransformModifierState(event)
       const elements = resizeCanvasSelection({
         adapter: pptCanvasTransformAdapter,
         bounds: interaction.bounds,
         handle: interaction.handle,
         items: startSlide.elements,
         point,
-        preserveAspectRatio: event.shiftKey,
-        resizeFromCenter: event.altKey,
+        preserveAspectRatio: transformModifierState.preserveAspectRatio,
+        resizeFromCenter: transformModifierState.resizeFromCenter,
         selection: interaction.selection,
       })
       const syncedElements = syncPPTLineConnections(
@@ -6520,6 +6522,7 @@ function App() {
       item.elementId,
       item.rotation,
     ]))
+    const transformModifierState = getCanvasPointerTransformModifierState(event)
     const elements = mapPPTElementsByIds(
       startSlide.elements,
       interaction.startRotations.map((item) => item.elementId),
@@ -6531,7 +6534,7 @@ function App() {
         }
 
         const rawRotation = normalizeCanvasRotationDegrees(startRotation + delta)
-        const rotation = event.shiftKey
+        const rotation = transformModifierState.constrainAngle
           ? Math.round(rawRotation / 15) * 15
           : rawRotation
 
