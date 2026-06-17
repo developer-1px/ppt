@@ -299,6 +299,7 @@ import {
   scheduleCanvasAnimationFrameTask,
 } from 'canvas/app/animation-frame-task'
 import {
+  CANVAS_COMMAND_PALETTE_ITEMS_MODEL,
   filterCanvasCommandPaletteItems,
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
@@ -8870,7 +8871,7 @@ function PPTCommandPaletteDialog({
         data-ppt-command-palette
         data-ppt-command-palette-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
         data-ppt-command-palette-focus-trap="true"
-        data-ppt-command-palette-model="canvas-command-palette-items"
+        data-ppt-command-palette-model={CANVAS_COMMAND_PALETTE_ITEMS_MODEL}
         data-ppt-command-palette-restore-focus="true"
         ref={dialogRef}
         role="dialog"
