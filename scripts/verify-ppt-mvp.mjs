@@ -4124,6 +4124,68 @@ async function runSlideMetadataScenario(page) {
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
     const json = JSON.stringify({
+      background: { color: '#f8fafc' },
+      name: 'AI Metadata Slide',
+      notes: 'AI metadata note for final retouch.',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterMetadataPaste = await getPPTSlideMetadataState(page)
+
+  record(
+    'pastes JSON slide metadata into active PPT slide',
+    afterMetadataPaste.slideMetadataImportModel === 'ppt-slide-metadata-import' &&
+      afterMetadataPaste.slideMetadataImportFormat === 'application-json-ppt-slide-metadata' &&
+      afterMetadataPaste.slideMetadataImportSlide === 'slide-1' &&
+      afterMetadataPaste.slideMetadataImportFields === 'name background notes' &&
+      afterMetadataPaste.slideMetadataImportCommands ===
+        'update-slide-name update-slide-background update-slide-notes' &&
+      afterMetadataPaste.slideMetadataImportName === 'AI Metadata Slide' &&
+      afterMetadataPaste.slideMetadataImportBackground === '#f8fafc' &&
+      afterMetadataPaste.slideMetadataImportNotesLength > 0 &&
+      afterMetadataPaste.slideMetadataImportJsonLength > 100 &&
+      afterMetadataPaste.name === 'AI Metadata Slide' &&
+      afterMetadataPaste.thumbName.includes('AI Metadata Slide') &&
+      afterMetadataPaste.notes === 'AI metadata note for final retouch.' &&
+      afterMetadataPaste.slideBackground === 'rgb(248, 250, 252)',
+    {
+      afterMetadataPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const name = document.querySelector('[data-ppt-slide-field="name"]')
+    const background = document.querySelector('[data-ppt-slide-field="background"]')
+    const notes = document.querySelector('[data-ppt-slide-field="notes"]')
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    const textAreaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    inputSetter.call(name, ${JSON.stringify(initial.name)})
+    name.dispatchEvent(new Event('input', { bubbles: true }))
+    name.dispatchEvent(new Event('change', { bubbles: true }))
+
+    inputSetter.call(background, ${JSON.stringify(initial.backgroundValue)})
+    background.dispatchEvent(new Event('input', { bubbles: true }))
+    background.dispatchEvent(new Event('change', { bubbles: true }))
+
+    textAreaSetter.call(notes, ${JSON.stringify(initial.notes)})
+    notes.dispatchEvent(new Event('input', { bubbles: true }))
+    notes.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
       notes: 'AI notes from JSON clipboard.\\nConfirm the ask before presenting.',
     })
 
@@ -15360,6 +15422,15 @@ function getPPTSlideMetadataState(page) {
       objectActive: objectInspector?.getAttribute('data-ppt-object-inspector-active') ?? '',
       objectPriority: objectInspector?.getAttribute('data-ppt-object-inspector-priority') ?? '',
       orientationValue: document.querySelector('[data-ppt-slide-metadata-field="orientation"]')?.getAttribute('data-ppt-slide-metadata-value') ?? '',
+      slideMetadataImportBackground: stage?.getAttribute('data-ppt-slide-metadata-import-background') ?? '',
+      slideMetadataImportCommands: stage?.getAttribute('data-ppt-slide-metadata-import-commands') ?? '',
+      slideMetadataImportFields: stage?.getAttribute('data-ppt-slide-metadata-import-fields') ?? '',
+      slideMetadataImportFormat: stage?.getAttribute('data-ppt-slide-metadata-import-format') ?? '',
+      slideMetadataImportJsonLength: Number(stage?.getAttribute('data-ppt-slide-metadata-import-json-length') ?? 0),
+      slideMetadataImportModel: stage?.getAttribute('data-ppt-slide-metadata-import-model') ?? '',
+      slideMetadataImportName: stage?.getAttribute('data-ppt-slide-metadata-import-name') ?? '',
+      slideMetadataImportNotesLength: Number(stage?.getAttribute('data-ppt-slide-metadata-import-notes-length') ?? 0),
+      slideMetadataImportSlide: stage?.getAttribute('data-ppt-slide-metadata-import-slide') ?? '',
       slideNotesImportFormat: stage?.getAttribute('data-ppt-slide-notes-import-format') ?? '',
       slideNotesImportModel: stage?.getAttribute('data-ppt-slide-notes-import-model') ?? '',
       slideNotesImportNotesLength: Number(stage?.getAttribute('data-ppt-slide-notes-import-notes-length') ?? 0),

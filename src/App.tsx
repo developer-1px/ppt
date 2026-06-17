@@ -1012,6 +1012,11 @@ const PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT =
 const PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT = 'text-plain-ppt-notes' as const
 const PPT_SLIDE_NOTES_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.notes+json'
+const PPT_SLIDE_METADATA_IMPORT_MODEL = 'ppt-slide-metadata-import' as const
+const PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT =
+  'application-json-ppt-slide-metadata' as const
+const PPT_SLIDE_METADATA_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.slide-metadata+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1145,6 +1150,13 @@ type PPTSlideNotesImportSource = {
   notes: string
   textLength: number
 }
+type PPTSlideMetadataImportSource = {
+  background?: PPTSlideMetadataBackgroundDescriptor
+  format: typeof PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT
+  jsonLength: number
+  name?: string
+  notes?: string
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1219,6 +1231,17 @@ type PPTSlideNotesImportEffect = {
   notesLength: number
   slideId: string
   textLength: number
+}
+type PPTSlideMetadataImportEffect = {
+  backgroundColor: string
+  commandIds: string
+  fieldIds: string
+  format: typeof PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_SLIDE_METADATA_IMPORT_MODEL
+  name: string
+  notesLength: number
+  slideId: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2243,6 +2266,8 @@ function App() {
     useState<PPTSlideJSONImportEffect | null>(null)
   const [lastSlideNotesImportEffect, setLastSlideNotesImportEffect] =
     useState<PPTSlideNotesImportEffect | null>(null)
+  const [lastSlideMetadataImportEffect, setLastSlideMetadataImportEffect] =
+    useState<PPTSlideMetadataImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3129,6 +3154,17 @@ function App() {
         return
       }
 
+      const slideMetadataSource =
+        getPPTSlideMetadataSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        slideMetadataSource &&
+        pastePPTSlideMetadataSource(slideMetadataSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const slideNotesSource =
         getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
 
@@ -3854,6 +3890,31 @@ function App() {
     commitDeck((current) =>
       updatePPTDeckSlide(current, effect.selection.slideId, (slide) =>
         applyPPTSlideMetadataHostCommandEffect(slide, effect)))
+
+    return true
+  }
+
+  function pastePPTSlideMetadataSource(source: PPTSlideMetadataImportSource) {
+    const effects = createPPTSlideMetadataImportCommandEffects({
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastSlideMetadataImportEffect(createPPTSlideMetadataImportEffect({
+      effects,
+      source,
+    }))
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) =>
+        effects.reduce(
+          (currentSlide, effect) =>
+            applyPPTSlideMetadataHostCommandEffect(currentSlide, effect),
+          slide,
+        )))
 
     return true
   }
@@ -9096,6 +9157,15 @@ function App() {
         data-ppt-slide-notes-import-notes-length={lastSlideNotesImportEffect?.notesLength}
         data-ppt-slide-notes-import-slide={lastSlideNotesImportEffect?.slideId}
         data-ppt-slide-notes-import-text-length={lastSlideNotesImportEffect?.textLength}
+        data-ppt-slide-metadata-import-background={lastSlideMetadataImportEffect?.backgroundColor}
+        data-ppt-slide-metadata-import-commands={lastSlideMetadataImportEffect?.commandIds}
+        data-ppt-slide-metadata-import-fields={lastSlideMetadataImportEffect?.fieldIds}
+        data-ppt-slide-metadata-import-format={lastSlideMetadataImportEffect?.format}
+        data-ppt-slide-metadata-import-json-length={lastSlideMetadataImportEffect?.jsonLength}
+        data-ppt-slide-metadata-import-model={lastSlideMetadataImportEffect?.model}
+        data-ppt-slide-metadata-import-name={lastSlideMetadataImportEffect?.name}
+        data-ppt-slide-metadata-import-notes-length={lastSlideMetadataImportEffect?.notesLength}
+        data-ppt-slide-metadata-import-slide={lastSlideMetadataImportEffect?.slideId}
         data-ppt-elements-json-import-count={lastElementsJSONImportEffect?.importedObjectCount}
         data-ppt-elements-json-import-format={lastElementsJSONImportEffect?.format}
         data-ppt-elements-json-import-json-length={lastElementsJSONImportEffect?.jsonLength}
@@ -11337,6 +11407,67 @@ function createPPTSlideNotesImportEffect({
   }
 }
 
+function createPPTSlideMetadataImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly PPTSlideMetadataHostCommandEffect[]
+  source: PPTSlideMetadataImportSource
+}): PPTSlideMetadataImportEffect {
+  return {
+    backgroundColor: source.background?.kind === 'solid-color'
+      ? source.background.color
+      : '',
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    fieldIds: effects.map((effect) => effect.payload.fieldId).join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_SLIDE_METADATA_IMPORT_MODEL,
+    name: source.name ?? '',
+    notesLength: source.notes?.length ?? 0,
+    slideId: effects[0]?.selection.slideId ?? '',
+  }
+}
+
+function createPPTSlideMetadataImportCommandEffects({
+  slideId,
+  source,
+}: {
+  slideId: string
+  source: PPTSlideMetadataImportSource
+}): PPTSlideMetadataHostCommandEffect[] {
+  const effects: PPTSlideMetadataHostCommandEffect[] = []
+
+  if (source.name !== undefined) {
+    effects.push(toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'name',
+      id: 'update-slide-name',
+      slideId,
+      value: source.name,
+    }))
+  }
+
+  if (source.background !== undefined) {
+    effects.push(toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'background',
+      id: 'update-slide-background',
+      slideId,
+      value: source.background,
+    }))
+  }
+
+  if (source.notes !== undefined) {
+    effects.push(toPPTSlideMetadataHostCommandEffect({
+      fieldId: 'notes',
+      id: 'update-slide-notes',
+      slideId,
+      value: source.notes,
+    }))
+  }
+
+  return effects
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -11740,6 +11871,133 @@ function getPPTSlideJSONSourceFromText(
   } catch {
     return null
   }
+}
+
+function getPPTSlideMetadataSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates = [
+    dataTransfer.getData(PPT_SLIDE_METADATA_JSON_MIME_TYPE),
+    dataTransfer.getData('application/json'),
+    dataTransfer.getData('text/json'),
+    dataTransfer.getData('text/plain'),
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTSlideMetadataSourceFromText(text)
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTSlideMetadataSourceFromText(
+  text: string,
+): PPTSlideMetadataImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTSlideMetadataSourceFromJSONValue(JSON.parse(json), json.length)
+  } catch {
+    return null
+  }
+}
+
+function getPPTSlideMetadataSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+): PPTSlideMetadataImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.slideMetadata)
+    ? value.slideMetadata
+    : value
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const name = getPPTSlideMetadataNameFromJSONValue(payloadValue)
+  const background = getPPTSlideMetadataBackgroundFromJSONValue(payloadValue)
+
+  if (name === undefined && background === undefined) {
+    return null
+  }
+
+  const notesValue = payloadValue.notes
+  const notes = typeof notesValue === 'string'
+    ? normalizePPTSlideNotesText(notesValue)
+    : null
+
+  return {
+    ...(background !== undefined ? { background } : {}),
+    format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
+    jsonLength,
+    ...(name !== undefined ? { name } : {}),
+    ...(notes !== null ? { notes } : {}),
+  }
+}
+
+function getPPTSlideMetadataNameFromJSONValue(
+  value: Record<string, unknown>,
+) {
+  const nameValue = value.name ?? value.slideName
+
+  return typeof nameValue === 'string'
+    ? normalizePPTSlideMetadataName(nameValue)
+    : undefined
+}
+
+function getPPTSlideMetadataBackgroundFromJSONValue(
+  value: Record<string, unknown>,
+): PPTSlideMetadataBackgroundDescriptor | undefined {
+  const backgroundValue = value.background ?? value.backgroundColor
+  const colorValue = typeof backgroundValue === 'string'
+    ? backgroundValue
+    : isPPTRecord(backgroundValue)
+      ? backgroundValue.color
+      : undefined
+  const color = typeof colorValue === 'string'
+    ? normalizePPTSlideMetadataColor(colorValue)
+    : null
+
+  return color
+    ? {
+        color,
+        kind: 'solid-color',
+      }
+    : undefined
+}
+
+function normalizePPTSlideMetadataName(name: string) {
+  const normalized = name.replace(/\s+/g, ' ').trim().slice(0, 80).trim()
+
+  return normalized || undefined
+}
+
+function normalizePPTSlideMetadataColor(color: string) {
+  const normalized = color.trim()
+
+  return /^#[\da-f]{6}$/i.test(normalized) ? normalized : null
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
