@@ -8295,7 +8295,7 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file fallback-html-selection-source fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -8693,6 +8693,112 @@ async function runImageImportScenario(page) {
       afterReplace.imageReplaceDescriptorSourceName === 'replacement.svg' &&
       afterReplace.imageReplaceDescriptorSurface === 'object-image-replace',
     afterReplace,
+  )
+
+  await page.eval(`(() => {
+    window.__pptRetouchedImageRichClipboardItemTypes = []
+    window.__pptRetouchedImageRichClipboardWriteCount = 0
+    window.__pptRetouchedImageRichClipboardHTML = ''
+    window.__pptRetouchedImageRichClipboardPlainText = ''
+    window.__pptRetouchedImageRichClipboardJSON = ''
+
+    window.ClipboardItem = class PPTRetouchedImageRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptRetouchedImageRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptRetouchedImageRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptRetouchedImageRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptRetouchedImageRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptRetouchedImageRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(120)
+
+  const afterRetouchedImageCopy = await getPPTImageImportState(page)
+  const retouchedImageRichClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptRetouchedImageRichClipboardHTML ?? '',
+    itemTypes: window.__pptRetouchedImageRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptRetouchedImageRichClipboardJSON ?? '',
+    plainText: window.__pptRetouchedImageRichClipboardPlainText ?? '',
+    writeCount: window.__pptRetouchedImageRichClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies retouched PPT image with positioned fit crop fallback HTML',
+    afterRetouchedImageCopy.richClipboardSelection === afterReplace.selectedId &&
+      retouchedImageRichClipboardWrite.writeCount === 1 &&
+      retouchedImageRichClipboardWrite.itemTypes.includes(afterRetouchedImageCopy.richClipboardJsonMimeType) &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-image="true"') &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-image-fit="contain"') &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-image-crop-x="25"') &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-image-crop-y="70"') &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-x="') &&
+      retouchedImageRichClipboardWrite.html.includes('data-ppt-selection-w="') &&
+      retouchedImageRichClipboardWrite.html.includes('replacement.svg') &&
+      retouchedImageRichClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"'),
+    {
+      afterReplace,
+      afterRetouchedImageCopy,
+      retouchedImageRichClipboardWrite,
+    },
+  )
+
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(retouchedImageRichClipboardWrite.html)}, ${JSON.stringify(retouchedImageRichClipboardWrite.plainText)})`)
+  await delay(180)
+
+  const afterImageFallbackHTMLPaste = await getPPTImageImportState(page)
+
+  record(
+    'pastes PPT image fallback HTML as editable image preserving fit crop',
+    afterImageFallbackHTMLPaste.imageCount === afterRetouchedImageCopy.imageCount + 1 &&
+      afterImageFallbackHTMLPaste.selectedKind === 'image' &&
+      afterImageFallbackHTMLPaste.selectedName === 'replacement.svg' &&
+      afterImageFallbackHTMLPaste.selectedAltText === 'replacement.svg' &&
+      afterImageFallbackHTMLPaste.selectedImageFit === 'contain' &&
+      afterImageFallbackHTMLPaste.selectedImagePosition === '25% 70%' &&
+      afterImageFallbackHTMLPaste.selectedWidth === afterRetouchedImageCopy.selectedWidth &&
+      afterImageFallbackHTMLPaste.selectedHeight === afterRetouchedImageCopy.selectedHeight &&
+      afterImageFallbackHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterImageFallbackHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterImageFallbackHTMLPaste.fallbackHTMLImportKind === 'image' &&
+      afterImageFallbackHTMLPaste.fallbackHTMLImportSourceObject === afterReplace.selectedId,
+    {
+      afterImageFallbackHTMLPaste,
+      afterRetouchedImageCopy,
+    },
   )
 
   const beforeResize = await page.eval(`(() => {
@@ -12920,6 +13026,10 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
+      fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
+      fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
+      fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       importExtension: stage?.getAttribute('data-ppt-import-extension') ?? '',
       importExtensionClipboardActionOrder: stage?.getAttribute('data-ppt-import-extension-clipboard-action-order') ?? '',
       importExtensionDropActionOrder: stage?.getAttribute('data-ppt-import-extension-drop-action-order') ?? '',

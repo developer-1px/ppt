@@ -594,6 +594,7 @@ import {
   PPT_IMPORT_EXTENSION,
   canHandlePPTStageDropImport,
   createPPTFallbackHTMLImportEffect,
+  createPPTFallbackHTMLImageElement,
   createPPTFallbackHTMLSelectionElements,
   createPPTFallbackHTMLSelectionImportEffect,
   createPPTFallbackHTMLShapeElement,
@@ -623,6 +624,7 @@ import {
   PPT_TEXT_PASTE_IMPORT_MODEL,
   type PPTClipboardImportAction,
   type PPTFallbackHTMLImportEffect,
+  type PPTFallbackHTMLImageSource,
   type PPTFallbackHTMLSelectionSource,
   type PPTFallbackHTMLShapeSource,
   type PPTFallbackHTMLTextSource,
@@ -3555,6 +3557,9 @@ function App() {
       case 'fallback-html-selection-source':
         insertPPTFallbackHTMLSelectionSource(action.source)
         return true
+      case 'fallback-html-image-source':
+        insertPPTFallbackHTMLImageSource(action.source)
+        return true
       case 'fallback-html-shape-source':
         insertPPTFallbackHTMLShapeSource(action.source)
         return true
@@ -3679,6 +3684,38 @@ function App() {
       return {
         ...slide,
         elements: [...slide.elements, ...elements],
+      }
+    }))
+  }
+
+  function insertPPTFallbackHTMLImageSource(
+    source: PPTFallbackHTMLImageSource,
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const element = createPPTFallbackHTMLImageElement({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        source,
+      })
+
+      setLastFallbackHTMLImportEffect(createPPTFallbackHTMLImportEffect({
+        element,
+        source,
+      }))
+      setSelection([element.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
       }
     }))
   }
@@ -10438,6 +10475,8 @@ function createPPTClipboardGeometryAttributes(element: PPTElement) {
   return [
     ['data-ppt-selection-x', element.geometry.x],
     ['data-ppt-selection-y', element.geometry.y],
+    ['data-ppt-selection-w', element.geometry.w],
+    ['data-ppt-selection-h', element.geometry.h],
   ]
     .map(([attribute, value]) =>
       ` ${attribute}="${escapePPTCanvasXmlAttribute(String(value))}"`)
@@ -10550,13 +10589,25 @@ function getPPTClipboardTextInsetCSS(inset: PPTTextInset) {
 
 function createPPTImageClipboardFallbackHTML(element: PPTImage) {
   const altText = createPPTElementClipboardPlainText(element).trim()
+  const crop = getPPTImageCrop(element)
+  const fit = getPPTImageFit(element)
   const captionHTML = altText
     ? `<figcaption>${escapePPTClipboardHTMLText(altText)}</figcaption>`
     : ''
+  const figureStyle = createPPTClipboardStyleAttribute([
+    ['height', `${element.geometry.h}px`],
+    ['width', `${element.geometry.w}px`],
+  ])
+  const imageStyle = createPPTClipboardStyleAttribute([
+    ['height', '100%'],
+    ['object-fit', fit],
+    ['object-position', `${crop.x}% ${crop.y}%`],
+    ['width', '100%'],
+  ])
 
   return [
-    `<figure data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}" data-ppt-selection-image="true">`,
-    `<img alt="${escapePPTCanvasXmlAttribute(altText)}" src="${escapePPTCanvasXmlAttribute(element.src)}">`,
+    `<figure data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}"${createPPTClipboardGeometryAttributes(element)} data-ppt-selection-image="true" data-ppt-selection-image-fit="${escapePPTCanvasXmlAttribute(fit)}" data-ppt-selection-image-crop-x="${escapePPTCanvasXmlAttribute(String(crop.x))}" data-ppt-selection-image-crop-y="${escapePPTCanvasXmlAttribute(String(crop.y))}"${figureStyle}>`,
+    `<img alt="${escapePPTCanvasXmlAttribute(altText)}" src="${escapePPTCanvasXmlAttribute(element.src)}"${imageStyle}>`,
     captionHTML,
     '</figure>',
   ].join('')
