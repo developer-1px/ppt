@@ -405,6 +405,7 @@ import {
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
 import {
+  CANVAS_PASTE_POSITION_MODEL,
   createCanvasPastePositionKey,
   getCanvasPasteOffsetForBounds,
   getCanvasPastePositionSession,
@@ -1004,7 +1005,7 @@ type PPTClipboardPastePositionEffect = {
   anchor: Point
   clipboardBounds: Bounds | null
   clipboardObjectCount: number
-  model: 'canvas-paste-position'
+  model: typeof CANVAS_PASTE_POSITION_MODEL
   pasteIndex: number
   viewportCenter: Point | null
 }
@@ -4154,7 +4155,7 @@ function App() {
       anchor: pasteAnchor,
       clipboardBounds,
       clipboardObjectCount: payload.objects.length,
-      model: 'canvas-paste-position',
+      model: CANVAS_PASTE_POSITION_MODEL,
       pasteIndex,
       viewportCenter,
     }
