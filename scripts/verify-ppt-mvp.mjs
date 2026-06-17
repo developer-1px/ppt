@@ -4120,6 +4120,84 @@ async function runSlideMetadataScenario(page) {
     notes.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      notes: 'AI notes from JSON clipboard.\\nConfirm the ask before presenting.',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterJSONNotesPaste = await getPPTSlideMetadataState(page)
+
+  record(
+    'pastes JSON speaker notes into active PPT slide metadata',
+    afterJSONNotesPaste.slideNotesImportModel === 'ppt-slide-notes-import' &&
+      afterJSONNotesPaste.slideNotesImportFormat === 'application-json-ppt-notes' &&
+      afterJSONNotesPaste.slideNotesImportSlide === 'slide-1' &&
+      afterJSONNotesPaste.notes.includes('AI notes from JSON clipboard.') &&
+      afterJSONNotesPaste.notes.includes('Confirm the ask before presenting.') &&
+      afterJSONNotesPaste.slideNotesImportNotesLength ===
+        afterJSONNotesPaste.notes.length &&
+      afterJSONNotesPaste.slideNotesImportTextLength > afterJSONNotesPaste.notes.length,
+    {
+      afterJSONNotesPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const markdown = [
+      'Speaker notes:',
+      '- Rehearse the imported AI draft.',
+      '- Leave the final wording editable.',
+    ].join('\\n')
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterMarkdownNotesPaste = await getPPTSlideMetadataState(page)
+
+  record(
+    'pastes Markdown speaker notes into active PPT slide metadata',
+    afterMarkdownNotesPaste.slideNotesImportModel === 'ppt-slide-notes-import' &&
+      afterMarkdownNotesPaste.slideNotesImportFormat === 'text-markdown-ppt-notes' &&
+      afterMarkdownNotesPaste.slideNotesImportSlide === 'slide-1' &&
+      afterMarkdownNotesPaste.notes.includes('Rehearse the imported AI draft.') &&
+      afterMarkdownNotesPaste.notes.includes('Leave the final wording editable.') &&
+      afterMarkdownNotesPaste.slideNotesImportNotesLength ===
+        afterMarkdownNotesPaste.notes.length &&
+      afterMarkdownNotesPaste.slideNotesImportTextLength > afterMarkdownNotesPaste.notes.length,
+    {
+      afterMarkdownNotesPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const notes = document.querySelector('[data-ppt-slide-field="notes"]')
+    const textAreaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+
+    textAreaSetter.call(notes, ${JSON.stringify(initial.notes)})
+    notes.dispatchEvent(new Event('input', { bubbles: true }))
+    notes.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await delay(80)
 }
 
 async function runThemeScenario(page) {
@@ -15261,6 +15339,7 @@ function getPPTSlideMetadataState(page) {
   return page.eval(`(() => {
     const inspector = document.querySelector('[data-ppt-slide-metadata-inspector]')
     const objectInspector = document.querySelector('[data-ppt-object-inspector]')
+    const stage = document.querySelector('.ppt-stage-shell')
     const fields = [...document.querySelectorAll('[data-ppt-slide-metadata-field]')]
     const editableByField = Object.fromEntries(fields.map((field) => [
       field.getAttribute('data-ppt-slide-metadata-field') ?? '',
@@ -15281,6 +15360,11 @@ function getPPTSlideMetadataState(page) {
       objectActive: objectInspector?.getAttribute('data-ppt-object-inspector-active') ?? '',
       objectPriority: objectInspector?.getAttribute('data-ppt-object-inspector-priority') ?? '',
       orientationValue: document.querySelector('[data-ppt-slide-metadata-field="orientation"]')?.getAttribute('data-ppt-slide-metadata-value') ?? '',
+      slideNotesImportFormat: stage?.getAttribute('data-ppt-slide-notes-import-format') ?? '',
+      slideNotesImportModel: stage?.getAttribute('data-ppt-slide-notes-import-model') ?? '',
+      slideNotesImportNotesLength: Number(stage?.getAttribute('data-ppt-slide-notes-import-notes-length') ?? 0),
+      slideNotesImportSlide: stage?.getAttribute('data-ppt-slide-notes-import-slide') ?? '',
+      slideNotesImportTextLength: Number(stage?.getAttribute('data-ppt-slide-notes-import-text-length') ?? 0),
       sizeValue: document.querySelector('[data-ppt-slide-metadata-field="size"]')?.getAttribute('data-ppt-slide-metadata-value') ?? '',
       slideBackground: document.querySelector('.ppt-slide')?.style.background ?? '',
       slideCount: Number(inspector?.getAttribute('data-ppt-slide-metadata-slide-count') ?? 0),
