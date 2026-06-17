@@ -362,6 +362,8 @@ import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
+  CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
+  CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
   getCanvasKeyboardSystemShortcutIntent,
   shouldReleaseCanvasKeyboardTemporaryPan,
 } from 'canvas/app/keyboard-system-shortcuts'
@@ -8085,8 +8087,8 @@ function App() {
         data-ppt-sticky-tool-shortcut={CANVAS_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
-        data-ppt-temporary-pan-model="canvas-temporary-pan-shortcut"
-        data-ppt-temporary-pan-shortcut="Space"
+        data-ppt-temporary-pan-model={CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL}
+        data-ppt-temporary-pan-shortcut={CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL}
         data-ppt-wheel-viewport-horizontal-pan-modifier="Shift"
         data-ppt-wheel-viewport-model="canvas-wheel-viewport"
         data-ppt-wheel-viewport-pan="ordinary-wheel"
