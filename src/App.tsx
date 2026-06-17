@@ -4391,21 +4391,24 @@ function App() {
 
     setLastTextAutoFitEffect(effect)
     commitDeck((current) =>
-      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
-        if (
-          !isPPTTextElement(element) ||
-          element.locked === true ||
-          element.visible === false
-        ) {
-          return element
-        }
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(slide.elements, [elementId], (element) => {
+          if (
+            !isPPTTextElement(element) ||
+            element.locked === true ||
+            element.visible === false
+          ) {
+            return element
+          }
 
-        return {
-          ...element,
-          geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
-          textAutoFit: PPT_TEXT_AUTOFIT,
-        }
-      }),
+          return {
+            ...element,
+            geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
+            textAutoFit: PPT_TEXT_AUTOFIT,
+          }
+        }),
+      })),
     )
     setTextOverflowById((current) => ({
       ...current,
@@ -10207,13 +10210,13 @@ function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
 ) {
-  return getCanvasGroupExpandedSelectionIds({
+  return unique(getCanvasGroupExpandedSelectionIds({
     getItemGroupId: (element) => element.groupId,
     getItemId: (element) => element.id,
     getSelectionGroupId: getPPTLayerPaneGroupIdFromRowId,
     items: slide.elements,
     selection: objectIds,
-  })
+  }))
 }
 
 function getPPTObjectVisibilityDescriptors(
