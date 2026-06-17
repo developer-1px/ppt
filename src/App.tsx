@@ -291,6 +291,10 @@ import {
   type SlideEditTransitionUpdateCommand,
 } from '@interactive-os/slide-edit-affordance'
 import {
+  cancelCanvasAnimationFrameTask,
+  scheduleCanvasAnimationFrameTask,
+} from 'canvas/app/animation-frame-task'
+import {
   filterCanvasCommandPaletteItems,
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
@@ -2342,9 +2346,13 @@ function App() {
   }
 
   useLayoutEffect(() => {
-    const frame = window.requestAnimationFrame(fitSlide)
+    const frame = scheduleCanvasAnimationFrameTask({
+      task: () => fitSlide(),
+    })
 
-    return () => window.cancelAnimationFrame(frame)
+    return () => {
+      cancelCanvasAnimationFrameTask({ frame })
+    }
   }, [activeSlideId, fitSlide])
 
   useEffect(() => {
@@ -11440,9 +11448,13 @@ function PPTElementView({
     }
 
     updateOverflow()
-    const frame = window.requestAnimationFrame(updateOverflow)
+    const frame = scheduleCanvasAnimationFrameTask({
+      task: updateOverflow,
+    })
 
-    return () => window.cancelAnimationFrame(frame)
+    return () => {
+      cancelCanvasAnimationFrameTask({ frame })
+    }
   }, [
     editing,
     element.geometry.h,

@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
+const canvasAnimationFrameTaskEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/frame/CanvasAnimationFrameTask.ts', import.meta.url))
 const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts', import.meta.url))
 const canvasDataTransferImportActionsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts', import.meta.url))
 const canvasDataTransferTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts', import.meta.url))
@@ -51,6 +52,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
+      { find: 'canvas/app/animation-frame-task', replacement: canvasAnimationFrameTaskEntry },
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/context-menu-position', replacement: canvasContextMenuPositionEntry },
       { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
