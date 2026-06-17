@@ -422,6 +422,9 @@ import {
   zoomCanvasViewport,
 } from 'canvas/app/viewport-controls'
 import {
+  CANVAS_RADIO_GROUP_FOCUS_MODEL,
+  CANVAS_RADIO_GROUP_KEYBOARD_MODEL,
+  CANVAS_RADIO_GROUP_MODEL,
   getCanvasRadioTabIndex,
   handleCanvasRadioGroupKeyDown,
 } from 'canvas/app/radio-group'
@@ -11041,9 +11044,9 @@ function PPTParagraphAlignRadioGroup({
       className={surface === 'quick'
         ? 'ppt-paragraph-align-radio-group ppt-paragraph-align-radio-group--quick'
         : 'ppt-segmented-control ppt-paragraph-align-radio-group'}
-      data-ppt-paragraph-align-focus-model="roving-tabindex"
-      data-ppt-paragraph-align-keyboard-model="arrow-home-end"
-      data-ppt-paragraph-align-model="canvas-radio-group"
+      data-ppt-paragraph-align-focus-model={CANVAS_RADIO_GROUP_FOCUS_MODEL}
+      data-ppt-paragraph-align-keyboard-model={CANVAS_RADIO_GROUP_KEYBOARD_MODEL}
+      data-ppt-paragraph-align-model={CANVAS_RADIO_GROUP_MODEL}
       data-ppt-paragraph-align-radiogroup={surface}
       role="radiogroup"
       onKeyDown={handleCanvasRadioGroupKeyDown}
