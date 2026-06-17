@@ -140,6 +140,20 @@ import {
 import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
 } from 'canvas/app/pointer-click-memory'
+import { useCanvasAppStageElement } from 'canvas/app/stage-element'
+import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
+import {
+  CANVAS_LASER_TRAIL_OVERLAY_MODEL,
+  previewCanvasPointerLaserInteraction,
+  startCanvasPointerLaserInteraction,
+  type CanvasPointerLaserInteraction,
+} from 'canvas/app/pointer-laser'
+import {
+  previewCanvasPointerPanInteraction,
+  startCanvasPointerPanInteraction,
+  type CanvasPointerPanInteraction,
+} from 'canvas/app/pointer-pan-interaction'
+import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 
 export const PPT_COMMAND_PALETTE_ITEMS_MODEL =
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL
@@ -158,6 +172,8 @@ export const PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER =
 export const PPT_INLINE_EDIT_DOM_MODEL = CANVAS_INLINE_EDIT_DOM_MODEL
 export const PPT_POINTER_CLICK_MEMORY_MODEL =
   CANVAS_POINTER_CLICK_MEMORY_MODEL
+export const PPT_LASER_TRAIL_OVERLAY_MODEL =
+  CANVAS_LASER_TRAIL_OVERLAY_MODEL
 export const PPT_COMMENT_THREAD_MODEL = CANVAS_COMMENT_THREAD_MODEL
 export const PPT_KEYBOARD_COMMAND_DISPATCH_MODEL =
   CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL
@@ -331,15 +347,31 @@ export const getPPTMinimapPointFromViewportOffset =
   getCanvasMinimapPointFromViewportOffset
 export const getPPTMinimapReadModel = getCanvasMinimapReadModel
 export const getPPTMinimapWorldPoint = getCanvasMinimapWorldPoint
+export const getNextPPTCanvasDrawingPoints = getNextCanvasDrawingPoints
+export const getPPTCanvasPointerStartProjection =
+  getCanvasPointerStartProjection
 export const getPPTInlineEditHistoryDirectionFromInputType =
   inlineEditHistoryDirectionFromInputType
 export const insertPPTInlineEditText = insertInlineEditText
 export const isPPTInlineEditLineBreakInput = isInlineEditLineBreakInput
+export const previewPPTCanvasPointerLaserInteraction =
+  previewCanvasPointerLaserInteraction
+export const previewPPTCanvasPointerPanInteraction =
+  previewCanvasPointerPanInteraction
+export const startPPTCanvasPointerLaserInteraction =
+  startCanvasPointerLaserInteraction
+export const startPPTCanvasPointerPanInteraction =
+  startCanvasPointerPanInteraction
+export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
 export type PPTMinimapItemBounds = CanvasMinimapItemBounds
 export type PPTMinimapReadModel = CanvasMinimapReadModel
 export type PPTMinimapSize = CanvasMinimapSize
+export type PPTCanvasPointerLaserInteractionBase =
+  CanvasPointerLaserInteraction
+export type PPTCanvasPointerPanInteractionBase =
+  CanvasPointerPanInteraction
 export type PPTCanvasFloatingAnchor = CanvasFloatingAnchor
 export type PPTCanvasKeyboardToolIntent = CanvasKeyboardToolIntent
 export type PPTCanvasPastePositionMemory = CanvasPastePositionMemory
