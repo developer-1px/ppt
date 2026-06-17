@@ -10010,6 +10010,58 @@ async function runImageImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      imageCrop: {
+        crop: { x: 25, y: 70 },
+        fit: 'contain',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterCropPaste = await getPPTImageImportState(page)
+
+  record(
+    'pastes JSON image crop into selected PPT image',
+    afterCropPaste.imageCropImportModel === 'ppt-image-crop-import' &&
+      afterCropPaste.imageCropImportFormat === 'application-json-ppt-image-crop' &&
+      afterCropPaste.imageCropImportSlide === 'slide-1' &&
+      afterCropPaste.imageCropImportObjects === afterCropPaste.selectedId &&
+      afterCropPaste.imageCropImportFields === 'fit x y' &&
+      afterCropPaste.imageCropImportCommands ===
+        'update-object-image-crop update-object-image-crop update-object-image-crop' &&
+      afterCropPaste.imageCropImportCommandFields === 'fit x y' &&
+      afterCropPaste.imageCropImportCommandTypes ===
+        'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterCropPaste.imageCropImportFit === 'contain' &&
+      afterCropPaste.imageCropImportX === '25' &&
+      afterCropPaste.imageCropImportY === '70' &&
+      afterCropPaste.imageCropImportJsonLength > 50 &&
+      afterCropPaste.imageCropCommand === 'update-object-image-crop' &&
+      afterCropPaste.imageCropCommandField === 'y' &&
+      afterCropPaste.imageCropCommandObject === afterCropPaste.selectedId &&
+      afterCropPaste.imageCropCommandValue === '70' &&
+      afterCropPaste.inspectorImageFit === 'contain' &&
+      afterCropPaste.inspectorCropX === 25 &&
+      afterCropPaste.inspectorCropY === 70 &&
+      afterCropPaste.selectedImageFit === 'contain' &&
+      afterCropPaste.selectedImagePosition === '25% 70%',
+    {
+      afterCropPaste,
+      afterResetUndo,
+    },
+  )
+
+  await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-image-replace-input]')
     const filesSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files').set
     const dataTransfer = new DataTransfer()
@@ -14922,6 +14974,18 @@ function getPPTImageImportState(page) {
       imageCropCommandSlide: stage?.getAttribute('data-ppt-image-crop-command-slide') ?? '',
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
+      imageCropImportCommandFields: stage?.getAttribute('data-ppt-image-crop-import-command-fields') ?? '',
+      imageCropImportCommandTypes: stage?.getAttribute('data-ppt-image-crop-import-command-types') ?? '',
+      imageCropImportCommands: stage?.getAttribute('data-ppt-image-crop-import-commands') ?? '',
+      imageCropImportFields: stage?.getAttribute('data-ppt-image-crop-import-fields') ?? '',
+      imageCropImportFit: stage?.getAttribute('data-ppt-image-crop-import-fit') ?? '',
+      imageCropImportFormat: stage?.getAttribute('data-ppt-image-crop-import-format') ?? '',
+      imageCropImportJsonLength: Number(stage?.getAttribute('data-ppt-image-crop-import-json-length') ?? 0),
+      imageCropImportModel: stage?.getAttribute('data-ppt-image-crop-import-model') ?? '',
+      imageCropImportObjects: stage?.getAttribute('data-ppt-image-crop-import-objects') ?? '',
+      imageCropImportSlide: stage?.getAttribute('data-ppt-image-crop-import-slide') ?? '',
+      imageCropImportX: stage?.getAttribute('data-ppt-image-crop-import-x') ?? '',
+      imageCropImportY: stage?.getAttribute('data-ppt-image-crop-import-y') ?? '',
       fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
       fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',

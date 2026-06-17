@@ -1037,6 +1037,11 @@ const PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-metadata' as const
 const PPT_OBJECT_METADATA_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-metadata+json'
+const PPT_IMAGE_CROP_IMPORT_MODEL = 'ppt-image-crop-import' as const
+const PPT_IMAGE_CROP_JSON_IMPORT_FORMAT =
+  'application-json-ppt-image-crop' as const
+const PPT_IMAGE_CROP_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.image-crop+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1219,6 +1224,19 @@ type PPTObjectMetadataImportSource = {
     hyperlinkUrl?: string | null
   }
 }
+type PPTImageCropImportField =
+  | 'fit'
+  | 'x'
+  | 'y'
+type PPTImageCropImportSource = {
+  fields: readonly PPTImageCropImportField[]
+  format: typeof PPT_IMAGE_CROP_JSON_IMPORT_FORMAT
+  imageCrop: {
+    crop?: Partial<PPTImageCrop>
+    fit?: PPTImageFit
+  }
+  jsonLength: number
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1364,6 +1382,20 @@ type PPTObjectMetadataImportEffect = {
   model: typeof PPT_OBJECT_METADATA_IMPORT_MODEL
   objectIds: string
   slideId: string
+}
+type PPTImageCropImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTypes: string
+  fields: string
+  fit: string
+  format: typeof PPT_IMAGE_CROP_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_IMAGE_CROP_IMPORT_MODEL
+  objectIds: string
+  slideId: string
+  x: string
+  y: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2398,6 +2430,8 @@ function App() {
     useState<PPTObjectStyleImportEffect | null>(null)
   const [lastObjectMetadataImportEffect, setLastObjectMetadataImportEffect] =
     useState<PPTObjectMetadataImportEffect | null>(null)
+  const [lastImageCropImportEffect, setLastImageCropImportEffect] =
+    useState<PPTImageCropImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3335,6 +3369,14 @@ function App() {
         objectMetadataSource &&
         pastePPTObjectMetadataSource(objectMetadataSource)
       ) {
+        event.preventDefault()
+        return
+      }
+
+      const imageCropSource =
+        getPPTImageCropSourceFromDataTransfer(event.clipboardData)
+
+      if (imageCropSource && pastePPTImageCropSource(imageCropSource)) {
         event.preventDefault()
         return
       }
@@ -4323,6 +4365,58 @@ function App() {
                 ),
               element,
             ),
+          )
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTImageCropSource(source: PPTImageCropImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) =>
+        selection.includes(element.id) && element.kind === 'image')
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    const effects = createPPTImageCropImportCommandEffects({
+      objectIds,
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastImageCropEffect(effects[effects.length - 1])
+    setLastImageCropImportEffect(createPPTImageCropImportEffect({
+      effects,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (element.kind !== 'image') {
+            return element
+          }
+
+          const elementEffects = effects.filter((effect) =>
+            effect.payload.objectId === element.id)
+
+          if (elementEffects.length === 0) {
+            return element
+          }
+
+          return elementEffects.reduce(
+            (currentElement, effect) =>
+              applyPPTImageCropCommandEffectToElement(currentElement, effect),
+            element,
           )
         }),
       })))
@@ -9842,6 +9936,18 @@ function App() {
         data-ppt-image-crop-command-value={lastImageCropEffect?.payload.id === 'update-object-image-crop'
           ? String(lastImageCropEffect.payload.value)
           : undefined}
+        data-ppt-image-crop-import-command-fields={lastImageCropImportEffect?.commandFields}
+        data-ppt-image-crop-import-command-types={lastImageCropImportEffect?.commandTypes}
+        data-ppt-image-crop-import-commands={lastImageCropImportEffect?.commandIds}
+        data-ppt-image-crop-import-fields={lastImageCropImportEffect?.fields}
+        data-ppt-image-crop-import-fit={lastImageCropImportEffect?.fit}
+        data-ppt-image-crop-import-format={lastImageCropImportEffect?.format}
+        data-ppt-image-crop-import-json-length={lastImageCropImportEffect?.jsonLength}
+        data-ppt-image-crop-import-model={lastImageCropImportEffect?.model}
+        data-ppt-image-crop-import-objects={lastImageCropImportEffect?.objectIds}
+        data-ppt-image-crop-import-slide={lastImageCropImportEffect?.slideId}
+        data-ppt-image-crop-import-x={lastImageCropImportEffect?.x}
+        data-ppt-image-crop-import-y={lastImageCropImportEffect?.y}
         data-ppt-image-crop-model="slide-edit-object-image-crop"
         data-ppt-image-import-count={lastImageImportEffect?.count}
         data-ppt-image-import-format={lastImageImportEffect?.format}
@@ -12246,6 +12352,117 @@ function applyPPTObjectAccessibilityCommandEffectToElement(
   }
 }
 
+function createPPTImageCropImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectImageCropHostCommandEffect<string, string>[]
+  source: PPTImageCropImportSource
+}): PPTImageCropImportEffect {
+  return {
+    commandFields: effects.map((effect) =>
+      effect.payload.id === 'update-object-image-crop'
+        ? effect.payload.fieldId
+        : '',
+    ).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    fields: source.fields.join(' '),
+    fit: source.imageCrop.fit ?? '',
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_IMAGE_CROP_IMPORT_MODEL,
+    objectIds: [...new Set(effects.map((effect) => effect.payload.objectId))]
+      .join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+    x: source.imageCrop.crop?.x === undefined
+      ? ''
+      : String(source.imageCrop.crop.x),
+    y: source.imageCrop.crop?.y === undefined
+      ? ''
+      : String(source.imageCrop.crop.y),
+  }
+}
+
+function createPPTImageCropImportCommandEffects({
+  objectIds,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  slideId: string
+  source: PPTImageCropImportSource
+}): SlideEditObjectImageCropHostCommandEffect<string, string>[] {
+  const effects: SlideEditObjectImageCropHostCommandEffect<string, string>[] = []
+
+  for (const objectId of objectIds) {
+    for (const field of source.fields) {
+      if (field === 'fit') {
+        const fit = source.imageCrop.fit
+
+        if (fit === undefined) {
+          continue
+        }
+
+        effects.push(getSlideEditObjectImageCropCommandEffect({
+          fieldId: 'fit',
+          id: 'update-object-image-crop',
+          objectId,
+          slideId,
+          value: normalizeSlideEditObjectImageCropFit(fit),
+        }))
+        continue
+      }
+
+      const value = source.imageCrop.crop?.[field]
+
+      if (value === undefined) {
+        continue
+      }
+
+      effects.push(getSlideEditObjectImageCropCommandEffect({
+        fieldId: field,
+        id: 'update-object-image-crop',
+        objectId,
+        slideId,
+        value: normalizeSlideEditObjectImageCropValue(value),
+      }))
+    }
+  }
+
+  return effects
+}
+
+function applyPPTImageCropCommandEffectToElement(
+  element: PPTImage,
+  effect: SlideEditObjectImageCropHostCommandEffect<string, string>,
+): PPTImage {
+  const payload = effect.payload
+
+  if (payload.id === 'reset-object-image-crop') {
+    return {
+      ...element,
+      crop: payload.crop,
+      fit: normalizePPTImageFit(payload.fit),
+    }
+  }
+
+  if (payload.fieldId === 'fit') {
+    return {
+      ...element,
+      fit: normalizePPTImageFit(String(payload.value)),
+    }
+  }
+
+  return {
+    ...element,
+    crop: {
+      ...getPPTImageCrop(element),
+      [payload.fieldId]: Number(payload.value),
+    },
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -13405,6 +13622,148 @@ function getPPTObjectMetadataAltTextFromJSONValue(
   }
 
   return normalizePPTAltText(value) || null
+}
+
+function getPPTImageCropSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_IMAGE_CROP_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTImageCropSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTImageCropSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTImageCropImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTImageCropSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTImageCropSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTImageCropImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.imageCrop)
+    ? value.imageCrop
+    : allowDirect
+      ? value
+      : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const imageCrop: PPTImageCropImportSource['imageCrop'] = {}
+  const crop: Partial<PPTImageCrop> = {}
+  const fields: PPTImageCropImportField[] = []
+  const fit = getPPTImageCropFitFromJSONValue(payloadValue.fit)
+  const cropValue = isPPTRecord(payloadValue.crop) ? payloadValue.crop : payloadValue
+  const x = getPPTImageCropPositionFromJSONValue(cropValue.x)
+  const y = getPPTImageCropPositionFromJSONValue(cropValue.y)
+
+  if (fit !== undefined) {
+    imageCrop.fit = fit
+    fields.push('fit')
+  }
+
+  if (x !== undefined) {
+    crop.x = x
+    fields.push('x')
+  }
+
+  if (y !== undefined) {
+    crop.y = y
+    fields.push('y')
+  }
+
+  if (Object.keys(crop).length > 0) {
+    imageCrop.crop = crop
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_IMAGE_CROP_JSON_IMPORT_FORMAT,
+        imageCrop,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTImageCropFitFromJSONValue(
+  value: unknown,
+): PPTImageFit | undefined {
+  const fit = typeof value === 'string' ? value.trim() : ''
+
+  return fit === 'contain' || fit === 'cover' ? fit : undefined
+}
+
+function getPPTImageCropPositionFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizeSlideEditObjectImageCropValue(value)
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
