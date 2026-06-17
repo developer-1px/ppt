@@ -1,4 +1,4 @@
-import { clamp } from 'canvas/core'
+import { clampCanvasBoundsToFrame } from 'canvas/core'
 import {
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
@@ -63,14 +63,23 @@ export function createPPTTableElement({
     columnCount,
     rowCount,
   }, PPT_TABLE_SIZE_OPTIONS)
-
-  return {
-    geometry: {
+  const geometry = clampCanvasBoundsToFrame({
+    bounds: {
       h: size.h,
       w: size.w,
-      x: clamp(point.x - size.w / 2, 0, PPT_SLIDE_WIDTH - size.w),
-      y: clamp(point.y - size.h / 2, 0, PPT_SLIDE_HEIGHT - size.h),
+      x: point.x - size.w / 2,
+      y: point.y - size.h / 2,
     },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
+
+  return {
+    geometry,
     id,
     kind: 'table',
     name,

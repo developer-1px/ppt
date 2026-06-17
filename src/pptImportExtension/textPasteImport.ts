@@ -1,5 +1,6 @@
 import {
   clamp,
+  clampCanvasBoundsToFrame,
   type Point,
   type Viewport,
 } from 'canvas/core'
@@ -109,16 +110,26 @@ export function createPPTTextPasteElement({
     return null
   }
 
+  const geometry = clampCanvasBoundsToFrame({
+    bounds: {
+      h: canvasItem.h,
+      w: canvasItem.w,
+      x: canvasItem.x,
+      y: canvasItem.y,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
+
   return {
     format: 'text-plain',
     importerId: PPT_TEXT_PASTE_IMPORTER.id,
     item: {
-      geometry: {
-        h: canvasItem.h,
-        w: canvasItem.w,
-        x: clamp(canvasItem.x, 0, PPT_SLIDE_WIDTH - canvasItem.w),
-        y: clamp(canvasItem.y, 0, PPT_SLIDE_HEIGHT - canvasItem.h),
-      },
+      geometry,
       id: canvasItem.id,
       kind: 'textBox',
       name: 'Text',

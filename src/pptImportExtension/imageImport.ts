@@ -1,5 +1,5 @@
 import {
-  clamp,
+  clampCanvasBoundsToFrame,
   type Point,
 } from 'canvas/core'
 import {
@@ -33,6 +33,20 @@ export function createPPTImportedImageElement({
 }): PPTImage {
   const size = getCanvasImportedImageSize(source)
   const name = source.name?.trim() || 'Image'
+  const geometry = clampCanvasBoundsToFrame({
+    bounds: {
+      h: size.h,
+      w: size.w,
+      x: center.x - size.w / 2,
+      y: center.y - size.h / 2,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
 
   return {
     alt: name,
@@ -40,12 +54,7 @@ export function createPPTImportedImageElement({
       x: 50,
       y: 50,
     },
-    geometry: {
-      h: size.h,
-      w: size.w,
-      x: clamp(center.x - size.w / 2, 0, PPT_SLIDE_WIDTH - size.w),
-      y: clamp(center.y - size.h / 2, 0, PPT_SLIDE_HEIGHT - size.h),
-    },
+    geometry,
     fit: 'cover',
     id: createId('image'),
     kind: 'image',
