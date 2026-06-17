@@ -350,6 +350,7 @@ import {
   getCanvasPastePositionSession,
   type CanvasPastePositionMemory,
 } from 'canvas/app/paste-position'
+import { writeCanvasClipboardText } from 'canvas/app/clipboard-text'
 import { downloadCanvasTextFile } from 'canvas/app/file-download'
 import {
   createCanvasRichClipboardHTML,
@@ -5393,7 +5394,7 @@ function App() {
   }
 
   function copyHTML() {
-    void navigator.clipboard.writeText(exportCode).catch(() => undefined)
+    void writeCanvasClipboardText({ text: exportCode })
   }
 
   function downloadHTML() {
