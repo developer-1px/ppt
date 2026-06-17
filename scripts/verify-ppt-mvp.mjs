@@ -2339,22 +2339,73 @@ async function runCrossSlideClipboardScenario(page) {
 
   const sourceBefore = await getPPTCrossSlideClipboardState(page)
 
+  await page.eval(`(() => {
+    window.__pptRichClipboardItemTypes = []
+    window.__pptRichClipboardWriteCount = 0
+    window.__pptRichClipboardHTML = ''
+    window.__pptRichClipboardJSON = ''
+    window.__pptRichClipboardPlainText = ''
+    window.__pptRichClipboardSVG = ''
+    window.__pptRichClipboardWriteText = ''
+
+    window.ClipboardItem = class PPTRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptRichClipboardSVG = item.items['image/svg+xml']
+            ? await item.items['image/svg+xml'].text()
+            : ''
+          window.__pptRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+        writeText: async (text) => {
+          window.__pptRichClipboardWriteText = text
+        },
+      },
+    })
+  })()`)
+
   await pressKey(page, {
     code: 'KeyC',
     key: 'c',
     modifiers: 2,
     windowsVirtualKeyCode: 67,
   })
-  await delay(50)
+  await delay(120)
 
   const afterCopy = await getPPTCrossSlideClipboardState(page)
+  const richClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptRichClipboardHTML ?? '',
+    itemTypes: window.__pptRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptRichClipboardJSON ?? '',
+    plainText: window.__pptRichClipboardPlainText ?? '',
+    svg: window.__pptRichClipboardSVG ?? '',
+    writeCount: window.__pptRichClipboardWriteCount ?? 0,
+    writeText: window.__pptRichClipboardWriteText ?? '',
+  }))()`)
 
   record('stores PPT clipboard source slide metadata', afterCopy.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterCopy.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterCopy.clipboardModel === 'slide-edit-clipboard' && afterCopy.clipboardCount === 1 && afterCopy.clipboardSourceSlide === 'slide-1' && afterCopy.clipboardSelection === 's1-title' && afterCopy.clipboardType === 'slide-object-clipboard' && afterCopy.clipboardOperation === 'copy' && afterCopy.clipboardMetadataCount === 1 && afterCopy.clipboardSelectedObjectIds === 's1-title', {
     afterCopy,
     sourceBefore,
   })
-  record('copies PPT selection as rich clipboard bundle', afterCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' && afterCopy.richClipboardFormats.includes('application/vnd.interactive-os.ppt.selection+json') && afterCopy.richClipboardFormats.includes('text/html') && afterCopy.richClipboardFormats.includes('image/svg+xml') && afterCopy.richClipboardFormats.includes('text/plain') && afterCopy.richClipboardJsonMimeType === 'application/vnd.interactive-os.ppt.selection+json' && afterCopy.richClipboardObjectCount === 1 && afterCopy.richClipboardSelection === 's1-title' && afterCopy.richClipboardSourceSlide === 'slide-1' && ['clipboard-item', 'pending', 'write-failed', 'write-text', 'unavailable'].includes(afterCopy.richClipboardWriteMode), {
+  record('copies PPT selection as rich clipboard bundle', afterCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' && afterCopy.richClipboardFormats.includes('application/vnd.interactive-os.ppt.selection+json') && afterCopy.richClipboardFormats.includes('text/html') && afterCopy.richClipboardFormats.includes('image/svg+xml') && afterCopy.richClipboardFormats.includes('text/plain') && afterCopy.richClipboardJsonMimeType === 'application/vnd.interactive-os.ppt.selection+json' && afterCopy.richClipboardObjectCount === 1 && afterCopy.richClipboardSelection === 's1-title' && afterCopy.richClipboardSourceSlide === 'slide-1' && afterCopy.richClipboardWriteMode === 'clipboard-item' && afterCopy.richClipboardPlainTextLength > 0 && afterCopy.richClipboardHTMLLength > afterCopy.richClipboardPlainTextLength && richClipboardWrite.writeCount === 1 && richClipboardWrite.itemTypes.includes(afterCopy.richClipboardJsonMimeType) && richClipboardWrite.itemTypes.includes('text/html') && richClipboardWrite.itemTypes.includes('text/plain') && richClipboardWrite.itemTypes.includes('image/svg+xml') && richClipboardWrite.plainText === afterCopy.selectedText && richClipboardWrite.html.includes(afterCopy.selectedText) && richClipboardWrite.html.includes('data-ppt-rich-clipboard-json') && richClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"') && richClipboardWrite.svg.includes('<svg'), {
     afterCopy,
+    richClipboardWrite,
   })
 
   await page.eval(`document.querySelectorAll('.ppt-thumb')[1]?.click()`)
@@ -13942,11 +13993,13 @@ function getPPTCrossSlideClipboardState(page) {
       pasteTargetSlide: stage?.getAttribute('data-ppt-clipboard-paste-target-slide') ?? '',
       pasteType: stage?.getAttribute('data-ppt-clipboard-paste-type') ?? '',
       richClipboardFormats: stage?.getAttribute('data-ppt-rich-clipboard-formats') ?? '',
+      richClipboardHTMLLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-html-length') ?? 0),
       richClipboardImported: stage?.getAttribute('data-ppt-rich-clipboard-imported') ?? '',
       richClipboardImportFormat: stage?.getAttribute('data-ppt-rich-clipboard-import-format') ?? '',
       richClipboardJsonMimeType: stage?.getAttribute('data-ppt-rich-clipboard-json-mime-type') ?? '',
       richClipboardModel: stage?.getAttribute('data-ppt-rich-clipboard-model') ?? '',
       richClipboardObjectCount: Number(stage?.getAttribute('data-ppt-rich-clipboard-object-count') ?? 0),
+      richClipboardPlainTextLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-plain-text-length') ?? 0),
       richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
       richClipboardSourceSlide: stage?.getAttribute('data-ppt-rich-clipboard-source-slide') ?? '',
       richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
@@ -13955,6 +14008,7 @@ function getPPTCrossSlideClipboardState(page) {
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
+      selectedText: selected?.querySelector('.ppt-element-editor, [data-ppt-comment-body], .ppt-table-grid')?.textContent?.trim() ?? selected?.getAttribute('data-ppt-alt-text') ?? selected?.getAttribute('data-ppt-element-name') ?? '',
       selectedWidth: Number.parseFloat(selected?.style.width ?? '0'),
       selectedX: Number.parseFloat(selected?.style.left ?? '0'),
       selectedY: Number.parseFloat(selected?.style.top ?? '0'),
