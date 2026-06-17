@@ -1,4 +1,4 @@
-import { clampCanvasBoundsToFrame } from 'canvas/core'
+import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
@@ -63,7 +63,7 @@ export function createPPTTableElement({
     columnCount,
     rowCount,
   }, PPT_TABLE_SIZE_OPTIONS)
-  const geometry = clampCanvasBoundsToFrame({
+  const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
       h: size.h,
       w: size.w,

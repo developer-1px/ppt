@@ -1,8 +1,8 @@
 import {
-  clampCanvasBoundsToFrame,
-  createCanvasSequentialIdFactory,
+  clampPPTCanvasBoundsToFrame,
+  createPPTCanvasSequentialIdFactory,
   type Bounds,
-} from 'canvas/core'
+} from './pptCanvasCoreAdapter'
 import {
   alignCanvasSelectionItems,
   type CanvasAlignMode,
@@ -195,7 +195,7 @@ export function getPPTCanvasCommandAvailability({
 }
 
 export function createPPTElementIdFactory(slide: PPTSlide) {
-  return createCanvasSequentialIdFactory({
+  return createPPTCanvasSequentialIdFactory({
     existingIds: slide.elements.map((element) => element.id),
     formatId: ({ index, prefix }) => `${slide.id}-${prefix}-${index}`,
     startIndex: slide.elements.length + 1,
@@ -350,7 +350,7 @@ function clonePPTElement(
   offset: { x: number; y: number },
   groupId: string | undefined,
 ): PPTElement {
-  const bounds = clampCanvasBoundsToFrame({
+  const bounds = clampPPTCanvasBoundsToFrame({
     bounds: {
       ...pptGeometryToBounds(item.geometry),
       x: item.geometry.x + offset.x,

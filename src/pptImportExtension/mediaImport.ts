@@ -1,8 +1,8 @@
 import {
-  clampCanvasBoundsToFrame,
+  clampPPTCanvasBoundsToFrame,
   type Point,
   type Viewport,
-} from 'canvas/core'
+} from '../pptCanvasCoreAdapter'
 import {
   CANVAS_MEDIA_IMPORT_MODEL,
   getCanvasMediaSourceFromDataTransfer,
@@ -83,7 +83,7 @@ export function createPPTMediaElement({
     return null
   }
 
-  const geometry = clampCanvasBoundsToFrame({
+  const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
       h: canvasItem.h,
       w: canvasItem.w,

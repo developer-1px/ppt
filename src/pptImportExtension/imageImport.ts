@@ -1,7 +1,7 @@
 import {
-  clampCanvasBoundsToFrame,
+  clampPPTCanvasBoundsToFrame,
   type Point,
-} from 'canvas/core'
+} from '../pptCanvasCoreAdapter'
 import {
   getCanvasImportedImageSize,
 } from 'canvas/app'
@@ -35,7 +35,7 @@ export function createPPTImportedImageElement({
 }): PPTImage {
   const size = getCanvasImportedImageSize(source)
   const name = source.name?.trim() || 'Image'
-  const geometry = clampCanvasBoundsToFrame({
+  const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
       h: size.h,
       w: size.w,

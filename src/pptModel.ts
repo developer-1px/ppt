@@ -1,5 +1,5 @@
-import { createCanvasSequentialIdFactory } from 'canvas/core'
 import { z } from 'zod'
+import { createPPTCanvasSequentialIdFactory } from './pptCanvasCoreAdapter'
 
 export const PPT_SLIDE_WIDTH = 1280
 export const PPT_SLIDE_HEIGHT = 720
@@ -409,7 +409,7 @@ export function findPPTElement(slide: PPTSlide, elementId: string | null) {
 }
 
 export function createPPTElementId(slide: PPTSlide, prefix: string) {
-  return createCanvasSequentialIdFactory({
+  return createPPTCanvasSequentialIdFactory({
     existingIds: slide.elements.map((element) => element.id),
     formatId: ({ index, prefix }) => `${slide.id}-${prefix}-${index}`,
     startIndex: slide.elements.length + 1,

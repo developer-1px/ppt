@@ -1,9 +1,9 @@
 import {
-  clamp,
-  clampCanvasBoundsToFrame,
+  clampPPTCanvasBoundsToFrame,
+  clampPPTCanvasValue,
   type Point,
   type Viewport,
-} from 'canvas/core'
+} from '../pptCanvasCoreAdapter'
 import {
   CANVAS_TEXT_PASTE_IMPORT_MODEL,
   createCanvasTextPasteItems,
@@ -100,7 +100,7 @@ export function createPPTTextPasteElement({
     return null
   }
 
-  const geometry = clampCanvasBoundsToFrame({
+  const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
       h: canvasItem.h,
       w: canvasItem.w,
@@ -179,7 +179,7 @@ const PPT_TEXT_PASTE_IMPORTER: PPTTextPasteImporter = {
     text: string
   }) => {
     const lineCount = Math.max(1, text.split('\n').length)
-    const height = clamp(
+    const height = clampPPTCanvasValue(
       lineCount * PPT_TEXT_PASTE_LINE_HEIGHT + 32,
       PPT_TEXT_PASTE_MIN_HEIGHT,
       PPT_TEXT_PASTE_MAX_HEIGHT,

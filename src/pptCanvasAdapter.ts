@@ -1,7 +1,7 @@
 import {
-  clampCanvasBoundsToFrame,
+  clampPPTCanvasBoundsToFrame,
   type Bounds,
-} from 'canvas/core'
+} from './pptCanvasCoreAdapter'
 import {
   canFlipCanvasSelectionItems,
   canSelectSameTypeCanvasItems,
@@ -354,7 +354,7 @@ export function pptGeometryToBounds(geometry: PPTGeometry): Bounds {
 }
 
 export function boundsToPPTGeometry(bounds: Bounds): PPTGeometry {
-  return clampCanvasBoundsToFrame({
+  return clampPPTCanvasBoundsToFrame({
     bounds,
     frame: {
       h: PPT_SLIDE_HEIGHT,

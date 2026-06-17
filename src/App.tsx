@@ -403,24 +403,24 @@ import {
   type CanvasTabsDescriptor,
 } from 'canvas/app'
 import {
-  RESIZE_HANDLES,
-  clamp,
-  clampCanvasBoundsToFrame,
-  clampCanvasPointToBounds,
-  createCanvasSequentialIdFactory,
-  getCanvasBoundsAnchorPoints,
-  getCanvasBoundsCenter,
-  handlePoint,
-  normalizeBounds,
-  normalizeCanvasPointsToLocalBounds,
-  pointDistance,
-  unique,
+  PPT_RESIZE_HANDLES,
+  clampPPTCanvasBoundsToFrame,
+  clampPPTCanvasPointToBounds,
+  clampPPTCanvasValue,
+  createPPTCanvasSequentialIdFactory,
+  getPPTCanvasBoundsAnchorPoints,
+  getPPTCanvasBoundsCenter,
+  getPPTCanvasHandlePoint,
+  getPPTCanvasPointDistance,
+  normalizePPTCanvasBounds,
+  normalizePPTCanvasPointsToLocalBounds,
+  uniquePPTCanvasValues,
   type Bounds,
   type Point,
   type ResizeHandle,
   type Tool,
   type Viewport,
-} from 'canvas/core'
+} from './pptCanvasCoreAdapter'
 import {
   CANVAS_MARQUEE_SELECTION_MODEL,
   EMPTY_CANVAS_SNAP_GUIDES,
@@ -4795,7 +4795,7 @@ function App() {
   function stepSelectedTextFontSize(delta: number) {
     updateSelectedTextStyles((style) => ({
       ...style,
-      fontSize: clamp(
+      fontSize: clampPPTCanvasValue(
         style.fontSize + delta,
         PPT_TEXT_FONT_SIZE_MIN,
         PPT_TEXT_FONT_SIZE_MAX,
@@ -6181,7 +6181,7 @@ function App() {
       return
     }
 
-    const center = getCanvasBoundsCenter(selectedBounds)
+    const center = getPPTCanvasBoundsCenter(selectedBounds)
     const point = screenToWorld(event.nativeEvent)
 
     setInteraction({
@@ -6339,7 +6339,7 @@ function App() {
     }
 
     if (interaction.kind === 'marquee') {
-      const bounds = normalizeBounds(interaction.startPoint, point)
+      const bounds = normalizePPTCanvasBounds(interaction.startPoint, point)
       const nextSelection = getCanvasMarqueeSelection({
         additive: interaction.additive,
         baseSelection: interaction.baseSelection,
@@ -6732,7 +6732,7 @@ function App() {
   }
 
   const marqueeBounds = interaction?.kind === 'marquee'
-    ? normalizeBounds(interaction.startPoint, interaction.currentPoint)
+    ? normalizePPTCanvasBounds(interaction.startPoint, interaction.currentPoint)
     : null
   const marqueeSelection = interaction?.kind === 'marquee'
     ? selection
@@ -8682,7 +8682,7 @@ function getPPTPresentationScale() {
     return 0.75
   }
 
-  return clamp(
+  return clampPPTCanvasValue(
     Math.min(
       (viewportSize.width - 96) / PPT_SLIDE_WIDTH,
       (viewportSize.height - 168) / PPT_SLIDE_HEIGHT,
@@ -9320,7 +9320,7 @@ function clampPPTElementAnimationOrder(
   elementCount: number = Number.MAX_SAFE_INTEGER,
   fallback: number = PPT_DEFAULT_ELEMENT_ANIMATION.order,
 ) {
-  return clamp(
+  return clampPPTCanvasValue(
     Number.isFinite(value) ? Math.round(value) : fallback,
     1,
     Math.max(1, elementCount),
@@ -9921,7 +9921,7 @@ function clonePPTElementFromClipboardMapping(
   mapping: PPTClipboardPasteObjectMapping,
   offset: Point,
 ): PPTElement {
-  const geometry = clampCanvasBoundsToFrame({
+  const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
       ...source.geometry,
       x: source.geometry.x + offset.x,
@@ -10137,7 +10137,7 @@ function getPPTLayerPaneActualObjectIds(
   slide: PPTSlide,
   objectIds: readonly string[],
 ) {
-  return unique(getCanvasGroupExpandedSelectionIds({
+  return uniquePPTCanvasValues(getCanvasGroupExpandedSelectionIds({
     getItemGroupId: (element) => element.groupId,
     getItemId: (element) => element.id,
     getSelectionGroupId: getPPTLayerPaneGroupIdFromRowId,
@@ -12007,8 +12007,8 @@ function SelectionOverlay({
           <RotateCw size={14} />
         </button>
       ) : null}
-      {canResize ? RESIZE_HANDLES.map((handle) => {
-        const point = handlePoint(bounds, handle)
+      {canResize ? PPT_RESIZE_HANDLES.map((handle) => {
+        const point = getPPTCanvasHandlePoint(bounds, handle)
         const size = 10 / scale
 
         return (
@@ -15225,7 +15225,7 @@ function getPPTStyleClipboardPackageCategoryIds(
     categoryIds.push('text-style')
   }
 
-  return unique(categoryIds)
+  return uniquePPTCanvasValues(categoryIds)
 }
 
 function getPPTStyleClipboardPackageStyles(
@@ -16050,7 +16050,7 @@ function parsePPTElementShadowAngle(value: string) {
 function normalizePPTElementShadowAngle(value: number) {
   const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.angle
 
-  return clamp(
+  return clampPPTCanvasValue(
     Math.round(finiteValue),
     PPT_ELEMENT_SHADOW_ANGLE_MIN,
     PPT_ELEMENT_SHADOW_ANGLE_MAX,
@@ -16064,7 +16064,7 @@ function parsePPTElementShadowBlur(value: string) {
 function normalizePPTElementShadowBlur(value: number) {
   const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.blur
 
-  return clamp(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_BLUR_MAX)
+  return clampPPTCanvasValue(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_BLUR_MAX)
 }
 
 function parsePPTElementShadowDistance(value: string) {
@@ -16074,7 +16074,7 @@ function parsePPTElementShadowDistance(value: string) {
 function normalizePPTElementShadowDistance(value: number) {
   const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.distance
 
-  return clamp(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_DISTANCE_MAX)
+  return clampPPTCanvasValue(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_DISTANCE_MAX)
 }
 
 function parsePPTElementShadowOpacity(value: string) {
@@ -16083,7 +16083,7 @@ function parsePPTElementShadowOpacity(value: string) {
 
 function normalizePPTElementShadowOpacity(value: number) {
   const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.opacity
-  const clamped = clamp(
+  const clamped = clampPPTCanvasValue(
     finiteValue,
     PPT_ELEMENT_SHADOW_OPACITY_MIN,
     PPT_ELEMENT_SHADOW_OPACITY_MAX,
@@ -16365,7 +16365,7 @@ function getPPTCreatedTextBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizeBounds(startWorld, currentWorld)
+  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
 
   if (bounds.w > 6 && bounds.h > 6) {
     return clampPPTCreationBounds(bounds)
@@ -16385,7 +16385,7 @@ function getPPTCreatedStickyBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizeBounds(startWorld, currentWorld)
+  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
 
   if (bounds.w > 6 && bounds.h > 6) {
     return clampPPTCreationBounds(bounds)
@@ -16405,7 +16405,7 @@ function getPPTCreatedSectionBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizeBounds(startWorld, currentWorld)
+  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
 
   if (bounds.w > 12 && bounds.h > 12) {
     return clampPPTCreationBounds(bounds)
@@ -16419,7 +16419,7 @@ function getPPTCreatedSectionBounds({
 }
 
 function clampPPTCreationBounds(bounds: Bounds): Bounds {
-  return clampCanvasBoundsToFrame({
+  return clampPPTCanvasBoundsToFrame({
     bounds,
     frame: {
       h: PPT_SLIDE_HEIGHT,
@@ -16613,8 +16613,8 @@ function replacePPTTextBodyRange(
   replacement: string,
 ): PPTTextBody {
   const tokens = tokenizePPTTextBody(body)
-  const safeStart = clamp(Math.min(start, end), 0, tokens.length)
-  const safeEnd = clamp(Math.max(start, end), safeStart, tokens.length)
+  const safeStart = clampPPTCanvasValue(Math.min(start, end), 0, tokens.length)
+  const safeEnd = clampPPTCanvasValue(Math.max(start, end), safeStart, tokens.length)
   const anchor = tokens[safeStart] ?? tokens[safeStart - 1] ?? tokens[0]
   const replacementTokens = createPPTTextTokens(
     replacement,
@@ -16838,7 +16838,7 @@ function getPPTLineEndpointPoint(
 }
 
 function getPPTLineBend(line: PPTLine) {
-  return clamp(line.routeBend ?? 0.5, 0.08, 0.92)
+  return clampPPTCanvasValue(line.routeBend ?? 0.5, 0.08, 0.92)
 }
 
 function getPPTLineBendPoint(line: PPTLine): Point {
@@ -16911,7 +16911,7 @@ function getPPTFreeformToolStyle(tool: PPTFreeformTool) {
 }
 
 function normalizePPTFreeformWorldPoints(points: Point[]) {
-  const normalized = normalizeCanvasPointsToLocalBounds({
+  const normalized = normalizePPTCanvasPointsToLocalBounds({
     fallbackPoint: {
       x: PPT_SLIDE_WIDTH / 2,
       y: PPT_SLIDE_HEIGHT / 2,
@@ -16954,7 +16954,7 @@ function getNextPPTEraserPoints(points: Point[], point: Point) {
     return [next]
   }
 
-  const distance = pointDistance(last, next)
+  const distance = getPPTCanvasPointDistance(last, next)
 
   if (distance < PPT_ERASER_POINT_DISTANCE) {
     return points
@@ -16974,7 +16974,7 @@ function getNextPPTEraserPoints(points: Point[], point: Point) {
 }
 
 function clampPPTPointToSlide(point: Point) {
-  return clampCanvasPointToBounds(point, {
+  return clampPPTCanvasPointToBounds(point, {
     h: PPT_SLIDE_HEIGHT,
     w: PPT_SLIDE_WIDTH,
     x: 0,
@@ -16986,7 +16986,7 @@ function getPPTFreeformWorldLength(element: PPTFreeform) {
   const points = getPPTFreeformWorldPoints(element)
 
   return points.slice(1).reduce((length, point, index) =>
-    length + pointDistance(points[index], point), 0)
+    length + getPPTCanvasPointDistance(points[index], point), 0)
 }
 
 function getPPTFreeformWorldPoints(element: PPTFreeform) {
@@ -17069,7 +17069,7 @@ function updatePPTLineRouteBend(line: PPTLine, point: Point): PPTLine {
   const fallback = getPPTLineBend(line)
   const routeBend = Math.abs(span) < 1
     ? fallback
-    : clamp((point.x - start.x) / span, 0.08, 0.92)
+    : clampPPTCanvasValue((point.x - start.x) / span, 0.08, 0.92)
 
   return {
     ...line,
@@ -17091,7 +17091,7 @@ function buildPPTLineFromWorldEndpoints({
   start: Point
   startConnection: PPTLineConnection | undefined
 }): PPTLine {
-  const normalized = normalizeCanvasPointsToLocalBounds({
+  const normalized = normalizePPTCanvasPointsToLocalBounds({
     frame: {
       h: PPT_SLIDE_HEIGHT,
       w: PPT_SLIDE_WIDTH,
@@ -17153,7 +17153,7 @@ function getPPTLineAttachment(
     }
 
     for (const anchor of getPPTConnectorAnchors(element)) {
-      const distance = pointDistance(point, anchor.point)
+      const distance = getPPTCanvasPointDistance(point, anchor.point)
 
       if (
         distance <= PPT_LINE_CONNECTION_DISTANCE &&
@@ -17265,7 +17265,7 @@ function getPPTConnectorAnchors(element: PPTElement): Array<{
   anchor: PPTLineConnection['anchor']
   point: Point
 }> {
-  const points = getCanvasBoundsAnchorPoints(pptGeometryToBounds(element.geometry))
+  const points = getPPTCanvasBoundsAnchorPoints(pptGeometryToBounds(element.geometry))
 
   return [
     { anchor: 'left', point: points.left },
@@ -17291,7 +17291,7 @@ function getPPTConnectionAnchorPoint(
 }
 
 function getPPTLineLength(line: PPTLine) {
-  return pointDistance(
+  return getPPTCanvasPointDistance(
     getPPTLineEndpointPoint(line, 'start'),
     getPPTLineEndpointPoint(line, 'end'),
   )
@@ -17326,7 +17326,7 @@ function measurePPTTextAutoFitSize(element: PPTTextElement) {
     whiteSpace: 'pre',
     width: 'max-content',
   })
-  const width = clamp(Math.ceil(preferred.w + padding.x + 8), 24, maxWidth)
+  const width = clampPPTCanvasValue(Math.ceil(preferred.w + padding.x + 8), 24, maxWidth)
   const contentWidth = Math.max(1, width - padding.x)
   const wrapped = measurePPTTextContentSize(element, {
     whiteSpace: 'pre-wrap',
@@ -17334,7 +17334,7 @@ function measurePPTTextAutoFitSize(element: PPTTextElement) {
   })
 
   return {
-    h: clamp(Math.ceil(wrapped.h + padding.y + 8), 24, maxHeight),
+    h: clampPPTCanvasValue(Math.ceil(wrapped.h + padding.y + 8), 24, maxHeight),
     w: width,
   }
 }
@@ -17477,7 +17477,7 @@ function getSpacingGuideLabelPoint(guide: CanvasSnapGuides['spacingGuides'][numb
 }
 
 function createPPTSlideId(deck: PPTDeck) {
-  return createCanvasSequentialIdFactory({
+  return createPPTCanvasSequentialIdFactory({
     existingIds: deck.slides.map((slide) => slide.id),
     startIndex: deck.slides.length + 1,
   })('slide')

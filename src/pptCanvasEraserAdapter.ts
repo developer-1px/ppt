@@ -5,7 +5,7 @@ import {
 import type {
   Bounds,
   Point,
-} from 'canvas/core'
+} from './pptCanvasCoreAdapter'
 import { unionCanvasRectList } from 'canvas/foundation'
 import { pptGeometryToBounds } from './pptCanvasAdapter'
 import type {
