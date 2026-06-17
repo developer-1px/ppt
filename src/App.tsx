@@ -93,6 +93,10 @@ import {
   type RefObject,
 } from 'react'
 import {
+  CANVAS_DOM_ALIGNMENT_POPOVER_MODEL,
+  CANVAS_DOM_ALIGNMENT_PREVIEW_GUIDE_MODEL,
+} from '@interactive-os/dom-edit-affordance/metadata'
+import {
   createSlideEditColorSwatchPaletteDescriptor,
   createSlideEditClipboardPasteCommandEffect,
   createSlideEditClipboardPayload,
@@ -7898,7 +7902,7 @@ function App() {
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model={CANVAS_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-alignment-popover-preview={alignmentPreviewCommand ?? undefined}
-        data-ppt-alignment-popover-preview-model="canvas-dom-alignment-preview-guide"
+        data-ppt-alignment-popover-preview-model={CANVAS_DOM_ALIGNMENT_PREVIEW_GUIDE_MODEL}
         data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}
         data-ppt-comment-thread-command-body={lastCommentThreadEffect?.payload.body}
         data-ppt-comment-thread-command-count={lastCommentThreadEffect?.payload.messageCount}
@@ -10847,7 +10851,7 @@ function PPTAlignmentPopover({
           className="ppt-alignment-popover"
           data-ppt-alignment-popover
           data-ppt-alignment-popover-active={activeEnabledCommandId ?? activeCommand}
-          data-ppt-alignment-popover-model="canvas-dom-alignment-popover"
+          data-ppt-alignment-popover-model={CANVAS_DOM_ALIGNMENT_POPOVER_MODEL}
           id="ppt-alignment-popover-menu"
           ref={setMenuRoot}
           role="menu"
