@@ -11907,9 +11907,38 @@ async function runSlideManagementScenario(page) {
   const expectedActiveOptionId = `slide-rail-option-${initialKeyboard.activeIndex}`
   const expectedSlideOrder = initialKeyboard.ids.join(' ')
 
-  record('exposes PPT slide rail listbox keyboard affordance', initialKeyboard.model === 'slide-edit-rail-interactions' && initialKeyboard.listRole === 'listbox' && initialKeyboard.keyboardModel === 'aria-listbox-roving-focus' && initialKeyboard.keyboardKeys === 'ArrowUp ArrowDown Home End Enter Space' && initialKeyboard.selectionMode === 'single' && initialKeyboard.activeAttr === initialKeyboard.activeId && initialKeyboard.activeOption === expectedActiveOptionId && initialKeyboard.focusableOption === expectedActiveOptionId && initialKeyboard.slideOrder === expectedSlideOrder && initialKeyboard.optionCount === initialKeyboard.count && initialKeyboard.optionCountAttr === String(initialKeyboard.count) && initialKeyboard.thumbnailCount === String(initialKeyboard.count) && initialKeyboard.optionIds.length === initialKeyboard.count && initialKeyboard.optionIds.every((id, index) => id === `slide-rail-option-${index}`) && initialKeyboard.optionIndexes.every((value, index) => value === String(index)) && initialKeyboard.optionFocusableIds.length === 1 && initialKeyboard.optionFocusableIds[0] === initialKeyboard.activeId && initialKeyboard.activeThumbW === '112' && initialKeyboard.activeThumbH === '86' && initialKeyboard.activeHitW === '124' && initialKeyboard.activeHitH === '98' && initialKeyboard.selectedOptionIds.length === 1 && initialKeyboard.selectedOptionIds[0] === initialKeyboard.activeId && initialKeyboard.tabStopIds.length === 1 && initialKeyboard.tabStopIds[0] === initialKeyboard.activeId && initialKeyboard.focusedId === initialKeyboard.activeId, {
-    initialKeyboard,
-  })
+  record(
+    'exposes PPT slide rail listbox keyboard affordance',
+    initialKeyboard.model === 'slide-edit-rail-interactions' &&
+      initialKeyboard.listRole === 'listbox' &&
+      initialKeyboard.keyboardModel === 'aria-listbox-roving-focus' &&
+      initialKeyboard.keyboardKeys === 'ArrowUp ArrowDown Home End Enter Space' &&
+      initialKeyboard.selectionMode === 'single' &&
+      initialKeyboard.activeAttr === initialKeyboard.activeId &&
+      initialKeyboard.activeOption === expectedActiveOptionId &&
+      initialKeyboard.focusableOption === expectedActiveOptionId &&
+      initialKeyboard.slideOrder === expectedSlideOrder &&
+      initialKeyboard.optionCount === initialKeyboard.count &&
+      initialKeyboard.optionCountAttr === String(initialKeyboard.count) &&
+      initialKeyboard.thumbnailCount === String(initialKeyboard.count) &&
+      initialKeyboard.optionIds.length === initialKeyboard.count &&
+      initialKeyboard.optionIds.every((id, index) => id === `slide-rail-option-${index}`) &&
+      initialKeyboard.optionIndexes.every((value, index) => value === String(index)) &&
+      initialKeyboard.optionFocusableIds.length === 1 &&
+      initialKeyboard.optionFocusableIds[0] === initialKeyboard.activeId &&
+      initialKeyboard.activeThumbW === '112' &&
+      initialKeyboard.activeThumbH === '86' &&
+      initialKeyboard.activeHitW === '124' &&
+      initialKeyboard.activeHitH === '98' &&
+      initialKeyboard.selectedOptionIds.length === 1 &&
+      initialKeyboard.selectedOptionIds[0] === initialKeyboard.activeId &&
+      initialKeyboard.tabStopIds.length === 1 &&
+      initialKeyboard.tabStopIds[0] === initialKeyboard.activeId &&
+      initialKeyboard.focusedId === initialKeyboard.activeId,
+    {
+      initialKeyboard,
+    },
+  )
 
   await pressKey(page, {
     code: 'Home',

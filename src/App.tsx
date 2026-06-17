@@ -207,6 +207,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
+  SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
@@ -7666,7 +7667,7 @@ function App() {
           data-ppt-slide-rail-command-to-index={lastSlideRailReorderPayload?.toIndex}
           data-ppt-slide-rail-command-type={lastSlideRailCommandEffect?.type}
           data-ppt-slide-rail-focusable-option={slideRailDescriptor.listbox.focusableOptionId ?? undefined}
-          data-ppt-slide-rail-keyboard-keys="ArrowUp ArrowDown Home End Enter Space"
+          data-ppt-slide-rail-keyboard-keys={SLIDE_EDIT_RAIL_KEYBOARD_KEYS}
           data-ppt-slide-rail-keyboard-model={slideRailDescriptor.listbox.keyboardModel}
           data-ppt-slide-rail-model="slide-edit-rail-interactions"
           data-ppt-slide-rail-option-count={slideRailDescriptor.listbox.options.length}
