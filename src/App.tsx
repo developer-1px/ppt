@@ -377,6 +377,7 @@ import {
   type CanvasRichClipboardReadFormat,
   type CanvasRichClipboardWriteMode,
 } from 'canvas/app/rich-clipboard'
+import { getCanvasTextPasteSourcesFromDataTransfer } from 'canvas/app/text-paste-import'
 import {
   centerCanvasViewportAtWorldPoint,
   fitCanvasViewportToBounds,
@@ -11565,7 +11566,9 @@ function PPTElementView({
       return
     }
 
-    const pasteText = event.clipboardData.getData('text/plain')
+    const pasteText = getCanvasTextPasteSourcesFromDataTransfer(
+      event.clipboardData,
+    )[0]
 
     if (!pasteText) {
       return
