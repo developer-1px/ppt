@@ -298,6 +298,7 @@ import {
   filterCanvasCommandPaletteItems,
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
+import { getCanvasClientViewportSize } from 'canvas/app/client-viewport-size'
 import {
   getCanvasContextMenuKeyboardIntent,
   getCanvasContextMenuPosition,
@@ -5539,13 +5540,11 @@ function App() {
   }
 
   function openPPTContextMenu(x: number, y: number) {
+    const viewportSize = getCanvasClientViewportSize()
     const position = getCanvasContextMenuPosition({
       menuSize: { height: 320, width: 220 },
       point: { x, y },
-      viewportSize: {
-        height: globalThis.innerHeight,
-        width: globalThis.innerWidth,
-      },
+      viewportSize,
     })
 
     setContextMenu(position)
@@ -8602,14 +8601,16 @@ function usePPTPresentationScale() {
 }
 
 function getPPTPresentationScale() {
-  if (typeof window === 'undefined') {
+  const viewportSize = getCanvasClientViewportSize()
+
+  if (!viewportSize) {
     return 0.75
   }
 
   return clamp(
     Math.min(
-      (window.innerWidth - 96) / PPT_SLIDE_WIDTH,
-      (window.innerHeight - 168) / PPT_SLIDE_HEIGHT,
+      (viewportSize.width - 96) / PPT_SLIDE_WIDTH,
+      (viewportSize.height - 168) / PPT_SLIDE_HEIGHT,
     ),
     0.2,
     1.4,

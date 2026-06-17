@@ -13,6 +13,7 @@
     "paths": {
       "canvas/app/animation-frame-task": ["../canvas/src/canvas/app/affordances/interaction/frame/CanvasAnimationFrameTask.ts"],
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/client-viewport-size": ["../canvas/src/canvas/app/affordances/interaction/viewport/CanvasClientViewportSize.ts"],
       "canvas/app/context-menu-position": ["../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts"],
       "canvas/app/data-transfer-import-actions": ["../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts"],
       "canvas/app/data-transfer-text": ["../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts"],
