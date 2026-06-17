@@ -2544,7 +2544,7 @@ function App() {
         return
       }
 
-      if (contextMenu && event.key === 'Escape') {
+      if (contextMenu && systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
         setContextMenu(null)
         return
@@ -2680,7 +2680,7 @@ function App() {
         return
       }
 
-      if (event.key === 'Escape') {
+      if (systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
         setEditingId(null)
         setInteraction(null)
