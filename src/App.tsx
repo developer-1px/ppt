@@ -1027,6 +1027,11 @@ const PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-animation' as const
 const PPT_OBJECT_ANIMATION_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-animation+json'
+const PPT_OBJECT_STYLE_IMPORT_MODEL = 'ppt-object-style-import' as const
+const PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-style' as const
+const PPT_OBJECT_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-style+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1185,6 +1190,18 @@ type PPTObjectAnimationImportSource = {
   format: typeof PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT
   jsonLength: number
 }
+type PPTObjectStyleImportField =
+  | 'opacity'
+  | 'shadow'
+type PPTObjectStyleImportSource = {
+  fields: readonly PPTObjectStyleImportField[]
+  format: typeof PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  object: {
+    opacity?: number
+    shadow?: PPTElementShadow | null
+  }
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1298,6 +1315,24 @@ type PPTObjectAnimationImportEffect = {
   slideId: string
   trigger: string
   type: string
+}
+type PPTObjectStyleImportEffect = {
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  format: typeof PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_STYLE_IMPORT_MODEL
+  objectIds: string
+  opacity: string
+  shadowAngle: string
+  shadowBlur: string
+  shadowColor: string
+  shadowDistance: string
+  shadowEnabled: string
+  shadowOpacity: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2328,6 +2363,8 @@ function App() {
     useState<PPTSlideTransitionImportEffect | null>(null)
   const [lastObjectAnimationImportEffect, setLastObjectAnimationImportEffect] =
     useState<PPTObjectAnimationImportEffect | null>(null)
+  const [lastObjectStyleImportEffect, setLastObjectStyleImportEffect] =
+    useState<PPTObjectStyleImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3247,6 +3284,17 @@ function App() {
         return
       }
 
+      const objectStyleSource =
+        getPPTObjectStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectStyleSource &&
+        pastePPTObjectStyleSource(objectStyleSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const slideNotesSource =
         getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
 
@@ -4082,6 +4130,76 @@ function App() {
             animation,
           }
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectStyleSource(source: PPTObjectStyleImportSource) {
+    if (selectedElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = selectedElements[0]
+    const styleClipboard: PPTStyleClipboard = {
+      categories: ['object'],
+      object: {
+        opacity: source.object.opacity ?? getPPTElementOpacity(sourceElement),
+        shadow: source.object.shadow === undefined
+          ? hasPPTElementShadow(sourceElement)
+            ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+            : null
+          : source.object.shadow
+            ? clonePPTElementShadow(source.object.shadow)
+            : null,
+      },
+      sourceId: 'ppt-object-style-json',
+      sourceKind: sourceElement.kind,
+      type: 'slide-style-clipboard',
+    }
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(selectedElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastObjectStyleImportEffect(createPPTObjectStyleImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
       })))
 
     return true
@@ -9406,6 +9524,22 @@ function App() {
           .join(' ')}
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
+        data-ppt-object-style-import-categories={lastObjectStyleImportEffect?.categories}
+        data-ppt-object-style-import-command={lastObjectStyleImportEffect?.commandId}
+        data-ppt-object-style-import-command-targets={lastObjectStyleImportEffect?.commandTargets}
+        data-ppt-object-style-import-command-type={lastObjectStyleImportEffect?.commandType}
+        data-ppt-object-style-import-fields={lastObjectStyleImportEffect?.fields}
+        data-ppt-object-style-import-format={lastObjectStyleImportEffect?.format}
+        data-ppt-object-style-import-json-length={lastObjectStyleImportEffect?.jsonLength}
+        data-ppt-object-style-import-model={lastObjectStyleImportEffect?.model}
+        data-ppt-object-style-import-objects={lastObjectStyleImportEffect?.objectIds}
+        data-ppt-object-style-import-opacity={lastObjectStyleImportEffect?.opacity}
+        data-ppt-object-style-import-shadow-angle={lastObjectStyleImportEffect?.shadowAngle}
+        data-ppt-object-style-import-shadow-blur={lastObjectStyleImportEffect?.shadowBlur}
+        data-ppt-object-style-import-shadow-color={lastObjectStyleImportEffect?.shadowColor}
+        data-ppt-object-style-import-shadow-distance={lastObjectStyleImportEffect?.shadowDistance}
+        data-ppt-object-style-import-shadow-enabled={lastObjectStyleImportEffect?.shadowEnabled}
+        data-ppt-object-style-import-shadow-opacity={lastObjectStyleImportEffect?.shadowOpacity}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
         data-ppt-import-extension-last-clipboard-actions={lastClipboardImportActionKinds}
         data-ppt-import-extension-last-drop-action={lastStageDropImportActionKind}
@@ -11790,6 +11924,47 @@ function createPPTObjectAnimationImportCommandEffects({
   return effects
 }
 
+function createPPTObjectStyleImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTObjectStyleImportSource
+}): PPTObjectStyleImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+  const shadow = source.object.shadow
+
+  return {
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_STYLE_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+    opacity: source.object.opacity === undefined
+      ? ''
+      : String(source.object.opacity),
+    shadowAngle: shadow ? String(shadow.angle) : '',
+    shadowBlur: shadow ? String(shadow.blur) : '',
+    shadowColor: shadow?.color ?? '',
+    shadowDistance: shadow ? String(shadow.distance) : '',
+    shadowEnabled: shadow === undefined ? '' : String(shadow !== null),
+    shadowOpacity: shadow ? String(shadow.opacity) : '',
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -12638,6 +12813,155 @@ function getPPTElementAnimationOrderFromJSONValue(value: unknown) {
   }
 
   return clampPPTElementAnimationOrder(value)
+}
+
+function getPPTObjectStyleSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_STYLE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectStyleSourceFromText(text, candidate.allowDirect)
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectStyleSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectStyleImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectStyleSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectStyleSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectStyleImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.objectStyle)
+    ? value.objectStyle
+    : isPPTRecord(value) && isPPTRecord(value.objectEffect)
+      ? value.objectEffect
+      : allowDirect
+        ? value
+        : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const object: PPTObjectStyleImportSource['object'] = {}
+  const fields: PPTObjectStyleImportField[] = []
+  const opacity = getPPTObjectStyleOpacityFromJSONValue(payloadValue.opacity)
+  const shadow = getPPTObjectStyleShadowFromJSONValue(payloadValue.shadow)
+
+  if (opacity !== undefined) {
+    object.opacity = opacity
+    fields.push('opacity')
+  }
+
+  if (shadow !== undefined) {
+    object.shadow = shadow
+    fields.push('shadow')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        object,
+      }
+    : null
+}
+
+function getPPTObjectStyleOpacityFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTElementOpacity(value)
+}
+
+function getPPTObjectStyleShadowFromJSONValue(
+  value: unknown,
+): PPTElementShadow | null | undefined {
+  if (value === null || value === false) {
+    return null
+  }
+
+  if (value === true) {
+    return normalizePPTElementShadow({})
+  }
+
+  if (!isPPTRecord(value)) {
+    return undefined
+  }
+
+  if (value.enabled === false) {
+    return null
+  }
+
+  return normalizePPTElementShadow({
+    angle: typeof value.angle === 'number' ? value.angle : undefined,
+    blur: typeof value.blur === 'number' ? value.blur : undefined,
+    color: typeof value.color === 'string' ? value.color : undefined,
+    distance: typeof value.distance === 'number' ? value.distance : undefined,
+    opacity: typeof value.opacity === 'number' ? value.opacity : undefined,
+  })
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(

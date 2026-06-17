@@ -9290,6 +9290,66 @@ async function runObjectShadowScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectStyle: {
+        opacity: 0.42,
+        shadow: {
+          angle: 60,
+          blur: 18,
+          color: '#334155',
+          distance: 12,
+          enabled: true,
+          opacity: 0.36,
+        },
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStylePaste = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'pastes JSON object visual style into selected PPT object',
+    afterStylePaste.objectStyleImportModel === 'ppt-object-style-import' &&
+      afterStylePaste.objectStyleImportFormat === 'application-json-ppt-object-style' &&
+      afterStylePaste.objectStyleImportCommand === 'paste-object-formatting' &&
+      afterStylePaste.objectStyleImportCommandTargets === targetId &&
+      afterStylePaste.objectStyleImportCommandType === 'slide-command-effect' &&
+      afterStylePaste.objectStyleImportObjects === targetId &&
+      afterStylePaste.objectStyleImportCategories === 'object-effect' &&
+      afterStylePaste.objectStyleImportFields === 'opacity shadow' &&
+      afterStylePaste.objectStyleImportOpacity === '0.42' &&
+      afterStylePaste.objectStyleImportShadowEnabled === 'true' &&
+      afterStylePaste.objectStyleImportShadowColor === '#334155' &&
+      afterStylePaste.objectStyleImportShadowOpacity === '0.36' &&
+      afterStylePaste.objectStyleImportShadowBlur === '18' &&
+      afterStylePaste.objectStyleImportShadowDistance === '12' &&
+      afterStylePaste.objectStyleImportShadowAngle === '60' &&
+      afterStylePaste.objectStyleImportJsonLength > 100 &&
+      afterStylePaste.selectedObjectOpacity === '0.42' &&
+      afterStylePaste.selectedShadow === 'true' &&
+      afterStylePaste.selectedColor === '#334155' &&
+      afterStylePaste.selectedOpacity === '0.36' &&
+      afterStylePaste.selectedBlur === '18' &&
+      afterStylePaste.selectedDistance === '12' &&
+      afterStylePaste.selectedAngle === '60' &&
+      afterStylePaste.thumbOpacity === '0.36',
+    {
+      afterFieldRedo,
+      afterStylePaste,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -15838,6 +15898,22 @@ function getPPTObjectShadowState(page, elementId) {
       enabled: enabled?.checked ?? false,
       inspectorEnabled: document.querySelector('[data-ppt-shadow-inspector]')?.getAttribute('data-ppt-shadow-enabled') ?? '',
       model: stage?.getAttribute('data-ppt-shadow-model') ?? '',
+      objectStyleImportCategories: stage?.getAttribute('data-ppt-object-style-import-categories') ?? '',
+      objectStyleImportCommand: stage?.getAttribute('data-ppt-object-style-import-command') ?? '',
+      objectStyleImportCommandTargets: stage?.getAttribute('data-ppt-object-style-import-command-targets') ?? '',
+      objectStyleImportCommandType: stage?.getAttribute('data-ppt-object-style-import-command-type') ?? '',
+      objectStyleImportFields: stage?.getAttribute('data-ppt-object-style-import-fields') ?? '',
+      objectStyleImportFormat: stage?.getAttribute('data-ppt-object-style-import-format') ?? '',
+      objectStyleImportJsonLength: Number(stage?.getAttribute('data-ppt-object-style-import-json-length') ?? 0),
+      objectStyleImportModel: stage?.getAttribute('data-ppt-object-style-import-model') ?? '',
+      objectStyleImportObjects: stage?.getAttribute('data-ppt-object-style-import-objects') ?? '',
+      objectStyleImportOpacity: stage?.getAttribute('data-ppt-object-style-import-opacity') ?? '',
+      objectStyleImportShadowAngle: stage?.getAttribute('data-ppt-object-style-import-shadow-angle') ?? '',
+      objectStyleImportShadowBlur: stage?.getAttribute('data-ppt-object-style-import-shadow-blur') ?? '',
+      objectStyleImportShadowColor: stage?.getAttribute('data-ppt-object-style-import-shadow-color') ?? '',
+      objectStyleImportShadowDistance: stage?.getAttribute('data-ppt-object-style-import-shadow-distance') ?? '',
+      objectStyleImportShadowEnabled: stage?.getAttribute('data-ppt-object-style-import-shadow-enabled') ?? '',
+      objectStyleImportShadowOpacity: stage?.getAttribute('data-ppt-object-style-import-shadow-opacity') ?? '',
       opacity: opacity?.value ?? '',
       opacityControl: opacity?.getAttribute('data-ppt-shadow-control') ?? '',
       opacityDisabled: opacity?.disabled ?? false,
@@ -15848,6 +15924,7 @@ function getPPTObjectShadowState(page, elementId) {
       selectedDistance: selected?.getAttribute('data-ppt-shadow-distance') ?? '',
       selectedFilter: selected?.style.filter ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedObjectOpacity: selected?.getAttribute('data-ppt-opacity') ?? '',
       selectedOpacity: selected?.getAttribute('data-ppt-shadow-opacity') ?? '',
       selectedShadow: selected?.getAttribute('data-ppt-shadow') ?? '',
       thumbFilter: thumb?.style.filter ?? '',
