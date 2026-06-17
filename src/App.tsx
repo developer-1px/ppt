@@ -10207,6 +10207,10 @@ function createPPTSelectionClipboardFallbackHTML(
 }
 
 function createPPTElementClipboardFallbackHTML(element: PPTElement) {
+  if (element.kind === 'image') {
+    return createPPTImageClipboardFallbackHTML(element)
+  }
+
   if (element.kind === 'table') {
     return createPPTTableClipboardHTML(element)
   }
@@ -10221,6 +10225,20 @@ function createPPTElementClipboardFallbackHTML(element: PPTElement) {
     `<p data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}">`,
     escapePPTClipboardHTMLText(text).replace(/\n/g, '<br>'),
     '</p>',
+  ].join('')
+}
+
+function createPPTImageClipboardFallbackHTML(element: PPTImage) {
+  const altText = createPPTElementClipboardPlainText(element).trim()
+  const captionHTML = altText
+    ? `<figcaption>${escapePPTClipboardHTMLText(altText)}</figcaption>`
+    : ''
+
+  return [
+    `<figure data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}" data-ppt-selection-image="true">`,
+    `<img alt="${escapePPTCanvasXmlAttribute(altText)}" src="${escapePPTCanvasXmlAttribute(element.src)}">`,
+    captionHTML,
+    '</figure>',
   ].join('')
 }
 

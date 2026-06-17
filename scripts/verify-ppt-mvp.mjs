@@ -8051,6 +8051,87 @@ async function runImageImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    window.__pptImageRichClipboardItemTypes = []
+    window.__pptImageRichClipboardWriteCount = 0
+    window.__pptImageRichClipboardHTML = ''
+    window.__pptImageRichClipboardJSON = ''
+    window.__pptImageRichClipboardPlainText = ''
+    window.__pptImageRichClipboardSVG = ''
+
+    window.ClipboardItem = class PPTImageRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptImageRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptImageRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptImageRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptImageRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptImageRichClipboardSVG = item.items['image/svg+xml']
+            ? await item.items['image/svg+xml'].text()
+            : ''
+          window.__pptImageRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(120)
+
+  const afterDataImageCopy = await getPPTImageImportState(page)
+  const imageRichClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptImageRichClipboardHTML ?? '',
+    itemTypes: window.__pptImageRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptImageRichClipboardJSON ?? '',
+    plainText: window.__pptImageRichClipboardPlainText ?? '',
+    svg: window.__pptImageRichClipboardSVG ?? '',
+    writeCount: window.__pptImageRichClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies selected PPT image with HTML image fallback through canvas rich clipboard writer',
+    afterDataImageCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' &&
+      afterDataImageCopy.richClipboardWriteMode === 'clipboard-item' &&
+      afterDataImageCopy.richClipboardSelection === afterDataImagePaste.selectedId &&
+      afterDataImageCopy.richClipboardPlainTextLength > 0 &&
+      afterDataImageCopy.richClipboardHTMLLength > afterDataImageCopy.richClipboardPlainTextLength &&
+      imageRichClipboardWrite.writeCount === 1 &&
+      imageRichClipboardWrite.itemTypes.includes(afterDataImageCopy.richClipboardJsonMimeType) &&
+      imageRichClipboardWrite.itemTypes.includes('text/html') &&
+      imageRichClipboardWrite.itemTypes.includes('text/plain') &&
+      imageRichClipboardWrite.itemTypes.includes('image/svg+xml') &&
+      imageRichClipboardWrite.html.includes('data-ppt-selection-image="true"') &&
+      imageRichClipboardWrite.html.includes('<img') &&
+      imageRichClipboardWrite.html.includes('src="data:image/png') &&
+      imageRichClipboardWrite.html.includes(afterDataImageCopy.selectedAltText) &&
+      imageRichClipboardWrite.plainText === afterDataImageCopy.selectedAltText &&
+      imageRichClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"') &&
+      imageRichClipboardWrite.svg.includes('<svg'),
+    {
+      afterDataImageCopy,
+      afterDataImagePaste,
+      imageRichClipboardWrite,
+    },
+  )
+
+  await page.eval(`(() => {
     const svg = '<svg width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg"><rect width="140" height="70" fill="#0891b2"/></svg>'
     window.__pptClipboardImageReadCount = 0
     window.__pptClipboardImageReadTypes = []
@@ -12411,6 +12492,12 @@ function getPPTImageImportState(page) {
       inspectorCropY: Number(cropYField?.value ?? 0),
       inspectorImageFit: fitField?.value ?? '',
       imageCount: document.querySelectorAll('[data-kind="image"]').length,
+      richClipboardHTMLLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-html-length') ?? 0),
+      richClipboardJsonMimeType: stage?.getAttribute('data-ppt-rich-clipboard-json-mime-type') ?? '',
+      richClipboardModel: stage?.getAttribute('data-ppt-rich-clipboard-model') ?? '',
+      richClipboardPlainTextLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-plain-text-length') ?? 0),
+      richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
+      richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       selectedAltText: selectedImage?.getAttribute('alt') ?? '',
       selectedFlipH: selected?.getAttribute('data-ppt-flip-h') ?? '',
       selectedFlipV: selected?.getAttribute('data-ppt-flip-v') ?? '',
