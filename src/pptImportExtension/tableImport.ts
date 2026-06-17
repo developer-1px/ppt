@@ -1,18 +1,18 @@
 import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
-  CANVAS_TABLE_IMPORT_MODEL,
-  getCanvasTableFileFromDataTransfer,
-  getCanvasTableFileFromList,
-  getCanvasTableColumnCount,
-  getCanvasTableComponentSize,
-  getCanvasTableSourceFromDataTransfer,
-  getCanvasTableSourceFromHTML as getCanvasTableSourceFromHTMLValue,
-  getCanvasTableSourceFromText,
-  normalizeCanvasTableRows,
-  readCanvasTableFileSource,
-  type CanvasTableImportFormat,
-  type CanvasTableImportSource,
-} from 'canvas/app/table-import'
+  getPPTCanvasTableColumnCount,
+  getPPTCanvasTableComponentSize,
+  getPPTCanvasTableFileFromDataTransfer,
+  getPPTCanvasTableFileFromList,
+  getPPTCanvasTableSourceFromDataTransfer,
+  getPPTCanvasTableSourceFromHTML,
+  getPPTCanvasTableSourceFromText,
+  normalizePPTCanvasTableRows,
+  PPT_CANVAS_TABLE_IMPORT_MODEL,
+  readPPTCanvasTableFileSource,
+  type PPTCanvasTableImportFormat,
+  type PPTCanvasTableImportSource,
+} from '../pptCanvasAppAffordanceAdapter'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -30,7 +30,7 @@ export type PPTTableImportSource = {
   name?: string
   rows: readonly (readonly string[])[]
 }
-export const PPT_TABLE_IMPORT_MODEL = CANVAS_TABLE_IMPORT_MODEL
+export const PPT_TABLE_IMPORT_MODEL = PPT_CANVAS_TABLE_IMPORT_MODEL
 
 export const PPT_DEFAULT_TABLE_ROWS = [
   ['Metric', 'Current', 'Target'],
@@ -61,7 +61,7 @@ export function createPPTTableElement({
   const normalizedRows = normalizePPTTableRows(rows)
   const columnCount = getPPTTableColumnCount(normalizedRows)
   const rowCount = normalizedRows.length
-  const size = getCanvasTableComponentSize({
+  const size = getPPTCanvasTableComponentSize({
     columnCount,
     rowCount,
   }, PPT_TABLE_SIZE_OPTIONS)
@@ -90,15 +90,15 @@ export function createPPTTableElement({
 }
 
 export function getPPTTableFileFromList(files: FileList | null) {
-  return getCanvasTableFileFromList(files)
+  return getPPTCanvasTableFileFromList(files)
 }
 
 export function getPPTTableFileFromDataTransfer(dataTransfer: DataTransfer | null) {
-  return getCanvasTableFileFromDataTransfer(dataTransfer)
+  return getPPTCanvasTableFileFromDataTransfer(dataTransfer)
 }
 
 export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | null) {
-  const source = getCanvasTableSourceFromDataTransfer(dataTransfer)
+  const source = getPPTCanvasTableSourceFromDataTransfer(dataTransfer)
 
   if (!source) {
     return null
@@ -108,7 +108,7 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
 }
 
 export async function readPPTTableFileSource(file: Blob & { name?: string }) {
-  const source = await readCanvasTableFileSource(file)
+  const source = await readPPTCanvasTableFileSource(file)
 
   if (!source) {
     return null
@@ -121,7 +121,7 @@ export function getPPTTableSourceFromText(
   text: string,
   options: { format?: PPTTableImportFormat; name?: string } = {},
 ): PPTTableImportSource | null {
-  const source = getCanvasTableSourceFromText(text, {
+  const source = getPPTCanvasTableSourceFromText(text, {
     format: getCanvasTableImportFormat(options.format),
     name: options.name,
   })
@@ -136,7 +136,7 @@ export function getPPTTableSourceFromText(
 }
 
 export function getPPTTableSourceFromHTML(value: string) {
-  const source = getCanvasTableSourceFromHTMLValue(value)
+  const source = getPPTCanvasTableSourceFromHTML(value)
 
   if (!source) {
     return null
@@ -152,7 +152,7 @@ export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
 }
 
 export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
-  return normalizeCanvasTableRows(rows, {
+  return normalizePPTCanvasTableRows(rows, {
     fallbackRows: PPT_DEFAULT_TABLE_ROWS,
     maxCellLength: PPT_TABLE_MAX_CELL_LENGTH,
     maxColumns: PPT_TABLE_MAX_COLUMNS,
@@ -161,7 +161,7 @@ export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
 }
 
 export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
-  return getCanvasTableColumnCount(rows)
+  return getPPTCanvasTableColumnCount(rows)
 }
 
 function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
@@ -193,7 +193,7 @@ function getPPTTableImportName(name: string) {
 }
 
 function createPPTTableImportSourceFromCanvas(
-  source: CanvasTableImportSource,
+  source: PPTCanvasTableImportSource,
   options: { format?: PPTTableImportFormat } = {},
 ) {
   return createPPTTableImportSource(source.rows, {
@@ -204,7 +204,7 @@ function createPPTTableImportSourceFromCanvas(
 
 function getCanvasTableImportFormat(
   format?: PPTTableImportFormat,
-): CanvasTableImportFormat | undefined {
+): PPTCanvasTableImportFormat | undefined {
   if (format === 'canvas-csv') {
     return 'text-csv'
   }
@@ -221,7 +221,7 @@ function getCanvasTableImportFormat(
 }
 
 function getPPTTableImportFormat(
-  format?: CanvasTableImportFormat,
+  format?: PPTCanvasTableImportFormat,
 ): PPTTableImportFormat | undefined {
   if (format === 'text-csv') {
     return 'canvas-csv'

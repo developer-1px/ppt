@@ -3,28 +3,26 @@ import {
   type Point,
 } from '../pptCanvasCoreAdapter'
 import {
+  getPPTCanvasDataImageSourceFromDataTransfer,
+  getPPTCanvasImageFileFromDataTransfer,
+  getPPTCanvasImageFileFromList,
   getPPTCanvasImportedImageSize,
+  getPPTCanvasSVGImageSourceFromDataTransfer,
+  PPT_CANVAS_IMAGE_IMPORT_MODEL,
+  readPPTCanvasImageFileSource,
+  resolvePPTCanvasImageSourceNaturalSize,
+  type PPTCanvasImageImportFormat,
+  type PPTCanvasImageImportSource,
 } from '../pptCanvasAppAffordanceAdapter'
-import {
-  CANVAS_IMAGE_IMPORT_MODEL,
-  getCanvasDataImageSourceFromDataTransfer,
-  getCanvasImageFileFromDataTransfer,
-  getCanvasImageFileFromList,
-  getCanvasSVGImageSourceFromDataTransfer,
-  readCanvasImageFileSource,
-  resolveCanvasImageSourceNaturalSize,
-  type CanvasImageImportFormat,
-  type CanvasImageImportSource,
-} from 'canvas/app/image-import'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
   type PPTImage,
 } from '../pptModel'
 
-export type PPTImageImportFormat = CanvasImageImportFormat
-export type PPTImageImportSource = CanvasImageImportSource
-export const PPT_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL
+export type PPTImageImportFormat = PPTCanvasImageImportFormat
+export type PPTImageImportSource = PPTCanvasImageImportSource
+export const PPT_IMAGE_IMPORT_MODEL = PPT_CANVAS_IMAGE_IMPORT_MODEL
 
 export function createPPTImportedImageElement({
   center,
@@ -68,7 +66,7 @@ export function createPPTImportedImageElement({
 }
 
 export async function readPPTImageFileSource(file: Blob & { name?: string }) {
-  const source = await readCanvasImageFileSource(file)
+  const source = await readPPTCanvasImageFileSource(file)
 
   if (!source) {
     return null
@@ -80,16 +78,16 @@ export async function readPPTImageFileSource(file: Blob & { name?: string }) {
   }
 }
 
-export const getPPTImageFileFromList = getCanvasImageFileFromList
+export const getPPTImageFileFromList = getPPTCanvasImageFileFromList
 
 export const getPPTImageFileFromDataTransfer =
-  getCanvasImageFileFromDataTransfer
+  getPPTCanvasImageFileFromDataTransfer
 
 export const getPPTDataImageSourceFromDataTransfer =
-  getCanvasDataImageSourceFromDataTransfer
+  getPPTCanvasDataImageSourceFromDataTransfer
 
 export const getPPTSVGImageSourceFromDataTransfer =
-  getCanvasSVGImageSourceFromDataTransfer
+  getPPTCanvasSVGImageSourceFromDataTransfer
 
 export const resolvePPTImageSourceNaturalSize =
-  resolveCanvasImageSourceNaturalSize
+  resolvePPTCanvasImageSourceNaturalSize

@@ -110,6 +110,22 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  CANVAS_IMAGE_IMPORT_MODEL,
+  getCanvasDataImageSourceFromDataTransfer,
+  getCanvasImageFileFromDataTransfer,
+  getCanvasImageFileFromList,
+  getCanvasSVGImageSourceFromDataTransfer,
+  readCanvasImageFileSource,
+  resolveCanvasImageSourceNaturalSize,
+  type CanvasImageImportFormat,
+  type CanvasImageImportSource,
+} from 'canvas/app/image-import'
+import {
+  CANVAS_MEDIA_IMPORT_MODEL,
+  getCanvasMediaSourceFromDataTransfer,
+  getCanvasMediaSourceFromText,
+} from 'canvas/app/media-import'
+import {
   CANVAS_MINIMAP_READ_MODEL,
   getCanvasMinimapPointFromViewportOffset,
   getCanvasMinimapReadModel,
@@ -121,6 +137,20 @@ import {
 import {
   CANVAS_PASTE_POSITION_MODEL,
 } from 'canvas/app/paste-position'
+import {
+  CANVAS_TABLE_IMPORT_MODEL,
+  getCanvasTableColumnCount,
+  getCanvasTableComponentSize,
+  getCanvasTableFileFromDataTransfer,
+  getCanvasTableFileFromList,
+  getCanvasTableSourceFromDataTransfer,
+  getCanvasTableSourceFromHTML,
+  getCanvasTableSourceFromText,
+  normalizeCanvasTableRows,
+  readCanvasTableFileSource,
+  type CanvasTableImportFormat,
+  type CanvasTableImportSource,
+} from 'canvas/app/table-import'
 import {
   CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
   CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
@@ -140,6 +170,13 @@ import {
 import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
 } from 'canvas/app/pointer-click-memory'
+import {
+  CANVAS_TEXT_PASTE_IMPORT_MODEL,
+  createCanvasTextPasteItems,
+  getCanvasRichTextPasteSourceFromDataTransfer,
+  getCanvasTextPasteSourcesFromDataTransfer,
+  type CanvasRichTextPasteSource,
+} from 'canvas/app/text-paste-import'
 import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
@@ -161,8 +198,13 @@ import {
 
 export const PPT_COMMAND_PALETTE_ITEMS_MODEL =
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL
+export const PPT_CANVAS_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL
+export const PPT_CANVAS_MEDIA_IMPORT_MODEL = CANVAS_MEDIA_IMPORT_MODEL
 export const PPT_MINIMAP_READ_MODEL = CANVAS_MINIMAP_READ_MODEL
 export const PPT_PASTE_POSITION_MODEL = CANVAS_PASTE_POSITION_MODEL
+export const PPT_CANVAS_TABLE_IMPORT_MODEL = CANVAS_TABLE_IMPORT_MODEL
+export const PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL =
+  CANVAS_TEXT_PASTE_IMPORT_MODEL
 export const PPT_KEYBOARD_TEMPORARY_PAN_MODEL =
   CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL
 export const PPT_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL =
@@ -347,6 +389,16 @@ export const zoomPPTCanvasViewport = zoomCanvasViewport
 
 export const filterPPTCommandPaletteItems =
   filterCanvasCommandPaletteItems
+export const createPPTCanvasTextPasteItems = createCanvasTextPasteItems
+export const getPPTCanvasDataImageSourceFromDataTransfer =
+  getCanvasDataImageSourceFromDataTransfer
+export const getPPTCanvasImageFileFromDataTransfer =
+  getCanvasImageFileFromDataTransfer
+export const getPPTCanvasImageFileFromList = getCanvasImageFileFromList
+export const getPPTCanvasMediaSourceFromDataTransfer =
+  getCanvasMediaSourceFromDataTransfer
+export const getPPTCanvasMediaSourceFromText =
+  getCanvasMediaSourceFromText
 export const getPPTMinimapPointFromViewportOffset =
   getCanvasMinimapPointFromViewportOffset
 export const getPPTMinimapReadModel = getCanvasMinimapReadModel
@@ -357,10 +409,29 @@ export const getPPTCanvasMergedEraserHitIds =
   getCanvasMergedEraserHitIds
 export const getPPTCanvasPointerStartProjection =
   getCanvasPointerStartProjection
+export const getPPTCanvasRichTextPasteSourceFromDataTransfer =
+  getCanvasRichTextPasteSourceFromDataTransfer
+export const getPPTCanvasSVGImageSourceFromDataTransfer =
+  getCanvasSVGImageSourceFromDataTransfer
+export const getPPTCanvasTableColumnCount = getCanvasTableColumnCount
+export const getPPTCanvasTableComponentSize =
+  getCanvasTableComponentSize
+export const getPPTCanvasTableFileFromDataTransfer =
+  getCanvasTableFileFromDataTransfer
+export const getPPTCanvasTableFileFromList = getCanvasTableFileFromList
+export const getPPTCanvasTableSourceFromDataTransfer =
+  getCanvasTableSourceFromDataTransfer
+export const getPPTCanvasTableSourceFromHTML =
+  getCanvasTableSourceFromHTML
+export const getPPTCanvasTableSourceFromText =
+  getCanvasTableSourceFromText
+export const getPPTCanvasTextPasteSourcesFromDataTransfer =
+  getCanvasTextPasteSourcesFromDataTransfer
 export const getPPTInlineEditHistoryDirectionFromInputType =
   inlineEditHistoryDirectionFromInputType
 export const insertPPTInlineEditText = insertInlineEditText
 export const isPPTInlineEditLineBreakInput = isInlineEditLineBreakInput
+export const normalizePPTCanvasTableRows = normalizeCanvasTableRows
 export const previewPPTCanvasPointerLaserInteraction =
   previewCanvasPointerLaserInteraction
 export const previewPPTCanvasPointerPanInteraction =
@@ -369,9 +440,18 @@ export const startPPTCanvasPointerLaserInteraction =
   startCanvasPointerLaserInteraction
 export const startPPTCanvasPointerPanInteraction =
   startCanvasPointerPanInteraction
+export const readPPTCanvasImageFileSource = readCanvasImageFileSource
+export const readPPTCanvasTableFileSource = readCanvasTableFileSource
+export const resolvePPTCanvasImageSourceNaturalSize =
+  resolveCanvasImageSourceNaturalSize
 export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
+export type PPTCanvasImageImportFormat = CanvasImageImportFormat
+export type PPTCanvasImageImportSource = CanvasImageImportSource
+export type PPTCanvasRichTextPasteSource = CanvasRichTextPasteSource
+export type PPTCanvasTableImportFormat = CanvasTableImportFormat
+export type PPTCanvasTableImportSource = CanvasTableImportSource
 export type PPTMinimapItemBounds = CanvasMinimapItemBounds
 export type PPTMinimapReadModel = CanvasMinimapReadModel
 export type PPTMinimapSize = CanvasMinimapSize

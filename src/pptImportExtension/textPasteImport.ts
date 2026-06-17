@@ -5,12 +5,12 @@ import {
   type Viewport,
 } from '../pptCanvasCoreAdapter'
 import {
-  CANVAS_TEXT_PASTE_IMPORT_MODEL,
-  createCanvasTextPasteItems,
-  getCanvasRichTextPasteSourceFromDataTransfer,
-  getCanvasTextPasteSourcesFromDataTransfer,
-  type CanvasRichTextPasteSource,
-} from 'canvas/app/text-paste-import'
+  createPPTCanvasTextPasteItems,
+  getPPTCanvasRichTextPasteSourceFromDataTransfer,
+  getPPTCanvasTextPasteSourcesFromDataTransfer,
+  PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL,
+  type PPTCanvasRichTextPasteSource,
+} from '../pptCanvasAppAffordanceAdapter'
 import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
@@ -33,7 +33,7 @@ type CanvasTextPasteTextItem = {
 }
 
 type PPTTextPasteImporter =
-  Parameters<typeof createCanvasTextPasteItems>[0]['importers'][number]
+  Parameters<typeof createPPTCanvasTextPasteItems>[0]['importers'][number]
 
 export type PPTTextPasteImportResult = {
   boldRunCount?: number
@@ -58,15 +58,15 @@ const PPT_TEXT_PASTE_WIDTH = 460
 const PPT_TEXT_PASTE_LINE_HEIGHT = 38
 const PPT_TEXT_PASTE_MIN_HEIGHT = 92
 const PPT_TEXT_PASTE_MAX_HEIGHT = 320
-export const PPT_TEXT_PASTE_IMPORT_MODEL = CANVAS_TEXT_PASTE_IMPORT_MODEL
+export const PPT_TEXT_PASTE_IMPORT_MODEL = PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL
 
 export const getPPTTextPasteSourcesFromDataTransfer =
-  getCanvasTextPasteSourcesFromDataTransfer
+  getPPTCanvasTextPasteSourcesFromDataTransfer
 
 export function getPPTRichTextPasteSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ): PPTRichTextPasteSource | null {
-  const source = getCanvasRichTextPasteSourceFromDataTransfer(dataTransfer)
+  const source = getPPTCanvasRichTextPasteSourceFromDataTransfer(dataTransfer)
 
   return source ? createPPTRichTextPasteSource(source) : null
 }
@@ -82,7 +82,7 @@ export function createPPTTextPasteElement({
   text: string
   viewport: Viewport
 }): PPTTextPasteImportResult | null {
-  const result = createCanvasTextPasteItems({
+  const result = createPPTCanvasTextPasteItems({
     createId,
     importers: [PPT_TEXT_PASTE_IMPORTER],
     position,
@@ -215,7 +215,7 @@ function isCanvasTextPasteTextItem(
 }
 
 function createPPTRichTextPasteSource(
-  source: CanvasRichTextPasteSource,
+  source: PPTCanvasRichTextPasteSource,
 ): PPTRichTextPasteSource {
   const textBody: PPTTextBody = {
     paragraphs: source.paragraphs.map((paragraph): PPTParagraph => ({

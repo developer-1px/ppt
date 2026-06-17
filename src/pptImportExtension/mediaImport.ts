@@ -4,10 +4,10 @@ import {
   type Viewport,
 } from '../pptCanvasCoreAdapter'
 import {
-  CANVAS_MEDIA_IMPORT_MODEL,
-  getCanvasMediaSourceFromDataTransfer,
-  getCanvasMediaSourceFromText,
-} from 'canvas/app/media-import'
+  getPPTCanvasMediaSourceFromDataTransfer,
+  getPPTCanvasMediaSourceFromText,
+  PPT_CANVAS_MEDIA_IMPORT_MODEL,
+} from '../pptCanvasAppAffordanceAdapter'
 import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
@@ -43,10 +43,10 @@ type CanvasMediaLinkItem = {
 const PPT_MEDIA_CARD_WIDTH = 440
 const PPT_MEDIA_CARD_HEIGHT = 132
 
-export const PPT_MEDIA_IMPORT_MODEL = CANVAS_MEDIA_IMPORT_MODEL
+export const PPT_MEDIA_IMPORT_MODEL = PPT_CANVAS_MEDIA_IMPORT_MODEL
 
 export const getPPTMediaSourceFromDataTransfer =
-  getCanvasMediaSourceFromDataTransfer
+  getPPTCanvasMediaSourceFromDataTransfer
 
 export function createPPTMediaElement({
   createId,
@@ -61,7 +61,7 @@ export function createPPTMediaElement({
 }): PPTMediaImportResult | null {
   void viewport
 
-  const normalized = getCanvasMediaSourceFromText(source.url)
+  const normalized = getPPTCanvasMediaSourceFromText(source.url)
 
   if (!normalized) {
     return null
