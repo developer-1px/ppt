@@ -8538,7 +8538,7 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file-batch image-file table-file-batch table-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file-batch image-file table-file-batch table-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source rich-text-source media-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file-batch image-file table-file-batch table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -9763,6 +9763,65 @@ async function runTextPasteScenario(page) {
     {
       afterRichPaste,
       afterRichUndo,
+      before,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const markdown = '# Launch plan\\n- **Draft** with _notes_\\n- [Review](https://example.com/review) handoff'
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterMarkdownPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes Markdown rich text clipboard data into PPT text body',
+    afterMarkdownPaste.textPasteModel === 'canvas-text-paste-import' &&
+      afterMarkdownPaste.importExtensionLastClipboardActions === 'rich-text-source' &&
+      afterMarkdownPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
+      afterMarkdownPaste.textPasteFormat === 'text-markdown-rich' &&
+      afterMarkdownPaste.textPasteBoldRuns >= 2 &&
+      afterMarkdownPaste.textPasteBulletParagraphs === 2 &&
+      afterMarkdownPaste.textPasteLinkRuns === 1 &&
+      afterMarkdownPaste.textPasteUnderlineRuns >= 1 &&
+      afterMarkdownPaste.textBoxCount === before.textBoxCount + 1 &&
+      afterMarkdownPaste.selectedKind === 'textBox' &&
+      afterMarkdownPaste.selectedName === 'Markdown Text' &&
+      afterMarkdownPaste.selectedBoldRunCount >= 2 &&
+      afterMarkdownPaste.selectedItalicRunCount >= 1 &&
+      afterMarkdownPaste.selectedUnderlineRunCount >= 1 &&
+      afterMarkdownPaste.selectedBulletParagraphCount === 2 &&
+      afterMarkdownPaste.selectedText.includes('Launch plan') &&
+      afterMarkdownPaste.selectedText.includes('Draft with notes') &&
+      afterMarkdownPaste.selectedText.includes('Review handoff'),
+    {
+      afterMarkdownPaste,
+      before,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterMarkdownUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes PPT Markdown rich text paste as one history step',
+    afterMarkdownUndo.textBoxCount === before.textBoxCount &&
+      afterMarkdownUndo.thumbTextCount === before.thumbTextCount &&
+      afterMarkdownUndo.redoEnabled,
+    {
+      afterMarkdownPaste,
+      afterMarkdownUndo,
       before,
     },
   )

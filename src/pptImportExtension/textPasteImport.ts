@@ -38,7 +38,7 @@ type PPTTextPasteImporter =
 export type PPTTextPasteImportResult = {
   boldRunCount?: number
   bulletParagraphCount?: number
-  format: 'text-html-rich' | 'text-plain'
+  format: 'text-html-rich' | 'text-markdown-rich' | 'text-plain'
   importerId: string
   italicRunCount?: number
   item: PPTTextBox
@@ -48,7 +48,10 @@ export type PPTTextPasteImportResult = {
 export type PPTRichTextPasteSource = {
   boldRunCount: number
   bulletParagraphCount: number
+  format?: 'text-html-rich' | 'text-markdown-rich'
+  importerId?: string
   linkRunCount: number
+  name?: string
   text: string
   textBody: PPTTextBody
   underlineRunCount: number
@@ -69,6 +72,19 @@ export function getPPTRichTextPasteSourceFromDataTransfer(
   const source = getPPTCanvasRichTextPasteSourceFromDataTransfer(dataTransfer)
 
   return source ? createPPTRichTextPasteSource(source) : null
+}
+
+export function getPPTMarkdownTextPasteSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+): PPTRichTextPasteSource | null {
+  if (!dataTransfer) {
+    return null
+  }
+
+  return getPPTMarkdownTextPasteSourceFromText(
+    dataTransfer.getData('text/markdown') ||
+      dataTransfer.getData('text/plain'),
+  )
 }
 
 export function createPPTTextPasteElement({
@@ -158,12 +174,12 @@ export function createPPTRichTextPasteElement({
   return {
     boldRunCount: source.boldRunCount,
     bulletParagraphCount: source.bulletParagraphCount,
-    format: 'text-html-rich',
-    importerId: 'ppt-rich-html-text',
+    format: source.format ?? 'text-html-rich',
+    importerId: source.importerId ?? 'ppt-rich-html-text',
     italicRunCount: getPPTTextBodyRunCount(source.textBody, 'italic'),
     item: {
       ...result.item,
-      name: 'Rich Text',
+      name: source.name ?? 'Rich Text',
       textBody: source.textBody,
     },
     linkRunCount: source.linkRunCount,
@@ -240,6 +256,126 @@ function createPPTRichTextPasteSource(
     textBody,
     underlineRunCount: getPPTTextBodyRunCount(textBody, 'underline'),
   }
+}
+
+function getPPTMarkdownTextPasteSourceFromText(
+  text: string,
+): PPTRichTextPasteSource | null {
+  const paragraphs = getPPTMarkdownTextPasteParagraphs(text)
+
+  if (paragraphs.length === 0 || !hasPPTMarkdownFormatting(text, paragraphs)) {
+    return null
+  }
+
+  const textBody = { paragraphs }
+
+  return {
+    boldRunCount: getPPTTextBodyRunCount(textBody, 'bold'),
+    bulletParagraphCount: textBody.paragraphs.filter((paragraph) =>
+      paragraph.bullet === 'bullet').length,
+    format: 'text-markdown-rich',
+    importerId: 'ppt-rich-markdown-text',
+    linkRunCount: getPPTTextBodyRunCount(textBody, 'color'),
+    name: 'Markdown Text',
+    text: textBody.paragraphs
+      .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+      .join('\n'),
+    textBody,
+    underlineRunCount: getPPTTextBodyRunCount(textBody, 'underline'),
+  }
+}
+
+function getPPTMarkdownTextPasteParagraphs(text: string): PPTParagraph[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map(parsePPTMarkdownTextPasteParagraph)
+    .filter((paragraph): paragraph is PPTParagraph => paragraph !== null)
+}
+
+function parsePPTMarkdownTextPasteParagraph(line: string): PPTParagraph | null {
+  const heading = line.match(/^#{1,6}\s+(.+?)\s*#*$/)
+  const bullet = line.match(/^(?:[-*+]|\d+[.)])\s+(.+)$/)
+  const text = heading?.[1] ?? bullet?.[1] ?? line
+  const runs = parsePPTMarkdownTextRuns(text)
+
+  if (runs.length === 0) {
+    return null
+  }
+
+  return {
+    ...(bullet ? { bullet: 'bullet' as const } : {}),
+    runs: heading
+      ? runs.map((run) => ({ ...run, bold: true }))
+      : runs,
+  }
+}
+
+function parsePPTMarkdownTextRuns(text: string): PPTRun[] {
+  const runs: PPTRun[] = []
+  const pattern =
+    /(\[([^\]]+)]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_)/g
+  let index = 0
+
+  for (const match of text.matchAll(pattern)) {
+    if (match.index === undefined) {
+      continue
+    }
+
+    if (match.index > index) {
+      runs.push({ text: unescapePPTMarkdownText(text.slice(index, match.index)) })
+    }
+
+    if (match[2] !== undefined) {
+      runs.push({
+        color: '#2563eb',
+        text: unescapePPTMarkdownText(match[2]),
+        underline: true,
+      })
+    } else if (match[4] !== undefined) {
+      runs.push({ text: unescapePPTMarkdownText(match[4]) })
+    } else if (match[5] !== undefined || match[6] !== undefined) {
+      runs.push({
+        bold: true,
+        text: unescapePPTMarkdownText(match[5] ?? match[6] ?? ''),
+      })
+    } else if (match[7] !== undefined || match[8] !== undefined) {
+      runs.push({
+        italic: true,
+        text: unescapePPTMarkdownText(match[7] ?? match[8] ?? ''),
+      })
+    }
+
+    index = match.index + match[0].length
+  }
+
+  if (index < text.length) {
+    runs.push({ text: unescapePPTMarkdownText(text.slice(index)) })
+  }
+
+  return runs.filter((run) => run.text.length > 0)
+}
+
+function unescapePPTMarkdownText(text: string) {
+  return text.replace(/\\([\\`*_[\]()#+.!|-])/g, '$1')
+}
+
+function hasPPTMarkdownFormatting(
+  text: string,
+  paragraphs: readonly PPTParagraph[],
+) {
+  return /^#{1,6}\s+/m.test(text) ||
+    /^(?:[-*+]|\d+[.)])\s+/m.test(text) ||
+    /\[([^\]]+)]\(([^)]+)\)/.test(text) ||
+    /(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/.test(text) ||
+    paragraphs.some((paragraph) =>
+      paragraph.bullet === 'bullet' ||
+      paragraph.runs.some((run) =>
+        run.bold === true ||
+        run.italic === true ||
+        run.underline === true ||
+        Boolean(run.color)))
 }
 
 function getPPTTextBodyRunCount(
