@@ -424,7 +424,6 @@ import { CANVAS_MEDIA_IMPORT_MODEL } from 'canvas/app/media-import'
 import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
 import {
   CANVAS_TEXT_PASTE_IMPORT_MODEL,
-  getCanvasTextPasteSourcesFromDataTransfer,
 } from 'canvas/app/text-paste-import'
 import {
   CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
@@ -446,9 +445,6 @@ import {
 import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
 } from 'canvas/app/pointer-click-memory'
-import {
-  screenPoint as getCanvasPointerScreenPoint,
-} from 'canvas/app/pointer-geometry'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
   CANVAS_LASER_TRAIL_OVERLAY_MODEL,
@@ -628,6 +624,7 @@ import {
   getPPTClipboardImportActions,
   getPPTStageDropImportAction,
   getPPTTableColumnCount,
+  getPPTTextPasteSourcesFromDataTransfer,
   normalizePPTTableRows,
   readPPTImageFileSource,
   readPPTTableFileSource,
@@ -5599,7 +5596,7 @@ function App() {
   function getPPTPointerScreenPoint(
     event: Pick<PointerEvent, 'clientX' | 'clientY'>,
   ) {
-    return getCanvasPointerScreenPoint(canvasStageElement, event)
+    return canvasStageElement.getScreenPoint(event)
   }
 
   function getPPTViewportCenter() {
@@ -11623,7 +11620,7 @@ function PPTElementView({
       return
     }
 
-    const pasteText = getCanvasTextPasteSourcesFromDataTransfer(
+    const pasteText = getPPTTextPasteSourcesFromDataTransfer(
       event.clipboardData,
     )[0]
 

@@ -13,7 +13,6 @@ const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/f
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
-const canvasPointerGeometryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerGeometry.ts', import.meta.url))
 const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
 const canvasPointerPanInteractionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerPanInteraction.ts', import.meta.url))
 const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts', import.meta.url))
@@ -43,7 +42,6 @@ export default defineConfig({
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
-      { find: 'canvas/app/pointer-geometry', replacement: canvasPointerGeometryEntry },
       { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
       { find: 'canvas/app/pointer-pan-interaction', replacement: canvasPointerPanInteractionEntry },
       { find: 'canvas/app/pointer-start-session', replacement: canvasPointerStartSessionEntry },
