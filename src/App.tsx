@@ -326,6 +326,7 @@ import {
 } from 'canvas/app/event-listener'
 import {
   isCanvasControlTarget,
+  isCanvasTargetWithinSelector,
   isCanvasWheelPassthroughTarget,
 } from 'canvas/app/interaction-target'
 import {
@@ -2409,8 +2410,10 @@ function App() {
     }
 
     function onPointerDown(event: PointerEvent) {
-      if (event.target instanceof Element &&
-        event.target.closest('[data-ppt-context-menu]')) {
+      if (isCanvasTargetWithinSelector({
+        selectors: '[data-ppt-context-menu]',
+        target: event.target,
+      })) {
         return
       }
 
