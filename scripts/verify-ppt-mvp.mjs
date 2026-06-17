@@ -12985,6 +12985,47 @@ async function runSlideManagementScenario(page) {
   })(${JSON.stringify(afterDuplicate.activeId)})`)
   await delay(60)
 
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(slideClipboardWrite.html)}, ${JSON.stringify(slideClipboardWrite.plainText)})`)
+  await delay(80)
+
+  const afterPasteSlideFallbackHTML = await getSlideRailState(page)
+
+  record(
+    'pastes PPT slide fallback HTML as snapshot slide when JSON is stripped',
+    afterPasteSlideFallbackHTML.count === afterDuplicate.count + 1 &&
+      afterPasteSlideFallbackHTML.activeId !== afterDuplicate.activeId &&
+      afterPasteSlideFallbackHTML.activeName.includes('Snapshot') &&
+      afterPasteSlideFallbackHTML.slideClipboardImported === 'true' &&
+      afterPasteSlideFallbackHTML.slideClipboardImportFormat === 'text-html-fallback' &&
+      afterPasteSlideFallbackHTML.slideClipboardElementCount === 1 &&
+      afterPasteSlideFallbackHTML.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideFallbackHTML.slideClipboardTargetSlide === afterPasteSlideFallbackHTML.activeId,
+    {
+      afterDuplicate,
+      afterPasteSlideFallbackHTML,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await delay(60)
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+    thumb?.click()
+  })(${JSON.stringify(afterDuplicate.activeId)})`)
+  await delay(60)
+
   const afterSlideClipboardCleanup = await getSlideRailState(page)
 
   record(
