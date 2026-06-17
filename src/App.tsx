@@ -429,27 +429,20 @@ import {
   getCanvasGroupExpandedSelectionIds,
   getCanvasGroupedItemSelection,
   getCanvasGroupedItemPointerSelection,
-  getCanvasItemGroupIndexRange,
-  getCanvasItemGroupMemberIdsForGroup,
-  getCanvasItemPointerSelection,
   getCanvasMarqueeSelection,
   getCanvasMoveSnap,
   getCanvasSelectedItems,
   getCanvasSingleItemSelection,
   deleteCanvasSelectionItems,
   isAdditivePointerInput,
-  insertCanvasItemAtTargetPlacement,
   mapCanvasSelectionItems,
-  moveCanvasItemToTargetPlacement,
   moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
   removeCanvasSelectionIds,
   resizeCanvasSelection,
-  canSelectSameTypeCanvasItems,
   canTidyCanvasSelectionItems,
   flipCanvasSelectionItems,
-  selectSameTypeCanvasItems,
   tidyCanvasSelectionItems,
   type CanvasSnapGuides,
 } from 'canvas/foundation'
@@ -533,8 +526,15 @@ import {
 import { SAMPLE_PPT_DECK } from './pptSampleDeck'
 import {
   createPPTCanvasScene,
+  getPPTElementGroupIndexRange,
+  getPPTElementGroupMemberIds,
+  getPPTElementPointerSelection,
+  insertPPTSlideAtTargetPlacement,
+  movePPTSlideToTargetPlacement,
+  canSelectSameTypePPTElements,
   pptGeometryToBounds,
   pptCanvasTransformAdapter,
+  selectSameTypePPTElements,
 } from './pptCanvasAdapter'
 import {
   filterPPTCommandPaletteItems,
@@ -3117,12 +3117,11 @@ function App() {
 
       const id = createPPTSlideId(current)
       const slide = clonePPTSlide(source, id)
-      const result = insertCanvasItemAtTargetPlacement({
-        getItemId: (item) => item.id,
-        item: slide,
-        items: current.slides,
+      const result = insertPPTSlideAtTargetPlacement({
         placement: 'after',
-        targetItemId: activeSlide.id,
+        slide,
+        slides: current.slides,
+        targetSlideId: activeSlide.id,
       })
 
       if (!result) {
@@ -3178,12 +3177,11 @@ function App() {
 
       const targetSlide = current.slides[targetIndex]
       const result = targetSlide
-        ? moveCanvasItemToTargetPlacement({
-            getItemId: (slide) => slide.id,
-            itemId: activeSlide.id,
-            items: current.slides,
+        ? movePPTSlideToTargetPlacement({
             placement: delta > 0 ? 'after' : 'before',
-            targetItemId: targetSlide.id,
+            slideId: activeSlide.id,
+            slides: current.slides,
+            targetSlideId: targetSlide.id,
           })
         : null
 
@@ -3309,12 +3307,11 @@ function App() {
     placement: PPTSlideDropPlacement,
   ) {
     const currentDeck = deckRef.current
-    const reorderResult = moveCanvasItemToTargetPlacement({
-      getItemId: (slide) => slide.id,
-      itemId: sourceSlideId,
-      items: currentDeck.slides,
+    const reorderResult = movePPTSlideToTargetPlacement({
       placement,
-      targetItemId: targetSlideId,
+      slideId: sourceSlideId,
+      slides: currentDeck.slides,
+      targetSlideId,
     })
 
     if (!reorderResult) {
@@ -3335,12 +3332,11 @@ function App() {
     setLastSlideRailCommandEffect(effect)
 
     commitDeck((current) => {
-      const result = moveCanvasItemToTargetPlacement({
-        getItemId: (slide) => slide.id,
-        itemId: sourceSlideId,
-        items: current.slides,
+      const result = movePPTSlideToTargetPlacement({
         placement,
-        targetItemId: targetSlideId,
+        slideId: sourceSlideId,
+        slides: current.slides,
+        targetSlideId,
       })
 
       if (!result) {
@@ -5952,9 +5948,9 @@ function App() {
     captureCanvasPointerFromEvent(event)
 
     const additive = isAdditivePointerInput(event)
-    const pointerSelection = getCanvasItemPointerSelection({
+    const pointerSelection = getPPTElementPointerSelection({
       additive,
-      itemId: elementId,
+      elementId,
       scene,
       selection,
     })
@@ -10203,10 +10199,9 @@ function getPPTLayerPaneDropIndex(
   const targetGroupId = getPPTLayerPaneGroupIdFromRowId(targetObjectId)
 
   if (targetGroupId) {
-    const groupRange = getCanvasItemGroupIndexRange({
-      getItemGroupId: (element) => element.groupId,
+    const groupRange = getPPTElementGroupIndexRange({
+      elements: slide.elements,
       groupId: targetGroupId,
-      items: slide.elements,
     })
 
     if (!groupRange) {
@@ -10261,11 +10256,9 @@ function reorderPPTLayerPaneElement(
 ) {
   const groupId = getPPTLayerPaneGroupIdFromRowId(objectId)
   const selection = groupId
-    ? getCanvasItemGroupMemberIdsForGroup({
-      getItemGroupId: (element) => element.groupId,
-      getItemId: (element) => element.id,
+    ? getPPTElementGroupMemberIds({
+      elements,
       groupId,
-      items: elements,
     })
     : [objectId]
   const result = moveCanvasSelectionItemsToIndex({
@@ -14995,11 +14988,8 @@ function selectSameTypePPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ): string[] {
-  return selectSameTypeCanvasItems({
-    getItemId: (element) => element.id,
-    getItemType: getPPTElementTypeKey,
-    isItemSelectable: (element) => element.visible !== false,
-    items: elements,
+  return selectSameTypePPTElements({
+    elements,
     selection,
   })
 }
@@ -15008,21 +14998,10 @@ function canSelectSameTypePPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  return canSelectSameTypeCanvasItems({
-    getItemId: (element) => element.id,
-    getItemType: getPPTElementTypeKey,
-    isItemSelectable: (element) => element.visible !== false,
-    items: elements,
+  return canSelectSameTypePPTElements({
+    elements,
     selection,
   })
-}
-
-function getPPTElementTypeKey(element: PPTElement) {
-  if (element.kind === 'shape') {
-    return `shape:${element.shape}`
-  }
-
-  return 'Object'
 }
 
 function canFlipPPTSelection(
