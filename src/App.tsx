@@ -414,6 +414,7 @@ import {
   getCanvasViewportScreenPoint,
   handlePoint,
   normalizeBounds,
+  normalizeCanvasPointsToLocalBounds,
   pointDistance,
   unique,
   type Bounds,
@@ -16814,32 +16815,26 @@ function getPPTFreeformToolStyle(tool: PPTFreeformTool) {
 }
 
 function normalizePPTFreeformWorldPoints(points: Point[]) {
-  const safePoints = points.length > 0
-    ? points.map(clampPPTPointToSlide)
-    : [{ x: PPT_SLIDE_WIDTH / 2, y: PPT_SLIDE_HEIGHT / 2 }]
-  const left = Math.min(...safePoints.map((point) => point.x))
-  const top = Math.min(...safePoints.map((point) => point.y))
-  const right = Math.max(...safePoints.map((point) => point.x))
-  const bottom = Math.max(...safePoints.map((point) => point.y))
-  const padding = 8
-  const rawWidth = right - left
-  const rawHeight = bottom - top
-  const width = Math.max(16, rawWidth + padding * 2)
-  const height = Math.max(16, rawHeight + padding * 2)
-  const x = clamp(left - Math.max(padding, (width - rawWidth) / 2), 0, PPT_SLIDE_WIDTH - width)
-  const y = clamp(top - Math.max(padding, (height - rawHeight) / 2), 0, PPT_SLIDE_HEIGHT - height)
+  const normalized = normalizeCanvasPointsToLocalBounds({
+    fallbackPoint: {
+      x: PPT_SLIDE_WIDTH / 2,
+      y: PPT_SLIDE_HEIGHT / 2,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    minHeight: 16,
+    minWidth: 16,
+    padding: 8,
+    points,
+  })
 
   return {
-    geometry: {
-      h: height,
-      w: width,
-      x,
-      y,
-    },
-    points: safePoints.map((point) => ({
-      x: point.x - x,
-      y: point.y - y,
-    })),
+    geometry: normalized.bounds,
+    points: normalized.points,
   }
 }
 
