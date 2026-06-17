@@ -8481,6 +8481,74 @@ async function runTableImportScenario(page) {
     afterToolbarInsert,
   })
 
+  await page.eval(`(() => {
+    window.__pptTableClipboardItemTypes = []
+    window.__pptTableClipboardWriteCount = 0
+    window.__pptTableClipboardHTML = ''
+    window.__pptTableClipboardJSON = ''
+    window.__pptTableClipboardPlainText = ''
+
+    window.ClipboardItem = class PPTTableClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptTableClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptTableClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain') ?? ''
+
+          window.__pptTableClipboardHTML = await item.items['text/html'].text()
+          window.__pptTableClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptTableClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+  await page.eval(`document.querySelector('[data-ppt-copy-table]')?.click()`)
+  await delay(120)
+
+  const afterCopyTable = await getPPTTableState(page)
+  const tableClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptTableClipboardHTML ?? '',
+    itemTypes: window.__pptTableClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptTableClipboardJSON ?? '',
+    plainText: window.__pptTableClipboardPlainText ?? '',
+    writeCount: window.__pptTableClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies selected PPT table as HTML and TSV through canvas rich clipboard writer',
+    afterCopyTable.tableClipboardModel === 'canvas-rich-table-clipboard' &&
+      afterCopyTable.tableClipboardObject === afterInspectorEdit.selectedId &&
+      afterCopyTable.tableClipboardRows === 3 &&
+      afterCopyTable.tableClipboardCols === 3 &&
+      afterCopyTable.tableClipboardWriteMode === 'clipboard-item' &&
+      tableClipboardWrite.writeCount === 1 &&
+      tableClipboardWrite.itemTypes.includes(afterCopyTable.tableClipboardJsonMimeType) &&
+      tableClipboardWrite.itemTypes.includes('text/html') &&
+      tableClipboardWrite.itemTypes.includes('text/plain') &&
+      tableClipboardWrite.html.includes('<table') &&
+      tableClipboardWrite.html.includes('<th>Metric</th>') &&
+      tableClipboardWrite.html.includes('<td>45%</td>') &&
+      tableClipboardWrite.plainText.includes('Revenue\t10\t12') &&
+      tableClipboardWrite.plainText.includes('Margin\t42%\t45%') &&
+      tableClipboardWrite.json.includes('"kind": "interactive-os.ppt.table-export"'),
+    {
+      afterCopyTable,
+      afterInspectorEdit,
+      tableClipboardWrite,
+    },
+  )
+
   await pressKey(page, {
     code: 'KeyK',
     key: 'k',
@@ -12339,6 +12407,15 @@ function getPPTTableState(page) {
       tableImportModel: stage?.getAttribute('data-ppt-table-import-model') ?? '',
       tableImportName: stage?.getAttribute('data-ppt-table-import-name') ?? '',
       tableImportRows: Number(stage?.getAttribute('data-ppt-table-import-rows') ?? 0),
+      tableClipboardCols: Number(stage?.getAttribute('data-ppt-table-clipboard-cols') ?? 0),
+      tableClipboardHtmlLength: Number(stage?.getAttribute('data-ppt-table-clipboard-html-length') ?? 0),
+      tableClipboardJsonMimeType: stage?.getAttribute('data-ppt-table-clipboard-json-mime-type') ?? '',
+      tableClipboardModel: stage?.getAttribute('data-ppt-table-clipboard-model') ?? '',
+      tableClipboardObject: stage?.getAttribute('data-ppt-table-clipboard-object') ?? '',
+      tableClipboardPlainTextLength: Number(stage?.getAttribute('data-ppt-table-clipboard-plain-text-length') ?? 0),
+      tableClipboardRows: Number(stage?.getAttribute('data-ppt-table-clipboard-rows') ?? 0),
+      tableClipboardSourceSlide: stage?.getAttribute('data-ppt-table-clipboard-source-slide') ?? '',
+      tableClipboardWriteMode: stage?.getAttribute('data-ppt-table-clipboard-write-mode') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,

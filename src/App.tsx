@@ -432,6 +432,7 @@ import {
   createPPTCanvasCssBoundsTransform,
   createPPTCanvasSvgFreehandPathData,
   createPPTCanvasSvgPathData,
+  escapePPTCanvasXmlAttribute,
 } from './pptCanvasRendererAdapter'
 import {
   PPT_COMMENT_THREAD_MODEL,
@@ -985,6 +986,11 @@ const PPT_SELECTION_SVG_CLIPBOARD_KIND =
 const PPT_SELECTION_SVG_CLIPBOARD_VERSION = 1
 const PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.selection-svg-export+json'
+const PPT_TABLE_CLIPBOARD_MODEL = 'canvas-rich-table-clipboard' as const
+const PPT_TABLE_CLIPBOARD_KIND = 'interactive-os.ppt.table-export' as const
+const PPT_TABLE_CLIPBOARD_VERSION = 1
+const PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.table-export+json'
 const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
@@ -1033,6 +1039,17 @@ type PPTSelectionSVGClipboardEffect = {
   selectedObjectIds: readonly string[]
   sourceSlideId: string
   svgLength: number
+  writeMode?: PPTRichClipboardWriteMode
+}
+type PPTTableClipboardEffect = {
+  columnCount: number
+  htmlLength: number
+  jsonMimeType: typeof PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE
+  model: typeof PPT_TABLE_CLIPBOARD_MODEL
+  objectId: string
+  plainTextLength: number
+  rowCount: number
+  sourceSlideId: string
   writeMode?: PPTRichClipboardWriteMode
 }
 type PPTStyleClipboardCategory =
@@ -2009,6 +2026,8 @@ function App() {
     useState<PPTSlideSVGClipboardEffect | null>(null)
   const [lastSelectionSVGClipboardEffect, setLastSelectionSVGClipboardEffect] =
     useState<PPTSelectionSVGClipboardEffect | null>(null)
+  const [lastTableClipboardEffect, setLastTableClipboardEffect] =
+    useState<PPTTableClipboardEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
@@ -2152,6 +2171,10 @@ function App() {
     () => selectedElements.filter(isPPTTextElement),
     [selectedElements],
   )
+  const selectedTableElement = selectedElements.length === 1 &&
+    selectedElements[0]?.kind === 'table'
+    ? selectedElements[0]
+    : null
   const selectedTextOverflow = selectedElement && isPPTTextElement(selectedElement)
     ? textOverflowById[selectedElement.id] === true
     : false
@@ -5658,6 +5681,45 @@ function App() {
     })
   }
 
+  function copySelectedTable() {
+    if (!selectedTableElement) {
+      return
+    }
+
+    const html = createPPTTableClipboardHTML(selectedTableElement)
+    const plainText = stringifyPPTTableRows(selectedTableElement.rows)
+    const effect = createPPTTableClipboardEffect({
+      html,
+      objectId: selectedTableElement.id,
+      plainText,
+      rows: selectedTableElement.rows,
+      sourceSlideId: activeSlide.id,
+      writeMode: 'pending',
+    })
+
+    setLastTableClipboardEffect(effect)
+
+    void writePPTTableClipboard({
+      html,
+      objectId: selectedTableElement.id,
+      plainText,
+      rows: selectedTableElement.rows,
+      sourceSlideId: activeSlide.id,
+    }).then((writeMode) => {
+      setLastTableClipboardEffect((current) =>
+        current &&
+        current.sourceSlideId === effect.sourceSlideId &&
+        current.objectId === effect.objectId &&
+        current.htmlLength === effect.htmlLength &&
+        current.plainTextLength === effect.plainTextLength
+          ? {
+              ...current,
+              writeMode,
+            }
+          : current)
+    })
+  }
+
   function downloadSelectionSVG() {
     if (!selectionSvgCode) {
       return
@@ -7223,6 +7285,12 @@ function App() {
     section: 'Create',
     title: 'Add table',
   }, {
+    disabled: !selectedTableElement,
+    id: 'table:copy',
+    onSelect: copySelectedTable,
+    section: 'Edit',
+    title: 'Copy table',
+  }, {
     id: 'slide:add',
     onSelect: addSlide,
     section: 'Slides',
@@ -7635,6 +7703,17 @@ function App() {
           <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
             <Table2 size={17} />
           </button>
+          <button
+            {...PPT_TOOLBAR_ITEM_PROPS}
+            className="ppt-icon-button"
+            data-ppt-copy-table
+            disabled={!selectedTableElement}
+            onClick={copySelectedTable}
+            title="Copy table"
+            type="button"
+          >
+            <Copy size={17} />
+          </button>
           <input
             accept="image/*"
             className="ppt-file-input"
@@ -7889,6 +7968,15 @@ function App() {
         data-ppt-selection-svg-clipboard-source-slide={lastSelectionSVGClipboardEffect?.sourceSlideId}
         data-ppt-selection-svg-clipboard-svg-length={lastSelectionSVGClipboardEffect?.svgLength}
         data-ppt-selection-svg-clipboard-write-mode={lastSelectionSVGClipboardEffect?.writeMode}
+        data-ppt-table-clipboard-cols={lastTableClipboardEffect?.columnCount}
+        data-ppt-table-clipboard-html-length={lastTableClipboardEffect?.htmlLength}
+        data-ppt-table-clipboard-json-mime-type={lastTableClipboardEffect?.jsonMimeType}
+        data-ppt-table-clipboard-model={lastTableClipboardEffect?.model}
+        data-ppt-table-clipboard-object={lastTableClipboardEffect?.objectId}
+        data-ppt-table-clipboard-plain-text-length={lastTableClipboardEffect?.plainTextLength}
+        data-ppt-table-clipboard-rows={lastTableClipboardEffect?.rowCount}
+        data-ppt-table-clipboard-source-slide={lastTableClipboardEffect?.sourceSlideId}
+        data-ppt-table-clipboard-write-mode={lastTableClipboardEffect?.writeMode}
         data-ppt-rich-clipboard-formats={lastRichClipboardEffect?.formats.join(' ')}
         data-ppt-rich-clipboard-import-format={lastRichClipboardEffect?.importFormat}
         data-ppt-rich-clipboard-imported={lastRichClipboardEffect?.imported ? 'true' : undefined}
@@ -9965,6 +10053,34 @@ function createPPTSelectionSVGClipboardEffect({
   }
 }
 
+function createPPTTableClipboardEffect({
+  html,
+  objectId,
+  plainText,
+  rows,
+  sourceSlideId,
+  writeMode,
+}: {
+  html: string
+  objectId: string
+  plainText: string
+  rows: readonly (readonly string[])[]
+  sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
+}): PPTTableClipboardEffect {
+  return {
+    columnCount: getPPTTableColumnCount(rows),
+    htmlLength: html.length,
+    jsonMimeType: PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE,
+    model: PPT_TABLE_CLIPBOARD_MODEL,
+    objectId,
+    plainTextLength: plainText.length,
+    rowCount: rows.length,
+    sourceSlideId,
+    writeMode,
+  }
+}
+
 function createPPTRichClipboardExportPayload(
   payload: PPTClipboardPayload,
 ): PPTRichClipboardExportPayload {
@@ -10076,6 +10192,39 @@ async function writePPTSelectionSVGClipboard({
     jsonMimeType: PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE,
     plainText: svg,
     selectionSvg: svg,
+  })
+}
+
+async function writePPTTableClipboard({
+  html,
+  objectId,
+  plainText,
+  rows,
+  sourceSlideId,
+}: {
+  html: string
+  objectId: string
+  plainText: string
+  rows: readonly (readonly string[])[]
+  sourceSlideId: string
+}): Promise<PPTRichClipboardWriteMode> {
+  const json = stringifyPPTCanvasRichClipboardPayload({
+    kind: PPT_TABLE_CLIPBOARD_KIND,
+    metadata: {
+      columnCount: getPPTTableColumnCount(rows),
+      objectId,
+      rowCount: rows.length,
+      sourceSlideId,
+    },
+    rows,
+    version: PPT_TABLE_CLIPBOARD_VERSION,
+  })
+
+  return writePPTCanvasRichClipboardPayload({
+    html,
+    json,
+    jsonMimeType: PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE,
+    plainText,
   })
 }
 
@@ -12149,6 +12298,22 @@ function PPTTableView({ element }: { element: PPTTable }) {
       )}
     </div>
   )
+}
+
+function createPPTTableClipboardHTML(element: PPTTable) {
+  const rows = normalizePPTTableRows(element.rows)
+  const [header = [], ...bodyRows] = rows
+  const headerHTML = header.length > 0
+    ? `<thead><tr>${header.map((cell) =>
+        `<th>${escapePPTCanvasXmlAttribute(cell)}</th>`).join('')}</tr></thead>`
+    : ''
+  const bodyHTML = bodyRows.length > 0
+    ? `<tbody>${bodyRows.map((row) =>
+        `<tr>${row.map((cell) =>
+          `<td>${escapePPTCanvasXmlAttribute(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`
+    : ''
+
+  return `<table data-ppt-table-export="${escapePPTCanvasXmlAttribute(element.id)}">${headerHTML}${bodyHTML}</table>`
 }
 
 function PPTTextBodyView({ body }: { body: PPTTextBody }) {
