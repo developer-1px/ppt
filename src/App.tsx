@@ -352,6 +352,11 @@ import {
 } from 'canvas/app/keyboard-command-shortcuts'
 import { isCanvasKeyboardTypingTarget } from 'canvas/app/keyboard-shortcut-intent'
 import {
+  CANVAS_KEYBOARD_NUDGE_INTENT_MODEL,
+  CANVAS_KEYBOARD_NUDGE_KEYS,
+  CANVAS_KEYBOARD_NUDGE_LARGE_STEP,
+  CANVAS_KEYBOARD_NUDGE_MODEL,
+  CANVAS_KEYBOARD_NUDGE_STEP,
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
 import {
@@ -7826,11 +7831,11 @@ function App() {
           ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
           : undefined}
         data-ppt-keyboard-nudge-enabled={commandAvailability.nudge ? 'true' : 'false'}
-        data-ppt-keyboard-nudge-intent="canvas-keyboard-nudge-shortcut-intent"
-        data-ppt-keyboard-nudge-keys="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"
-        data-ppt-keyboard-nudge-large-step="10"
-        data-ppt-keyboard-nudge-model="canvas-keyboard-nudge-shortcuts"
-        data-ppt-keyboard-nudge-step="1"
+        data-ppt-keyboard-nudge-intent={CANVAS_KEYBOARD_NUDGE_INTENT_MODEL}
+        data-ppt-keyboard-nudge-keys={CANVAS_KEYBOARD_NUDGE_KEYS}
+        data-ppt-keyboard-nudge-large-step={String(CANVAS_KEYBOARD_NUDGE_LARGE_STEP)}
+        data-ppt-keyboard-nudge-model={CANVAS_KEYBOARD_NUDGE_MODEL}
+        data-ppt-keyboard-nudge-step={String(CANVAS_KEYBOARD_NUDGE_STEP)}
         data-ppt-arrow-tool-model="canvas-arrow-tool"
         data-ppt-arrow-tool-shortcut="L"
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
