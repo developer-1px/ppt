@@ -299,102 +299,114 @@ import {
   type SlideEditTransitionUpdateCommand,
 } from '@interactive-os/slide-edit-affordance'
 import {
-  cancelCanvasAnimationFrameTask,
-  scheduleCanvasAnimationFrameTask,
-} from 'canvas/app/animation-frame-task'
-import {
-  CANVAS_COMMAND_PALETTE_ITEMS_MODEL,
-  filterCanvasCommandPaletteItems,
-  type CanvasCommandPaletteItem,
-} from 'canvas/app/command-palette-items'
-import {
-  getCanvasCommandPaletteKeyboardIntent,
-} from 'canvas/app/command-palette-keyboard'
-import { getCanvasClientViewportSize } from 'canvas/app/client-viewport-size'
-import {
-  getCanvasContextMenuKeyboardIntent,
-  getCanvasContextMenuPosition,
-} from 'canvas/app/context-menu-position'
-import {
-  getCanvasDataTransferText,
-  setCanvasDataTransferDropEffect,
-  setCanvasDataTransferText,
-} from 'canvas/app/data-transfer-text'
-import {
-  cancelCanvasDeferredFocus,
-  focusCanvasElement,
-  focusCanvasElementBySelectorOnNextFrame,
-  focusCanvasElementOnNextFrame,
-} from 'canvas/app/deferred-focus'
-import {
-  getCanvasEditableFieldKeyboardIntent,
-} from 'canvas/app/editable-field-keyboard'
-import {
-  getCanvasPresentationKeyboardIntent,
-} from 'canvas/app/presentation-keyboard'
-import {
-  bindCanvasEventListener,
-  bindCanvasEventListeners,
-} from 'canvas/app/event-listener'
-import {
-  isCanvasControlTarget,
-  isCanvasTargetWithinSelector,
-  isCanvasWheelPassthroughTarget,
-} from 'canvas/app/interaction-target'
-import {
-  getCanvasFloatingAnchorForBounds,
-  type CanvasFloatingAnchor,
-} from 'canvas/app/floating-anchor'
-import {
-  getCanvasFindInputKeyboardIntent,
-} from 'canvas/app/find-replace-keyboard'
-import {
+  CANVAS_COMMENT_THREAD_MODEL,
   CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL,
-  isCanvasKeyboardCommandIntent,
-  runCanvasKeyboardCommandIntent,
-} from 'canvas/app/keyboard-command-dispatch'
-import {
   CANVAS_KEYBOARD_COMMAND_INTENT_MODEL,
-  getCanvasKeyboardBuiltinCommandShortcutIntent,
-} from 'canvas/app/keyboard-command-shortcuts'
-import { isCanvasKeyboardTypingTarget } from 'canvas/app/keyboard-shortcut-intent'
-import {
   CANVAS_KEYBOARD_NUDGE_INTENT_MODEL,
   CANVAS_KEYBOARD_NUDGE_KEYS,
   CANVAS_KEYBOARD_NUDGE_LARGE_STEP,
   CANVAS_KEYBOARD_NUDGE_MODEL,
   CANVAS_KEYBOARD_NUDGE_STEP,
-  getCanvasKeyboardNudgeShortcutIntent,
-} from 'canvas/app/keyboard-nudge-shortcuts'
-import {
-  CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
-  CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
-  getCanvasKeyboardSystemShortcutIntent,
-  shouldReleaseCanvasKeyboardTemporaryPan,
-} from 'canvas/app/keyboard-system-shortcuts'
-import {
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
-  getCanvasKeyboardToolShortcutIntent,
-} from 'canvas/app/keyboard-tool-shortcuts'
-import {
-  isCanvasKeyboardViewportIntent,
-  runCanvasKeyboardViewportIntent,
-} from 'canvas/app/keyboard-viewport-dispatch'
-import {
   CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_MODEL,
-  getCanvasKeyboardViewportShortcutIntent,
-} from 'canvas/app/keyboard-viewport-shortcuts'
-import {
   CANVAS_MENU_FOCUS_MODEL,
   CANVAS_MENU_ITEM_PROPS,
   CANVAS_MENU_KEYBOARD_KEYS,
   CANVAS_MENU_ROVING_FOCUS_MODEL,
+  CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
+  CANVAS_RADIO_GROUP_FOCUS_MODEL,
+  CANVAS_RADIO_GROUP_KEYBOARD_MODEL,
+  CANVAS_RADIO_GROUP_MODEL,
+  CANVAS_RESIZE_POINTER_MODIFIERS_MODEL,
   CANVAS_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL,
+  CANVAS_TABS_ROVING_FOCUS_MODEL,
+  CANVAS_TOOLBAR_FOCUS_MODEL,
+  CANVAS_TOOLBAR_ITEM_PROPS,
+  CANVAS_TOOLBAR_KEYBOARD_MODEL,
+  CANVAS_TOOLBAR_ROVING_FOCUS_MODEL,
+  bindCanvasEventListener,
+  bindCanvasEventListeners,
+  cancelCanvasAnimationFrameTask,
+  cancelCanvasDeferredFocus,
+  captureCanvasPointerFromEvent,
+  centerCanvasViewportAtWorldPoint,
+  createCanvasPastePositionKey,
+  createCanvasRichClipboardHTML,
+  createCanvasTabsDescriptor,
+  downloadCanvasTextFile,
+  fitCanvasViewportToBounds,
+  focusCanvasElement,
+  focusCanvasElementBySelectorOnNextFrame,
+  focusCanvasElementOnNextFrame,
+  getCanvasClientViewportSize,
+  getCanvasCommandPaletteKeyboardIntent,
+  getCanvasContextMenuKeyboardIntent,
+  getCanvasContextMenuPosition,
+  getCanvasDataTransferText,
+  getCanvasEditableFieldKeyboardIntent,
+  getCanvasFindInputKeyboardIntent,
+  getCanvasFloatingAnchorForBounds,
+  getCanvasInlineEditKeyboardIntent,
+  getCanvasKeyboardBuiltinCommandShortcutIntent,
+  getCanvasKeyboardNudgeShortcutIntent,
+  getCanvasKeyboardSystemShortcutIntent,
+  getCanvasKeyboardToolShortcutIntent,
+  getCanvasKeyboardViewportShortcutIntent,
   getCanvasMenuTriggerKeyboardIntent,
+  getCanvasModalBackdropPointerIntent,
+  getCanvasModalKeyboardIntent,
+  getCanvasPasteOffsetForBounds,
+  getCanvasPastePositionSession,
+  getCanvasPresentationKeyboardIntent,
+  getCanvasPointerLocalGeometry,
+  getCanvasPointerTransformModifierState,
+  getCanvasRadioTabIndex,
+  getCanvasResizeHandleDoubleClickIntent,
+  getCanvasSelectionListModifierState,
+  getCanvasTabsKeyboardIntent,
+  getCanvasWorldClientPoint,
+  handleCanvasRadioGroupKeyDown,
+  isCanvasControlTarget,
+  isCanvasKeyboardCommandIntent,
+  isCanvasKeyboardToolIntent,
+  isCanvasKeyboardTypingTarget,
+  isCanvasKeyboardViewportIntent,
+  isCanvasTargetWithinSelector,
+  isCanvasWheelPassthroughTarget,
+  measureCanvasElementOverflow,
+  measureCanvasTextBlocks,
+  readCanvasRichClipboardFromDataTransfer,
+  resetCanvasViewport,
+  runCanvasKeyboardCommandIntent,
+  runCanvasKeyboardToolIntent,
+  runCanvasKeyboardViewportIntent,
+  scheduleCanvasAnimationFrameTask,
+  scheduleCanvasTimeoutTask,
+  setCanvasDataTransferDropEffect,
+  setCanvasDataTransferText,
+  shouldReleaseCanvasKeyboardTemporaryPan,
+  stringifyCanvasRichClipboardPayload,
+  trapCanvasModalTabFocus,
   useCanvasMenuRovingFocus,
-} from 'canvas/app/menu-roving-focus'
-import { getCanvasSelectionListModifierState } from 'canvas/app/selection-list-range'
+  useCanvasModalFocusLifecycle,
+  useCanvasToolbarRovingFocus,
+  writeCanvasClipboardText,
+  writeCanvasRichClipboardPayload,
+  zoomCanvasViewport,
+  type CanvasFloatingAnchor,
+  type CanvasKeyboardToolIntent,
+  type CanvasPastePositionMemory,
+  type CanvasPointerClickMemory,
+  type CanvasRichClipboardReadFormat,
+  type CanvasRichClipboardWriteMode,
+  type CanvasTabsDescriptor,
+} from 'canvas/app'
+import {
+  CANVAS_COMMAND_PALETTE_ITEMS_MODEL,
+  filterCanvasCommandPaletteItems,
+  type CanvasCommandPaletteItem,
+} from 'canvas/app/command-palette-items'
 import {
   CANVAS_MINIMAP_READ_MODEL,
   getCanvasMinimapPointFromViewportOffset,
@@ -405,87 +417,36 @@ import {
   type CanvasMinimapSize,
 } from 'canvas/app/minimap-model'
 import {
-  CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
-  getCanvasModalBackdropPointerIntent,
-  getCanvasModalKeyboardIntent,
-  trapCanvasModalTabFocus,
-  useCanvasModalFocusLifecycle,
-} from 'canvas/app/modal-focus-lifecycle'
-import {
   CANVAS_PASTE_POSITION_MODEL,
-  createCanvasPastePositionKey,
-  getCanvasPasteOffsetForBounds,
-  getCanvasPastePositionSession,
-  type CanvasPastePositionMemory,
 } from 'canvas/app/paste-position'
 import { CANVAS_IMAGE_IMPORT_MODEL } from 'canvas/app/image-import'
 import { CANVAS_MEDIA_IMPORT_MODEL } from 'canvas/app/media-import'
 import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
-import { writeCanvasClipboardText } from 'canvas/app/clipboard-text'
-import { downloadCanvasTextFile } from 'canvas/app/file-download'
-import {
-  createCanvasRichClipboardHTML,
-  readCanvasRichClipboardFromDataTransfer,
-  stringifyCanvasRichClipboardPayload,
-  writeCanvasRichClipboardPayload,
-  type CanvasRichClipboardReadFormat,
-  type CanvasRichClipboardWriteMode,
-} from 'canvas/app/rich-clipboard'
-import {
-  CANVAS_COMMENT_THREAD_MODEL,
-  isCanvasKeyboardToolIntent,
-  runCanvasKeyboardToolIntent,
-  type CanvasKeyboardToolIntent,
-} from 'canvas/app'
 import {
   CANVAS_TEXT_PASTE_IMPORT_MODEL,
   getCanvasTextPasteSourcesFromDataTransfer,
 } from 'canvas/app/text-paste-import'
-import { scheduleCanvasTimeoutTask } from 'canvas/app/timeout-task'
+import {
+  CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
+  CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
+} from 'canvas/app/keyboard-system-shortcuts'
 import {
   CANVAS_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER,
   CANVAS_WHEEL_VIEWPORT_MODEL,
   CANVAS_WHEEL_VIEWPORT_PAN_MODE,
   CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER,
-  centerCanvasViewportAtWorldPoint,
-  fitCanvasViewportToBounds,
-  resetCanvasViewport,
-  zoomCanvasViewport,
 } from 'canvas/app/viewport-controls'
-import {
-  CANVAS_RADIO_GROUP_FOCUS_MODEL,
-  CANVAS_RADIO_GROUP_KEYBOARD_MODEL,
-  CANVAS_RADIO_GROUP_MODEL,
-  getCanvasRadioTabIndex,
-  handleCanvasRadioGroupKeyDown,
-} from 'canvas/app/radio-group'
-import {
-  CANVAS_TABS_ROVING_FOCUS_MODEL,
-  createCanvasTabsDescriptor,
-  getCanvasTabsKeyboardIntent,
-  type CanvasTabsDescriptor,
-} from 'canvas/app/tabs-roving-focus'
 import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import {
   CANVAS_INLINE_EDIT_DOM_MODEL,
-  getCanvasInlineEditKeyboardIntent,
   inlineEditHistoryDirectionFromInputType,
   insertInlineEditText,
   isInlineEditLineBreakInput,
 } from 'canvas/app/inline-edit-dom'
 import {
-  measureCanvasElementOverflow,
-  measureCanvasTextBlocks,
-} from 'canvas/app/text-measurement-dom'
-import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
-  getCanvasResizeHandleDoubleClickIntent,
-  type CanvasPointerClickMemory,
 } from 'canvas/app/pointer-click-memory'
-import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
 import {
-  getCanvasPointerLocalGeometry,
-  getCanvasWorldClientPoint,
   screenPoint as getCanvasPointerScreenPoint,
 } from 'canvas/app/pointer-geometry'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
@@ -500,18 +461,7 @@ import {
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
 } from 'canvas/app/pointer-pan-interaction'
-import {
-  CANVAS_RESIZE_POINTER_MODIFIERS_MODEL,
-  getCanvasPointerTransformModifierState,
-} from 'canvas/app/pointer-input'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
-import {
-  CANVAS_TOOLBAR_FOCUS_MODEL,
-  CANVAS_TOOLBAR_ITEM_PROPS,
-  CANVAS_TOOLBAR_KEYBOARD_MODEL,
-  CANVAS_TOOLBAR_ROVING_FOCUS_MODEL,
-  useCanvasToolbarRovingFocus,
-} from 'canvas/app/toolbar-roving-focus'
 import {
   RESIZE_HANDLES,
   clamp,
