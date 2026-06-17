@@ -1052,6 +1052,11 @@ const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-style' as const
 const PPT_TEXT_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-style+json'
+const PPT_LINE_STYLE_IMPORT_MODEL = 'ppt-line-style-import' as const
+const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-line-style' as const
+const PPT_LINE_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.line-style+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1290,6 +1295,16 @@ type PPTTextStyleImportSource = {
   paragraph?: PPTTextStyleImportParagraph
   text?: PPTTextStyleImportText
 }
+type PPTLineStyleImportField =
+  | 'color'
+  | 'dash'
+  | 'width'
+type PPTLineStyleImportSource = {
+  fields: readonly PPTLineStyleImportField[]
+  format: typeof PPT_LINE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  stroke: Partial<PPTStroke>
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1488,6 +1503,20 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingBefore: string
   textInset: string
   verticalAlign: string
+}
+type PPTLineStyleImportEffect = {
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  format: typeof PPT_LINE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_LINE_STYLE_IMPORT_MODEL
+  objectIds: string
+  strokeColor: string
+  strokeDash: string
+  strokeWidth: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2528,6 +2557,8 @@ function App() {
     useState<PPTShapeStyleImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
     useState<PPTTextStyleImportEffect | null>(null)
+  const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
+    useState<PPTLineStyleImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3481,6 +3512,14 @@ function App() {
         getPPTShapeStyleSourceFromDataTransfer(event.clipboardData)
 
       if (shapeStyleSource && pastePPTShapeStyleSource(shapeStyleSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const lineStyleSource =
+        getPPTLineStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (lineStyleSource && pastePPTLineStyleSource(lineStyleSource)) {
         event.preventDefault()
         return
       }
@@ -4592,6 +4631,82 @@ function App() {
     setStyleClipboard(styleClipboard)
     setLastStyleClipboardEffect(effect)
     setLastShapeStyleImportEffect(createPPTShapeStyleImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTLineStyleSource(source: PPTLineStyleImportSource) {
+    const lineStyleElements = selectedElements.filter(isPPTLineStyleTargetElement)
+
+    if (lineStyleElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = lineStyleElements[0]
+    const currentStroke = getPPTElementStroke(sourceElement) ??
+      normalizePPTStroke({})
+    const stroke = normalizePPTStroke({
+      ...currentStroke,
+      ...source.stroke,
+    })
+    const styleClipboard: PPTStyleClipboard = {
+      categories: ['object', 'stroke'],
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      sourceId: 'ppt-line-style-json',
+      sourceKind: sourceElement.kind,
+      stroke,
+      type: 'slide-style-clipboard',
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(lineStyleElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastLineStyleImportEffect(createPPTLineStyleImportEffect({
       effect,
       source,
     }))
@@ -10103,6 +10218,18 @@ function App() {
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
         data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
         data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
+        data-ppt-line-style-import-categories={lastLineStyleImportEffect?.categories}
+        data-ppt-line-style-import-command={lastLineStyleImportEffect?.commandId}
+        data-ppt-line-style-import-command-targets={lastLineStyleImportEffect?.commandTargets}
+        data-ppt-line-style-import-command-type={lastLineStyleImportEffect?.commandType}
+        data-ppt-line-style-import-fields={lastLineStyleImportEffect?.fields}
+        data-ppt-line-style-import-format={lastLineStyleImportEffect?.format}
+        data-ppt-line-style-import-json-length={lastLineStyleImportEffect?.jsonLength}
+        data-ppt-line-style-import-model={lastLineStyleImportEffect?.model}
+        data-ppt-line-style-import-objects={lastLineStyleImportEffect?.objectIds}
+        data-ppt-line-style-import-stroke-color={lastLineStyleImportEffect?.strokeColor}
+        data-ppt-line-style-import-stroke-dash={lastLineStyleImportEffect?.strokeDash}
+        data-ppt-line-style-import-stroke-width={lastLineStyleImportEffect?.strokeWidth}
         data-ppt-object-metadata-import-alt-text-length={lastObjectMetadataImportEffect?.altTextLength}
         data-ppt-object-metadata-import-alt-text-present={lastObjectMetadataImportEffect?.altTextPresent}
         data-ppt-object-metadata-import-command-fields={lastObjectMetadataImportEffect?.commandFields}
@@ -12939,6 +13066,42 @@ function getPPTTextStyleImportParagraph(
   }
 }
 
+function createPPTLineStyleImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTLineStyleImportSource
+}): PPTLineStyleImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+
+  return {
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_LINE_STYLE_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+    strokeColor: source.stroke.color ?? '',
+    strokeDash: source.stroke.dash ?? '',
+    strokeWidth: source.stroke.width === undefined
+      ? ''
+      : String(source.stroke.width),
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -14432,6 +14595,161 @@ function getPPTShapeStyleCornerRadiusFromJSONValue(value: unknown) {
   }
 
   return normalizePPTShapeCornerRadius(value)
+}
+
+function getPPTLineStyleSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_LINE_STYLE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTLineStyleSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTLineStyleSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTLineStyleImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTLineStyleSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTLineStyleSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTLineStyleImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.lineStyle)
+    ? value.lineStyle
+    : isPPTRecord(value) && isPPTRecord(value.stroke)
+      ? value.stroke
+      : allowDirect
+        ? value
+        : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const strokeValue = isPPTRecord(payloadValue.stroke)
+    ? payloadValue.stroke
+    : payloadValue
+  const stroke: Partial<PPTStroke> = {}
+  const fields: PPTLineStyleImportField[] = []
+  const color = getPPTLineStyleColorFromJSONValue(
+    strokeValue.color ?? strokeValue.strokeColor,
+  )
+  const width = getPPTLineStyleWidthFromJSONValue(
+    strokeValue.width ?? strokeValue.strokeWidth,
+  )
+  const dash = getPPTLineStyleDashFromJSONValue(
+    strokeValue.dash ?? strokeValue.strokeDash,
+  )
+
+  if (color !== undefined) {
+    stroke.color = color
+    fields.push('color')
+  }
+
+  if (width !== undefined) {
+    stroke.width = width
+    fields.push('width')
+  }
+
+  if (dash !== undefined) {
+    stroke.dash = dash
+    fields.push('dash')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_LINE_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        stroke,
+      }
+    : null
+}
+
+function getPPTLineStyleColorFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  return normalizePPTSwatchColor(value) || undefined
+}
+
+function getPPTLineStyleWidthFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTStrokeWidth(value)
+}
+
+function getPPTLineStyleDashFromJSONValue(
+  value: unknown,
+): PPTStrokeDash | undefined {
+  return typeof value === 'string' && isPPTStrokeDash(value)
+    ? normalizePPTStrokeDash(value)
+    : undefined
 }
 
 function getPPTTextStyleSourceFromDataTransfer(
@@ -21289,6 +21607,14 @@ function canCopyPPTElementFormatting(element: PPTElement | undefined) {
     element.locked !== true &&
     element.visible !== false &&
     createPPTStyleClipboard(element) !== null
+}
+
+function isPPTLineStyleTargetElement(
+  element: PPTElement,
+): element is PPTShape | PPTLine | PPTFreeform {
+  return element.kind === 'shape' ||
+    element.kind === 'line' ||
+    element.kind === 'freeform'
 }
 
 function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null {

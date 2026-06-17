@@ -12191,6 +12191,63 @@ async function runLineAffordanceScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      lineStyle: {
+        stroke: {
+          color: '#0f766e',
+          dash: 'dash',
+          width: 5,
+        },
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterLineStylePaste = await getPPTLineState(page)
+
+  record(
+    'pastes JSON line style into selected PPT line',
+    afterLineStylePaste.selectedId === beforeLineFormatPaste.selectedId &&
+      afterLineStylePaste.selectedName === beforeLineFormatPaste.selectedName &&
+      afterLineStylePaste.lineStyleImportModel === 'ppt-line-style-import' &&
+      afterLineStylePaste.lineStyleImportFormat === 'application-json-ppt-line-style' &&
+      afterLineStylePaste.lineStyleImportCommand === 'paste-object-formatting' &&
+      afterLineStylePaste.lineStyleImportCommandTargets === afterLineStylePaste.selectedId &&
+      afterLineStylePaste.lineStyleImportCommandType === 'slide-command-effect' &&
+      afterLineStylePaste.lineStyleImportObjects === afterLineStylePaste.selectedId &&
+      afterLineStylePaste.lineStyleImportCategories.includes('object-effect') &&
+      afterLineStylePaste.lineStyleImportCategories.includes('line-style') &&
+      afterLineStylePaste.lineStyleImportFields === 'color width dash' &&
+      afterLineStylePaste.lineStyleImportStrokeColor === '#0f766e' &&
+      afterLineStylePaste.lineStyleImportStrokeDash === 'dash' &&
+      afterLineStylePaste.lineStyleImportStrokeWidth === '5' &&
+      Number(afterLineStylePaste.lineStyleImportJsonLength) > 60 &&
+      afterLineStylePaste.stroke === '#0f766e' &&
+      afterLineStylePaste.strokeWidth === '5' &&
+      afterLineStylePaste.selectedDash === 'dash' &&
+      afterLineStylePaste.strokeDasharray !== '' &&
+      afterLineStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      afterLineStylePaste.styleClipboardCommandTargets === afterLineStylePaste.selectedId &&
+      afterLineStylePaste.styleClipboardCommandType === 'slide-command-effect' &&
+      afterLineStylePaste.styleClipboardCommandApplications.includes(afterLineStylePaste.selectedId) &&
+      afterLineStylePaste.styleClipboardCommandApplications.includes('line-style'),
+    {
+      afterLineFormatPaste,
+      afterLineStylePaste,
+      beforeLineFormatPaste,
+    },
+  )
+
   await pressKey(page, {
     code: 'Delete',
     key: 'Delete',
@@ -12200,6 +12257,8 @@ async function runLineAffordanceScenario(page) {
 
   await page.eval(`document.querySelector(${JSON.stringify(`[data-ppt-layer-select="${lineId}"]`)})?.click()`)
   await delay(50)
+  await page.eval(`document.querySelector('[data-ppt-command="copy-formatting"]')?.click()`)
+  await delay(80)
 
   await page.eval(`(() => {
     const route = document.querySelector('[data-ppt-style-field="line-route"]')
@@ -15572,6 +15631,18 @@ function getPPTLineState(page, elementId = null) {
       descriptorCommand: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
       descriptorControl: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-control') ?? '',
       descriptorSurface: lineStrokeDashField?.getAttribute('data-ppt-stroke-line-style-surface') ?? '',
+      lineStyleImportCategories: stage?.getAttribute('data-ppt-line-style-import-categories') ?? '',
+      lineStyleImportCommand: stage?.getAttribute('data-ppt-line-style-import-command') ?? '',
+      lineStyleImportCommandTargets: stage?.getAttribute('data-ppt-line-style-import-command-targets') ?? '',
+      lineStyleImportCommandType: stage?.getAttribute('data-ppt-line-style-import-command-type') ?? '',
+      lineStyleImportFields: stage?.getAttribute('data-ppt-line-style-import-fields') ?? '',
+      lineStyleImportFormat: stage?.getAttribute('data-ppt-line-style-import-format') ?? '',
+      lineStyleImportJsonLength: stage?.getAttribute('data-ppt-line-style-import-json-length') ?? '',
+      lineStyleImportModel: stage?.getAttribute('data-ppt-line-style-import-model') ?? '',
+      lineStyleImportObjects: stage?.getAttribute('data-ppt-line-style-import-objects') ?? '',
+      lineStyleImportStrokeColor: stage?.getAttribute('data-ppt-line-style-import-stroke-color') ?? '',
+      lineStyleImportStrokeDash: stage?.getAttribute('data-ppt-line-style-import-stroke-dash') ?? '',
+      lineStyleImportStrokeWidth: stage?.getAttribute('data-ppt-line-style-import-stroke-width') ?? '',
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
       lineTool: stage?.getAttribute('data-line-tool') ?? '',
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
@@ -15590,6 +15661,10 @@ function getPPTLineState(page, elementId = null) {
       stroke: selectedStrokeElement?.getAttribute('stroke') ?? '',
       strokeDasharray: selectedStrokeElement?.getAttribute('stroke-dasharray') ?? '',
       strokeWidth: selectedStrokeElement?.getAttribute('stroke-width') ?? '',
+      styleClipboardCommand: stage?.getAttribute('data-ppt-style-clipboard-command') ?? '',
+      styleClipboardCommandApplications: stage?.getAttribute('data-ppt-style-clipboard-command-applications') ?? '',
+      styleClipboardCommandTargets: stage?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
+      styleClipboardCommandType: stage?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
       thumbDash: document.querySelector(\`.ppt-thumb[aria-current="page"] [data-ppt-thumb-element="\${selected?.getAttribute('data-ppt-element') ?? ''}"]\`)?.getAttribute('data-ppt-thumb-stroke-dash') ?? '',
       thumbLineCount: document.querySelectorAll('.ppt-thumb-line').length,
       endpointHandleCount: document.querySelectorAll('[data-ppt-line-endpoint]').length,
