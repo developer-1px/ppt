@@ -1042,6 +1042,11 @@ const PPT_IMAGE_CROP_JSON_IMPORT_FORMAT =
   'application-json-ppt-image-crop' as const
 const PPT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.image-crop+json'
+const PPT_SHAPE_STYLE_IMPORT_MODEL = 'ppt-shape-style-import' as const
+const PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-shape-style' as const
+const PPT_SHAPE_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.shape-style+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1237,6 +1242,20 @@ type PPTImageCropImportSource = {
   }
   jsonLength: number
 }
+type PPTShapeStyleImportField =
+  | 'cornerRadius'
+  | 'fill'
+  | 'stroke'
+type PPTShapeStyleImportSource = {
+  fields: readonly PPTShapeStyleImportField[]
+  format: typeof PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  shape: {
+    cornerRadius?: number
+    fill?: PPTFill
+    stroke?: PPTStroke
+  }
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1396,6 +1415,23 @@ type PPTImageCropImportEffect = {
   slideId: string
   x: string
   y: string
+}
+type PPTShapeStyleImportEffect = {
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  cornerRadius: string
+  fields: string
+  fillColor: string
+  fillOpacity: string
+  format: typeof PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_SHAPE_STYLE_IMPORT_MODEL
+  objectIds: string
+  strokeColor: string
+  strokeDash: string
+  strokeWidth: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2432,6 +2468,8 @@ function App() {
     useState<PPTObjectMetadataImportEffect | null>(null)
   const [lastImageCropImportEffect, setLastImageCropImportEffect] =
     useState<PPTImageCropImportEffect | null>(null)
+  const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
+    useState<PPTShapeStyleImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3377,6 +3415,14 @@ function App() {
         getPPTImageCropSourceFromDataTransfer(event.clipboardData)
 
       if (imageCropSource && pastePPTImageCropSource(imageCropSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const shapeStyleSource =
+        getPPTShapeStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (shapeStyleSource && pastePPTShapeStyleSource(shapeStyleSource)) {
         event.preventDefault()
         return
       }
@@ -4419,6 +4465,97 @@ function App() {
             element,
           )
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTShapeStyleSource(source: PPTShapeStyleImportSource) {
+    const shapeElements = selectedElements.filter((element): element is PPTShape =>
+      element.kind === 'shape')
+
+    if (shapeElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = shapeElements[0]
+    const stroke = source.shape.stroke ?? sourceElement.stroke
+    const categories: PPTStyleClipboardCategory[] = ['object', 'shape']
+
+    if (stroke) {
+      categories.push('stroke')
+    }
+
+    const styleClipboard: PPTStyleClipboard = {
+      categories,
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      shape: {
+        cornerRadius: source.shape.cornerRadius ??
+          getPPTShapeCornerRadius(sourceElement),
+        fill: source.shape.fill
+          ? clonePPTFill(source.shape.fill)
+          : clonePPTFill(sourceElement.fill),
+        ...(stroke
+          ? { stroke: clonePPTStroke(stroke) }
+          : {}),
+      },
+      sourceId: 'ppt-shape-style-json',
+      sourceKind: sourceElement.kind,
+      type: 'slide-style-clipboard',
+    }
+
+    if (styleClipboard.shape?.stroke) {
+      styleClipboard.stroke = clonePPTStroke(styleClipboard.shape.stroke)
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(shapeElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastShapeStyleImportEffect(createPPTShapeStyleImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
       })))
 
     return true
@@ -9759,6 +9896,21 @@ function App() {
         data-ppt-object-style-import-shadow-distance={lastObjectStyleImportEffect?.shadowDistance}
         data-ppt-object-style-import-shadow-enabled={lastObjectStyleImportEffect?.shadowEnabled}
         data-ppt-object-style-import-shadow-opacity={lastObjectStyleImportEffect?.shadowOpacity}
+        data-ppt-shape-style-import-categories={lastShapeStyleImportEffect?.categories}
+        data-ppt-shape-style-import-command={lastShapeStyleImportEffect?.commandId}
+        data-ppt-shape-style-import-command-targets={lastShapeStyleImportEffect?.commandTargets}
+        data-ppt-shape-style-import-command-type={lastShapeStyleImportEffect?.commandType}
+        data-ppt-shape-style-import-corner-radius={lastShapeStyleImportEffect?.cornerRadius}
+        data-ppt-shape-style-import-fields={lastShapeStyleImportEffect?.fields}
+        data-ppt-shape-style-import-fill-color={lastShapeStyleImportEffect?.fillColor}
+        data-ppt-shape-style-import-fill-opacity={lastShapeStyleImportEffect?.fillOpacity}
+        data-ppt-shape-style-import-format={lastShapeStyleImportEffect?.format}
+        data-ppt-shape-style-import-json-length={lastShapeStyleImportEffect?.jsonLength}
+        data-ppt-shape-style-import-model={lastShapeStyleImportEffect?.model}
+        data-ppt-shape-style-import-objects={lastShapeStyleImportEffect?.objectIds}
+        data-ppt-shape-style-import-stroke-color={lastShapeStyleImportEffect?.strokeColor}
+        data-ppt-shape-style-import-stroke-dash={lastShapeStyleImportEffect?.strokeDash}
+        data-ppt-shape-style-import-stroke-width={lastShapeStyleImportEffect?.strokeWidth}
         data-ppt-object-metadata-import-alt-text-length={lastObjectMetadataImportEffect?.altTextLength}
         data-ppt-object-metadata-import-alt-text-present={lastObjectMetadataImportEffect?.altTextPresent}
         data-ppt-object-metadata-import-command-fields={lastObjectMetadataImportEffect?.commandFields}
@@ -12463,6 +12615,49 @@ function applyPPTImageCropCommandEffectToElement(
   }
 }
 
+function createPPTShapeStyleImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTShapeStyleImportSource
+}): PPTShapeStyleImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+
+  return {
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    cornerRadius: source.shape.cornerRadius === undefined
+      ? ''
+      : String(source.shape.cornerRadius),
+    fields: source.fields.join(' '),
+    fillColor: source.shape.fill?.color ?? '',
+    fillOpacity: source.shape.fill?.opacity === undefined
+      ? ''
+      : String(source.shape.fill.opacity),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_SHAPE_STYLE_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+    strokeColor: source.shape.stroke?.color ?? '',
+    strokeDash: source.shape.stroke ? getPPTStrokeDash(source.shape.stroke) : '',
+    strokeWidth: source.shape.stroke?.width === undefined
+      ? ''
+      : String(source.shape.stroke.width),
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -13764,6 +13959,198 @@ function getPPTImageCropPositionFromJSONValue(value: unknown) {
   }
 
   return normalizeSlideEditObjectImageCropValue(value)
+}
+
+function getPPTShapeStyleSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_SHAPE_STYLE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTShapeStyleSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTShapeStyleSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTShapeStyleImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTShapeStyleSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTShapeStyleSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTShapeStyleImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.shapeStyle)
+    ? value.shapeStyle
+    : allowDirect
+      ? value
+      : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const shape: PPTShapeStyleImportSource['shape'] = {}
+  const fields: PPTShapeStyleImportField[] = []
+  const fill = getPPTShapeStyleFillFromJSONValue(
+    payloadValue.fill ?? {
+      color: payloadValue.fillColor,
+      opacity: payloadValue.fillOpacity,
+    },
+  )
+  const stroke = getPPTShapeStyleStrokeFromJSONValue(
+    payloadValue.stroke ?? {
+      color: payloadValue.strokeColor,
+      dash: payloadValue.strokeDash,
+      width: payloadValue.strokeWidth,
+    },
+  )
+  const cornerRadius = getPPTShapeStyleCornerRadiusFromJSONValue(
+    payloadValue.cornerRadius,
+  )
+
+  if (fill !== undefined) {
+    shape.fill = fill
+    fields.push('fill')
+  }
+
+  if (stroke !== undefined) {
+    shape.stroke = stroke
+    fields.push('stroke')
+  }
+
+  if (cornerRadius !== undefined) {
+    shape.cornerRadius = cornerRadius
+    fields.push('cornerRadius')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        shape,
+      }
+    : null
+}
+
+function getPPTShapeStyleFillFromJSONValue(
+  value: unknown,
+): PPTFill | undefined {
+  if (typeof value === 'string') {
+    const color = normalizePPTSwatchColor(value)
+
+    return color ? normalizePPTFill({ color }) : undefined
+  }
+
+  if (!isPPTRecord(value)) {
+    return undefined
+  }
+
+  const color = typeof value.color === 'string'
+    ? normalizePPTSwatchColor(value.color)
+    : ''
+  const opacity = typeof value.opacity === 'number' &&
+    Number.isFinite(value.opacity)
+    ? normalizePPTFillOpacity(value.opacity)
+    : undefined
+
+  return color
+    ? normalizePPTFill({ color, opacity })
+    : undefined
+}
+
+function getPPTShapeStyleStrokeFromJSONValue(
+  value: unknown,
+): PPTStroke | undefined {
+  if (!isPPTRecord(value)) {
+    return undefined
+  }
+
+  const color = typeof value.color === 'string'
+    ? normalizePPTSwatchColor(value.color)
+    : ''
+  const width = typeof value.width === 'number' && Number.isFinite(value.width)
+    ? normalizePPTStrokeWidth(value.width)
+    : undefined
+  const dashValue = typeof value.dash === 'string' ? value.dash : ''
+  const dash = isPPTStrokeDash(dashValue) ? normalizePPTStrokeDash(dashValue) : undefined
+
+  return color || width !== undefined || dash
+    ? normalizePPTStroke({
+        ...(color ? { color } : {}),
+        ...(dash ? { dash } : {}),
+        ...(width !== undefined ? { width } : {}),
+      })
+    : undefined
+}
+
+function getPPTShapeStyleCornerRadiusFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTShapeCornerRadius(value)
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(

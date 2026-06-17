@@ -8330,6 +8330,76 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      shapeStyle: {
+        cornerRadius: 18,
+        fill: {
+          color: '#ef4444',
+          opacity: 0.62,
+        },
+        stroke: {
+          color: '#111827',
+          dash: 'dot',
+          width: 6,
+        },
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterShapeStylePaste = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'pastes JSON shape style into selected PPT shape',
+    afterShapeStylePaste.shapeStyleImportModel === 'ppt-shape-style-import' &&
+      afterShapeStylePaste.shapeStyleImportFormat === 'application-json-ppt-shape-style' &&
+      afterShapeStylePaste.shapeStyleImportCommand === 'paste-object-formatting' &&
+      afterShapeStylePaste.shapeStyleImportCommandTargets === afterShapeStylePaste.selectedId &&
+      afterShapeStylePaste.shapeStyleImportCommandType === 'slide-command-effect' &&
+      afterShapeStylePaste.shapeStyleImportObjects === afterShapeStylePaste.selectedId &&
+      afterShapeStylePaste.shapeStyleImportCategories.includes('object-effect') &&
+      afterShapeStylePaste.shapeStyleImportCategories.includes('shape-fill') &&
+      afterShapeStylePaste.shapeStyleImportCategories.includes('shape-stroke') &&
+      afterShapeStylePaste.shapeStyleImportCategories.includes('line-style') &&
+      afterShapeStylePaste.shapeStyleImportFields === 'fill stroke cornerRadius' &&
+      afterShapeStylePaste.shapeStyleImportFillColor === '#ef4444' &&
+      afterShapeStylePaste.shapeStyleImportFillOpacity === '0.62' &&
+      afterShapeStylePaste.shapeStyleImportStrokeColor === '#111827' &&
+      afterShapeStylePaste.shapeStyleImportStrokeDash === 'dot' &&
+      afterShapeStylePaste.shapeStyleImportStrokeWidth === '6' &&
+      afterShapeStylePaste.shapeStyleImportCornerRadius === '18' &&
+      Number(afterShapeStylePaste.shapeStyleImportJsonLength) > 100 &&
+      afterShapeStylePaste.fillOpacity === '0.62' &&
+      afterShapeStylePaste.background.includes('0.62') &&
+      afterShapeStylePaste.borderColor === 'rgb(17, 24, 39)' &&
+      afterShapeStylePaste.borderStyle === 'dotted' &&
+      afterShapeStylePaste.borderWidth === '6px' &&
+      afterShapeStylePaste.strokeDash === 'dot' &&
+      afterShapeStylePaste.cornerRadius === '18' &&
+      afterShapeStylePaste.borderRadius === '18px' &&
+      afterShapeStylePaste.objectOpacity === '0.42' &&
+      afterShapeStylePaste.shadow === 'true' &&
+      afterShapeStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      afterShapeStylePaste.styleClipboardCommandApplications.includes(afterShapeStylePaste.selectedId) &&
+      afterShapeStylePaste.styleClipboardCommandApplications.includes('shape-fill') &&
+      afterShapeStylePaste.styleClipboardCommandApplications.includes('shape-stroke') &&
+      afterShapeStylePaste.styleClipboardCommandApplications.includes('line-style'),
+    {
+      afterPalettePasteFormatting,
+      afterShapeStylePaste,
+    },
+  )
+
   await pressKey(page, {
     code: 'KeyT',
     key: 't',
@@ -15512,8 +15582,10 @@ function getPPTFormatPainterSelectedShapeState(page) {
 
     return {
       background: selected?.style.background ?? '',
+      borderColor: selected?.style.borderColor ?? '',
       borderRadius: selected?.style.borderRadius ?? '',
       borderStyle: selected?.style.borderStyle ?? '',
+      borderWidth: selected?.style.borderWidth ?? '',
       cornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
       fillOpacity: selected?.getAttribute('data-ppt-fill-opacity') ?? '',
       filter: selected?.style.filter ?? '',
@@ -15533,6 +15605,21 @@ function getPPTFormatPainterSelectedShapeState(page) {
       styleClipboardCommandSelection: shell?.getAttribute('data-ppt-style-clipboard-command-selection') ?? '',
       styleClipboardCommandTargets: shell?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
       styleClipboardCommandType: shell?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
+      shapeStyleImportCategories: shell?.getAttribute('data-ppt-shape-style-import-categories') ?? '',
+      shapeStyleImportCommand: shell?.getAttribute('data-ppt-shape-style-import-command') ?? '',
+      shapeStyleImportCommandTargets: shell?.getAttribute('data-ppt-shape-style-import-command-targets') ?? '',
+      shapeStyleImportCommandType: shell?.getAttribute('data-ppt-shape-style-import-command-type') ?? '',
+      shapeStyleImportCornerRadius: shell?.getAttribute('data-ppt-shape-style-import-corner-radius') ?? '',
+      shapeStyleImportFields: shell?.getAttribute('data-ppt-shape-style-import-fields') ?? '',
+      shapeStyleImportFillColor: shell?.getAttribute('data-ppt-shape-style-import-fill-color') ?? '',
+      shapeStyleImportFillOpacity: shell?.getAttribute('data-ppt-shape-style-import-fill-opacity') ?? '',
+      shapeStyleImportFormat: shell?.getAttribute('data-ppt-shape-style-import-format') ?? '',
+      shapeStyleImportJsonLength: shell?.getAttribute('data-ppt-shape-style-import-json-length') ?? '',
+      shapeStyleImportModel: shell?.getAttribute('data-ppt-shape-style-import-model') ?? '',
+      shapeStyleImportObjects: shell?.getAttribute('data-ppt-shape-style-import-objects') ?? '',
+      shapeStyleImportStrokeColor: shell?.getAttribute('data-ppt-shape-style-import-stroke-color') ?? '',
+      shapeStyleImportStrokeDash: shell?.getAttribute('data-ppt-shape-style-import-stroke-dash') ?? '',
+      shapeStyleImportStrokeWidth: shell?.getAttribute('data-ppt-shape-style-import-stroke-width') ?? '',
       strokeDash: selected?.getAttribute('data-ppt-stroke-dash') ?? '',
       top: selected?.style.top ?? '',
       width: selected?.style.width ?? '',
