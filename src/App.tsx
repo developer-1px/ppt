@@ -298,6 +298,9 @@ import {
   filterCanvasCommandPaletteItems,
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
+import {
+  getCanvasCommandPaletteKeyboardIntent,
+} from 'canvas/app/command-palette-keyboard'
 import { getCanvasClientViewportSize } from 'canvas/app/client-viewport-size'
 import {
   getCanvasContextMenuKeyboardIntent,
@@ -8710,24 +8713,24 @@ function PPTCommandPaletteDialog({
       return
     }
 
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      event.stopPropagation()
-      setActiveIndex(() => Math.min(activeItemIndex + 1, maxActiveIndex))
-      return
-    }
+    const keyboardIntent = getCanvasCommandPaletteKeyboardIntent({
+      activeIndex: activeItemIndex,
+      itemCount: filteredItems.length,
+      key: event.key,
+    })
 
-    if (event.key === 'ArrowUp') {
+    if (keyboardIntent.preventDefault) {
       event.preventDefault()
       event.stopPropagation()
-      setActiveIndex(() => Math.max(0, activeItemIndex - 1))
-      return
-    }
 
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      event.stopPropagation()
-      runItem(filteredItems[activeItemIndex])
+      if (keyboardIntent.kind === 'move-active') {
+        setActiveIndex(keyboardIntent.activeIndex)
+        return
+      }
+
+      if (keyboardIntent.kind === 'run-active') {
+        runItem(filteredItems[keyboardIntent.activeIndex])
+      }
     }
   }
 

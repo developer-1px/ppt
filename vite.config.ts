@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
+const canvasCommandPaletteKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteKeyboard.ts', import.meta.url))
 const canvasAnimationFrameTaskEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/frame/CanvasAnimationFrameTask.ts', import.meta.url))
 const canvasClientViewportSizeEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/viewport/CanvasClientViewportSize.ts', import.meta.url))
 const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts', import.meta.url))
@@ -64,6 +65,7 @@ export default defineConfig({
       { find: 'canvas/app/animation-frame-task', replacement: canvasAnimationFrameTaskEntry },
       { find: 'canvas/app/client-viewport-size', replacement: canvasClientViewportSizeEntry },
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
+      { find: 'canvas/app/command-palette-keyboard', replacement: canvasCommandPaletteKeyboardEntry },
       { find: 'canvas/app/context-menu-position', replacement: canvasContextMenuPositionEntry },
       { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
       { find: 'canvas/app/data-transfer-text', replacement: canvasDataTransferTextEntry },
