@@ -15,9 +15,11 @@ import {
   toSlideEditObjectOpacityAttributeValue,
 } from '@interactive-os/slide-edit-affordance'
 import {
+  createCanvasCssBoundsTransform,
+  createCanvasSvgBoundsTransform,
   createCanvasSvgFreehandPathData,
   createCanvasSvgPathData,
-} from 'canvas/renderer/svg-drawing-primitives'
+} from 'canvas/renderer'
 import { unionCanvasRectList } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
@@ -798,13 +800,11 @@ function renderPPTTableSVG(element: PPTTable) {
 }
 
 function getPPTElementTransform(element: PPTElement) {
-  const transforms = [
-    element.geometry.rotation ? `rotate(${element.geometry.rotation}deg)` : '',
-    element.flipH === true ? 'scaleX(-1)' : '',
-    element.flipV === true ? 'scaleY(-1)' : '',
-  ].filter(Boolean)
-
-  return transforms.length > 0 ? transforms.join(' ') : ''
+  return createCanvasCssBoundsTransform({
+    flipX: element.flipH === true,
+    flipY: element.flipV === true,
+    rotation: element.geometry.rotation,
+  })
 }
 
 function getPPTElementTransformAttrs(element: PPTElement) {
@@ -1019,24 +1019,12 @@ function getPPTElementAnimationAttrEntries(element: PPTElement) {
 }
 
 function getPPTElementSVGTransform(element: PPTElement) {
-  const scaleX = element.flipH === true ? -1 : 1
-  const scaleY = element.flipV === true ? -1 : 1
-  const rotation = element.geometry.rotation ?? 0
-
-  if (scaleX === 1 && scaleY === 1 && !rotation) {
-    return ''
-  }
-
-  const centerX = element.geometry.x + element.geometry.w / 2
-  const centerY = element.geometry.y + element.geometry.h / 2
-  const transforms = [
-    `translate(${formatNumber(centerX)} ${formatNumber(centerY)})`,
-    rotation ? `rotate(${formatNumber(rotation)})` : '',
-    scaleX !== 1 || scaleY !== 1 ? `scale(${scaleX} ${scaleY})` : '',
-    `translate(${formatNumber(-centerX)} ${formatNumber(-centerY)})`,
-  ].filter(Boolean)
-
-  return transforms.join(' ')
+  return createCanvasSvgBoundsTransform({
+    bounds: element.geometry,
+    flipX: element.flipH === true,
+    flipY: element.flipV === true,
+    rotation: element.geometry.rotation,
+  })
 }
 
 function getPPTLinePath(element: PPTLine) {

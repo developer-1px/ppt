@@ -480,9 +480,10 @@ import {
   type CanvasReorderMode,
 } from 'canvas/engine'
 import {
+  createCanvasCssBoundsTransform,
   createCanvasSvgFreehandPathData,
   createCanvasSvgPathData,
-} from 'canvas/renderer/svg-drawing-primitives'
+} from 'canvas/renderer'
 import {
   PPT_DEFAULT_THEME_ID,
   PPT_SPLIT_LAYOUT_ID,
@@ -14771,13 +14772,11 @@ function pptElementStyle(element: PPTElement): CSSProperties {
 }
 
 function getPPTElementTransform(element: PPTElement) {
-  const transforms = [
-    element.geometry.rotation ? `rotate(${element.geometry.rotation}deg)` : '',
-    element.flipH === true ? 'scaleX(-1)' : '',
-    element.flipV === true ? 'scaleY(-1)' : '',
-  ].filter(Boolean)
-
-  return transforms.length > 0 ? transforms.join(' ') : undefined
+  return createCanvasCssBoundsTransform({
+    flipX: element.flipH === true,
+    flipY: element.flipV === true,
+    rotation: element.geometry.rotation,
+  }) || undefined
 }
 
 function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
