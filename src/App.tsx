@@ -593,9 +593,12 @@ import {
 } from './pptExport'
 import {
   PPT_DEFAULT_TABLE_ROWS,
+  PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT,
+  PPT_DECK_MARKDOWN_OUTLINE_IMPORT_MODEL,
   PPT_FALLBACK_HTML_IMPORT_MODEL,
   PPT_IMPORT_EXTENSION,
   canHandlePPTStageDropImport,
+  createPPTDeckMarkdownOutlineSlides,
   createPPTFallbackHTMLImportEffect,
   createPPTFallbackHTMLImageElement,
   createPPTFallbackHTMLSelectionElements,
@@ -612,6 +615,7 @@ import {
   createPPTRichTextPasteElement,
   createPPTTextPasteElement,
   getPPTClipboardImportActions,
+  getPPTDeckMarkdownOutlineSourceFromDataTransfer,
   getPPTStageDropImportAction,
   getPPTTableColumnCount,
   getPPTTextPasteSourcesFromDataTransfer,
@@ -627,6 +631,7 @@ import {
   PPT_TABLE_IMPORT_MODEL,
   PPT_TEXT_PASTE_IMPORT_MODEL,
   type PPTClipboardImportAction,
+  type PPTDeckMarkdownOutlineSource,
   type PPTFallbackHTMLImportEffect,
   type PPTFallbackHTMLImageSource,
   type PPTFallbackHTMLSelectionSource,
@@ -1118,6 +1123,15 @@ type PPTDeckHTMLImportEffect = {
   sourceDeckId: string
   sourceSlideCount: number
   sourceTitle: string
+}
+type PPTDeckMarkdownOutlineImportEffect = {
+  firstImportedSlideId: string
+  format: typeof PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT
+  importedSlideCount: number
+  model: typeof PPT_DECK_MARKDOWN_OUTLINE_IMPORT_MODEL
+  sourceSlideCount: number
+  sourceTitle: string
+  textLength: number
 }
 type PPTSlideSVGClipboardEffect = {
   jsonMimeType: typeof PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE
@@ -2122,6 +2136,10 @@ function App() {
   const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
   const [lastDeckHTMLImportEffect, setLastDeckHTMLImportEffect] =
     useState<PPTDeckHTMLImportEffect | null>(null)
+  const [
+    lastDeckMarkdownOutlineImportEffect,
+    setLastDeckMarkdownOutlineImportEffect,
+  ] = useState<PPTDeckMarkdownOutlineImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
     useState('')
   const [lastStageDropImportActionKind, setLastStageDropImportActionKind] =
@@ -2971,6 +2989,17 @@ function App() {
         return
       }
 
+      const deckMarkdownOutlineSource =
+        getPPTDeckMarkdownOutlineSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        deckMarkdownOutlineSource &&
+        pastePPTDeckMarkdownOutlineSource(deckMarkdownOutlineSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
 
       if (richClipboard && pasteClipboardPayload(richClipboard.payload, {
@@ -3584,6 +3613,72 @@ function App() {
         importedSlides,
         source,
       }))
+      selectSlide(importedSlides[0].id)
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+
+    return true
+  }
+
+  function pastePPTDeckMarkdownOutlineSource(
+    source: PPTDeckMarkdownOutlineSource,
+  ) {
+    if (source.slides.length === 0) {
+      return false
+    }
+
+    commitDeck((current) => {
+      const targetSlideId = current.slides.some((slide) =>
+        slide.id === activeSlide.id)
+        ? activeSlide.id
+        : current.slides.at(-1)?.id
+
+      if (!targetSlideId) {
+        return current
+      }
+
+      const createSlideId = createPPTCanvasSequentialIdFactory({
+        existingIds: current.slides.map((slide) => slide.id),
+        startIndex: current.slides.length + 1,
+      })
+      const importedSlides = createPPTDeckMarkdownOutlineSlides({
+        createSlideId,
+        source,
+      })
+
+      if (importedSlides.length === 0) {
+        return current
+      }
+
+      let slides = current.slides
+      let anchorSlideId = targetSlideId
+
+      for (const slide of importedSlides) {
+        const result = insertPPTSlideAtTargetPlacement({
+          placement: 'after',
+          slide,
+          slides,
+          targetSlideId: anchorSlideId,
+        })
+
+        if (!result) {
+          return current
+        }
+
+        slides = result.items
+        anchorSlideId = slide.id
+      }
+
+      setLastDeckMarkdownOutlineImportEffect(
+        createPPTDeckMarkdownOutlineImportEffect({
+          importedSlides,
+          source,
+        }),
+      )
       selectSlide(importedSlides[0].id)
 
       return {
@@ -8688,6 +8783,13 @@ function App() {
         data-ppt-deck-html-import-source-deck={lastDeckHTMLImportEffect?.sourceDeckId}
         data-ppt-deck-html-import-source-slide-count={lastDeckHTMLImportEffect?.sourceSlideCount}
         data-ppt-deck-html-import-source-title={lastDeckHTMLImportEffect?.sourceTitle}
+        data-ppt-deck-outline-import-first-slide={lastDeckMarkdownOutlineImportEffect?.firstImportedSlideId}
+        data-ppt-deck-outline-import-format={lastDeckMarkdownOutlineImportEffect?.format}
+        data-ppt-deck-outline-import-imported-count={lastDeckMarkdownOutlineImportEffect?.importedSlideCount}
+        data-ppt-deck-outline-import-model={lastDeckMarkdownOutlineImportEffect?.model}
+        data-ppt-deck-outline-import-source-slide-count={lastDeckMarkdownOutlineImportEffect?.sourceSlideCount}
+        data-ppt-deck-outline-import-source-title={lastDeckMarkdownOutlineImportEffect?.sourceTitle}
+        data-ppt-deck-outline-import-text-length={lastDeckMarkdownOutlineImportEffect?.textLength}
         data-ppt-slide-svg-clipboard-json-mime-type={lastSlideSVGClipboardEffect?.jsonMimeType}
         data-ppt-slide-svg-clipboard-model={lastSlideSVGClipboardEffect?.model}
         data-ppt-slide-svg-clipboard-source-slide={lastSlideSVGClipboardEffect?.sourceSlideId}
@@ -10858,6 +10960,24 @@ function createPPTDeckHTMLFallbackImportEffect({
     sourceDeckId: '',
     sourceSlideCount: source.slides.length,
     sourceTitle: source.title,
+  }
+}
+
+function createPPTDeckMarkdownOutlineImportEffect({
+  importedSlides,
+  source,
+}: {
+  importedSlides: readonly PPTSlide[]
+  source: PPTDeckMarkdownOutlineSource
+}): PPTDeckMarkdownOutlineImportEffect {
+  return {
+    firstImportedSlideId: importedSlides[0]?.id ?? '',
+    format: PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT,
+    importedSlideCount: importedSlides.length,
+    model: PPT_DECK_MARKDOWN_OUTLINE_IMPORT_MODEL,
+    sourceSlideCount: source.slideCount,
+    sourceTitle: source.title,
+    textLength: source.textLength,
   }
 }
 

@@ -6328,6 +6328,105 @@ async function runExportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const markdown = [
+      '# AI Draft Outline',
+      '',
+      '## Market context',
+      '- Current demand is fragmented',
+      '- **Risk** needs tighter framing',
+      'Notes: Mention the source assumptions.',
+      '',
+      '## Retouch plan',
+      '1. Draft compact slides',
+      '2. Review final copy',
+    ].join('\\n')
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const deckOutlineImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const selectedBody = document.querySelector('.ppt-slide [data-ppt-element$="-body"]')
+    const selectedTitle = document.querySelector('.ppt-slide [data-ppt-element$="-title"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      bodyText: selectedBody?.textContent ?? '',
+      bulletCount: selectedBody?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
+      exportHasLayout: exportCode.includes('"layoutId": "ppt-layout-title-body"'),
+      exportHasNotes: exportCode.includes('Mention the source assumptions.'),
+      exportHasNumbered: exportCode.includes('"bullet": "numbered"') && exportCode.includes('Draft compact slides'),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-outline-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-outline-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-outline-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-outline-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-outline-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-outline-import-source-title') ?? '',
+      textLength: Number(stage?.getAttribute('data-ppt-deck-outline-import-text-length') ?? 0),
+      titleText: selectedTitle?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes Markdown outline as editable PPT slides',
+    deckOutlineImportState.model === 'ppt-deck-markdown-outline-import' &&
+      deckOutlineImportState.format === 'text-markdown-ppt-outline' &&
+      deckOutlineImportState.sourceTitle === 'AI Draft Outline' &&
+      deckOutlineImportState.sourceSlideCount === 2 &&
+      deckOutlineImportState.importedCount === 2 &&
+      deckOutlineImportState.slideCount === beforeDeckHTMLPaste.slideCount + 2 &&
+      deckOutlineImportState.activeSlide === deckOutlineImportState.firstImportedSlideId &&
+      deckOutlineImportState.activeName.includes('Market context') &&
+      deckOutlineImportState.titleText.includes('Market context') &&
+      deckOutlineImportState.bodyText.includes('Current demand is fragmented') &&
+      deckOutlineImportState.bodyText.includes('Risk needs tighter framing') &&
+      deckOutlineImportState.bulletCount === 2 &&
+      deckOutlineImportState.textLength > 0 &&
+      deckOutlineImportState.exportHasNotes &&
+      deckOutlineImportState.exportHasNumbered &&
+      deckOutlineImportState.exportHasLayout,
+    {
+      beforeDeckHTMLPaste,
+      deckOutlineImportState,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckOutlinePasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT Markdown outline paste probes before export scenario continues',
+    afterDeckOutlinePasteCleanup.activeSlide === 'slide-1' &&
+      afterDeckOutlinePasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterDeckOutlinePasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptClipboardItemTypes = []
     window.__pptClipboardWriteCount = 0
     window.__pptClipboardWriteText = ''

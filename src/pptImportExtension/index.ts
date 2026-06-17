@@ -1,4 +1,5 @@
 export * from './extension'
+export * from './deckOutlineImport'
 export * from './pptFallbackHTMLImport'
 export * from './imageImport'
 export * from './mediaImport'
