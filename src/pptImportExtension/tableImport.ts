@@ -122,7 +122,7 @@ export function getPPTTableSourceFromText(
   options: { format?: PPTTableImportFormat; name?: string } = {},
 ): PPTTableImportSource | null {
   const source = getPPTCanvasTableSourceFromText(text, {
-    format: getCanvasTableImportFormat(options.format),
+    format: getPPTCanvasTableImportFormat(options.format),
     name: options.name,
   })
 
@@ -202,7 +202,7 @@ function createPPTTableImportSourceFromCanvas(
   })
 }
 
-function getCanvasTableImportFormat(
+function getPPTCanvasTableImportFormat(
   format?: PPTTableImportFormat,
 ): PPTCanvasTableImportFormat | undefined {
   if (format === 'canvas-csv') {

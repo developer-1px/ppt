@@ -26,7 +26,7 @@ export type PPTMediaImportResult = {
   source: PPTMediaImportSource
 }
 
-type CanvasMediaLinkItem = {
+type PPTMediaLinkItem = {
   fill: string
   h: number
   id: string
@@ -71,24 +71,24 @@ export function createPPTMediaElement({
     ...source,
     url: normalized.url,
   }
-  const canvasItem = PPT_LINK_CARD_MEDIA_IMPORTER
+  const mediaItem = PPT_LINK_CARD_MEDIA_IMPORTER
     .createItems({
       createId,
       position,
       source: normalizedSource,
     })
-    .find(isCanvasMediaLinkItem)
+    .find(isPPTMediaLinkItem)
 
-  if (!canvasItem) {
+  if (!mediaItem) {
     return null
   }
 
   const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
-      h: canvasItem.h,
-      w: canvasItem.w,
-      x: canvasItem.x,
-      y: canvasItem.y,
+      h: mediaItem.h,
+      w: mediaItem.w,
+      x: mediaItem.x,
+      y: mediaItem.y,
     },
     frame: {
       h: PPT_SLIDE_HEIGHT,
@@ -102,16 +102,16 @@ export function createPPTMediaElement({
     importerId: PPT_LINK_CARD_MEDIA_IMPORTER.id,
     item: {
       cornerRadius: 16,
-      fill: { color: canvasItem.fill },
+      fill: { color: mediaItem.fill },
       geometry,
       hyperlink: { url: normalizedSource.url },
-      id: canvasItem.id,
+      id: mediaItem.id,
       kind: 'shape',
       name: 'Link card',
       shape: 'rect',
       stroke: {
-        color: canvasItem.stroke,
-        width: canvasItem.strokeWidth ?? 2,
+        color: mediaItem.stroke,
+        width: mediaItem.strokeWidth ?? 2,
       },
       style: {
         color: '#1e3a8a',
@@ -124,7 +124,7 @@ export function createPPTMediaElement({
           top: 18,
         },
       },
-      textBody: createPPTTextBody(canvasItem.text ?? normalizedSource.url),
+      textBody: createPPTTextBody(mediaItem.text ?? normalizedSource.url),
     },
     source: normalizedSource,
   }
@@ -157,17 +157,17 @@ function getPPTMediaCardText(source: PPTMediaImportSource) {
     : source.url
 }
 
-function isCanvasMediaLinkItem(value: unknown): value is CanvasMediaLinkItem {
+function isPPTMediaLinkItem(value: unknown): value is PPTMediaLinkItem {
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as CanvasMediaLinkItem).type === 'rect' &&
-    typeof (value as CanvasMediaLinkItem).id === 'string' &&
-    typeof (value as CanvasMediaLinkItem).fill === 'string' &&
-    typeof (value as CanvasMediaLinkItem).stroke === 'string' &&
-    typeof (value as CanvasMediaLinkItem).x === 'number' &&
-    typeof (value as CanvasMediaLinkItem).y === 'number' &&
-    typeof (value as CanvasMediaLinkItem).w === 'number' &&
-    typeof (value as CanvasMediaLinkItem).h === 'number'
+    (value as PPTMediaLinkItem).type === 'rect' &&
+    typeof (value as PPTMediaLinkItem).id === 'string' &&
+    typeof (value as PPTMediaLinkItem).fill === 'string' &&
+    typeof (value as PPTMediaLinkItem).stroke === 'string' &&
+    typeof (value as PPTMediaLinkItem).x === 'number' &&
+    typeof (value as PPTMediaLinkItem).y === 'number' &&
+    typeof (value as PPTMediaLinkItem).w === 'number' &&
+    typeof (value as PPTMediaLinkItem).h === 'number'
   )
 }

@@ -21,7 +21,7 @@ import {
   type PPTTextBox,
 } from '../pptModel'
 
-type CanvasTextPasteTextItem = {
+type PPTTextPasteTextItem = {
   fontSize?: number
   h: number
   id: string
@@ -94,18 +94,18 @@ export function createPPTTextPasteElement({
     return null
   }
 
-  const canvasItem = result.items.find(isCanvasTextPasteTextItem)
+  const textItem = result.items.find(isPPTTextPasteTextItem)
 
-  if (!canvasItem) {
+  if (!textItem) {
     return null
   }
 
   const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
-      h: canvasItem.h,
-      w: canvasItem.w,
-      x: canvasItem.x,
-      y: canvasItem.y,
+      h: textItem.h,
+      w: textItem.w,
+      x: textItem.x,
+      y: textItem.y,
     },
     frame: {
       h: PPT_SLIDE_HEIGHT,
@@ -120,15 +120,15 @@ export function createPPTTextPasteElement({
     importerId: result.importerId,
     item: {
       geometry,
-      id: canvasItem.id,
+      id: textItem.id,
       kind: 'textBox',
       name: 'Text',
       style: {
         color: '#111827',
-        fontSize: canvasItem.fontSize ?? 30,
+        fontSize: textItem.fontSize ?? 30,
         fontWeight: 'semibold',
       },
-      textBody: createPPTTextBody(canvasItem.text),
+      textBody: createPPTTextBody(textItem.text),
     },
   }
 }
@@ -198,19 +198,19 @@ const PPT_TEXT_PASTE_IMPORTER: PPTTextPasteImporter = {
   },
 }
 
-function isCanvasTextPasteTextItem(
+function isPPTTextPasteTextItem(
   value: unknown,
-): value is CanvasTextPasteTextItem {
+): value is PPTTextPasteTextItem {
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as CanvasTextPasteTextItem).type === 'text' &&
-    typeof (value as CanvasTextPasteTextItem).id === 'string' &&
-    typeof (value as CanvasTextPasteTextItem).text === 'string' &&
-    typeof (value as CanvasTextPasteTextItem).x === 'number' &&
-    typeof (value as CanvasTextPasteTextItem).y === 'number' &&
-    typeof (value as CanvasTextPasteTextItem).w === 'number' &&
-    typeof (value as CanvasTextPasteTextItem).h === 'number'
+    (value as PPTTextPasteTextItem).type === 'text' &&
+    typeof (value as PPTTextPasteTextItem).id === 'string' &&
+    typeof (value as PPTTextPasteTextItem).text === 'string' &&
+    typeof (value as PPTTextPasteTextItem).x === 'number' &&
+    typeof (value as PPTTextPasteTextItem).y === 'number' &&
+    typeof (value as PPTTextPasteTextItem).w === 'number' &&
+    typeof (value as PPTTextPasteTextItem).h === 'number'
   )
 }
 
