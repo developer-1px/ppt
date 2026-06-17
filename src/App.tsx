@@ -390,6 +390,7 @@ import {
 } from 'canvas/app/menu-roving-focus'
 import { getCanvasSelectionListModifierState } from 'canvas/app/selection-list-range'
 import {
+  CANVAS_MINIMAP_READ_MODEL,
   getCanvasMinimapPointFromViewportOffset,
   getCanvasMinimapReadModel,
   getCanvasMinimapWorldPoint,
@@ -8399,7 +8400,7 @@ function PPTMinimap({
       className="ppt-minimap"
       data-ppt-minimap
       data-ppt-minimap-item-count={itemRects.length}
-      data-ppt-minimap-model="canvas-minimap-read-model"
+      data-ppt-minimap-model={CANVAS_MINIMAP_READ_MODEL}
       data-ppt-minimap-scale={readModel.scale}
       data-ppt-minimap-viewport-h={readModel.viewportWorldBounds.h}
       data-ppt-minimap-viewport-w={readModel.viewportWorldBounds.w}
