@@ -376,6 +376,7 @@ import {
 } from 'canvas/app/minimap-model'
 import {
   CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
+  getCanvasModalKeyboardIntent,
   trapCanvasModalTabFocus,
   useCanvasModalFocusLifecycle,
 } from 'canvas/app/modal-focus-lifecycle'
@@ -8415,14 +8416,20 @@ function PPTShortcutHelpDialog({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
+    const modalKeyboardIntent = getCanvasModalKeyboardIntent({ key: event.key })
+
+    if (modalKeyboardIntent.kind === 'close') {
+      if (modalKeyboardIntent.preventDefault) {
+        event.preventDefault()
+      }
+      if (modalKeyboardIntent.stopPropagation) {
+        event.stopPropagation()
+      }
       onClose()
       return
     }
 
-    if (event.key === 'Tab') {
+    if (modalKeyboardIntent.kind === 'trap-focus') {
       trapCanvasModalTabFocus({
         event,
         root: dialogRef.current,
@@ -8716,14 +8723,20 @@ function PPTCommandPaletteDialog({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
+    const modalKeyboardIntent = getCanvasModalKeyboardIntent({ key: event.key })
+
+    if (modalKeyboardIntent.kind === 'close') {
+      if (modalKeyboardIntent.preventDefault) {
+        event.preventDefault()
+      }
+      if (modalKeyboardIntent.stopPropagation) {
+        event.stopPropagation()
+      }
       onClose()
       return
     }
 
-    if (event.key === 'Tab') {
+    if (modalKeyboardIntent.kind === 'trap-focus') {
       trapCanvasModalTabFocus({
         event,
         root: dialogRef.current,
