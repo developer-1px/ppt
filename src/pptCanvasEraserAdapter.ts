@@ -1,7 +1,8 @@
 import {
-  getCanvasEraserHitItemIds,
-  getCanvasMergedEraserHitIds,
-} from 'canvas/app/eraser-hit-testing'
+  getPPTCanvasEraserHitItemIds,
+  getPPTCanvasMergedEraserHitIds,
+  type PPTCanvasEraserHitInput,
+} from './pptCanvasAppAffordanceAdapter'
 import type {
   Bounds,
   Point,
@@ -16,15 +17,14 @@ import type {
 
 const PPT_CANVAS_ERASER_RADIUS = 8
 
-type CanvasEraserHitInput = Parameters<typeof getCanvasEraserHitItemIds>[0]
-type CanvasEraserItemReadModel = CanvasEraserHitInput['itemReadModel']
-type CanvasEraserItem = ReturnType<CanvasEraserItemReadModel['getAllItems']>[number]
-type CanvasEraserStrokeItem = Extract<
-  CanvasEraserItem,
+type PPTEraserItemReadModel = PPTCanvasEraserHitInput['itemReadModel']
+type PPTEraserItem = ReturnType<PPTEraserItemReadModel['getAllItems']>[number]
+type PPTEraserStrokeItem = Extract<
+  PPTEraserItem,
   { type: 'highlight' | 'marker' }
 >
 
-export const mergePPTEraserHitElementIds = getCanvasMergedEraserHitIds
+export const mergePPTEraserHitElementIds = getPPTCanvasMergedEraserHitIds
 
 export function getPPTEraserHitElementIds({
   points,
@@ -32,10 +32,10 @@ export function getPPTEraserHitElementIds({
   slide,
 }: {
   points: Point[]
-  scene: CanvasEraserHitInput['scene']
+  scene: PPTCanvasEraserHitInput['scene']
   slide: PPTSlide
 }) {
-  return getCanvasEraserHitItemIds({
+  return getPPTCanvasEraserHitItemIds({
     itemReadModel: createPPTEraserItemReadModel(slide),
     points,
     radius: PPT_CANVAS_ERASER_RADIUS,
@@ -43,8 +43,8 @@ export function getPPTEraserHitElementIds({
   })
 }
 
-function createPPTEraserItemReadModel(slide: PPTSlide): CanvasEraserItemReadModel {
-  const items = slide.elements.flatMap(toCanvasEraserStrokeItem)
+function createPPTEraserItemReadModel(slide: PPTSlide): PPTEraserItemReadModel {
+  const items = slide.elements.flatMap(toPPTEraserStrokeItem)
   const itemById = new Map(items.map((item) => [item.id, item]))
 
   return {
@@ -52,13 +52,13 @@ function createPPTEraserItemReadModel(slide: PPTSlide): CanvasEraserItemReadMode
     findItem: (id) => itemById.get(id),
     getAllIds: () => items.map((item) => item.id),
     getAllItems: () => items,
-    getItemBounds: getCanvasEraserItemBounds,
+    getItemBounds: getPPTEraserItemBounds,
     getSelection: (ids) => ids.filter((id) => itemById.has(id)),
     getSelectionBounds: (ids) =>
       unionPPTCanvasRectList(Array.from(ids).flatMap((id) => {
         const item = itemById.get(id)
 
-        return item ? [getCanvasEraserItemBounds(item)] : []
+        return item ? [getPPTEraserItemBounds(item)] : []
       })),
     getSelectedItems: (ids) =>
       ids.flatMap((id) => {
@@ -69,7 +69,7 @@ function createPPTEraserItemReadModel(slide: PPTSlide): CanvasEraserItemReadMode
   }
 }
 
-function toCanvasEraserStrokeItem(element: PPTElement): CanvasEraserStrokeItem[] {
+function toPPTEraserStrokeItem(element: PPTElement): PPTEraserStrokeItem[] {
   if (
     element.kind !== 'freeform' ||
     element.visible === false ||
@@ -78,12 +78,12 @@ function toCanvasEraserStrokeItem(element: PPTElement): CanvasEraserStrokeItem[]
     return []
   }
 
-  return [createCanvasEraserStrokeItem(element)]
+  return [createPPTEraserStrokeItem(element)]
 }
 
-function createCanvasEraserStrokeItem(
+function createPPTEraserStrokeItem(
   element: PPTFreeform,
-): CanvasEraserStrokeItem {
+): PPTEraserStrokeItem {
   const bounds = pptGeometryToBounds(element.geometry)
 
   return {
@@ -97,7 +97,7 @@ function createCanvasEraserStrokeItem(
   }
 }
 
-function getCanvasEraserItemBounds(item: CanvasEraserItem): Bounds {
+function getPPTEraserItemBounds(item: PPTEraserItem): Bounds {
   return {
     h: item.h,
     w: item.w,

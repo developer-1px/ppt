@@ -154,6 +154,10 @@ import {
   type CanvasPointerPanInteraction,
 } from 'canvas/app/pointer-pan-interaction'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
+import {
+  getCanvasEraserHitItemIds,
+  getCanvasMergedEraserHitIds,
+} from 'canvas/app/eraser-hit-testing'
 
 export const PPT_COMMAND_PALETTE_ITEMS_MODEL =
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL
@@ -348,6 +352,9 @@ export const getPPTMinimapPointFromViewportOffset =
 export const getPPTMinimapReadModel = getCanvasMinimapReadModel
 export const getPPTMinimapWorldPoint = getCanvasMinimapWorldPoint
 export const getNextPPTCanvasDrawingPoints = getNextCanvasDrawingPoints
+export const getPPTCanvasEraserHitItemIds = getCanvasEraserHitItemIds
+export const getPPTCanvasMergedEraserHitIds =
+  getCanvasMergedEraserHitIds
 export const getPPTCanvasPointerStartProjection =
   getCanvasPointerStartProjection
 export const getPPTInlineEditHistoryDirectionFromInputType =
@@ -368,6 +375,8 @@ export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
 export type PPTMinimapItemBounds = CanvasMinimapItemBounds
 export type PPTMinimapReadModel = CanvasMinimapReadModel
 export type PPTMinimapSize = CanvasMinimapSize
+export type PPTCanvasEraserHitInput =
+  Parameters<typeof getCanvasEraserHitItemIds>[0]
 export type PPTCanvasPointerLaserInteractionBase =
   CanvasPointerLaserInteraction
 export type PPTCanvasPointerPanInteractionBase =
