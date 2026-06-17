@@ -4,26 +4,26 @@ import {
   type Bounds,
 } from './pptCanvasCoreAdapter'
 import {
-  alignCanvasSelectionItems,
-  type CanvasAlignMode,
-  type CanvasCommandAdapter,
-  type CanvasCommandAvailability,
-  type CanvasCommandAvailabilityConfig,
-  type CanvasDistributeMode,
-  type CanvasReorderMode,
-  cloneCanvasSelectionItems,
-  deleteCanvasSelectionItems,
-  distributeCanvasSelectionItems,
-  getCanvasSelectableItemIds,
-  getCanvasSelectedItemIds,
-  getCanvasCommandAvailability,
-  groupCanvasSelectionItems,
-  mapCanvasSelectionItems,
-  moveCanvasSelection,
-  reorderCanvasSelectionItems,
-  ungroupCanvasSelectionItems,
-  unionCanvasRectList,
-} from 'canvas/foundation'
+  alignPPTCanvasSelectionItems,
+  clonePPTCanvasSelectionItems,
+  deletePPTCanvasSelectionItems,
+  distributePPTCanvasSelectionItems,
+  getPPTCanvasCommandBaseAvailability,
+  getPPTCanvasSelectableItemIds,
+  getPPTCanvasSelectedItemIds,
+  groupPPTCanvasSelectionItems,
+  mapPPTCanvasSelectionItems,
+  movePPTCanvasSelection,
+  reorderPPTCanvasSelectionItems,
+  ungroupPPTCanvasSelectionItems,
+  unionPPTCanvasRectList,
+  type PPTCanvasCommandAdapterBase,
+  type PPTCanvasCommandBaseAvailability,
+  type PPTCanvasCommandBaseAvailabilityConfig,
+  type PPTCanvasFoundationAlignMode,
+  type PPTCanvasFoundationDistributeMode,
+  type PPTCanvasFoundationReorderMode,
+} from './pptCanvasFoundationAdapter'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -36,14 +36,14 @@ import {
   pptGeometryToBounds,
 } from './pptCanvasAdapter'
 
-export type PPTCanvasCommandAvailability = CanvasCommandAvailability & {
+export type PPTCanvasCommandAvailability = PPTCanvasCommandBaseAvailability & {
   cut: boolean
   nudge: boolean
   paste: boolean
 }
 
-type PPTCanvasCommandAvailabilityConfig = CanvasCommandAvailabilityConfig & {
-  commands: CanvasCommandAvailabilityConfig['commands'] & Readonly<{
+type PPTCanvasCommandAvailabilityConfig = PPTCanvasCommandBaseAvailabilityConfig & {
+  commands: PPTCanvasCommandBaseAvailabilityConfig['commands'] & Readonly<{
     cut?: boolean
     nudge?: boolean
     paste?: boolean
@@ -54,7 +54,7 @@ export function createPPTCanvasCommandAdapter({
   frame = getPPTSlideBounds(),
 }: {
   frame?: Bounds
-} = {}): CanvasCommandAdapter<PPTElement> {
+} = {}): PPTCanvasCommandAdapterBase<PPTElement> {
   return {
     alignSelection({ items, mode, selection }) {
       return alignPPTElements(items, selection, mode, frame)
@@ -63,7 +63,7 @@ export function createPPTCanvasCommandAdapter({
       return clonePPTElements(items, ids, createId, offset)
     },
     deleteSelection({ items, selection }) {
-      return deleteCanvasSelectionItems({
+      return deletePPTCanvasSelectionItems({
         getItemId: getPPTCommandElementId,
         isItemSelectable: isPPTCommandElementEditable,
         items,
@@ -74,7 +74,7 @@ export function createPPTCanvasCommandAdapter({
       return distributePPTElements(items, selection, mode)
     },
     groupSelection({ groupId, items, selection }) {
-      return groupCanvasSelectionItems({
+      return groupPPTCanvasSelectionItems({
         getItemId: getPPTCommandElementId,
         groupId,
         groupItem: ({ groupId, item }) => ({ ...item, groupId }),
@@ -85,7 +85,7 @@ export function createPPTCanvasCommandAdapter({
     },
     lockSelection({ items, selection }) {
       return {
-        items: mapCanvasSelectionItems({
+        items: mapPPTCanvasSelectionItems({
           getItemId: getPPTCommandElementId,
           items,
           mapItem: (item) => ({ ...item, locked: true }),
@@ -95,7 +95,7 @@ export function createPPTCanvasCommandAdapter({
       }
     },
     nudgeSelection({ dx, dy, items, selection }) {
-      return moveCanvasSelection({
+      return movePPTCanvasSelection({
         adapter: pptCanvasTransformAdapter,
         dx,
         dy,
@@ -110,14 +110,14 @@ export function createPPTCanvasCommandAdapter({
       return reorderPPTElements(items, selection, mode)
     },
     selectAll({ items }) {
-      return getCanvasSelectableItemIds({
+      return getPPTCanvasSelectableItemIds({
         getItemId: getPPTCommandElementId,
         isItemSelectable: isPPTCommandElementVisible,
         items,
       })
     },
     ungroupSelection({ items, selection }) {
-      return ungroupCanvasSelectionItems({
+      return ungroupPPTCanvasSelectionItems({
         getItemGroupId: (item) => item.groupId,
         getItemId: getPPTCommandElementId,
         items,
@@ -155,7 +155,7 @@ export function getPPTCanvasCommandAvailability({
   hasLockedSelection?: boolean
   selection: readonly string[]
 }): PPTCanvasCommandAvailability {
-  const baseAvailability = getCanvasCommandAvailability({
+  const baseAvailability = getPPTCanvasCommandBaseAvailability({
     canRedo,
     canUndo,
     config,
@@ -212,7 +212,7 @@ export function getPPTSlideBounds(): Bounds {
 }
 
 export function getPPTElementsBounds(elements: PPTElement[]): Bounds | null {
-  return unionCanvasRectList(elements.map((element) =>
+  return unionPPTCanvasRectList(elements.map((element) =>
     pptGeometryToBounds(element.geometry)))
 }
 
@@ -241,10 +241,10 @@ export function getPPTElementIdPrefix(element: PPTElement) {
 function alignPPTElements(
   items: PPTElement[],
   selection: string[],
-  mode: CanvasAlignMode,
+  mode: PPTCanvasFoundationAlignMode,
   slideFrame: Bounds,
 ) {
-  return alignCanvasSelectionItems({
+  return alignPPTCanvasSelectionItems({
     frame: selection.length === 1 ? slideFrame : undefined,
     getItemBounds: (item) => pptGeometryToBounds(item.geometry),
     getItemId: (item) => item.id,
@@ -259,9 +259,9 @@ function alignPPTElements(
 function distributePPTElements(
   items: PPTElement[],
   selection: string[],
-  mode: CanvasDistributeMode,
+  mode: PPTCanvasFoundationDistributeMode,
 ) {
-  return distributeCanvasSelectionItems({
+  return distributePPTCanvasSelectionItems({
     getItemBounds: (item) => pptGeometryToBounds(item.geometry),
     getItemId: (item) => item.id,
     isItemSelectable: isPPTCommandElementEditable,
@@ -293,7 +293,7 @@ function getEditablePPTSelection(
   items: PPTElement[],
   selection: readonly string[],
 ) {
-  return getCanvasSelectedItemIds({
+  return getPPTCanvasSelectedItemIds({
     getItemId: getPPTCommandElementId,
     isItemSelectable: isPPTCommandElementEditable,
     items,
@@ -322,12 +322,12 @@ function clonePPTElementsFromSource(
     selection?: readonly string[]
   } = {},
 ) {
-  const selection = options.selection ?? getCanvasSelectableItemIds({
+  const selection = options.selection ?? getPPTCanvasSelectableItemIds({
     getItemId: getPPTCommandElementId,
     items,
   })
 
-  return cloneCanvasSelectionItems({
+  return clonePPTCanvasSelectionItems({
     cloneItem: ({ item, targetGroupId }) =>
       clonePPTElement(
         item,
@@ -377,9 +377,9 @@ function clonePPTElement(
 function reorderPPTElements(
   items: PPTElement[],
   selection: string[],
-  mode: CanvasReorderMode,
+  mode: PPTCanvasFoundationReorderMode,
 ) {
-  return reorderCanvasSelectionItems({
+  return reorderPPTCanvasSelectionItems({
     getItemId: (item) => item.id,
     isItemSelectable: isPPTCommandElementEditable,
     items,

@@ -14,7 +14,6 @@ import {
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
 } from '@interactive-os/slide-edit-affordance'
-import { unionCanvasRectList } from 'canvas/foundation'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -48,6 +47,7 @@ import {
   escapePPTCanvasXmlAttribute,
   formatPPTCanvasSvgNumber,
 } from './pptCanvasRendererAdapter'
+import { unionPPTCanvasRectList } from './pptCanvasFoundationAdapter'
 
 const PPT_SELECTION_EXPORT_PADDING = 24
 const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
@@ -1537,7 +1537,7 @@ function getVisiblePPTElements(elements: PPTElement[]) {
 }
 
 function getPPTElementsExportBounds(elements: PPTElement[]) {
-  return unionCanvasRectList(elements.map((element) => element.geometry))
+  return unionPPTCanvasRectList(elements.map((element) => element.geometry))
 }
 
 function getPPTSvgImageAlignX(value: number) {

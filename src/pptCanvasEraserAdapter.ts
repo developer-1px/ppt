@@ -6,7 +6,7 @@ import type {
   Bounds,
   Point,
 } from './pptCanvasCoreAdapter'
-import { unionCanvasRectList } from 'canvas/foundation'
+import { unionPPTCanvasRectList } from './pptCanvasFoundationAdapter'
 import { pptGeometryToBounds } from './pptCanvasAdapter'
 import type {
   PPTElement,
@@ -55,7 +55,7 @@ function createPPTEraserItemReadModel(slide: PPTSlide): CanvasEraserItemReadMode
     getItemBounds: getCanvasEraserItemBounds,
     getSelection: (ids) => ids.filter((id) => itemById.has(id)),
     getSelectionBounds: (ids) =>
-      unionCanvasRectList(Array.from(ids).flatMap((id) => {
+      unionPPTCanvasRectList(Array.from(ids).flatMap((id) => {
         const item = itemById.get(id)
 
         return item ? [getCanvasEraserItemBounds(item)] : []
