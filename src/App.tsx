@@ -16995,40 +16995,30 @@ function buildPPTLineFromWorldEndpoints({
   start: Point
   startConnection: PPTLineConnection | undefined
 }): PPTLine {
-  const rawLeft = Math.min(start.x, end.x)
-  const rawTop = Math.min(start.y, end.y)
-  const rawWidth = Math.abs(end.x - start.x)
-  const rawHeight = Math.abs(end.y - start.y)
-  const width = Math.max(24, rawWidth)
-  const height = Math.max(24, rawHeight)
-  const x = clamp(
-    rawLeft - Math.max(0, width - rawWidth) / 2,
-    0,
-    PPT_SLIDE_WIDTH - width,
-  )
-  const y = clamp(
-    rawTop - Math.max(0, height - rawHeight) / 2,
-    0,
-    PPT_SLIDE_HEIGHT - height,
-  )
+  const normalized = normalizeCanvasPointsToLocalBounds({
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    minHeight: 24,
+    minWidth: 24,
+    points: [start, end],
+  })
+  const [
+    localStart = { x: 0, y: 0 },
+    localEnd = { x: 0, y: 0 },
+  ] = normalized.points
 
   const next: PPTLine = {
     ...line,
-    end: {
-      x: end.x - x,
-      y: end.y - y,
-    },
+    end: localEnd,
     geometry: {
       ...line.geometry,
-      h: height,
-      w: width,
-      x,
-      y,
+      ...normalized.bounds,
     },
-    start: {
-      x: start.x - x,
-      y: start.y - y,
-    },
+    start: localStart,
   }
 
   if (endConnection) {
