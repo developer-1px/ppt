@@ -2652,6 +2652,96 @@ async function runCrossSlideClipboardScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  const shapeCopyPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, shapeCopyPoint.x, shapeCopyPoint.y, 1)
+  await delay(80)
+
+  await page.eval(`(() => {
+    window.__pptShapeRichClipboardItemTypes = []
+    window.__pptShapeRichClipboardWriteCount = 0
+    window.__pptShapeRichClipboardHTML = ''
+    window.__pptShapeRichClipboardJSON = ''
+    window.__pptShapeRichClipboardPlainText = ''
+    window.__pptShapeRichClipboardSVG = ''
+
+    window.ClipboardItem = class PPTShapeRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptShapeRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptShapeRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptShapeRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptShapeRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptShapeRichClipboardSVG = item.items['image/svg+xml']
+            ? await item.items['image/svg+xml'].text()
+            : ''
+          window.__pptShapeRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(120)
+
+  const afterShapeCopy = await getPPTCrossSlideClipboardState(page)
+  const shapeRichClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptShapeRichClipboardHTML ?? '',
+    itemTypes: window.__pptShapeRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptShapeRichClipboardJSON ?? '',
+    plainText: window.__pptShapeRichClipboardPlainText ?? '',
+    svg: window.__pptShapeRichClipboardSVG ?? '',
+    writeCount: window.__pptShapeRichClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies PPT shape selection with styled HTML clipboard fallback',
+    afterShapeCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' &&
+      afterShapeCopy.richClipboardWriteMode === 'clipboard-item' &&
+      afterShapeCopy.selectedKind === 'shape' &&
+      afterShapeCopy.richClipboardSelection === afterShapeCopy.selectedId &&
+      afterShapeCopy.richClipboardPlainTextLength > 0 &&
+      afterShapeCopy.richClipboardHTMLLength > afterShapeCopy.richClipboardPlainTextLength &&
+      shapeRichClipboardWrite.writeCount === 1 &&
+      shapeRichClipboardWrite.itemTypes.includes(afterShapeCopy.richClipboardJsonMimeType) &&
+      shapeRichClipboardWrite.itemTypes.includes('text/html') &&
+      shapeRichClipboardWrite.itemTypes.includes('text/plain') &&
+      shapeRichClipboardWrite.itemTypes.includes('image/svg+xml') &&
+      shapeRichClipboardWrite.html.includes('data-ppt-selection-shape="rect"') &&
+      shapeRichClipboardWrite.html.includes('background:#e0f2fe') &&
+      shapeRichClipboardWrite.html.includes('border:2px solid #0ea5e9') &&
+      shapeRichClipboardWrite.html.includes('border-radius:24px') &&
+      shapeRichClipboardWrite.html.includes('width:') &&
+      shapeRichClipboardWrite.html.includes('height:') &&
+      shapeRichClipboardWrite.html.includes('Fast draft') &&
+      shapeRichClipboardWrite.html.includes('Small edits') &&
+      shapeRichClipboardWrite.plainText.includes('Fast draft') &&
+      shapeRichClipboardWrite.plainText.includes('Small edits') &&
+      shapeRichClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"') &&
+      shapeRichClipboardWrite.svg.includes('<svg'),
+    {
+      afterShapeCopy,
+      shapeRichClipboardWrite,
+    },
+  )
 }
 
 async function runSelectSameTypeScenario(page) {

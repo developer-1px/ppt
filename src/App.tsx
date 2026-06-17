@@ -10215,6 +10215,10 @@ function createPPTElementClipboardFallbackHTML(element: PPTElement) {
     return createPPTTableClipboardHTML(element)
   }
 
+  if (element.kind === 'shape') {
+    return createPPTShapeClipboardFallbackHTML(element)
+  }
+
   if (isPPTTextElement(element)) {
     return createPPTTextElementClipboardFallbackHTML(element)
   }
@@ -10229,6 +10233,50 @@ function createPPTElementClipboardFallbackHTML(element: PPTElement) {
     `<p data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}">`,
     escapePPTClipboardHTMLText(text).replace(/\n/g, '<br>'),
     '</p>',
+  ].join('')
+}
+
+function createPPTShapeClipboardFallbackHTML(element: PPTShape) {
+  const style = {
+    ...getDefaultPPTTextStyle(),
+    ...element.style,
+  }
+  const contentHTML = element.textBody
+    ? createPPTTextBodyClipboardHTML(element.textBody)
+    : ''
+  const borderStyle = element.stroke
+    ? `${element.stroke.width}px ${getPPTStrokeDashBorderStyle(element.stroke)} ${element.stroke.color}`
+    : undefined
+  const shapeStyle = createPPTClipboardStyleAttribute([
+    ['align-items', getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))],
+    ['background', getPPTFillColorCSS(element.fill)],
+    ['border', borderStyle],
+    ['border-radius', element.shape === 'rect'
+      ? getSlideEditObjectCornerRadiusCSS(getPPTShapeCornerRadius(element))
+      : element.shape === 'ellipse'
+        ? '999px'
+        : undefined],
+    ['box-sizing', 'border-box'],
+    ['clip-path', element.shape === 'diamond'
+      ? 'polygon(50% 0,100% 50%,50% 100%,0 50%)'
+      : undefined],
+    ['color', style.color],
+    ['display', 'flex'],
+    ['font-family', getPPTTextFontFamilyCSS(style.fontFamily)],
+    ['font-size', `${style.fontSize}px`],
+    ['font-weight', getPPTClipboardFontWeightCSS(style.fontWeight)],
+    ['height', `${element.geometry.h}px`],
+    ['line-height', String(PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT)],
+    ['min-height', `${element.geometry.h}px`],
+    ['padding', getPPTClipboardTextInsetCSS(getPPTTextElementInset(element))],
+    ['text-align', getPPTElementParagraphAlign(element)],
+    ['width', `${element.geometry.w}px`],
+  ])
+
+  return [
+    `<section data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}" data-ppt-selection-shape="${escapePPTCanvasXmlAttribute(element.shape)}"${shapeStyle}>`,
+    `<div data-ppt-selection-text-body="true">${contentHTML}</div>`,
+    '</section>',
   ].join('')
 }
 
@@ -10351,6 +10399,10 @@ function getPPTClipboardFontWeightCSS(fontWeight: PPTTextStyle['fontWeight']) {
   }
 
   return '400'
+}
+
+function getPPTClipboardTextInsetCSS(inset: PPTTextInset) {
+  return `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`
 }
 
 function createPPTImageClipboardFallbackHTML(element: PPTImage) {
