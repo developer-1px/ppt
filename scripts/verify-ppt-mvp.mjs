@@ -8811,6 +8811,90 @@ async function runTextPasteScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    window.__pptTextRichClipboardItemTypes = []
+    window.__pptTextRichClipboardWriteCount = 0
+    window.__pptTextRichClipboardHTML = ''
+    window.__pptTextRichClipboardJSON = ''
+    window.__pptTextRichClipboardPlainText = ''
+    window.__pptTextRichClipboardSVG = ''
+
+    window.ClipboardItem = class PPTTextRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptTextRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptTextRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptTextRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptTextRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptTextRichClipboardSVG = item.items['image/svg+xml']
+            ? await item.items['image/svg+xml'].text()
+            : ''
+          window.__pptTextRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(120)
+
+  const afterRichCopy = await getPPTTextPasteState(page)
+  const textRichClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptTextRichClipboardHTML ?? '',
+    itemTypes: window.__pptTextRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptTextRichClipboardJSON ?? '',
+    plainText: window.__pptTextRichClipboardPlainText ?? '',
+    svg: window.__pptTextRichClipboardSVG ?? '',
+    writeCount: window.__pptTextRichClipboardWriteCount ?? 0,
+  }))()`)
+
+  record(
+    'copies PPT rich text selection with semantic HTML clipboard fallback',
+    afterRichCopy.richClipboardModel === 'canvas-board-io-ppt-rich-clipboard' &&
+      afterRichCopy.richClipboardWriteMode === 'clipboard-item' &&
+      afterRichCopy.richClipboardSelection === afterRichPaste.selectedId &&
+      afterRichCopy.richClipboardPlainTextLength > 0 &&
+      afterRichCopy.richClipboardHTMLLength > afterRichCopy.richClipboardPlainTextLength &&
+      textRichClipboardWrite.writeCount === 1 &&
+      textRichClipboardWrite.itemTypes.includes(afterRichCopy.richClipboardJsonMimeType) &&
+      textRichClipboardWrite.itemTypes.includes('text/html') &&
+      textRichClipboardWrite.itemTypes.includes('text/plain') &&
+      textRichClipboardWrite.itemTypes.includes('image/svg+xml') &&
+      textRichClipboardWrite.html.includes('data-ppt-selection-text-body="true"') &&
+      textRichClipboardWrite.html.includes('<strong>Bold plan</strong>') &&
+      textRichClipboardWrite.html.includes('<em>italic note</em>') &&
+      textRichClipboardWrite.html.includes('<u>underline</u>') &&
+      textRichClipboardWrite.html.includes('data-ppt-selection-list="bullet"') &&
+      textRichClipboardWrite.html.includes('<li') &&
+      textRichClipboardWrite.plainText.includes('Bold plan') &&
+      textRichClipboardWrite.plainText.includes('Second bullet') &&
+      textRichClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"') &&
+      textRichClipboardWrite.svg.includes('<svg'),
+    {
+      afterRichCopy,
+      afterRichPaste,
+      textRichClipboardWrite,
+    },
+  )
+
   await page.eval(`document.querySelector('button[title="Undo"]').click()`)
   await delay(80)
 
@@ -12580,6 +12664,12 @@ function getPPTTextPasteState(page) {
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedUnderlineRunCount: selected?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
+      richClipboardHTMLLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-html-length') ?? 0),
+      richClipboardJsonMimeType: stage?.getAttribute('data-ppt-rich-clipboard-json-mime-type') ?? '',
+      richClipboardModel: stage?.getAttribute('data-ppt-rich-clipboard-model') ?? '',
+      richClipboardPlainTextLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-plain-text-length') ?? 0),
+      richClipboardSelection: stage?.getAttribute('data-ppt-rich-clipboard-selection') ?? '',
+      richClipboardWriteMode: stage?.getAttribute('data-ppt-rich-clipboard-write-mode') ?? '',
       textBoxCount: document.querySelectorAll('[data-kind="textBox"]').length,
       textPasteBoldRuns: Number(stage?.getAttribute('data-ppt-text-paste-bold-runs') ?? 0),
       textPasteBulletParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-bullet-paragraphs') ?? 0),

@@ -10215,6 +10215,10 @@ function createPPTElementClipboardFallbackHTML(element: PPTElement) {
     return createPPTTableClipboardHTML(element)
   }
 
+  if (isPPTTextElement(element)) {
+    return createPPTTextElementClipboardFallbackHTML(element)
+  }
+
   const text = createPPTElementClipboardPlainText(element).trim()
 
   if (!text) {
@@ -10226,6 +10230,127 @@ function createPPTElementClipboardFallbackHTML(element: PPTElement) {
     escapePPTClipboardHTMLText(text).replace(/\n/g, '<br>'),
     '</p>',
   ].join('')
+}
+
+function createPPTTextElementClipboardFallbackHTML(element: PPTTextElement) {
+  const style = getPPTTextElementStyle(element)
+  const contentHTML = createPPTTextBodyClipboardHTML(element.textBody)
+
+  if (!contentHTML) {
+    return ''
+  }
+
+  return [
+    `<section data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}" data-ppt-selection-text-body="true"${createPPTClipboardStyleAttribute([
+      ['color', style.color],
+      ['font-family', getPPTTextFontFamilyCSS(style.fontFamily)],
+      ['font-size', `${style.fontSize}px`],
+      ['font-weight', getPPTClipboardFontWeightCSS(style.fontWeight)],
+      ['line-height', String(PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT)],
+    ])}>`,
+    contentHTML,
+    '</section>',
+  ].join('')
+}
+
+function createPPTTextBodyClipboardHTML(body: PPTTextBody) {
+  const parts: string[] = []
+  let listItems: string[] = []
+
+  function flushList() {
+    if (listItems.length === 0) {
+      return
+    }
+
+    parts.push(`<ul data-ppt-selection-list="bullet">${listItems.join('')}</ul>`)
+    listItems = []
+  }
+
+  body.paragraphs.forEach((paragraph) => {
+    const runsHTML = createPPTTextRunsClipboardHTML(paragraph.runs)
+
+    if (paragraph.bullet === 'bullet') {
+      listItems.push(
+        `<li data-ppt-selection-paragraph="true"${createPPTParagraphClipboardStyleAttribute(paragraph)}>${runsHTML || '<br>'}</li>`,
+      )
+      return
+    }
+
+    flushList()
+    parts.push(
+      `<p data-ppt-selection-paragraph="true"${createPPTParagraphClipboardStyleAttribute(paragraph)}>${runsHTML || '<br>'}</p>`,
+    )
+  })
+
+  flushList()
+
+  return parts.join('')
+}
+
+function createPPTTextRunsClipboardHTML(runs: readonly PPTRun[]) {
+  return runs
+    .map((run) => createPPTRunClipboardHTML(run))
+    .join('')
+}
+
+function createPPTRunClipboardHTML(run: PPTRun) {
+  let content = escapePPTClipboardHTMLText(run.text).replace(/\n/g, '<br>')
+
+  if (!content) {
+    return ''
+  }
+
+  if (run.underline === true) {
+    content = `<u>${content}</u>`
+  }
+
+  if (run.italic === true) {
+    content = `<em>${content}</em>`
+  }
+
+  if (run.bold === true) {
+    content = `<strong>${content}</strong>`
+  }
+
+  const styleAttribute = createPPTClipboardStyleAttribute([
+    ['color', run.color],
+    ['font-size', run.size === undefined ? undefined : `${run.size}px`],
+  ])
+
+  return styleAttribute ? `<span${styleAttribute}>${content}</span>` : content
+}
+
+function createPPTParagraphClipboardStyleAttribute(paragraph: PPTParagraph) {
+  return createPPTClipboardStyleAttribute([
+    ['text-align', paragraph.align],
+    ['line-height', paragraph.lineHeight === undefined ? undefined : String(paragraph.lineHeight)],
+    ['margin-bottom', paragraph.spacingAfter === undefined ? undefined : `${paragraph.spacingAfter}px`],
+    ['margin-top', paragraph.spacingBefore === undefined ? undefined : `${paragraph.spacingBefore}px`],
+  ])
+}
+
+function createPPTClipboardStyleAttribute(
+  entries: readonly (readonly [string, string | undefined])[],
+) {
+  const style = entries
+    .filter((entry): entry is readonly [string, string] =>
+      entry[1] !== undefined && entry[1] !== '')
+    .map(([property, value]) => `${property}:${value}`)
+    .join(';')
+
+  return style ? ` style="${escapePPTCanvasXmlAttribute(style)}"` : ''
+}
+
+function getPPTClipboardFontWeightCSS(fontWeight: PPTTextStyle['fontWeight']) {
+  if (fontWeight === 'bold') {
+    return '700'
+  }
+
+  if (fontWeight === 'semibold') {
+    return '600'
+  }
+
+  return '400'
 }
 
 function createPPTImageClipboardFallbackHTML(element: PPTImage) {
