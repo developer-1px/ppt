@@ -1,5 +1,5 @@
 import {
-  clamp,
+  clampCanvasBoundsToFrame,
   type Bounds,
 } from 'canvas/core'
 import {
@@ -90,13 +90,15 @@ export function pptGeometryToBounds(geometry: PPTGeometry): Bounds {
 }
 
 export function boundsToPPTGeometry(bounds: Bounds): PPTGeometry {
-  const w = Math.min(PPT_SLIDE_WIDTH, Math.max(24, bounds.w))
-  const h = Math.min(PPT_SLIDE_HEIGHT, Math.max(24, bounds.h))
-
-  return {
-    h,
-    w,
-    x: clamp(bounds.x, 0, PPT_SLIDE_WIDTH - w),
-    y: clamp(bounds.y, 0, PPT_SLIDE_HEIGHT - h),
-  }
+  return clampCanvasBoundsToFrame({
+    bounds,
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+    minHeight: 24,
+    minWidth: 24,
+  })
 }
