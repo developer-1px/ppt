@@ -494,7 +494,10 @@ import {
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
 } from 'canvas/app/pointer-pan-interaction'
-import { getCanvasPointerTransformModifierState } from 'canvas/app/pointer-input'
+import {
+  CANVAS_RESIZE_POINTER_MODIFIERS_MODEL,
+  getCanvasPointerTransformModifierState,
+} from 'canvas/app/pointer-input'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
   CANVAS_TOOLBAR_FOCUS_MODEL,
@@ -7891,7 +7894,7 @@ function App() {
         data-ppt-section-tool-shortcut={CANVAS_TOOL_AFFORDANCES.section.shortcut}
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
-        data-ppt-resize-modifier-model="canvas-resize-pointer-modifiers"
+        data-ppt-resize-modifier-model={CANVAS_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-alignment-popover-preview={alignmentPreviewCommand ?? undefined}
         data-ppt-alignment-popover-preview-model="canvas-dom-alignment-preview-guide"
         data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}
