@@ -598,6 +598,7 @@ import {
   createPPTFallbackHTMLSelectionElements,
   createPPTFallbackHTMLSelectionImportEffect,
   createPPTFallbackHTMLShapeElement,
+  createPPTFallbackHTMLTableElement,
   createPPTFallbackHTMLTextElement,
   createPPTImageImportEffect,
   createPPTImportedImageElement,
@@ -627,6 +628,7 @@ import {
   type PPTFallbackHTMLImageSource,
   type PPTFallbackHTMLSelectionSource,
   type PPTFallbackHTMLShapeSource,
+  type PPTFallbackHTMLTableSource,
   type PPTFallbackHTMLTextSource,
   type PPTImageImportEffect,
   type PPTMediaImportResult,
@@ -3563,6 +3565,9 @@ function App() {
       case 'fallback-html-shape-source':
         insertPPTFallbackHTMLShapeSource(action.source)
         return true
+      case 'fallback-html-table-source':
+        insertPPTFallbackHTMLTableSource(action.source)
+        return true
       case 'fallback-html-text-source':
         insertPPTFallbackHTMLTextSource(action.source)
         return true
@@ -3726,6 +3731,38 @@ function App() {
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const element = createPPTFallbackHTMLShapeElement({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        source,
+      })
+
+      setLastFallbackHTMLImportEffect(createPPTFallbackHTMLImportEffect({
+        element,
+        source,
+      }))
+      setSelection([element.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
+  }
+
+  function insertPPTFallbackHTMLTableSource(
+    source: PPTFallbackHTMLTableSource,
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const element = createPPTFallbackHTMLTableElement({
         center,
         createId: createPPTElementIdFactory(slide),
         source,
@@ -12819,7 +12856,10 @@ function createPPTTableClipboardHTML(element: PPTTable) {
           `<td>${escapePPTCanvasXmlAttribute(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`
     : ''
 
-  return `<table data-ppt-table-export="${escapePPTCanvasXmlAttribute(element.id)}">${headerHTML}${bodyHTML}</table>`
+  return `<table data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}"${createPPTClipboardGeometryAttributes(element)} data-ppt-selection-table="true" data-ppt-table-export="${escapePPTCanvasXmlAttribute(element.id)}"${createPPTClipboardStyleAttribute([
+    ['height', `${element.geometry.h}px`],
+    ['width', `${element.geometry.w}px`],
+  ])}>${headerHTML}${bodyHTML}</table>`
 }
 
 function PPTTextBodyView({ body }: { body: PPTTextBody }) {

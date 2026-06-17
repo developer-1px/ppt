@@ -8295,7 +8295,7 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -9114,6 +9114,9 @@ async function runTableImportScenario(page) {
       tableClipboardWrite.itemTypes.includes('text/html') &&
       tableClipboardWrite.itemTypes.includes('text/plain') &&
       tableClipboardWrite.html.includes('<table') &&
+      tableClipboardWrite.html.includes('data-ppt-selection-table="true"') &&
+      tableClipboardWrite.html.includes('data-ppt-selection-x="') &&
+      tableClipboardWrite.html.includes('data-ppt-selection-w="') &&
       tableClipboardWrite.html.includes('<th>Metric</th>') &&
       tableClipboardWrite.html.includes('<td>45%</td>') &&
       tableClipboardWrite.plainText.includes('Revenue\t10\t12') &&
@@ -9123,6 +9126,63 @@ async function runTableImportScenario(page) {
       afterCopyTable,
       afterInspectorEdit,
       tableClipboardWrite,
+    },
+  )
+
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(tableClipboardWrite.html)}, ${JSON.stringify(tableClipboardWrite.plainText)})`)
+  await delay(120)
+
+  const afterTableFallbackHTMLPaste = await getPPTTableState(page)
+
+  record(
+    'pastes PPT table fallback HTML as editable table preserving size',
+    afterTableFallbackHTMLPaste.tableCount === afterCopyTable.tableCount + 1 &&
+      afterTableFallbackHTMLPaste.selectedKind === 'table' &&
+      afterTableFallbackHTMLPaste.selectedRows === 3 &&
+      afterTableFallbackHTMLPaste.selectedCols === 3 &&
+      afterTableFallbackHTMLPaste.selectedWidth === afterCopyTable.selectedWidth &&
+      afterTableFallbackHTMLPaste.selectedHeight === afterCopyTable.selectedHeight &&
+      afterTableFallbackHTMLPaste.cellTexts.includes('Revenue') &&
+      afterTableFallbackHTMLPaste.cellTexts.includes('45%') &&
+      afterTableFallbackHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterTableFallbackHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterTableFallbackHTMLPaste.fallbackHTMLImportKind === 'table' &&
+      afterTableFallbackHTMLPaste.fallbackHTMLImportSourceObject === afterInspectorEdit.selectedId,
+    {
+      afterCopyTable,
+      afterInspectorEdit,
+      afterTableFallbackHTMLPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterTableFallbackUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table fallback HTML paste before table scenario continues',
+    afterTableFallbackUndo.tableCount === afterCopyTable.tableCount,
+    {
+      afterCopyTable,
+      afterTableFallbackHTMLPaste,
+      afterTableFallbackUndo,
     },
   )
 
@@ -13117,8 +13177,13 @@ function getPPTTableState(page) {
       cellTexts: tableCells.map((cell) => cell.textContent ?? ''),
       inspectorSize: document.querySelector('[data-ppt-table-inspector-size]')?.textContent?.trim() ?? '',
       inspectorValue: document.querySelector('[data-ppt-style-field="table-data"]')?.value ?? '',
+      fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
+      fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
+      fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
+      fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       paletteOpen: !!document.querySelector('[data-ppt-command-palette]'),
       selectedCols: Number(selected?.getAttribute('data-ppt-table-cols') ?? 0),
+      selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
@@ -13139,6 +13204,7 @@ function getPPTTableState(page) {
       tableClipboardSourceSlide: stage?.getAttribute('data-ppt-table-clipboard-source-slide') ?? '',
       tableClipboardWriteMode: stage?.getAttribute('data-ppt-table-clipboard-write-mode') ?? '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedWidth: parseFloat(selected?.style.width ?? '0'),
       tableCount: document.querySelectorAll('[data-kind="table"]').length,
       thumbTableCount: document.querySelectorAll('.ppt-thumb-table').length,
     }

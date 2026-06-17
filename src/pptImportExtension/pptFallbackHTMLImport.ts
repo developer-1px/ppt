@@ -16,6 +16,7 @@ import {
   type PPTShape,
   type PPTShapeKind,
   type PPTStroke,
+  type PPTTable,
   type PPTTextBody,
   type PPTTextBox,
   type PPTTextStyle,
@@ -25,6 +26,11 @@ import {
   getPPTSVGImageSourceFromDataTransfer,
   type PPTImageImportSource,
 } from './imageImport'
+import {
+  getPPTTableSourceFromHTML,
+  normalizePPTTableRows,
+  type PPTTableImportSource,
+} from './tableImport'
 
 export const PPT_FALLBACK_HTML_IMPORT_MODEL = 'ppt-fallback-html-import'
 
@@ -73,10 +79,26 @@ export type PPTFallbackHTMLImageSource = {
   sourceObjectId?: string
 }
 
+export type PPTFallbackHTMLTableSource = {
+  geometry: {
+    h: number
+    w: number
+    x?: number
+    y?: number
+  }
+  name: string
+  sourceObjectId?: string
+  table: PPTTableImportSource
+}
+
 export type PPTFallbackHTMLSelectionItemSource =
   | {
       kind: PPTImage['kind']
       source: PPTFallbackHTMLImageSource
+    }
+  | {
+      kind: PPTTable['kind']
+      source: PPTFallbackHTMLTableSource
     }
   | {
       kind: PPTShape['kind']
@@ -94,7 +116,12 @@ export type PPTFallbackHTMLSelectionSource = {
 
 export type PPTFallbackHTMLImportEffect = {
   format: 'text-html-ppt-fallback'
-  kind: PPTImage['kind'] | PPTShape['kind'] | PPTTextBox['kind'] | 'selection'
+  kind:
+    | PPTImage['kind']
+    | PPTShape['kind']
+    | PPTTable['kind']
+    | PPTTextBox['kind']
+    | 'selection'
   model: typeof PPT_FALLBACK_HTML_IMPORT_MODEL
   name: string
   objectCount?: number
@@ -109,6 +136,9 @@ const PPT_FALLBACK_SHAPE_MAX_HEIGHT = 560
 const PPT_FALLBACK_IMAGE_MIN_SIZE = 24
 const PPT_FALLBACK_IMAGE_MAX_WIDTH = 980
 const PPT_FALLBACK_IMAGE_MAX_HEIGHT = 560
+const PPT_FALLBACK_TABLE_MIN_SIZE = 24
+const PPT_FALLBACK_TABLE_MAX_WIDTH = 980
+const PPT_FALLBACK_TABLE_MAX_HEIGHT = 560
 const PPT_FALLBACK_TEXT_MIN_SIZE = 24
 const PPT_FALLBACK_TEXT_MAX_WIDTH = 980
 const PPT_FALLBACK_TEXT_MAX_HEIGHT = 560
@@ -138,6 +168,14 @@ export function getPPTFallbackHTMLImageSourceFromDataTransfer(
   return getPPTFallbackHTMLImageSourceFromHTML(
     dataTransfer?.getData('text/html') ?? '',
     image,
+  )
+}
+
+export function getPPTFallbackHTMLTableSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTFallbackHTMLTableSourceFromHTML(
+    dataTransfer?.getData('text/html') ?? '',
   )
 }
 
@@ -218,12 +256,25 @@ export function getPPTFallbackHTMLImageSourceFromHTML(
   return element ? getPPTFallbackHTMLImageSourceFromElement(element, image) : null
 }
 
+export function getPPTFallbackHTMLTableSourceFromHTML(
+  html: string,
+): PPTFallbackHTMLTableSource | null {
+  if (!html || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const element = doc.querySelector<HTMLElement>('[data-ppt-selection-table]')
+
+  return element ? getPPTFallbackHTMLTableSourceFromElement(element) : null
+}
+
 function getPPTFallbackHTMLSelectionItemSources(
   doc: Document,
   image: PPTImageImportSource | null = null,
 ): PPTFallbackHTMLSelectionItemSource[] {
   return [...doc.querySelectorAll<HTMLElement>(
-    '[data-ppt-selection-image], [data-ppt-selection-shape], [data-ppt-selection-text-body]',
+    '[data-ppt-selection-image], [data-ppt-selection-shape], [data-ppt-selection-table], [data-ppt-selection-text-body]',
   )]
     .map((element): PPTFallbackHTMLSelectionItemSource | null => {
       if (element.hasAttribute('data-ppt-selection-image')) {
@@ -236,6 +287,12 @@ function getPPTFallbackHTMLSelectionItemSources(
         const source = getPPTFallbackHTMLShapeSourceFromElement(element)
 
         return source ? { kind: 'shape', source } : null
+      }
+
+      if (element.hasAttribute('data-ppt-selection-table')) {
+        const source = getPPTFallbackHTMLTableSourceFromElement(element)
+
+        return source ? { kind: 'table', source } : null
       }
 
       if (isPPTFallbackHTMLStandaloneTextElement(element)) {
@@ -322,6 +379,45 @@ function getPPTFallbackHTMLImageSourceFromElement(
     },
     name: alt,
     ...(sourceObjectId ? { sourceObjectId } : {}),
+  }
+}
+
+function getPPTFallbackHTMLTableSourceFromElement(
+  element: HTMLElement,
+): PPTFallbackHTMLTableSource | null {
+  const table = getPPTTableSourceFromHTML(element.outerHTML)
+
+  if (!table) {
+    return null
+  }
+
+  const rawStyle = element.getAttribute('style') ?? ''
+  const sourceObjectId =
+    element.getAttribute('data-ppt-selection-object')?.trim() ||
+    element.getAttribute('data-ppt-table-export')?.trim() ||
+    undefined
+
+  return {
+    geometry: {
+      h: clampPPTCanvasValue(
+        parsePPTFallbackHTMLNumberAttribute(element, 'data-ppt-selection-h') ??
+          parsePPTFallbackHTMLPixelStyle(rawStyle, 'height') ??
+          180,
+        PPT_FALLBACK_TABLE_MIN_SIZE,
+        PPT_FALLBACK_TABLE_MAX_HEIGHT,
+      ),
+      ...parsePPTFallbackHTMLPositionAttributes(element),
+      w: clampPPTCanvasValue(
+        parsePPTFallbackHTMLNumberAttribute(element, 'data-ppt-selection-w') ??
+          parsePPTFallbackHTMLPixelStyle(rawStyle, 'width') ??
+          420,
+        PPT_FALLBACK_TABLE_MIN_SIZE,
+        PPT_FALLBACK_TABLE_MAX_WIDTH,
+      ),
+    },
+    name: table.name ?? 'PPT HTML Table',
+    ...(sourceObjectId ? { sourceObjectId } : {}),
+    table,
   }
 }
 
@@ -468,12 +564,53 @@ export function createPPTFallbackHTMLSelectionElements({
       })
     }
 
+    if (item.kind === 'table') {
+      return createPPTFallbackHTMLTableElement({
+        center: centers[index],
+        createId,
+        source: item.source,
+      })
+    }
+
     return createPPTFallbackHTMLTextElement({
       center: centers[index],
       createId,
       source: item.source,
     })
   })
+}
+
+export function createPPTFallbackHTMLTableElement({
+  center,
+  createId,
+  source,
+}: {
+  center: Point
+  createId: (prefix: string) => string
+  source: PPTFallbackHTMLTableSource
+}): PPTTable {
+  const geometry = clampPPTCanvasBoundsToFrame({
+    bounds: {
+      h: source.geometry.h,
+      w: source.geometry.w,
+      x: center.x - source.geometry.w / 2,
+      y: center.y - source.geometry.h / 2,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
+
+  return {
+    geometry,
+    id: createId('table'),
+    kind: 'table',
+    name: source.name,
+    rows: normalizePPTTableRows(source.table.rows),
+  }
 }
 
 export function createPPTFallbackHTMLImageElement({
@@ -591,7 +728,7 @@ export function createPPTFallbackHTMLSelectionImportEffect({
   elements,
   source,
 }: {
-  elements: readonly (PPTImage | PPTShape | PPTTextBox)[]
+  elements: readonly (PPTImage | PPTShape | PPTTable | PPTTextBox)[]
   source: PPTFallbackHTMLSelectionSource
 }): PPTFallbackHTMLImportEffect {
   const sourceObjectIds = source.items
@@ -612,10 +749,11 @@ export function createPPTFallbackHTMLImportEffect({
   element,
   source,
 }: {
-  element: PPTImage | PPTShape | PPTTextBox
+  element: PPTImage | PPTShape | PPTTable | PPTTextBox
   source:
     | PPTFallbackHTMLImageSource
     | PPTFallbackHTMLShapeSource
+    | PPTFallbackHTMLTableSource
     | PPTFallbackHTMLTextSource
 }): PPTFallbackHTMLImportEffect {
   return {

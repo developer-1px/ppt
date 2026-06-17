@@ -18,12 +18,14 @@ import {
   getPPTFallbackHTMLImageSourceFromDataTransfer,
   getPPTFallbackHTMLSelectionSourceFromDataTransfer,
   getPPTFallbackHTMLShapeSourceFromDataTransfer,
+  getPPTFallbackHTMLTableSourceFromDataTransfer,
   getPPTFallbackHTMLTextSourceFromDataTransfer,
   PPT_FALLBACK_HTML_IMPORT_MODEL,
   type PPTFallbackHTMLImportEffect,
   type PPTFallbackHTMLImageSource,
   type PPTFallbackHTMLSelectionSource,
   type PPTFallbackHTMLShapeSource,
+  type PPTFallbackHTMLTableSource,
   type PPTFallbackHTMLTextSource,
 } from './pptFallbackHTMLImport'
 import {
@@ -51,6 +53,7 @@ export const PPT_IMPORT_EXTENSION = {
     'fallback-html-selection-source',
     'fallback-html-image-source',
     'fallback-html-shape-source',
+    'fallback-html-table-source',
     'fallback-html-text-source',
     'image-source',
     'table-source',
@@ -109,6 +112,10 @@ export type PPTClipboardImportAction =
   | {
       kind: 'fallback-html-shape-source'
       source: PPTFallbackHTMLShapeSource
+    }
+  | {
+      kind: 'fallback-html-table-source'
+      source: PPTFallbackHTMLTableSource
     }
   | {
       kind: 'fallback-html-text-source'
@@ -193,6 +200,17 @@ export function getPPTClipboardImportActions(
 
           return source
             ? { kind: 'fallback-html-shape-source', source }
+            : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source =
+            getPPTFallbackHTMLTableSourceFromDataTransfer(dataTransfer)
+
+          return source
+            ? { kind: 'fallback-html-table-source', source }
             : null
         },
       },
