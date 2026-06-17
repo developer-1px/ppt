@@ -387,6 +387,7 @@ import {
   insertInlineEditText,
   isInlineEditLineBreakInput,
 } from 'canvas/app/inline-edit-dom'
+import { measureCanvasTextBlocks } from 'canvas/app/text-measurement-dom'
 import {
   recordCanvasItemPointerClick,
   type CanvasPointerClickMemory,
@@ -17326,42 +17327,34 @@ function measurePPTTextContentSize(
   },
 ) {
   const style = element.style
-  const measurer = document.createElement('div')
+  const size = measureCanvasTextBlocks({
+    blocks: element.textBody.paragraphs.map((paragraph) => {
+      const paragraphStyle = getPPTParagraphStyle(paragraph)
 
-  measurer.style.position = 'fixed'
-  measurer.style.left = '-10000px'
-  measurer.style.top = '-10000px'
-  measurer.style.width = options.width
-  measurer.style.whiteSpace = options.whiteSpace ?? 'pre-wrap'
-  measurer.style.overflowWrap = 'anywhere'
-  measurer.style.fontFamily = getPPTTextFontFamilyCSS(style?.fontFamily)
-  measurer.style.fontSize = `${style?.fontSize ?? 24}px`
-  measurer.style.fontWeight = style?.fontWeight === 'bold'
-    ? '700'
-    : style?.fontWeight === 'semibold'
-      ? '600'
-      : '400'
-  element.textBody.paragraphs.forEach((paragraph) => {
-    const paragraphStyle = getPPTParagraphStyle(paragraph)
-    const line = document.createElement('span')
-    line.style.display = 'block'
-    line.style.lineHeight = String(paragraphStyle.lineHeight)
-    line.style.marginBottom = String(paragraphStyle.marginBottom)
-    line.style.marginTop = String(paragraphStyle.marginTop)
-    line.textContent = `${paragraph.bullet === 'bullet' ? '\u2022 ' : ''}${
-      paragraph.runs.map((run) => run.text).join('') || ' '
-    }`
-    measurer.appendChild(line)
+      return {
+        lineHeight: paragraphStyle.lineHeight,
+        marginBottom: paragraphStyle.marginBottom,
+        marginTop: paragraphStyle.marginTop,
+        text: `${paragraph.bullet === 'bullet' ? '\u2022 ' : ''}${
+          paragraph.runs.map((run) => run.text).join('') || ' '
+        }`,
+      }
+    }),
+    style: {
+      fontFamily: getPPTTextFontFamilyCSS(style?.fontFamily),
+      fontSize: `${style?.fontSize ?? 24}px`,
+      fontWeight: style?.fontWeight === 'bold'
+        ? '700'
+        : style?.fontWeight === 'semibold'
+          ? '600'
+          : '400',
+      overflowWrap: 'anywhere',
+      whiteSpace: options.whiteSpace,
+      width: options.width,
+    },
   })
-  document.body.appendChild(measurer)
 
-  const rect = measurer.getBoundingClientRect()
-  measurer.remove()
-
-  return {
-    h: rect.height,
-    w: rect.width,
-  }
+  return size ?? { h: 0, w: 0 }
 }
 
 function getPPTTextMeasurementPadding(element: PPTTextElement) {
