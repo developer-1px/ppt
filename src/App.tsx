@@ -404,6 +404,7 @@ import {
   recordCanvasItemPointerClick,
   type CanvasPointerClickMemory,
 } from 'canvas/app/pointer-click-memory'
+import { captureCanvasPointerFromEvent } from 'canvas/app/pointer-capture'
 import {
   screenPoint as getCanvasPointerScreenPoint,
   screenToWorld as getCanvasPointerWorldPoint,
@@ -5617,7 +5618,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
     const result = startCanvasPointerPanInteraction({
       input: event.nativeEvent,
       startScreen: getPointerClientPoint(event.nativeEvent),
@@ -5640,7 +5641,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const startWorld = clampPPTPointToSlide(point)
     const result = startCanvasPointerLaserInteraction({
@@ -5672,7 +5673,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5716,7 +5717,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5760,7 +5761,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5797,7 +5798,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const startDeck = deckRef.current
     const startSlide = findPPTSlide(startDeck, activeSlide.id)
@@ -5876,7 +5877,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     const additive = isAdditivePointerInput(event)
     const pointerSelection = getCanvasItemPointerSelection({
@@ -5987,7 +5988,7 @@ function App() {
     }
 
     focusStageShell()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
     const additive = isAdditivePointerInput(event)
     const point = screenToWorld(event.nativeEvent)
 
@@ -6090,7 +6091,7 @@ function App() {
       return
     }
 
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     setInteraction({
       bounds: selectedBounds,
@@ -6105,7 +6106,7 @@ function App() {
   function handleRotatePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     if (!selectedBounds || !canResizeSelection) {
       return
@@ -6135,7 +6136,7 @@ function App() {
   ) {
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     if (!selectedLineElement || !canResizeSelection) {
       return
@@ -6155,7 +6156,7 @@ function App() {
   ) {
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
 
     if (!selectedLineElement || !canResizeSelection) {
       return
@@ -8240,7 +8241,7 @@ function PPTMinimap({
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    captureCanvasPointerFromEvent(event)
     setActivePointerId(event.pointerId)
     navigate(event)
   }
