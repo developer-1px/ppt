@@ -972,6 +972,12 @@ const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
 const PPT_HTML_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.html-export+json'
+const PPT_SELECTION_SVG_CLIPBOARD_MODEL = 'canvas-rich-selection-svg-clipboard' as const
+const PPT_SELECTION_SVG_CLIPBOARD_KIND =
+  'interactive-os.ppt.selection-svg-export' as const
+const PPT_SELECTION_SVG_CLIPBOARD_VERSION = 1
+const PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.selection-svg-export+json'
 const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
@@ -1005,6 +1011,14 @@ type PPTHTMLClipboardEffect = {
   jsonMimeType: typeof PPT_HTML_CLIPBOARD_JSON_MIME_TYPE
   model: typeof PPT_HTML_CLIPBOARD_MODEL
   sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
+}
+type PPTSelectionSVGClipboardEffect = {
+  jsonMimeType: typeof PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE
+  model: typeof PPT_SELECTION_SVG_CLIPBOARD_MODEL
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
+  svgLength: number
   writeMode?: PPTRichClipboardWriteMode
 }
 type PPTStyleClipboardCategory =
@@ -1977,6 +1991,8 @@ function App() {
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
   const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
+  const [lastSelectionSVGClipboardEffect, setLastSelectionSVGClipboardEffect] =
+    useState<PPTSelectionSVGClipboardEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
@@ -5558,6 +5574,38 @@ function App() {
     })
   }
 
+  function copySelectionSVG() {
+    if (!selectionSvgCode) {
+      return
+    }
+
+    const effect = createPPTSelectionSVGClipboardEffect({
+      selectedObjectIds: selection,
+      sourceSlideId: activeSlide.id,
+      svg: selectionSvgCode,
+      writeMode: 'pending',
+    })
+
+    setLastSelectionSVGClipboardEffect(effect)
+
+    void writePPTSelectionSVGClipboard({
+      selectedObjectIds: selection,
+      sourceSlideId: activeSlide.id,
+      svg: selectionSvgCode,
+    }).then((writeMode) => {
+      setLastSelectionSVGClipboardEffect((current) =>
+        current &&
+        current.sourceSlideId === effect.sourceSlideId &&
+        current.svgLength === effect.svgLength &&
+        current.selectedObjectIds.join(' ') === effect.selectedObjectIds.join(' ')
+          ? {
+              ...current,
+              writeMode,
+            }
+          : current)
+    })
+  }
+
   function downloadSelectionSVG() {
     if (!selectionSvgCode) {
       return
@@ -7150,6 +7198,12 @@ function App() {
     section: 'Slides',
     title: `Apply ${layout.name}`,
   })), {
+    disabled: !canExportSelectionSVG,
+    id: 'export:copy-selection-svg',
+    onSelect: copySelectionSVG,
+    section: 'Export',
+    title: 'Copy selection SVG',
+  }, {
     id: 'export:download-slide-svg',
     onSelect: downloadSlideSVG,
     section: 'Export',
@@ -7630,6 +7684,9 @@ function App() {
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
             <Download size={16} /> SVG
           </button>
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy selection SVG" className="ppt-button" data-ppt-copy-selection-svg disabled={!canExportSelectionSVG} onClick={copySelectionSVG} type="button">
+            <Copy size={16} /> Sel SVG
+          </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download selection SVG" className="ppt-button" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG} type="button">
             <Download size={16} /> Sel SVG
           </button>
@@ -7742,6 +7799,12 @@ function App() {
         data-ppt-html-clipboard-model={lastHTMLClipboardEffect?.model}
         data-ppt-html-clipboard-source-slide={lastHTMLClipboardEffect?.sourceSlideId}
         data-ppt-html-clipboard-write-mode={lastHTMLClipboardEffect?.writeMode}
+        data-ppt-selection-svg-clipboard-json-mime-type={lastSelectionSVGClipboardEffect?.jsonMimeType}
+        data-ppt-selection-svg-clipboard-model={lastSelectionSVGClipboardEffect?.model}
+        data-ppt-selection-svg-clipboard-selection={lastSelectionSVGClipboardEffect?.selectedObjectIds.join(' ')}
+        data-ppt-selection-svg-clipboard-source-slide={lastSelectionSVGClipboardEffect?.sourceSlideId}
+        data-ppt-selection-svg-clipboard-svg-length={lastSelectionSVGClipboardEffect?.svgLength}
+        data-ppt-selection-svg-clipboard-write-mode={lastSelectionSVGClipboardEffect?.writeMode}
         data-ppt-rich-clipboard-formats={lastRichClipboardEffect?.formats.join(' ')}
         data-ppt-rich-clipboard-import-format={lastRichClipboardEffect?.importFormat}
         data-ppt-rich-clipboard-imported={lastRichClipboardEffect?.imported ? 'true' : undefined}
@@ -9779,6 +9842,27 @@ function createPPTHTMLClipboardEffect({
   }
 }
 
+function createPPTSelectionSVGClipboardEffect({
+  selectedObjectIds,
+  sourceSlideId,
+  svg,
+  writeMode,
+}: {
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
+  svg: string
+  writeMode?: PPTRichClipboardWriteMode
+}): PPTSelectionSVGClipboardEffect {
+  return {
+    jsonMimeType: PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE,
+    model: PPT_SELECTION_SVG_CLIPBOARD_MODEL,
+    selectedObjectIds,
+    sourceSlideId,
+    svgLength: svg.length,
+    writeMode,
+  }
+}
+
 function createPPTRichClipboardExportPayload(
   payload: PPTClipboardPayload,
 ): PPTRichClipboardExportPayload {
@@ -9836,6 +9920,35 @@ async function writePPTHTMLClipboard({
     json,
     jsonMimeType: PPT_HTML_CLIPBOARD_JSON_MIME_TYPE,
     plainText: html,
+  })
+}
+
+async function writePPTSelectionSVGClipboard({
+  selectedObjectIds,
+  sourceSlideId,
+  svg,
+}: {
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
+  svg: string
+}): Promise<PPTRichClipboardWriteMode> {
+  const json = stringifyPPTCanvasRichClipboardPayload({
+    kind: PPT_SELECTION_SVG_CLIPBOARD_KIND,
+    metadata: {
+      objectCount: selectedObjectIds.length,
+      selectedObjectIds,
+      sourceSlideId,
+      svgLength: svg.length,
+    },
+    version: PPT_SELECTION_SVG_CLIPBOARD_VERSION,
+  })
+
+  return writePPTCanvasRichClipboardPayload({
+    html: svg,
+    json,
+    jsonMimeType: PPT_SELECTION_SVG_CLIPBOARD_JSON_MIME_TYPE,
+    plainText: svg,
+    selectionSvg: svg,
   })
 }
 

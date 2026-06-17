@@ -5719,9 +5719,40 @@ async function runExportScenario(page) {
   await delay(80)
 
   const beforeSelectionSvg = await page.eval(`(() => ({
+    copyDisabled: document.querySelector('[data-ppt-copy-selection-svg]')?.disabled ?? true,
     disabled: document.querySelector('[data-ppt-export-selection-svg]')?.disabled ?? true,
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
   }))()`)
+
+  await page.eval(`(() => {
+    window.__pptClipboardItemTypes = []
+    window.__pptClipboardWriteCount = 0
+    window.__pptClipboardWriteText = ''
+  })()`)
+  await page.eval(`document.querySelector('[data-ppt-copy-selection-svg]')?.click()`)
+  await delay(80)
+
+  const selectionSvgClipboardState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const mimeType = stage?.getAttribute('data-ppt-selection-svg-clipboard-json-mime-type') ?? ''
+    const itemTypes = window.__pptClipboardItemTypes?.at(-1) ?? []
+
+    return {
+      hasCustomJson: itemTypes.includes(mimeType),
+      hasHTML: itemTypes.includes('text/html'),
+      hasPlainText: itemTypes.includes('text/plain'),
+      hasSVG: itemTypes.includes('image/svg+xml'),
+      itemTypes,
+      mimeType,
+      model: stage?.getAttribute('data-ppt-selection-svg-clipboard-model') ?? '',
+      selection: stage?.getAttribute('data-ppt-selection-svg-clipboard-selection') ?? '',
+      sourceSlide: stage?.getAttribute('data-ppt-selection-svg-clipboard-source-slide') ?? '',
+      svgLength: Number(stage?.getAttribute('data-ppt-selection-svg-clipboard-svg-length') ?? 0),
+      writeCount: window.__pptClipboardWriteCount ?? 0,
+      writeMode: stage?.getAttribute('data-ppt-selection-svg-clipboard-write-mode') ?? '',
+      writeTextLength: (window.__pptClipboardWriteText ?? '').length,
+    }
+  })()`)
 
   await page.eval(`document.querySelector('[data-ppt-export-selection-svg]')?.click()`)
   await delay(80)
@@ -5745,7 +5776,22 @@ async function runExportScenario(page) {
     }
   })()`)
 
-  record('enables selected-object PPT SVG export', beforeSelectionSvg.selectedId === imageId && !beforeSelectionSvg.disabled, beforeSelectionSvg)
+  record('enables selected-object PPT SVG export', beforeSelectionSvg.selectedId === imageId && !beforeSelectionSvg.disabled && !beforeSelectionSvg.copyDisabled, beforeSelectionSvg)
+  record(
+    'copies selected PPT objects as SVG through canvas rich clipboard writer',
+    selectionSvgClipboardState.model === 'canvas-rich-selection-svg-clipboard' &&
+      selectionSvgClipboardState.sourceSlide === 'slide-1' &&
+      selectionSvgClipboardState.selection === imageId &&
+      selectionSvgClipboardState.writeMode === 'clipboard-item' &&
+      selectionSvgClipboardState.writeCount === 1 &&
+      selectionSvgClipboardState.svgLength > 100 &&
+      selectionSvgClipboardState.hasCustomJson &&
+      selectionSvgClipboardState.hasHTML &&
+      selectionSvgClipboardState.hasPlainText &&
+      selectionSvgClipboardState.hasSVG &&
+      selectionSvgClipboardState.writeTextLength === 0,
+    selectionSvgClipboardState,
+  )
   record('downloads selected PPT objects as SVG', selectionSvgState.download === 'slide-1-selection.svg' && selectionSvgState.type.includes('image/svg+xml') && selectionSvgState.hasSvg && selectionSvgState.hasScope && selectionSvgState.hasOnlySelectedImage, selectionSvgState)
   record('preserves PPT image fit/crop/flip metadata in selection SVG', selectionSvgState.hasFit && selectionSvgState.hasCrop && selectionSvgState.hasFlip, selectionSvgState)
 
