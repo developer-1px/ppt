@@ -466,6 +466,7 @@ import {
 } from 'canvas/app/pointer-geometry'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
+  CANVAS_LASER_TRAIL_OVERLAY_MODEL,
   previewCanvasPointerLaserInteraction,
   startCanvasPointerLaserInteraction,
   type CanvasPointerLaserInteraction,
@@ -7857,7 +7858,7 @@ function App() {
         data-ppt-laser-tool-active={isLaserToolActive ? 'true' : 'false'}
         data-ppt-laser-tool-model={CANVAS_TOOL_AFFORDANCES.laser.model}
         data-ppt-laser-tool-shortcut={CANVAS_TOOL_AFFORDANCES.laser.shortcut}
-        data-ppt-laser-trail-model="canvas-laser-trail-overlay"
+        data-ppt-laser-trail-model={CANVAS_LASER_TRAIL_OVERLAY_MODEL}
         data-ppt-laser-trail-point-count={laserTrailPoints.length}
         data-ppt-laser-trail-state={interaction?.kind === 'laser'
           ? 'active'
