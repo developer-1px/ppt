@@ -344,10 +344,12 @@ import {
   getCanvasFindInputKeyboardIntent,
 } from 'canvas/app/find-replace-keyboard'
 import {
+  CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL,
   isCanvasKeyboardCommandIntent,
   runCanvasKeyboardCommandIntent,
 } from 'canvas/app/keyboard-command-dispatch'
 import {
+  CANVAS_KEYBOARD_COMMAND_INTENT_MODEL,
   getCanvasKeyboardBuiltinCommandShortcutIntent,
 } from 'canvas/app/keyboard-command-shortcuts'
 import { isCanvasKeyboardTypingTarget } from 'canvas/app/keyboard-shortcut-intent'
@@ -364,6 +366,7 @@ import {
   shouldReleaseCanvasKeyboardTemporaryPan,
 } from 'canvas/app/keyboard-system-shortcuts'
 import {
+  CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
   getCanvasKeyboardToolShortcutIntent,
 } from 'canvas/app/keyboard-tool-shortcuts'
 import {
@@ -371,6 +374,8 @@ import {
   runCanvasKeyboardViewportIntent,
 } from 'canvas/app/keyboard-viewport-dispatch'
 import {
+  CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
+  CANVAS_KEYBOARD_VIEWPORT_MODEL,
   getCanvasKeyboardViewportShortcutIntent,
 } from 'canvas/app/keyboard-viewport-shortcuts'
 import {
@@ -8070,11 +8075,11 @@ function App() {
           ? String(selectedTextAutoFitIndicator.isVisible)
           : undefined}
         data-ppt-text-overflow-indicator-width={selectedTextAutoFitIndicator?.bounds.w}
-        data-ppt-keyboard-command-dispatch="canvas-keyboard-command-dispatch"
-        data-ppt-keyboard-command-intent="canvas-keyboard-command-shortcut-intent"
-        data-ppt-keyboard-tool-dispatch="canvas-keyboard-tool-dispatch"
-        data-ppt-keyboard-viewport-intent="canvas-keyboard-viewport-shortcut-intent"
-        data-ppt-keyboard-viewport-model="canvas-keyboard-viewport-shortcuts"
+        data-ppt-keyboard-command-dispatch={CANVAS_KEYBOARD_COMMAND_DISPATCH_MODEL}
+        data-ppt-keyboard-command-intent={CANVAS_KEYBOARD_COMMAND_INTENT_MODEL}
+        data-ppt-keyboard-tool-dispatch={CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL}
+        data-ppt-keyboard-viewport-intent={CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL}
+        data-ppt-keyboard-viewport-model={CANVAS_KEYBOARD_VIEWPORT_MODEL}
         data-ppt-sticky-tool-model="canvas-sticky-note-tool"
         data-ppt-sticky-tool-shortcut="S"
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
