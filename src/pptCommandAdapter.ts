@@ -1,5 +1,5 @@
 import {
-  clamp,
+  clampCanvasBoundsToFrame,
   createCanvasSequentialIdFactory,
   type Bounds,
 } from 'canvas/core'
@@ -350,10 +350,19 @@ function clonePPTElement(
   offset: { x: number; y: number },
   groupId: string | undefined,
 ): PPTElement {
+  const bounds = clampCanvasBoundsToFrame({
+    bounds: {
+      ...pptGeometryToBounds(item.geometry),
+      x: item.geometry.x + offset.x,
+      y: item.geometry.y + offset.y,
+    },
+    frame: getPPTSlideBounds(),
+    minHeight: 24,
+    minWidth: 24,
+  })
   const geometry = {
     ...item.geometry,
-    x: clamp(item.geometry.x + offset.x, 0, PPT_SLIDE_WIDTH - item.geometry.w),
-    y: clamp(item.geometry.y + offset.y, 0, PPT_SLIDE_HEIGHT - item.geometry.h),
+    ...bounds,
   }
 
   return {
