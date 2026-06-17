@@ -329,6 +329,7 @@ import {
 import {
   getCanvasKeyboardBuiltinCommandShortcutIntent,
 } from 'canvas/app/keyboard-command-shortcuts'
+import { isCanvasKeyboardTypingTarget } from 'canvas/app/keyboard-shortcut-intent'
 import {
   getCanvasKeyboardNudgeShortcutIntent,
 } from 'canvas/app/keyboard-nudge-shortcuts'
@@ -2458,7 +2459,7 @@ function App() {
         }
       }
 
-      if (isEditableTarget(event.target)) {
+      if (isCanvasKeyboardTypingTarget(event.target)) {
         return
       }
 
@@ -2713,7 +2714,7 @@ function App() {
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
-      if (isEditableTarget(event.target)) {
+      if (isCanvasKeyboardTypingTarget(event.target)) {
         return
       }
 
@@ -5600,7 +5601,7 @@ function App() {
   function handleStageWheel(event: WheelEvent) {
     if (
       editingId ||
-      isEditableTarget(event.target) ||
+      isCanvasKeyboardTypingTarget(event.target) ||
       isPPTWheelViewportPassthroughTarget(event.target)
     ) {
       return
@@ -5977,7 +5978,7 @@ function App() {
     event: ReactMouseEvent<HTMLDivElement>,
     elementId: string,
   ) {
-    if (editingId || isEditableTarget(event.target)) {
+    if (editingId || isCanvasKeyboardTypingTarget(event.target)) {
       return
     }
 
@@ -6054,7 +6055,7 @@ function App() {
   }
 
   function handleStageContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
-    if (editingId || isEditableTarget(event.target)) {
+    if (editingId || isCanvasKeyboardTypingTarget(event.target)) {
       return
     }
 
@@ -14915,12 +14916,6 @@ function pptTextRunStyle(run: PPTRun): CSSProperties {
     fontWeight: run.bold === true ? 700 : undefined,
     textDecoration: run.underline === true ? 'underline' : undefined,
   }
-}
-
-function isEditableTarget(target: EventTarget | null) {
-  return target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 }
 
 function isPPTTemporaryPanBlockedTarget(target: EventTarget | null) {

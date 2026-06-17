@@ -27,6 +27,7 @@
       "canvas/app/keyboard-command-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandDispatch.ts"],
       "canvas/app/keyboard-command-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardCommandShortcuts.ts"],
       "canvas/app/keyboard-nudge-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardNudgeShortcuts.ts"],
+      "canvas/app/keyboard-shortcut-intent": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardShortcutIntent.ts"],
       "canvas/app/keyboard-system-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardSystemShortcuts.ts"],
       "canvas/app/keyboard-tool-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardToolShortcutIntent.ts"],
       "canvas/app/keyboard-viewport-dispatch": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardViewportDispatch.ts"],
