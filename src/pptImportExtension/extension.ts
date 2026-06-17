@@ -15,10 +15,12 @@ import {
 } from './mediaImport'
 import {
   createPPTFallbackHTMLImportEffect,
+  getPPTFallbackHTMLSelectionSourceFromDataTransfer,
   getPPTFallbackHTMLShapeSourceFromDataTransfer,
   getPPTFallbackHTMLTextSourceFromDataTransfer,
   PPT_FALLBACK_HTML_IMPORT_MODEL,
   type PPTFallbackHTMLImportEffect,
+  type PPTFallbackHTMLSelectionSource,
   type PPTFallbackHTMLShapeSource,
   type PPTFallbackHTMLTextSource,
 } from './pptFallbackHTMLImport'
@@ -44,6 +46,7 @@ export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
   clipboardActionOrder: [
     'image-file',
+    'fallback-html-selection-source',
     'fallback-html-shape-source',
     'fallback-html-text-source',
     'image-source',
@@ -91,6 +94,10 @@ export type PPTClipboardImportAction =
       kind: 'image-source'
       resolveNaturalSize?: boolean
       source: PPTImageImportSource
+    }
+  | {
+      kind: 'fallback-html-selection-source'
+      source: PPTFallbackHTMLSelectionSource
     }
   | {
       kind: 'fallback-html-shape-source'
@@ -147,6 +154,17 @@ export function getPPTClipboardImportActions(
           const file = getPPTImageFileFromDataTransfer(dataTransfer)
 
           return file ? { file, kind: 'image-file' } : null
+        },
+      },
+      {
+        mode: 'exclusive',
+        resolve: () => {
+          const source =
+            getPPTFallbackHTMLSelectionSourceFromDataTransfer(dataTransfer)
+
+          return source
+            ? { kind: 'fallback-html-selection-source', source }
+            : null
         },
       },
       {

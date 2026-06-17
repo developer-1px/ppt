@@ -2834,6 +2834,163 @@ async function runCrossSlideClipboardScenario(page) {
       afterShapeFallbackHTMLPaste,
     },
   )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const multiTextPoint = await getElementCenter(page, 's1-title')
+  const multiShapePoint = await getElementCenter(page, 's1-card-1')
+
+  await clickMouse(page, multiTextPoint.x, multiTextPoint.y, 1)
+  await delay(80)
+  await clickMouse(page, multiShapePoint.x, multiShapePoint.y, 1, 8)
+  await delay(80)
+
+  await page.eval(`(() => {
+    window.__pptMultiRichClipboardItemTypes = []
+    window.__pptMultiRichClipboardWriteCount = 0
+    window.__pptMultiRichClipboardHTML = ''
+    window.__pptMultiRichClipboardJSON = ''
+    window.__pptMultiRichClipboardPlainText = ''
+    window.__pptMultiRichClipboardSVG = ''
+
+    window.ClipboardItem = class PPTMultiRichClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptMultiRichClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptMultiRichClipboardWriteCount = items.length
+          const item = items[0]
+          const mimeType = Object.keys(item.items)
+            .find((type) => type !== 'text/html' && type !== 'text/plain' && type !== 'image/svg+xml') ?? ''
+
+          window.__pptMultiRichClipboardHTML = await item.items['text/html'].text()
+          window.__pptMultiRichClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptMultiRichClipboardSVG = item.items['image/svg+xml']
+            ? await item.items['image/svg+xml'].text()
+            : ''
+          window.__pptMultiRichClipboardJSON = mimeType
+            ? await item.items[mimeType].text()
+            : ''
+        },
+      },
+    })
+  })()`)
+
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(120)
+
+  const afterMultiCopy = await getPPTCrossSlideClipboardState(page)
+  const multiRichClipboardWrite = await page.eval(`(() => ({
+    html: window.__pptMultiRichClipboardHTML ?? '',
+    itemTypes: window.__pptMultiRichClipboardItemTypes?.at(-1) ?? [],
+    json: window.__pptMultiRichClipboardJSON ?? '',
+    plainText: window.__pptMultiRichClipboardPlainText ?? '',
+    svg: window.__pptMultiRichClipboardSVG ?? '',
+    writeCount: window.__pptMultiRichClipboardWriteCount ?? 0,
+  }))()`)
+  const multiCopiedShapeId = afterMultiCopy.selectedIds.find((id, index) =>
+    afterMultiCopy.selectedKinds[index] === 'shape') ?? ''
+
+  record(
+    'copies multi-selected PPT text and shape with positioned fallback HTML',
+    afterMultiCopy.selectedCount === 2 &&
+      afterMultiCopy.richClipboardObjectCount === 2 &&
+      Boolean(multiCopiedShapeId) &&
+      afterMultiCopy.selectedIds.includes('s1-title') &&
+      afterMultiCopy.selectedKinds.includes('shape') &&
+      afterMultiCopy.richClipboardSelection.includes('s1-title') &&
+      afterMultiCopy.richClipboardSelection.includes(multiCopiedShapeId) &&
+      multiRichClipboardWrite.writeCount === 1 &&
+      multiRichClipboardWrite.itemTypes.includes(afterMultiCopy.richClipboardJsonMimeType) &&
+      multiRichClipboardWrite.html.includes(`data-ppt-selection-object="${multiCopiedShapeId}"`) &&
+      multiRichClipboardWrite.html.includes('data-ppt-selection-text-body="true"') &&
+      multiRichClipboardWrite.html.includes('data-ppt-selection-shape="rect"') &&
+      multiRichClipboardWrite.html.includes('data-ppt-selection-x="') &&
+      multiRichClipboardWrite.html.includes('data-ppt-selection-y="') &&
+      multiRichClipboardWrite.html.includes('Edited title') &&
+      multiRichClipboardWrite.html.includes('Fast draft'),
+    {
+      afterMultiCopy,
+      multiCopiedShapeId,
+      multiRichClipboardWrite,
+    },
+  )
+
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(multiRichClipboardWrite.html)}, ${JSON.stringify(multiRichClipboardWrite.plainText)})`)
+  await delay(120)
+
+  const afterMultiFallbackHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'pastes multi-object PPT fallback HTML as editable selection',
+    afterMultiFallbackHTMLPaste.stageCount === afterMultiCopy.stageCount + 2 &&
+      afterMultiFallbackHTMLPaste.selectedCount === 2 &&
+      afterMultiFallbackHTMLPaste.selectedKinds.includes('textBox') &&
+      afterMultiFallbackHTMLPaste.selectedKinds.includes('shape') &&
+      afterMultiFallbackHTMLPaste.selectedTexts.some((text) =>
+        text.includes('Edited title')) &&
+      afterMultiFallbackHTMLPaste.selectedTexts.some((text) =>
+        text.includes('Fast draft')) &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportKind === 'selection' &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportCount === 2 &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportSourceObjects.includes('s1-title') &&
+      afterMultiFallbackHTMLPaste.fallbackHTMLImportSourceObjects.includes(multiCopiedShapeId),
+    {
+      afterMultiCopy,
+      afterMultiFallbackHTMLPaste,
+      multiCopiedShapeId,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterMultiFallbackUndo = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'undoes multi-object PPT fallback HTML paste as one history step',
+    afterMultiFallbackUndo.stageCount === afterMultiCopy.stageCount,
+    {
+      afterMultiCopy,
+      afterMultiFallbackHTMLPaste,
+      afterMultiFallbackUndo,
+    },
+  )
 }
 
 async function runSelectSameTypeScenario(page) {
@@ -8138,7 +8295,7 @@ async function runImageImportScenario(page) {
       afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file fallback-html-selection-source fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -14388,6 +14545,7 @@ function getPPTCrossSlideClipboardState(page) {
     const stage = document.querySelector('.ppt-stage-shell')
     const slide = document.querySelector('.ppt-slide')
     const selected = document.querySelector('[data-selected="true"]')
+    const selectedElements = [...document.querySelectorAll('[data-selected="true"]')]
     const thumbs = [...document.querySelectorAll('.ppt-thumb')]
 
     return {
@@ -14400,12 +14558,14 @@ function getPPTCrossSlideClipboardState(page) {
       clipboardSelectedObjectIds: stage?.getAttribute('data-ppt-clipboard-selected-object-ids') ?? '',
       clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
       clipboardType: stage?.getAttribute('data-ppt-clipboard-type') ?? '',
+      fallbackHTMLImportCount: Number(stage?.getAttribute('data-ppt-fallback-html-import-count') ?? 0),
       fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
       fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
       fallbackHTMLImportName: stage?.getAttribute('data-ppt-fallback-html-import-name') ?? '',
       fallbackHTMLImportShape: stage?.getAttribute('data-ppt-fallback-html-import-shape') ?? '',
       fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
+      fallbackHTMLImportSourceObjects: stage?.getAttribute('data-ppt-fallback-html-import-source-objects') ?? '',
       keyboardCommandDispatch: stage?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
       keyboardCommandIntent: stage?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       pasteAnchor: stage?.getAttribute('data-ppt-clipboard-paste-anchor') ?? '',
@@ -14443,10 +14603,16 @@ function getPPTCrossSlideClipboardState(page) {
       selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
       selectedHeight: Number.parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedIds: selectedElements.map((element) =>
+        element.getAttribute('data-ppt-element') ?? ''),
       selectedKind: selected?.getAttribute('data-kind') ?? '',
+      selectedKinds: selectedElements.map((element) =>
+        element.getAttribute('data-kind') ?? ''),
       selectedName: document.querySelector('[data-ppt-layer-row][aria-selected="true"] .ppt-layer-name')?.textContent ?? '',
       selectedShape: selected?.getAttribute('data-shape') ?? '',
       selectedText: selected?.querySelector('.ppt-element-editor, [data-ppt-comment-body], .ppt-table-grid')?.textContent?.trim() ?? selected?.getAttribute('data-ppt-alt-text') ?? selected?.getAttribute('data-ppt-element-name') ?? '',
+      selectedTexts: selectedElements.map((element) =>
+        element.querySelector('.ppt-element-editor, [data-ppt-comment-body], .ppt-table-grid')?.textContent?.trim() ?? element.getAttribute('data-ppt-alt-text') ?? element.getAttribute('data-ppt-element-name') ?? ''),
       selectedWidth: Number.parseFloat(selected?.style.width ?? '0'),
       selectedX: Number.parseFloat(selected?.style.left ?? '0'),
       selectedY: Number.parseFloat(selected?.style.top ?? '0'),

@@ -26,6 +26,8 @@ export type PPTFallbackHTMLShapeSource = {
   geometry: {
     h: number
     w: number
+    x?: number
+    y?: number
   }
   name: string
   shape: PPTShapeKind
@@ -39,6 +41,8 @@ export type PPTFallbackHTMLTextSource = {
   geometry: {
     h: number
     w: number
+    x?: number
+    y?: number
   }
   name: string
   sourceObjectId?: string
@@ -46,13 +50,30 @@ export type PPTFallbackHTMLTextSource = {
   textBody: PPTTextBody
 }
 
+export type PPTFallbackHTMLSelectionItemSource =
+  | {
+      kind: PPTShape['kind']
+      source: PPTFallbackHTMLShapeSource
+    }
+  | {
+      kind: PPTTextBox['kind']
+      source: PPTFallbackHTMLTextSource
+    }
+
+export type PPTFallbackHTMLSelectionSource = {
+  items: PPTFallbackHTMLSelectionItemSource[]
+  name: string
+}
+
 export type PPTFallbackHTMLImportEffect = {
   format: 'text-html-ppt-fallback'
-  kind: PPTShape['kind'] | PPTTextBox['kind']
+  kind: PPTShape['kind'] | PPTTextBox['kind'] | 'selection'
   model: typeof PPT_FALLBACK_HTML_IMPORT_MODEL
   name: string
+  objectCount?: number
   shape?: PPTShapeKind
   sourceObjectId?: string
+  sourceObjectIds?: string[]
 }
 
 const PPT_FALLBACK_SHAPE_MIN_SIZE = 48
@@ -78,6 +99,32 @@ export function getPPTFallbackHTMLTextSourceFromDataTransfer(
   )
 }
 
+export function getPPTFallbackHTMLSelectionSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTFallbackHTMLSelectionSourceFromHTML(
+    dataTransfer?.getData('text/html') ?? '',
+  )
+}
+
+export function getPPTFallbackHTMLSelectionSourceFromHTML(
+  html: string,
+): PPTFallbackHTMLSelectionSource | null {
+  if (!html || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const items = getPPTFallbackHTMLSelectionItemSources(doc)
+
+  return items.length > 1
+    ? {
+        items,
+        name: 'PPT HTML Selection',
+      }
+    : null
+}
+
 export function getPPTFallbackHTMLShapeSourceFromHTML(
   html: string,
 ): PPTFallbackHTMLShapeSource | null {
@@ -92,6 +139,57 @@ export function getPPTFallbackHTMLShapeSourceFromHTML(
     return null
   }
 
+  return getPPTFallbackHTMLShapeSourceFromElement(element)
+}
+
+export function getPPTFallbackHTMLTextSourceFromHTML(
+  html: string,
+): PPTFallbackHTMLTextSource | null {
+  if (!html || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const element = [...doc.querySelectorAll<HTMLElement>(
+    '[data-ppt-selection-text-body]',
+  )].find(isPPTFallbackHTMLStandaloneTextElement)
+
+  return element ? getPPTFallbackHTMLTextSourceFromElement(element) : null
+}
+
+function getPPTFallbackHTMLSelectionItemSources(
+  doc: Document,
+): PPTFallbackHTMLSelectionItemSource[] {
+  return [...doc.querySelectorAll<HTMLElement>(
+    '[data-ppt-selection-shape], [data-ppt-selection-text-body]',
+  )]
+    .map((element): PPTFallbackHTMLSelectionItemSource | null => {
+      if (element.hasAttribute('data-ppt-selection-shape')) {
+        const source = getPPTFallbackHTMLShapeSourceFromElement(element)
+
+        return source ? { kind: 'shape', source } : null
+      }
+
+      if (isPPTFallbackHTMLStandaloneTextElement(element)) {
+        const source = getPPTFallbackHTMLTextSourceFromElement(element)
+
+        return source ? { kind: 'textBox', source } : null
+      }
+
+      return null
+    })
+    .filter((item): item is PPTFallbackHTMLSelectionItemSource =>
+      item !== null)
+}
+
+function isPPTFallbackHTMLStandaloneTextElement(element: HTMLElement) {
+  return !element.closest('[data-ppt-selection-shape]') &&
+    element.getAttribute('data-ppt-selection-shape') === null
+}
+
+function getPPTFallbackHTMLShapeSourceFromElement(
+  element: HTMLElement,
+): PPTFallbackHTMLShapeSource | null {
   const shape = parsePPTFallbackShapeKind(
     element.getAttribute('data-ppt-selection-shape'),
   )
@@ -121,6 +219,7 @@ export function getPPTFallbackHTMLShapeSourceFromHTML(
         PPT_FALLBACK_SHAPE_MIN_SIZE,
         PPT_FALLBACK_SHAPE_MAX_HEIGHT,
       ),
+      ...parsePPTFallbackHTMLPositionAttributes(element),
       w: clampPPTCanvasValue(
         parsePPTFallbackHTMLPixelStyle(rawStyle, 'width') ?? 320,
         PPT_FALLBACK_SHAPE_MIN_SIZE,
@@ -152,24 +251,9 @@ export function getPPTFallbackHTMLShapeSourceFromHTML(
   }
 }
 
-export function getPPTFallbackHTMLTextSourceFromHTML(
-  html: string,
+function getPPTFallbackHTMLTextSourceFromElement(
+  element: HTMLElement,
 ): PPTFallbackHTMLTextSource | null {
-  if (!html || typeof DOMParser === 'undefined') {
-    return null
-  }
-
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const element = [...doc.querySelectorAll<HTMLElement>(
-    '[data-ppt-selection-text-body]',
-  )].find((candidate) =>
-    !candidate.closest('[data-ppt-selection-shape]') &&
-    candidate.getAttribute('data-ppt-selection-shape') === null)
-
-  if (!element) {
-    return null
-  }
-
   const textBody = getPPTFallbackHTMLTextBody(element)
 
   if (!textBody) {
@@ -188,6 +272,7 @@ export function getPPTFallbackHTMLTextSourceFromHTML(
         PPT_FALLBACK_TEXT_MIN_SIZE,
         PPT_FALLBACK_TEXT_MAX_HEIGHT,
       ),
+      ...parsePPTFallbackHTMLPositionAttributes(element),
       w: clampPPTCanvasValue(
         parsePPTFallbackHTMLPixelStyle(rawStyle, 'width') ?? 460,
         PPT_FALLBACK_TEXT_MIN_SIZE,
@@ -215,6 +300,31 @@ export function getPPTFallbackHTMLTextSourceFromHTML(
     },
     textBody,
   }
+}
+
+export function createPPTFallbackHTMLSelectionElements({
+  center,
+  createId,
+  source,
+}: {
+  center: Point
+  createId: (prefix: string) => string
+  source: PPTFallbackHTMLSelectionSource
+}) {
+  const centers = getPPTFallbackHTMLSelectionItemCenters(source, center)
+
+  return source.items.map((item, index) =>
+    item.kind === 'shape'
+      ? createPPTFallbackHTMLShapeElement({
+          center: centers[index],
+          createId,
+          source: item.source,
+        })
+      : createPPTFallbackHTMLTextElement({
+          center: centers[index],
+          createId,
+          source: item.source,
+        }))
 }
 
 export function createPPTFallbackHTMLShapeElement({
@@ -292,6 +402,27 @@ export function createPPTFallbackHTMLTextElement({
   }
 }
 
+export function createPPTFallbackHTMLSelectionImportEffect({
+  elements,
+  source,
+}: {
+  elements: readonly (PPTShape | PPTTextBox)[]
+  source: PPTFallbackHTMLSelectionSource
+}): PPTFallbackHTMLImportEffect {
+  const sourceObjectIds = source.items
+    .map((item) => item.source.sourceObjectId)
+    .filter((id): id is string => Boolean(id))
+
+  return {
+    format: 'text-html-ppt-fallback',
+    kind: 'selection',
+    model: PPT_FALLBACK_HTML_IMPORT_MODEL,
+    name: source.name,
+    objectCount: elements.length,
+    ...(sourceObjectIds.length > 0 ? { sourceObjectIds } : {}),
+  }
+}
+
 export function createPPTFallbackHTMLImportEffect({
   element,
   source,
@@ -307,6 +438,49 @@ export function createPPTFallbackHTMLImportEffect({
     ...(element.kind === 'shape' ? { shape: element.shape } : {}),
     ...(source.sourceObjectId ? { sourceObjectId: source.sourceObjectId } : {}),
   }
+}
+
+function getPPTFallbackHTMLSelectionItemCenters(
+  source: PPTFallbackHTMLSelectionSource,
+  center: Point,
+) {
+  if (source.items.every((item) =>
+    item.source.geometry.x !== undefined &&
+    item.source.geometry.y !== undefined)) {
+    const bounds = source.items.reduce(
+      (current, item) => {
+        const x = item.source.geometry.x ?? 0
+        const y = item.source.geometry.y ?? 0
+
+        return {
+          maxX: Math.max(current.maxX, x + item.source.geometry.w),
+          maxY: Math.max(current.maxY, y + item.source.geometry.h),
+          minX: Math.min(current.minX, x),
+          minY: Math.min(current.minY, y),
+        }
+      },
+      {
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY,
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+      },
+    )
+    const offset = {
+      x: center.x - (bounds.minX + (bounds.maxX - bounds.minX) / 2),
+      y: center.y - (bounds.minY + (bounds.maxY - bounds.minY) / 2),
+    }
+
+    return source.items.map((item) => ({
+      x: (item.source.geometry.x ?? 0) + item.source.geometry.w / 2 + offset.x,
+      y: (item.source.geometry.y ?? 0) + item.source.geometry.h / 2 + offset.y,
+    }))
+  }
+
+  return source.items.map((_, index) => ({
+    x: center.x + index * 28,
+    y: center.y + index * 28,
+  }))
 }
 
 function parsePPTFallbackShapeKind(value: string | null): PPTShapeKind | null {
@@ -333,6 +507,31 @@ function parsePPTFallbackHTMLPixelStyle(
   const match = value.match(/-?\d+(?:\.\d+)?/)
 
   return match ? Number(match[0]) : undefined
+}
+
+function parsePPTFallbackHTMLPositionAttributes(element: HTMLElement) {
+  const x = parsePPTFallbackHTMLNumberAttribute(element, 'data-ppt-selection-x')
+  const y = parsePPTFallbackHTMLNumberAttribute(element, 'data-ppt-selection-y')
+
+  return {
+    ...(x === undefined ? {} : { x }),
+    ...(y === undefined ? {} : { y }),
+  }
+}
+
+function parsePPTFallbackHTMLNumberAttribute(
+  element: HTMLElement,
+  attribute: string,
+) {
+  const rawValue = element.getAttribute(attribute)
+
+  if (rawValue === null || rawValue.trim() === '') {
+    return undefined
+  }
+
+  const value = Number(rawValue)
+
+  return Number.isFinite(value) ? value : undefined
 }
 
 function parsePPTFallbackHTMLBorder(style: string): PPTStroke | undefined {
