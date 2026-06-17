@@ -297,7 +297,7 @@ import {
   type SlideEditSlideTransitionDescriptor,
   type SlideEditTransitionHostCommandEffect,
   type SlideEditTransitionUpdateCommand,
-} from '@interactive-os/slide-edit-affordance'
+} from './pptSlideEditAffordanceAdapter'
 import {
   PPT_RESIZE_HANDLES,
   clampPPTCanvasBoundsToFrame,

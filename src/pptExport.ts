@@ -13,7 +13,7 @@ import {
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
-} from '@interactive-os/slide-edit-affordance'
+} from './pptSlideEditAffordanceAdapter'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
