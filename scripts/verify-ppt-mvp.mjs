@@ -8581,6 +8581,57 @@ async function runSlideTransitionScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      transition: {
+        advanceAfterMs: 2500,
+        advanceOnClick: false,
+        durationMs: 720,
+        type: 'push',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterTransitionPaste = await getPPTSlideTransitionState(page)
+
+  record(
+    'pastes JSON slide transition into active PPT slide',
+    afterTransitionPaste.importModel === 'ppt-slide-transition-import' &&
+      afterTransitionPaste.importFormat === 'application-json-ppt-slide-transition' &&
+      afterTransitionPaste.importSlide === 'slide-1' &&
+      afterTransitionPaste.importFields ===
+        'type durationMs advanceOnClick advanceAfterMs' &&
+      afterTransitionPaste.importCommands ===
+        'update-slide-transition update-slide-transition update-slide-transition update-slide-transition' &&
+      afterTransitionPaste.importCommandFields === 'type durationMs advance advance' &&
+      afterTransitionPaste.importType === 'push' &&
+      afterTransitionPaste.importDuration === '720' &&
+      afterTransitionPaste.importAdvanceOnClick === 'false' &&
+      afterTransitionPaste.importAdvanceAfter === '2500' &&
+      afterTransitionPaste.importJsonLength > 80 &&
+      afterTransitionPaste.type === 'push' &&
+      afterTransitionPaste.duration === '720' &&
+      afterTransitionPaste.advanceOnClick === 'false' &&
+      afterTransitionPaste.advanceAfter === '2500' &&
+      afterTransitionPaste.stageType === 'push' &&
+      afterTransitionPaste.stageDuration === '720' &&
+      afterTransitionPaste.stageAdvanceOnClick === 'false' &&
+      afterTransitionPaste.stageAdvanceAfter === '2500',
+    {
+      afterTransitionPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     const type = document.querySelector('[data-ppt-slide-transition-field="type"]')
     const duration = document.querySelector('[data-ppt-slide-transition-field="durationMs"]')
     const advanceOnClick = document.querySelector('[data-ppt-slide-transition-field="advanceOnClick"]')
@@ -15519,6 +15570,17 @@ function getPPTSlideTransitionState(page) {
       commandValue: shell?.getAttribute('data-ppt-transition-command-value') ?? '',
       duration: document.querySelector('[data-ppt-slide-transition-field="durationMs"]')?.value ?? '',
       inspector: !!inspector,
+      importAdvanceAfter: shell?.getAttribute('data-ppt-transition-import-advance-after') ?? '',
+      importAdvanceOnClick: shell?.getAttribute('data-ppt-transition-import-advance-on-click') ?? '',
+      importCommandFields: shell?.getAttribute('data-ppt-transition-import-command-fields') ?? '',
+      importCommands: shell?.getAttribute('data-ppt-transition-import-commands') ?? '',
+      importDuration: shell?.getAttribute('data-ppt-transition-import-duration') ?? '',
+      importFields: shell?.getAttribute('data-ppt-transition-import-fields') ?? '',
+      importFormat: shell?.getAttribute('data-ppt-transition-import-format') ?? '',
+      importJsonLength: Number(shell?.getAttribute('data-ppt-transition-import-json-length') ?? 0),
+      importModel: shell?.getAttribute('data-ppt-transition-import-model') ?? '',
+      importSlide: shell?.getAttribute('data-ppt-transition-import-slide') ?? '',
+      importType: shell?.getAttribute('data-ppt-transition-import-type') ?? '',
       inspectorAdvanceAfter: inspector?.getAttribute('data-ppt-transition-advance-after') ?? '',
       inspectorAdvanceOnClick: inspector?.getAttribute('data-ppt-transition-advance-on-click') ?? '',
       inspectorDuration: inspector?.getAttribute('data-ppt-transition-duration') ?? '',

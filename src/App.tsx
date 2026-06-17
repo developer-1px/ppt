@@ -1017,6 +1017,11 @@ const PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-slide-metadata' as const
 const PPT_SLIDE_METADATA_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.slide-metadata+json'
+const PPT_SLIDE_TRANSITION_IMPORT_MODEL = 'ppt-slide-transition-import' as const
+const PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT =
+  'application-json-ppt-slide-transition' as const
+const PPT_SLIDE_TRANSITION_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.slide-transition+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1157,6 +1162,17 @@ type PPTSlideMetadataImportSource = {
   name?: string
   notes?: string
 }
+type PPTSlideTransitionImportField =
+  | 'advanceAfterMs'
+  | 'advanceOnClick'
+  | 'durationMs'
+  | 'type'
+type PPTSlideTransitionImportSource = {
+  fields: readonly PPTSlideTransitionImportField[]
+  format: typeof PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT
+  jsonLength: number
+  transition: Partial<PPTSlideTransition>
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1242,6 +1258,19 @@ type PPTSlideMetadataImportEffect = {
   name: string
   notesLength: number
   slideId: string
+}
+type PPTSlideTransitionImportEffect = {
+  advanceAfterMs: string
+  advanceOnClick: string
+  commandFields: string
+  commandIds: string
+  durationMs: string
+  fields: string
+  format: typeof PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_SLIDE_TRANSITION_IMPORT_MODEL
+  slideId: string
+  type: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2268,6 +2297,8 @@ function App() {
     useState<PPTSlideNotesImportEffect | null>(null)
   const [lastSlideMetadataImportEffect, setLastSlideMetadataImportEffect] =
     useState<PPTSlideMetadataImportEffect | null>(null)
+  const [lastSlideTransitionImportEffect, setLastSlideTransitionImportEffect] =
+    useState<PPTSlideTransitionImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3165,6 +3196,17 @@ function App() {
         return
       }
 
+      const slideTransitionSource =
+        getPPTSlideTransitionSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        slideTransitionSource &&
+        pastePPTSlideTransitionSource(slideTransitionSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const slideNotesSource =
         getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
 
@@ -3915,6 +3957,35 @@ function App() {
             applyPPTSlideMetadataHostCommandEffect(currentSlide, effect),
           slide,
         )))
+
+    return true
+  }
+
+  function pastePPTSlideTransitionSource(source: PPTSlideTransitionImportSource) {
+    const effects = createPPTSlideTransitionImportCommandEffects({
+      currentTransition: activeSlideTransition,
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastSlideTransitionEffect(effects[effects.length - 1])
+    setLastSlideTransitionImportEffect(createPPTSlideTransitionImportEffect({
+      effects,
+      source,
+    }))
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        transition: effects.reduce(
+          (transition, effect) =>
+            applyPPTSlideTransitionUpdateCommand(transition, effect.payload),
+          getPPTSlideTransition(slide),
+        ),
+      })))
 
     return true
   }
@@ -9455,6 +9526,17 @@ function App() {
         data-ppt-transition-command-value={lastSlideTransitionEffect
           ? getPPTSlideTransitionCommandValue(lastSlideTransitionEffect.payload)
           : undefined}
+        data-ppt-transition-import-advance-after={lastSlideTransitionImportEffect?.advanceAfterMs}
+        data-ppt-transition-import-advance-on-click={lastSlideTransitionImportEffect?.advanceOnClick}
+        data-ppt-transition-import-command-fields={lastSlideTransitionImportEffect?.commandFields}
+        data-ppt-transition-import-commands={lastSlideTransitionImportEffect?.commandIds}
+        data-ppt-transition-import-duration={lastSlideTransitionImportEffect?.durationMs}
+        data-ppt-transition-import-fields={lastSlideTransitionImportEffect?.fields}
+        data-ppt-transition-import-format={lastSlideTransitionImportEffect?.format}
+        data-ppt-transition-import-json-length={lastSlideTransitionImportEffect?.jsonLength}
+        data-ppt-transition-import-model={lastSlideTransitionImportEffect?.model}
+        data-ppt-transition-import-slide={lastSlideTransitionImportEffect?.slideId}
+        data-ppt-transition-import-type={lastSlideTransitionImportEffect?.type}
         data-ppt-transition-model="slide-edit-slide-transition-timing"
         data-ppt-shadow-command={lastShadowEffect?.payload.id}
         data-ppt-shadow-command-field={lastShadowEffect?.payload.fieldId}
@@ -11468,6 +11550,72 @@ function createPPTSlideMetadataImportCommandEffects({
   return effects
 }
 
+function createPPTSlideTransitionImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly PPTSlideTransitionHostCommandEffect[]
+  source: PPTSlideTransitionImportSource
+}): PPTSlideTransitionImportEffect {
+  return {
+    advanceAfterMs: source.transition.advanceAfterMs === undefined
+      ? ''
+      : String(source.transition.advanceAfterMs ?? ''),
+    advanceOnClick: source.transition.advanceOnClick === undefined
+      ? ''
+      : String(source.transition.advanceOnClick),
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    durationMs: source.transition.durationMs === undefined
+      ? ''
+      : String(source.transition.durationMs),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_SLIDE_TRANSITION_IMPORT_MODEL,
+    slideId: effects[0]?.selection.slideId ?? '',
+    type: source.transition.type ?? '',
+  }
+}
+
+function createPPTSlideTransitionImportCommandEffects({
+  currentTransition,
+  slideId,
+  source,
+}: {
+  currentTransition: PPTSlideTransition
+  slideId: string
+  source: PPTSlideTransitionImportSource
+}): PPTSlideTransitionHostCommandEffect[] {
+  let transition = currentTransition
+  const effects: PPTSlideTransitionHostCommandEffect[] = []
+
+  for (const field of source.fields) {
+    const value = source.transition[field]
+
+    if (value === undefined) {
+      continue
+    }
+
+    const effect = getSlideEditTransitionUpdateCommandEffect(
+      getPPTSlideTransitionUpdateCommand({
+        field,
+        slideId,
+        transition,
+        value,
+      }),
+    )
+
+    effects.push(effect)
+    transition = applyPPTSlideTransitionUpdateCommand(
+      transition,
+      effect.payload,
+    )
+  }
+
+  return effects
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -11998,6 +12146,148 @@ function normalizePPTSlideMetadataColor(color: string) {
   const normalized = color.trim()
 
   return /^#[\da-f]{6}$/i.test(normalized) ? normalized : null
+}
+
+function getPPTSlideTransitionSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates = [
+    dataTransfer.getData(PPT_SLIDE_TRANSITION_JSON_MIME_TYPE),
+    dataTransfer.getData('application/json'),
+    dataTransfer.getData('text/json'),
+    dataTransfer.getData('text/plain'),
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTSlideTransitionSourceFromText(text)
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTSlideTransitionSourceFromText(
+  text: string,
+): PPTSlideTransitionImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTSlideTransitionSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTSlideTransitionSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+): PPTSlideTransitionImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.transition)
+    ? value.transition
+    : value
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const transition: Partial<PPTSlideTransition> = {}
+  const fields: PPTSlideTransitionImportField[] = []
+  const type = getPPTSlideTransitionTypeFromJSONValue(payloadValue.type)
+  const durationMs = getPPTSlideTransitionDurationFromJSONValue(
+    payloadValue.durationMs ?? payloadValue.duration,
+  )
+  const advanceOnClick = typeof payloadValue.advanceOnClick === 'boolean'
+    ? payloadValue.advanceOnClick
+    : isPPTRecord(payloadValue.advance) &&
+        typeof payloadValue.advance.onClick === 'boolean'
+      ? payloadValue.advance.onClick
+      : undefined
+  const advanceAfterMs = getPPTSlideTransitionAdvanceAfterFromJSONValue(
+    payloadValue.advanceAfterMs ??
+      payloadValue.advanceAfter ??
+      (isPPTRecord(payloadValue.advance) ? payloadValue.advance.afterMs : undefined),
+  )
+
+  if (type !== undefined) {
+    transition.type = type
+    fields.push('type')
+  }
+
+  if (durationMs !== undefined) {
+    transition.durationMs = durationMs
+    fields.push('durationMs')
+  }
+
+  if (advanceOnClick !== undefined) {
+    transition.advanceOnClick = advanceOnClick
+    fields.push('advanceOnClick')
+  }
+
+  if (advanceAfterMs !== undefined) {
+    transition.advanceAfterMs = advanceAfterMs
+    fields.push('advanceAfterMs')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
+        jsonLength,
+        transition,
+      }
+    : null
+}
+
+function getPPTSlideTransitionTypeFromJSONValue(
+  value: unknown,
+): PPTSlideTransitionType | undefined {
+  const type = typeof value === 'string' ? value.trim() : ''
+
+  return isPPTSlideTransitionType(type) ? type : undefined
+}
+
+function getPPTSlideTransitionDurationFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return clampPPTSlideTransitionDuration(value)
+}
+
+function getPPTSlideTransitionAdvanceAfterFromJSONValue(value: unknown) {
+  if (value === null) {
+    return null
+  }
+
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return parsePPTSlideTransitionAdvanceAfter(String(value))
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
