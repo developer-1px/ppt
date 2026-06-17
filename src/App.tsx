@@ -1014,6 +1014,11 @@ const PPT_DECK_JSON_IMPORT_FORMAT = 'application-json-ppt-deck' as const
 const PPT_DECK_JSON_TEXT_IMPORT_FORMAT = 'text-json-ppt-deck' as const
 const PPT_DECK_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.deck+json'
+const PPT_ELEMENTS_JSON_IMPORT_MODEL = 'ppt-elements-json-import' as const
+const PPT_ELEMENTS_JSON_IMPORT_FORMAT = 'application-json-ppt-elements' as const
+const PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT = 'text-json-ppt-elements' as const
+const PPT_ELEMENTS_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.elements+json'
 const PPT_SLIDE_SVG_CLIPBOARD_MODEL = 'canvas-rich-slide-svg-clipboard' as const
 const PPT_SLIDE_SVG_CLIPBOARD_KIND = 'interactive-os.ppt.slide-svg-export' as const
 const PPT_SLIDE_SVG_CLIPBOARD_VERSION = 1
@@ -1113,6 +1118,15 @@ type PPTDeckJSONImportSource = {
     | typeof PPT_DECK_JSON_TEXT_IMPORT_FORMAT
   jsonLength: number
 }
+type PPTElementsJSONImportSource = {
+  format:
+    | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
+    | typeof PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT
+  jsonLength: number
+  objects: readonly PPTElement[]
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
+}
 type PPTDeckHTMLFallbackSlideSource = {
   htmlLength: number
   name: string
@@ -1156,6 +1170,16 @@ type PPTDeckJSONImportEffect = {
   sourceDeckId: string
   sourceSlideCount: number
   sourceTitle: string
+}
+type PPTElementsJSONImportEffect = {
+  format:
+    | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
+    | typeof PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT
+  importedObjectCount: number
+  jsonLength: number
+  model: typeof PPT_ELEMENTS_JSON_IMPORT_MODEL
+  selectedObjectIds: readonly string[]
+  sourceSlideId: string
 }
 type PPTSlideSVGClipboardEffect = {
   jsonMimeType: typeof PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE
@@ -2166,6 +2190,8 @@ function App() {
   ] = useState<PPTDeckMarkdownOutlineImportEffect | null>(null)
   const [lastDeckJSONImportEffect, setLastDeckJSONImportEffect] =
     useState<PPTDeckJSONImportEffect | null>(null)
+  const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
+    useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
     useState('')
   const [lastStageDropImportActionKind, setLastStageDropImportActionKind] =
@@ -3012,6 +3038,14 @@ function App() {
         return
       }
 
+      const elementJSONSource =
+        getPPTElementsJSONSourceFromDataTransfer(event.clipboardData)
+
+      if (elementJSONSource && pastePPTElementsJSONSource(elementJSONSource)) {
+        event.preventDefault()
+        return
+      }
+
       const deckFallbackHTMLSource =
         getPPTDeckFallbackHTMLSourceFromDataTransfer(event.clipboardData)
 
@@ -3655,6 +3689,26 @@ function App() {
       }
     })
 
+    return true
+  }
+
+  function pastePPTElementsJSONSource(source: PPTElementsJSONImportSource) {
+    if (source.objects.length === 0) {
+      return false
+    }
+
+    const payload = createPPTClipboardPayload({
+      objects: source.objects,
+      operation: 'copy',
+      selectedObjectIds: source.selectedObjectIds,
+      sourceSlideId: source.sourceSlideId,
+    })
+
+    if (!pasteClipboardPayload(payload)) {
+      return false
+    }
+
+    setLastElementsJSONImportEffect(createPPTElementsJSONImportEffect(source))
     return true
   }
 
@@ -8883,6 +8937,12 @@ function App() {
         data-ppt-deck-json-import-source-deck={lastDeckJSONImportEffect?.sourceDeckId}
         data-ppt-deck-json-import-source-slide-count={lastDeckJSONImportEffect?.sourceSlideCount}
         data-ppt-deck-json-import-source-title={lastDeckJSONImportEffect?.sourceTitle}
+        data-ppt-elements-json-import-count={lastElementsJSONImportEffect?.importedObjectCount}
+        data-ppt-elements-json-import-format={lastElementsJSONImportEffect?.format}
+        data-ppt-elements-json-import-json-length={lastElementsJSONImportEffect?.jsonLength}
+        data-ppt-elements-json-import-model={lastElementsJSONImportEffect?.model}
+        data-ppt-elements-json-import-selection={lastElementsJSONImportEffect?.selectedObjectIds.join(' ')}
+        data-ppt-elements-json-import-source-slide={lastElementsJSONImportEffect?.sourceSlideId}
         data-ppt-deck-outline-import-first-slide={lastDeckMarkdownOutlineImportEffect?.firstImportedSlideId}
         data-ppt-deck-outline-import-format={lastDeckMarkdownOutlineImportEffect?.format}
         data-ppt-deck-outline-import-imported-count={lastDeckMarkdownOutlineImportEffect?.importedSlideCount}
@@ -11083,6 +11143,19 @@ function createPPTDeckJSONImportEffect({
   }
 }
 
+function createPPTElementsJSONImportEffect(
+  source: PPTElementsJSONImportSource,
+): PPTElementsJSONImportEffect {
+  return {
+    format: source.format,
+    importedObjectCount: source.objects.length,
+    jsonLength: source.jsonLength,
+    model: PPT_ELEMENTS_JSON_IMPORT_MODEL,
+    selectedObjectIds: source.selectedObjectIds,
+    sourceSlideId: source.sourceSlideId,
+  }
+}
+
 function createPPTDeckMarkdownOutlineImportEffect({
   importedSlides,
   source,
@@ -11376,7 +11449,7 @@ function getPPTDeckJSONSourceFromText(
   text: string,
   format: PPTDeckJSONImportSource['format'],
 ): PPTDeckJSONImportSource | null {
-  const json = getPPTDeckJSONText(text)
+  const json = getPPTImportJSONText(text)
 
   if (!json) {
     return null
@@ -11397,7 +11470,7 @@ function getPPTDeckJSONSourceFromText(
   }
 }
 
-function getPPTDeckJSONText(text: string) {
+function getPPTImportJSONText(text: string) {
   const trimmed = text.trim()
 
   if (!trimmed) {
@@ -11412,6 +11485,149 @@ function getPPTDeckJSONText(text: string) {
     trimmed.match(/```(?:json|ppt|ppt-json)?\s*\n([\s\S]*?)\n```/i)
 
   return fenced?.[1]?.trim() ?? null
+}
+
+function getPPTElementsJSONSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    format: PPTElementsJSONImportSource['format']
+    text: string
+  }> = [
+    {
+      format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
+      text: dataTransfer.getData(PPT_ELEMENTS_JSON_MIME_TYPE),
+    },
+    {
+      format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
+      text: dataTransfer.getData('text/markdown'),
+    },
+    {
+      format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTElementsJSONSourceFromText(text, candidate.format)
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTElementsJSONSourceFromText(
+  text: string,
+  format: PPTElementsJSONImportSource['format'],
+): PPTElementsJSONImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    const source = getPPTElementsJSONSourceFromValue(JSON.parse(json))
+
+    return source
+      ? {
+          ...source,
+          format,
+          jsonLength: json.length,
+        }
+      : null
+  } catch {
+    return null
+  }
+}
+
+function getPPTElementsJSONSourceFromValue(
+  value: unknown,
+): Omit<PPTElementsJSONImportSource, 'format' | 'jsonLength'> | null {
+  const payloadValue = isPPTRecord(value) &&
+    value.kind === PPT_RICH_CLIPBOARD_KIND &&
+    value.version === PPT_RICH_CLIPBOARD_VERSION
+    ? value.payload
+    : value
+  const sourceSlideId = isPPTRecord(payloadValue) &&
+    typeof payloadValue.sourceSlideId === 'string'
+    ? payloadValue.sourceSlideId
+    : 'ai-elements-json'
+  const rawObjects = getPPTElementsJSONObjectsValue(payloadValue)
+  const objects = rawObjects.flatMap((item) => {
+    const parsed = PPTElementSchema.safeParse(item)
+
+    return parsed.success ? [parsed.data] : []
+  })
+
+  if (objects.length === 0) {
+    return null
+  }
+
+  const selectedObjectIds = normalizeSlideEditClipboardSelectedObjectIds({
+    getObjectId: (object) => object.id,
+    objects,
+    selectedObjectIds: isPPTRecord(payloadValue) &&
+      Array.isArray(payloadValue.selectedObjectIds)
+      ? payloadValue.selectedObjectIds
+      : null,
+  })
+
+  return {
+    objects,
+    selectedObjectIds,
+    sourceSlideId,
+  }
+}
+
+function getPPTElementsJSONObjectsValue(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  const parsed = PPTElementSchema.safeParse(value)
+
+  if (parsed.success) {
+    return [parsed.data]
+  }
+
+  if (!isPPTRecord(value)) {
+    return []
+  }
+
+  if (Array.isArray(value.objects)) {
+    return value.objects
+  }
+
+  if (Array.isArray(value.elements)) {
+    return value.elements
+  }
+
+  return value.element === undefined ? [] : [value.element]
 }
 
 function getPPTDeckFromJSONValue(value: unknown) {

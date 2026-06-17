@@ -2590,6 +2590,96 @@ async function runCrossSlideClipboardScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
+    const objects = [
+      {
+        geometry: { h: 88, w: 300, x: 180, y: 210 },
+        id: 'ai-element-title',
+        kind: 'textBox',
+        name: 'AI Element Title',
+        style: { color: '#111827', fontSize: 32, fontWeight: 'bold' },
+        textBody: { paragraphs: [{ runs: [{ text: 'AI element JSON' }] }] },
+      },
+      {
+        fill: { color: '#fef3c7' },
+        geometry: { h: 104, w: 240, x: 540, y: 230 },
+        hyperlink: { url: 'https://example.com/element-json' },
+        id: 'ai-element-card',
+        kind: 'shape',
+        name: 'AI Element Card',
+        shape: 'rect',
+        stroke: { color: '#d97706', width: 2 },
+        style: { color: '#78350f', fontSize: 24, fontWeight: 'semibold' },
+        textBody: { paragraphs: [{ runs: [{ text: 'Retouch me' }] }] },
+      },
+    ]
+    const json = JSON.stringify({
+      objects,
+      selectedObjectIds: ['ai-element-title', 'ai-element-card'],
+      sourceSlideId: 'ai-json-elements',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterElementJSONPaste = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'pastes raw PPT element JSON through canvas clipboard paste pipeline',
+    afterElementJSONPaste.activeSlide === 'slide-1' &&
+      afterElementJSONPaste.stageCount === sourceAfter.stageCount + 2 &&
+      afterElementJSONPaste.selectedCount === 2 &&
+      afterElementJSONPaste.selectedKinds.includes('textBox') &&
+      afterElementJSONPaste.selectedKinds.includes('shape') &&
+      afterElementJSONPaste.selectedTexts.includes('AI element JSON') &&
+      afterElementJSONPaste.selectedTexts.includes('Retouch me') &&
+      afterElementJSONPaste.elementsJSONImportModel === 'ppt-elements-json-import' &&
+      afterElementJSONPaste.elementsJSONImportFormat === 'application-json-ppt-elements' &&
+      afterElementJSONPaste.elementsJSONImportCount === 2 &&
+      afterElementJSONPaste.elementsJSONImportSelection === 'ai-element-title ai-element-card' &&
+      afterElementJSONPaste.elementsJSONImportSourceSlide === 'ai-json-elements' &&
+      afterElementJSONPaste.elementsJSONImportJsonLength > 100 &&
+      afterElementJSONPaste.pasteCommand === 'paste-slide-objects' &&
+      afterElementJSONPaste.pasteType === 'slide-command-effect' &&
+      afterElementJSONPaste.pasteSourceSlide === 'ai-json-elements' &&
+      afterElementJSONPaste.pasteTargetSlide === 'slide-1' &&
+      afterElementJSONPaste.pasteMappingCount === 2 &&
+      afterElementJSONPaste.pastePositionModel === 'canvas-paste-position',
+    {
+      afterElementJSONPaste,
+      sourceAfter,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterElementJSONUndo = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'undoes raw PPT element JSON paste as one history step',
+    afterElementJSONUndo.stageCount === sourceAfter.stageCount &&
+      afterElementJSONUndo.activeSlide === 'slide-1',
+    {
+      afterElementJSONPaste,
+      afterElementJSONUndo,
+      sourceAfter,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
     const payload = {
       kind: 'interactive-os.ppt.selection',
       metadata: {
@@ -15899,6 +15989,12 @@ function getPPTCrossSlideClipboardState(page) {
       fallbackHTMLImportShape: stage?.getAttribute('data-ppt-fallback-html-import-shape') ?? '',
       fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       fallbackHTMLImportSourceObjects: stage?.getAttribute('data-ppt-fallback-html-import-source-objects') ?? '',
+      elementsJSONImportCount: Number(stage?.getAttribute('data-ppt-elements-json-import-count') ?? 0),
+      elementsJSONImportFormat: stage?.getAttribute('data-ppt-elements-json-import-format') ?? '',
+      elementsJSONImportJsonLength: Number(stage?.getAttribute('data-ppt-elements-json-import-json-length') ?? 0),
+      elementsJSONImportModel: stage?.getAttribute('data-ppt-elements-json-import-model') ?? '',
+      elementsJSONImportSelection: stage?.getAttribute('data-ppt-elements-json-import-selection') ?? '',
+      elementsJSONImportSourceSlide: stage?.getAttribute('data-ppt-elements-json-import-source-slide') ?? '',
       keyboardCommandDispatch: stage?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
       keyboardCommandIntent: stage?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       pasteAnchor: stage?.getAttribute('data-ppt-clipboard-paste-anchor') ?? '',
