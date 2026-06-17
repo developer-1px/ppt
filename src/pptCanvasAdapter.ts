@@ -3,24 +3,24 @@ import {
   type Bounds,
 } from './pptCanvasCoreAdapter'
 import {
-  canFlipCanvasSelectionItems,
-  canSelectSameTypeCanvasItems,
-  canTidyCanvasSelectionItems,
-  createCanvasSceneAdapter,
-  flipCanvasSelectionItems,
-  getCanvasItemGroupIndexRange,
-  getCanvasItemGroupMemberIdsForGroup,
-  getCanvasItemPointerSelection,
-  insertCanvasItemAtTargetPlacement,
-  moveCanvasItemToTargetPlacement,
-  moveCanvasSelectionItemsToIndex,
-  selectSameTypeCanvasItems,
-  tidyCanvasSelectionItems,
-  type CanvasSceneEntry,
-  type CanvasTransformAdapter,
-  resizeCanvasSelectionItems,
-  translateCanvasSelectionItems,
-} from 'canvas/foundation'
+  canFlipPPTCanvasSelectionItems,
+  canSelectSameTypePPTCanvasItems,
+  canTidyPPTCanvasSelectionItems,
+  createPPTCanvasSceneAdapter,
+  flipPPTCanvasSelectionItems,
+  getPPTCanvasItemGroupIndexRange,
+  getPPTCanvasItemGroupMemberIdsForGroup,
+  getPPTCanvasItemPointerSelection,
+  insertPPTCanvasItemAtTargetPlacement,
+  movePPTCanvasItemToTargetPlacement,
+  movePPTCanvasSelectionItemsToIndex,
+  resizePPTCanvasSelectionItems,
+  selectSameTypePPTCanvasItems,
+  tidyPPTCanvasSelectionItems,
+  translatePPTCanvasSelectionItems,
+  type PPTCanvasSceneEntryBase,
+  type PPTCanvasTransformAdapterBase,
+} from './pptCanvasFoundationAdapter'
 import {
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -40,7 +40,7 @@ type PPTFlipElementInput = {
 }
 
 export function createPPTCanvasScene(slide: PPTSlide) {
-  const entries: CanvasSceneEntry[] = slide.elements
+  const entries: PPTCanvasSceneEntryBase[] = slide.elements
     .filter((element) => element.visible !== false)
     .map((element, index) => ({
       bounds: pptGeometryToBounds(element.geometry),
@@ -51,12 +51,12 @@ export function createPPTCanvasScene(slide: PPTSlide) {
       path: [index],
     }))
 
-  return createCanvasSceneAdapter(entries)
+  return createPPTCanvasSceneAdapter(entries)
 }
 
-export const pptCanvasTransformAdapter: CanvasTransformAdapter<PPTElement> = {
+export const pptCanvasTransformAdapter: PPTCanvasTransformAdapterBase<PPTElement> = {
   resizeSelection({ from, items, selection, to }) {
-    return resizeCanvasSelectionItems({
+    return resizePPTCanvasSelectionItems({
       from,
       getItemBounds: getPPTElementBounds,
       getItemId: getPPTElementId,
@@ -67,7 +67,7 @@ export const pptCanvasTransformAdapter: CanvasTransformAdapter<PPTElement> = {
     })
   },
   translateSelection({ dx, dy, items, selection }) {
-    return translateCanvasSelectionItems({
+    return translatePPTCanvasSelectionItems({
       dx,
       dy,
       getItemBounds: getPPTElementBounds,
@@ -90,7 +90,7 @@ export function getPPTElementPointerSelection({
   scene: ReturnType<typeof createPPTCanvasScene>
   selection: string[]
 }) {
-  return getCanvasItemPointerSelection({
+  return getPPTCanvasItemPointerSelection({
     additive,
     itemId: elementId,
     scene,
@@ -109,7 +109,7 @@ export function insertPPTSlideAtTargetPlacement({
   slides: readonly PPTSlide[]
   targetSlideId: string
 }) {
-  return insertCanvasItemAtTargetPlacement({
+  return insertPPTCanvasItemAtTargetPlacement({
     getItemId: getPPTSlideId,
     item: slide,
     items: slides,
@@ -129,7 +129,7 @@ export function movePPTSlideToTargetPlacement({
   slides: readonly PPTSlide[]
   targetSlideId: string
 }) {
-  return moveCanvasItemToTargetPlacement({
+  return movePPTCanvasItemToTargetPlacement({
     getItemId: getPPTSlideId,
     itemId: slideId,
     items: slides,
@@ -145,7 +145,7 @@ export function getPPTElementGroupIndexRange({
   elements: readonly PPTElement[]
   groupId: string
 }) {
-  return getCanvasItemGroupIndexRange({
+  return getPPTCanvasItemGroupIndexRange({
     getItemGroupId: getPPTElementGroupId,
     groupId,
     items: elements,
@@ -159,7 +159,7 @@ export function getPPTElementGroupMemberIds({
   elements: readonly PPTElement[]
   groupId: string
 }) {
-  return getCanvasItemGroupMemberIdsForGroup({
+  return getPPTCanvasItemGroupMemberIdsForGroup({
     getItemGroupId: getPPTElementGroupId,
     getItemId: getPPTElementId,
     groupId,
@@ -174,7 +174,7 @@ export function selectSameTypePPTElements({
   elements: readonly PPTElement[]
   selection: readonly string[]
 }) {
-  return selectSameTypeCanvasItems({
+  return selectSameTypePPTCanvasItems({
     getItemId: getPPTElementId,
     getItemType: getPPTElementTypeKey,
     isItemSelectable: isPPTSelectableElement,
@@ -190,7 +190,7 @@ export function canSelectSameTypePPTElements({
   elements: readonly PPTElement[]
   selection: readonly string[]
 }) {
-  return canSelectSameTypeCanvasItems({
+  return canSelectSameTypePPTCanvasItems({
     getItemId: getPPTElementId,
     getItemType: getPPTElementTypeKey,
     isItemSelectable: isPPTSelectableElement,
@@ -208,7 +208,7 @@ export function movePPTElementsToIndex({
   selection: readonly string[]
   toIndex: number
 }) {
-  return moveCanvasSelectionItemsToIndex({
+  return movePPTCanvasSelectionItemsToIndex({
     getItemId: getPPTElementId,
     items: elements,
     selection,
@@ -225,7 +225,7 @@ export function canFlipPPTElements({
   isElementSelectable: PPTElementPredicate
   selection: readonly string[]
 }) {
-  return canFlipCanvasSelectionItems({
+  return canFlipPPTCanvasSelectionItems({
     getItemBounds: getPPTElementBounds,
     getItemId: getPPTElementId,
     isItemSelectable: isElementSelectable,
@@ -247,7 +247,7 @@ export function flipPPTElements({
   isElementSelectable: PPTElementPredicate
   selection: readonly string[]
 }) {
-  return flipCanvasSelectionItems({
+  return flipPPTCanvasSelectionItems({
     axis,
     flipItem: flipElement
       ? ({ item, pivot, reflectedBounds }) =>
@@ -271,7 +271,7 @@ export function canTidyPPTElements({
   isElementSelectable: PPTElementPredicate
   selection: readonly string[]
 }) {
-  return canTidyCanvasSelectionItems({
+  return canTidyPPTCanvasSelectionItems({
     getItemBounds: getPPTElementBounds,
     getItemId: getPPTElementId,
     isItemSelectable: isElementSelectable,
@@ -291,7 +291,7 @@ export function tidyPPTElements({
   isElementSelectable: PPTElementPredicate
   selection: readonly string[]
 }) {
-  return tidyCanvasSelectionItems({
+  return tidyPPTCanvasSelectionItems({
     gap,
     getItemBounds: getPPTElementBounds,
     getItemId: getPPTElementId,
