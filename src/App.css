@@ -1266,6 +1266,22 @@
   content: '\2022';
 }
 
+.ppt-element-editor {
+  counter-reset: ppt-numbered-list;
+}
+
+.ppt-text-paragraph[data-ppt-numbered='true'] {
+  position: relative;
+  padding-left: 1.45em;
+  counter-increment: ppt-numbered-list;
+}
+
+.ppt-text-paragraph[data-ppt-numbered='true']::before {
+  position: absolute;
+  left: 0;
+  content: counter(ppt-numbered-list) '.';
+}
+
 .ppt-selection-box,
 .ppt-marquee {
   position: absolute;
@@ -1859,7 +1875,7 @@
 
 .ppt-paragraph-control-row {
   display: grid;
-  grid-template-columns: minmax(64px, 0.65fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(62px, 0.5fr)) minmax(0, 1fr);
   gap: 8px;
 }
 

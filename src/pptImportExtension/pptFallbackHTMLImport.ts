@@ -1144,9 +1144,7 @@ function getPPTFallbackHTMLTextBody(element: HTMLElement): PPTTextBody | null {
       }
 
       return {
-        ...(paragraphElement.tagName.toLowerCase() === 'li'
-          ? { bullet: 'bullet' as const }
-          : {}),
+        ...getPPTFallbackHTMLParagraphListAttribute(paragraphElement),
         ...getPPTFallbackHTMLParagraphAttributes(paragraphElement),
         runs,
       }
@@ -1154,6 +1152,20 @@ function getPPTFallbackHTMLTextBody(element: HTMLElement): PPTTextBody | null {
     .filter((paragraph): paragraph is PPTParagraph => paragraph !== null)
 
   return paragraphs.length > 0 ? { paragraphs } : null
+}
+
+function getPPTFallbackHTMLParagraphListAttribute(
+  element: HTMLElement,
+): Pick<PPTParagraph, 'bullet'> {
+  if (element.tagName.toLowerCase() !== 'li') {
+    return {}
+  }
+
+  return {
+    bullet: element.parentElement?.tagName.toLowerCase() === 'ol'
+      ? 'numbered'
+      : 'bullet',
+  }
 }
 
 function getPPTFallbackHTMLRuns(root: HTMLElement): PPTRun[] {

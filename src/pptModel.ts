@@ -37,7 +37,7 @@ const PPTRunSchema = z.object({
 
 const PPTParagraphSchema = z.object({
   align: z.enum(['left', 'center', 'right']).optional(),
-  bullet: z.enum(['bullet']).optional(),
+  bullet: z.enum(['bullet', 'numbered']).optional(),
   lineHeight: z.number().optional(),
   runs: z.array(PPTRunSchema),
   spacingAfter: z.number().optional(),

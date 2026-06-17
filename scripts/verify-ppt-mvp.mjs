@@ -5152,12 +5152,13 @@ async function runTextQuickFormatScenario(page) {
     boldPressed: document.querySelector('[data-ppt-text-quick="bold"]')?.getAttribute('aria-pressed') ?? '',
     fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
     italicPressed: document.querySelector('[data-ppt-text-quick="italic"]')?.getAttribute('aria-pressed') ?? '',
+    numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
     quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
     underlinePressed: document.querySelector('[data-ppt-text-quick="underline"]')?.getAttribute('aria-pressed') ?? '',
   }))()`)
 
-  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.italicPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
+  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
 
   const initialAlignRadio = await readPPTParagraphAlignRadioGroupState(page)
 
@@ -5293,9 +5294,12 @@ async function runTextQuickFormatScenario(page) {
       fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
       fontWeight: document.querySelector('[data-ppt-style-field="font-weight"]')?.value ?? '',
       inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
       italicPressed: document.querySelector('[data-ppt-text-quick="italic"]')?.getAttribute('aria-pressed') ?? '',
       italicRun: title?.querySelector('[data-ppt-run-italic="true"]')?.style.fontStyle ?? '',
       paragraphBullet: title?.querySelector('[data-ppt-bullet="true"]')?.textContent ?? '',
+      numberedList: title?.getAttribute('data-ppt-numbered-list') ?? '',
+      numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
       rightPressed: document.querySelector('[data-ppt-paragraph-align="right"]')?.getAttribute('aria-pressed') ?? '',
       textAlign: title?.style.textAlign ?? '',
       thumbBulletCount: document.querySelectorAll('[data-ppt-thumb-bullet="true"]').length,
@@ -5304,7 +5308,7 @@ async function runTextQuickFormatScenario(page) {
     }
   })()`)
 
-  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true' && afterSingleFormat.bulletList === 'true' && afterSingleFormat.bulletPressed === 'true' && afterSingleFormat.inspectorBulletPressed === 'true' && afterSingleFormat.italicPressed === 'true' && afterSingleFormat.underlinePressed === 'true' && afterSingleFormat.italicRun === 'italic' && afterSingleFormat.underlineRun.includes('underline') && afterSingleFormat.paragraphBullet.length > 0 && afterSingleFormat.thumbBulletCount > 0, {
+  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true' && afterSingleFormat.bulletList === 'true' && afterSingleFormat.numberedList === '' && afterSingleFormat.bulletPressed === 'true' && afterSingleFormat.numberedPressed === 'false' && afterSingleFormat.inspectorBulletPressed === 'true' && afterSingleFormat.inspectorNumberedPressed === 'false' && afterSingleFormat.italicPressed === 'true' && afterSingleFormat.underlinePressed === 'true' && afterSingleFormat.italicRun === 'italic' && afterSingleFormat.underlineRun.includes('underline') && afterSingleFormat.paragraphBullet.length > 0 && afterSingleFormat.thumbBulletCount > 0, {
     afterSingleFormat,
     initial,
   })
@@ -5397,6 +5401,50 @@ async function runTextQuickFormatScenario(page) {
     afterMultiFormat,
     beforeMulti,
   })
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="numbered"]')?.click()`)
+  await delay(80)
+
+  const afterNumberedToggle = await page.eval(`(() => {
+    const title = document.querySelector('[data-ppt-element="s1-title"]')
+    const summary = document.querySelector('[data-ppt-element="s1-summary"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      exportHasNumberedMarkup: exportCode.includes('data-ppt-numbered-list="true"') && exportCode.includes('data-ppt-numbered="true"'),
+      exportHasNumberedModel: exportCode.includes('"bullet": "numbered"'),
+      inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
+      numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
+      summaryBulletList: summary?.getAttribute('data-ppt-bullet-list') ?? '',
+      summaryNumberedCount: summary?.querySelectorAll('[data-ppt-numbered="true"]').length ?? 0,
+      summaryNumberedList: summary?.getAttribute('data-ppt-numbered-list') ?? '',
+      thumbNumberedCount: document.querySelectorAll('[data-ppt-thumb-numbered="true"]').length,
+      titleBulletList: title?.getAttribute('data-ppt-bullet-list') ?? '',
+      titleNumberedCount: title?.querySelectorAll('[data-ppt-numbered="true"]').length ?? 0,
+      titleNumberedList: title?.getAttribute('data-ppt-numbered-list') ?? '',
+    }
+  })()`)
+
+  record(
+    'toggles PPT numbered list formatting on multi-selected text objects',
+    afterNumberedToggle.numberedPressed === 'true' &&
+      afterNumberedToggle.inspectorBulletPressed === 'false' &&
+      afterNumberedToggle.inspectorNumberedPressed === 'true' &&
+      afterNumberedToggle.titleBulletList === '' &&
+      afterNumberedToggle.summaryBulletList === '' &&
+      afterNumberedToggle.titleNumberedList === 'true' &&
+      afterNumberedToggle.summaryNumberedList === 'true' &&
+      afterNumberedToggle.exportHasNumberedMarkup &&
+      afterNumberedToggle.exportHasNumberedModel &&
+      afterNumberedToggle.titleNumberedCount > 0 &&
+      afterNumberedToggle.summaryNumberedCount > 0 &&
+      afterNumberedToggle.thumbNumberedCount > 0,
+    afterNumberedToggle,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="bullet"]')?.click()`)
+  await delay(80)
 
   await pressKey(page, {
     code: 'Escape',
@@ -9630,7 +9678,7 @@ async function runTextPasteScenario(page) {
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
 
-    dataTransfer.setData('text/html', '<article><p><strong>Bold plan</strong> and <em>italic note</em> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul></article>')
+    dataTransfer.setData('text/html', '<article><p><strong>Bold plan</strong> and <em>italic note</em> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul><ol><li>First step</li><li><strong>Second step</strong></li></ol></article>')
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -9650,6 +9698,7 @@ async function runTextPasteScenario(page) {
       afterRichPaste.textPasteBoldRuns >= 2 &&
       afterRichPaste.textPasteUnderlineRuns >= 2 &&
       afterRichPaste.textPasteBulletParagraphs === 2 &&
+      afterRichPaste.textPasteNumberedParagraphs === 2 &&
       afterRichPaste.textPasteLinkRuns === 1 &&
       afterRichPaste.textBoxCount === before.textBoxCount + 1 &&
       afterRichPaste.selectedKind === 'textBox' &&
@@ -9658,8 +9707,10 @@ async function runTextPasteScenario(page) {
       afterRichPaste.selectedItalicRunCount >= 1 &&
       afterRichPaste.selectedUnderlineRunCount >= 2 &&
       afterRichPaste.selectedBulletParagraphCount === 2 &&
+      afterRichPaste.selectedNumberedParagraphCount === 2 &&
       afterRichPaste.selectedText.includes('Bold plan') &&
-      afterRichPaste.selectedText.includes('Second bullet'),
+      afterRichPaste.selectedText.includes('Second bullet') &&
+      afterRichPaste.selectedText.includes('Second step'),
     {
       afterRichPaste,
       before,
@@ -9738,9 +9789,12 @@ async function runTextPasteScenario(page) {
       textRichClipboardWrite.html.includes('<em>italic note</em>') &&
       textRichClipboardWrite.html.includes('<u>underline</u>') &&
       textRichClipboardWrite.html.includes('data-ppt-selection-list="bullet"') &&
+      textRichClipboardWrite.html.includes('data-ppt-selection-list="numbered"') &&
+      textRichClipboardWrite.html.includes('<ol') &&
       textRichClipboardWrite.html.includes('<li') &&
       textRichClipboardWrite.plainText.includes('Bold plan') &&
       textRichClipboardWrite.plainText.includes('Second bullet') &&
+      textRichClipboardWrite.plainText.includes('2. Second step') &&
       textRichClipboardWrite.json.includes('"kind": "interactive-os.ppt.selection"') &&
       textRichClipboardWrite.svg.includes('<svg'),
     {
@@ -9769,7 +9823,7 @@ async function runTextPasteScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
-    const markdown = '# Launch plan\\n- **Draft** with _notes_\\n- [Review](https://example.com/review) handoff'
+    const markdown = '# Launch plan\\n- **Draft** with _notes_\\n1. [Review](https://example.com/review) handoff'
 
     dataTransfer.setData('text/markdown', markdown)
     dataTransfer.setData('text/plain', markdown)
@@ -9790,7 +9844,8 @@ async function runTextPasteScenario(page) {
       afterMarkdownPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
       afterMarkdownPaste.textPasteFormat === 'text-markdown-rich' &&
       afterMarkdownPaste.textPasteBoldRuns >= 2 &&
-      afterMarkdownPaste.textPasteBulletParagraphs === 2 &&
+      afterMarkdownPaste.textPasteBulletParagraphs === 1 &&
+      afterMarkdownPaste.textPasteNumberedParagraphs === 1 &&
       afterMarkdownPaste.textPasteLinkRuns === 1 &&
       afterMarkdownPaste.textPasteUnderlineRuns >= 1 &&
       afterMarkdownPaste.textBoxCount === before.textBoxCount + 1 &&
@@ -9799,7 +9854,8 @@ async function runTextPasteScenario(page) {
       afterMarkdownPaste.selectedBoldRunCount >= 2 &&
       afterMarkdownPaste.selectedItalicRunCount >= 1 &&
       afterMarkdownPaste.selectedUnderlineRunCount >= 1 &&
-      afterMarkdownPaste.selectedBulletParagraphCount === 2 &&
+      afterMarkdownPaste.selectedBulletParagraphCount === 1 &&
+      afterMarkdownPaste.selectedNumberedParagraphCount === 1 &&
       afterMarkdownPaste.selectedText.includes('Launch plan') &&
       afterMarkdownPaste.selectedText.includes('Draft with notes') &&
       afterMarkdownPaste.selectedText.includes('Review handoff'),
@@ -13856,6 +13912,7 @@ function getPPTTextPasteState(page) {
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
+      selectedNumberedParagraphCount: selected?.querySelectorAll('[data-ppt-numbered="true"]').length ?? 0,
       selectedParagraphLineHeights: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-line-height') ?? ''),
       selectedParagraphSpacingAfter: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-after') ?? ''),
       selectedParagraphSpacingBefore: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-before') ?? ''),
@@ -13879,6 +13936,7 @@ function getPPTTextPasteState(page) {
       textPasteImporter: stage?.getAttribute('data-ppt-text-paste-importer') ?? '',
       textPasteLinkRuns: Number(stage?.getAttribute('data-ppt-text-paste-link-runs') ?? 0),
       textPasteModel: stage?.getAttribute('data-ppt-text-paste-model') ?? '',
+      textPasteNumberedParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-numbered-paragraphs') ?? 0),
       textPasteRichFallback: stage?.getAttribute('data-ppt-text-paste-rich-fallback') ?? '',
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
       textPasteUnderlineRuns: Number(stage?.getAttribute('data-ppt-text-paste-underline-runs') ?? 0),

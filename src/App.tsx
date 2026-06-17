@@ -42,6 +42,7 @@ import {
   Keyboard,
   Layers,
   List,
+  ListOrdered,
   Lock,
   Map as MapIcon,
   Maximize2,
@@ -1575,6 +1576,7 @@ type PPTTextQuickFormatState = {
   isBold: boolean
   isItalic: boolean
   isUnderline: boolean
+  numbered: boolean
 }
 type PPTShapeQuickMenuState = {
   elementId: string
@@ -5448,7 +5450,9 @@ function App() {
     )
   }
 
-  function updateSelectedParagraphBullet(enabled: boolean) {
+  function updateSelectedParagraphList(
+    list: PPTParagraph['bullet'] | undefined,
+  ) {
     if (!canFormatSelectedText) {
       return
     }
@@ -5461,7 +5465,7 @@ function App() {
           textBody: {
             paragraphs: element.textBody.paragraphs.map((paragraph) => ({
               ...paragraph,
-              ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
+              bullet: list,
             })),
           },
         })),
@@ -5469,10 +5473,20 @@ function App() {
     )
   }
 
+  function updateSelectedParagraphBullet(enabled: boolean) {
+    updateSelectedParagraphList(enabled ? 'bullet' : undefined)
+  }
+
   function toggleSelectedParagraphBullet() {
     const enabled = !areAllPPTTextElementsBulleted(selectedTextElements)
 
     updateSelectedParagraphBullet(enabled)
+  }
+
+  function toggleSelectedParagraphNumbered() {
+    const enabled = !areAllPPTTextElementsNumbered(selectedTextElements)
+
+    updateSelectedParagraphList(enabled ? 'numbered' : undefined)
   }
 
   function updateSelectedTextRunStyle(
@@ -6076,9 +6090,9 @@ function App() {
     )
   }
 
-  function updateParagraphBullet(
+  function updateParagraphList(
     elementId: string,
-    enabled: boolean,
+    list: PPTParagraph['bullet'] | undefined,
   ) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
@@ -6091,12 +6105,26 @@ function App() {
           textBody: {
             paragraphs: element.textBody.paragraphs.map((paragraph) => ({
               ...paragraph,
-              ...(enabled ? { bullet: 'bullet' as const } : { bullet: undefined }),
+              bullet: list,
             })),
           },
         }
       }),
     )
+  }
+
+  function updateParagraphBullet(
+    elementId: string,
+    enabled: boolean,
+  ) {
+    updateParagraphList(elementId, enabled ? 'bullet' : undefined)
+  }
+
+  function updateParagraphNumbered(
+    elementId: string,
+    enabled: boolean,
+  ) {
+    updateParagraphList(elementId, enabled ? 'numbered' : undefined)
   }
 
   function updateParagraphSpacing(
@@ -8105,6 +8133,12 @@ function App() {
     section: 'Format',
     title: 'Toggle bullet list',
   }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:numbered',
+    onSelect: toggleSelectedParagraphNumbered,
+    section: 'Format',
+    title: 'Toggle numbered list',
+  }, {
     disabled: !selectedElement || !isPPTTextElement(selectedElement) || !selectedTextOverflow,
     id: 'format:auto-fit-text',
     onSelect: () => {
@@ -8743,6 +8777,7 @@ function App() {
         data-ppt-text-paste-importer={lastTextPasteImport?.importerId}
         data-ppt-text-paste-link-runs={lastTextPasteImport?.linkRunCount}
         data-ppt-text-paste-model={PPT_TEXT_PASTE_IMPORT_MODEL}
+        data-ppt-text-paste-numbered-paragraphs={lastTextPasteImport?.numberedParagraphCount}
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
         data-ppt-text-paste-underline-runs={lastTextPasteImport?.underlineRunCount}
         data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
@@ -9125,6 +9160,7 @@ function App() {
               onAlignmentPreviewChange={setAlignmentPreviewCommand}
               onFontSizeStep={stepSelectedTextFontSize}
               onParagraphBulletToggle={toggleSelectedParagraphBullet}
+              onParagraphNumberedToggle={toggleSelectedParagraphNumbered}
               onParagraphAlign={updateSelectedParagraphAlign}
               onShapeKindChange={updateShapeKind}
               onTextBoldToggle={toggleSelectedTextBold}
@@ -9210,6 +9246,7 @@ function App() {
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
+        onParagraphNumberedChange={updateParagraphNumbered}
         onParagraphSpacingChange={updateParagraphSpacing}
         onElementTextStyleChange={updateElementTextStyle}
         onTextAutoFit={autoFitTextElement}
@@ -11306,10 +11343,34 @@ function createPPTElementClipboardPlainText(element: PPTElement) {
       return element.accessibility?.altText || element.alt || element.name
     case 'shape':
     case 'textBox':
-      return readPPTText(element.textBody) || element.name
+      return readPPTTextForClipboard(element.textBody) || element.name
     case 'table':
       return stringifyPPTTableRows(element.rows)
   }
+}
+
+function readPPTTextForClipboard(body: PPTTextBody | undefined) {
+  if (!body) {
+    return ''
+  }
+
+  let numberedIndex = 0
+
+  return body.paragraphs
+    .map((paragraph) => {
+      const listPrefix = paragraph.bullet === 'bullet'
+        ? '\u2022 '
+        : paragraph.bullet === 'numbered'
+          ? `${numberedIndex + 1}. `
+          : ''
+
+      if (paragraph.bullet === 'numbered') {
+        numberedIndex += 1
+      }
+
+      return `${listPrefix}${paragraph.runs.map((run) => run.text).join('')}`
+    })
+    .join('\n')
 }
 
 function createPPTSelectionClipboardFallbackHTML(
@@ -11451,6 +11512,7 @@ function createPPTClipboardGeometryAttributes(element: PPTElement) {
 
 function createPPTTextBodyClipboardHTML(body: PPTTextBody) {
   const parts: string[] = []
+  let listKind: PPTParagraph['bullet'] | undefined
   let listItems: string[] = []
 
   function flushList() {
@@ -11458,14 +11520,26 @@ function createPPTTextBodyClipboardHTML(body: PPTTextBody) {
       return
     }
 
-    parts.push(`<ul data-ppt-selection-list="bullet">${listItems.join('')}</ul>`)
+    const tag = listKind === 'numbered' ? 'ol' : 'ul'
+
+    parts.push(
+      `<${tag} data-ppt-selection-list="${listKind ?? 'bullet'}">${
+        listItems.join('')
+      }</${tag}>`,
+    )
     listItems = []
+    listKind = undefined
   }
 
   body.paragraphs.forEach((paragraph) => {
     const runsHTML = createPPTTextRunsClipboardHTML(paragraph.runs)
 
-    if (paragraph.bullet === 'bullet') {
+    if (paragraph.bullet === 'bullet' || paragraph.bullet === 'numbered') {
+      if (listKind !== paragraph.bullet) {
+        flushList()
+        listKind = paragraph.bullet
+      }
+
       listItems.push(
         `<li data-ppt-selection-paragraph="true"${createPPTParagraphClipboardStyleAttribute(paragraph)}>${runsHTML || '<br>'}</li>`,
       )
@@ -12426,6 +12500,7 @@ function PPTSelectionFloatingBar({
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
+  onParagraphNumberedToggle,
   onShapeKindChange,
   onTextBoldToggle,
   onTextColorChange,
@@ -12443,6 +12518,7 @@ function PPTSelectionFloatingBar({
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
+  onParagraphNumberedToggle: () => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
@@ -12476,6 +12552,7 @@ function PPTSelectionFloatingBar({
           onFontSizeStep={onFontSizeStep}
           onParagraphAlign={onParagraphAlign}
           onParagraphBulletToggle={onParagraphBulletToggle}
+          onParagraphNumberedToggle={onParagraphNumberedToggle}
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
           onTextItalicToggle={onTextItalicToggle}
@@ -12847,6 +12924,7 @@ function PPTTextQuickFormatControls({
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
+  onParagraphNumberedToggle,
   onTextBoldToggle,
   onTextColorChange,
   onTextItalicToggle,
@@ -12856,6 +12934,7 @@ function PPTTextQuickFormatControls({
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
+  onParagraphNumberedToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   onTextItalicToggle: () => void
@@ -12966,6 +13045,21 @@ function PPTTextQuickFormatControls({
         }}
       >
         <List size={16} />
+      </button>
+      <button
+        aria-label="Toggle numbered list"
+        aria-pressed={state.numbered}
+        className="ppt-floating-command"
+        data-ppt-text-quick="numbered"
+        title="Toggle numbered list"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onParagraphNumberedToggle()
+        }}
+      >
+        <ListOrdered size={16} />
       </button>
       <PPTParagraphAlignRadioGroup
         align={state.align}
@@ -13346,6 +13440,9 @@ function SlideThumb({
             data-ppt-thumb-bullet={isPPTTextElement(element) && hasPPTTextBodyBullet(element.textBody)
               ? 'true'
               : undefined}
+            data-ppt-thumb-numbered={isPPTTextElement(element) && hasPPTTextBodyNumbered(element.textBody)
+              ? 'true'
+              : undefined}
             data-ppt-thumb-font-family={isPPTTextElement(element)
               ? normalizePPTTextFontFamily(getPPTTextElementStyle(element).fontFamily)
               : undefined}
@@ -13718,6 +13815,7 @@ function PPTElementView({
         ? element.rows.length
         : undefined}
       data-ppt-bullet-list={textBody && hasPPTTextBodyBullet(textBody) ? 'true' : undefined}
+      data-ppt-numbered-list={textBody && hasPPTTextBodyNumbered(textBody) ? 'true' : undefined}
       data-locked={element.locked === true ? 'true' : 'false'}
       data-ppt-element={element.id}
       data-ppt-element-name={element.name}
@@ -13854,6 +13952,8 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
         <span
           className="ppt-text-paragraph"
           data-ppt-bullet={paragraph.bullet === 'bullet' ? 'true' : undefined}
+          data-ppt-list={paragraph.bullet}
+          data-ppt-numbered={paragraph.bullet === 'numbered' ? 'true' : undefined}
           data-ppt-line-height={getPPTParagraphLineHeight(paragraph)}
           data-ppt-spacing-after={getPPTParagraphSpacingAfter(paragraph)}
           data-ppt-spacing-before={getPPTParagraphSpacingBefore(paragraph)}
@@ -14401,6 +14501,7 @@ function Inspector({
   onLineMarkerChange,
   onLineRouteChange,
   onParagraphBulletChange,
+  onParagraphNumberedChange,
   onParagraphAlignChange,
   onParagraphSpacingChange,
   onShapeCornerRadiusChange,
@@ -14515,6 +14616,10 @@ function Inspector({
     elementId: string,
     enabled: boolean,
   ) => void
+  onParagraphNumberedChange: (
+    elementId: string,
+    enabled: boolean,
+  ) => void
   onParagraphAlignChange: (
     elementId: string,
     align: NonNullable<PPTParagraph['align']>,
@@ -14565,6 +14670,9 @@ function Inspector({
     : 'left'
   const paragraphBullet = selectedElement && isPPTTextElement(selectedElement)
     ? hasPPTTextBodyBullet(selectedElement.textBody)
+    : false
+  const paragraphNumbered = selectedElement && isPPTTextElement(selectedElement)
+    ? hasPPTTextBodyNumbered(selectedElement.textBody)
     : false
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
@@ -16006,6 +16114,19 @@ function Inspector({
                         onParagraphBulletChange(selectedElement.id, !paragraphBullet)}
                     >
                       bullet
+                    </button>
+                    <button
+                      aria-pressed={paragraphNumbered}
+                      className="ppt-paragraph-bullet-button"
+                      data-ppt-paragraph-numbered
+                      type="button"
+                      onClick={() =>
+                        onParagraphNumberedChange(
+                          selectedElement.id,
+                          !paragraphNumbered,
+                        )}
+                    >
+                      numbered
                     </button>
                     <PPTParagraphAlignRadioGroup
                       align={paragraphAlign}
@@ -17471,18 +17592,34 @@ function getPPTTextQuickFormatState(
       styles.every((style) => style.fontWeight === 'bold'),
     isItalic: areAllPPTTextRunsStyled(elements, 'italic'),
     isUnderline: areAllPPTTextRunsStyled(elements, 'underline'),
+    numbered: areAllPPTTextElementsNumbered(elements),
   }
 }
 
 function areAllPPTTextElementsBulleted(elements: readonly PPTTextElement[]) {
+  return areAllPPTTextElementsListed(elements, 'bullet')
+}
+
+function areAllPPTTextElementsNumbered(elements: readonly PPTTextElement[]) {
+  return areAllPPTTextElementsListed(elements, 'numbered')
+}
+
+function areAllPPTTextElementsListed(
+  elements: readonly PPTTextElement[],
+  list: NonNullable<PPTParagraph['bullet']>,
+) {
   return elements.length > 0 &&
     elements.every((element) =>
       element.textBody.paragraphs.length > 0 &&
-      element.textBody.paragraphs.every((paragraph) => paragraph.bullet === 'bullet'))
+      element.textBody.paragraphs.every((paragraph) => paragraph.bullet === list))
 }
 
 function hasPPTTextBodyBullet(body: PPTTextBody) {
   return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
+}
+
+function hasPPTTextBodyNumbered(body: PPTTextBody) {
+  return body.paragraphs.some((paragraph) => paragraph.bullet === 'numbered')
 }
 
 function areAllPPTTextRunsStyled(
@@ -19421,15 +19558,25 @@ function measurePPTTextContentSize(
   },
 ) {
   const style = element.style
+  let numberedIndex = 0
   const size = measurePPTCanvasTextBlocks({
     blocks: element.textBody.paragraphs.map((paragraph) => {
       const paragraphStyle = getPPTParagraphStyle(paragraph)
+      const listPrefix = paragraph.bullet === 'bullet'
+        ? '\u2022 '
+        : paragraph.bullet === 'numbered'
+          ? `${numberedIndex + 1}. `
+          : ''
+
+      if (paragraph.bullet === 'numbered') {
+        numberedIndex += 1
+      }
 
       return {
         lineHeight: paragraphStyle.lineHeight,
         marginBottom: paragraphStyle.marginBottom,
         marginTop: paragraphStyle.marginTop,
-        text: `${paragraph.bullet === 'bullet' ? '\u2022 ' : ''}${
+        text: `${listPrefix}${
           paragraph.runs.map((run) => run.text).join('') || ' '
         }`,
       }

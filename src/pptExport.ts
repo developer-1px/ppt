@@ -324,13 +324,16 @@ function renderPPTElementHTML(element: PPTElement) {
   const bulletListAttr = element.textBody && hasPPTTextBodyBullet(element.textBody)
     ? ' data-ppt-bullet-list="true"'
     : ''
+  const numberedListAttr = element.textBody && hasPPTTextBodyNumbered(element.textBody)
+    ? ' data-ppt-numbered-list="true"'
+    : ''
   const autoFitAttr = getPPTTextAutoFitAttr(element)
 
   if (element.kind === 'shape') {
-    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${cornerRadiusAttr}${fillOpacityAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+    return `    <div class="ppt-element ppt-shape ppt-shape-${element.shape}" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${cornerRadiusAttr}${fillOpacityAttr}${strokeDashAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${numberedListAttr}${autoFitAttr} style="${[...style, exportShapeStyle(element), textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
   }
 
-  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
+  return `    <div class="ppt-element ppt-text" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs}${fontFamilyAttr}${textInsetAttr}${verticalAlignAttr}${bulletListAttr}${numberedListAttr}${autoFitAttr} style="${[...style, textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div>`
 }
 
 function renderPPTElementSVG(element: PPTElement) {
@@ -482,10 +485,17 @@ function renderPPTTextBodySVG({
     verticalAlign,
   })
 
+  let numberedIndex = 0
+
   return body.paragraphs.map((paragraph) => {
     const bullet = paragraph.bullet === 'bullet'
+    const numbered = paragraph.bullet === 'numbered'
     const runs = paragraph.runs.map(renderPPTTextRunSVG).join('')
-    const bulletPrefix = bullet ? '<tspan data-ppt-bullet="true">&#8226; </tspan>' : ''
+    const listPrefix = bullet
+      ? '<tspan data-ppt-bullet="true">&#8226; </tspan>'
+      : numbered
+        ? `<tspan data-ppt-numbered="true">${numberedIndex + 1}. </tspan>`
+        : ''
     const lineHeight = getPPTParagraphLineHeight(paragraph)
     const spacingBefore = getPPTParagraphSpacingBefore(paragraph)
     const spacingAfter = getPPTParagraphSpacingAfter(paragraph)
@@ -496,9 +506,14 @@ function renderPPTTextBodySVG({
       inset,
     })
     y += spacingBefore + fontSize
+    if (numbered) {
+      numberedIndex += 1
+    }
     const attrs = [
       'class="ppt-svg-text-paragraph"',
       bullet ? 'data-ppt-bullet="true"' : '',
+      numbered ? 'data-ppt-numbered="true"' : '',
+      paragraph.bullet ? `data-ppt-list="${escapeHtml(paragraph.bullet)}"` : '',
       `data-ppt-line-height="${formatNumber(lineHeight)}"`,
       `data-ppt-spacing-after="${formatNumber(spacingAfter)}"`,
       `data-ppt-spacing-before="${formatNumber(spacingBefore)}"`,
@@ -516,7 +531,7 @@ function renderPPTTextBodySVG({
 
     y += fontSize * lineHeight + spacingAfter
 
-    return `<text ${attrs}>${bulletPrefix}${runs}</text>`
+    return `<text ${attrs}>${listPrefix}${runs}</text>`
   }).join('')
 }
 
@@ -568,6 +583,9 @@ function exportCSS() {
     '.ppt-text-paragraph{display:block;min-height:1em;}',
     '.ppt-text-paragraph[data-ppt-bullet="true"]{position:relative;padding-left:1.1em;}',
     '.ppt-text-paragraph[data-ppt-bullet="true"]::before{content:"\\2022";position:absolute;left:0;}',
+    '.ppt-element{counter-reset:ppt-numbered-list;}',
+    '.ppt-text-paragraph[data-ppt-numbered="true"]{position:relative;padding-left:1.45em;counter-increment:ppt-numbered-list;}',
+    '.ppt-text-paragraph[data-ppt-numbered="true"]::before{content:counter(ppt-numbered-list) ".";position:absolute;left:0;}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
     '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
@@ -585,9 +603,7 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
     const runs = paragraph.runs
       .map(renderPPTTextRunHTML)
       .join('')
-    const bulletAttr = paragraph.bullet === 'bullet'
-      ? ' data-ppt-bullet="true"'
-      : ''
+    const bulletAttr = getPPTParagraphListHTMLAttrs(paragraph)
     const paragraphAttrs = getPPTParagraphHTMLAttrs(paragraph)
     const paragraphStyleAttr = getPPTParagraphStyleAttr(paragraph)
 
@@ -619,8 +635,24 @@ function renderPPTTextRunStyleAttr(run: PPTRun) {
   return styles ? `style="${styles}"` : ''
 }
 
+function getPPTParagraphListHTMLAttrs(paragraph: PPTParagraph) {
+  if (paragraph.bullet === 'bullet') {
+    return ' data-ppt-bullet="true" data-ppt-list="bullet"'
+  }
+
+  if (paragraph.bullet === 'numbered') {
+    return ' data-ppt-numbered="true" data-ppt-list="numbered"'
+  }
+
+  return ''
+}
+
 function hasPPTTextBodyBullet(body: PPTTextBody) {
   return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
+}
+
+function hasPPTTextBodyNumbered(body: PPTTextBody) {
+  return body.paragraphs.some((paragraph) => paragraph.bullet === 'numbered')
 }
 
 function renderPPTLineHTML(element: PPTLine, style: string[]) {
