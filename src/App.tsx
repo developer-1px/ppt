@@ -206,6 +206,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
+  SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
@@ -14651,7 +14652,7 @@ function Inspector({
           data-ppt-layer-pane-aria-container={layerPaneDescriptor.aria.containerRole}
           data-ppt-layer-pane-aria-row={layerPaneDescriptor.aria.rowRole}
           data-ppt-layer-pane-keyboard-intent-model={SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL}
-          data-ppt-layer-pane-keyboard-keys="arrow-left-right-home-end-enter-space-shift-range-alt-reorder"
+          data-ppt-layer-pane-keyboard-keys={SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS}
           data-ppt-layer-pane-keyboard-model={layerPaneDescriptor.aria.keyboardModel}
           data-ppt-layer-pane-range-anchor-object-id={layerPaneGroupState.rangeAnchorObjectId ?? ''}
           data-ppt-layer-pane-range-selection-model="row-press-range-anchor"

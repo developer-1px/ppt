@@ -10174,7 +10174,7 @@ async function runSelectionPaneScenario(page) {
       initial.rowRole === 'treeitem' &&
       initial.keyboardModel === 'roving-tabindex' &&
       initial.keyboardIntentModel === 'slide-edit-layer-pane-keyboard-intent' &&
-      initial.keyboardKeys === 'arrow-left-right-home-end-enter-space-shift-range-alt-reorder' &&
+      initial.keyboardKeys === 'arrow-left-right-up-down-home-end-enter-space-shift-range-alt-reorder-f2-rename' &&
       initial.rangeSelectionModel === 'row-press-range-anchor' &&
       initial.selectionModel === 'host-controlled-multi-select' &&
       initial.selectedRowId === initial.selectedId &&
