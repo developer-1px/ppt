@@ -424,7 +424,6 @@ import {
 import {
   CANVAS_MARQUEE_SELECTION_MODEL,
   EMPTY_CANVAS_SNAP_GUIDES,
-  canFlipCanvasSelectionItems,
   getCanvasFullySelectedItemGroupIds,
   getCanvasGroupExpandedSelectionIds,
   getCanvasGroupedItemSelection,
@@ -436,14 +435,10 @@ import {
   deleteCanvasSelectionItems,
   isAdditivePointerInput,
   mapCanvasSelectionItems,
-  moveCanvasSelectionItemsToIndex,
   moveCanvasSelection,
   normalizeCanvasRotationDegrees,
   removeCanvasSelectionIds,
   resizeCanvasSelection,
-  canTidyCanvasSelectionItems,
-  flipCanvasSelectionItems,
-  tidyCanvasSelectionItems,
   type CanvasSnapGuides,
 } from 'canvas/foundation'
 import {
@@ -526,15 +521,20 @@ import {
 import { SAMPLE_PPT_DECK } from './pptSampleDeck'
 import {
   createPPTCanvasScene,
+  canFlipPPTElements,
   getPPTElementGroupIndexRange,
   getPPTElementGroupMemberIds,
   getPPTElementPointerSelection,
   insertPPTSlideAtTargetPlacement,
+  movePPTElementsToIndex,
   movePPTSlideToTargetPlacement,
   canSelectSameTypePPTElements,
   pptGeometryToBounds,
   pptCanvasTransformAdapter,
   selectSameTypePPTElements,
+  canTidyPPTElements,
+  flipPPTElements,
+  tidyPPTElements,
 } from './pptCanvasAdapter'
 import {
   filterPPTCommandPaletteItems,
@@ -10261,9 +10261,8 @@ function reorderPPTLayerPaneElement(
       groupId,
     })
     : [objectId]
-  const result = moveCanvasSelectionItemsToIndex({
-    getItemId: (element) => element.id,
-    items: elements,
+  const result = movePPTElementsToIndex({
+    elements,
     selection,
     toIndex,
   })
@@ -15008,11 +15007,9 @@ function canFlipPPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  return canFlipCanvasSelectionItems({
-    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
-    getItemId: (element) => element.id,
-    isItemSelectable: isPPTFlipSelectionElement,
-    items: elements,
+  return canFlipPPTElements({
+    elements,
+    isElementSelectable: isPPTFlipSelectionElement,
     selection,
   })
 }
@@ -15022,18 +15019,15 @@ function flipPPTSelectionElements(
   selection: readonly string[],
   axis: PPTFlipAxis,
 ) {
-  return flipCanvasSelectionItems({
+  return flipPPTElements({
     axis,
-    flipItem: ({ item, pivot, reflectedBounds }) =>
-      item.kind === 'line'
-        ? flipPPTLineElement(item, axis, pivot)
-        : flipPPTElementBounds(item, axis, reflectedBounds),
-    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
-    getItemId: (element) => element.id,
-    isItemSelectable: isPPTFlipSelectionElement,
-    items: elements,
+    elements,
+    flipElement: ({ element, pivot, reflectedBounds }) =>
+      element.kind === 'line'
+        ? flipPPTLineElement(element, axis, pivot)
+        : flipPPTElementBounds(element, axis, reflectedBounds),
+    isElementSelectable: isPPTFlipSelectionElement,
     selection,
-    updateItemBounds: updatePPTElementBounds,
   })
 }
 
@@ -15076,11 +15070,9 @@ function canTidyPPTSelection(
   elements: readonly PPTElement[],
   selection: readonly string[],
 ) {
-  return canTidyCanvasSelectionItems({
-    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
-    getItemId: (element) => element.id,
-    isItemSelectable: isPPTTidySelectionElement,
-    items: elements,
+  return canTidyPPTElements({
+    elements,
+    isElementSelectable: isPPTTidySelectionElement,
     selection,
   })
 }
@@ -15089,14 +15081,11 @@ function tidyPPTSelectionElements(
   elements: PPTElement[],
   selection: readonly string[],
 ) {
-  return tidyCanvasSelectionItems({
+  return tidyPPTElements({
+    elements,
     gap: PPT_TIDY_GAP,
-    getItemBounds: (element) => pptGeometryToBounds(element.geometry),
-    getItemId: (element) => element.id,
-    isItemSelectable: isPPTTidySelectionElement,
-    items: elements,
+    isElementSelectable: isPPTTidySelectionElement,
     selection,
-    updateItemBounds: updatePPTElementBounds,
   })
 }
 

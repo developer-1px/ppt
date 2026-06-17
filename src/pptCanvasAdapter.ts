@@ -3,14 +3,19 @@ import {
   type Bounds,
 } from 'canvas/core'
 import {
+  canFlipCanvasSelectionItems,
   canSelectSameTypeCanvasItems,
+  canTidyCanvasSelectionItems,
   createCanvasSceneAdapter,
+  flipCanvasSelectionItems,
   getCanvasItemGroupIndexRange,
   getCanvasItemGroupMemberIdsForGroup,
   getCanvasItemPointerSelection,
   insertCanvasItemAtTargetPlacement,
   moveCanvasItemToTargetPlacement,
+  moveCanvasSelectionItemsToIndex,
   selectSameTypeCanvasItems,
+  tidyCanvasSelectionItems,
   type CanvasSceneEntry,
   type CanvasTransformAdapter,
   resizeCanvasSelectionItems,
@@ -26,6 +31,13 @@ import {
 } from './pptModel'
 
 type PPTTargetPlacement = 'after' | 'before'
+type PPTSelectionLayoutAxis = 'horizontal' | 'vertical'
+type PPTElementPredicate = (element: PPTElement) => boolean
+type PPTFlipElementInput = {
+  element: PPTElement
+  pivot: number
+  reflectedBounds: Bounds
+}
 
 export function createPPTCanvasScene(slide: PPTSlide) {
   const entries: CanvasSceneEntry[] = slide.elements
@@ -184,6 +196,109 @@ export function canSelectSameTypePPTElements({
     isItemSelectable: isPPTSelectableElement,
     items: elements,
     selection,
+  })
+}
+
+export function movePPTElementsToIndex({
+  elements,
+  selection,
+  toIndex,
+}: {
+  elements: readonly PPTElement[]
+  selection: readonly string[]
+  toIndex: number
+}) {
+  return moveCanvasSelectionItemsToIndex({
+    getItemId: getPPTElementId,
+    items: elements,
+    selection,
+    toIndex,
+  })
+}
+
+export function canFlipPPTElements({
+  elements,
+  isElementSelectable,
+  selection,
+}: {
+  elements: readonly PPTElement[]
+  isElementSelectable: PPTElementPredicate
+  selection: readonly string[]
+}) {
+  return canFlipCanvasSelectionItems({
+    getItemBounds: getPPTElementBounds,
+    getItemId: getPPTElementId,
+    isItemSelectable: isElementSelectable,
+    items: elements,
+    selection,
+  })
+}
+
+export function flipPPTElements({
+  axis,
+  elements,
+  flipElement,
+  isElementSelectable,
+  selection,
+}: {
+  axis: PPTSelectionLayoutAxis
+  elements: PPTElement[]
+  flipElement?: (input: PPTFlipElementInput) => PPTElement
+  isElementSelectable: PPTElementPredicate
+  selection: readonly string[]
+}) {
+  return flipCanvasSelectionItems({
+    axis,
+    flipItem: flipElement
+      ? ({ item, pivot, reflectedBounds }) =>
+          flipElement({ element: item, pivot, reflectedBounds })
+      : undefined,
+    getItemBounds: getPPTElementBounds,
+    getItemId: getPPTElementId,
+    isItemSelectable: isElementSelectable,
+    items: elements,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
+  })
+}
+
+export function canTidyPPTElements({
+  elements,
+  isElementSelectable,
+  selection,
+}: {
+  elements: readonly PPTElement[]
+  isElementSelectable: PPTElementPredicate
+  selection: readonly string[]
+}) {
+  return canTidyCanvasSelectionItems({
+    getItemBounds: getPPTElementBounds,
+    getItemId: getPPTElementId,
+    isItemSelectable: isElementSelectable,
+    items: elements,
+    selection,
+  })
+}
+
+export function tidyPPTElements({
+  elements,
+  gap,
+  isElementSelectable,
+  selection,
+}: {
+  elements: PPTElement[]
+  gap: number
+  isElementSelectable: PPTElementPredicate
+  selection: readonly string[]
+}) {
+  return tidyCanvasSelectionItems({
+    gap,
+    getItemBounds: getPPTElementBounds,
+    getItemId: getPPTElementId,
+    isItemSelectable: isElementSelectable,
+    items: elements,
+    selection,
+    updateItemBounds: updatePPTElementBounds,
   })
 }
 
