@@ -428,6 +428,10 @@ import {
 import { getCanvasTextPasteSourcesFromDataTransfer } from 'canvas/app/text-paste-import'
 import { scheduleCanvasTimeoutTask } from 'canvas/app/timeout-task'
 import {
+  CANVAS_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER,
+  CANVAS_WHEEL_VIEWPORT_MODEL,
+  CANVAS_WHEEL_VIEWPORT_PAN_MODE,
+  CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER,
   centerCanvasViewportAtWorldPoint,
   fitCanvasViewportToBounds,
   resetCanvasViewport,
@@ -8089,10 +8093,10 @@ function App() {
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
         data-ppt-temporary-pan-model={CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL}
         data-ppt-temporary-pan-shortcut={CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL}
-        data-ppt-wheel-viewport-horizontal-pan-modifier="Shift"
-        data-ppt-wheel-viewport-model="canvas-wheel-viewport"
-        data-ppt-wheel-viewport-pan="ordinary-wheel"
-        data-ppt-wheel-viewport-zoom-modifier="Ctrl/Meta"
+        data-ppt-wheel-viewport-horizontal-pan-modifier={CANVAS_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER}
+        data-ppt-wheel-viewport-model={CANVAS_WHEEL_VIEWPORT_MODEL}
+        data-ppt-wheel-viewport-pan={CANVAS_WHEEL_VIEWPORT_PAN_MODE}
+        data-ppt-wheel-viewport-zoom-modifier={CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER}
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
