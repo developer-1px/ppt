@@ -330,6 +330,9 @@ import {
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
 import {
+  getCanvasFindInputKeyboardIntent,
+} from 'canvas/app/find-replace-keyboard'
+import {
   isCanvasKeyboardCommandIntent,
   runCanvasKeyboardCommandIntent,
 } from 'canvas/app/keyboard-command-dispatch'
@@ -3037,14 +3040,21 @@ function App() {
   }
 
   function handleFindKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter') {
+    const intent = getCanvasFindInputKeyboardIntent({
+      key: event.key,
+      shiftKey: event.shiftKey,
+    })
+
+    if (intent.preventDefault) {
       event.preventDefault()
-      goToFindMatch(event.shiftKey ? -1 : 1)
+    }
+
+    if (intent.kind === 'find-match') {
+      goToFindMatch(intent.direction)
       return
     }
 
-    if (event.key === 'Escape') {
-      event.preventDefault()
+    if (intent.kind === 'close-find') {
       closeFindStrip()
     }
   }

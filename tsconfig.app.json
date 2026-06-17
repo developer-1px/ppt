@@ -23,6 +23,7 @@
       "canvas/app/event-listener": ["../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts"],
       "canvas/app/interaction-target": ["../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts"],
       "canvas/app/floating-anchor": ["../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts"],
+      "canvas/app/find-replace-keyboard": ["../canvas/src/canvas/app/feature-packs/find-replace/CanvasFindReplaceKeyboard.ts"],
       "canvas/app/pointer-drawing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts"],
       "canvas/app/image-import": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts"],
       "canvas/app/inline-edit-dom": ["../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts"],

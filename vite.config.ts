@@ -15,6 +15,7 @@ const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/
 const canvasEventListenerEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts', import.meta.url))
 const canvasInteractionTargetEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts', import.meta.url))
 const canvasFloatingAnchorEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts', import.meta.url))
+const canvasFindReplaceKeyboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/find-replace/CanvasFindReplaceKeyboard.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
 const canvasInlineEditDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts', import.meta.url))
@@ -74,6 +75,7 @@ export default defineConfig({
       { find: 'canvas/app/event-listener', replacement: canvasEventListenerEntry },
       { find: 'canvas/app/interaction-target', replacement: canvasInteractionTargetEntry },
       { find: 'canvas/app/floating-anchor', replacement: canvasFloatingAnchorEntry },
+      { find: 'canvas/app/find-replace-keyboard', replacement: canvasFindReplaceKeyboardEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
       { find: 'canvas/app/inline-edit-dom', replacement: canvasInlineEditDomEntry },
