@@ -379,6 +379,7 @@ import {
   type CanvasRichClipboardWriteMode,
 } from 'canvas/app/rich-clipboard'
 import { getCanvasTextPasteSourcesFromDataTransfer } from 'canvas/app/text-paste-import'
+import { scheduleCanvasTimeoutTask } from 'canvas/app/timeout-task'
 import {
   centerCanvasViewportAtWorldPoint,
   fitCanvasViewportToBounds,
@@ -3177,9 +3178,16 @@ function App() {
   } = {}) {
     if (suppressClick) {
       slideDragSuppressClickRef.current = true
-      window.setTimeout(() => {
+      const timeout = scheduleCanvasTimeoutTask({
+        delayMs: 120,
+        task: () => {
+          slideDragSuppressClickRef.current = false
+        },
+      })
+
+      if (timeout === null) {
         slideDragSuppressClickRef.current = false
-      }, 120)
+      }
     }
 
     setSlideDragState(null)

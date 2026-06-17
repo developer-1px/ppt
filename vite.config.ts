@@ -42,6 +42,7 @@ const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts', import.meta.url))
 const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/text-paste-import/CanvasTextPasteImport.ts', import.meta.url))
 const canvasTextMeasurementDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasTextMeasurementDom.ts', import.meta.url))
+const canvasTimeoutTaskEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/frame/CanvasTimeoutTask.ts', import.meta.url))
 const canvasToolbarRovingFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/toolbar/CanvasToolbarRovingFocus.ts', import.meta.url))
 const canvasViewportControlsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/viewport/CanvasViewportControlExecution.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
@@ -94,6 +95,7 @@ export default defineConfig({
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
       { find: 'canvas/app/text-measurement-dom', replacement: canvasTextMeasurementDomEntry },
+      { find: 'canvas/app/timeout-task', replacement: canvasTimeoutTaskEntry },
       { find: 'canvas/app/toolbar-roving-focus', replacement: canvasToolbarRovingFocusEntry },
       { find: 'canvas/app/viewport-controls', replacement: canvasViewportControlsEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
