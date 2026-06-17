@@ -356,6 +356,7 @@ import {
   getCanvasMenuRovingKeyIndex,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
+import { getCanvasSelectionListModifierState } from 'canvas/app/selection-list-range'
 import {
   getCanvasMinimapPointFromViewportOffset,
   getCanvasMinimapReadModel,
@@ -12892,15 +12893,20 @@ function Inspector({
     const rangeAnchorObjectId = event.shiftKey
       ? layerPaneGroupState.rangeAnchorObjectId ?? activeLayerPaneObjectId
       : null
-    const isRangeSelection = Boolean(rangeAnchorObjectId)
+    const selectionModifierState = getCanvasSelectionListModifierState({
+      ctrlKey: event.ctrlKey,
+      hasRangeAnchor: Boolean(rangeAnchorObjectId),
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+    })
 
     setLayerPaneFocusedObjectId(row.objectId, {
-      rangeAnchor: !isRangeSelection,
+      rangeAnchor: !selectionModifierState.range,
     })
     runLayerPaneIntent({
-      ...(rangeAnchorObjectId
+      ...(selectionModifierState.range && rangeAnchorObjectId
         ? { rangeAnchorObjectId }
-        : { additive: event.metaKey || event.ctrlKey }),
+        : { additive: selectionModifierState.additive }),
       objectId: row.objectId,
       type: 'row-press',
     })
