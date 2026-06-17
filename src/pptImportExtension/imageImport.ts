@@ -3,10 +3,12 @@ import {
   type Point,
 } from 'canvas/core'
 import {
+  getCanvasImportedImageSize,
+} from 'canvas/app'
+import {
   getCanvasDataImageSourceFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
-  getCanvasImportedImageSize,
   getCanvasSVGImageSourceFromDataTransfer,
   readCanvasImageFileSource,
   resolveCanvasImageSourceNaturalSize,

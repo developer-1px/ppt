@@ -1,6 +1,6 @@
 import {
   createCanvasDataTransferImportActionPlan,
-} from 'canvas/app/data-transfer-import-actions'
+} from 'canvas/app'
 import { CANVAS_IMAGE_IMPORT_MODEL } from 'canvas/app/image-import'
 import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
 import {
