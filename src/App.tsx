@@ -321,6 +321,9 @@ import {
   getCanvasEditableFieldKeyboardIntent,
 } from 'canvas/app/editable-field-keyboard'
 import {
+  getCanvasPresentationKeyboardIntent,
+} from 'canvas/app/presentation-keyboard'
+import {
   bindCanvasEventListener,
   bindCanvasEventListeners,
 } from 'canvas/app/event-listener'
@@ -2460,21 +2463,23 @@ function App() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (presentationSlideId) {
-        if (event.key === 'Escape') {
-          event.preventDefault()
+        const presentationKeyboardIntent = getCanvasPresentationKeyboardIntent({
+          key: event.key,
+        })
+
+        if (presentationKeyboardIntent.kind === 'exit') {
+          if (presentationKeyboardIntent.preventDefault) {
+            event.preventDefault()
+          }
           exitPresentation()
           return
         }
 
-        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
-          event.preventDefault()
-          navigatePresentation(1)
-          return
-        }
-
-        if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-          event.preventDefault()
-          navigatePresentation(-1)
+        if (presentationKeyboardIntent.kind === 'navigate') {
+          if (presentationKeyboardIntent.preventDefault) {
+            event.preventDefault()
+          }
+          navigatePresentation(presentationKeyboardIntent.direction)
           return
         }
       }

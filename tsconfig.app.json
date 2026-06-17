@@ -20,6 +20,7 @@
       "canvas/app/data-transfer-text": ["../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts"],
       "canvas/app/deferred-focus": ["../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts"],
       "canvas/app/editable-field-keyboard": ["../canvas/src/canvas/app/affordances/controls/editable-field/CanvasEditableFieldKeyboard.ts"],
+      "canvas/app/presentation-keyboard": ["../canvas/src/canvas/app/affordances/controls/presentation/CanvasPresentationKeyboard.ts"],
       "canvas/app/eraser-hit-testing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts"],
       "canvas/app/event-listener": ["../canvas/src/canvas/app/affordances/interaction/dom/CanvasEventListener.ts"],
       "canvas/app/interaction-target": ["../canvas/src/canvas/app/affordances/interaction/dom/CanvasInteractionTarget.ts"],
