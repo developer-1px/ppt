@@ -1044,6 +1044,11 @@ const PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-metadata' as const
 const PPT_OBJECT_METADATA_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-metadata+json'
+const PPT_OBJECT_STATE_IMPORT_MODEL = 'ppt-object-state-import' as const
+const PPT_OBJECT_STATE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-state' as const
+const PPT_OBJECT_STATE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-state+json'
 const PPT_IMAGE_CROP_IMPORT_MODEL = 'ppt-image-crop-import' as const
 const PPT_IMAGE_CROP_JSON_IMPORT_FORMAT =
   'application-json-ppt-image-crop' as const
@@ -1276,6 +1281,18 @@ type PPTObjectMetadataImportSource = {
   metadata: {
     altText?: string | null
     hyperlinkUrl?: string | null
+  }
+}
+type PPTObjectStateImportField =
+  | 'locked'
+  | 'visible'
+type PPTObjectStateImportSource = {
+  fields: readonly PPTObjectStateImportField[]
+  format: typeof PPT_OBJECT_STATE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  state: {
+    locked?: boolean
+    visible?: boolean
   }
 }
 type PPTImageCropImportField =
@@ -1541,6 +1558,20 @@ type PPTObjectMetadataImportEffect = {
   model: typeof PPT_OBJECT_METADATA_IMPORT_MODEL
   objectIds: string
   slideId: string
+}
+type PPTObjectStateImportEffect = {
+  commandIds: string
+  commandTypes: string
+  fields: string
+  format: typeof PPT_OBJECT_STATE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  locked: string
+  lockTargets: string
+  model: typeof PPT_OBJECT_STATE_IMPORT_MODEL
+  objectIds: string
+  slideId: string
+  visible: string
+  visibilityTargets: string
 }
 type PPTImageCropImportEffect = {
   commandFields: string
@@ -2694,6 +2725,8 @@ function App() {
     useState<PPTObjectStyleImportEffect | null>(null)
   const [lastObjectMetadataImportEffect, setLastObjectMetadataImportEffect] =
     useState<PPTObjectMetadataImportEffect | null>(null)
+  const [lastObjectStateImportEffect, setLastObjectStateImportEffect] =
+    useState<PPTObjectStateImportEffect | null>(null)
   const [lastImageCropImportEffect, setLastImageCropImportEffect] =
     useState<PPTImageCropImportEffect | null>(null)
   const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
@@ -3657,6 +3690,17 @@ function App() {
       if (
         objectMetadataSource &&
         pastePPTObjectMetadataSource(objectMetadataSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectStateSource =
+        getPPTObjectStateSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectStateSource &&
+        pastePPTObjectStateSource(objectStateSource)
       ) {
         event.preventDefault()
         return
@@ -4795,6 +4839,73 @@ function App() {
               element,
             ),
           )
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectStateSource(source: PPTObjectStateImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) => selection.includes(element.id))
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    const effects = createPPTObjectStateImportCommandEffects({
+      objectIds,
+      slide: activeSlide,
+      source,
+    })
+
+    if (
+      !effects.visibilityEffect &&
+      effects.lockEffects.length === 0
+    ) {
+      return false
+    }
+
+    if (effects.visibilityEffect) {
+      setLastObjectVisibilityEffect(effects.visibilityEffect)
+    }
+
+    setLastObjectStateImportEffect(createPPTObjectStateImportEffect({
+      objectIds,
+      source,
+      ...effects,
+    }))
+
+    const visibilityObjectIds = new Set(
+      effects.visibilityEffect?.payload.objectIds ?? [],
+    )
+    const lockObjectIds = new Set(effects.lockEffects.flatMap((effect) =>
+      effect.payload.id === 'lock-objects' ||
+        effect.payload.id === 'unlock-objects'
+        ? effect.payload.objectIds
+        : []))
+
+    setSelection(objectIds)
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!objectIds.includes(element.id)) {
+            return element
+          }
+
+          return {
+            ...element,
+            ...(visibilityObjectIds.has(element.id) &&
+                source.state.visible !== undefined
+              ? { visible: source.state.visible }
+              : {}),
+            ...(lockObjectIds.has(element.id) &&
+                source.state.locked !== undefined
+              ? { locked: source.state.locked }
+              : {}),
+          }
         }),
       })))
 
@@ -10705,6 +10816,18 @@ function App() {
         data-ppt-object-metadata-import-model={lastObjectMetadataImportEffect?.model}
         data-ppt-object-metadata-import-objects={lastObjectMetadataImportEffect?.objectIds}
         data-ppt-object-metadata-import-slide={lastObjectMetadataImportEffect?.slideId}
+        data-ppt-object-state-import-command-types={lastObjectStateImportEffect?.commandTypes}
+        data-ppt-object-state-import-commands={lastObjectStateImportEffect?.commandIds}
+        data-ppt-object-state-import-fields={lastObjectStateImportEffect?.fields}
+        data-ppt-object-state-import-format={lastObjectStateImportEffect?.format}
+        data-ppt-object-state-import-json-length={lastObjectStateImportEffect?.jsonLength}
+        data-ppt-object-state-import-locked={lastObjectStateImportEffect?.locked}
+        data-ppt-object-state-import-lock-targets={lastObjectStateImportEffect?.lockTargets}
+        data-ppt-object-state-import-model={lastObjectStateImportEffect?.model}
+        data-ppt-object-state-import-objects={lastObjectStateImportEffect?.objectIds}
+        data-ppt-object-state-import-slide={lastObjectStateImportEffect?.slideId}
+        data-ppt-object-state-import-visible={lastObjectStateImportEffect?.visible}
+        data-ppt-object-state-import-visibility-targets={lastObjectStateImportEffect?.visibilityTargets}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
         data-ppt-import-extension-last-clipboard-actions={lastClipboardImportActionKinds}
         data-ppt-import-extension-last-drop-action={lastStageDropImportActionKind}
@@ -13414,6 +13537,157 @@ function applyPPTObjectAccessibilityCommandEffectToElement(
   }
 }
 
+function createPPTObjectStateImportEffect({
+  lockEffects,
+  objectIds,
+  source,
+  visibilityEffect,
+}: {
+  lockEffects: readonly PPTLayerPaneHostCommandEffect[]
+  objectIds: readonly string[]
+  source: PPTObjectStateImportSource
+  visibilityEffect: PPTObjectVisibilityHostCommandEffect | null
+}): PPTObjectStateImportEffect {
+  const visibilityEffects = visibilityEffect ? [visibilityEffect] : []
+  const effects = source.state.locked === false
+    ? [...lockEffects, ...visibilityEffects]
+    : [...visibilityEffects, ...lockEffects]
+  const lockTargets = uniquePPTCanvasValues(lockEffects.flatMap((effect) =>
+    effect.payload.id === 'lock-objects' ||
+      effect.payload.id === 'unlock-objects'
+      ? effect.payload.objectIds
+      : []))
+
+  return {
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    locked: source.state.locked === undefined
+      ? ''
+      : String(source.state.locked),
+    lockTargets: lockTargets.join(' '),
+    model: PPT_OBJECT_STATE_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    slideId: effects[0]?.selection.slideId ?? '',
+    visible: source.state.visible === undefined
+      ? ''
+      : String(source.state.visible),
+    visibilityTargets: visibilityEffect?.payload.objectIds.join(' ') ?? '',
+  }
+}
+
+function createPPTObjectStateImportCommandEffects({
+  objectIds,
+  slide,
+  source,
+}: {
+  objectIds: readonly string[]
+  slide: PPTSlide
+  source: PPTObjectStateImportSource
+}): {
+  lockEffects: PPTLayerPaneHostCommandEffect[]
+  visibilityEffect: PPTObjectVisibilityHostCommandEffect | null
+} {
+  const lockEffects = source.state.locked === undefined
+    ? []
+    : createPPTObjectStateLockCommandEffects({
+      locked: source.state.locked,
+      objectIds,
+      slide,
+    })
+  const visibilitySlide = source.state.locked === false
+    ? applyPPTObjectStateVirtualLock(slide, objectIds, false)
+    : slide
+  const visibilityEffect = source.state.visible === undefined
+    ? null
+    : createPPTObjectStateVisibilityCommandEffect({
+      objectIds,
+      slide: visibilitySlide,
+      visible: source.state.visible,
+    })
+
+  return {
+    lockEffects,
+    visibilityEffect,
+  }
+}
+
+function createPPTObjectStateVisibilityCommandEffect({
+  objectIds,
+  slide,
+  visible,
+}: {
+  objectIds: readonly string[]
+  slide: PPTSlide
+  visible: boolean
+}): PPTObjectVisibilityHostCommandEffect | null {
+  const descriptor = createPPTLayerPaneDescriptor({
+    activeObjectId: null,
+    collapsedGroupIds: new Set(),
+    selectedObjectIds: objectIds,
+    slide,
+  })
+
+  return getSlideEditObjectVisibilityCommandEffect({
+    commandId: visible ? 'show-objects' : 'hide-objects',
+    objects: getPPTObjectVisibilityDescriptors(slide.id, descriptor.rows),
+    selectedObjectIds: objectIds,
+    slideId: slide.id,
+  })
+}
+
+function createPPTObjectStateLockCommandEffects({
+  locked,
+  objectIds,
+  slide,
+}: {
+  locked: boolean
+  objectIds: readonly string[]
+  slide: PPTSlide
+}): PPTLayerPaneHostCommandEffect[] {
+  const descriptor = createPPTLayerPaneDescriptor({
+    activeObjectId: null,
+    collapsedGroupIds: new Set(),
+    selectedObjectIds: objectIds,
+    slide,
+  })
+
+  return objectIds
+    .map((objectId) => {
+      const row = descriptor.rows.find((candidate) =>
+        candidate.objectId === objectId)
+
+      if (!row || row.isLocked === locked) {
+        return null
+      }
+
+      return getSlideEditLayerPaneCommandEffect(descriptor, {
+        objectId,
+        type: 'lock-toggle',
+      })
+    })
+    .filter((effect): effect is PPTLayerPaneHostCommandEffect =>
+      effect !== null)
+}
+
+function applyPPTObjectStateVirtualLock(
+  slide: PPTSlide,
+  objectIds: readonly string[],
+  locked: boolean,
+): PPTSlide {
+  const objectIdSet = new Set(objectIds)
+
+  return {
+    ...slide,
+    elements: slide.elements.map((element) =>
+      objectIdSet.has(element.id)
+        ? { ...element, locked }
+        : element),
+  }
+}
+
 function createPPTImageCropImportEffect({
   effects,
   source,
@@ -15233,6 +15507,166 @@ function getPPTObjectMetadataAltTextFromJSONValue(
   }
 
   return normalizePPTAltText(value) || null
+}
+
+function getPPTObjectStateSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_STATE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectStateSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectStateSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectStateImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectStateSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectStateSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectStateImportSource | null {
+  const payloadValue = getPPTObjectStatePayloadValue(value, allowDirect)
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const state: PPTObjectStateImportSource['state'] = {}
+  const fields: PPTObjectStateImportField[] = []
+  const visible = getPPTObjectStateVisibleFromJSONValue(payloadValue)
+  const locked = getPPTObjectStateLockedFromJSONValue(payloadValue.locked)
+
+  if (visible !== undefined) {
+    state.visible = visible
+    fields.push('visible')
+  }
+
+  if (locked !== undefined) {
+    state.locked = locked
+    fields.push('locked')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_OBJECT_STATE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        state,
+      }
+    : null
+}
+
+function getPPTObjectStatePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (isPPTRecord(value.objectState)) {
+    return value.objectState
+  }
+
+  if (isPPTRecord(value.objectVisibility)) {
+    return value.objectVisibility
+  }
+
+  if (isPPTRecord(value.layerState)) {
+    return value.layerState
+  }
+
+  if (isPPTRecord(value.selectionState)) {
+    return value.selectionState
+  }
+
+  if (
+    value.visible !== undefined ||
+    value.hidden !== undefined ||
+    value.locked !== undefined
+  ) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTObjectStateVisibleFromJSONValue(
+  value: Record<string, unknown>,
+) {
+  if (typeof value.visible === 'boolean') {
+    return value.visible
+  }
+
+  return typeof value.hidden === 'boolean'
+    ? !value.hidden
+    : undefined
+}
+
+function getPPTObjectStateLockedFromJSONValue(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined
 }
 
 function getPPTObjectTransformSourceFromDataTransfer(

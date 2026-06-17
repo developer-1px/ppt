@@ -5076,6 +5076,36 @@ async function readPPTElementLayerState(page, elementId) {
   })()`)
 }
 
+async function readPPTObjectStateImportState(page, elementId) {
+  return page.eval(`(() => {
+    const elementId = ${JSON.stringify(elementId)}
+    const shell = document.querySelector('.ppt-stage-shell')
+    const row = document.querySelector('[data-ppt-layer-row="' + elementId + '"]')
+    const stageElement = document.querySelector('[data-ppt-element="' + elementId + '"]')
+
+    return {
+      commandTypes: shell?.getAttribute('data-ppt-object-state-import-command-types') ?? '',
+      commands: shell?.getAttribute('data-ppt-object-state-import-commands') ?? '',
+      fields: shell?.getAttribute('data-ppt-object-state-import-fields') ?? '',
+      format: shell?.getAttribute('data-ppt-object-state-import-format') ?? '',
+      hidden: row?.getAttribute('data-ppt-layer-pane-hidden') ?? '',
+      importLocked: shell?.getAttribute('data-ppt-object-state-import-locked') ?? '',
+      importVisible: shell?.getAttribute('data-ppt-object-state-import-visible') ?? '',
+      jsonLength: Number(shell?.getAttribute('data-ppt-object-state-import-json-length') ?? 0),
+      locked: row?.getAttribute('data-ppt-layer-pane-locked') ?? '',
+      lockTargets: shell?.getAttribute('data-ppt-object-state-import-lock-targets') ?? '',
+      model: shell?.getAttribute('data-ppt-object-state-import-model') ?? '',
+      objectIds: shell?.getAttribute('data-ppt-object-state-import-objects') ?? '',
+      rowSelected: row?.getAttribute('aria-selected') ?? '',
+      slide: shell?.getAttribute('data-ppt-object-state-import-slide') ?? '',
+      stageElementExists: !!stageElement,
+      stageSelected: stageElement?.getAttribute('data-selected') ?? '',
+      visibilityCommand: shell?.getAttribute('data-ppt-object-visibility-command') ?? '',
+      visibilityTargets: shell?.getAttribute('data-ppt-object-state-import-visibility-targets') ?? '',
+    }
+  })()`)
+}
+
 async function readPPTTidyState(page, ids) {
   return page.eval(`(() => {
     const ids = ${JSON.stringify(ids)}
@@ -14045,6 +14075,122 @@ async function runSelectionPaneScenario(page) {
       afterShow.rowVisible === 'true' &&
       afterShow.rowStageBlockReason === '',
     afterShow)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectState: {
+        locked: true,
+        visible: false,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterObjectStateHideLock = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes JSON object visible and locked state into selected PPT object',
+    afterObjectStateHideLock.model === 'ppt-object-state-import' &&
+      afterObjectStateHideLock.format === 'application-json-ppt-object-state' &&
+      afterObjectStateHideLock.fields === 'visible locked' &&
+      afterObjectStateHideLock.commands === 'hide-objects lock-objects' &&
+      afterObjectStateHideLock.commandTypes ===
+        'slide-command-effect slide-command-effect' &&
+      afterObjectStateHideLock.importVisible === 'false' &&
+      afterObjectStateHideLock.importLocked === 'true' &&
+      afterObjectStateHideLock.objectIds === layerTargetId &&
+      afterObjectStateHideLock.visibilityTargets === layerTargetId &&
+      afterObjectStateHideLock.lockTargets === layerTargetId &&
+      afterObjectStateHideLock.slide === 'slide-1' &&
+      afterObjectStateHideLock.jsonLength > 40 &&
+      afterObjectStateHideLock.hidden === 'true' &&
+      afterObjectStateHideLock.locked === 'true' &&
+      afterObjectStateHideLock.rowSelected === 'true' &&
+      !afterObjectStateHideLock.stageElementExists &&
+      afterObjectStateHideLock.visibilityCommand === 'hide-objects',
+    {
+      afterObjectStateHideLock,
+      afterShow,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectState: {
+        locked: false,
+        visible: true,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterObjectStateShowUnlock = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterObjectStateShowUnlockUndo = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(100)
+
+  const afterObjectStateShowUnlockRedo = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes JSON object unlock and show state through one PPT history step',
+    afterObjectStateShowUnlock.model === 'ppt-object-state-import' &&
+      afterObjectStateShowUnlock.commands === 'unlock-objects show-objects' &&
+      afterObjectStateShowUnlock.importVisible === 'true' &&
+      afterObjectStateShowUnlock.importLocked === 'false' &&
+      afterObjectStateShowUnlock.visibilityTargets === layerTargetId &&
+      afterObjectStateShowUnlock.lockTargets === layerTargetId &&
+      afterObjectStateShowUnlock.hidden === 'false' &&
+      afterObjectStateShowUnlock.locked === 'false' &&
+      afterObjectStateShowUnlock.stageElementExists &&
+      afterObjectStateShowUnlock.stageSelected === 'true' &&
+      afterObjectStateShowUnlockUndo.hidden === 'true' &&
+      afterObjectStateShowUnlockUndo.locked === 'true' &&
+      !afterObjectStateShowUnlockUndo.stageElementExists &&
+      afterObjectStateShowUnlockRedo.hidden === 'false' &&
+      afterObjectStateShowUnlockRedo.locked === 'false' &&
+      afterObjectStateShowUnlockRedo.stageElementExists,
+    {
+      afterObjectStateHideLock,
+      afterObjectStateShowUnlock,
+      afterObjectStateShowUnlockRedo,
+      afterObjectStateShowUnlockUndo,
+    },
+  )
 }
 
 async function readPPTLayerPaneKeyboardState(page) {
