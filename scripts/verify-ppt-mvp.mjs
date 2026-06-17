@@ -9206,6 +9206,57 @@ async function runTextPasteScenario(page) {
 
   await page.eval(`document.activeElement?.blur()`)
   await delay(50)
+
+  const beforeStyledFallbackPaste = await getPPTTextPasteState(page)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', [
+      '<section data-ppt-selection-object="styled-html-text" data-ppt-selection-text-body="true" style="width:360px;height:126px;color:#111827;font-family:Inter;font-size:24px;font-weight:400;text-align:center;align-items:center">',
+      '<p data-ppt-selection-paragraph="true" style="text-align:center;line-height:1.35;margin-top:7px;margin-bottom:11px">',
+      '<span style="color:#dc2626;font-size:34px"><strong>Scaled</strong></span>',
+      ' ',
+      '<span style="font-size:22px"><em>note</em></span>',
+      '</p>',
+      '</section>',
+    ].join(''))
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStyledFallbackPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes PPT fallback HTML text styles into editable text model',
+    afterStyledFallbackPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterStyledFallbackPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterStyledFallbackPaste.fallbackHTMLImportKind === 'textBox' &&
+      afterStyledFallbackPaste.fallbackHTMLImportSourceObject === 'styled-html-text' &&
+      afterStyledFallbackPaste.textBoxCount === beforeStyledFallbackPaste.textBoxCount + 1 &&
+      afterStyledFallbackPaste.selectedKind === 'textBox' &&
+      afterStyledFallbackPaste.selectedName === 'PPT HTML Text' &&
+      afterStyledFallbackPaste.selectedText.includes('Scaled note') &&
+      afterStyledFallbackPaste.selectedTextAlign === 'center' &&
+      afterStyledFallbackPaste.selectedFontSize === '24px' &&
+      afterStyledFallbackPaste.selectedRunFontSizes.includes('34px') &&
+      afterStyledFallbackPaste.selectedRunFontSizes.includes('22px') &&
+      afterStyledFallbackPaste.selectedRunColors.includes('rgb(220, 38, 38)') &&
+      afterStyledFallbackPaste.selectedParagraphLineHeights.includes('1.35') &&
+      afterStyledFallbackPaste.selectedParagraphSpacingBefore.includes('7') &&
+      afterStyledFallbackPaste.selectedParagraphSpacingAfter.includes('11'),
+    {
+      afterStyledFallbackPaste,
+      beforeStyledFallbackPaste,
+    },
+  )
+
+  await page.eval(`document.activeElement?.blur()`)
+  await delay(50)
 }
 
 async function runMediaImportScenario(page) {
@@ -12831,18 +12882,35 @@ function getPPTTextPasteState(page) {
   return page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const stage = document.querySelector('.ppt-stage-shell')
+    const selectedParagraphs = selected
+      ? [...selected.querySelectorAll('.ppt-text-paragraph')]
+      : []
+    const selectedRuns = selected
+      ? [...selected.querySelectorAll('.ppt-text-paragraph > span')]
+      : []
 
     return {
+      fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
+      fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
+      fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
+      fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
       selectedBoldRunCount: selected?.querySelectorAll('[data-ppt-run-bold="true"]').length ?? 0,
       selectedBulletParagraphCount: selected?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
+      selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
       selectedHeight: parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedItalicRunCount: selected?.querySelectorAll('[data-ppt-run-italic="true"]').length ?? 0,
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       selectedLeft: parseFloat(selected?.style.left ?? '0'),
       selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
+      selectedParagraphLineHeights: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-line-height') ?? ''),
+      selectedParagraphSpacingAfter: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-after') ?? ''),
+      selectedParagraphSpacingBefore: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-before') ?? ''),
+      selectedRunColors: selectedRuns.map((run) => getComputedStyle(run).color),
+      selectedRunFontSizes: selectedRuns.map((run) => getComputedStyle(run).fontSize),
       selectedText: selected?.textContent ?? '',
+      selectedTextAlign: selected ? getComputedStyle(selected).textAlign : '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
       selectedUnderlineRunCount: selected?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
       selectedWidth: parseFloat(selected?.style.width ?? '0'),

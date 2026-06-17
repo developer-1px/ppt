@@ -485,6 +485,7 @@ function getPPTFallbackHTMLTextBody(element: HTMLElement): PPTTextBody | null {
         ...(paragraphElement.tagName.toLowerCase() === 'li'
           ? { bullet: 'bullet' as const }
           : {}),
+        ...getPPTFallbackHTMLParagraphAttributes(paragraphElement),
         runs,
       }
     })
@@ -499,6 +500,33 @@ function getPPTFallbackHTMLRuns(root: HTMLElement): PPTRun[] {
   collectPPTFallbackHTMLRuns(root, {}, runs)
 
   return runs.length > 0 ? runs : [{ text: root.textContent ?? '' }]
+}
+
+function getPPTFallbackHTMLParagraphAttributes(
+  element: HTMLElement,
+): Omit<PPTParagraph, 'runs'> {
+  const style = element.getAttribute('style') ?? ''
+  const align = parsePPTFallbackHTMLTextAlign(
+    getPPTFallbackHTMLStyleValue(style, 'text-align'),
+  )
+  const lineHeight = parsePPTFallbackHTMLLineHeight(
+    getPPTFallbackHTMLStyleValue(style, 'line-height'),
+  )
+  const spacingAfter = parsePPTFallbackHTMLPositivePixelStyle(
+    style,
+    'margin-bottom',
+  )
+  const spacingBefore = parsePPTFallbackHTMLPositivePixelStyle(
+    style,
+    'margin-top',
+  )
+
+  return {
+    ...(align ? { align } : {}),
+    ...(lineHeight === undefined ? {} : { lineHeight }),
+    ...(spacingAfter === undefined ? {} : { spacingAfter }),
+    ...(spacingBefore === undefined ? {} : { spacingBefore }),
+  }
 }
 
 function collectPPTFallbackHTMLRuns(
@@ -551,12 +579,51 @@ function collectPPTFallbackHTMLRuns(
     getPPTFallbackHTMLStyleValue(style, 'color'),
     '',
   )
+  const size = parsePPTFallbackHTMLPositivePixelStyle(style, 'font-size')
+  const styledRun = {
+    ...nextRunStyle,
+    ...(color ? { color } : {}),
+    ...(size === undefined ? {} : { size }),
+  }
 
   for (const child of [...node.childNodes]) {
     collectPPTFallbackHTMLRuns(
       child,
-      color ? { ...nextRunStyle, color } : nextRunStyle,
+      styledRun,
       runs,
     )
   }
+}
+
+function parsePPTFallbackHTMLTextAlign(
+  value: string,
+): PPTParagraph['align'] | undefined {
+  return value === 'center' || value === 'right' || value === 'left'
+    ? value
+    : undefined
+}
+
+function parsePPTFallbackHTMLLineHeight(value: string) {
+  const match = value.match(/-?\d+(?:\.\d+)?/)
+
+  if (!match) {
+    return undefined
+  }
+
+  const parsed = Number(match[0])
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined
+  }
+
+  return value.includes('%') ? parsed / 100 : parsed
+}
+
+function parsePPTFallbackHTMLPositivePixelStyle(
+  style: string,
+  property: string,
+) {
+  const value = parsePPTFallbackHTMLPixelStyle(style, property)
+
+  return value !== undefined && value > 0 ? value : undefined
 }
