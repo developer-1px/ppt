@@ -8777,6 +8777,71 @@ async function runObjectAnimationScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      animation: {
+        delayMs: 180,
+        durationMs: 640,
+        order: 2,
+        trigger: 'withPrevious',
+        type: 'fadeIn',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterAnimationPaste = await getPPTObjectAnimationState(page)
+
+  record(
+    'pastes JSON object animation into selected PPT object',
+    afterAnimationPaste.importModel === 'ppt-object-animation-import' &&
+      afterAnimationPaste.importFormat === 'application-json-ppt-object-animation' &&
+      afterAnimationPaste.importSlide === 'slide-1' &&
+      afterAnimationPaste.importObjects === 's1-title' &&
+      afterAnimationPaste.importFields ===
+        'type trigger durationMs delayMs order' &&
+      afterAnimationPaste.importCommands ===
+        'update-object-animation update-object-animation update-object-animation update-object-animation update-object-animation' &&
+      afterAnimationPaste.importCommandFields ===
+        'type trigger durationMs delayMs order' &&
+      afterAnimationPaste.importType === 'fadeIn' &&
+      afterAnimationPaste.importTrigger === 'withPrevious' &&
+      afterAnimationPaste.importDuration === '640' &&
+      afterAnimationPaste.importDelay === '180' &&
+      afterAnimationPaste.importOrder === '2' &&
+      afterAnimationPaste.importJsonLength > 80 &&
+      afterAnimationPaste.type === 'fadeIn' &&
+      afterAnimationPaste.trigger === 'withPrevious' &&
+      afterAnimationPaste.duration === '640' &&
+      afterAnimationPaste.delay === '180' &&
+      afterAnimationPaste.order === '2' &&
+      afterAnimationPaste.selectedType === 'fadeIn' &&
+      afterAnimationPaste.selectedTrigger === 'withPrevious' &&
+      afterAnimationPaste.selectedDuration === '640' &&
+      afterAnimationPaste.selectedDelay === '180' &&
+      afterAnimationPaste.selectedOrder === '2' &&
+      afterAnimationPaste.command === 'update-object-animation' &&
+      afterAnimationPaste.commandField === 'order' &&
+      afterAnimationPaste.commandObject === 's1-title' &&
+      afterAnimationPaste.commandSlide === 'slide-1' &&
+      afterAnimationPaste.commandType === 'slide-command-effect' &&
+      afterAnimationPaste.commandValue === '2' &&
+      afterAnimationPaste.buildOrder.split(' ').includes('s1-title'),
+    {
+      afterAnimationPaste,
+      initial,
+    },
+  )
+
+  await page.eval(`(() => {
     const type = document.querySelector('[data-ppt-animation-field="type"]')
     const trigger = document.querySelector('[data-ppt-animation-field="trigger"]')
     const duration = document.querySelector('[data-ppt-animation-field="durationMs"]')
@@ -15636,6 +15701,19 @@ function getPPTObjectAnimationState(page) {
       inspectorOrder: inspector?.getAttribute('data-ppt-animation-order') ?? '',
       inspectorTrigger: inspector?.getAttribute('data-ppt-animation-trigger') ?? '',
       inspectorType: inspector?.getAttribute('data-ppt-animation-type') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-object-animation-import-command-fields') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-object-animation-import-commands') ?? '',
+      importDelay: stage?.getAttribute('data-ppt-object-animation-import-delay') ?? '',
+      importDuration: stage?.getAttribute('data-ppt-object-animation-import-duration') ?? '',
+      importFields: stage?.getAttribute('data-ppt-object-animation-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-object-animation-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-object-animation-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-object-animation-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-object-animation-import-objects') ?? '',
+      importOrder: stage?.getAttribute('data-ppt-object-animation-import-order') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-object-animation-import-slide') ?? '',
+      importTrigger: stage?.getAttribute('data-ppt-object-animation-import-trigger') ?? '',
+      importType: stage?.getAttribute('data-ppt-object-animation-import-type') ?? '',
       model: stage?.getAttribute('data-ppt-object-animation-model') ?? '',
       order: order?.value ?? '',
       orderCommand: order?.getAttribute('data-ppt-animation-command') ?? '',

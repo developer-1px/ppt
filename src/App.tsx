@@ -1022,6 +1022,11 @@ const PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT =
   'application-json-ppt-slide-transition' as const
 const PPT_SLIDE_TRANSITION_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.slide-transition+json'
+const PPT_OBJECT_ANIMATION_IMPORT_MODEL = 'ppt-object-animation-import' as const
+const PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-animation' as const
+const PPT_OBJECT_ANIMATION_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-animation+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1173,6 +1178,13 @@ type PPTSlideTransitionImportSource = {
   jsonLength: number
   transition: Partial<PPTSlideTransition>
 }
+type PPTObjectAnimationImportField = keyof PPTElementAnimation
+type PPTObjectAnimationImportSource = {
+  animation: Partial<PPTElementAnimation>
+  fields: readonly PPTObjectAnimationImportField[]
+  format: typeof PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1270,6 +1282,21 @@ type PPTSlideTransitionImportEffect = {
   jsonLength: number
   model: typeof PPT_SLIDE_TRANSITION_IMPORT_MODEL
   slideId: string
+  type: string
+}
+type PPTObjectAnimationImportEffect = {
+  commandFields: string
+  commandIds: string
+  delayMs: string
+  durationMs: string
+  fields: string
+  format: typeof PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_ANIMATION_IMPORT_MODEL
+  objectIds: string
+  order: string
+  slideId: string
+  trigger: string
   type: string
 }
 type PPTElementsJSONImportEffect = {
@@ -2299,6 +2326,8 @@ function App() {
     useState<PPTSlideMetadataImportEffect | null>(null)
   const [lastSlideTransitionImportEffect, setLastSlideTransitionImportEffect] =
     useState<PPTSlideTransitionImportEffect | null>(null)
+  const [lastObjectAnimationImportEffect, setLastObjectAnimationImportEffect] =
+    useState<PPTObjectAnimationImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3207,6 +3236,17 @@ function App() {
         return
       }
 
+      const objectAnimationSource =
+        getPPTObjectAnimationSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectAnimationSource &&
+        pastePPTObjectAnimationSource(objectAnimationSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const slideNotesSource =
         getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
 
@@ -3985,6 +4025,63 @@ function App() {
             applyPPTSlideTransitionUpdateCommand(transition, effect.payload),
           getPPTSlideTransition(slide),
         ),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectAnimationSource(source: PPTObjectAnimationImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) => selection.includes(element.id))
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    const effects = createPPTObjectAnimationImportCommandEffects({
+      objectIds,
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastObjectAnimationEffect(effects[effects.length - 1])
+    setLastObjectAnimationImportEffect(createPPTObjectAnimationImportEffect({
+      effects,
+      source,
+    }))
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const elementEffects = effects.filter((effect) =>
+            effect.payload.objectId === element.id)
+
+          if (elementEffects.length === 0) {
+            return element
+          }
+
+          const animation = elementEffects.reduce(
+            (currentAnimation, effect) => {
+              const { field, value } = toPPTElementAnimationUpdate(effect.payload)
+
+              return normalizePPTElementAnimation({
+                ...currentAnimation,
+                [field]: value,
+              }, slide, element.id)
+            },
+            getPPTElementAnimation(element, slide),
+          )
+
+          return {
+            ...element,
+            animation,
+          }
+        }),
       })))
 
     return true
@@ -9503,6 +9600,19 @@ function App() {
           : undefined}
         data-ppt-object-animation-build-order={activeSlideAnimationBuildOrder.join(' ')}
         data-ppt-object-animation-build-order-model="slide-edit-object-animation-build-order"
+        data-ppt-object-animation-import-command-fields={lastObjectAnimationImportEffect?.commandFields}
+        data-ppt-object-animation-import-commands={lastObjectAnimationImportEffect?.commandIds}
+        data-ppt-object-animation-import-delay={lastObjectAnimationImportEffect?.delayMs}
+        data-ppt-object-animation-import-duration={lastObjectAnimationImportEffect?.durationMs}
+        data-ppt-object-animation-import-fields={lastObjectAnimationImportEffect?.fields}
+        data-ppt-object-animation-import-format={lastObjectAnimationImportEffect?.format}
+        data-ppt-object-animation-import-json-length={lastObjectAnimationImportEffect?.jsonLength}
+        data-ppt-object-animation-import-model={lastObjectAnimationImportEffect?.model}
+        data-ppt-object-animation-import-objects={lastObjectAnimationImportEffect?.objectIds}
+        data-ppt-object-animation-import-order={lastObjectAnimationImportEffect?.order}
+        data-ppt-object-animation-import-slide={lastObjectAnimationImportEffect?.slideId}
+        data-ppt-object-animation-import-trigger={lastObjectAnimationImportEffect?.trigger}
+        data-ppt-object-animation-import-type={lastObjectAnimationImportEffect?.type}
         data-ppt-object-animation-model="slide-edit-object-animation"
         data-ppt-object-opacity-command={lastObjectOpacityEffect?.payload.id}
         data-ppt-object-opacity-command-field={lastObjectOpacityEffect?.payload.fieldId}
@@ -11616,6 +11726,70 @@ function createPPTSlideTransitionImportCommandEffects({
   return effects
 }
 
+function createPPTObjectAnimationImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectAnimationHostCommandEffect<string, string>[]
+  source: PPTObjectAnimationImportSource
+}): PPTObjectAnimationImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    delayMs: source.animation.delayMs === undefined
+      ? ''
+      : String(source.animation.delayMs),
+    durationMs: source.animation.durationMs === undefined
+      ? ''
+      : String(source.animation.durationMs),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_ANIMATION_IMPORT_MODEL,
+    objectIds: [...new Set(effects.map((effect) => effect.payload.objectId))]
+      .join(' '),
+    order: source.animation.order === undefined
+      ? ''
+      : String(source.animation.order),
+    slideId: effects[0]?.payload.slideId ?? '',
+    trigger: source.animation.trigger ?? '',
+    type: source.animation.type ?? '',
+  }
+}
+
+function createPPTObjectAnimationImportCommandEffects({
+  objectIds,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  slideId: string
+  source: PPTObjectAnimationImportSource
+}): SlideEditObjectAnimationHostCommandEffect<string, string>[] {
+  const effects: SlideEditObjectAnimationHostCommandEffect<string, string>[] = []
+
+  for (const objectId of objectIds) {
+    for (const field of source.fields) {
+      const value = source.animation[field]
+
+      if (value === undefined) {
+        continue
+      }
+
+      effects.push(getSlideEditObjectAnimationUpdateCommandEffect(
+        toSlideEditObjectAnimationCommand({
+          elementId: objectId,
+          field,
+          slideId,
+          value,
+        }),
+      ))
+    }
+  }
+
+  return effects
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -12288,6 +12462,182 @@ function getPPTSlideTransitionAdvanceAfterFromJSONValue(value: unknown) {
   }
 
   return parsePPTSlideTransitionAdvanceAfter(String(value))
+}
+
+function getPPTObjectAnimationSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_ANIMATION_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectAnimationSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectAnimationSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectAnimationImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectAnimationSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectAnimationSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectAnimationImportSource | null {
+  const payloadValue = isPPTRecord(value) &&
+    isPPTRecord(value.animation)
+    ? value.animation
+    : allowDirect
+      ? value
+      : null
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const animation: Partial<PPTElementAnimation> = {}
+  const fields: PPTObjectAnimationImportField[] = []
+  const type = getPPTElementAnimationTypeFromJSONValue(payloadValue.type)
+  const trigger = getPPTElementAnimationTriggerFromJSONValue(
+    payloadValue.trigger,
+  )
+  const durationMs = getPPTElementAnimationTimeFromJSONValue(
+    payloadValue.durationMs ?? payloadValue.duration,
+  )
+  const delayMs = getPPTElementAnimationTimeFromJSONValue(
+    payloadValue.delayMs ?? payloadValue.delay,
+  )
+  const order = getPPTElementAnimationOrderFromJSONValue(
+    payloadValue.order ?? payloadValue.buildOrder,
+  )
+
+  if (type !== undefined) {
+    animation.type = type
+    fields.push('type')
+  }
+
+  if (trigger !== undefined) {
+    animation.trigger = trigger
+    fields.push('trigger')
+  }
+
+  if (durationMs !== undefined) {
+    animation.durationMs = durationMs
+    fields.push('durationMs')
+  }
+
+  if (delayMs !== undefined) {
+    animation.delayMs = delayMs
+    fields.push('delayMs')
+  }
+
+  if (order !== undefined) {
+    animation.order = order
+    fields.push('order')
+  }
+
+  return fields.length > 0
+    ? {
+        animation,
+        fields,
+        format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTElementAnimationTypeFromJSONValue(
+  value: unknown,
+): PPTElementAnimationType | undefined {
+  const type = typeof value === 'string' ? value.trim() : ''
+
+  return (PPT_ELEMENT_ANIMATION_TYPES as readonly string[]).includes(type)
+    ? type as PPTElementAnimationType
+    : undefined
+}
+
+function getPPTElementAnimationTriggerFromJSONValue(
+  value: unknown,
+): PPTElementAnimationTrigger | undefined {
+  const trigger = typeof value === 'string' ? value.trim() : ''
+
+  return (PPT_ELEMENT_ANIMATION_TRIGGERS as readonly string[]).includes(trigger)
+    ? trigger as PPTElementAnimationTrigger
+    : undefined
+}
+
+function getPPTElementAnimationTimeFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return clampPPTElementAnimationTime(value)
+}
+
+function getPPTElementAnimationOrderFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return clampPPTElementAnimationOrder(value)
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
