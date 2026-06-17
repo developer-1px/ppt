@@ -9765,13 +9765,23 @@ function clonePPTElementFromClipboardMapping(
   mapping: PPTClipboardPasteObjectMapping,
   offset: Point,
 ): PPTElement {
+  const geometry = clampCanvasBoundsToFrame({
+    bounds: {
+      ...source.geometry,
+      x: source.geometry.x + offset.x,
+      y: source.geometry.y + offset.y,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
+
   return {
     ...source,
-    geometry: {
-      ...source.geometry,
-      x: clamp(source.geometry.x + offset.x, 0, PPT_SLIDE_WIDTH - source.geometry.w),
-      y: clamp(source.geometry.y + offset.y, 0, PPT_SLIDE_HEIGHT - source.geometry.h),
-    },
+    geometry: { ...source.geometry, ...geometry },
     groupId: mapping.targetGroupId ?? undefined,
     id: mapping.targetObjectId,
     name: `${source.name} Copy`,
