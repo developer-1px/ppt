@@ -11946,6 +11946,93 @@ async function runCommentReviewScenario(page) {
     afterThreadReply,
   })
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      comment: {
+        body: 'AI review: tighten final claim.',
+        createdAt: 'AI review',
+        resolved: false,
+        thread: [
+          {
+            authorName: 'AI',
+            body: 'Draft headline overpromises the metric.',
+            createdAt: 'AI review',
+            id: 'ai-review-1',
+          },
+          {
+            authorName: 'Editor',
+            body: 'Use a smaller claim before export.',
+            createdAt: 'Human pass',
+            id: 'human-review-1',
+          },
+        ],
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterCommentJSONPaste = await getPPTCommentState(page)
+
+  record(
+    'pastes JSON comment thread into selected PPT comment',
+    afterCommentJSONPaste.commentImportModel === 'ppt-comment-import' &&
+      afterCommentJSONPaste.commentImportFormat === 'application-json-ppt-comment' &&
+      afterCommentJSONPaste.commentImportObjects === afterThreadReply.selectedId &&
+      afterCommentJSONPaste.commentImportTargets === afterThreadReply.selectedId &&
+      afterCommentJSONPaste.commentImportFields === 'body resolved createdAt thread' &&
+      afterCommentJSONPaste.commentImportMessageCount === 2 &&
+      afterCommentJSONPaste.commentImportResolved === 'false' &&
+      afterCommentJSONPaste.commentImportBodyLength > 20 &&
+      afterCommentJSONPaste.commentImportJsonLength > 220 &&
+      afterCommentJSONPaste.selectedKind === 'comment' &&
+      afterCommentJSONPaste.selectedId === afterThreadReply.selectedId &&
+      afterCommentJSONPaste.selectedBody === 'AI review: tighten final claim.' &&
+      afterCommentJSONPaste.selectedResolved === '' &&
+      afterCommentJSONPaste.inspectorBody === 'AI review: tighten final claim.' &&
+      !afterCommentJSONPaste.inspectorResolved &&
+      afterCommentJSONPaste.commentThreadCount === 2 &&
+      afterCommentJSONPaste.commentThreadMessageCount === 2 &&
+      afterCommentJSONPaste.commentThreadFirstBody === 'AI review: tighten final claim.' &&
+      afterCommentJSONPaste.commentThreadBodies.includes('Use a smaller claim before export.'),
+    {
+      afterCommentJSONPaste,
+      afterThreadReply,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCommentJSONUndo = await getPPTCommentState(page)
+
+  record(
+    'undoes PPT comment JSON paste as one history step',
+    afterCommentJSONUndo.selectedId === afterThreadReply.selectedId &&
+      afterCommentJSONUndo.selectedBody === 'Review CTA wording' &&
+      afterCommentJSONUndo.selectedResolved === 'true' &&
+      afterCommentJSONUndo.commentThreadCount === 2 &&
+      afterCommentJSONUndo.commentThreadBodies.includes('Looks good after headline edit.'),
+    {
+      afterCommentJSONPaste,
+      afterCommentJSONUndo,
+      afterThreadReply,
+    },
+  )
+
   const beforeMove = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const rect = selected.getBoundingClientRect()
@@ -15825,6 +15912,16 @@ function getPPTCommentState(page) {
 
     return {
       commentCount: document.querySelectorAll('[data-kind="comment"]').length,
+      commentImportBodyLength: Number(stage?.getAttribute('data-ppt-comment-import-body-length') ?? 0),
+      commentImportCreatedAt: stage?.getAttribute('data-ppt-comment-import-created-at') ?? '',
+      commentImportFields: stage?.getAttribute('data-ppt-comment-import-fields') ?? '',
+      commentImportFormat: stage?.getAttribute('data-ppt-comment-import-format') ?? '',
+      commentImportJsonLength: Number(stage?.getAttribute('data-ppt-comment-import-json-length') ?? 0),
+      commentImportMessageCount: Number(stage?.getAttribute('data-ppt-comment-import-message-count') ?? 0),
+      commentImportModel: stage?.getAttribute('data-ppt-comment-import-model') ?? '',
+      commentImportObjects: stage?.getAttribute('data-ppt-comment-import-objects') ?? '',
+      commentImportResolved: stage?.getAttribute('data-ppt-comment-import-resolved') ?? '',
+      commentImportTargets: stage?.getAttribute('data-ppt-comment-import-command-targets') ?? '',
       creationTool: document.querySelector('.ppt-stage-shell')?.getAttribute('data-creation-tool') ?? '',
       commentThreadCommand: stage?.getAttribute('data-ppt-comment-thread-command') ?? '',
       commentThreadCommandBody: stage?.getAttribute('data-ppt-comment-thread-command-body') ?? '',

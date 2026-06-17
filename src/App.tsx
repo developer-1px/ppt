@@ -1068,6 +1068,11 @@ const PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-transform' as const
 const PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-transform+json'
+const PPT_COMMENT_IMPORT_MODEL = 'ppt-comment-import' as const
+const PPT_COMMENT_JSON_IMPORT_FORMAT =
+  'application-json-ppt-comment' as const
+const PPT_COMMENT_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.comment+json'
 const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
 const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
@@ -1341,6 +1346,22 @@ type PPTObjectTransformImportSource = {
     rotation: number
   }>
 }
+type PPTCommentImportField =
+  | 'body'
+  | 'createdAt'
+  | 'resolved'
+  | 'thread'
+type PPTCommentImportSource = {
+  comment: {
+    body?: string
+    createdAt?: string
+    resolved?: boolean
+    thread?: readonly PPTCommentThreadMessage[]
+  }
+  fields: readonly PPTCommentImportField[]
+  format: typeof PPT_COMMENT_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1577,6 +1598,18 @@ type PPTObjectTransformImportEffect = {
   w: string
   x: string
   y: string
+}
+type PPTCommentImportEffect = {
+  bodyLength: number
+  commandTargets: string
+  createdAt: string
+  fields: string
+  format: typeof PPT_COMMENT_JSON_IMPORT_FORMAT
+  jsonLength: number
+  messageCount: number
+  model: typeof PPT_COMMENT_IMPORT_MODEL
+  objectIds: string
+  resolved: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2637,6 +2670,8 @@ function App() {
     useState<PPTLineStyleImportEffect | null>(null)
   const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
     useState<PPTObjectTransformImportEffect | null>(null)
+  const [lastCommentImportEffect, setLastCommentImportEffect] =
+    useState<PPTCommentImportEffect | null>(null)
   const [lastElementsJSONImportEffect, setLastElementsJSONImportEffect] =
     useState<PPTElementsJSONImportEffect | null>(null)
   const [lastClipboardImportActionKinds, setLastClipboardImportActionKinds] =
@@ -3603,6 +3638,14 @@ function App() {
         getPPTTableRowsSourceFromDataTransfer(event.clipboardData)
 
       if (tableRowsSource && pastePPTTableRowsSource(tableRowsSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const commentSource =
+        getPPTCommentSourceFromDataTransfer(event.clipboardData)
+
+      if (commentSource && pastePPTCommentSource(commentSource)) {
         event.preventDefault()
         return
       }
@@ -4726,6 +4769,39 @@ function App() {
           objectIds,
           (element) => element.kind === 'table'
             ? { ...element, rows }
+            : element,
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTCommentSource(source: PPTCommentImportSource) {
+    const objectIds = activeSlide.elements
+      .filter((element) =>
+        selection.includes(element.id) &&
+        element.kind === 'comment' &&
+        element.locked !== true &&
+        element.visible !== false)
+      .map((element) => element.id)
+
+    if (objectIds.length === 0) {
+      return false
+    }
+
+    setLastCommentImportEffect(createPPTCommentImportEffect({
+      objectIds,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          objectIds,
+          (element) => element.kind === 'comment'
+            ? applyPPTCommentImportSourceToElement(element, source)
             : element,
         ),
       })))
@@ -10467,6 +10543,16 @@ function App() {
         data-ppt-object-transform-import-w={lastObjectTransformImportEffect?.w}
         data-ppt-object-transform-import-x={lastObjectTransformImportEffect?.x}
         data-ppt-object-transform-import-y={lastObjectTransformImportEffect?.y}
+        data-ppt-comment-import-body-length={lastCommentImportEffect?.bodyLength}
+        data-ppt-comment-import-command-targets={lastCommentImportEffect?.commandTargets}
+        data-ppt-comment-import-created-at={lastCommentImportEffect?.createdAt}
+        data-ppt-comment-import-fields={lastCommentImportEffect?.fields}
+        data-ppt-comment-import-format={lastCommentImportEffect?.format}
+        data-ppt-comment-import-json-length={lastCommentImportEffect?.jsonLength}
+        data-ppt-comment-import-message-count={lastCommentImportEffect?.messageCount}
+        data-ppt-comment-import-model={lastCommentImportEffect?.model}
+        data-ppt-comment-import-objects={lastCommentImportEffect?.objectIds}
+        data-ppt-comment-import-resolved={lastCommentImportEffect?.resolved}
         data-ppt-object-metadata-import-alt-text-length={lastObjectMetadataImportEffect?.altTextLength}
         data-ppt-object-metadata-import-alt-text-present={lastObjectMetadataImportEffect?.altTextPresent}
         data-ppt-object-metadata-import-command-fields={lastObjectMetadataImportEffect?.commandFields}
@@ -13357,6 +13443,29 @@ function createPPTTextBodyImportEffect({
   }
 }
 
+function createPPTCommentImportEffect({
+  objectIds,
+  source,
+}: {
+  objectIds: readonly string[]
+  source: PPTCommentImportSource
+}): PPTCommentImportEffect {
+  return {
+    bodyLength: source.comment.body?.length ?? 0,
+    commandTargets: objectIds.join(' '),
+    createdAt: source.comment.createdAt ?? '',
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    messageCount: source.comment.thread?.length ?? 0,
+    model: PPT_COMMENT_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    resolved: source.comment.resolved === undefined
+      ? ''
+      : String(source.comment.resolved),
+  }
+}
+
 function clonePPTTextBody(body: PPTTextBody): PPTTextBody {
   return {
     paragraphs: body.paragraphs.map((paragraph) => ({
@@ -15930,6 +16039,223 @@ function isPPTTableRowsJSONValue(
   return rows.length > 0 &&
     rows.some((row) => row.some((cell) => cell.trim().length > 0)) &&
     getPPTTableColumnCount(rows) > 0
+}
+
+function getPPTCommentSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_COMMENT_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTCommentSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTCommentSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTCommentImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTCommentSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTCommentSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTCommentImportSource | null {
+  const payloadValue = getPPTCommentPayloadValue(value, allowDirect)
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const comment: PPTCommentImportSource['comment'] = {}
+  const fields: PPTCommentImportField[] = []
+  const body = getPPTCommentBodyFromJSONValue(
+    payloadValue.body ?? payloadValue.text,
+  )
+  const resolved = typeof payloadValue.resolved === 'boolean'
+    ? payloadValue.resolved
+    : undefined
+  const createdAt = getPPTCommentCreatedAtFromJSONValue(
+    payloadValue.createdAt,
+  )
+  const thread = getPPTCommentThreadFromJSONValue(
+    payloadValue.thread ?? payloadValue.messages ?? payloadValue.replies,
+    body,
+  )
+
+  if (body !== undefined) {
+    comment.body = body
+    fields.push('body')
+  }
+
+  if (resolved !== undefined) {
+    comment.resolved = resolved
+    fields.push('resolved')
+  }
+
+  if (createdAt !== undefined) {
+    comment.createdAt = createdAt
+    fields.push('createdAt')
+  }
+
+  if (thread !== undefined) {
+    comment.thread = thread
+    fields.push('thread')
+  }
+
+  return fields.length > 0
+    ? {
+        comment,
+        fields,
+        format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTCommentPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.comment)) {
+    return value.comment
+  }
+
+  if (isPPTRecord(value.commentThread)) {
+    return value.commentThread
+  }
+
+  if (isPPTRecord(value.reviewComment)) {
+    return value.reviewComment
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTCommentBodyFromJSONValue(value: unknown) {
+  return typeof value === 'string'
+    ? normalizePPTCommentBody(value.replace(/\r\n?/g, '\n'))
+    : undefined
+}
+
+function getPPTCommentCreatedAtFromJSONValue(value: unknown) {
+  return typeof value === 'string' && value.trim()
+    ? normalizePPTCommentCreatedAt(value)
+    : undefined
+}
+
+function getPPTCommentThreadFromJSONValue(
+  value: unknown,
+  firstBody: string | undefined,
+) {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const thread = value
+    .map((message, index) =>
+      getPPTCommentThreadMessageFromJSONValue(message, index))
+    .filter((message): message is PPTCommentThreadMessage => message !== null)
+
+  if (thread.length === 0) {
+    return undefined
+  }
+
+  return firstBody === undefined
+    ? thread
+    : syncPPTCommentThreadWithBody(thread, firstBody)
+}
+
+function getPPTCommentThreadMessageFromJSONValue(
+  value: unknown,
+  index: number,
+): PPTCommentThreadMessage | null {
+  const body = typeof value === 'string'
+    ? normalizePPTCommentReplyBody(value.replace(/\r\n?/g, '\n'))
+    : isPPTRecord(value)
+      ? normalizePPTCommentReplyBody(
+          String(value.body ?? value.text ?? '').replace(/\r\n?/g, '\n'),
+        )
+      : ''
+
+  if (!body.trim()) {
+    return null
+  }
+
+  return {
+    authorName: isPPTRecord(value) && typeof value.authorName === 'string'
+      ? normalizePPTCommentAuthorName(value.authorName)
+      : PPT_COMMENT_DEFAULT_AUTHOR,
+    body,
+    createdAt: isPPTRecord(value) && typeof value.createdAt === 'string'
+      ? normalizePPTCommentCreatedAt(value.createdAt)
+      : PPT_COMMENT_DEFAULT_CREATED_AT,
+    id: isPPTRecord(value) && typeof value.id === 'string' && value.id.trim()
+      ? normalizePPTCommentMessageId(value.id)
+      : `json-comment:message-${index + 1}`,
+  }
 }
 
 function getPPTSlideNotesSourceFromDataTransfer(
@@ -24893,6 +25219,18 @@ function normalizePPTCommentReplyBody(value: string) {
   return value.slice(0, PPT_COMMENT_REPLY_MAX_LENGTH)
 }
 
+function normalizePPTCommentAuthorName(value: string) {
+  return value.trim().slice(0, 80) || PPT_COMMENT_DEFAULT_AUTHOR
+}
+
+function normalizePPTCommentCreatedAt(value: string) {
+  return value.trim().slice(0, 80) || PPT_COMMENT_DEFAULT_CREATED_AT
+}
+
+function normalizePPTCommentMessageId(value: string) {
+  return value.trim().slice(0, 120) || 'json-comment:message'
+}
+
 function getPPTCommentThread(comment: PPTComment): PPTCommentThreadMessage[] {
   if (comment.thread && comment.thread.length > 0) {
     return comment.thread
@@ -24917,6 +25255,46 @@ function getPPTCommentThreadWithBody(
     ...first,
     body,
   }, ...rest]
+}
+
+function applyPPTCommentImportSourceToElement(
+  element: PPTComment,
+  source: PPTCommentImportSource,
+): PPTComment {
+  const importedThread = source.comment.thread?.length
+    ? source.comment.thread
+    : null
+  const body = source.comment.body ??
+    importedThread?.[0]?.body ??
+    element.body
+  const thread = importedThread
+    ? syncPPTCommentThreadWithBody(importedThread, body)
+    : getPPTCommentThreadWithBody(element, body)
+
+  return {
+    ...element,
+    ...(source.comment.createdAt ? { createdAt: source.comment.createdAt } : {}),
+    ...(source.comment.resolved === undefined ? {} : { resolved: source.comment.resolved }),
+    body,
+    thread,
+  }
+}
+
+function syncPPTCommentThreadWithBody(
+  thread: readonly PPTCommentThreadMessage[],
+  body: string,
+): PPTCommentThreadMessage[] {
+  const [first, ...rest] = thread
+
+  return first
+    ? [{ ...first, body }, ...rest.map(clonePPTCommentThreadMessage)]
+    : []
+}
+
+function clonePPTCommentThreadMessage(
+  message: PPTCommentThreadMessage,
+): PPTCommentThreadMessage {
+  return { ...message }
 }
 
 function createPPTCommentReplyMessage(
