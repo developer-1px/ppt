@@ -6691,7 +6691,7 @@ function App() {
           x: 0,
           y: 0,
         },
-        stageRect: stageRef.current?.getBoundingClientRect() ?? null,
+        stageRect: canvasStageElement.getRect(),
         viewport,
       })
     : null
