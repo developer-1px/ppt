@@ -427,6 +427,7 @@ import {
   type CanvasRichClipboardWriteMode,
 } from 'canvas/app/rich-clipboard'
 import {
+  CANVAS_COMMENT_THREAD_MODEL,
   isCanvasKeyboardToolIntent,
   runCanvasKeyboardToolIntent,
   type CanvasKeyboardToolIntent,
@@ -7904,7 +7905,7 @@ function App() {
         data-ppt-comment-thread-command-selection={lastCommentThreadEffect?.selection.objectIds.join(' ') ?? undefined}
         data-ppt-comment-thread-command-slide={lastCommentThreadEffect?.payload.slideId}
         data-ppt-comment-thread-command-type={lastCommentThreadEffect?.type}
-        data-ppt-comment-thread-model="canvas-comment-thread"
+        data-ppt-comment-thread-model={CANVAS_COMMENT_THREAD_MODEL}
         data-ppt-accessibility-command={lastAccessibilityEffect?.payload.id}
         data-ppt-accessibility-command-field={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
           ? lastAccessibilityEffect.payload.fieldId
@@ -14491,7 +14492,7 @@ function Inspector({
                   className="ppt-comment-thread"
                   data-ppt-comment-thread
                   data-ppt-comment-thread-count={commentThread.length}
-                  data-ppt-comment-thread-model="canvas-comment-thread"
+                  data-ppt-comment-thread-model={CANVAS_COMMENT_THREAD_MODEL}
                   data-ppt-comment-thread-resolved={selectedElement.resolved === true ? 'true' : 'false'}
                 >
                   <div className="ppt-comment-thread-header">
