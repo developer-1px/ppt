@@ -465,7 +465,10 @@ import {
 import { getCanvasPointerTransformModifierState } from 'canvas/app/pointer-input'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
+  CANVAS_TOOLBAR_FOCUS_MODEL,
   CANVAS_TOOLBAR_ITEM_PROPS,
+  CANVAS_TOOLBAR_KEYBOARD_MODEL,
+  CANVAS_TOOLBAR_ROVING_FOCUS_MODEL,
   useCanvasToolbarRovingFocus,
 } from 'canvas/app/toolbar-roving-focus'
 import {
@@ -7261,9 +7264,9 @@ function App() {
         aria-orientation="horizontal"
         className="ppt-topbar"
         data-ppt-toolbar
-        data-ppt-toolbar-focus-model="roving-tabindex"
-        data-ppt-toolbar-keyboard-model="arrow-home-end"
-        data-ppt-toolbar-model="canvas-toolbar-roving-focus"
+        data-ppt-toolbar-focus-model={CANVAS_TOOLBAR_FOCUS_MODEL}
+        data-ppt-toolbar-keyboard-model={CANVAS_TOOLBAR_KEYBOARD_MODEL}
+        data-ppt-toolbar-model={CANVAS_TOOLBAR_ROVING_FOCUS_MODEL}
         ref={setTopbarToolbarRoot}
         role="toolbar"
         onFocus={handleTopbarToolbarFocus}
