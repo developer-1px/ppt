@@ -386,6 +386,7 @@ import {
   CANVAS_MENU_ITEM_PROPS,
   CANVAS_MENU_KEYBOARD_KEYS,
   CANVAS_MENU_ROVING_FOCUS_MODEL,
+  CANVAS_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL,
   getCanvasMenuTriggerKeyboardIntent,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
@@ -10687,7 +10688,7 @@ function PPTShapeKindMenu({
           className="ppt-floating-menu"
           data-ppt-shape-menu
           data-ppt-shape-menu-active={activeOption.shape}
-          data-ppt-shape-menu-model="canvas-selection-toolbar-dropdown-menu"
+          data-ppt-shape-menu-model={CANVAS_SELECTION_TOOLBAR_DROPDOWN_MENU_MODEL}
           id="ppt-shape-kind-menu"
           ref={setMenuRoot}
           role="menu"
