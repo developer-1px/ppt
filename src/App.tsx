@@ -403,42 +403,6 @@ import {
   type CanvasTabsDescriptor,
 } from 'canvas/app'
 import {
-  CANVAS_COMMAND_PALETTE_ITEMS_MODEL,
-  filterCanvasCommandPaletteItems,
-  type CanvasCommandPaletteItem,
-} from 'canvas/app/command-palette-items'
-import {
-  CANVAS_MINIMAP_READ_MODEL,
-  getCanvasMinimapPointFromViewportOffset,
-  getCanvasMinimapReadModel,
-  getCanvasMinimapWorldPoint,
-  type CanvasMinimapItemBounds,
-  type CanvasMinimapReadModel,
-  type CanvasMinimapSize,
-} from 'canvas/app/minimap-model'
-import {
-  CANVAS_PASTE_POSITION_MODEL,
-} from 'canvas/app/paste-position'
-import {
-  CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL,
-  CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
-} from 'canvas/app/keyboard-system-shortcuts'
-import {
-  CANVAS_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER,
-  CANVAS_WHEEL_VIEWPORT_MODEL,
-  CANVAS_WHEEL_VIEWPORT_PAN_MODE,
-  CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER,
-} from 'canvas/app/viewport-controls'
-import {
-  CANVAS_INLINE_EDIT_DOM_MODEL,
-  inlineEditHistoryDirectionFromInputType,
-  insertInlineEditText,
-  isInlineEditLineBreakInput,
-} from 'canvas/app/inline-edit-dom'
-import {
-  CANVAS_POINTER_CLICK_MEMORY_MODEL,
-} from 'canvas/app/pointer-click-memory'
-import {
   RESIZE_HANDLES,
   clamp,
   clampCanvasBoundsToFrame,
@@ -572,6 +536,30 @@ import {
   pptGeometryToBounds,
   pptCanvasTransformAdapter,
 } from './pptCanvasAdapter'
+import {
+  filterPPTCommandPaletteItems,
+  getPPTInlineEditHistoryDirectionFromInputType,
+  getPPTMinimapPointFromViewportOffset,
+  getPPTMinimapReadModel,
+  getPPTMinimapWorldPoint,
+  insertPPTInlineEditText,
+  isPPTInlineEditLineBreakInput,
+  PPT_COMMAND_PALETTE_ITEMS_MODEL,
+  PPT_INLINE_EDIT_DOM_MODEL,
+  PPT_KEYBOARD_TEMPORARY_PAN_MODEL,
+  PPT_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
+  PPT_MINIMAP_READ_MODEL,
+  PPT_PASTE_POSITION_MODEL,
+  PPT_POINTER_CLICK_MEMORY_MODEL,
+  PPT_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER,
+  PPT_WHEEL_VIEWPORT_MODEL,
+  PPT_WHEEL_VIEWPORT_PAN_MODE,
+  PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
+  type PPTCommandPaletteItemBase,
+  type PPTMinimapItemBounds as PPTMinimapItemBoundsBase,
+  type PPTMinimapReadModel as PPTMinimapReadModelBase,
+  type PPTMinimapSize as PPTMinimapSizeBase,
+} from './pptCanvasAppAffordanceAdapter'
 import {
   getNextPPTDrawingPoints,
   getPPTPointerStartProjection,
@@ -969,7 +957,7 @@ type PPTClipboardPastePositionEffect = {
   anchor: Point
   clipboardBounds: Bounds | null
   clipboardObjectCount: number
-  model: typeof CANVAS_PASTE_POSITION_MODEL
+  model: typeof PPT_PASTE_POSITION_MODEL
   pasteIndex: number
   viewportCenter: Point | null
 }
@@ -1176,7 +1164,7 @@ type PPTSurfaceCommandViewGroup = {
   commands: PPTSurfaceCommandView[]
   id: string
 }
-type PPTCommandPaletteItem = CanvasCommandPaletteItem
+type PPTCommandPaletteItem = PPTCommandPaletteItemBase
 type PPTShortcutHelpItem = {
   id: string
   section: string
@@ -1393,14 +1381,14 @@ type PPTInlineEditEffect = {
   historyDirection?: PPTInlineEditHistoryDirection
   inputType?: string
   lineBreak?: boolean
-  model: typeof CANVAS_INLINE_EDIT_DOM_MODEL
+  model: typeof PPT_INLINE_EDIT_DOM_MODEL
   pasteText?: string
 }
 type PPTResizeHandleClickMemoryEffect = {
   handle: ResizeHandle
   id: string
   isDoubleClick: boolean
-  model: typeof CANVAS_POINTER_CLICK_MEMORY_MODEL
+  model: typeof PPT_POINTER_CLICK_MEMORY_MODEL
   point: Point
 }
 type PPTLayerPaneGroupState = {
@@ -1419,9 +1407,9 @@ type PPTLayerPaneDragState = {
   dropToIndex?: number
   objectId: string
 }
-type PPTMinimapSize = CanvasMinimapSize
-type PPTMinimapItemBounds = CanvasMinimapItemBounds
-type PPTMinimapReadModel = CanvasMinimapReadModel
+type PPTMinimapSize = PPTMinimapSizeBase
+type PPTMinimapItemBounds = PPTMinimapItemBoundsBase
+type PPTMinimapReadModel = PPTMinimapReadModelBase
 type PPTContextMenuState = {
   x: number
   y: number
@@ -2186,7 +2174,7 @@ function App() {
   )
   const stageRect = canvasStageElement.getRect()
   const minimapModel = stageRect && showMinimap
-    ? getCanvasMinimapReadModel({
+    ? getPPTMinimapReadModel({
         items: minimapItems,
         size: PPT_MINIMAP_SIZE,
         stageRect,
@@ -4119,7 +4107,7 @@ function App() {
       anchor: pasteAnchor,
       clipboardBounds,
       clipboardObjectCount: payload.objects.length,
-      model: CANVAS_PASTE_POSITION_MODEL,
+      model: PPT_PASTE_POSITION_MODEL,
       pasteIndex,
       viewportCenter,
     }
@@ -6159,7 +6147,7 @@ function App() {
       handle,
       id: clickId,
       isDoubleClick: resizeHandleIntent.isDoubleClick,
-      model: CANVAS_POINTER_CLICK_MEMORY_MODEL,
+      model: PPT_POINTER_CLICK_MEMORY_MODEL,
       point,
     })
 
@@ -7771,7 +7759,7 @@ function App() {
         data-ppt-inline-edit-history-direction={lastInlineEditEffect?.historyDirection}
         data-ppt-inline-edit-input-type={lastInlineEditEffect?.inputType}
         data-ppt-inline-edit-line-break={lastInlineEditEffect?.lineBreak ? 'true' : undefined}
-        data-ppt-inline-edit-model={CANVAS_INLINE_EDIT_DOM_MODEL}
+        data-ppt-inline-edit-model={PPT_INLINE_EDIT_DOM_MODEL}
         data-ppt-inline-edit-paste-text={lastInlineEditEffect?.pasteText}
         data-ppt-text-paste-bold-runs={lastTextPasteImport?.boldRunCount}
         data-ppt-text-paste-bullet-paragraphs={lastTextPasteImport?.bulletParagraphCount}
@@ -8030,7 +8018,7 @@ function App() {
         data-ppt-resize-handle-click-double={lastResizeHandleClickMemoryEffect?.isDoubleClick ? 'true' : undefined}
         data-ppt-resize-handle-click-handle={lastResizeHandleClickMemoryEffect?.handle}
         data-ppt-resize-handle-click-id={lastResizeHandleClickMemoryEffect?.id}
-        data-ppt-resize-handle-click-model={CANVAS_POINTER_CLICK_MEMORY_MODEL}
+        data-ppt-resize-handle-click-model={PPT_POINTER_CLICK_MEMORY_MODEL}
         data-ppt-resize-handle-click-x={lastResizeHandleClickMemoryEffect?.point.x}
         data-ppt-resize-handle-click-y={lastResizeHandleClickMemoryEffect?.point.y}
         data-ppt-table-import-cols={lastTableImportEffect?.columnCount}
@@ -8059,12 +8047,12 @@ function App() {
         data-ppt-sticky-tool-shortcut={CANVAS_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
         data-ppt-temporary-pan-gesture={interaction?.kind === 'pan' ? 'true' : 'false'}
-        data-ppt-temporary-pan-model={CANVAS_KEYBOARD_TEMPORARY_PAN_MODEL}
-        data-ppt-temporary-pan-shortcut={CANVAS_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL}
-        data-ppt-wheel-viewport-horizontal-pan-modifier={CANVAS_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER}
-        data-ppt-wheel-viewport-model={CANVAS_WHEEL_VIEWPORT_MODEL}
-        data-ppt-wheel-viewport-pan={CANVAS_WHEEL_VIEWPORT_PAN_MODE}
-        data-ppt-wheel-viewport-zoom-modifier={CANVAS_WHEEL_VIEWPORT_ZOOM_MODIFIER}
+        data-ppt-temporary-pan-model={PPT_KEYBOARD_TEMPORARY_PAN_MODEL}
+        data-ppt-temporary-pan-shortcut={PPT_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL}
+        data-ppt-wheel-viewport-horizontal-pan-modifier={PPT_WHEEL_VIEWPORT_HORIZONTAL_PAN_MODIFIER}
+        data-ppt-wheel-viewport-model={PPT_WHEEL_VIEWPORT_MODEL}
+        data-ppt-wheel-viewport-pan={PPT_WHEEL_VIEWPORT_PAN_MODE}
+        data-ppt-wheel-viewport-zoom-modifier={PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER}
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
@@ -8312,7 +8300,7 @@ function PPTMinimap({
       return
     }
 
-    const point = getCanvasMinimapPointFromViewportOffset({
+    const point = getPPTMinimapPointFromViewportOffset({
       model: readModel,
       offset: localGeometry.point,
       viewportSize: {
@@ -8325,7 +8313,7 @@ function PPTMinimap({
       return
     }
 
-    onNavigateToWorldPoint(getCanvasMinimapWorldPoint({ model: readModel, point }))
+    onNavigateToWorldPoint(getPPTMinimapWorldPoint({ model: readModel, point }))
   }
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -8357,7 +8345,7 @@ function PPTMinimap({
       className="ppt-minimap"
       data-ppt-minimap
       data-ppt-minimap-item-count={itemRects.length}
-      data-ppt-minimap-model={CANVAS_MINIMAP_READ_MODEL}
+      data-ppt-minimap-model={PPT_MINIMAP_READ_MODEL}
       data-ppt-minimap-scale={readModel.scale}
       data-ppt-minimap-viewport-h={readModel.viewportWorldBounds.h}
       data-ppt-minimap-viewport-w={readModel.viewportWorldBounds.w}
@@ -8736,7 +8724,7 @@ function PPTCommandPaletteDialog({
   const dialogRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const filteredItems = useMemo(
-    () => filterCanvasCommandPaletteItems(items, query).slice(0, 10),
+    () => filterPPTCommandPaletteItems(items, query).slice(0, 10),
     [items, query],
   )
   const maxActiveIndex = Math.max(0, filteredItems.length - 1)
@@ -8827,7 +8815,7 @@ function PPTCommandPaletteDialog({
         data-ppt-command-palette
         data-ppt-command-palette-focus-lifecycle={CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL}
         data-ppt-command-palette-focus-trap="true"
-        data-ppt-command-palette-model={CANVAS_COMMAND_PALETTE_ITEMS_MODEL}
+        data-ppt-command-palette-model={PPT_COMMAND_PALETTE_ITEMS_MODEL}
         data-ppt-command-palette-restore-focus="true"
         ref={dialogRef}
         role="dialog"
@@ -11542,7 +11530,7 @@ function PPTElementView({
   function recordInlineEditEffect(effect: Omit<PPTInlineEditEffect, 'elementId' | 'model'>) {
     onInlineEditEffect({
       elementId: element.id,
-      model: CANVAS_INLINE_EDIT_DOM_MODEL,
+      model: PPT_INLINE_EDIT_DOM_MODEL,
       ...effect,
     })
   }
@@ -11553,8 +11541,8 @@ function PPTElementView({
     }
 
     const inputType = getPPTInlineEditInputType(event)
-    const historyDirection = inlineEditHistoryDirectionFromInputType(inputType)
-    const lineBreak = isInlineEditLineBreakInput(inputType)
+    const historyDirection = getPPTInlineEditHistoryDirectionFromInputType(inputType)
+    const lineBreak = isPPTInlineEditLineBreakInput(inputType)
 
     if (!historyDirection && !lineBreak) {
       return
@@ -11590,7 +11578,7 @@ function PPTElementView({
     if (intent.kind === 'line-break') {
       recordInlineEditEffect({
         inputType: intent.inputType,
-        ...(isInlineEditLineBreakInput(intent.inputType) ? { lineBreak: true } : {}),
+        ...(isPPTInlineEditLineBreakInput(intent.inputType) ? { lineBreak: true } : {}),
       })
       return
     }
@@ -11625,7 +11613,7 @@ function PPTElementView({
     }
 
     event.preventDefault()
-    insertInlineEditText(event.currentTarget, pasteText)
+    insertPPTInlineEditText(event.currentTarget, pasteText)
     recordInlineEditEffect({ pasteText })
   }
 
@@ -11779,7 +11767,7 @@ function PPTElementView({
           className="ppt-element-editor"
           contentEditable={editing}
           data-ppt-inline-edit-active={editing ? 'true' : 'false'}
-          data-ppt-inline-edit-model={CANVAS_INLINE_EDIT_DOM_MODEL}
+          data-ppt-inline-edit-model={PPT_INLINE_EDIT_DOM_MODEL}
           ref={editorRef}
           suppressContentEditableWarning={true}
           onBeforeInput={handleInlineEditBeforeInput}
