@@ -9544,6 +9544,61 @@ async function runObjectHyperlinkScenario(page) {
     },
   )
 
+  const metadataAltText = 'AI generated card linking to PPT reference.'
+
+  await page.eval(`((url, altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectMetadata: {
+        accessibility: { altText },
+        hyperlink: { url },
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(url)}, ${JSON.stringify(metadataAltText)})`)
+  await delay(120)
+
+  const afterMetadataPaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes JSON object metadata into selected PPT object',
+    afterMetadataPaste.objectMetadataImportModel === 'ppt-object-metadata-import' &&
+      afterMetadataPaste.objectMetadataImportFormat === 'application-json-ppt-object-metadata' &&
+      afterMetadataPaste.objectMetadataImportSlide === 'slide-1' &&
+      afterMetadataPaste.objectMetadataImportObjects === targetId &&
+      afterMetadataPaste.objectMetadataImportFields === 'hyperlinkUrl altText' &&
+      afterMetadataPaste.objectMetadataImportCommands ===
+        'update-object-hyperlink update-object-accessibility' &&
+      afterMetadataPaste.objectMetadataImportCommandFields === 'url altText' &&
+      afterMetadataPaste.objectMetadataImportCommandTypes ===
+        'slide-command-effect slide-command-effect' &&
+      afterMetadataPaste.objectMetadataImportHyperlinkUrl === url &&
+      afterMetadataPaste.objectMetadataImportAltTextPresent === 'true' &&
+      afterMetadataPaste.objectMetadataImportAltTextLength === metadataAltText.length &&
+      afterMetadataPaste.objectMetadataImportJsonLength > 90 &&
+      afterMetadataPaste.command === 'update-object-hyperlink' &&
+      afterMetadataPaste.commandField === 'url' &&
+      afterMetadataPaste.commandValue === url &&
+      afterMetadataPaste.accessibilityCommand === 'update-object-accessibility' &&
+      afterMetadataPaste.accessibilityCommandField === 'altText' &&
+      afterMetadataPaste.accessibilityCommandValue === metadataAltText &&
+      afterMetadataPaste.selectedUrl === url &&
+      afterMetadataPaste.selectedAltText === metadataAltText &&
+      afterMetadataPaste.thumbUrl === url &&
+      afterMetadataPaste.thumbAltText === metadataAltText,
+    {
+      afterMetadataPaste,
+      afterRestore,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -15953,6 +16008,12 @@ function getPPTObjectHyperlinkState(page, elementId) {
     }
 
     return {
+      accessibilityCommand: stage?.getAttribute('data-ppt-accessibility-command') ?? '',
+      accessibilityCommandField: stage?.getAttribute('data-ppt-accessibility-command-field') ?? '',
+      accessibilityCommandObject: stage?.getAttribute('data-ppt-accessibility-command-object') ?? '',
+      accessibilityCommandSlide: stage?.getAttribute('data-ppt-accessibility-command-slide') ?? '',
+      accessibilityCommandType: stage?.getAttribute('data-ppt-accessibility-command-type') ?? '',
+      accessibilityCommandValue: stage?.getAttribute('data-ppt-accessibility-command-value') ?? '',
       command: stage?.getAttribute('data-ppt-hyperlink-command') ?? '',
       commandField: stage?.getAttribute('data-ppt-hyperlink-command-field') ?? '',
       commandObject: stage?.getAttribute('data-ppt-hyperlink-command-object') ?? '',
@@ -15969,8 +16030,22 @@ function getPPTObjectHyperlinkState(page, elementId) {
       descriptorUrl: descriptor?.url ?? '',
       descriptorValidation: field?.getAttribute('data-ppt-hyperlink-validation') ?? '',
       model: stage?.getAttribute('data-ppt-hyperlink-model') ?? '',
+      objectMetadataImportAltTextLength: Number(stage?.getAttribute('data-ppt-object-metadata-import-alt-text-length') ?? 0),
+      objectMetadataImportAltTextPresent: stage?.getAttribute('data-ppt-object-metadata-import-alt-text-present') ?? '',
+      objectMetadataImportCommandFields: stage?.getAttribute('data-ppt-object-metadata-import-command-fields') ?? '',
+      objectMetadataImportCommandTypes: stage?.getAttribute('data-ppt-object-metadata-import-command-types') ?? '',
+      objectMetadataImportCommands: stage?.getAttribute('data-ppt-object-metadata-import-commands') ?? '',
+      objectMetadataImportFields: stage?.getAttribute('data-ppt-object-metadata-import-fields') ?? '',
+      objectMetadataImportFormat: stage?.getAttribute('data-ppt-object-metadata-import-format') ?? '',
+      objectMetadataImportHyperlinkUrl: stage?.getAttribute('data-ppt-object-metadata-import-hyperlink-url') ?? '',
+      objectMetadataImportJsonLength: Number(stage?.getAttribute('data-ppt-object-metadata-import-json-length') ?? 0),
+      objectMetadataImportModel: stage?.getAttribute('data-ppt-object-metadata-import-model') ?? '',
+      objectMetadataImportObjects: stage?.getAttribute('data-ppt-object-metadata-import-objects') ?? '',
+      objectMetadataImportSlide: stage?.getAttribute('data-ppt-object-metadata-import-slide') ?? '',
+      selectedAltText: selected?.getAttribute('data-ppt-alt-text') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedUrl: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
+      thumbAltText: thumb?.getAttribute('data-ppt-thumb-alt-text') ?? '',
       thumbUrl: thumb?.getAttribute('data-ppt-thumb-hyperlink-url') ?? '',
       url: field?.value ?? '',
     }
