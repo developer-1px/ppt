@@ -356,6 +356,7 @@ import {
 } from 'canvas/app/keyboard-viewport-shortcuts'
 import {
   CANVAS_MENU_ITEM_PROPS,
+  getCanvasMenuTriggerKeyboardIntent,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
 import { getCanvasSelectionListModifierState } from 'canvas/app/selection-list-range'
@@ -10522,8 +10523,13 @@ function PPTShapeKindMenu({
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+    const intent = getCanvasMenuTriggerKeyboardIntent({ key: event.key })
+
+    if (intent.preventDefault) {
       event.preventDefault()
+    }
+
+    if (intent.kind === 'open-menu') {
       event.stopPropagation()
       openMenu()
     }
@@ -10675,8 +10681,13 @@ function PPTAlignmentPopover({
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+    const intent = getCanvasMenuTriggerKeyboardIntent({ key: event.key })
+
+    if (intent.preventDefault) {
       event.preventDefault()
+    }
+
+    if (intent.kind === 'open-menu') {
       event.stopPropagation()
       openPopover()
     }
