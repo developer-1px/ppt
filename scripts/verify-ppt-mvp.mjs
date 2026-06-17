@@ -6310,10 +6310,7 @@ async function runExportScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
@@ -6455,10 +6452,10 @@ async function runExportScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
+  await deletePPTSlidesByThumbNameIncludes(page, [
+    'AI JSON Source Copy',
+    'AI JSON Opening Copy',
+  ])
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
@@ -6473,6 +6470,246 @@ async function runExportScenario(page) {
       afterDeckJSONPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
     {
       afterDeckJSONPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const slide = {
+      background: { color: '#ffffff' },
+      elements: [
+        {
+          geometry: { h: 82, w: 1040, x: 92, y: 72 },
+          id: 'ai-single-title',
+          kind: 'textBox',
+          name: 'Title',
+          style: { color: '#111827', fontSize: 42, fontWeight: 'bold' },
+          textBody: { paragraphs: [{ runs: [{ text: 'AI Single Slide' }] }] },
+          textAutoFit: 'resizeShapeToFitText',
+        },
+        {
+          geometry: { h: 190, w: 860, x: 104, y: 184 },
+          id: 'ai-single-body',
+          kind: 'textBox',
+          name: 'Body',
+          style: { color: '#1f2937', fontSize: 28 },
+          textBody: {
+            paragraphs: [
+              { bullet: 'bullet', runs: [{ text: 'Paste one AI generated slide' }] },
+              { bullet: 'numbered', runs: [{ text: 'Retouch as editable PPT content' }] },
+            ],
+          },
+        },
+        {
+          fill: { color: '#eff6ff' },
+          geometry: { h: 72, w: 340, x: 104, y: 426 },
+          hyperlink: { url: 'https://example.com/single-slide-json' },
+          id: 'ai-single-link',
+          kind: 'shape',
+          name: 'Source Link',
+          shape: 'rect',
+          stroke: { color: '#2563eb', width: 2 },
+          style: { color: '#1e3a8a', fontSize: 22, fontWeight: 'semibold' },
+          textBody: { paragraphs: [{ runs: [{ text: 'Source link' }] }] },
+        },
+      ],
+      id: 'ai-single-slide',
+      layoutId: 'ppt-layout-title-body',
+      name: 'AI Single Slide',
+      notes: 'AI single slide note',
+      themeId: 'ppt-theme-default',
+    }
+    const json = JSON.stringify(slide)
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const slideJSONImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const body = document.querySelector('.ppt-slide [data-ppt-element-name="Body"]')
+    const title = document.querySelector('.ppt-slide [data-ppt-element-name="Title"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      bodyText: body?.textContent ?? '',
+      exportHasHyperlink: exportCode.includes('https://example.com/single-slide-json') && exportCode.includes('data-ppt-hyperlink-url='),
+      exportHasNotes: exportCode.includes('AI single slide note'),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-slide-json-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-slide-json-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-slide-json-import-imported-count') ?? 0),
+      jsonLength: Number(stage?.getAttribute('data-ppt-slide-json-import-json-length') ?? 0),
+      model: stage?.getAttribute('data-ppt-slide-json-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-slide-json-import-source-slide-count') ?? 0),
+      sourceSlideIds: stage?.getAttribute('data-ppt-slide-json-import-source-slide-ids') ?? '',
+      sourceSlideNames: stage?.getAttribute('data-ppt-slide-json-import-source-slide-names') ?? '',
+      titleText: title?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes raw PPT slide JSON as editable slide',
+    slideJSONImportState.model === 'ppt-slide-json-import' &&
+      slideJSONImportState.format === 'application-json-ppt-slide' &&
+      slideJSONImportState.sourceSlideCount === 1 &&
+      slideJSONImportState.sourceSlideIds === 'ai-single-slide' &&
+      slideJSONImportState.sourceSlideNames === 'AI Single Slide' &&
+      slideJSONImportState.importedCount === 1 &&
+      slideJSONImportState.slideCount === beforeDeckHTMLPaste.slideCount + 1 &&
+      slideJSONImportState.activeSlide === slideJSONImportState.firstImportedSlideId &&
+      slideJSONImportState.activeName.includes('AI Single Slide Copy') &&
+      slideJSONImportState.titleText.includes('AI Single Slide') &&
+      slideJSONImportState.bodyText.includes('Paste one AI generated slide') &&
+      slideJSONImportState.bodyText.includes('Retouch as editable PPT content') &&
+      slideJSONImportState.exportHasNotes &&
+      slideJSONImportState.exportHasHyperlink &&
+      slideJSONImportState.jsonLength > 100,
+    {
+      beforeDeckHTMLPaste,
+      slideJSONImportState,
+    },
+  )
+
+  await deletePPTSlideByThumbName(page, 'AI Single Slide Copy')
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterSlideJSONPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPT slide JSON paste probe before export scenario continues',
+    afterSlideJSONPasteCleanup.activeSlide === 'slide-1' &&
+      afterSlideJSONPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterSlideJSONPasteCleanup,
+      beforeDeckHTMLPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const payload = {
+      slides: [
+        {
+          background: { color: '#ffffff' },
+          elements: [
+            {
+              geometry: { h: 86, w: 960, x: 108, y: 86 },
+              id: 'ai-wrapper-title-a',
+              kind: 'textBox',
+              name: 'Title',
+              style: { color: '#111827', fontSize: 42, fontWeight: 'bold' },
+              textBody: { paragraphs: [{ runs: [{ text: 'Wrapper Slide A' }] }] },
+            },
+          ],
+          id: 'ai-wrapper-slide-a',
+          name: 'Wrapper Slide A',
+          themeId: 'ppt-theme-default',
+        },
+        {
+          background: { color: '#f8fafc' },
+          elements: [
+            {
+              geometry: { h: 86, w: 960, x: 108, y: 86 },
+              id: 'ai-wrapper-title-b',
+              kind: 'textBox',
+              name: 'Title',
+              style: { color: '#111827', fontSize: 42, fontWeight: 'bold' },
+              textBody: { paragraphs: [{ runs: [{ text: 'Wrapper Slide B' }] }] },
+            },
+          ],
+          id: 'ai-wrapper-slide-b',
+          name: 'Wrapper Slide B',
+          themeId: 'ppt-theme-default',
+        },
+      ],
+    }
+    const fence = String.fromCharCode(96, 96, 96)
+    const markdown = fence + 'json\\n' + JSON.stringify(payload, null, 2) +
+      '\\n' + fence
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(140)
+
+  const fencedSlideJSONImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const title = document.querySelector('.ppt-slide [data-ppt-element-name="Title"]')
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      firstImportedSlideId: stage?.getAttribute('data-ppt-slide-json-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-slide-json-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-slide-json-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-slide-json-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-slide-json-import-source-slide-count') ?? 0),
+      sourceSlideIds: stage?.getAttribute('data-ppt-slide-json-import-source-slide-ids') ?? '',
+      sourceSlideNames: stage?.getAttribute('data-ppt-slide-json-import-source-slide-names') ?? '',
+      titleText: title?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'pastes fenced PPT slide JSON wrapper as editable slides',
+    fencedSlideJSONImportState.model === 'ppt-slide-json-import' &&
+      fencedSlideJSONImportState.format === 'text-json-ppt-slide' &&
+      fencedSlideJSONImportState.sourceSlideCount === 2 &&
+      fencedSlideJSONImportState.sourceSlideIds === 'ai-wrapper-slide-a ai-wrapper-slide-b' &&
+      fencedSlideJSONImportState.sourceSlideNames === 'Wrapper Slide A, Wrapper Slide B' &&
+      fencedSlideJSONImportState.importedCount === 2 &&
+      fencedSlideJSONImportState.slideCount === beforeDeckHTMLPaste.slideCount + 2 &&
+      fencedSlideJSONImportState.activeSlide === fencedSlideJSONImportState.firstImportedSlideId &&
+      fencedSlideJSONImportState.activeName.includes('Wrapper Slide A Copy') &&
+      fencedSlideJSONImportState.titleText.includes('Wrapper Slide A'),
+    {
+      beforeDeckHTMLPaste,
+      fencedSlideJSONImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, [
+    'Wrapper Slide B Copy',
+    'Wrapper Slide A Copy',
+  ])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterFencedSlideJSONPasteCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes fenced PPT slide JSON paste probes before export scenario continues',
+    afterFencedSlideJSONPasteCleanup.activeSlide === 'slide-1' &&
+      afterFencedSlideJSONPasteCleanup.slideCount === beforeDeckHTMLPaste.slideCount,
+    {
+      afterFencedSlideJSONPasteCleanup,
       beforeDeckHTMLPaste,
     },
   )
@@ -6557,8 +6794,7 @@ async function runExportScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
+  await deletePPTSlideByThumbName(page, 'Fenced JSON Copy')
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
@@ -6640,10 +6876,7 @@ async function runExportScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
+  await deletePPTSlidesByThumbNameIncludes(page, ['Snapshot'])
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
@@ -6739,10 +6972,10 @@ async function runExportScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
-  await delay(100)
+  await deletePPTSlidesByThumbNameIncludes(page, [
+    'Retouch plan',
+    'Market context',
+  ])
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
@@ -6991,6 +7224,24 @@ async function runExportScenario(page) {
 async function runAlignmentPopoverScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
+
+  const alignmentTargetState = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    elementIds: [...document.querySelectorAll('.ppt-slide [data-ppt-element]')]
+      .map((element) => element.getAttribute('data-ppt-element') ?? ''),
+    hasS1Card1: !!document.querySelector('[data-ppt-element="s1-card-1"]'),
+    thumbLabels: [...document.querySelectorAll('.ppt-thumb')]
+      .map((thumb) => thumb.getAttribute('aria-label') ?? ''),
+    thumbNames: [...document.querySelectorAll('.ppt-thumb .ppt-thumb-name')]
+      .map((name) => name.textContent ?? ''),
+  }))()`)
+
+  if (!alignmentTargetState.hasS1Card1) {
+    throw new Error(JSON.stringify({
+      message: 'PPT alignment target is missing',
+      state: alignmentTargetState,
+    }))
+  }
 
   const point = await page.eval(`(() => {
     const rect = document.querySelector('[data-ppt-element="s1-card-1"]').getBoundingClientRect()
@@ -15961,6 +16212,42 @@ function dragPPTSlideThumbnail(page, {
       targetIndex,
     }
   })(${JSON.stringify({ placement, sourceSelector, targetSelector })})`)
+}
+
+async function deletePPTSlideByThumbName(page, name) {
+  const selected = await page.eval(`((name) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) =>
+        item.querySelector('.ppt-thumb-name')?.textContent?.includes(name))
+
+    if (!(thumb instanceof HTMLElement)) {
+      return false
+    }
+
+    thumb.click()
+    return true
+  })(${JSON.stringify(name)})`)
+
+  await delay(80)
+
+  if (!selected) {
+    return false
+  }
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(100)
+
+  return true
+}
+
+async function deletePPTSlidesByThumbNameIncludes(page, names) {
+  for (const name of names) {
+    let guard = 0
+
+    while (guard < 20 && await deletePPTSlideByThumbName(page, name)) {
+      guard += 1
+    }
+  }
 }
 
 function getPPTCrossSlideClipboardState(page) {
