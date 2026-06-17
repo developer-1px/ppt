@@ -13111,6 +13111,17 @@ function Inspector({
         setLayerPaneGroupExpanded(intent.objectId, true)
         focusLayerPaneRow(intent.objectId)
         return
+      case 'rename-row':
+        {
+          const row = layerPaneDescriptor.rows.find((candidate) =>
+            candidate.objectId === intent.objectId
+          )
+
+          if (row) {
+            startLayerPaneRename(row)
+          }
+        }
+        return
       case 'none':
         return
     }
@@ -13172,15 +13183,6 @@ function Inspector({
       event.metaKey ||
       (event.altKey && event.key !== 'ArrowDown' && event.key !== 'ArrowUp')
     ) {
-      return
-    }
-
-    if (event.key === 'F2') {
-      if (row.isRenamable) {
-        event.preventDefault()
-        event.stopPropagation()
-        startLayerPaneRename(row)
-      }
       return
     }
 
