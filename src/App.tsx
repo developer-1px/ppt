@@ -376,6 +376,7 @@ import {
 } from 'canvas/app/minimap-model'
 import {
   CANVAS_MODAL_FOCUS_LIFECYCLE_MODEL,
+  getCanvasModalBackdropPointerIntent,
   getCanvasModalKeyboardIntent,
   trapCanvasModalTabFocus,
   useCanvasModalFocusLifecycle,
@@ -8410,7 +8411,12 @@ function PPTShortcutHelpDialog({
   })
 
   function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
+    const backdropPointerIntent = getCanvasModalBackdropPointerIntent({
+      currentTarget: event.currentTarget,
+      target: event.target,
+    })
+
+    if (backdropPointerIntent.kind === 'dismiss') {
       onClose()
     }
   }
@@ -8766,7 +8772,12 @@ function PPTCommandPaletteDialog({
   }
 
   function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
+    const backdropPointerIntent = getCanvasModalBackdropPointerIntent({
+      currentTarget: event.currentTarget,
+      target: event.target,
+    })
+
+    if (backdropPointerIntent.kind === 'dismiss') {
       onClose()
     }
   }
