@@ -14,6 +14,7 @@ import {
   type PPTShapeKind,
   type PPTStroke,
   type PPTTextBody,
+  type PPTTextBox,
   type PPTTextStyle,
 } from '../pptModel'
 
@@ -34,22 +35,45 @@ export type PPTFallbackHTMLShapeSource = {
   textBody?: PPTTextBody
 }
 
+export type PPTFallbackHTMLTextSource = {
+  geometry: {
+    h: number
+    w: number
+  }
+  name: string
+  sourceObjectId?: string
+  style: PPTTextStyle
+  textBody: PPTTextBody
+}
+
 export type PPTFallbackHTMLImportEffect = {
   format: 'text-html-ppt-fallback'
+  kind: PPTShape['kind'] | PPTTextBox['kind']
   model: typeof PPT_FALLBACK_HTML_IMPORT_MODEL
   name: string
-  shape: PPTShapeKind
+  shape?: PPTShapeKind
   sourceObjectId?: string
 }
 
 const PPT_FALLBACK_SHAPE_MIN_SIZE = 48
 const PPT_FALLBACK_SHAPE_MAX_WIDTH = 980
 const PPT_FALLBACK_SHAPE_MAX_HEIGHT = 560
+const PPT_FALLBACK_TEXT_MIN_SIZE = 24
+const PPT_FALLBACK_TEXT_MAX_WIDTH = 980
+const PPT_FALLBACK_TEXT_MAX_HEIGHT = 560
 
 export function getPPTFallbackHTMLShapeSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   return getPPTFallbackHTMLShapeSourceFromHTML(
+    dataTransfer?.getData('text/html') ?? '',
+  )
+}
+
+export function getPPTFallbackHTMLTextSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTFallbackHTMLTextSourceFromHTML(
     dataTransfer?.getData('text/html') ?? '',
   )
 }
@@ -119,12 +143,77 @@ export function getPPTFallbackHTMLShapeSourceFromHTML(
       fontWeight: parsePPTFallbackHTMLFontWeight(
         getPPTFallbackHTMLStyleValue(rawStyle, 'font-weight'),
       ),
-      textInset: parsePPTFallbackHTMLPadding(rawStyle),
+      textInset: parsePPTFallbackHTMLPadding(rawStyle, 18),
       verticalAlign: parsePPTFallbackHTMLVerticalAlign(
         getPPTFallbackHTMLStyleValue(rawStyle, 'align-items'),
       ),
     },
     ...(textBody ? { textBody } : {}),
+  }
+}
+
+export function getPPTFallbackHTMLTextSourceFromHTML(
+  html: string,
+): PPTFallbackHTMLTextSource | null {
+  if (!html || typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const element = [...doc.querySelectorAll<HTMLElement>(
+    '[data-ppt-selection-text-body]',
+  )].find((candidate) =>
+    !candidate.closest('[data-ppt-selection-shape]') &&
+    candidate.getAttribute('data-ppt-selection-shape') === null)
+
+  if (!element) {
+    return null
+  }
+
+  const textBody = getPPTFallbackHTMLTextBody(element)
+
+  if (!textBody) {
+    return null
+  }
+
+  const rawStyle = element.getAttribute('style') ?? ''
+  const sourceObjectId =
+    element.getAttribute('data-ppt-selection-object')?.trim() || undefined
+
+  return {
+    geometry: {
+      h: clampPPTCanvasValue(
+        parsePPTFallbackHTMLPixelStyle(rawStyle, 'height') ??
+          getPPTFallbackHTMLTextHeight(textBody),
+        PPT_FALLBACK_TEXT_MIN_SIZE,
+        PPT_FALLBACK_TEXT_MAX_HEIGHT,
+      ),
+      w: clampPPTCanvasValue(
+        parsePPTFallbackHTMLPixelStyle(rawStyle, 'width') ?? 460,
+        PPT_FALLBACK_TEXT_MIN_SIZE,
+        PPT_FALLBACK_TEXT_MAX_WIDTH,
+      ),
+    },
+    name: 'PPT HTML Text',
+    ...(sourceObjectId ? { sourceObjectId } : {}),
+    style: {
+      color: parsePPTFallbackHTMLColor(
+        getPPTFallbackHTMLStyleValue(rawStyle, 'color'),
+        '#111827',
+      ),
+      fontFamily: normalizePPTFallbackHTMLFontFamily(
+        getPPTFallbackHTMLStyleValue(rawStyle, 'font-family'),
+      ),
+      fontSize: parsePPTFallbackHTMLPixelStyle(rawStyle, 'font-size') ?? 24,
+      fontWeight: parsePPTFallbackHTMLFontWeight(
+        getPPTFallbackHTMLStyleValue(rawStyle, 'font-weight'),
+      ),
+      textInset: parsePPTFallbackHTMLPadding(rawStyle, 0),
+      verticalAlign: parsePPTFallbackHTMLVerticalAlign(
+        getPPTFallbackHTMLStyleValue(rawStyle, 'align-items'),
+      ),
+    },
+    textBody,
   }
 }
 
@@ -169,18 +258,53 @@ export function createPPTFallbackHTMLShapeElement({
   }
 }
 
+export function createPPTFallbackHTMLTextElement({
+  center,
+  createId,
+  source,
+}: {
+  center: Point
+  createId: (prefix: string) => string
+  source: PPTFallbackHTMLTextSource
+}): PPTTextBox {
+  const geometry = clampPPTCanvasBoundsToFrame({
+    bounds: {
+      h: source.geometry.h,
+      w: source.geometry.w,
+      x: center.x - source.geometry.w / 2,
+      y: center.y - source.geometry.h / 2,
+    },
+    frame: {
+      h: PPT_SLIDE_HEIGHT,
+      w: PPT_SLIDE_WIDTH,
+      x: 0,
+      y: 0,
+    },
+  })
+
+  return {
+    geometry,
+    id: createId('text'),
+    kind: 'textBox',
+    name: source.name,
+    style: source.style,
+    textBody: source.textBody,
+  }
+}
+
 export function createPPTFallbackHTMLImportEffect({
   element,
   source,
 }: {
-  element: PPTShape
-  source: PPTFallbackHTMLShapeSource
+  element: PPTShape | PPTTextBox
+  source: PPTFallbackHTMLShapeSource | PPTFallbackHTMLTextSource
 }): PPTFallbackHTMLImportEffect {
   return {
     format: 'text-html-ppt-fallback',
+    kind: element.kind,
     model: PPT_FALLBACK_HTML_IMPORT_MODEL,
     name: element.name,
-    shape: source.shape,
+    ...(element.kind === 'shape' ? { shape: element.shape } : {}),
     ...(source.sourceObjectId ? { sourceObjectId: source.sourceObjectId } : {}),
   }
 }
@@ -291,7 +415,7 @@ function normalizePPTFallbackHTMLFontFamily(value: string) {
   return firstFamily.trim().replace(/^["']|["']$/g, '') || 'Inter'
 }
 
-function parsePPTFallbackHTMLPadding(style: string) {
+function parsePPTFallbackHTMLPadding(style: string, fallbackValue: number) {
   const value = getPPTFallbackHTMLStyleValue(style, 'padding')
   const parts = value
     .split(/\s+/)
@@ -300,10 +424,10 @@ function parsePPTFallbackHTMLPadding(style: string) {
 
   if (parts.length === 0) {
     return {
-      bottom: 18,
-      left: 18,
-      right: 18,
-      top: 18,
+      bottom: fallbackValue,
+      left: fallbackValue,
+      right: fallbackValue,
+      top: fallbackValue,
     }
   }
 
@@ -315,6 +439,10 @@ function parsePPTFallbackHTMLPadding(style: string) {
     right,
     top,
   }
+}
+
+function getPPTFallbackHTMLTextHeight(body: PPTTextBody) {
+  return Math.max(1, body.paragraphs.length) * 38 + 32
 }
 
 function parsePPTFallbackHTMLVerticalAlign(

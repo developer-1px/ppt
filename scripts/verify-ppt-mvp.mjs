@@ -2408,6 +2408,60 @@ async function runCrossSlideClipboardScenario(page) {
     richClipboardWrite,
   })
 
+  await page.eval(`((html, plainText) => {
+    const dataTransfer = new DataTransfer()
+    const fallbackHTML = html.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, '')
+
+    dataTransfer.setData('text/html', fallbackHTML)
+    dataTransfer.setData('text/plain', plainText)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(richClipboardWrite.html)}, ${JSON.stringify(richClipboardWrite.plainText)})`)
+  await delay(120)
+
+  const afterTextFallbackHTMLPaste = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'pastes PPT text fallback HTML without embedded JSON as editable text box',
+    afterTextFallbackHTMLPaste.stageCount === sourceBefore.stageCount + 1 &&
+      afterTextFallbackHTMLPaste.selectedKind === 'textBox' &&
+      afterTextFallbackHTMLPaste.selectedText === afterCopy.selectedText &&
+      afterTextFallbackHTMLPaste.selectedFontSize === '56px' &&
+      afterTextFallbackHTMLPaste.selectedWidth === sourceBefore.selectedWidth &&
+      afterTextFallbackHTMLPaste.selectedHeight === sourceBefore.selectedHeight &&
+      afterTextFallbackHTMLPaste.fallbackHTMLImportModel === 'ppt-fallback-html-import' &&
+      afterTextFallbackHTMLPaste.fallbackHTMLImportFormat === 'text-html-ppt-fallback' &&
+      afterTextFallbackHTMLPaste.fallbackHTMLImportKind === 'textBox' &&
+      afterTextFallbackHTMLPaste.fallbackHTMLImportSourceObject === afterCopy.selectedId,
+    {
+      afterCopy,
+      afterTextFallbackHTMLPaste,
+      sourceBefore,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterTextFallbackUndo = await getPPTCrossSlideClipboardState(page)
+
+  record(
+    'undoes PPT text fallback HTML paste before cross-slide clipboard scenario continues',
+    afterTextFallbackUndo.stageCount === sourceBefore.stageCount,
+    {
+      afterTextFallbackUndo,
+      sourceBefore,
+    },
+  )
+
   await page.eval(`document.querySelectorAll('.ppt-thumb')[1]?.click()`)
   await delay(80)
 
@@ -8081,10 +8135,10 @@ async function runImageImportScenario(page) {
 
   record(
     'inserts PPT image from file picker affordance',
-    afterUpload.importExtension === 'ppt-import-extension' &&
+      afterUpload.importExtension === 'ppt-import-extension' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
-        'image-file fallback-html-shape-source image-source table-source media-source rich-text-source text-source' &&
+        'image-file fallback-html-shape-source fallback-html-text-source image-source table-source media-source rich-text-source text-source' &&
       afterUpload.importExtensionDropActionOrder ===
         'image-file table-file table-source media-source' &&
       afterUpload.imageImportModel === 'canvas-image-import' &&
@@ -14279,6 +14333,7 @@ function getPPTCrossSlideClipboardState(page) {
       clipboardSourceSlide: stage?.getAttribute('data-ppt-clipboard-source-slide') ?? '',
       clipboardType: stage?.getAttribute('data-ppt-clipboard-type') ?? '',
       fallbackHTMLImportFormat: stage?.getAttribute('data-ppt-fallback-html-import-format') ?? '',
+      fallbackHTMLImportKind: stage?.getAttribute('data-ppt-fallback-html-import-kind') ?? '',
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
       fallbackHTMLImportName: stage?.getAttribute('data-ppt-fallback-html-import-name') ?? '',
       fallbackHTMLImportShape: stage?.getAttribute('data-ppt-fallback-html-import-shape') ?? '',
@@ -14317,6 +14372,7 @@ function getPPTCrossSlideClipboardState(page) {
       selectedBorderColor: selected ? getComputedStyle(selected).borderColor : '',
       selectedCornerRadius: selected?.getAttribute('data-ppt-corner-radius') ?? '',
       selectedFill: selected ? getComputedStyle(selected).background : '',
+      selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
       selectedHeight: Number.parseFloat(selected?.style.height ?? '0'),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',

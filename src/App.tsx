@@ -595,6 +595,7 @@ import {
   canHandlePPTStageDropImport,
   createPPTFallbackHTMLImportEffect,
   createPPTFallbackHTMLShapeElement,
+  createPPTFallbackHTMLTextElement,
   createPPTImageImportEffect,
   createPPTImportedImageElement,
   getPPTImageFileFromList,
@@ -621,6 +622,7 @@ import {
   type PPTClipboardImportAction,
   type PPTFallbackHTMLImportEffect,
   type PPTFallbackHTMLShapeSource,
+  type PPTFallbackHTMLTextSource,
   type PPTImageImportEffect,
   type PPTMediaImportResult,
   type PPTMediaImportSource,
@@ -3550,6 +3552,9 @@ function App() {
       case 'fallback-html-shape-source':
         insertPPTFallbackHTMLShapeSource(action.source)
         return true
+      case 'fallback-html-text-source':
+        insertPPTFallbackHTMLTextSource(action.source)
+        return true
       case 'table-source':
         insertPPTTableSource(action.source)
         return true
@@ -3646,6 +3651,38 @@ function App() {
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const element = createPPTFallbackHTMLShapeElement({
+        center,
+        createId: createPPTElementIdFactory(slide),
+        source,
+      })
+
+      setLastFallbackHTMLImportEffect(createPPTFallbackHTMLImportEffect({
+        element,
+        source,
+      }))
+      setSelection([element.id])
+      setEditingId(null)
+      setLineCreationMode(null)
+      setCreationTool(null)
+      setIsPanToolActive(false)
+      setIsLaserToolActive(false)
+      setLaserTrailPoints([])
+      setIsEraserToolActive(false)
+      setContextMenu(null)
+
+      return {
+        ...slide,
+        elements: [...slide.elements, element],
+      }
+    }))
+  }
+
+  function insertPPTFallbackHTMLTextSource(
+    source: PPTFallbackHTMLTextSource,
+    center = getPPTViewportCenter(),
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const element = createPPTFallbackHTMLTextElement({
         center,
         createId: createPPTElementIdFactory(slide),
         source,
@@ -8080,6 +8117,7 @@ function App() {
         data-ppt-import-extension-drop-action-order={PPT_IMPORT_EXTENSION.dropActionOrder.join(' ')}
         data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
         data-ppt-fallback-html-import-format={lastFallbackHTMLImportEffect?.format}
+        data-ppt-fallback-html-import-kind={lastFallbackHTMLImportEffect?.kind}
         data-ppt-fallback-html-import-model={lastFallbackHTMLImportEffect?.model ?? PPT_FALLBACK_HTML_IMPORT_MODEL}
         data-ppt-fallback-html-import-name={lastFallbackHTMLImportEffect?.name}
         data-ppt-fallback-html-import-shape={lastFallbackHTMLImportEffect?.shape}
@@ -10337,11 +10375,19 @@ function createPPTTextElementClipboardFallbackHTML(element: PPTTextElement) {
 
   return [
     `<section data-ppt-selection-object="${escapePPTCanvasXmlAttribute(element.id)}" data-ppt-selection-text-body="true"${createPPTClipboardStyleAttribute([
+      ['align-items', getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))],
+      ['box-sizing', 'border-box'],
       ['color', style.color],
+      ['display', 'flex'],
       ['font-family', getPPTTextFontFamilyCSS(style.fontFamily)],
       ['font-size', `${style.fontSize}px`],
       ['font-weight', getPPTClipboardFontWeightCSS(style.fontWeight)],
+      ['height', `${element.geometry.h}px`],
       ['line-height', String(PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT)],
+      ['min-height', `${element.geometry.h}px`],
+      ['padding', getPPTClipboardTextInsetCSS(getPPTTextElementInset(element))],
+      ['text-align', getPPTElementParagraphAlign(element)],
+      ['width', `${element.geometry.w}px`],
     ])}>`,
     contentHTML,
     '</section>',
