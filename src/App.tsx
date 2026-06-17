@@ -304,6 +304,10 @@ import {
   setCanvasDataTransferText,
 } from 'canvas/app/data-transfer-text'
 import {
+  cancelCanvasDeferredFocus,
+  focusCanvasElementOnNextFrame,
+} from 'canvas/app/deferred-focus'
+import {
   getCanvasFloatingAnchorForBounds,
   type CanvasFloatingAnchor,
 } from 'canvas/app/floating-anchor'
@@ -2377,12 +2381,14 @@ function App() {
       return
     }
 
-    const frame = window.requestAnimationFrame(() => {
-      findInputRef.current?.focus()
-      findInputRef.current?.select()
+    const frame = focusCanvasElementOnNextFrame({
+      resolveElement: () => findInputRef.current,
+      select: true,
     })
 
-    return () => window.cancelAnimationFrame(frame)
+    return () => {
+      cancelCanvasDeferredFocus({ frame })
+    }
   }, [findOpen])
 
   useEffect(() => {
@@ -2777,11 +2783,11 @@ function App() {
   }
 
   function focusPPTSlideThumb(slideId: string) {
-    window.requestAnimationFrame(() => {
-      const thumb = [...document.querySelectorAll<HTMLButtonElement>('.ppt-thumb')]
-        .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
-
-      thumb?.focus({ preventScroll: true })
+    focusCanvasElementOnNextFrame({
+      resolveElement: () =>
+        [...document.querySelectorAll<HTMLButtonElement>('.ppt-thumb')]
+          .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+          ?? null,
     })
   }
 
@@ -10397,14 +10403,14 @@ function PPTShapeKindMenu({
   ) ?? PPT_SHAPE_MENU_OPTIONS[0]
 
   function focusTrigger() {
-    window.requestAnimationFrame(() => {
-      triggerRef.current?.focus({ preventScroll: true })
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => triggerRef.current,
     })
   }
 
   function focusShape(shape: PPTShapeKind) {
-    window.requestAnimationFrame(() => {
-      itemRefs.current.get(shape)?.focus({ preventScroll: true })
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => itemRefs.current.get(shape) ?? null,
     })
   }
 
@@ -10587,8 +10593,8 @@ function PPTAlignmentPopover({
   useEffect(() => () => onPreviewChange(null), [onPreviewChange])
 
   function focusCommand(command: PPTAlignmentPopoverCommand) {
-    window.requestAnimationFrame(() => {
-      itemRefs.current.get(command)?.focus({ preventScroll: true })
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => itemRefs.current.get(command) ?? null,
     })
   }
 
@@ -10609,8 +10615,8 @@ function PPTAlignmentPopover({
   }
 
   function focusTrigger() {
-    window.requestAnimationFrame(() => {
-      triggerRef.current?.focus({ preventScroll: true })
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => triggerRef.current,
     })
   }
 
@@ -10927,11 +10933,11 @@ function PPTParagraphAlignRadioGroup({
     container: HTMLElement | null,
   ) {
     onAlignChange(nextAlign)
-    window.requestAnimationFrame(() => {
-      container
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => container
         ?.querySelector<HTMLButtonElement>(`[data-ppt-paragraph-align="${nextAlign}"]`)
-        ?.focus({ preventScroll: true })
-      })
+        ?? null,
+    })
   }
 
   return (
@@ -12698,10 +12704,9 @@ function Inspector({
   }
 
   function focusLayerPaneRow(objectId: string) {
-    window.requestAnimationFrame(() => {
-      document
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => document
         .querySelector<HTMLElement>(`[data-ppt-layer-pane-row="${objectId}"]`)
-        ?.focus({ preventScroll: true })
     })
   }
 
@@ -12743,13 +12748,11 @@ function Inspector({
   }
 
   function focusLayerPaneRenameInput(objectId: string) {
-    window.requestAnimationFrame(() => {
-      const input = document.querySelector<HTMLInputElement>(
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => document.querySelector<HTMLInputElement>(
         `[data-ppt-layer-pane-rename-input="${objectId}"]`,
-      )
-
-      input?.focus({ preventScroll: true })
-      input?.select()
+      ),
+      select: true,
     })
   }
 
@@ -13009,10 +13012,9 @@ function Inspector({
   }
 
   function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
-    window.requestAnimationFrame(() => {
-      document
+    focusCanvasElementOnNextFrame({
+      resolveElement: () => document
         .querySelector<HTMLButtonElement>(`[data-ppt-inspector-tab="${tabId}"]`)
-        ?.focus({ preventScroll: true })
     })
   }
 

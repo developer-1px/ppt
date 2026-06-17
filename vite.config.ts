@@ -7,6 +7,7 @@ const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canv
 const canvasContextMenuPositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/context-menu/CanvasContextMenuPosition.ts', import.meta.url))
 const canvasDataTransferImportActionsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferImportActionPlan.ts', import.meta.url))
 const canvasDataTransferTextEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasDataTransferText.ts', import.meta.url))
+const canvasDeferredFocusEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/focus/CanvasDeferredFocus.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasFloatingAnchorEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/controls/floating-anchor/CanvasFloatingAnchor.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
@@ -54,6 +55,7 @@ export default defineConfig({
       { find: 'canvas/app/context-menu-position', replacement: canvasContextMenuPositionEntry },
       { find: 'canvas/app/data-transfer-import-actions', replacement: canvasDataTransferImportActionsEntry },
       { find: 'canvas/app/data-transfer-text', replacement: canvasDataTransferTextEntry },
+      { find: 'canvas/app/deferred-focus', replacement: canvasDeferredFocusEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/floating-anchor', replacement: canvasFloatingAnchorEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
