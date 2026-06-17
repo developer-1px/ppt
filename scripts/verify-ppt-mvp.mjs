@@ -5591,6 +5591,67 @@ async function runExportScenario(page) {
   record('exports PPT speaker notes markup and model data', state.hasSpeakerNotesMarkup && state.hasSpeakerNotesModel, state)
   record('exports PPT object rotation style', state.hasRotationStyle, state)
 
+  await page.eval(`(() => {
+    window.__pptClipboardItemTypes = []
+    window.__pptClipboardWriteCount = 0
+    window.__pptClipboardWriteText = ''
+
+    window.ClipboardItem = class PPTClipboardItem {
+      constructor(items) {
+        this.items = items
+        window.__pptClipboardItemTypes.push(Object.keys(items).sort())
+      }
+    }
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        write: async (items) => {
+          window.__pptClipboardWriteCount = items.length
+        },
+        writeText: async (text) => {
+          window.__pptClipboardWriteText = text
+        },
+      },
+    })
+  })()`)
+  await page.eval(`document.querySelector('[aria-label="Copy HTML"]')?.click()`)
+  await delay(80)
+
+  const htmlClipboardState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const mimeType = stage?.getAttribute('data-ppt-html-clipboard-json-mime-type') ?? ''
+    const itemTypes = window.__pptClipboardItemTypes?.at(-1) ?? []
+
+    return {
+      hasCustomJson: itemTypes.includes(mimeType),
+      hasHTML: itemTypes.includes('text/html'),
+      hasPlainText: itemTypes.includes('text/plain'),
+      htmlLength: Number(stage?.getAttribute('data-ppt-html-clipboard-html-length') ?? 0),
+      itemTypes,
+      mimeType,
+      model: stage?.getAttribute('data-ppt-html-clipboard-model') ?? '',
+      sourceSlide: stage?.getAttribute('data-ppt-html-clipboard-source-slide') ?? '',
+      writeCount: window.__pptClipboardWriteCount ?? 0,
+      writeMode: stage?.getAttribute('data-ppt-html-clipboard-write-mode') ?? '',
+      writeTextLength: (window.__pptClipboardWriteText ?? '').length,
+    }
+  })()`)
+
+  record(
+    'copies PPT HTML through canvas rich clipboard writer',
+    htmlClipboardState.model === 'canvas-rich-html-clipboard' &&
+      htmlClipboardState.sourceSlide === 'slide-1' &&
+      htmlClipboardState.writeMode === 'clipboard-item' &&
+      htmlClipboardState.writeCount === 1 &&
+      htmlClipboardState.htmlLength > 1000 &&
+      htmlClipboardState.hasCustomJson &&
+      htmlClipboardState.hasHTML &&
+      htmlClipboardState.hasPlainText &&
+      htmlClipboardState.writeTextLength === 0,
+    htmlClipboardState,
+  )
+
   await page.eval(`document.querySelector('[data-ppt-export-svg]')?.click()`)
   await delay(80)
 

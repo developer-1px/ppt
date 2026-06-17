@@ -543,7 +543,6 @@ import {
   usePPTCanvasMenuRovingFocus,
   usePPTCanvasModalFocusLifecycle,
   usePPTCanvasToolbarRovingFocus,
-  writePPTCanvasClipboardText,
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
   type PPTCanvasFloatingAnchor,
@@ -968,6 +967,11 @@ const PPT_RICH_CLIPBOARD_JSON_MIME_TYPE =
 const PPT_RICH_CLIPBOARD_HTML_ROOT_ATTRIBUTE = 'data-ppt-rich-clipboard'
 const PPT_RICH_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE =
   'data-ppt-rich-clipboard-json'
+const PPT_HTML_CLIPBOARD_MODEL = 'canvas-rich-html-clipboard' as const
+const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
+const PPT_HTML_CLIPBOARD_VERSION = 1
+const PPT_HTML_CLIPBOARD_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.html-export+json'
 const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
@@ -993,6 +997,13 @@ type PPTRichClipboardEffect = {
   model: typeof PPT_RICH_CLIPBOARD_MODEL
   objectCount: number
   selectedObjectIds: readonly string[]
+  sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
+}
+type PPTHTMLClipboardEffect = {
+  htmlLength: number
+  jsonMimeType: typeof PPT_HTML_CLIPBOARD_JSON_MIME_TYPE
+  model: typeof PPT_HTML_CLIPBOARD_MODEL
   sourceSlideId: string
   writeMode?: PPTRichClipboardWriteMode
 }
@@ -1965,6 +1976,7 @@ function App() {
   const [lastClipboardPasteEffect, setLastClipboardPasteEffect] = useState<PPTClipboardPasteHostCommandEffect | null>(null)
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
+  const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
@@ -5506,7 +5518,28 @@ function App() {
   }
 
   function copyHTML() {
-    void writePPTCanvasClipboardText({ text: exportCode })
+    const effect = createPPTHTMLClipboardEffect({
+      html: exportCode,
+      sourceSlideId: activeSlide.id,
+      writeMode: 'pending',
+    })
+
+    setLastHTMLClipboardEffect(effect)
+
+    void writePPTHTMLClipboard({
+      html: exportCode,
+      sourceSlideId: activeSlide.id,
+    }).then((writeMode) => {
+      setLastHTMLClipboardEffect((current) =>
+        current &&
+        current.sourceSlideId === effect.sourceSlideId &&
+        current.htmlLength === effect.htmlLength
+          ? {
+              ...current,
+              writeMode,
+            }
+          : current)
+    })
   }
 
   function downloadHTML() {
@@ -7704,6 +7737,11 @@ function App() {
         data-ppt-clipboard-selection={clipboard?.selectedObjectIds.join(' ') ?? undefined}
         data-ppt-clipboard-source-slide={clipboard?.sourceSlideId ?? undefined}
         data-ppt-clipboard-type={clipboard?.type ?? undefined}
+        data-ppt-html-clipboard-html-length={lastHTMLClipboardEffect?.htmlLength}
+        data-ppt-html-clipboard-json-mime-type={lastHTMLClipboardEffect?.jsonMimeType}
+        data-ppt-html-clipboard-model={lastHTMLClipboardEffect?.model}
+        data-ppt-html-clipboard-source-slide={lastHTMLClipboardEffect?.sourceSlideId}
+        data-ppt-html-clipboard-write-mode={lastHTMLClipboardEffect?.writeMode}
         data-ppt-rich-clipboard-formats={lastRichClipboardEffect?.formats.join(' ')}
         data-ppt-rich-clipboard-import-format={lastRichClipboardEffect?.importFormat}
         data-ppt-rich-clipboard-imported={lastRichClipboardEffect?.imported ? 'true' : undefined}
@@ -9723,6 +9761,24 @@ function createPPTRichClipboardEffect(
   }
 }
 
+function createPPTHTMLClipboardEffect({
+  html,
+  sourceSlideId,
+  writeMode,
+}: {
+  html: string
+  sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
+}): PPTHTMLClipboardEffect {
+  return {
+    htmlLength: html.length,
+    jsonMimeType: PPT_HTML_CLIPBOARD_JSON_MIME_TYPE,
+    model: PPT_HTML_CLIPBOARD_MODEL,
+    sourceSlideId,
+    writeMode,
+  }
+}
+
 function createPPTRichClipboardExportPayload(
   payload: PPTClipboardPayload,
 ): PPTRichClipboardExportPayload {
@@ -9756,6 +9812,30 @@ function createPPTRichClipboardHTML({
     json: stringifyPPTRichClipboardPayload(payload),
     rootAttribute: PPT_RICH_CLIPBOARD_HTML_ROOT_ATTRIBUTE,
     scriptAttribute: PPT_RICH_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE,
+  })
+}
+
+async function writePPTHTMLClipboard({
+  html,
+  sourceSlideId,
+}: {
+  html: string
+  sourceSlideId: string
+}): Promise<PPTRichClipboardWriteMode> {
+  const json = stringifyPPTCanvasRichClipboardPayload({
+    kind: PPT_HTML_CLIPBOARD_KIND,
+    metadata: {
+      htmlLength: html.length,
+      sourceSlideId,
+    },
+    version: PPT_HTML_CLIPBOARD_VERSION,
+  })
+
+  return writePPTCanvasRichClipboardPayload({
+    html,
+    json,
+    jsonMimeType: PPT_HTML_CLIPBOARD_JSON_MIME_TYPE,
+    plainText: html,
   })
 }
 
