@@ -411,8 +411,8 @@ import {
 } from 'canvas/app/tabs-roving-focus'
 import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import {
+  getCanvasInlineEditKeyboardIntent,
   inlineEditHistoryDirectionFromInputType,
-  inlineEditHistoryDirectionFromKeydown,
   insertInlineEditText,
   isInlineEditLineBreakInput,
 } from 'canvas/app/inline-edit-dom'
@@ -11513,32 +11513,41 @@ function PPTElementView({
       return
     }
 
-    const historyDirection = inlineEditHistoryDirectionFromKeydown(event.nativeEvent)
+    const intent = getCanvasInlineEditKeyboardIntent({
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      key: event.key,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+    })
 
-    if (historyDirection) {
-      recordInlineEditEffect({ historyDirection })
-    }
-
-    if (
-      event.key === 'Enter' &&
-      !(event.altKey || event.ctrlKey || event.metaKey)
-    ) {
-      const inputType = 'insertParagraph'
-
+    if (intent.kind === 'history') {
       recordInlineEditEffect({
-        inputType,
-        ...(isInlineEditLineBreakInput(inputType) ? { lineBreak: true } : {}),
+        historyDirection: intent.historyDirection,
       })
+      return
     }
 
-    if (event.key === 'Escape') {
+    if (intent.kind === 'line-break') {
+      recordInlineEditEffect({
+        inputType: intent.inputType,
+        ...(isInlineEditLineBreakInput(intent.inputType) ? { lineBreak: true } : {}),
+      })
+      return
+    }
+
+    if (intent.preventDefault) {
       event.preventDefault()
+    }
+
+    if (intent.kind === 'cancel') {
       event.currentTarget.innerText = text
       event.currentTarget.blur()
       onStopEdit()
+      return
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      event.preventDefault()
+
+    if (intent.kind === 'commit') {
       event.currentTarget.blur()
     }
   }
