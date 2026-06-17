@@ -120,6 +120,7 @@ import {
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
   getSlideEditColorWithAlphaCSS,
+  getSlideEditDeckNavigationKeyboardIntent,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
@@ -2668,15 +2669,21 @@ function App() {
         return
       }
 
-      if (event.key === 'PageUp') {
-        event.preventDefault()
-        activateRelativeSlide(-1)
-        return
-      }
+      const deckNavigationKeyboardIntent = getSlideEditDeckNavigationKeyboardIntent({
+        activeSlideId: activeSlide.id,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        key: event.key,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        slideOrder: slideRailDescriptor.slideOrder,
+      })
 
-      if (event.key === 'PageDown') {
-        event.preventDefault()
-        activateRelativeSlide(1)
+      if (deckNavigationKeyboardIntent) {
+        if (deckNavigationKeyboardIntent.preventDefault) {
+          event.preventDefault()
+        }
+        selectSlide(deckNavigationKeyboardIntent.targetSlideId)
         return
       }
 
@@ -2915,15 +2922,6 @@ function App() {
     setLastSlideRailCommandEffect(effect)
     selectSlide(targetSlideId)
     focusPPTSlideThumb(targetSlideId)
-  }
-
-  function activateRelativeSlide(delta: number) {
-    const index = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
-    const nextSlide = deck.slides[index + delta]
-
-    if (nextSlide) {
-      selectSlide(nextSlide.id)
-    }
   }
 
   function openFindStrip() {
