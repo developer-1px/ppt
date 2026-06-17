@@ -310,6 +310,7 @@ import {
 } from 'canvas/app/data-transfer-text'
 import {
   cancelCanvasDeferredFocus,
+  focusCanvasElement,
   focusCanvasElementBySelectorOnNextFrame,
   focusCanvasElementOnNextFrame,
 } from 'canvas/app/deferred-focus'
@@ -5856,7 +5857,7 @@ function App() {
   }
 
   function focusStageShell() {
-    stageRef.current?.focus({ preventScroll: true })
+    focusCanvasElement({ element: stageRef.current })
   }
 
   function handleElementPointerDown(
@@ -11474,7 +11475,10 @@ function PPTElementView({
       return
     }
 
-    editorRef.current?.focus()
+    focusCanvasElement({
+      element: editorRef.current,
+      preventScroll: false,
+    })
   }, [editing])
 
   useLayoutEffect(() => {
