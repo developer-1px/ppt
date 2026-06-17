@@ -7749,10 +7749,23 @@ async function runImageImportScenario(page) {
 
   const afterUpload = await getPPTImageImportState(page)
 
-  record('inserts PPT image from file picker affordance', afterUpload.importExtension === 'ppt-import-extension' && afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' && afterUpload.imageImportModel === 'canvas-image-import' && afterUpload.imageCount === before.imageCount + 1 && afterUpload.selectedKind === 'image' && afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'), {
-    afterUpload,
-    before,
-  })
+  record(
+    'inserts PPT image from file picker affordance',
+    afterUpload.importExtension === 'ppt-import-extension' &&
+      afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
+      afterUpload.importExtensionClipboardActionOrder ===
+        'image-file image-source table-source media-source rich-text-source text-source' &&
+      afterUpload.importExtensionDropActionOrder ===
+        'image-file table-file table-source media-source' &&
+      afterUpload.imageImportModel === 'canvas-image-import' &&
+      afterUpload.imageCount === before.imageCount + 1 &&
+      afterUpload.selectedKind === 'image' &&
+      afterUpload.selectedImageSrc.startsWith('data:image/svg+xml'),
+    {
+      afterUpload,
+      before,
+    },
+  )
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
@@ -12018,6 +12031,8 @@ function getPPTImageImportState(page) {
       imageCropCommandType: stage?.getAttribute('data-ppt-image-crop-command-type') ?? '',
       imageCropCommandValue: stage?.getAttribute('data-ppt-image-crop-command-value') ?? '',
       importExtension: stage?.getAttribute('data-ppt-import-extension') ?? '',
+      importExtensionClipboardActionOrder: stage?.getAttribute('data-ppt-import-extension-clipboard-action-order') ?? '',
+      importExtensionDropActionOrder: stage?.getAttribute('data-ppt-import-extension-drop-action-order') ?? '',
       importExtensionInstallUnit: stage?.getAttribute('data-ppt-import-extension-install-unit') ?? '',
       imageImportFormat: stage?.getAttribute('data-ppt-image-import-format') ?? '',
       imageImportMime: stage?.getAttribute('data-ppt-image-import-mime') ?? '',

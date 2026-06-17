@@ -7765,6 +7765,8 @@ function App() {
         data-ppt-style-clipboard-targets={styleClipboardPasteAvailability?.targetObjectIds.join(' ')}
         data-ppt-style-clipboard-type={styleClipboard?.type ?? undefined}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
+        data-ppt-import-extension-clipboard-action-order={PPT_IMPORT_EXTENSION.clipboardActionOrder.join(' ')}
+        data-ppt-import-extension-drop-action-order={PPT_IMPORT_EXTENSION.dropActionOrder.join(' ')}
         data-ppt-import-extension-install-unit={PPT_IMPORT_EXTENSION.installUnit}
         data-ppt-media-import-importer={lastMediaImport?.importerId}
         data-ppt-media-import-model="canvas-media-import"
