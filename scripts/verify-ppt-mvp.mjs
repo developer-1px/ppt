@@ -5652,6 +5652,50 @@ async function runExportScenario(page) {
     htmlClipboardState,
   )
 
+  await page.eval(`(() => {
+    window.__pptClipboardItemTypes = []
+    window.__pptClipboardWriteCount = 0
+    window.__pptClipboardWriteText = ''
+  })()`)
+  await page.eval(`document.querySelector('[data-ppt-copy-slide-svg]')?.click()`)
+  await delay(80)
+
+  const slideSvgClipboardState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const mimeType = stage?.getAttribute('data-ppt-slide-svg-clipboard-json-mime-type') ?? ''
+    const itemTypes = window.__pptClipboardItemTypes?.at(-1) ?? []
+
+    return {
+      hasCustomJson: itemTypes.includes(mimeType),
+      hasHTML: itemTypes.includes('text/html'),
+      hasPlainText: itemTypes.includes('text/plain'),
+      hasSVG: itemTypes.includes('image/svg+xml'),
+      itemTypes,
+      mimeType,
+      model: stage?.getAttribute('data-ppt-slide-svg-clipboard-model') ?? '',
+      sourceSlide: stage?.getAttribute('data-ppt-slide-svg-clipboard-source-slide') ?? '',
+      svgLength: Number(stage?.getAttribute('data-ppt-slide-svg-clipboard-svg-length') ?? 0),
+      writeCount: window.__pptClipboardWriteCount ?? 0,
+      writeMode: stage?.getAttribute('data-ppt-slide-svg-clipboard-write-mode') ?? '',
+      writeTextLength: (window.__pptClipboardWriteText ?? '').length,
+    }
+  })()`)
+
+  record(
+    'copies active PPT slide as SVG through canvas rich clipboard writer',
+    slideSvgClipboardState.model === 'canvas-rich-slide-svg-clipboard' &&
+      slideSvgClipboardState.sourceSlide === 'slide-1' &&
+      slideSvgClipboardState.writeMode === 'clipboard-item' &&
+      slideSvgClipboardState.writeCount === 1 &&
+      slideSvgClipboardState.svgLength > 1000 &&
+      slideSvgClipboardState.hasCustomJson &&
+      slideSvgClipboardState.hasHTML &&
+      slideSvgClipboardState.hasPlainText &&
+      slideSvgClipboardState.hasSVG &&
+      slideSvgClipboardState.writeTextLength === 0,
+    slideSvgClipboardState,
+  )
+
   await page.eval(`document.querySelector('[data-ppt-export-svg]')?.click()`)
   await delay(80)
 

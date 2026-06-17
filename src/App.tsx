@@ -972,6 +972,11 @@ const PPT_HTML_CLIPBOARD_KIND = 'interactive-os.ppt.html-export' as const
 const PPT_HTML_CLIPBOARD_VERSION = 1
 const PPT_HTML_CLIPBOARD_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.html-export+json'
+const PPT_SLIDE_SVG_CLIPBOARD_MODEL = 'canvas-rich-slide-svg-clipboard' as const
+const PPT_SLIDE_SVG_CLIPBOARD_KIND = 'interactive-os.ppt.slide-svg-export' as const
+const PPT_SLIDE_SVG_CLIPBOARD_VERSION = 1
+const PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.slide-svg-export+json'
 const PPT_SELECTION_SVG_CLIPBOARD_MODEL = 'canvas-rich-selection-svg-clipboard' as const
 const PPT_SELECTION_SVG_CLIPBOARD_KIND =
   'interactive-os.ppt.selection-svg-export' as const
@@ -1011,6 +1016,13 @@ type PPTHTMLClipboardEffect = {
   jsonMimeType: typeof PPT_HTML_CLIPBOARD_JSON_MIME_TYPE
   model: typeof PPT_HTML_CLIPBOARD_MODEL
   sourceSlideId: string
+  writeMode?: PPTRichClipboardWriteMode
+}
+type PPTSlideSVGClipboardEffect = {
+  jsonMimeType: typeof PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE
+  model: typeof PPT_SLIDE_SVG_CLIPBOARD_MODEL
+  sourceSlideId: string
+  svgLength: number
   writeMode?: PPTRichClipboardWriteMode
 }
 type PPTSelectionSVGClipboardEffect = {
@@ -1991,6 +2003,8 @@ function App() {
   const [lastClipboardPastePositionEffect, setLastClipboardPastePositionEffect] = useState<PPTClipboardPastePositionEffect | null>(null)
   const [lastRichClipboardEffect, setLastRichClipboardEffect] = useState<PPTRichClipboardEffect | null>(null)
   const [lastHTMLClipboardEffect, setLastHTMLClipboardEffect] = useState<PPTHTMLClipboardEffect | null>(null)
+  const [lastSlideSVGClipboardEffect, setLastSlideSVGClipboardEffect] =
+    useState<PPTSlideSVGClipboardEffect | null>(null)
   const [lastSelectionSVGClipboardEffect, setLastSelectionSVGClipboardEffect] =
     useState<PPTSelectionSVGClipboardEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
@@ -5574,6 +5588,31 @@ function App() {
     })
   }
 
+  function copySlideSVG() {
+    const effect = createPPTSlideSVGClipboardEffect({
+      sourceSlideId: activeSlide.id,
+      svg: slideSvgCode,
+      writeMode: 'pending',
+    })
+
+    setLastSlideSVGClipboardEffect(effect)
+
+    void writePPTSlideSVGClipboard({
+      sourceSlideId: activeSlide.id,
+      svg: slideSvgCode,
+    }).then((writeMode) => {
+      setLastSlideSVGClipboardEffect((current) =>
+        current &&
+        current.sourceSlideId === effect.sourceSlideId &&
+        current.svgLength === effect.svgLength
+          ? {
+              ...current,
+              writeMode,
+            }
+          : current)
+    })
+  }
+
   function copySelectionSVG() {
     if (!selectionSvgCode) {
       return
@@ -7198,6 +7237,11 @@ function App() {
     section: 'Slides',
     title: `Apply ${layout.name}`,
   })), {
+    id: 'export:copy-slide-svg',
+    onSelect: copySlideSVG,
+    section: 'Export',
+    title: 'Copy slide SVG',
+  }, {
     disabled: !canExportSelectionSVG,
     id: 'export:copy-selection-svg',
     onSelect: copySelectionSVG,
@@ -7681,6 +7725,9 @@ function App() {
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
             <Download size={16} /> HTML
           </button>
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy slide SVG" className="ppt-button" data-ppt-copy-slide-svg onClick={copySlideSVG} type="button">
+            <Copy size={16} /> SVG
+          </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
             <Download size={16} /> SVG
           </button>
@@ -7799,6 +7846,11 @@ function App() {
         data-ppt-html-clipboard-model={lastHTMLClipboardEffect?.model}
         data-ppt-html-clipboard-source-slide={lastHTMLClipboardEffect?.sourceSlideId}
         data-ppt-html-clipboard-write-mode={lastHTMLClipboardEffect?.writeMode}
+        data-ppt-slide-svg-clipboard-json-mime-type={lastSlideSVGClipboardEffect?.jsonMimeType}
+        data-ppt-slide-svg-clipboard-model={lastSlideSVGClipboardEffect?.model}
+        data-ppt-slide-svg-clipboard-source-slide={lastSlideSVGClipboardEffect?.sourceSlideId}
+        data-ppt-slide-svg-clipboard-svg-length={lastSlideSVGClipboardEffect?.svgLength}
+        data-ppt-slide-svg-clipboard-write-mode={lastSlideSVGClipboardEffect?.writeMode}
         data-ppt-selection-svg-clipboard-json-mime-type={lastSelectionSVGClipboardEffect?.jsonMimeType}
         data-ppt-selection-svg-clipboard-model={lastSelectionSVGClipboardEffect?.model}
         data-ppt-selection-svg-clipboard-selection={lastSelectionSVGClipboardEffect?.selectedObjectIds.join(' ')}
@@ -9842,6 +9894,24 @@ function createPPTHTMLClipboardEffect({
   }
 }
 
+function createPPTSlideSVGClipboardEffect({
+  sourceSlideId,
+  svg,
+  writeMode,
+}: {
+  sourceSlideId: string
+  svg: string
+  writeMode?: PPTRichClipboardWriteMode
+}): PPTSlideSVGClipboardEffect {
+  return {
+    jsonMimeType: PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE,
+    model: PPT_SLIDE_SVG_CLIPBOARD_MODEL,
+    sourceSlideId,
+    svgLength: svg.length,
+    writeMode,
+  }
+}
+
 function createPPTSelectionSVGClipboardEffect({
   selectedObjectIds,
   sourceSlideId,
@@ -9920,6 +9990,31 @@ async function writePPTHTMLClipboard({
     json,
     jsonMimeType: PPT_HTML_CLIPBOARD_JSON_MIME_TYPE,
     plainText: html,
+  })
+}
+
+async function writePPTSlideSVGClipboard({
+  sourceSlideId,
+  svg,
+}: {
+  sourceSlideId: string
+  svg: string
+}): Promise<PPTRichClipboardWriteMode> {
+  const json = stringifyPPTCanvasRichClipboardPayload({
+    kind: PPT_SLIDE_SVG_CLIPBOARD_KIND,
+    metadata: {
+      sourceSlideId,
+      svgLength: svg.length,
+    },
+    version: PPT_SLIDE_SVG_CLIPBOARD_VERSION,
+  })
+
+  return writePPTCanvasRichClipboardPayload({
+    html: svg,
+    json,
+    jsonMimeType: PPT_SLIDE_SVG_CLIPBOARD_JSON_MIME_TYPE,
+    plainText: svg,
+    selectionSvg: svg,
   })
 }
 
