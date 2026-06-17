@@ -5593,6 +5593,10 @@ function App() {
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
     if (canHandlePPTStageDropImport(event.dataTransfer)) {
       event.preventDefault()
+      setCanvasDataTransferDropEffect({
+        dataTransfer: event.dataTransfer,
+        dropEffect: 'copy',
+      })
     }
   }
 
