@@ -1,12 +1,11 @@
 import {
-  createCanvasDataTransferImportActionPlan,
-} from 'canvas/app'
-import { CANVAS_IMAGE_IMPORT_MODEL } from 'canvas/app/image-import'
-import { CANVAS_TABLE_IMPORT_MODEL } from 'canvas/app/table-import'
+  createPPTCanvasDataTransferImportActionPlan,
+} from '../pptCanvasAppAffordanceAdapter'
 import {
   getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
   getPPTSVGImageSourceFromDataTransfer,
+  PPT_IMAGE_IMPORT_MODEL,
   type PPTImageImportFormat,
   type PPTImageImportSource,
 } from './imageImport'
@@ -18,6 +17,7 @@ import {
   getPPTTableColumnCount,
   getPPTTableFileFromDataTransfer,
   getPPTTableSourceFromDataTransfer,
+  PPT_TABLE_IMPORT_MODEL,
   type PPTTableImportFormat,
   type PPTTableImportSource,
 } from './tableImport'
@@ -30,9 +30,6 @@ import type {
   PPTImage,
   PPTTable,
 } from '../pptModel'
-
-export const PPT_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL
-export const PPT_TABLE_IMPORT_MODEL = CANVAS_TABLE_IMPORT_MODEL
 
 export const PPT_IMPORT_EXTENSION = {
   canvasFallbackIssues: [],
@@ -121,7 +118,7 @@ export type PPTStageDropImportAction =
 export function getPPTClipboardImportActions(
   dataTransfer: DataTransfer | null,
 ): PPTClipboardImportAction[] {
-  return createCanvasDataTransferImportActionPlan<PPTClipboardImportAction>({
+  return createPPTCanvasDataTransferImportActionPlan<PPTClipboardImportAction>({
     resolvers: [
       {
         mode: 'exclusive',
@@ -186,7 +183,7 @@ export function getPPTStageDropImportAction(
   dataTransfer: DataTransfer | null,
 ): PPTStageDropImportAction | null {
   const [action = null] =
-    createCanvasDataTransferImportActionPlan<PPTStageDropImportAction>({
+    createPPTCanvasDataTransferImportActionPlan<PPTStageDropImportAction>({
       resolvers: [
         {
           mode: 'exclusive',

@@ -31,6 +31,7 @@ import {
   cancelCanvasDeferredFocus,
   captureCanvasPointerFromEvent,
   centerCanvasViewportAtWorldPoint,
+  createCanvasDataTransferImportActionPlan,
   createCanvasPastePositionKey,
   createCanvasRichClipboardHTML,
   createCanvasTabsDescriptor,
@@ -47,6 +48,7 @@ import {
   getCanvasEditableFieldKeyboardIntent,
   getCanvasFindInputKeyboardIntent,
   getCanvasFloatingAnchorForBounds,
+  getCanvasImportedImageSize,
   getCanvasInlineEditKeyboardIntent,
   getCanvasKeyboardBuiltinCommandShortcutIntent,
   getCanvasKeyboardNudgeShortcutIntent,
@@ -208,6 +210,8 @@ export const capturePPTCanvasPointerFromEvent =
   captureCanvasPointerFromEvent
 export const centerPPTCanvasViewportAtWorldPoint =
   centerCanvasViewportAtWorldPoint
+export const createPPTCanvasDataTransferImportActionPlan =
+  createCanvasDataTransferImportActionPlan
 export const createPPTCanvasPastePositionKey =
   createCanvasPastePositionKey
 export const createPPTCanvasRichClipboardHTML =
@@ -235,6 +239,8 @@ export const getPPTCanvasFindInputKeyboardIntent =
   getCanvasFindInputKeyboardIntent
 export const getPPTCanvasFloatingAnchorForBounds =
   getCanvasFloatingAnchorForBounds
+export const getPPTCanvasImportedImageSize =
+  getCanvasImportedImageSize
 export const getPPTCanvasInlineEditKeyboardIntent =
   getCanvasInlineEditKeyboardIntent
 export const getPPTCanvasKeyboardBuiltinCommandShortcutIntent =

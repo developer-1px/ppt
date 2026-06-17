@@ -1,5 +1,6 @@
 import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
+  CANVAS_TABLE_IMPORT_MODEL,
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
   getCanvasTableColumnCount,
@@ -29,6 +30,7 @@ export type PPTTableImportSource = {
   name?: string
   rows: readonly (readonly string[])[]
 }
+export const PPT_TABLE_IMPORT_MODEL = CANVAS_TABLE_IMPORT_MODEL
 
 export const PPT_DEFAULT_TABLE_ROWS = [
   ['Metric', 'Current', 'Target'],

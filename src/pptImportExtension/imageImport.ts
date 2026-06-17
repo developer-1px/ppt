@@ -3,9 +3,10 @@ import {
   type Point,
 } from '../pptCanvasCoreAdapter'
 import {
-  getCanvasImportedImageSize,
-} from 'canvas/app'
+  getPPTCanvasImportedImageSize,
+} from '../pptCanvasAppAffordanceAdapter'
 import {
+  CANVAS_IMAGE_IMPORT_MODEL,
   getCanvasDataImageSourceFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
@@ -23,6 +24,7 @@ import {
 
 export type PPTImageImportFormat = CanvasImageImportFormat
 export type PPTImageImportSource = CanvasImageImportSource
+export const PPT_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL
 
 export function createPPTImportedImageElement({
   center,
@@ -33,7 +35,7 @@ export function createPPTImportedImageElement({
   createId: (prefix: string) => string
   source: PPTImageImportSource
 }): PPTImage {
-  const size = getCanvasImportedImageSize(source)
+  const size = getPPTCanvasImportedImageSize(source)
   const name = source.name?.trim() || 'Image'
   const geometry = clampPPTCanvasBoundsToFrame({
     bounds: {
