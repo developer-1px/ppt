@@ -5748,6 +5748,7 @@ async function runAlignmentPopoverScenario(page) {
 
     return {
       active: popover?.getAttribute('data-ppt-alignment-popover-active') ?? '',
+      canvasMenuItemCount: items.filter((item) => item.hasAttribute('data-canvas-menu-item')).length,
       expanded: trigger?.getAttribute('aria-expanded') ?? '',
       itemCommands: items.map((item) => item.getAttribute('data-ppt-alignment-popover-command') ?? ''),
       itemCount: items.length,
@@ -5758,7 +5759,7 @@ async function runAlignmentPopoverScenario(page) {
     }
   })()`)
 
-  record('opens PPT selection alignment popover from floating bar', alignmentPopoverOpen.selectedId !== '' && alignmentPopoverOpen.expanded === 'true' && alignmentPopoverOpen.role === 'menu' && alignmentPopoverOpen.model === 'canvas-dom-alignment-popover' && alignmentPopoverOpen.triggerHasPopup === 'menu' && alignmentPopoverOpen.itemCount === 8 && alignmentPopoverOpen.itemCommands.includes('align-center-x') && alignmentPopoverOpen.itemCommands.includes('distribute-horizontal'), alignmentPopoverOpen)
+  record('opens PPT selection alignment popover from floating bar', alignmentPopoverOpen.selectedId !== '' && alignmentPopoverOpen.expanded === 'true' && alignmentPopoverOpen.role === 'menu' && alignmentPopoverOpen.model === 'canvas-dom-alignment-popover' && alignmentPopoverOpen.triggerHasPopup === 'menu' && alignmentPopoverOpen.itemCount === 8 && alignmentPopoverOpen.canvasMenuItemCount === alignmentPopoverOpen.itemCount && alignmentPopoverOpen.itemCommands.includes('align-center-x') && alignmentPopoverOpen.itemCommands.includes('distribute-horizontal'), alignmentPopoverOpen)
 
   await page.eval(`document.querySelector('[data-ppt-alignment-popover-command="align-center-x"]')?.focus()`)
   await delay(40)
@@ -5885,6 +5886,7 @@ async function runShapeMenuScenario(page) {
       checked: items.map((item) => item.getAttribute('aria-checked') ?? ''),
       checkedShape: items.find((item) => item.getAttribute('aria-checked') === 'true')?.getAttribute('data-ppt-shape-menu-item') ?? '',
       controls: trigger?.getAttribute('aria-controls') ?? '',
+      canvasMenuItemCount: items.filter((item) => item.hasAttribute('data-canvas-menu-item')).length,
       expanded: trigger?.getAttribute('aria-expanded') ?? '',
       hasPopup: trigger?.getAttribute('aria-haspopup') ?? '',
       itemCount: items.length,
@@ -5896,7 +5898,7 @@ async function runShapeMenuScenario(page) {
     }
   })()`)
 
-  record('opens PPT Shape menu from selection floating bar', point.id !== '' && shapeMenuOpen.selectedId === point.id && shapeMenuOpen.expanded === 'true' && shapeMenuOpen.hasPopup === 'menu' && shapeMenuOpen.role === 'menu' && shapeMenuOpen.model === 'canvas-selection-toolbar-dropdown-menu' && shapeMenuOpen.controls === 'ppt-shape-kind-menu' && shapeMenuOpen.itemCount === 3 && shapeMenuOpen.itemRoles.every((role) => role === 'menuitemcheckbox') && shapeMenuOpen.itemShapes.join(' ') === 'rect ellipse diamond' && shapeMenuOpen.checkedShape === point.shape, {
+  record('opens PPT Shape menu from selection floating bar', point.id !== '' && shapeMenuOpen.selectedId === point.id && shapeMenuOpen.expanded === 'true' && shapeMenuOpen.hasPopup === 'menu' && shapeMenuOpen.role === 'menu' && shapeMenuOpen.model === 'canvas-selection-toolbar-dropdown-menu' && shapeMenuOpen.controls === 'ppt-shape-kind-menu' && shapeMenuOpen.itemCount === 3 && shapeMenuOpen.canvasMenuItemCount === shapeMenuOpen.itemCount && shapeMenuOpen.itemRoles.every((role) => role === 'menuitemcheckbox') && shapeMenuOpen.itemShapes.join(' ') === 'rect ellipse diamond' && shapeMenuOpen.checkedShape === point.shape, {
     point,
     shapeMenuOpen,
   })

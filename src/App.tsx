@@ -10596,6 +10596,7 @@ function PPTShapeKindMenu({
         >
           {PPT_SHAPE_MENU_OPTIONS.map((option) => (
             <button
+              {...CANVAS_MENU_ITEM_PROPS}
               aria-checked={state.shape === option.shape}
               className="ppt-floating-menu-item"
               data-ppt-shape-menu-item={option.shape}
@@ -10793,6 +10794,7 @@ function PPTAlignmentPopover({
         >
           {commands.map((command) => (
             <button
+              {...CANVAS_MENU_ITEM_PROPS}
               aria-disabled={command.disabled}
               className="ppt-alignment-popover-item"
               data-ppt-alignment-popover-command={command.dataCommand}
