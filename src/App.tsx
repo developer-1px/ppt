@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronUp,
   Circle,
+  ClipboardPaste,
   Command,
   Copy,
   CopyPlus,
@@ -604,6 +605,7 @@ import {
   getPPTTextPasteSourcesFromDataTransfer,
   normalizePPTTableRows,
   PPT_IMAGE_IMPORT_MODEL,
+  readPPTClipboardImageSource,
   readPPTImageFileSource,
   readPPTTableFileSource,
   resolvePPTImageSourceNaturalSize,
@@ -3585,6 +3587,17 @@ function App() {
     }
 
     insertPPTImageSource(source, center)
+    return true
+  }
+
+  async function pastePPTClipboardImage() {
+    const source = await readPPTClipboardImageSource()
+
+    if (!source) {
+      return false
+    }
+
+    insertPPTImageSource(source)
     return true
   }
 
@@ -7198,6 +7211,13 @@ function App() {
     section: 'Create',
     title: 'Add image',
   }, {
+    id: 'tool:paste-image',
+    onSelect: () => {
+      void pastePPTClipboardImage()
+    },
+    section: 'Create',
+    title: 'Paste image',
+  }, {
     id: 'tool:table',
     onSelect: () => insertPPTTableSource(),
     section: 'Create',
@@ -7599,6 +7619,18 @@ function App() {
           </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
             <ImagePlus size={17} />
+          </button>
+          <button
+            {...PPT_TOOLBAR_ITEM_PROPS}
+            className="ppt-icon-button"
+            data-ppt-paste-image
+            onClick={() => {
+              void pastePPTClipboardImage()
+            }}
+            title="Paste image"
+            type="button"
+          >
+            <ClipboardPaste size={17} />
           </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
             <Table2 size={17} />

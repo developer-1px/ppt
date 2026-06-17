@@ -8000,6 +8000,42 @@ async function runImageImportScenario(page) {
   })
 
   await page.eval(`(() => {
+    const svg = '<svg width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg"><rect width="140" height="70" fill="#0891b2"/></svg>'
+    window.__pptClipboardImageReadCount = 0
+    window.__pptClipboardImageReadTypes = []
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        read: async () => {
+          window.__pptClipboardImageReadCount += 1
+          window.__pptClipboardImageReadTypes = ['image/svg+xml']
+
+          return [{
+            types: ['image/svg+xml'],
+            getType: async (type) => new Blob([svg], { type }),
+          }]
+        },
+      },
+    })
+
+    document.querySelector('[data-ppt-paste-image]')?.click()
+  })()`)
+  await delay(220)
+
+  const afterClipboardImagePaste = await getPPTImageImportState(page)
+  const clipboardImageReadState = await page.eval(`(() => ({
+    readCount: window.__pptClipboardImageReadCount ?? 0,
+    readTypes: window.__pptClipboardImageReadTypes ?? [],
+  }))()`)
+
+  record('pastes image from navigator clipboard through canvas image reader', afterClipboardImagePaste.imageImportModel === 'canvas-image-import' && afterClipboardImagePaste.imageImportFormat === 'file' && afterClipboardImagePaste.imageImportMime === 'image/svg+xml' && afterClipboardImagePaste.imageImportNaturalWidth === 140 && afterClipboardImagePaste.imageImportNaturalHeight === 70 && afterClipboardImagePaste.imageCount === afterDataImagePaste.imageCount + 1 && afterClipboardImagePaste.selectedKind === 'image' && afterClipboardImagePaste.selectedName === 'Image' && afterClipboardImagePaste.selectedImageSrc.startsWith('data:image/svg+xml') && clipboardImageReadState.readCount === 1 && clipboardImageReadState.readTypes.includes('image/svg+xml'), {
+    afterClipboardImagePaste,
+    afterDataImagePaste,
+    clipboardImageReadState,
+  })
+
+  await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
     const rect = stage.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
@@ -8016,9 +8052,9 @@ async function runImageImportScenario(page) {
 
   const afterDrop = await getPPTImageImportState(page)
 
-  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageImportFormat === 'file' && afterDrop.imageCount === afterDataImagePaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
+  record('drops image file onto PPT stage at pointer position', afterDrop.imageImportModel === 'canvas-image-import' && afterDrop.imageImportFormat === 'file' && afterDrop.imageCount === afterClipboardImagePaste.imageCount + 1 && afterDrop.selectedKind === 'image' && afterDrop.selectedName === 'drop.svg' && afterDrop.selectedLeft > 0 && afterDrop.selectedTop >= 0, {
     afterDrop,
-    afterDataImagePaste,
+    afterClipboardImagePaste,
   })
 
   await page.eval(`(() => {

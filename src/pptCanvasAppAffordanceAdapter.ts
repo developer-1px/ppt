@@ -110,6 +110,9 @@ import {
   type CanvasCommandPaletteItem,
 } from 'canvas/app/command-palette-items'
 import {
+  readCanvasClipboardImageSource,
+} from 'canvas/app/image-clipboard'
+import {
   CANVAS_IMAGE_IMPORT_MODEL,
   getCanvasDataImageSourceFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
@@ -392,6 +395,8 @@ export const filterPPTCommandPaletteItems =
 export const createPPTCanvasTextPasteItems = createCanvasTextPasteItems
 export const getPPTCanvasDataImageSourceFromDataTransfer =
   getCanvasDataImageSourceFromDataTransfer
+export const readPPTCanvasClipboardImageSource =
+  readCanvasClipboardImageSource
 export const getPPTCanvasImageFileFromDataTransfer =
   getCanvasImageFileFromDataTransfer
 export const getPPTCanvasImageFileFromList = getCanvasImageFileFromList

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
 const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
+const canvasImageClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageClipboard.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
 const canvasInlineEditDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts', import.meta.url))
 const canvasKeyboardSystemShortcutsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardSystemShortcuts.ts', import.meta.url))
@@ -35,6 +36,7 @@ export default defineConfig({
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
       { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
+      { find: 'canvas/app/image-clipboard', replacement: canvasImageClipboardEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
       { find: 'canvas/app/inline-edit-dom', replacement: canvasInlineEditDomEntry },
       { find: 'canvas/app/keyboard-system-shortcuts', replacement: canvasKeyboardSystemShortcutsEntry },
