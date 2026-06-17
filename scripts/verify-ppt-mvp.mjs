@@ -2136,7 +2136,7 @@ async function runCommandSurfaceScenario(page) {
   record(
     'opens PPT context menu with APG menu focus contract',
     afterContextOpen.menuRole === 'menu' &&
-      afterContextOpen.keyboard === 'arrow-home-end-enter-escape' &&
+      afterContextOpen.keyboard === 'arrow-left-right-up-down-home-end-enter-space-escape' &&
       afterContextOpen.focusModel === 'enabled-menuitem-roving' &&
       afterContextOpen.model === 'canvas-menu-roving-focus' &&
       afterContextOpen.canvasMenuItemCount === afterContextOpen.commandItemCount &&

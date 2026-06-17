@@ -369,7 +369,10 @@ import {
   getCanvasKeyboardViewportShortcutIntent,
 } from 'canvas/app/keyboard-viewport-shortcuts'
 import {
+  CANVAS_MENU_FOCUS_MODEL,
   CANVAS_MENU_ITEM_PROPS,
+  CANVAS_MENU_KEYBOARD_KEYS,
+  CANVAS_MENU_ROVING_FOCUS_MODEL,
   getCanvasMenuTriggerKeyboardIntent,
   useCanvasMenuRovingFocus,
 } from 'canvas/app/menu-roving-focus'
@@ -11121,9 +11124,9 @@ function PPTContextCommandMenu({
       aria-label="Selection commands"
       className="ppt-context-menu"
       data-ppt-context-menu
-      data-ppt-context-menu-focus-model="enabled-menuitem-roving"
-      data-ppt-context-menu-keyboard="arrow-home-end-enter-escape"
-      data-ppt-context-menu-model="canvas-menu-roving-focus"
+      data-ppt-context-menu-focus-model={CANVAS_MENU_FOCUS_MODEL}
+      data-ppt-context-menu-keyboard={CANVAS_MENU_KEYBOARD_KEYS}
+      data-ppt-context-menu-model={CANVAS_MENU_ROVING_FOCUS_MODEL}
       ref={setMenuRoot}
       role="menu"
       style={{
