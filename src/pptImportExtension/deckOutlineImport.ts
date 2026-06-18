@@ -5,6 +5,13 @@ import {
   type PPTSlide,
   type PPTTextBody,
 } from '../pptModel'
+import {
+  getSlideEditMarkdownDeckSource,
+  getSlideEditMarkdownDeckSourceFromDataTransfer,
+  type SlideEditMarkdownDeckSource,
+  type SlideEditMarkdownSlideBlock,
+  type SlideEditMarkdownSlideSource,
+} from '../pptSlideEditAffordanceAdapter'
 
 export const PPT_DECK_MARKDOWN_OUTLINE_IMPORT_MODEL =
   'ppt-deck-markdown-outline-import'
@@ -42,6 +49,16 @@ export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource = getSlideEditMarkdownDeckSourceFromDataTransfer({
+    dataTransfer,
+  })
+
+  if (slideEditSource) {
+    return createPPTDeckMarkdownOutlineSourceFromSlideEditSource(
+      slideEditSource,
+    )
+  }
+
   return getPPTDeckMarkdownOutlineSourceFromText(
     dataTransfer.getData('text/markdown') ||
       dataTransfer.getData('text/plain'),
@@ -55,6 +72,17 @@ export function getPPTDeckMarkdownOutlineSourceFromText(
 
   if (!normalized) {
     return null
+  }
+
+  const slideEditSource = getSlideEditMarkdownDeckSource({
+    markdown: text,
+    sourceType: 'text/plain',
+  })
+
+  if (slideEditSource) {
+    return createPPTDeckMarkdownOutlineSourceFromSlideEditSource(
+      slideEditSource,
+    )
   }
 
   const parsed =
@@ -144,6 +172,98 @@ export function createPPTDeckMarkdownOutlineSlides({
       themeId: PPT_DEFAULT_THEME_ID,
     }
   })
+}
+
+function createPPTDeckMarkdownOutlineSourceFromSlideEditSource(
+  source: SlideEditMarkdownDeckSource,
+): PPTDeckMarkdownOutlineSource | null {
+  const slides = source.slides
+    .map(createPPTDeckMarkdownOutlineSlideSourceFromSlideEditSource)
+    .filter((slide): slide is PPTDeckMarkdownOutlineSlideSource =>
+      slide !== null)
+
+  return slides.length >= 2
+    ? {
+        format: PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT,
+        slideCount: slides.length,
+        slides,
+        textLength: source.payloadLength,
+        title: source.deckTitle ?? 'Markdown Outline',
+      }
+    : null
+}
+
+function createPPTDeckMarkdownOutlineSlideSourceFromSlideEditSource(
+  source: SlideEditMarkdownSlideSource,
+): PPTDeckMarkdownOutlineSlideSource | null {
+  const paragraphs = createPPTMarkdownOutlineParagraphsFromSlideEditBlocks(
+    source.body,
+  )
+  const notes = readPPTMarkdownOutlineTextFromSlideEditBlocks(source.notes)
+  const title = normalizePPTMarkdownOutlineText(source.title)
+    .slice(0, PPT_MARKDOWN_OUTLINE_TITLE_MAX_LENGTH)
+    .trim()
+
+  if (!title) {
+    return null
+  }
+
+  return {
+    body: {
+      paragraphs: paragraphs.slice(0, PPT_MARKDOWN_OUTLINE_BODY_MAX_PARAGRAPHS),
+    },
+    ...(notes ? { notes } : {}),
+    title,
+  }
+}
+
+function createPPTMarkdownOutlineParagraphsFromSlideEditBlocks(
+  blocks: readonly SlideEditMarkdownSlideBlock[],
+): PPTParagraph[] {
+  return blocks.flatMap((block) => {
+    if (block.kind === 'paragraph') {
+      return block.markdown
+        .split('\n')
+        .flatMap((line) => {
+          const paragraph = createPPTMarkdownOutlineParagraph(line)
+
+          return paragraph ? [paragraph] : []
+        })
+    }
+
+    return block.items.flatMap((item) => {
+      const text = normalizePPTMarkdownOutlineText(item.text)
+        .slice(0, PPT_MARKDOWN_OUTLINE_BODY_MAX_LENGTH)
+        .trim()
+
+      return text
+        ? [{
+            bullet: block.kind === 'ordered-list'
+              ? 'numbered' as const
+              : 'bullet' as const,
+            lineHeight: 1.2,
+            runs: [{ text }],
+            spacingAfter: 10,
+          }]
+        : []
+    })
+  })
+}
+
+function readPPTMarkdownOutlineTextFromSlideEditBlocks(
+  blocks: readonly SlideEditMarkdownSlideBlock[],
+) {
+  const lines = blocks.flatMap((block) => {
+    if (block.kind === 'paragraph') {
+      return [block.text]
+    }
+
+    return block.items.map((item) => item.text)
+  })
+    .map(normalizePPTMarkdownOutlineText)
+    .filter(Boolean)
+
+  return lines.join('\n')
 }
 
 function getPPTDeckMarkdownOutlineFromHeadings(text: string) {
