@@ -11505,6 +11505,72 @@ async function runObjectOpacityScenario(page) {
   })
   await delay(80)
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ opacity: 0.64 })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneOpacityJSONPaste = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'pastes standalone JSON object opacity through slide-edit command effect',
+    afterStandaloneOpacityJSONPaste.opacityImportModel === 'ppt-object-opacity-import' &&
+      afterStandaloneOpacityJSONPaste.opacityImportFormat === 'application-json-ppt-object-opacity' &&
+      afterStandaloneOpacityJSONPaste.opacityImportSlide === 'slide-1' &&
+      afterStandaloneOpacityJSONPaste.opacityImportObjects === targetId &&
+      afterStandaloneOpacityJSONPaste.opacityImportFields === 'opacity' &&
+      afterStandaloneOpacityJSONPaste.opacityImportCommands === 'update-object-opacity' &&
+      afterStandaloneOpacityJSONPaste.opacityImportCommandFields === 'opacity' &&
+      afterStandaloneOpacityJSONPaste.opacityImportCommandTargets === targetId &&
+      afterStandaloneOpacityJSONPaste.opacityImportCommandTypes === 'slide-command-effect' &&
+      afterStandaloneOpacityJSONPaste.opacityImportCommandValues === '0.64' &&
+      afterStandaloneOpacityJSONPaste.opacityImportValue === '0.64' &&
+      afterStandaloneOpacityJSONPaste.opacityImportJsonLength > 10 &&
+      afterStandaloneOpacityJSONPaste.command === 'update-object-opacity' &&
+      afterStandaloneOpacityJSONPaste.commandField === 'opacity' &&
+      afterStandaloneOpacityJSONPaste.commandValue === '0.64' &&
+      afterStandaloneOpacityJSONPaste.opacity === '0.64' &&
+      afterStandaloneOpacityJSONPaste.selectedOpacity === '0.64' &&
+      afterStandaloneOpacityJSONPaste.selectedStyleOpacity === '0.64' &&
+      afterStandaloneOpacityJSONPaste.thumbOpacity === '0.64' &&
+      afterStandaloneOpacityJSONPaste.thumbStyleOpacity === '0.64',
+    {
+      afterOpacityJSONRedo,
+      afterStandaloneOpacityJSONPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneOpacityJSONUndo = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'undoes standalone JSON object opacity as one history step',
+    afterStandaloneOpacityJSONUndo.opacity === '0.42' &&
+      afterStandaloneOpacityJSONUndo.selectedOpacity === '0.42' &&
+      afterStandaloneOpacityJSONUndo.selectedStyleOpacity === '0.42' &&
+      afterStandaloneOpacityJSONUndo.thumbOpacity === '0.42',
+    {
+      afterStandaloneOpacityJSONPaste,
+      afterStandaloneOpacityJSONUndo,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -11999,6 +12065,111 @@ async function runObjectShadowScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      angle: 30,
+      blur: 20,
+      color: '#0f766e',
+      distance: 8,
+      enabled: true,
+      opacity: 0.44,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneShadowJSONPaste = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'pastes standalone JSON object shadow through slide-edit command effects',
+    afterStandaloneShadowJSONPaste.shadowImportModel === 'ppt-object-shadow-import' &&
+      afterStandaloneShadowJSONPaste.shadowImportFormat === 'application-json-ppt-object-shadow' &&
+      afterStandaloneShadowJSONPaste.shadowImportSlide === 'slide-1' &&
+      afterStandaloneShadowJSONPaste.shadowImportObjects === targetId &&
+      afterStandaloneShadowJSONPaste.shadowImportFields === 'enabled color opacity blur distance angle' &&
+      afterStandaloneShadowJSONPaste.shadowImportCommands === [
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+      ].join(' ') &&
+      afterStandaloneShadowJSONPaste.shadowImportCommandFields === 'enabled color opacity blur distance angle' &&
+      afterStandaloneShadowJSONPaste.shadowImportCommandTargets === [
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+      ].join(' ') &&
+      afterStandaloneShadowJSONPaste.shadowImportCommandTypes === [
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+      ].join(' ') &&
+      afterStandaloneShadowJSONPaste.shadowImportCommandValues === 'true #0f766e 0.44 20 8 30' &&
+      afterStandaloneShadowJSONPaste.shadowImportEnabled === 'true' &&
+      afterStandaloneShadowJSONPaste.shadowImportColor === '#0f766e' &&
+      afterStandaloneShadowJSONPaste.shadowImportOpacity === '0.44' &&
+      afterStandaloneShadowJSONPaste.shadowImportBlur === '20' &&
+      afterStandaloneShadowJSONPaste.shadowImportDistance === '8' &&
+      afterStandaloneShadowJSONPaste.shadowImportAngle === '30' &&
+      afterStandaloneShadowJSONPaste.shadowImportJsonLength > 70 &&
+      afterStandaloneShadowJSONPaste.command === 'update-object-shadow' &&
+      afterStandaloneShadowJSONPaste.commandField === 'angle' &&
+      afterStandaloneShadowJSONPaste.commandObject === targetId &&
+      afterStandaloneShadowJSONPaste.commandSlide === 'slide-1' &&
+      afterStandaloneShadowJSONPaste.commandType === 'slide-command-effect' &&
+      afterStandaloneShadowJSONPaste.commandValue === '30' &&
+      afterStandaloneShadowJSONPaste.selectedShadow === 'true' &&
+      afterStandaloneShadowJSONPaste.selectedColor === '#0f766e' &&
+      afterStandaloneShadowJSONPaste.selectedOpacity === '0.44' &&
+      afterStandaloneShadowJSONPaste.selectedBlur === '20' &&
+      afterStandaloneShadowJSONPaste.selectedDistance === '8' &&
+      afterStandaloneShadowJSONPaste.selectedAngle === '30' &&
+      afterStandaloneShadowJSONPaste.thumbOpacity === '0.44',
+    {
+      afterShadowJSONRedo,
+      afterStandaloneShadowJSONPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneShadowJSONUndo = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'undoes standalone JSON object shadow as one history step',
+    afterStandaloneShadowJSONUndo.selectedColor === '#334155' &&
+      afterStandaloneShadowJSONUndo.selectedOpacity === '0.36' &&
+      afterStandaloneShadowJSONUndo.selectedBlur === '18' &&
+      afterStandaloneShadowJSONUndo.selectedDistance === '12' &&
+      afterStandaloneShadowJSONUndo.selectedAngle === '60',
+    {
+      afterStandaloneShadowJSONPaste,
+      afterStandaloneShadowJSONUndo,
+    },
+  )
 
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)

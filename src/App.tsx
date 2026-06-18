@@ -19509,17 +19509,34 @@ function getPPTObjectShadowPayloadValue(
     return value.value
   }
 
-  return allowDirect &&
-    (
-      value.enabled !== undefined ||
-      value.color !== undefined ||
-      value.opacity !== undefined ||
-      value.blur !== undefined ||
-      value.distance !== undefined ||
-      value.angle !== undefined
-    )
+  return (allowDirect && hasPPTObjectShadowPayloadFields(value)) ||
+    hasPPTObjectShadowStandalonePayloadFields(value)
     ? value
     : undefined
+}
+
+function hasPPTObjectShadowPayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.enabled !== undefined ||
+    value.color !== undefined ||
+    value.blur !== undefined ||
+    value.distance !== undefined ||
+    value.angle !== undefined
+  )
+}
+
+function hasPPTObjectShadowStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.enabled !== undefined ||
+    value.blur !== undefined ||
+    value.distance !== undefined ||
+    value.angle !== undefined ||
+    (value.color !== undefined && value.opacity !== undefined)
+  )
 }
 
 function getPPTObjectShadowFromJSONValue(
@@ -19750,6 +19767,13 @@ function getPPTObjectOpacityPayloadValue(
 
   if (value.objectOpacityValue !== undefined) {
     return value.objectOpacityValue
+  }
+
+  if (
+    value.opacity !== undefined &&
+    !hasPPTObjectShadowStandalonePayloadFields(value)
+  ) {
+    return value
   }
 
   return allowDirect &&
