@@ -1080,6 +1080,12 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_PARAGRAPH_SPACING_IMPORT_MODEL =
+  'ppt-text-paragraph-spacing-import' as const
+const PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-paragraph-spacing' as const
+const PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-paragraph-spacing+json'
 const PPT_TEXT_VERTICAL_ALIGN_IMPORT_MODEL =
   'ppt-text-vertical-align-import' as const
 const PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT =
@@ -1428,6 +1434,13 @@ type PPTTextBodyImportSource = {
   jsonLength: number
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
+}
+type PPTTextParagraphSpacingImportField = PPTParagraphSpacingField
+type PPTTextParagraphSpacingImportSource = {
+  fields: readonly PPTTextParagraphSpacingImportField[]
+  format: typeof PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT
+  jsonLength: number
+  spacing: Partial<Record<PPTParagraphSpacingField, number>>
 }
 type PPTTextVerticalAlignImportField =
   | 'alignItems'
@@ -1793,6 +1806,22 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextParagraphSpacingImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandUnits: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT
+  jsonLength: number
+  lineHeight: string
+  model: typeof PPT_TEXT_PARAGRAPH_SPACING_IMPORT_MODEL
+  objectIds: string
+  spacingAfter: string
+  spacingBefore: string
 }
 type PPTTextVerticalAlignImportEffect = {
   alignItems: string
@@ -2965,6 +2994,10 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
+  const [
+    lastTextParagraphSpacingImportEffect,
+    setLastTextParagraphSpacingImportEffect,
+  ] = useState<PPTTextParagraphSpacingImportEffect | null>(null)
   const [lastTextAutoFitImportEffect, setLastTextAutoFitImportEffect] =
     useState<PPTTextAutoFitImportEffect | null>(null)
   const [
@@ -3976,6 +4009,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textParagraphSpacingSource =
+        getPPTTextParagraphSpacingSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textParagraphSpacingSource &&
+        pastePPTTextParagraphSpacingSource(textParagraphSpacingSource)
       ) {
         event.preventDefault()
         return
@@ -5373,6 +5417,48 @@ function App() {
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
             : element
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextParagraphSpacingSource(
+    source: PPTTextParagraphSpacingImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element): element is PPTTextElement =>
+        isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .flatMap((element) =>
+        createPPTTextParagraphSpacingImportCommandEffects({
+          element,
+          slideId: activeSlide.id,
+          source,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastTextParagraphSpacingEffect(effects[effects.length - 1])
+    setLastTextParagraphSpacingImportEffect(
+      createPPTTextParagraphSpacingImportEffect({
+        effects,
+        source,
+      }),
+    )
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) =>
+          isPPTTextElement(element)
+            ? applyPPTTextParagraphSpacingCommandEffectsToElement(
+                element,
+                effects.filter((effect) =>
+                  effect.payload.objectId === element.id),
+              )
+            : element),
       })))
 
     return true
@@ -11828,6 +11914,20 @@ function App() {
             ? lastTextParagraphSpacingEffect.payload.value
             : lastTextParagraphSpacingEffect.payload.value.value
           : undefined}
+        data-ppt-text-paragraph-spacing-import-command-fields={lastTextParagraphSpacingImportEffect?.commandFields}
+        data-ppt-text-paragraph-spacing-import-command-targets={lastTextParagraphSpacingImportEffect?.commandTargets}
+        data-ppt-text-paragraph-spacing-import-command-types={lastTextParagraphSpacingImportEffect?.commandTypes}
+        data-ppt-text-paragraph-spacing-import-command-units={lastTextParagraphSpacingImportEffect?.commandUnits}
+        data-ppt-text-paragraph-spacing-import-command-values={lastTextParagraphSpacingImportEffect?.commandValues}
+        data-ppt-text-paragraph-spacing-import-commands={lastTextParagraphSpacingImportEffect?.commandIds}
+        data-ppt-text-paragraph-spacing-import-fields={lastTextParagraphSpacingImportEffect?.fields}
+        data-ppt-text-paragraph-spacing-import-format={lastTextParagraphSpacingImportEffect?.format}
+        data-ppt-text-paragraph-spacing-import-json-length={lastTextParagraphSpacingImportEffect?.jsonLength}
+        data-ppt-text-paragraph-spacing-import-line-height={lastTextParagraphSpacingImportEffect?.lineHeight}
+        data-ppt-text-paragraph-spacing-import-model={lastTextParagraphSpacingImportEffect?.model}
+        data-ppt-text-paragraph-spacing-import-objects={lastTextParagraphSpacingImportEffect?.objectIds}
+        data-ppt-text-paragraph-spacing-import-spacing-after={lastTextParagraphSpacingImportEffect?.spacingAfter}
+        data-ppt-text-paragraph-spacing-import-spacing-before={lastTextParagraphSpacingImportEffect?.spacingBefore}
         data-ppt-text-paragraph-spacing-model="slide-edit-text-paragraph-spacing"
         data-ppt-text-vertical-align-command={lastTextVerticalAlignmentEffect?.payload.id}
         data-ppt-text-vertical-align-command-field={lastTextVerticalAlignmentEffect?.payload.fieldId}
@@ -14879,6 +14979,89 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextParagraphSpacingImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditTextParagraphSpacingHostCommandEffect<string, string>[]
+  source: PPTTextParagraphSpacingImportSource
+}): PPTTextParagraphSpacingImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandUnits: effects.map((effect) =>
+      effect.payload.fieldId === 'lineHeightRatio'
+        ? 'ratio'
+        : effect.payload.value.unit).join(' '),
+    commandValues: effects.map((effect) =>
+      effect.payload.fieldId === 'lineHeightRatio'
+        ? String(effect.payload.value)
+        : String(effect.payload.value.value)).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    lineHeight: source.spacing.lineHeight === undefined
+      ? ''
+      : String(source.spacing.lineHeight),
+    model: PPT_TEXT_PARAGRAPH_SPACING_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    spacingAfter: source.spacing.spacingAfter === undefined
+      ? ''
+      : String(source.spacing.spacingAfter),
+    spacingBefore: source.spacing.spacingBefore === undefined
+      ? ''
+      : String(source.spacing.spacingBefore),
+  }
+}
+
+function createPPTTextParagraphSpacingImportCommandEffects({
+  element,
+  slideId,
+  source,
+}: {
+  element: PPTTextElement
+  slideId: string
+  source: PPTTextParagraphSpacingImportSource
+}): SlideEditTextParagraphSpacingHostCommandEffect<string, string>[] {
+  return source.fields.map((field) =>
+    getSlideEditTextParagraphSpacingCommandEffect(
+      toSlideEditParagraphSpacingCommand({
+        elementId: element.id,
+        field,
+        slideId,
+        value: source.spacing[field] ?? 0,
+      }),
+    ))
+}
+
+function applyPPTTextParagraphSpacingCommandEffectsToElement(
+  element: PPTTextElement,
+  effects: readonly SlideEditTextParagraphSpacingHostCommandEffect<string, string>[],
+): PPTTextElement {
+  if (effects.length === 0) {
+    return element
+  }
+
+  return {
+    ...element,
+    textBody: {
+      paragraphs: element.textBody.paragraphs.map((paragraph) =>
+        effects.reduce((currentParagraph, effect) => {
+          const { field, value } = toPPTParagraphSpacingUpdate(effect.payload)
+
+          return {
+            ...currentParagraph,
+            [field]: value,
+          }
+        }, paragraph)),
+    },
   }
 }
 
@@ -18521,6 +18704,212 @@ function getPPTTextStyleParagraphSpacingFromJSONValue(value: unknown) {
   }
 
   return normalizePPTParagraphSpacing(value)
+}
+
+function getPPTTextParagraphSpacingSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextParagraphSpacingSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextParagraphSpacingSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextParagraphSpacingImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextParagraphSpacingSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextParagraphSpacingSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextParagraphSpacingImportSource | null {
+  const payloadValue = getPPTTextParagraphSpacingPayloadValue(
+    value,
+    allowDirect,
+  )
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const spacing: Partial<Record<PPTParagraphSpacingField, number>> = {}
+  const lineHeight = getPPTTextParagraphSpacingLineHeightFromJSONValue(
+    payloadValue.lineHeight ?? payloadValue.lineHeightRatio,
+  )
+  const spacingBefore = getPPTTextParagraphSpacingAmountFromJSONValue(
+    payloadValue.spacingBefore ??
+      payloadValue.paragraphBefore ??
+      payloadValue.before ??
+      payloadValue.marginTop,
+  )
+  const spacingAfter = getPPTTextParagraphSpacingAmountFromJSONValue(
+    payloadValue.spacingAfter ??
+      payloadValue.paragraphAfter ??
+      payloadValue.after ??
+      payloadValue.marginBottom,
+  )
+
+  if (lineHeight !== undefined) {
+    spacing.lineHeight = lineHeight
+  }
+
+  if (spacingBefore !== undefined) {
+    spacing.spacingBefore = spacingBefore
+  }
+
+  if (spacingAfter !== undefined) {
+    spacing.spacingAfter = spacingAfter
+  }
+
+  const fields = ([
+    'lineHeight',
+    'spacingBefore',
+    'spacingAfter',
+  ] as const).filter((field) => spacing[field] !== undefined)
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+        jsonLength,
+        spacing,
+      }
+    : null
+}
+
+function getPPTTextParagraphSpacingPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  for (const field of [
+    'textParagraphSpacing',
+    'paragraphSpacing',
+    'paragraphStyle',
+    'paragraph',
+    'spacing',
+  ] as const) {
+    if (isPPTRecord(value[field])) {
+      return value[field]
+    }
+  }
+
+  if (
+    allowDirect &&
+    (
+      value.lineHeight !== undefined ||
+      value.lineHeightRatio !== undefined ||
+      value.spacingBefore !== undefined ||
+      value.paragraphBefore !== undefined ||
+      value.marginTop !== undefined ||
+      value.spacingAfter !== undefined ||
+      value.paragraphAfter !== undefined ||
+      value.marginBottom !== undefined
+    )
+  ) {
+    return value
+  }
+
+  return null
+}
+
+function getPPTJSONFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const text = value.trim().replace(/px$/i, '')
+  const numberValue = Number(text)
+
+  return Number.isFinite(numberValue) ? numberValue : undefined
+}
+
+function getPPTTextParagraphSpacingLineHeightFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTParagraphLineHeight(numberValue)
+}
+
+function getPPTTextParagraphSpacingAmountFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTParagraphSpacing(numberValue)
 }
 
 function getPPTTextBodySourceFromDataTransfer(

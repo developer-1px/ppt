@@ -6207,6 +6207,100 @@ async function runTextParagraphSpacingScenario(page) {
       afterUndo,
     },
   )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textParagraphSpacing: {
+        lineHeight: 1.28,
+        spacingAfter: 15,
+        spacingBefore: 9,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'pastes PPT paragraph spacing JSON through slide-edit command effects',
+    afterJSONPaste.command === 'update-text-paragraph-spacing' &&
+      afterJSONPaste.commandField === 'paragraphAfter' &&
+      afterJSONPaste.commandObject === 's1-title' &&
+      afterJSONPaste.commandType === 'slide-command-effect' &&
+      afterJSONPaste.commandUnit === 'px' &&
+      afterJSONPaste.commandValue === '15' &&
+      afterJSONPaste.importCommandFields === 'lineHeightRatio paragraphBefore paragraphAfter' &&
+      afterJSONPaste.importCommandTargets === 's1-title s1-title s1-title' &&
+      afterJSONPaste.importCommandTypes === 'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterJSONPaste.importCommandUnits === 'ratio px px' &&
+      afterJSONPaste.importCommandValues === '1.28 9 15' &&
+      afterJSONPaste.importCommands === 'update-text-paragraph-spacing update-text-paragraph-spacing update-text-paragraph-spacing' &&
+      afterJSONPaste.importFields === 'lineHeight spacingBefore spacingAfter' &&
+      afterJSONPaste.importFormat === 'application-json-ppt-text-paragraph-spacing' &&
+      afterJSONPaste.importJsonLength > 60 &&
+      afterJSONPaste.importLineHeight === '1.28' &&
+      afterJSONPaste.importModel === 'ppt-text-paragraph-spacing-import' &&
+      afterJSONPaste.importObjects === 's1-title' &&
+      afterJSONPaste.importSpacingAfter === '15' &&
+      afterJSONPaste.importSpacingBefore === '9' &&
+      afterJSONPaste.lineHeight === '1.28' &&
+      afterJSONPaste.spacingBefore === '9' &&
+      afterJSONPaste.spacingAfter === '15' &&
+      afterJSONPaste.selectedLineHeight === '1.28' &&
+      afterJSONPaste.selectedSpacingBefore === '9' &&
+      afterJSONPaste.selectedSpacingAfter === '15' &&
+      afterJSONPaste.selectedStyleLineHeight === '1.28' &&
+      afterJSONPaste.selectedStyleMarginTop === '9px' &&
+      afterJSONPaste.selectedStyleMarginBottom === '15px',
+    {
+      afterJSONPaste,
+      afterRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONUndo = await getPPTTextParagraphSpacingState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterJSONRedo = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'undoes and redoes PPT paragraph spacing JSON as one history step',
+    afterJSONUndo.lineHeight === '1.4' &&
+      afterJSONUndo.spacingBefore === '6' &&
+      afterJSONUndo.spacingAfter === '12' &&
+      afterJSONRedo.lineHeight === '1.28' &&
+      afterJSONRedo.spacingBefore === '9' &&
+      afterJSONRedo.spacingAfter === '15',
+    {
+      afterJSONPaste,
+      afterJSONRedo,
+      afterJSONUndo,
+    },
+  )
 }
 
 async function runTextFontFamilyScenario(page) {
@@ -6804,8 +6898,8 @@ async function runExportScenario(page) {
       hasStrokeDashModel: code.includes('"dash": "dash"') && code.includes('"dash": "dot"'),
       hasFontFamilyMarkup: code.includes('data-ppt-font-family="Georgia"') && code.includes('font-family:Georgia, serif'),
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
-      hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
-      hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
+      hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.28"') && code.includes('data-ppt-spacing-before="9"') && code.includes('data-ppt-spacing-after="15"') && code.includes('line-height:1.28') && code.includes('margin-top:9px') && code.includes('margin-bottom:15px'),
+      hasParagraphSpacingModel: code.includes('"lineHeight": 1.28') && code.includes('"spacingBefore": 9') && code.includes('"spacingAfter": 15'),
       hasTextFrameInsetMarkup: code.includes('data-ppt-text-inset="8,12,16,20"') && code.includes('padding:8px 12px 16px 20px'),
       hasTextFrameInsetModel: code.includes('"textInset"') && code.includes('"top": 8') && code.includes('"right": 12') && code.includes('"bottom": 16') && code.includes('"left": 20'),
       hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="bottom"') && code.includes('align-items:flex-end'),
@@ -7748,7 +7842,7 @@ async function runExportScenario(page) {
       hasFillOpacity: text.includes('data-ppt-fill-opacity="0.35"') && text.includes('fill-opacity="0.35"'),
       hasStrokeDash: text.includes('data-ppt-stroke-dash="dash"') && text.includes('data-ppt-stroke-dash="dot"') && text.includes('stroke-dasharray='),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
-      hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
+      hasParagraphSpacing: text.includes('data-ppt-line-height="1.28"') && text.includes('data-ppt-spacing-before="9"') && text.includes('data-ppt-spacing-after="15"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="8,12,16,20"'),
       hasTextVerticalAlign: text.includes('data-ppt-vertical-align="bottom"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
@@ -11526,7 +11620,7 @@ async function runTableImportScenario(page) {
     windowsVirtualKeyCode: 75,
   })
   await delay(80)
-  await page.send('Input.insertText', { text: 'table' })
+  await page.send('Input.insertText', { text: 'add table' })
   await delay(80)
   await pressKey(page, {
     code: 'Enter',
@@ -13803,15 +13897,97 @@ async function runFreeformScenario(page) {
 
   record('starts PPT eraser tool from canvas E shortcut', afterEraserShortcut.eraserActive === 'true' && afterEraserShortcut.eraserToolbarPressed === 'true' && afterEraserShortcut.creationTool === '', afterEraserShortcut)
 
-  const shapePoint = await getElementCenter(page, 's1-card-1')
+  const nonDrawingEraseTrace = await page.eval(`(() => {
+    const shapes = [...document.querySelectorAll('[data-kind="shape"]')]
+      .map((element) => {
+        const rect = element.getBoundingClientRect()
+
+        return {
+          h: rect.height,
+          id: element.getAttribute('data-ppt-element') ?? '',
+          w: rect.width,
+          x: rect.left,
+          y: rect.top,
+        }
+      })
+      .filter((rect) => rect.w > 24 && rect.h > 24)
+    const freeforms = [...document.querySelectorAll('[data-kind="freeform"]')]
+      .map((element) => {
+        const rect = element.getBoundingClientRect()
+
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        }
+      })
+    const candidates = [
+      [0.16, 0.18],
+      [0.84, 0.18],
+      [0.16, 0.82],
+      [0.84, 0.82],
+      [0.5, 0.16],
+      [0.5, 0.84],
+      [0.5, 0.5],
+    ]
+    const intersectsFreeform = (x1, y1, x2, y2) => {
+      const pad = 24
+      const left = Math.min(x1, x2) - pad
+      const right = Math.max(x1, x2) + pad
+      const top = Math.min(y1, y2) - pad
+      const bottom = Math.max(y1, y2) + pad
+
+      return freeforms.some((rect) =>
+        right >= rect.left &&
+          left <= rect.right &&
+          bottom >= rect.top &&
+          top <= rect.bottom)
+    }
+
+    for (const shape of shapes) {
+      const delta = Math.min(12, shape.w * 0.08, shape.h * 0.08)
+
+      for (const [fx, fy] of candidates) {
+        const centerX = shape.x + shape.w * fx
+        const centerY = shape.y + shape.h * fy
+        const startX = centerX - delta
+        const startY = centerY - delta
+        const endX = centerX + delta
+        const endY = centerY + delta
+
+        if (!intersectsFreeform(startX, startY, endX, endY)) {
+          return {
+            endX,
+            endY,
+            shapeId: shape.id,
+            startX,
+            startY,
+          }
+        }
+      }
+    }
+
+    const fallback = shapes[0]
+    const centerX = fallback.x + fallback.w / 2
+    const centerY = fallback.y + fallback.h / 2
+
+    return {
+      endX: centerX + 8,
+      endY: centerY + 8,
+      shapeId: fallback.id,
+      startX: centerX - 8,
+      startY: centerY - 8,
+    }
+  })()`)
   const beforeNonDrawingErase = await getPPTFreeformState(page)
 
   await dragMouse(page, [{
-    x: shapePoint.x - 24,
-    y: shapePoint.y - 18,
+    x: nonDrawingEraseTrace.startX,
+    y: nonDrawingEraseTrace.startY,
   }, {
-    x: shapePoint.x + 24,
-    y: shapePoint.y + 18,
+    x: nonDrawingEraseTrace.endX,
+    y: nonDrawingEraseTrace.endY,
   }])
   await delay(100)
 
@@ -13820,6 +13996,7 @@ async function runFreeformScenario(page) {
   record('keeps non-drawing PPT objects when eraser crosses shapes', afterNonDrawingErase.eraserActive === 'true' && afterNonDrawingErase.shapeCount === beforeNonDrawingErase.shapeCount && afterNonDrawingErase.freeformCount === beforeNonDrawingErase.freeformCount && afterNonDrawingErase.elementCount === beforeNonDrawingErase.elementCount, {
     afterNonDrawingErase,
     beforeNonDrawingErase,
+    nonDrawingEraseTrace,
   })
 
   const highlighterTrace = await page.eval(`(() => {
@@ -17752,6 +17929,20 @@ function getPPTTextParagraphSpacingState(page) {
       inspectorLineHeight: inspector?.getAttribute('data-ppt-paragraph-line-height') ?? '',
       inspectorSpacingAfter: inspector?.getAttribute('data-ppt-paragraph-spacing-after') ?? '',
       inspectorSpacingBefore: inspector?.getAttribute('data-ppt-paragraph-spacing-before') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-command-types') ?? '',
+      importCommandUnits: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-command-units') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-text-paragraph-spacing-import-json-length') ?? '0'),
+      importLineHeight: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-line-height') ?? '',
+      importModel: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-objects') ?? '',
+      importSpacingAfter: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-spacing-after') ?? '',
+      importSpacingBefore: stage?.getAttribute('data-ppt-text-paragraph-spacing-import-spacing-before') ?? '',
       lineHeight: lineHeight?.value ?? '',
       lineHeightCommand: lineHeight?.getAttribute('data-ppt-paragraph-command') ?? '',
       lineHeightControl: lineHeight?.getAttribute('data-ppt-paragraph-control') ?? '',
