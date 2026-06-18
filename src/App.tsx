@@ -29036,79 +29036,49 @@ function getPPTTableRowsSourceFromJSONValue(
 function getPPTTableRowsSourceFromTableImportDataTransfer(
   dataTransfer: DataTransfer,
 ): PPTTableRowsImportSource | null {
-  const text = getPPTTableRowsTableImportTextFromDataTransfer(dataTransfer)
-
-  if (!text || getPPTImportJSONText(text)) {
+  if (hasPPTTableRowsInternalHTMLClipboard(dataTransfer)) {
     return null
   }
 
   const source = getPPTTableSourceFromDataTransfer(dataTransfer)
+  const textLength = getPPTTableRowsTableImportTextLengthFromDataTransfer(
+    dataTransfer,
+  )
 
-  return source
+  return source && textLength > 0
     ? {
         format: source.format ?? 'text-delimited',
-        jsonLength: text.length,
+        jsonLength: textLength,
         rows: source.rows,
       }
     : null
 }
 
-function getPPTTableRowsTableImportTextFromDataTransfer(
+function hasPPTTableRowsInternalHTMLClipboard(dataTransfer: DataTransfer) {
+  const html = readPPTDataTransferText(dataTransfer, 'text/html')
+
+  return /data-ppt-(rich-clipboard|selection-|table-export)/i.test(html)
+}
+
+function getPPTTableRowsTableImportTextLengthFromDataTransfer(
   dataTransfer: DataTransfer,
 ) {
   for (const mimeType of [
     'text/tab-separated-values',
     'text/csv',
+    'text/html',
+    'text/markdown',
+    'text/x-markdown',
+    'text/plain',
   ] as const) {
     const text = readPPTDataTransferText(dataTransfer, mimeType).trim()
 
     if (text) {
-      return text
+      return getPPTImportJSONText(text) ? 0 : text.length
     }
   }
 
-  const markdownText = readPPTDataTransferText(dataTransfer, 'text/markdown').trim()
-
-  if (markdownText) {
-    return markdownText
-  }
-
-  const htmlText = readPPTDataTransferText(dataTransfer, 'text/html').trim()
-
-  if (htmlText) {
-    return isPPTTableRowsExternalHTMLTableClipboard(htmlText) ? htmlText : ''
-  }
-
-  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain').trim()
-
-  return plainText &&
-      (/[\t,]/.test(plainText) || isPPTTableRowsMarkdownTableText(plainText))
-    ? plainText
-    : ''
-}
-
-function isPPTTableRowsExternalHTMLTableClipboard(html: string) {
-  if (
-    !html ||
-    /data-ppt-(rich-clipboard|selection-|table-export)/i.test(html)
-  ) {
-    return false
-  }
-
-  if (typeof DOMParser === 'undefined') {
-    return /<table[\s>]/i.test(html)
-  }
-
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-
-  return !!doc.querySelector('table') &&
-    !doc.querySelector(
-      '[data-ppt-rich-clipboard], [data-ppt-selection-object], [data-ppt-selection-table], [data-ppt-table-export]',
-    )
-}
-
-function isPPTTableRowsMarkdownTableText(text: string) {
-  return /^\s*\|.+\|\s*\n\s*\|[\s:|-]+\|\s*\n/m.test(text)
+  return 0
 }
 
 function getPPTTableRowsPayloadValue(
