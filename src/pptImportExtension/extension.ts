@@ -2,6 +2,7 @@ import {
   createPPTCanvasDataTransferImportActionPlanFromRegistry,
   createPPTCanvasDataTransferImportRegistry,
   getPPTCanvasDataTransferImportRegistryMetadata,
+  PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   type PPTCanvasDataTransferImportRegistryResolver,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
@@ -380,7 +381,12 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return source ? { kind: 'media-source', source } : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: ['text/plain', 'text/uri-list'],
+    supportedFormats: [
+      PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
+      'application/json',
+      'text/plain',
+      'text/uri-list',
+    ],
     title: 'Media source',
   },
   {
