@@ -1,5 +1,8 @@
 import {
-  createPPTCanvasDataTransferImportActionPlan,
+  createPPTCanvasDataTransferImportActionPlanFromRegistry,
+  createPPTCanvasDataTransferImportRegistry,
+  getPPTCanvasDataTransferImportRegistryMetadata,
+  type PPTCanvasDataTransferImportRegistryResolver,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
   getPPTDataImageSourceFromDataTransfer,
@@ -48,36 +51,10 @@ import type {
   PPTTable,
 } from '../pptModel'
 
-export const PPT_IMPORT_EXTENSION = {
-  canvasFallbackIssues: [],
-  clipboardActionOrder: [
-    'image-file-batch',
-    'image-file',
-    'table-file-batch',
-    'table-file',
-    'fallback-html-selection-source',
-    'fallback-html-image-source',
-    'fallback-html-shape-source',
-    'fallback-html-table-source',
-    'fallback-html-text-source',
-    'image-source',
-    'table-source',
-    'rich-text-source',
-    'media-source',
-    'text-source',
-  ],
-  dropActionOrder: [
-    'image-file-batch',
-    'image-file',
-    'table-file-batch',
-    'table-file',
-    'table-source',
-    'media-source',
-  ],
-  id: 'ppt-import-extension',
-  installUnit: 'src/pptImportExtension',
-  title: 'PPT import extension',
-} as const
+const PPT_DATA_TRANSFER_IMPORT_REGISTRY_MODEL =
+  'canvas-data-transfer-import-registry'
+const PPT_CLIPBOARD_IMPORT_SCOPE = 'clipboard'
+const PPT_STAGE_DROP_IMPORT_SCOPE = 'stage-drop'
 
 export type PPTImageImportEffect = {
   count: number
@@ -188,211 +165,281 @@ export type PPTStageDropImportAction =
       source: PPTMediaImportSource
     }
 
+type PPTDataTransferImportScope =
+  | typeof PPT_CLIPBOARD_IMPORT_SCOPE
+  | typeof PPT_STAGE_DROP_IMPORT_SCOPE
+type PPTDataTransferImportAction =
+  | PPTClipboardImportAction
+  | PPTStageDropImportAction
+
+const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
+  {
+    id: 'image-file-batch',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const files = getPPTImageFilesFromDataTransfer(dataTransfer)
+
+      return files.length > 1
+        ? { files, kind: 'image-file-batch' }
+        : null
+    },
+    scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
+    supportedFormats: ['Files', 'image/*'],
+    title: 'Image file batch',
+  },
+  {
+    id: 'image-file',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const files = getPPTImageFilesFromDataTransfer(dataTransfer)
+      const file = files.length === 1
+        ? files[0]
+        : getPPTImageFileFromDataTransfer(dataTransfer)
+
+      return file ? { file, kind: 'image-file' } : null
+    },
+    scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
+    supportedFormats: ['Files', 'image/*'],
+    title: 'Image file',
+  },
+  {
+    id: 'table-file-batch',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const files = getPPTTableFilesFromDataTransfer(dataTransfer)
+
+      return files.length > 1
+        ? { files, kind: 'table-file-batch' }
+        : null
+    },
+    scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
+    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    title: 'Table file batch',
+  },
+  {
+    id: 'table-file',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const files = getPPTTableFilesFromDataTransfer(dataTransfer)
+      const file = files.length === 1
+        ? files[0]
+        : getPPTTableFileFromDataTransfer(dataTransfer)
+
+      return file ? { file, kind: 'table-file' } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    title: 'Table file',
+  },
+  {
+    id: 'table-file',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const file = getPPTTableFileFromDataTransfer(dataTransfer)
+
+      return file
+        ? {
+            fallbackSource: getPPTTableSourceFromDataTransfer(dataTransfer),
+            file,
+            kind: 'table-file',
+          }
+        : null
+    },
+    scope: PPT_STAGE_DROP_IMPORT_SCOPE,
+    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    title: 'Table file',
+  },
+  {
+    id: 'fallback-html-selection-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source =
+        getPPTFallbackHTMLSelectionSourceFromDataTransfer(dataTransfer)
+
+      return source
+        ? { kind: 'fallback-html-selection-source', source }
+        : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Fallback HTML selection',
+  },
+  {
+    id: 'fallback-html-image-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTFallbackHTMLImageSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'fallback-html-image-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Fallback HTML image',
+  },
+  {
+    id: 'fallback-html-shape-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTFallbackHTMLShapeSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'fallback-html-shape-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Fallback HTML shape',
+  },
+  {
+    id: 'fallback-html-table-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTFallbackHTMLTableSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'fallback-html-table-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Fallback HTML table',
+  },
+  {
+    id: 'fallback-html-text-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTFallbackHTMLTextSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'fallback-html-text-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Fallback HTML text',
+  },
+  {
+    id: 'image-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTSVGImageSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'image-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['image/svg+xml', 'text/html'],
+    title: 'SVG image source',
+  },
+  {
+    id: 'image-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTDataImageSourceFromDataTransfer(dataTransfer)
+
+      return source
+        ? { kind: 'image-source', resolveNaturalSize: true, source }
+        : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html'],
+    title: 'Data image source',
+  },
+  {
+    id: 'table-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTTableSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'table-source', source } : null
+    },
+    scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
+    supportedFormats: ['text/html', 'text/markdown', 'text/plain', 'text/csv'],
+    title: 'Table source',
+  },
+  {
+    id: 'rich-text-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'rich-text-source', source } : null
+    },
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/html', 'text/markdown', 'text/plain'],
+    title: 'Rich text source',
+  },
+  {
+    id: 'media-source',
+    mode: 'exclusive',
+    resolve: ({ dataTransfer }) => {
+      const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
+
+      return source ? { kind: 'media-source', source } : null
+    },
+    scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
+    supportedFormats: ['text/plain', 'text/uri-list'],
+    title: 'Media source',
+  },
+  {
+    id: 'text-source',
+    mode: 'append',
+    resolve: ({ dataTransfer }) =>
+      getPPTTextPasteSourcesFromDataTransfer(dataTransfer)
+        .map((text): PPTClipboardImportAction => ({ kind: 'text-source', text })),
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+    supportedFormats: ['text/plain'],
+    title: 'Text source',
+  },
+] satisfies readonly PPTCanvasDataTransferImportRegistryResolver<
+  PPTDataTransferImportAction,
+  PPTDataTransferImportScope
+>[]
+
+const PPT_DATA_TRANSFER_IMPORT_REGISTRY =
+  createPPTCanvasDataTransferImportRegistry<
+    PPTDataTransferImportAction,
+    PPTDataTransferImportScope
+  >({
+    resolvers: PPT_DATA_TRANSFER_IMPORT_RESOLVERS,
+  })
+
+function getPPTDataTransferImportActionOrder(
+  scope: PPTDataTransferImportScope,
+) {
+  return [
+    ...new Set(getPPTCanvasDataTransferImportRegistryMetadata({
+      registry: PPT_DATA_TRANSFER_IMPORT_REGISTRY,
+      scope,
+    }).map((metadata) => metadata.id)),
+  ]
+}
+
+export const PPT_IMPORT_EXTENSION = {
+  actionPlanner: PPT_DATA_TRANSFER_IMPORT_REGISTRY_MODEL,
+  canvasFallbackIssues: [],
+  clipboardActionOrder: getPPTDataTransferImportActionOrder(
+    PPT_CLIPBOARD_IMPORT_SCOPE,
+  ),
+  dropActionOrder: getPPTDataTransferImportActionOrder(
+    PPT_STAGE_DROP_IMPORT_SCOPE,
+  ),
+  id: 'ppt-import-extension',
+  installUnit: 'src/pptImportExtension',
+  title: 'PPT import extension',
+} as const
+
 export function getPPTClipboardImportActions(
   dataTransfer: DataTransfer | null,
 ): PPTClipboardImportAction[] {
-  return createPPTCanvasDataTransferImportActionPlan<PPTClipboardImportAction>({
-    resolvers: [
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const files = getPPTImageFilesFromDataTransfer(dataTransfer)
-          const file = files.length === 1
-            ? files[0]
-            : getPPTImageFileFromDataTransfer(dataTransfer)
-
-          return files.length > 1
-            ? { files, kind: 'image-file-batch' }
-            : file
-              ? { file, kind: 'image-file' }
-              : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const files = getPPTTableFilesFromDataTransfer(dataTransfer)
-          const file = files.length === 1
-            ? files[0]
-            : getPPTTableFileFromDataTransfer(dataTransfer)
-
-          return files.length > 1
-            ? { files, kind: 'table-file-batch' }
-            : file
-              ? { file, kind: 'table-file' }
-              : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source =
-            getPPTFallbackHTMLSelectionSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'fallback-html-selection-source', source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source =
-            getPPTFallbackHTMLImageSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'fallback-html-image-source', source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source =
-            getPPTFallbackHTMLShapeSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'fallback-html-shape-source', source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source =
-            getPPTFallbackHTMLTableSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'fallback-html-table-source', source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source =
-            getPPTFallbackHTMLTextSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'fallback-html-text-source', source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source = getPPTSVGImageSourceFromDataTransfer(dataTransfer)
-
-          return source ? { kind: 'image-source', source } : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source = getPPTDataImageSourceFromDataTransfer(dataTransfer)
-
-          return source
-            ? { kind: 'image-source', resolveNaturalSize: true, source }
-            : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source = getPPTTableSourceFromDataTransfer(dataTransfer)
-
-          return source ? { kind: 'table-source', source } : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
-
-          return source ? { kind: 'rich-text-source', source } : null
-        },
-      },
-      {
-        mode: 'exclusive',
-        resolve: () => {
-          const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
-
-          return source ? { kind: 'media-source', source } : null
-        },
-      },
-      {
-        mode: 'append',
-        resolve: () => getPPTTextPasteSourcesFromDataTransfer(dataTransfer)
-          .map((text): PPTClipboardImportAction => ({ kind: 'text-source', text })),
-      },
-    ],
-  })
+  return createPPTCanvasDataTransferImportActionPlanFromRegistry({
+    dataTransfer,
+    registry: PPT_DATA_TRANSFER_IMPORT_REGISTRY,
+    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
+  }) as PPTClipboardImportAction[]
 }
 
 export function getPPTStageDropImportAction(
   dataTransfer: DataTransfer | null,
 ): PPTStageDropImportAction | null {
-  const [action = null] =
-    createPPTCanvasDataTransferImportActionPlan<PPTStageDropImportAction>({
-      resolvers: [
-        {
-          mode: 'exclusive',
-          resolve: () => {
-            const files = getPPTImageFilesFromDataTransfer(dataTransfer)
-            const file = files.length === 1
-              ? files[0]
-              : getPPTImageFileFromDataTransfer(dataTransfer)
-
-            return files.length > 1
-              ? { files, kind: 'image-file-batch' }
-              : file
-                ? { file, kind: 'image-file' }
-                : null
-          },
-        },
-        {
-          mode: 'exclusive',
-          resolve: () => {
-            const files = getPPTTableFilesFromDataTransfer(dataTransfer)
-
-            return files.length > 1
-              ? { files, kind: 'table-file-batch' }
-              : null
-          },
-        },
-        {
-          mode: 'exclusive',
-          resolve: () => {
-            const file = getPPTTableFileFromDataTransfer(dataTransfer)
-
-            return file
-              ? {
-                  fallbackSource:
-                    getPPTTableSourceFromDataTransfer(dataTransfer),
-                  file,
-                  kind: 'table-file',
-                }
-              : null
-          },
-        },
-        {
-          mode: 'exclusive',
-          resolve: () => {
-            const source = getPPTTableSourceFromDataTransfer(dataTransfer)
-
-            return source ? { kind: 'table-source', source } : null
-          },
-        },
-        {
-          mode: 'exclusive',
-          resolve: () => {
-            const source = getPPTMediaSourceFromDataTransfer(dataTransfer)
-
-            return source ? { kind: 'media-source', source } : null
-          },
-        },
-      ],
-    })
+  const [action = null] = createPPTCanvasDataTransferImportActionPlanFromRegistry({
+    dataTransfer,
+    registry: PPT_DATA_TRANSFER_IMPORT_REGISTRY,
+    scope: PPT_STAGE_DROP_IMPORT_SCOPE,
+  }) as PPTStageDropImportAction[]
 
   return action
 }

@@ -13823,6 +13823,7 @@ function App() {
         data-ppt-object-layer-import-slide={lastObjectLayerImportEffect?.slideId}
         data-ppt-object-layer-import-to-index={lastObjectLayerImportEffect?.toIndex}
         data-ppt-import-extension={PPT_IMPORT_EXTENSION.id}
+        data-ppt-import-extension-action-planner={PPT_IMPORT_EXTENSION.actionPlanner}
         data-ppt-import-extension-last-clipboard-actions={lastClipboardImportActionKinds}
         data-ppt-import-extension-last-drop-action={lastStageDropImportActionKind}
         data-ppt-import-extension-clipboard-action-order={PPT_IMPORT_EXTENSION.clipboardActionOrder.join(' ')}

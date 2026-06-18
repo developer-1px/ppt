@@ -39,6 +39,8 @@ import {
   captureCanvasPointerFromEvent,
   centerCanvasViewportAtWorldPoint,
   createCanvasDataTransferImportActionPlan,
+  createCanvasDataTransferImportActionPlanFromRegistry,
+  createCanvasDataTransferImportRegistry,
   createCanvasPastePositionKey,
   createCanvasRichClipboardHTML,
   createCanvasTabsDescriptor,
@@ -53,6 +55,7 @@ import {
   getCanvasContextMenuKeyboardIntent,
   getCanvasContextMenuPosition,
   getCanvasDataTransferText,
+  getCanvasDataTransferImportRegistryMetadata,
   getCanvasEditableFieldKeyboardIntent,
   getCanvasEraserHitItemIds,
   getCanvasFindInputKeyboardIntent,
@@ -123,6 +126,9 @@ import {
   zoomCanvasViewport,
   type CanvasFloatingAnchor,
   type CanvasDeferredSelectorFocusInput,
+  type CanvasDataTransferImportRegistry,
+  type CanvasDataTransferImportRegistryResolver,
+  type CanvasDataTransferImportRegistryResolverMetadata,
   type CanvasFocusableElement,
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
@@ -280,6 +286,10 @@ export const centerPPTCanvasViewportAtWorldPoint =
   centerCanvasViewportAtWorldPoint
 export const createPPTCanvasDataTransferImportActionPlan =
   createCanvasDataTransferImportActionPlan
+export const createPPTCanvasDataTransferImportActionPlanFromRegistry =
+  createCanvasDataTransferImportActionPlanFromRegistry
+export const createPPTCanvasDataTransferImportRegistry =
+  createCanvasDataTransferImportRegistry
 export const createPPTCanvasPastePositionKey =
   createCanvasPastePositionKey
 export const createPPTCanvasRichClipboardHTML =
@@ -304,6 +314,8 @@ export const getPPTCanvasContextMenuKeyboardIntent =
 export const getPPTCanvasContextMenuPosition =
   getCanvasContextMenuPosition
 export const getPPTCanvasDataTransferText = getCanvasDataTransferText
+export const getPPTCanvasDataTransferImportRegistryMetadata =
+  getCanvasDataTransferImportRegistryMetadata
 export const getPPTCanvasEditableFieldKeyboardIntent =
   getCanvasEditableFieldKeyboardIntent
 export const getPPTCanvasFindInputKeyboardIntent =
@@ -504,6 +516,17 @@ export const resolvePPTCanvasImageSourceNaturalSize =
 export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
+export type PPTCanvasDataTransferImportRegistry<
+  TAction,
+  TScope extends string,
+> = CanvasDataTransferImportRegistry<TAction, TScope>
+export type PPTCanvasDataTransferImportRegistryResolver<
+  TAction,
+  TScope extends string,
+> = CanvasDataTransferImportRegistryResolver<TAction, TScope>
+export type PPTCanvasDataTransferImportRegistryResolverMetadata<
+  TScope extends string,
+> = CanvasDataTransferImportRegistryResolverMetadata<TScope>
 export type PPTCanvasImageImportFormat = CanvasImageImportFormat
 export type PPTCanvasImageImportSource = CanvasImageImportSource
 export type PPTCanvasImagePasteReplaceRoute =

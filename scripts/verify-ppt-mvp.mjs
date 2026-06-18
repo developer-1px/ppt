@@ -13718,6 +13718,8 @@ async function runImageImportScenario(page) {
   record(
     'inserts PPT image from file picker affordance',
       afterUpload.importExtension === 'ppt-import-extension' &&
+      afterUpload.importExtensionActionPlanner ===
+        'canvas-data-transfer-import-registry' &&
       afterUpload.importExtensionInstallUnit === 'src/pptImportExtension' &&
       afterUpload.importExtensionClipboardActionOrder ===
         'image-file-batch image-file table-file-batch table-file fallback-html-selection-source fallback-html-image-source fallback-html-shape-source fallback-html-table-source fallback-html-text-source image-source table-source rich-text-source media-source text-source' &&
@@ -21543,6 +21545,7 @@ function getPPTImageImportState(page) {
       fallbackHTMLImportModel: stage?.getAttribute('data-ppt-fallback-html-import-model') ?? '',
       fallbackHTMLImportSourceObject: stage?.getAttribute('data-ppt-fallback-html-import-source-object') ?? '',
       importExtension: stage?.getAttribute('data-ppt-import-extension') ?? '',
+      importExtensionActionPlanner: stage?.getAttribute('data-ppt-import-extension-action-planner') ?? '',
       importExtensionClipboardActionOrder: stage?.getAttribute('data-ppt-import-extension-clipboard-action-order') ?? '',
       importExtensionDropActionOrder: stage?.getAttribute('data-ppt-import-extension-drop-action-order') ?? '',
       importExtensionInstallUnit: stage?.getAttribute('data-ppt-import-extension-install-unit') ?? '',
