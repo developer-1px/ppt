@@ -6,6 +6,7 @@ import {
   createPPTCanvasExternalClipboardImagePasteActionResolver,
   createPPTCanvasExternalClipboardPasteActionPlan,
   getPPTCanvasDataImageSourceFromDataTransfer,
+  getPPTCanvasHTMLDataImageSourcesFromDataTransfer,
   getPPTCanvasImageFileFromDataTransfer,
   getPPTCanvasImageFileFromList,
   getPPTCanvasImageFilesFromDataTransfer,
@@ -196,6 +197,15 @@ export const getPPTImageFilesFromDataTransfer =
 
 export const getPPTDataImageSourceFromDataTransfer =
   getPPTCanvasDataImageSourceFromDataTransfer
+
+export const getPPTHTMLDataImageSourcesFromDataTransfer =
+  getPPTCanvasHTMLDataImageSourcesFromDataTransfer
+
+export function getPPTHTMLDataImageSourcesFromHTML(html: string) {
+  return getPPTHTMLDataImageSourcesFromDataTransfer({
+    getData: (type: string) => type === 'text/html' ? html : '',
+  } as DataTransfer)
+}
 
 export const getPPTImageSourceFromDataTransfer =
   getPPTCanvasImageSourceFromDataTransfer

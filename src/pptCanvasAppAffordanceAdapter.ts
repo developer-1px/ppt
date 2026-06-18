@@ -208,6 +208,7 @@ import {
 import {
   CANVAS_IMAGE_IMPORT_MODEL,
   getCanvasDataImageSourceFromDataTransfer,
+  getCanvasHTMLDataImageSourcesFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
   getCanvasImageFilesFromDataTransfer,
@@ -494,6 +495,8 @@ export const filterPPTCommandPaletteItems =
 export const createPPTCanvasTextPasteItems = createCanvasTextPasteItems
 export const getPPTCanvasDataImageSourceFromDataTransfer =
   getCanvasDataImageSourceFromDataTransfer
+export const getPPTCanvasHTMLDataImageSourcesFromDataTransfer =
+  getCanvasHTMLDataImageSourcesFromDataTransfer
 export const readPPTCanvasClipboardImageSource =
   readCanvasClipboardImageSource
 export const getPPTCanvasImageFileFromDataTransfer =

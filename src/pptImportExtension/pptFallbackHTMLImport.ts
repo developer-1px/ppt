@@ -22,6 +22,7 @@ import {
   type PPTTextStyle,
 } from '../pptModel'
 import {
+  getPPTHTMLDataImageSourcesFromHTML,
   getPPTImageSourceFromDataTransfer,
   type PPTImageImportSource,
 } from './imageImport'
@@ -283,12 +284,19 @@ function getPPTFallbackHTMLMarkedSelectionItemSources(
   doc: Document,
   image: PPTImageImportSource | null = null,
 ): PPTFallbackHTMLSelectionItemSource[] {
+  const imageElementCount = doc.querySelectorAll(
+    '[data-ppt-selection-image]',
+  ).length
+
   return [...doc.querySelectorAll<HTMLElement>(
     '[data-ppt-selection-image], [data-ppt-selection-shape], [data-ppt-selection-table], [data-ppt-selection-text-body]',
   )]
     .map((element): PPTFallbackHTMLSelectionItemSource | null => {
       if (element.hasAttribute('data-ppt-selection-image')) {
-        const source = getPPTFallbackHTMLImageSourceFromElement(element, image)
+        const source = getPPTFallbackHTMLImageSourceFromElement(
+          element,
+          imageElementCount === 1 ? image : null,
+        )
 
         return source ? { kind: 'image', source } : null
       }
@@ -320,10 +328,15 @@ function getPPTFallbackHTMLMarkedSelectionItemSources(
 function getPPTFallbackHTMLExternalSelectionItemSources(
   doc: Document,
 ): PPTFallbackHTMLSelectionItemSource[] {
+  const seenImageDataUrls = new Set<string>()
+
   return [...doc.querySelectorAll<HTMLElement>('img[src^="data:image/"], table')]
     .map((element): PPTFallbackHTMLSelectionItemSource | null => {
       if (element instanceof HTMLImageElement) {
-        const source = getPPTFallbackHTMLExternalImageSourceFromElement(element)
+        const source = getPPTFallbackHTMLExternalImageSourceFromElement(
+          element,
+          seenImageDataUrls,
+        )
 
         return source ? { kind: 'image', source } : null
       }
@@ -347,8 +360,17 @@ function isPPTFallbackHTMLStandaloneTextElement(element: HTMLElement) {
 
 function getPPTFallbackHTMLExternalImageSourceFromElement(
   element: HTMLImageElement,
+  seenDataUrls?: Set<string>,
 ) {
   const image = getPPTFallbackHTMLImageImportSourceFromHTML(element.outerHTML)
+
+  if (image && seenDataUrls?.has(image.dataUrl)) {
+    return null
+  }
+
+  if (image) {
+    seenDataUrls?.add(image.dataUrl)
+  }
 
   return getPPTFallbackHTMLImageSourceFromElement(element, image)
 }
@@ -360,7 +382,8 @@ function getPPTFallbackHTMLImageSourceFromElement(
   const img = element.matches('img')
     ? element as HTMLImageElement
     : element.querySelector<HTMLImageElement>('img')
-  const imageSource = image ?? getPPTFallbackHTMLImageImportSource(img)
+  const imageSource = image ??
+    (img ? getPPTFallbackHTMLImageImportSourceFromHTML(img.outerHTML) : null)
 
   if (!img || !imageSource) {
     return null
@@ -807,26 +830,15 @@ export function createPPTFallbackHTMLImportEffect({
   }
 }
 
-function getPPTFallbackHTMLImageImportSource(
-  image: HTMLImageElement | null,
-): PPTImageImportSource | null {
-  const dataUrl = image?.getAttribute('src')?.trim() ?? ''
-  const mimeType = dataUrl.match(/^data:([^;,]+)/i)?.[1]?.toLowerCase()
-
-  if (!dataUrl || !mimeType?.startsWith('image/') || mimeType === 'image/svg+xml') {
-    return null
-  }
-
-  return {
-    dataUrl,
-    mimeType,
-    name: image?.getAttribute('alt')?.trim() || undefined,
-  }
-}
-
 function getPPTFallbackHTMLImageImportSourceFromHTML(
   html: string,
 ): PPTImageImportSource | null {
+  const [source = null] = getPPTHTMLDataImageSourcesFromHTML(html)
+
+  if (source) {
+    return source
+  }
+
   const dataTransfer = {
     getData: (type: string) => type === 'text/html' ? html : '',
   } as DataTransfer
