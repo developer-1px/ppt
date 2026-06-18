@@ -8549,6 +8549,93 @@ async function runViewAndShapeScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectStrokeLineStyle: { value: 'dot' },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterShapeDashJSONPaste = await getPPTShapeStrokeDashState(page)
+
+  record(
+    'pastes JSON object stroke line style through slide-edit command effect',
+    afterShapeDashJSONPaste.importModel === 'ppt-object-stroke-line-style-import' &&
+      afterShapeDashJSONPaste.importFormat === 'application-json-ppt-object-stroke-line-style' &&
+      afterShapeDashJSONPaste.importSlide === 'slide-1' &&
+      afterShapeDashJSONPaste.importObjects === afterShapeDashJSONPaste.selectedId &&
+      afterShapeDashJSONPaste.importFields === 'strokeLineStyle' &&
+      afterShapeDashJSONPaste.importCommands === 'update-object-stroke-line-style' &&
+      afterShapeDashJSONPaste.importCommandFields === 'strokeLineStyle' &&
+      afterShapeDashJSONPaste.importCommandTargets === afterShapeDashJSONPaste.selectedId &&
+      afterShapeDashJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterShapeDashJSONPaste.importCommandValues === 'dot' &&
+      afterShapeDashJSONPaste.importValue === 'dot' &&
+      afterShapeDashJSONPaste.importJsonLength > 40 &&
+      afterShapeDashJSONPaste.command === 'update-object-stroke-line-style' &&
+      afterShapeDashJSONPaste.commandField === 'strokeLineStyle' &&
+      afterShapeDashJSONPaste.commandValue === 'dot' &&
+      afterShapeDashJSONPaste.inspectorDash === 'dot' &&
+      afterShapeDashJSONPaste.selectedDash === 'dot' &&
+      afterShapeDashJSONPaste.selectedBorderStyle === 'dotted' &&
+      afterShapeDashJSONPaste.thumbDash === 'dot' &&
+      afterShapeDashJSONPaste.thumbBorderStyle === 'dotted',
+    {
+      afterShapeDashJSONPaste,
+      afterShapeDashRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterShapeDashJSONUndo = await getPPTShapeStrokeDashState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterShapeDashJSONRedo = await getPPTShapeStrokeDashState(page)
+
+  record(
+    'undoes and redoes PPT object stroke line style JSON as one history step',
+    afterShapeDashJSONUndo.inspectorDash === 'dash' &&
+      afterShapeDashJSONUndo.selectedDash === 'dash' &&
+      afterShapeDashJSONRedo.inspectorDash === 'dot' &&
+      afterShapeDashJSONRedo.selectedDash === 'dot',
+    {
+      afterShapeDashJSONPaste,
+      afterShapeDashJSONRedo,
+      afterShapeDashJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="fill-opacity"]')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
 
@@ -17473,6 +17560,18 @@ function getPPTShapeStrokeDashState(page) {
       descriptorCommand: field?.getAttribute('data-ppt-stroke-line-style-command') ?? '',
       descriptorControl: field?.getAttribute('data-ppt-stroke-line-style-control') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-stroke-line-style-surface') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-stroke-line-style-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-stroke-line-style-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-stroke-line-style-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-stroke-line-style-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-stroke-line-style-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-stroke-line-style-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-stroke-line-style-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-stroke-line-style-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-stroke-line-style-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-stroke-line-style-import-objects') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-stroke-line-style-import-slide') ?? '',
+      importValue: stage?.getAttribute('data-ppt-stroke-line-style-import-value') ?? '',
       inspectorDash: field?.value ?? '',
       model: stage?.getAttribute('data-ppt-stroke-line-style-model') ?? '',
       selectedBorderStyle: selected?.style.borderStyle ?? '',

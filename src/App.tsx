@@ -1134,6 +1134,12 @@ const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-line-style' as const
 const PPT_LINE_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.line-style+json'
+const PPT_OBJECT_STROKE_LINE_STYLE_IMPORT_MODEL =
+  'ppt-object-stroke-line-style-import' as const
+const PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-stroke-line-style' as const
+const PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-stroke-line-style+json'
 const PPT_OBJECT_TRANSFORM_IMPORT_MODEL = 'ppt-object-transform-import' as const
 const PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-transform' as const
@@ -1547,6 +1553,13 @@ type PPTLineStyleImportSource = {
   format: typeof PPT_LINE_STYLE_JSON_IMPORT_FORMAT
   jsonLength: number
   stroke: Partial<PPTStroke>
+}
+type PPTObjectStrokeLineStyleImportField = 'strokeLineStyle'
+type PPTObjectStrokeLineStyleImportSource = {
+  fields: readonly PPTObjectStrokeLineStyleImportField[]
+  format: typeof PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  strokeLineStyle: PPTStrokeDash
 }
 type PPTObjectTransformImportField =
   | 'h'
@@ -2001,6 +2014,20 @@ type PPTLineStyleImportEffect = {
   strokeColor: string
   strokeDash: string
   strokeWidth: string
+}
+type PPTObjectStrokeLineStyleImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_STROKE_LINE_STYLE_IMPORT_MODEL
+  objectIds: string
+  slideId: string
+  strokeLineStyle: string
 }
 type PPTObjectTransformImportEffect = {
   commandTargets: string
@@ -3120,6 +3147,8 @@ function App() {
   ] = useState<PPTTextVerticalAlignImportEffect | null>(null)
   const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
     useState<PPTLineStyleImportEffect | null>(null)
+  const [lastObjectStrokeLineStyleImportEffect, setLastObjectStrokeLineStyleImportEffect] =
+    useState<PPTObjectStrokeLineStyleImportEffect | null>(null)
   const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
     useState<PPTObjectTransformImportEffect | null>(null)
   const [lastCommentImportEffect, setLastCommentImportEffect] =
@@ -4101,6 +4130,17 @@ function App() {
       if (
         objectCornerRadiusSource &&
         pastePPTObjectCornerRadiusSource(objectCornerRadiusSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectStrokeLineStyleSource =
+        getPPTObjectStrokeLineStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectStrokeLineStyleSource &&
+        pastePPTObjectStrokeLineStyleSource(objectStrokeLineStyleSource)
       ) {
         event.preventDefault()
         return
@@ -5428,6 +5468,70 @@ function App() {
             cornerRadius: normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
               ? undefined
               : normalized,
+          }
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectStrokeLineStyleSource(
+    source: PPTObjectStrokeLineStyleImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element) =>
+        isPPTLineStyleTargetElement(element) &&
+          getPPTElementStroke(element) !== null &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getSlideEditObjectStrokeLineStyleCommandEffect({
+          fieldId: 'strokeLineStyle',
+          id: 'update-object-stroke-line-style',
+          objectId: element.id,
+          slideId: activeSlide.id,
+          value: source.strokeLineStyle,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastStrokeLineStyleEffect(effects[effects.length - 1])
+    setLastObjectStrokeLineStyleImportEffect(
+      createPPTObjectStrokeLineStyleImportEffect({
+        effects,
+        source,
+      }),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (!isPPTLineStyleTargetElement(element)) {
+            return element
+          }
+
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          if (!effect) {
+            return element
+          }
+
+          const stroke = getPPTElementStroke(element)
+
+          if (!stroke) {
+            return element
+          }
+
+          return {
+            ...element,
+            stroke: normalizePPTStroke({
+              ...stroke,
+              dash: normalizePPTStrokeDash(effect.payload.value),
+            }),
           }
         }),
       })))
@@ -12272,6 +12376,18 @@ function App() {
         data-ppt-stroke-line-style-command-slide={lastStrokeLineStyleEffect?.payload.slideId}
         data-ppt-stroke-line-style-command-type={lastStrokeLineStyleEffect?.type}
         data-ppt-stroke-line-style-command-value={lastStrokeLineStyleEffect?.payload.value}
+        data-ppt-stroke-line-style-import-command-fields={lastObjectStrokeLineStyleImportEffect?.commandFields}
+        data-ppt-stroke-line-style-import-command-targets={lastObjectStrokeLineStyleImportEffect?.commandTargets}
+        data-ppt-stroke-line-style-import-command-types={lastObjectStrokeLineStyleImportEffect?.commandTypes}
+        data-ppt-stroke-line-style-import-command-values={lastObjectStrokeLineStyleImportEffect?.commandValues}
+        data-ppt-stroke-line-style-import-commands={lastObjectStrokeLineStyleImportEffect?.commandIds}
+        data-ppt-stroke-line-style-import-fields={lastObjectStrokeLineStyleImportEffect?.fields}
+        data-ppt-stroke-line-style-import-format={lastObjectStrokeLineStyleImportEffect?.format}
+        data-ppt-stroke-line-style-import-json-length={lastObjectStrokeLineStyleImportEffect?.jsonLength}
+        data-ppt-stroke-line-style-import-model={lastObjectStrokeLineStyleImportEffect?.model}
+        data-ppt-stroke-line-style-import-objects={lastObjectStrokeLineStyleImportEffect?.objectIds}
+        data-ppt-stroke-line-style-import-slide={lastObjectStrokeLineStyleImportEffect?.slideId}
+        data-ppt-stroke-line-style-import-value={lastObjectStrokeLineStyleImportEffect?.strokeLineStyle}
         data-ppt-stroke-line-style-model="slide-edit-object-stroke-line-style"
         data-ppt-text-font-family-command={lastTextFontFamilyEffect?.payload.id}
         data-ppt-text-font-family-command-field={lastTextFontFamilyEffect?.payload.fieldId}
@@ -15993,6 +16109,31 @@ function createPPTLineStyleImportEffect({
   }
 }
 
+function createPPTObjectStrokeLineStyleImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectStrokeLineStyleHostCommandEffect<string, string>[]
+  source: PPTObjectStrokeLineStyleImportSource
+}): PPTObjectStrokeLineStyleImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => String(effect.payload.value)).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_STROKE_LINE_STYLE_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+    strokeLineStyle: source.strokeLineStyle,
+  }
+}
+
 function createPPTElementsJSONImportEffect(
   source: PPTElementsJSONImportSource,
 ): PPTElementsJSONImportEffect {
@@ -19359,6 +19500,139 @@ function getPPTLineStyleDashFromJSONValue(
 ): PPTStrokeDash | undefined {
   return typeof value === 'string' && isPPTStrokeDash(value)
     ? normalizePPTStrokeDash(value)
+    : undefined
+}
+
+function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectStrokeLineStyleSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectStrokeLineStyleSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectStrokeLineStyleImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectStrokeLineStyleSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectStrokeLineStyleSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectStrokeLineStyleImportSource | null {
+  const strokeLineStyle = getPPTObjectStrokeLineStyleFromJSONValue(
+    getPPTObjectStrokeLineStylePayloadValue(value, allowDirect),
+  )
+
+  return strokeLineStyle === undefined
+    ? null
+    : {
+        fields: ['strokeLineStyle'],
+        format: PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        strokeLineStyle,
+      }
+}
+
+function getPPTObjectStrokeLineStylePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (value.objectStrokeLineStyle !== undefined) {
+    return value.objectStrokeLineStyle
+  }
+
+  if (value.strokeLineStyle !== undefined) {
+    return value.strokeLineStyle
+  }
+
+  if (value.strokeDash !== undefined) {
+    return value.strokeDash
+  }
+
+  return allowDirect &&
+    (
+      value.dash !== undefined ||
+      value.value !== undefined
+    )
+    ? value
+    : undefined
+}
+
+function getPPTObjectStrokeLineStyleFromJSONValue(
+  value: unknown,
+): PPTStrokeDash | undefined {
+  const raw = isPPTRecord(value)
+    ? value.strokeLineStyle ?? value.strokeDash ?? value.dash ?? value.value
+    : value
+
+  return typeof raw === 'string' && isPPTStrokeDash(raw)
+    ? normalizePPTStrokeDash(raw)
     : undefined
 }
 
