@@ -24729,49 +24729,43 @@ function getPPTTextFontSizeSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextFontSizeImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE),
+      format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextFontSizeSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextFontSizeSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextFontSizeSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextFontSizeSourceFromSlideEditJSONPasteValue(
@@ -25022,49 +25016,43 @@ function getPPTTextFontWeightSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextFontWeightImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE),
+      format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextFontWeightSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextFontWeightSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextFontWeightSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextFontWeightSourceFromSlideEditJSONPasteValue(
@@ -25246,49 +25234,43 @@ function getPPTTextRunSizeSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextRunSizeImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_SIZE_JSON_MIME_TYPE),
+      format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_RUN_SIZE_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextRunSizeSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextRunSizeSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextRunSizeSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(
@@ -25513,49 +25495,43 @@ function getPPTTextRunColorSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextRunColorImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE),
+      format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextRunColorSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextRunColorSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextRunColorSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextRunColorSourceFromSlideEditJSONPasteValue(
@@ -25770,49 +25746,43 @@ function getPPTTextRunBoldSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextRunBoldImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_BOLD_JSON_MIME_TYPE),
+      format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_RUN_BOLD_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextRunBoldSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextRunBoldSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextRunBoldSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextRunBoldSourceFromSlideEditJSONPasteValue(
