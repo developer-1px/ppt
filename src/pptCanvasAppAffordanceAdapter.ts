@@ -138,6 +138,7 @@ import {
   executeCanvasStandardCommand,
   pasteCanvasClipboardSelection,
   trapCanvasModalTabFocus,
+  transformCanvasAppItemsChange,
   useCanvasMenuRovingFocus,
   useCanvasModalFocusLifecycle,
   useCanvasAppStageElement,
@@ -152,6 +153,8 @@ import {
   type CanvasClipboardCommandEffectPlanContext,
   type CanvasClipboardCommandExecutionContext,
   type CanvasClipboardCommandExecutionResult,
+  type CanvasAppItemsChange,
+  type CanvasAppItemsChangeTransformer,
   type CanvasStandardCommand,
   type CanvasStandardCommandDocumentEffect,
   type CanvasStandardCommandDocumentEffectContext,
@@ -185,6 +188,9 @@ import {
   type CanvasTextPasteReplaceTarget,
   type CanvasTextPasteSource,
 } from 'canvas/app'
+import {
+  CANVAS_COMPONENT_DEFINITION_REGISTRY,
+} from 'canvas/host'
 import {
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL,
   filterCanvasCommandPaletteItems,
@@ -458,6 +464,8 @@ export const shouldReleasePPTCanvasKeyboardTemporaryPan =
 export const stringifyPPTCanvasRichClipboardPayload =
   stringifyCanvasRichClipboardPayload
 export const trapPPTCanvasModalTabFocus = trapCanvasModalTabFocus
+export const transformPPTCanvasAppItemsChange =
+  transformCanvasAppItemsChange
 export const usePPTCanvasMenuRovingFocus = useCanvasMenuRovingFocus
 export const usePPTCanvasModalFocusLifecycle =
   useCanvasModalFocusLifecycle
@@ -574,6 +582,11 @@ export type PPTCanvasClipboardCommandExecutionContext<
 export type PPTCanvasClipboardCommandExecutionResult<
   TItem extends { id: string },
 > = CanvasClipboardCommandExecutionResult<TItem>
+export type PPTCanvasAppItemsChange<TItem extends { id: string }> =
+  CanvasAppItemsChange<TItem>
+export type PPTCanvasAppItemsChangeTransformer<
+  TItem extends { id: string },
+> = CanvasAppItemsChangeTransformer<TItem>
 export type PPTCanvasStandardCommand = CanvasStandardCommand
 export type PPTCanvasStandardCommandDocumentEffect<
   TItem extends { id: string },
@@ -643,3 +656,5 @@ export type PPTCanvasRichClipboardWriteMode =
 export type RunPPTCanvasClipboardCommand = RunCanvasClipboardCommand
 export type PPTCanvasTabsDescriptor<TId extends string> =
   CanvasTabsDescriptor<TId>
+export const PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY =
+  CANVAS_COMPONENT_DEFINITION_REGISTRY

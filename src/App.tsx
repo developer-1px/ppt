@@ -675,12 +675,15 @@ import {
   setPPTCanvasDataTransferText,
   shouldReleasePPTCanvasKeyboardTemporaryPan,
   stringifyPPTCanvasRichClipboardPayload,
+  transformPPTCanvasAppItemsChange,
   trapPPTCanvasModalTabFocus,
   usePPTCanvasMenuRovingFocus,
   usePPTCanvasModalFocusLifecycle,
   usePPTCanvasToolbarRovingFocus,
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
+  PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+  type PPTCanvasAppItemsChangeTransformer,
   type PPTCanvasClipboardCommand,
   type PPTCanvasFloatingAnchor,
   type PPTCanvasImagePasteReplaceRoute,
@@ -5055,30 +5058,82 @@ function App() {
         return slide
       }
 
+      const items = transformPPTCanvasChangedItems(
+        result.items,
+        result.selection,
+        slide.elements,
+      )
+
       setSelection(result.selection)
 
       return {
         ...slide,
-        elements: syncPPTLineConnections(
-          result.items,
-          getPPTSelectedLineIds(result.items, result.selection),
-        ),
+        elements: items,
       }
     }))
   }
 
-  function commitPPTCanvasStandardItems(
+  function transformPPTCanvasChangedItems(
+    items: PPTElement[],
+    detachedSelection: readonly string[] = selection,
+    currentItems: readonly PPTElement[] = activeSlide.elements,
+  ) {
+    const change = transformPPTCanvasAppItemsChange<PPTElement>({
+      change: {
+        items,
+        type: 'replace-changed',
+      },
+      componentDefinitionRegistry: PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+      currentItems,
+      transformers: [
+        createPPTLineConnectionItemsChangeTransformer(detachedSelection),
+      ],
+    })
+
+    return change.type === 'replace-changed' ? change.items : items
+  }
+
+  function commitPPTCanvasChangedItems(
     items: PPTElement[],
     nextSelection: readonly string[] = selection,
   ) {
     setSelection([...nextSelection])
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-      ...slide,
-      elements: syncPPTLineConnections(
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const nextItems = transformPPTCanvasChangedItems(
         items,
-        getPPTSelectedLineIds(items, [...nextSelection]),
-      ),
-    })))
+        nextSelection,
+        slide.elements,
+      )
+
+      return {
+        ...slide,
+        elements: nextItems,
+      }
+    }))
+    return true
+  }
+
+  function commitPPTCanvasAddedItems(
+    items: PPTElement[],
+    nextSelection: readonly string[] = items.map((item) => item.id),
+  ) {
+    if (items.length === 0) {
+      return false
+    }
+
+    setSelection([...nextSelection])
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
+      const nextItems = transformPPTCanvasChangedItems(
+        [...slide.elements, ...items],
+        nextSelection,
+        slide.elements,
+      )
+
+      return {
+        ...slide,
+        elements: nextItems,
+      }
+    }))
     return true
   }
 
@@ -5092,12 +5147,8 @@ function App() {
 
     switch (change.type) {
       case 'add':
-        if (change.items.length === 0) {
-          return false
-        }
-
-        return commitPPTCanvasStandardItems(
-          [...activeSlide.elements, ...change.items],
+        return commitPPTCanvasAddedItems(
+          change.items,
           nextSelection.length > 0
             ? nextSelection
             : change.items.map((item) => item.id),
@@ -5109,7 +5160,7 @@ function App() {
           selection: [...change.selection],
         })
 
-        return commitPPTCanvasStandardItems(
+        return commitPPTCanvasChangedItems(
           result.items,
           nextSelection.length > 0 ? nextSelection : result.selection,
         )
@@ -5126,13 +5177,13 @@ function App() {
           return false
         }
 
-        return commitPPTCanvasStandardItems(
+        return commitPPTCanvasChangedItems(
           result.items,
           nextSelection.length > 0 ? nextSelection : result.selection,
         )
       }
       case 'replace-changed':
-        return commitPPTCanvasStandardItems(change.items, nextSelection)
+        return commitPPTCanvasChangedItems(change.items, nextSelection)
       case 'reorder-selection': {
         const items = commandAdapter.reorderSelection({
           items: activeSlide.elements,
@@ -5140,17 +5191,17 @@ function App() {
           selection: [...change.selection],
         })
 
-        return commitPPTCanvasStandardItems(items, nextSelection)
+        return commitPPTCanvasChangedItems(items, nextSelection)
       }
       case 'transform':
-        return commitPPTCanvasStandardItems(change.afterItems, nextSelection)
+        return commitPPTCanvasChangedItems(change.afterItems, nextSelection)
       case 'ungroup-selection': {
         const result = commandAdapter.ungroupSelection({
           items: activeSlide.elements,
           selection: [...change.selection],
         })
 
-        return commitPPTCanvasStandardItems(
+        return commitPPTCanvasChangedItems(
           result.items,
           nextSelection.length > 0 ? nextSelection : result.selection,
         )
@@ -9678,26 +9729,10 @@ function App() {
         commitItemsChange: (change, selectionHistory) => {
           switch (change.type) {
             case 'add':
-              if (change.items.length === 0) {
-                return false
-              }
-
-              setSelection(
+              return commitPPTCanvasAddedItems(
+                change.items,
                 selectionHistory?.after ?? change.items.map((item) => item.id),
               )
-              commitDeck((current) =>
-                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-                  ...slide,
-                  elements: syncPPTLineConnections(
-                    [...slide.elements, ...change.items],
-                    getPPTSelectedLineIds(
-                      [...slide.elements, ...change.items],
-                      selectionHistory?.after ??
-                        change.items.map((item) => item.id),
-                    ),
-                  ),
-                })))
-              return true
             case 'remove-selection': {
               const result = deletePPTCanvasCommand({
                 adapter: commandAdapter,
@@ -9710,34 +9745,16 @@ function App() {
                 return false
               }
 
-              setSelection(selectionHistory?.after ?? result.selection)
-              commitDeck((current) =>
-                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-                  ...slide,
-                  elements: syncPPTLineConnections(
-                    result.items,
-                    getPPTSelectedLineIds(
-                      result.items,
-                      selectionHistory?.after ?? result.selection,
-                    ),
-                  ),
-                })))
-              return true
+              return commitPPTCanvasChangedItems(
+                result.items,
+                selectionHistory?.after ?? result.selection,
+              )
             }
             case 'transform':
-              setSelection(selectionHistory?.after ?? selection)
-              commitDeck((current) =>
-                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
-                  ...slide,
-                  elements: syncPPTLineConnections(
-                    change.afterItems,
-                    getPPTSelectedLineIds(
-                      change.afterItems,
-                      selectionHistory?.after ?? selection,
-                    ),
-                  ),
-                })))
-              return true
+              return commitPPTCanvasChangedItems(
+                change.afterItems,
+                selectionHistory?.after ?? selection,
+              )
           }
         },
         commitSelection: (action) => {
@@ -9946,8 +9963,10 @@ function App() {
 
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
       ...slide,
-      elements: syncPPTLineConnections(
+      elements: transformPPTCanvasChangedItems(
         tidyPPTSelectionElements(slide.elements, selection),
+        selection,
+        slide.elements,
       ),
     })))
     setEditingId(null)
@@ -9964,9 +9983,10 @@ function App() {
 
       return {
         ...slide,
-        elements: syncPPTLineConnections(
+        elements: transformPPTCanvasChangedItems(
           elements,
-          getPPTSelectedLineIds(elements, selection),
+          selection,
+          slide.elements,
         ),
       }
     }))
@@ -38694,6 +38714,27 @@ function syncPPTLineConnections(
       startConnection,
     })
   })
+}
+
+function createPPTLineConnectionItemsChangeTransformer(
+  detachedSelection: readonly string[],
+): PPTCanvasAppItemsChangeTransformer<PPTElement> {
+  return {
+    id: 'ppt-line-connection-sync',
+    transform: ({ change }) => {
+      if (change.type !== 'replace-changed') {
+        return change
+      }
+
+      return {
+        ...change,
+        items: syncPPTLineConnections(
+          change.items,
+          getPPTSelectedLineIds(change.items, [...detachedSelection]),
+        ),
+      }
+    },
+  }
 }
 
 function clearPPTLineConnections(line: PPTLine): PPTLine {
