@@ -1222,8 +1222,9 @@ function readPPTJSONDataTransferSource<
   const parsed = readPPTCanvasDataTransferJSONCandidate<TSource, TCandidate>({
     candidates,
     dataTransfer,
-    parseValue: ({ candidate, json, rawText }) => {
-      const text = rawText.trim()
+    extractTextJSON: true,
+    parseValue: ({ candidate, json, jsonText, rawText }) => {
+      const text = (jsonText ?? rawText).trim()
 
       if (seen.has(text)) {
         throw new Error('Duplicate PPT JSON candidate')
