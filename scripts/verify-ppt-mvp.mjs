@@ -6206,6 +6206,89 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textParagraphStyle: {
+        align: 'left',
+        bullet: null,
+        lineHeight: 1.08,
+        spacingAfter: 6,
+        spacingBefore: 2,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterStandaloneParagraphStylePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes standalone PPT textParagraphStyle JSON through style clipboard text category',
+    summaryAfterStandaloneParagraphStylePaste.selected === 'true' &&
+      summaryAfterStandaloneParagraphStylePaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportModel === 'ppt-text-style-import' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportFormat === 'application-json-ppt-text-style' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportCommand === 'paste-object-formatting' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportCommandTargets === 's1-summary' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportCommandType === 'slide-command-effect' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportCategories.includes('object-effect') &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportCategories.includes('text-style') &&
+      !summaryAfterStandaloneParagraphStylePaste.textStyleImportCategories.includes('text-run-style') &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportFields === 'paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportParagraphAlign === 'left' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportParagraphBullet === '' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportParagraphLineHeight === '1.08' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportParagraphSpacingAfter === '6' &&
+      summaryAfterStandaloneParagraphStylePaste.textStyleImportParagraphSpacingBefore === '2' &&
+      summaryAfterStandaloneParagraphStylePaste.textAlign === 'left' &&
+      summaryAfterStandaloneParagraphStylePaste.numberedList === '' &&
+      summaryAfterStandaloneParagraphStylePaste.bulletList === '' &&
+      summaryAfterStandaloneParagraphStylePaste.paragraphList === '' &&
+      summaryAfterStandaloneParagraphStylePaste.paragraphLineHeight === '1.08' &&
+      summaryAfterStandaloneParagraphStylePaste.paragraphSpacingAfter === '6' &&
+      summaryAfterStandaloneParagraphStylePaste.paragraphSpacingBefore === '2' &&
+      summaryAfterStandaloneParagraphStylePaste.styleClipboardCategories.includes('paragraph') &&
+      summaryAfterStandaloneParagraphStylePaste.styleClipboardPackageCategories.includes('text-style') &&
+      summaryAfterStandaloneParagraphStylePaste.styleClipboardCommandApplications.includes('text-style') &&
+      !summaryAfterStandaloneParagraphStylePaste.styleClipboardPackageCategories.includes('text-run-style'),
+    {
+      summaryAfterStandaloneParagraphStylePaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterStandaloneParagraphStyleUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes standalone PPT textParagraphStyle JSON as one history step',
+    summaryAfterStandaloneParagraphStyleUndo.textAlign === summaryAfterTextStylePaste.textAlign &&
+      summaryAfterStandaloneParagraphStyleUndo.paragraphList === summaryAfterTextStylePaste.paragraphList &&
+      summaryAfterStandaloneParagraphStyleUndo.paragraphLineHeight === summaryAfterTextStylePaste.paragraphLineHeight &&
+      summaryAfterStandaloneParagraphStyleUndo.paragraphSpacingAfter === summaryAfterTextStylePaste.paragraphSpacingAfter &&
+      summaryAfterStandaloneParagraphStyleUndo.paragraphSpacingBefore === summaryAfterTextStylePaste.paragraphSpacingBefore,
+    {
+      summaryAfterStandaloneParagraphStylePaste,
+      summaryAfterStandaloneParagraphStyleUndo,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
     const json = JSON.stringify(42)
 
     dataTransfer.setData(

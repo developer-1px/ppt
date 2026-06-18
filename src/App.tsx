@@ -4666,6 +4666,14 @@ function App() {
         return
       }
 
+      const textStyleSource =
+        getPPTTextStyleSourceFromDataTransfer(event.clipboardData)
+
+      if (textStyleSource && pastePPTTextStyleSource(textStyleSource)) {
+        event.preventDefault()
+        return
+      }
+
       const textRunSizeSource =
         getPPTTextRunSizeSourceFromDataTransfer(event.clipboardData)
 
@@ -4875,14 +4883,6 @@ function App() {
         getPPTLineStyleSourceFromDataTransfer(event.clipboardData)
 
       if (lineStyleSource && pastePPTLineStyleSource(lineStyleSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const textStyleSource =
-        getPPTTextStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (textStyleSource && pastePPTTextStyleSource(textStyleSource)) {
         event.preventDefault()
         return
       }
@@ -22044,7 +22044,9 @@ function getPPTTextStyleSourceFromJSONValue(
     ? payloadValue.paragraph
     : isPPTRecord(payloadValue.paragraphStyle)
       ? payloadValue.paragraphStyle
-      : payloadValue
+      : isPPTRecord(payloadValue.textParagraphStyle)
+        ? payloadValue.textParagraphStyle
+        : payloadValue
   const runStyleValue = isPPTRecord(payloadValue.runStyle)
     ? payloadValue.runStyle
     : isPPTRecord(payloadValue.textRunStyle)
@@ -22070,7 +22072,7 @@ function getPPTTextStyleSourceFromJSONValue(
     paragraphValue.align,
   )
   const bullet = getPPTTextStyleParagraphBulletFromJSONValue(
-    paragraphValue.bullet ?? paragraphValue.list,
+    'bullet' in paragraphValue ? paragraphValue.bullet : paragraphValue.list,
   )
   const lineHeight = getPPTTextStyleParagraphLineHeightFromJSONValue(
     paragraphValue.lineHeight,
@@ -22175,7 +22177,7 @@ function getPPTTextStyleSourceFromJSONValue(
 function getPPTTextStylePayloadValue(
   value: unknown,
   allowDirect: boolean,
-) {
+): unknown {
   if (!isPPTRecord(value)) {
     return allowDirect ? value : null
   }
@@ -22185,6 +22187,14 @@ function getPPTTextStylePayloadValue(
   }
 
   if (isPPTRecord(value.runStyle) || isPPTRecord(value.textRunStyle)) {
+    return value
+  }
+
+  if (
+    isPPTRecord(value.paragraph) ||
+    isPPTRecord(value.paragraphStyle) ||
+    isPPTRecord(value.textParagraphStyle)
+  ) {
     return value
   }
 
