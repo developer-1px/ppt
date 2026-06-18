@@ -5385,6 +5385,16 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontSizeImportModel: stage?.getAttribute('data-ppt-text-font-size-import-model') ?? '',
       textFontSizeImportObjects: stage?.getAttribute('data-ppt-text-font-size-import-objects') ?? '',
       textFontSizeImportValue: stage?.getAttribute('data-ppt-text-font-size-import-value') ?? '',
+      textFontWeightImportCategories: stage?.getAttribute('data-ppt-text-font-weight-import-categories') ?? '',
+      textFontWeightImportCommand: stage?.getAttribute('data-ppt-text-font-weight-import-command') ?? '',
+      textFontWeightImportCommandTargets: stage?.getAttribute('data-ppt-text-font-weight-import-command-targets') ?? '',
+      textFontWeightImportCommandType: stage?.getAttribute('data-ppt-text-font-weight-import-command-type') ?? '',
+      textFontWeightImportFields: stage?.getAttribute('data-ppt-text-font-weight-import-fields') ?? '',
+      textFontWeightImportFormat: stage?.getAttribute('data-ppt-text-font-weight-import-format') ?? '',
+      textFontWeightImportJsonLength: Number(stage?.getAttribute('data-ppt-text-font-weight-import-json-length') ?? 0),
+      textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
+      textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
+      textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
       textStyleImportCategories: stage?.getAttribute('data-ppt-text-style-import-categories') ?? '',
       textStyleImportColor: stage?.getAttribute('data-ppt-text-style-import-color') ?? '',
       textStyleImportCommand: stage?.getAttribute('data-ppt-text-style-import-command') ?? '',
@@ -6051,6 +6061,95 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextFontSizePaste,
       summaryAfterTextFontSizeRedo,
       summaryAfterTextFontSizeUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontSizeRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('bold')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-font-weight+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextFontWeightPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text font weight JSON through slide-edit style clipboard effect',
+    summaryAfterTextFontSizeRestore.fontSize === '34px' &&
+      summaryAfterTextFontWeightPaste.selected === 'true' &&
+      summaryAfterTextFontWeightPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextFontWeightPaste.fontSize === '34px' &&
+      summaryAfterTextFontWeightPaste.fontWeight === '700' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportModel === 'ppt-text-font-weight-import' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportFormat === 'application-json-ppt-text-font-weight' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportCommandTargets === 's1-summary' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportObjects === 's1-summary' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportCategories.includes('object-effect') &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportCategories.includes('text-style') &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportFields === 'value' &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportJsonLength > 5 &&
+      summaryAfterTextFontWeightPaste.textFontWeightImportValue === 'bold' &&
+      summaryAfterTextFontWeightPaste.styleClipboardCommand === 'paste-object-formatting' &&
+      summaryAfterTextFontWeightPaste.styleClipboardCommandTargets === 's1-summary' &&
+      summaryAfterTextFontWeightPaste.styleClipboardCommandApplications.includes('s1-summary') &&
+      summaryAfterTextFontWeightPaste.styleClipboardCommandApplications.includes('text-style'),
+    {
+      summaryAfterTextFontSizeRestore,
+      summaryAfterTextFontWeightPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontWeightUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontWeightRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text font weight JSON as one history step',
+    summaryAfterTextFontWeightUndo.fontWeight === '600' &&
+      summaryAfterTextFontWeightRedo.fontWeight === '700',
+    {
+      summaryAfterTextFontWeightPaste,
+      summaryAfterTextFontWeightRedo,
+      summaryAfterTextFontWeightUndo,
     },
   )
 

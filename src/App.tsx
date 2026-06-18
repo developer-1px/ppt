@@ -1114,6 +1114,12 @@ const PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-font-size' as const
 const PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-font-size+json'
+const PPT_TEXT_FONT_WEIGHT_IMPORT_MODEL =
+  'ppt-text-font-weight-import' as const
+const PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-font-weight' as const
+const PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-font-weight+json'
 const PPT_TEXT_FONT_FAMILY_IMPORT_MODEL =
   'ppt-text-font-family-import' as const
 const PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT =
@@ -1531,6 +1537,18 @@ type PPTTextFontSizeImportSource = {
   fields: readonly PPTTextFontSizeImportField[]
   fontSize: number
   format: typeof PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
+type PPTTextFontWeightImportField =
+  | 'bold'
+  | 'fontWeight'
+  | 'textFontWeight'
+  | 'value'
+  | 'weight'
+type PPTTextFontWeightImportSource = {
+  fields: readonly PPTTextFontWeightImportField[]
+  fontWeight: NonNullable<PPTTextStyle['fontWeight']>
+  format: typeof PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT
   jsonLength: number
 }
 type PPTTextFontFamilyImportField =
@@ -2019,6 +2037,18 @@ type PPTTextFontSizeImportEffect = {
   format: typeof PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT
   jsonLength: number
   model: typeof PPT_TEXT_FONT_SIZE_IMPORT_MODEL
+  objectIds: string
+}
+type PPTTextFontWeightImportEffect = {
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  fontWeight: string
+  format: typeof PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_FONT_WEIGHT_IMPORT_MODEL
   objectIds: string
 }
 type PPTTextFontFamilyImportEffect = {
@@ -3316,6 +3346,8 @@ function App() {
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFontSizeImportEffect, setLastTextFontSizeImportEffect] =
     useState<PPTTextFontSizeImportEffect | null>(null)
+  const [lastTextFontWeightImportEffect, setLastTextFontWeightImportEffect] =
+    useState<PPTTextFontWeightImportEffect | null>(null)
   const [lastTextFontFamilyImportEffect, setLastTextFontFamilyImportEffect] =
     useState<PPTTextFontFamilyImportEffect | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
@@ -4401,6 +4433,17 @@ function App() {
       if (
         textFontSizeSource &&
         pastePPTTextFontSizeSource(textFontSizeSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textFontWeightSource =
+        getPPTTextFontWeightSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textFontWeightSource &&
+        pastePPTTextFontWeightSource(textFontWeightSource)
       ) {
         event.preventDefault()
         return
@@ -6257,6 +6300,84 @@ function App() {
     setStyleClipboard(styleClipboard)
     setLastStyleClipboardEffect(effect)
     setLastTextFontSizeImportEffect(createPPTTextFontSizeImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextFontWeightSource(
+    source: PPTTextFontWeightImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = textElements[0]
+    const styleClipboard: PPTStyleClipboard = {
+      categories: ['object', 'text'],
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      sourceId: 'ppt-text-font-weight-json',
+      sourceKind: sourceElement.kind,
+      text: clonePPTTextStyle({
+        ...getPPTTextElementStyle(sourceElement),
+        fontWeight: source.fontWeight,
+      }),
+      type: 'slide-style-clipboard',
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(textElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastTextFontWeightImportEffect(createPPTTextFontWeightImportEffect({
       effect,
       source,
     }))
@@ -12808,6 +12929,16 @@ function App() {
         data-ppt-text-font-size-import-model={lastTextFontSizeImportEffect?.model}
         data-ppt-text-font-size-import-objects={lastTextFontSizeImportEffect?.objectIds}
         data-ppt-text-font-size-import-value={lastTextFontSizeImportEffect?.fontSize}
+        data-ppt-text-font-weight-import-categories={lastTextFontWeightImportEffect?.categories}
+        data-ppt-text-font-weight-import-command={lastTextFontWeightImportEffect?.commandId}
+        data-ppt-text-font-weight-import-command-targets={lastTextFontWeightImportEffect?.commandTargets}
+        data-ppt-text-font-weight-import-command-type={lastTextFontWeightImportEffect?.commandType}
+        data-ppt-text-font-weight-import-fields={lastTextFontWeightImportEffect?.fields}
+        data-ppt-text-font-weight-import-format={lastTextFontWeightImportEffect?.format}
+        data-ppt-text-font-weight-import-json-length={lastTextFontWeightImportEffect?.jsonLength}
+        data-ppt-text-font-weight-import-model={lastTextFontWeightImportEffect?.model}
+        data-ppt-text-font-weight-import-objects={lastTextFontWeightImportEffect?.objectIds}
+        data-ppt-text-font-weight-import-value={lastTextFontWeightImportEffect?.fontWeight}
         data-ppt-text-font-family-command={lastTextFontFamilyEffect?.payload.id}
         data-ppt-text-font-family-command-field={lastTextFontFamilyEffect?.payload.fieldId}
         data-ppt-text-font-family-command-object={lastTextFontFamilyEffect?.payload.objectId}
@@ -16217,6 +16348,38 @@ function createPPTTextFontSizeImportEffect({
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_FONT_SIZE_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+  }
+}
+
+function createPPTTextFontWeightImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTTextFontWeightImportSource
+}): PPTTextFontWeightImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+
+  return {
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    fontWeight: source.fontWeight,
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_FONT_WEIGHT_IMPORT_MODEL,
     objectIds: payload?.categoryApplications
       .map((application) => application.objectId)
       .join(' ') ?? '',
@@ -21097,6 +21260,178 @@ function getPPTTextFontSizeImportValueFromJSONValue(
         PPT_TEXT_FONT_SIZE_MIN,
         PPT_TEXT_FONT_SIZE_MAX,
       )
+}
+
+function getPPTTextFontWeightSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextFontWeightSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFontWeightSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextFontWeightImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextFontWeightSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextFontWeightSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextFontWeightSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextFontWeightSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextFontWeightImportSource | null {
+  const payload = getPPTTextFontWeightPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const fontWeight = getPPTTextFontWeightImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return fontWeight
+    ? {
+        fields: payload.fields,
+        fontWeight,
+        format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTTextFontWeightPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextFontWeightImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textFontWeight',
+    'fontWeight',
+    'weight',
+    'bold',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextFontWeightImportValueFromJSONValue(
+  value: unknown,
+): PPTTextStyle['fontWeight'] | undefined {
+  if (isPPTRecord(value)) {
+    return getPPTTextFontWeightImportValueFromJSONValue(
+      value.value ??
+        value.fontWeight ??
+        value.weight ??
+        value.textFontWeight ??
+        value.bold,
+    )
+  }
+
+  return getPPTTextStyleFontWeightFromJSONValue(value) ??
+    getPPTTextStyleBoldFromJSONValue(value)
 }
 
 function getPPTTextStyleFontFamilyFromJSONValue(value: unknown) {
