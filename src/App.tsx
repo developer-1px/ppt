@@ -1152,12 +1152,94 @@ type PPTJSONDataTransferCandidate<TFormat extends string> = {
   format: TFormat
   mimeType: string
 }
+type PPTJSONDataTransferSourceParseInput<
+  TCandidate extends PPTJSONDataTransferCandidate<string>,
+> = {
+  candidate: TCandidate
+  json: unknown
+  jsonLength: number
+  rawText: string
+}
 
 function readPPTDataTransferText(
   dataTransfer: PPTDataTransferTextReader | null,
   mimeType: string,
 ) {
   return getPPTCanvasDataTransferText({ dataTransfer, mimeType })
+}
+
+function readPPTJSONDataTransferSource<
+  TSource,
+  TCandidate extends PPTJSONDataTransferCandidate<string>,
+>({
+  candidates,
+  dataTransfer,
+  parseJSONValue,
+  parseText,
+}: {
+  candidates: readonly TCandidate[]
+  dataTransfer: PPTDataTransferTextReader | null
+  parseJSONValue: (
+    input: PPTJSONDataTransferSourceParseInput<TCandidate>
+  ) => TSource | null
+  parseText: (text: string, candidate: TCandidate) => TSource | null
+}) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const seen = new Set<string>()
+  const parsed = readPPTCanvasDataTransferJSONCandidate<TSource, TCandidate>({
+    candidates,
+    dataTransfer,
+    parseValue: ({ candidate, json, rawText }) => {
+      const text = rawText.trim()
+
+      if (seen.has(text)) {
+        throw new Error('Duplicate PPT JSON candidate')
+      }
+
+      seen.add(text)
+
+      const source = parseJSONValue({
+        candidate,
+        json,
+        jsonLength: text.length,
+        rawText: text,
+      })
+
+      if (!source) {
+        throw new Error('Invalid PPT JSON candidate')
+      }
+
+      return source
+    },
+  })
+
+  if (parsed) {
+    return parsed.value
+  }
+
+  for (const candidate of candidates) {
+    const text = readPPTDataTransferText(
+      dataTransfer,
+      candidate.mimeType,
+    ).trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = parseText(text, candidate)
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
 }
 
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
@@ -19331,10 +19413,6 @@ function getPPTDeckHTMLSourceFromHTML(
 function getPPTDeckJSONSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
   const candidates: readonly PPTJSONDataTransferCandidate<
     PPTDeckJSONImportSource['format']
   >[] = [
@@ -19359,67 +19437,24 @@ function getPPTDeckJSONSourceFromDataTransfer(
       mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
-  const parsed = readPPTCanvasDataTransferJSONCandidate({
+
+  return readPPTJSONDataTransferSource({
     candidates,
     dataTransfer,
-    parseValue: ({
-      candidate,
-      json,
-      rawText,
-    }: {
-      candidate: PPTJSONDataTransferCandidate<
-        PPTDeckJSONImportSource['format']
-      >
-      json: unknown
-      rawText: string
-    }) => {
-      const text = rawText.trim()
-
-      if (seen.has(text)) {
-        throw new Error('Duplicate PPT deck JSON candidate')
-      }
-
-      seen.add(text)
-
+    parseJSONValue: ({ candidate, json, jsonLength }) => {
       const deck = getPPTDeckFromJSONValue(json)
 
-      if (!deck) {
-        throw new Error('Invalid PPT deck JSON candidate')
-      }
-
-      return {
-        deck,
-        format: candidate.format,
-        jsonLength: text.length,
-      }
+      return deck
+        ? {
+            deck,
+            format: candidate.format,
+            jsonLength,
+          }
+        : null
     },
+    parseText: (text, candidate) =>
+      getPPTDeckJSONSourceFromText(text, candidate.format),
   })
-
-  if (parsed) {
-    return parsed.value
-  }
-
-  for (const candidate of candidates) {
-    const text = readPPTDataTransferText(
-      dataTransfer,
-      candidate.mimeType,
-    ).trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTDeckJSONSourceFromText(text, candidate.format)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
 }
 
 function getPPTDeckJSONSourceFromText(
@@ -19450,10 +19485,6 @@ function getPPTDeckJSONSourceFromText(
 function getPPTSlideJSONSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
   const candidates: readonly PPTJSONDataTransferCandidate<
     PPTSlideJSONImportSource['format']
   >[] = [
@@ -19478,67 +19509,24 @@ function getPPTSlideJSONSourceFromDataTransfer(
       mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
-  const parsed = readPPTCanvasDataTransferJSONCandidate({
+
+  return readPPTJSONDataTransferSource({
     candidates,
     dataTransfer,
-    parseValue: ({
-      candidate,
-      json,
-      rawText,
-    }: {
-      candidate: PPTJSONDataTransferCandidate<
-        PPTSlideJSONImportSource['format']
-      >
-      json: unknown
-      rawText: string
-    }) => {
-      const text = rawText.trim()
-
-      if (seen.has(text)) {
-        throw new Error('Duplicate PPT slide JSON candidate')
-      }
-
-      seen.add(text)
-
+    parseJSONValue: ({ candidate, json, jsonLength }) => {
       const slides = getPPTSlidesFromJSONValue(json)
 
-      if (slides.length === 0) {
-        throw new Error('Invalid PPT slide JSON candidate')
-      }
-
-      return {
-        format: candidate.format,
-        jsonLength: text.length,
-        slides,
-      }
+      return slides.length > 0
+        ? {
+            format: candidate.format,
+            jsonLength,
+            slides,
+          }
+        : null
     },
+    parseText: (text, candidate) =>
+      getPPTSlideJSONSourceFromText(text, candidate.format),
   })
-
-  if (parsed) {
-    return parsed.value
-  }
-
-  for (const candidate of candidates) {
-    const text = readPPTDataTransferText(
-      dataTransfer,
-      candidate.mimeType,
-    ).trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTSlideJSONSourceFromText(text, candidate.format)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
 }
 
 function getPPTSlideJSONSourceFromText(
@@ -19569,35 +19557,34 @@ function getPPTSlideJSONSourceFromText(
 function getPPTSlideMetadataSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates = [
-    readPPTDataTransferText(dataTransfer, PPT_SLIDE_METADATA_JSON_MIME_TYPE),
-    readPPTDataTransferText(dataTransfer, 'application/json'),
-    readPPTDataTransferText(dataTransfer, 'text/json'),
-    readPPTDataTransferText(dataTransfer, 'text/plain'),
+  const candidates: readonly PPTJSONDataTransferCandidate<
+    PPTSlideMetadataImportSource['format']
+  >[] = [
+    {
+      format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
+      mimeType: PPT_SLIDE_METADATA_JSON_MIME_TYPE,
+    },
+    {
+      format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
+    },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTSlideMetadataSourceFromText(text)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ json, jsonLength }) =>
+      getPPTSlideMetadataSourceFromJSONValue(json, jsonLength),
+    parseText: (text) => getPPTSlideMetadataSourceFromText(text),
+  })
 }
 
 function getPPTSlideMetadataSourceFromText(
@@ -19718,31 +19705,34 @@ function getPPTSlideLayoutSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates = [
-    readPPTDataTransferText(dataTransfer, PPT_SLIDE_LAYOUT_JSON_MIME_TYPE),
-    readPPTDataTransferText(dataTransfer, 'application/json'),
-    readPPTDataTransferText(dataTransfer, 'text/json'),
-    readPPTDataTransferText(dataTransfer, 'text/plain'),
+  const candidates: readonly PPTJSONDataTransferCandidate<
+    PPTSlideLayoutImportSource['format']
+  >[] = [
+    {
+      format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
+      mimeType: PPT_SLIDE_LAYOUT_JSON_MIME_TYPE,
+    },
+    {
+      format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
+    },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTSlideLayoutSourceFromText(text)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ json, jsonLength }) =>
+      getPPTSlideLayoutSourceFromJSONValue(json, jsonLength),
+    parseText: (text) => getPPTSlideLayoutSourceFromText(text),
+  })
 }
 
 function getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
@@ -20162,35 +20152,34 @@ function getPPTSlideLayoutPlaceholderIdFromJSONValue(value: unknown) {
 function getPPTSlideTransitionSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates = [
-    readPPTDataTransferText(dataTransfer, PPT_SLIDE_TRANSITION_JSON_MIME_TYPE),
-    readPPTDataTransferText(dataTransfer, 'application/json'),
-    readPPTDataTransferText(dataTransfer, 'text/json'),
-    readPPTDataTransferText(dataTransfer, 'text/plain'),
+  const candidates: readonly PPTJSONDataTransferCandidate<
+    PPTSlideTransitionImportSource['format']
+  >[] = [
+    {
+      format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
+      mimeType: PPT_SLIDE_TRANSITION_JSON_MIME_TYPE,
+    },
+    {
+      format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
+    },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTSlideTransitionSourceFromText(text)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ json, jsonLength }) =>
+      getPPTSlideTransitionSourceFromJSONValue(json, jsonLength),
+    parseText: (text) => getPPTSlideTransitionSourceFromText(text),
+  })
 }
 
 function getPPTSlideTransitionSourceFromText(
