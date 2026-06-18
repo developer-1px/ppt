@@ -1279,6 +1279,7 @@ type PPTObjectStyleImportSource = {
 type PPTObjectMetadataImportField =
   | 'altText'
   | 'hyperlinkUrl'
+  | 'name'
 type PPTObjectMetadataImportSource = {
   fields: readonly PPTObjectMetadataImportField[]
   format: typeof PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT
@@ -1286,6 +1287,7 @@ type PPTObjectMetadataImportSource = {
   metadata: {
     altText?: string | null
     hyperlinkUrl?: string | null
+    name?: string
   }
 }
 type PPTObjectStateImportField =
@@ -1578,6 +1580,7 @@ type PPTObjectMetadataImportEffect = {
   hyperlinkUrl: string
   jsonLength: number
   model: typeof PPT_OBJECT_METADATA_IMPORT_MODEL
+  name: string
   objectIds: string
   slideId: string
 }
@@ -4831,9 +4834,15 @@ function App() {
       slideId: activeSlide.id,
       source,
     })
+    const renameEffects = createPPTObjectMetadataRenameEffects({
+      objectIds,
+      slide: activeSlide,
+      source,
+    })
     const effects = [
       ...hyperlinkEffects,
       ...accessibilityEffects,
+      ...renameEffects,
     ]
 
     if (effects.length === 0) {
@@ -4853,6 +4862,7 @@ function App() {
     setLastObjectMetadataImportEffect(createPPTObjectMetadataImportEffect({
       accessibilityEffects,
       hyperlinkEffects,
+      renameEffects,
       source,
     }))
 
@@ -4864,27 +4874,38 @@ function App() {
             effect.payload.objectId === element.id)
           const elementAccessibilityEffects = accessibilityEffects.filter((effect) =>
             effect.payload.objectId === element.id)
+          const elementRenameEffects = renameEffects.filter((effect) =>
+            effect.payload.id === 'rename-object' &&
+              effect.payload.objectId === element.id)
 
           if (
             elementHyperlinkEffects.length === 0 &&
-            elementAccessibilityEffects.length === 0
+            elementAccessibilityEffects.length === 0 &&
+            elementRenameEffects.length === 0
           ) {
             return element
           }
 
-          return elementAccessibilityEffects.reduce(
+          return elementRenameEffects.reduce(
             (currentElement, effect) =>
-              applyPPTObjectAccessibilityCommandEffectToElement(
+              applyPPTObjectMetadataRenameCommandEffectToElement(
                 currentElement,
                 effect,
               ),
-            elementHyperlinkEffects.reduce(
+            elementAccessibilityEffects.reduce(
               (currentElement, effect) =>
-                applyPPTObjectHyperlinkCommandEffectToElement(
+                applyPPTObjectAccessibilityCommandEffectToElement(
                   currentElement,
                   effect,
                 ),
-              element,
+              elementHyperlinkEffects.reduce(
+                (currentElement, effect) =>
+                  applyPPTObjectHyperlinkCommandEffectToElement(
+                    currentElement,
+                    effect,
+                  ),
+                element,
+              ),
             ),
           )
         }),
@@ -10905,6 +10926,7 @@ function App() {
         data-ppt-object-metadata-import-hyperlink-url={lastObjectMetadataImportEffect?.hyperlinkUrl}
         data-ppt-object-metadata-import-json-length={lastObjectMetadataImportEffect?.jsonLength}
         data-ppt-object-metadata-import-model={lastObjectMetadataImportEffect?.model}
+        data-ppt-object-metadata-import-name={lastObjectMetadataImportEffect?.name}
         data-ppt-object-metadata-import-objects={lastObjectMetadataImportEffect?.objectIds}
         data-ppt-object-metadata-import-slide={lastObjectMetadataImportEffect?.slideId}
         data-ppt-object-state-import-command-types={lastObjectStateImportEffect?.commandTypes}
@@ -13438,15 +13460,18 @@ function createPPTObjectStyleImportEffect({
 function createPPTObjectMetadataImportEffect({
   accessibilityEffects,
   hyperlinkEffects,
+  renameEffects,
   source,
 }: {
   accessibilityEffects: readonly SlideEditObjectAccessibilityHostCommandEffect<string, string>[]
   hyperlinkEffects: readonly SlideEditObjectHyperlinkHostCommandEffect<string, string>[]
+  renameEffects: readonly PPTLayerPaneHostCommandEffect[]
   source: PPTObjectMetadataImportSource
 }): PPTObjectMetadataImportEffect {
   const effects = [
     ...hyperlinkEffects,
     ...accessibilityEffects,
+    ...renameEffects,
   ]
   const altText = source.metadata.altText
 
@@ -13464,9 +13489,11 @@ function createPPTObjectMetadataImportEffect({
     hyperlinkUrl: source.metadata.hyperlinkUrl ?? '',
     jsonLength: source.jsonLength,
     model: PPT_OBJECT_METADATA_IMPORT_MODEL,
-    objectIds: [...new Set(effects.map((effect) => effect.payload.objectId))]
+    name: source.metadata.name ?? '',
+    objectIds: [...new Set(effects.flatMap((effect) =>
+      getPPTObjectMetadataEffectObjectIds(effect)))]
       .join(' '),
-    slideId: effects[0]?.payload.slideId ?? '',
+    slideId: getPPTObjectMetadataEffectSlideId(effects[0]) ?? '',
   }
 }
 
@@ -13533,16 +13560,60 @@ function applyPPTObjectTransformSourceToElement(
 function getPPTObjectMetadataCommandField(
   effect:
     | SlideEditObjectAccessibilityHostCommandEffect<string, string>
-    | SlideEditObjectHyperlinkHostCommandEffect<string, string>,
+    | SlideEditObjectHyperlinkHostCommandEffect<string, string>
+    | PPTLayerPaneHostCommandEffect,
 ) {
   switch (effect.payload.id) {
     case 'remove-object-alt-text':
     case 'remove-object-hyperlink':
       return ''
+    case 'rename-object':
+      return 'name'
     case 'update-object-accessibility':
     case 'update-object-hyperlink':
       return effect.payload.fieldId
+    default:
+      return ''
   }
+}
+
+function getPPTObjectMetadataEffectObjectIds(
+  effect:
+    | SlideEditObjectAccessibilityHostCommandEffect<string, string>
+    | SlideEditObjectHyperlinkHostCommandEffect<string, string>
+    | PPTLayerPaneHostCommandEffect,
+) {
+  switch (effect.payload.id) {
+    case 'hide-objects':
+    case 'lock-objects':
+    case 'select-objects':
+    case 'show-objects':
+    case 'unlock-objects':
+      return effect.payload.objectIds
+    case 'rename-object':
+    case 'reorder-object':
+    case 'remove-object-alt-text':
+    case 'remove-object-hyperlink':
+    case 'update-object-accessibility':
+    case 'update-object-hyperlink':
+      return [effect.payload.objectId]
+  }
+}
+
+function getPPTObjectMetadataEffectSlideId(
+  effect:
+    | SlideEditObjectAccessibilityHostCommandEffect<string, string>
+    | SlideEditObjectHyperlinkHostCommandEffect<string, string>
+    | PPTLayerPaneHostCommandEffect
+    | undefined,
+) {
+  if (!effect) {
+    return undefined
+  }
+
+  return 'slideId' in effect.payload
+    ? effect.payload.slideId
+    : effect.selection.slideId
 }
 
 function createPPTObjectMetadataHyperlinkEffects({
@@ -13607,6 +13678,37 @@ function createPPTObjectMetadataAccessibilityEffects({
     ))
 }
 
+function createPPTObjectMetadataRenameEffects({
+  objectIds,
+  slide,
+  source,
+}: {
+  objectIds: readonly string[]
+  slide: PPTSlide
+  source: PPTObjectMetadataImportSource
+}): PPTLayerPaneHostCommandEffect[] {
+  if (source.metadata.name === undefined) {
+    return []
+  }
+
+  const descriptor = createPPTLayerPaneDescriptor({
+    activeObjectId: null,
+    collapsedGroupIds: new Set(),
+    selectedObjectIds: objectIds,
+    slide,
+  })
+
+  return objectIds
+    .map((objectId) =>
+      getSlideEditLayerPaneCommandEffect(descriptor, {
+        name: source.metadata.name ?? '',
+        objectId,
+        type: 'rename-submit',
+      }))
+    .filter((effect): effect is PPTLayerPaneHostCommandEffect =>
+      effect !== null)
+}
+
 function applyPPTObjectHyperlinkCommandEffectToElement(
   element: PPTElement,
   effect: SlideEditObjectHyperlinkHostCommandEffect<string, string>,
@@ -13619,6 +13721,18 @@ function applyPPTObjectHyperlinkCommandEffectToElement(
     ...element,
     hyperlink: hyperlink ?? undefined,
   }
+}
+
+function applyPPTObjectMetadataRenameCommandEffectToElement(
+  element: PPTElement,
+  effect: PPTLayerPaneHostCommandEffect,
+): PPTElement {
+  return effect.payload.id === 'rename-object'
+    ? {
+        ...element,
+        name: effect.payload.name,
+      }
+    : element
 }
 
 function applyPPTObjectAccessibilityCommandEffectToElement(
@@ -15622,12 +15736,7 @@ function getPPTObjectMetadataSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTObjectMetadataImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.objectMetadata)
-    ? value.objectMetadata
-    : allowDirect
-      ? value
-      : null
+  const payloadValue = getPPTObjectMetadataPayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -15645,6 +15754,11 @@ function getPPTObjectMetadataSourceFromJSONValue(
       ? payloadValue.accessibility.altText
       : payloadValue.altText,
   )
+  const name = getPPTObjectMetadataNameFromJSONValue(
+    payloadValue.name ??
+      payloadValue.objectName ??
+      payloadValue.layerName,
+  )
 
   if (hyperlinkUrl !== undefined) {
     metadata.hyperlinkUrl = hyperlinkUrl
@@ -15656,6 +15770,11 @@ function getPPTObjectMetadataSourceFromJSONValue(
     fields.push('altText')
   }
 
+  if (name !== undefined) {
+    metadata.name = name
+    fields.push('name')
+  }
+
   return fields.length > 0
     ? {
         fields,
@@ -15664,6 +15783,39 @@ function getPPTObjectMetadataSourceFromJSONValue(
         metadata,
       }
     : null
+}
+
+function getPPTObjectMetadataPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (isPPTRecord(value.objectMetadata)) {
+    return value.objectMetadata
+  }
+
+  if (
+    typeof value.objectName === 'string' ||
+    isPPTRecord(value.objectName)
+  ) {
+    return typeof value.objectName === 'string'
+      ? { name: value.objectName }
+      : value.objectName
+  }
+
+  if (
+    typeof value.layerName === 'string' ||
+    isPPTRecord(value.layerName)
+  ) {
+    return typeof value.layerName === 'string'
+      ? { name: value.layerName }
+      : value.layerName
+  }
+
+  return allowDirect ? value : null
 }
 
 function getPPTObjectMetadataHyperlinkURLFromJSONValue(
@@ -15704,6 +15856,16 @@ function getPPTObjectMetadataAltTextFromJSONValue(
   }
 
   return normalizePPTAltText(value) || null
+}
+
+function getPPTObjectMetadataNameFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const name = value.trim()
+
+  return name.length > 0 ? name : undefined
 }
 
 function getPPTObjectStateSourceFromDataTransfer(

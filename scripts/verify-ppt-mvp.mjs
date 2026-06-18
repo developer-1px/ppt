@@ -10017,6 +10017,62 @@ async function runObjectHyperlinkScenario(page) {
     },
   )
 
+  const metadataName = 'AI renamed layer'
+
+  await page.eval(`((name) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectName: { name },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(metadataName)})`)
+  await delay(120)
+
+  const afterMetadataNamePaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterMetadataNameUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(80)
+
+  const afterMetadataNameRedo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes JSON object name through slide-edit layer pane rename command effect',
+    afterMetadataNamePaste.objectMetadataImportModel === 'ppt-object-metadata-import' &&
+      afterMetadataNamePaste.objectMetadataImportFormat === 'application-json-ppt-object-metadata' &&
+      afterMetadataNamePaste.objectMetadataImportSlide === 'slide-1' &&
+      afterMetadataNamePaste.objectMetadataImportObjects === targetId &&
+      afterMetadataNamePaste.objectMetadataImportFields === 'name' &&
+      afterMetadataNamePaste.objectMetadataImportCommands === 'rename-object' &&
+      afterMetadataNamePaste.objectMetadataImportCommandFields === 'name' &&
+      afterMetadataNamePaste.objectMetadataImportCommandTypes === 'slide-command-effect' &&
+      afterMetadataNamePaste.objectMetadataImportName === metadataName &&
+      afterMetadataNamePaste.objectMetadataImportJsonLength > 30 &&
+      afterMetadataNamePaste.selectedName === metadataName &&
+      afterMetadataNamePaste.rowName === metadataName &&
+      afterMetadataNameUndo.selectedName === afterMetadataPaste.selectedName &&
+      afterMetadataNameUndo.rowName === afterMetadataPaste.rowName &&
+      afterMetadataNameRedo.selectedName === metadataName &&
+      afterMetadataNameRedo.rowName === metadataName,
+    {
+      afterMetadataNamePaste,
+      afterMetadataNameRedo,
+      afterMetadataNameUndo,
+      afterMetadataPaste,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -17116,10 +17172,15 @@ function getPPTObjectHyperlinkState(page, elementId) {
       objectMetadataImportHyperlinkUrl: stage?.getAttribute('data-ppt-object-metadata-import-hyperlink-url') ?? '',
       objectMetadataImportJsonLength: Number(stage?.getAttribute('data-ppt-object-metadata-import-json-length') ?? 0),
       objectMetadataImportModel: stage?.getAttribute('data-ppt-object-metadata-import-model') ?? '',
+      objectMetadataImportName: stage?.getAttribute('data-ppt-object-metadata-import-name') ?? '',
       objectMetadataImportObjects: stage?.getAttribute('data-ppt-object-metadata-import-objects') ?? '',
       objectMetadataImportSlide: stage?.getAttribute('data-ppt-object-metadata-import-slide') ?? '',
+      rowName: targetId
+        ? document.querySelector(\`[data-ppt-layer-row="\${targetId}"] .ppt-layer-name\`)?.textContent ?? ''
+        : '',
       selectedAltText: selected?.getAttribute('data-ppt-alt-text') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedName: selected?.getAttribute('data-ppt-element-name') ?? '',
       selectedUrl: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
       thumbAltText: thumb?.getAttribute('data-ppt-thumb-alt-text') ?? '',
       thumbUrl: thumb?.getAttribute('data-ppt-thumb-hyperlink-url') ?? '',
