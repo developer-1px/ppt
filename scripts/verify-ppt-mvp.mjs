@@ -11300,6 +11300,69 @@ async function runObjectAnimationScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      delayMs: 90,
+      durationMs: 520,
+      order: 1,
+      trigger: 'onClick',
+      type: 'flyIn',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneAnimationPaste = await getPPTObjectAnimationState(page)
+
+  record(
+    'pastes standalone JSON object animation into selected PPT object through slide-edit command-effects',
+    afterStandaloneAnimationPaste.importModel === 'ppt-object-animation-import' &&
+      afterStandaloneAnimationPaste.importFormat === 'application-json-ppt-object-animation' &&
+      afterStandaloneAnimationPaste.importSlide === 'slide-1' &&
+      afterStandaloneAnimationPaste.importObjects === 's1-title' &&
+      afterStandaloneAnimationPaste.importFields ===
+        'type trigger durationMs delayMs order' &&
+      afterStandaloneAnimationPaste.importCommands ===
+        'update-object-animation update-object-animation update-object-animation update-object-animation update-object-animation' &&
+      afterStandaloneAnimationPaste.importCommandFields ===
+        'type trigger durationMs delayMs order' &&
+      afterStandaloneAnimationPaste.importType === 'flyIn' &&
+      afterStandaloneAnimationPaste.importTrigger === 'onClick' &&
+      afterStandaloneAnimationPaste.importDuration === '520' &&
+      afterStandaloneAnimationPaste.importDelay === '90' &&
+      afterStandaloneAnimationPaste.importOrder === '1' &&
+      afterStandaloneAnimationPaste.importJsonLength > 70 &&
+      afterStandaloneAnimationPaste.type === 'flyIn' &&
+      afterStandaloneAnimationPaste.trigger === 'onClick' &&
+      afterStandaloneAnimationPaste.duration === '520' &&
+      afterStandaloneAnimationPaste.delay === '90' &&
+      afterStandaloneAnimationPaste.order === '1' &&
+      afterStandaloneAnimationPaste.selectedType === 'flyIn' &&
+      afterStandaloneAnimationPaste.selectedTrigger === 'onClick' &&
+      afterStandaloneAnimationPaste.selectedDuration === '520' &&
+      afterStandaloneAnimationPaste.selectedDelay === '90' &&
+      afterStandaloneAnimationPaste.selectedOrder === '1' &&
+      afterStandaloneAnimationPaste.command === 'update-object-animation' &&
+      afterStandaloneAnimationPaste.commandField === 'order' &&
+      afterStandaloneAnimationPaste.commandObject === 's1-title' &&
+      afterStandaloneAnimationPaste.commandSlide === 'slide-1' &&
+      afterStandaloneAnimationPaste.commandType === 'slide-command-effect' &&
+      afterStandaloneAnimationPaste.commandValue === '1' &&
+      afterStandaloneAnimationPaste.buildOrder.split(' ').includes('s1-title'),
+    {
+      afterAnimationPaste,
+      afterStandaloneAnimationPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     const type = document.querySelector('[data-ppt-animation-field="type"]')
     const trigger = document.querySelector('[data-ppt-animation-field="trigger"]')
     const duration = document.querySelector('[data-ppt-animation-field="durationMs"]')

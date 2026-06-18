@@ -18975,8 +18975,18 @@ function getPPTSlideTransitionSourceFromJSONValue(
   value: unknown,
   jsonLength: number,
 ): PPTSlideTransitionImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
+  const hasExplicitTransition = isPPTRecord(value) &&
     isPPTRecord(value.transition)
+
+  if (
+    !hasExplicitTransition &&
+    isPPTRecord(value) &&
+    hasPPTObjectAnimationStandalonePayloadFields(value)
+  ) {
+    return null
+  }
+
+  const payloadValue = hasExplicitTransition
     ? value.transition
     : value
 
@@ -19138,12 +19148,7 @@ function getPPTObjectAnimationSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTObjectAnimationImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.animation)
-    ? value.animation
-    : allowDirect
-      ? value
-      : null
+  const payloadValue = getPPTObjectAnimationPayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -19198,6 +19203,38 @@ function getPPTObjectAnimationSourceFromJSONValue(
         jsonLength,
       }
     : null
+}
+
+function getPPTObjectAnimationPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.objectAnimation)) {
+    return value.objectAnimation
+  }
+
+  if (isPPTRecord(value.animation)) {
+    return value.animation
+  }
+
+  if (hasPPTObjectAnimationStandalonePayloadFields(value)) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function hasPPTObjectAnimationStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return getPPTElementAnimationTypeFromJSONValue(value.type) !== undefined ||
+    getPPTElementAnimationTriggerFromJSONValue(value.trigger) !== undefined ||
+    value.order !== undefined ||
+    value.buildOrder !== undefined
 }
 
 function getPPTElementAnimationTypeFromJSONValue(
