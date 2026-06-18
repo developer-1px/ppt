@@ -5405,6 +5405,16 @@ function getPPTTextFormatPainterState(page, elementId) {
       textParagraphAlignImportModel: stage?.getAttribute('data-ppt-text-paragraph-align-import-model') ?? '',
       textParagraphAlignImportObjects: stage?.getAttribute('data-ppt-text-paragraph-align-import-objects') ?? '',
       textParagraphAlignImportValue: stage?.getAttribute('data-ppt-text-paragraph-align-import-value') ?? '',
+      textParagraphBulletImportCategories: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-categories') ?? '',
+      textParagraphBulletImportCommand: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command') ?? '',
+      textParagraphBulletImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-targets') ?? '',
+      textParagraphBulletImportCommandType: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-type') ?? '',
+      textParagraphBulletImportFields: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-fields') ?? '',
+      textParagraphBulletImportFormat: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-format') ?? '',
+      textParagraphBulletImportJsonLength: Number(stage?.getAttribute('data-ppt-text-paragraph-bullet-import-json-length') ?? 0),
+      textParagraphBulletImportModel: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-model') ?? '',
+      textParagraphBulletImportObjects: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-objects') ?? '',
+      textParagraphBulletImportValue: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-value') ?? '',
       textStyleImportCategories: stage?.getAttribute('data-ppt-text-style-import-categories') ?? '',
       textStyleImportColor: stage?.getAttribute('data-ppt-text-style-import-color') ?? '',
       textStyleImportCommand: stage?.getAttribute('data-ppt-text-style-import-command') ?? '',
@@ -6249,6 +6259,99 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextParagraphAlignPaste,
       summaryAfterTextParagraphAlignRedo,
       summaryAfterTextParagraphAlignUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphAlignRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('bullet')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-paragraph-bullet+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextParagraphBulletPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text paragraph bullet JSON through slide-edit style clipboard effect',
+    summaryAfterTextParagraphAlignRestore.textAlign === 'center' &&
+      summaryAfterTextParagraphAlignRestore.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletPaste.selected === 'true' &&
+      summaryAfterTextParagraphBulletPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextParagraphBulletPaste.textAlign === 'center' &&
+      summaryAfterTextParagraphBulletPaste.bulletList === 'true' &&
+      summaryAfterTextParagraphBulletPaste.numberedList === '' &&
+      summaryAfterTextParagraphBulletPaste.paragraphList === 'bullet' &&
+      summaryAfterTextParagraphBulletPaste.paragraphBullet.length > 0 &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportModel === 'ppt-text-paragraph-bullet-import' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportFormat === 'application-json-ppt-text-paragraph-bullet' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandTargets === 's1-summary' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportObjects === 's1-summary' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCategories.includes('object-effect') &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCategories.includes('text-style') &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportFields === 'value' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportJsonLength > 7 &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportValue === 'bullet' &&
+      summaryAfterTextParagraphBulletPaste.styleClipboardCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphBulletPaste.styleClipboardCommandTargets === 's1-summary' &&
+      summaryAfterTextParagraphBulletPaste.styleClipboardCommandApplications.includes('s1-summary') &&
+      summaryAfterTextParagraphBulletPaste.styleClipboardCommandApplications.includes('text-style'),
+    {
+      summaryAfterTextParagraphAlignRestore,
+      summaryAfterTextParagraphBulletPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphBulletUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphBulletRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text paragraph bullet JSON as one history step',
+    summaryAfterTextParagraphBulletUndo.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletRedo.paragraphList === 'bullet',
+    {
+      summaryAfterTextParagraphBulletPaste,
+      summaryAfterTextParagraphBulletRedo,
+      summaryAfterTextParagraphBulletUndo,
     },
   )
 

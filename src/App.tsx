@@ -1137,6 +1137,12 @@ const PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-paragraph-align' as const
 const PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-paragraph-align+json'
+const PPT_TEXT_PARAGRAPH_BULLET_IMPORT_MODEL =
+  'ppt-text-paragraph-bullet-import' as const
+const PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-paragraph-bullet' as const
+const PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-paragraph-bullet+json'
 const PPT_TEXT_PARAGRAPH_SPACING_IMPORT_MODEL =
   'ppt-text-paragraph-spacing-import' as const
 const PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT =
@@ -1585,6 +1591,18 @@ type PPTTextParagraphAlignImportSource = {
   align: NonNullable<PPTParagraph['align']>
   fields: readonly PPTTextParagraphAlignImportField[]
   format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
+type PPTTextParagraphBulletImportField =
+  | 'bullet'
+  | 'list'
+  | 'paragraphBullet'
+  | 'textParagraphBullet'
+  | 'value'
+type PPTTextParagraphBulletImportSource = {
+  bullet: PPTParagraph['bullet'] | null
+  fields: readonly PPTTextParagraphBulletImportField[]
+  format: typeof PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT
   jsonLength: number
 }
 type PPTTextParagraphSpacingImportField = PPTParagraphSpacingField
@@ -2104,6 +2122,18 @@ type PPTTextParagraphAlignImportEffect = {
   format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
   jsonLength: number
   model: typeof PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL
+  objectIds: string
+}
+type PPTTextParagraphBulletImportEffect = {
+  bullet: string
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  format: typeof PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_PARAGRAPH_BULLET_IMPORT_MODEL
   objectIds: string
 }
 type PPTTextParagraphSpacingImportEffect = {
@@ -3321,6 +3351,8 @@ function App() {
     useState<PPTTextBodyImportEffect | null>(null)
   const [lastTextParagraphAlignImportEffect, setLastTextParagraphAlignImportEffect] =
     useState<PPTTextParagraphAlignImportEffect | null>(null)
+  const [lastTextParagraphBulletImportEffect, setLastTextParagraphBulletImportEffect] =
+    useState<PPTTextParagraphBulletImportEffect | null>(null)
   const [
     lastTextParagraphSpacingImportEffect,
     setLastTextParagraphSpacingImportEffect,
@@ -4432,6 +4464,17 @@ function App() {
       if (
         textParagraphAlignSource &&
         pastePPTTextParagraphAlignSource(textParagraphAlignSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textParagraphBulletSource =
+        getPPTTextParagraphBulletSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textParagraphBulletSource &&
+        pastePPTTextParagraphBulletSource(textParagraphBulletSource)
       ) {
         event.preventDefault()
         return
@@ -6265,6 +6308,90 @@ function App() {
     setStyleClipboard(styleClipboard)
     setLastStyleClipboardEffect(effect)
     setLastTextParagraphAlignImportEffect(createPPTTextParagraphAlignImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextParagraphBulletSource(
+    source: PPTTextParagraphBulletImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = textElements[0]
+    const paragraph = sourceElement.textBody.paragraphs[0]
+    const styleClipboard: PPTStyleClipboard = {
+      categories: ['object', 'paragraph'],
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      paragraph: {
+        align: paragraph?.align ?? 'left',
+        ...(source.bullet ? { bullet: source.bullet } : {}),
+        lineHeight: paragraph
+          ? getPPTParagraphLineHeight(paragraph)
+          : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+        spacingAfter: paragraph ? getPPTParagraphSpacingAfter(paragraph) : 0,
+        spacingBefore: paragraph ? getPPTParagraphSpacingBefore(paragraph) : 0,
+      },
+      sourceId: 'ppt-text-paragraph-bullet-json',
+      sourceKind: sourceElement.kind,
+      type: 'slide-style-clipboard',
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(textElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastTextParagraphBulletImportEffect(createPPTTextParagraphBulletImportEffect({
       effect,
       source,
     }))
@@ -12588,6 +12715,16 @@ function App() {
         data-ppt-text-paragraph-align-import-model={lastTextParagraphAlignImportEffect?.model}
         data-ppt-text-paragraph-align-import-objects={lastTextParagraphAlignImportEffect?.objectIds}
         data-ppt-text-paragraph-align-import-value={lastTextParagraphAlignImportEffect?.align}
+        data-ppt-text-paragraph-bullet-import-categories={lastTextParagraphBulletImportEffect?.categories}
+        data-ppt-text-paragraph-bullet-import-command={lastTextParagraphBulletImportEffect?.commandId}
+        data-ppt-text-paragraph-bullet-import-command-targets={lastTextParagraphBulletImportEffect?.commandTargets}
+        data-ppt-text-paragraph-bullet-import-command-type={lastTextParagraphBulletImportEffect?.commandType}
+        data-ppt-text-paragraph-bullet-import-fields={lastTextParagraphBulletImportEffect?.fields}
+        data-ppt-text-paragraph-bullet-import-format={lastTextParagraphBulletImportEffect?.format}
+        data-ppt-text-paragraph-bullet-import-json-length={lastTextParagraphBulletImportEffect?.jsonLength}
+        data-ppt-text-paragraph-bullet-import-model={lastTextParagraphBulletImportEffect?.model}
+        data-ppt-text-paragraph-bullet-import-objects={lastTextParagraphBulletImportEffect?.objectIds}
+        data-ppt-text-paragraph-bullet-import-value={lastTextParagraphBulletImportEffect?.bullet}
         data-ppt-line-style-import-categories={lastLineStyleImportEffect?.categories}
         data-ppt-line-style-import-command={lastLineStyleImportEffect?.commandId}
         data-ppt-line-style-import-command-targets={lastLineStyleImportEffect?.commandTargets}
@@ -16580,6 +16717,38 @@ function createPPTTextParagraphAlignImportEffect({
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
+  }
+}
+
+function createPPTTextParagraphBulletImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTTextParagraphBulletImportSource
+}): PPTTextParagraphBulletImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+
+  return {
+    bullet: source.bullet ?? 'none',
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_PARAGRAPH_BULLET_IMPORT_MODEL,
     objectIds: payload?.categoryApplications
       .map((application) => application.objectId)
       .join(' ') ?? '',
@@ -22181,6 +22350,183 @@ function getPPTTextParagraphAlignImportValueFromJSONValue(
   }
 
   return getPPTTextStyleParagraphAlignFromJSONValue(value)
+}
+
+function getPPTTextParagraphBulletSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextParagraphBulletSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextParagraphBulletSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextParagraphBulletImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextParagraphBulletSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextParagraphBulletSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextParagraphBulletSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextParagraphBulletSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextParagraphBulletImportSource | null {
+  const payload = getPPTTextParagraphBulletPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const bullet = getPPTTextParagraphBulletImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return bullet !== undefined
+    ? {
+        bullet,
+        fields: payload.fields,
+        format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTTextParagraphBulletPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextParagraphBulletImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textParagraphBullet',
+    'paragraphBullet',
+    'bullet',
+    'list',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextParagraphBulletImportValueFromJSONValue(
+  value: unknown,
+): PPTParagraph['bullet'] | null | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'bullet',
+      'list',
+      'paragraphBullet',
+      'textParagraphBullet',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextParagraphBulletImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  return getPPTTextStyleParagraphBulletFromJSONValue(value)
 }
 
 function getPPTTextStyleParagraphBulletFromJSONValue(
