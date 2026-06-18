@@ -168,6 +168,7 @@ import {
   getCanvasImageFilesFromDataTransfer,
   getCanvasSVGImageSourceFromDataTransfer,
   readCanvasImageFileSource,
+  readCanvasImageFileSources,
   resolveCanvasImageSourceNaturalSize,
   routeCanvasImagePasteReplace,
   type CanvasImageImportFormat,
@@ -477,6 +478,7 @@ export const startPPTCanvasPointerLaserInteraction =
 export const startPPTCanvasPointerPanInteraction =
   startCanvasPointerPanInteraction
 export const readPPTCanvasImageFileSource = readCanvasImageFileSource
+export const readPPTCanvasImageFileSources = readCanvasImageFileSources
 export const readPPTCanvasTableFileSource = readCanvasTableFileSource
 export const resolvePPTCanvasImageSourceNaturalSize =
   resolveCanvasImageSourceNaturalSize

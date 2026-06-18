@@ -12,6 +12,7 @@ import {
   PPT_CANVAS_IMAGE_IMPORT_MODEL,
   readPPTCanvasClipboardImageSource,
   readPPTCanvasImageFileSource,
+  readPPTCanvasImageFileSources,
   resolvePPTCanvasImageSourceNaturalSize,
   type PPTCanvasImageImportFormat,
   type PPTCanvasImageImportSource,
@@ -145,6 +146,15 @@ export async function readPPTImageFileSource(file: Blob & { name?: string }) {
     ...source,
     format: 'file' as const,
   }
+}
+
+export async function readPPTImageFileSources(
+  files: readonly (Blob & { name?: string })[],
+) {
+  return (await readPPTCanvasImageFileSources(files)).map((source) => ({
+    ...source,
+    format: 'file' as const,
+  }))
 }
 
 export async function readPPTClipboardImageSource() {

@@ -757,6 +757,7 @@ import {
   PPT_IMAGE_IMPORT_MODEL,
   readPPTClipboardImageSource,
   readPPTImageFileSource,
+  readPPTImageFileSources,
   readPPTTableFileSource,
   resolvePPTImageSourceNaturalSize,
   type PPTImageImportFormat,
@@ -8774,13 +8775,7 @@ function App() {
     files: readonly (Blob & { name?: string })[],
     center = getPPTViewportCenter(),
   ) {
-    const sources: PPTImageImportSource[] = []
-
-    for (const source of await Promise.all(files.map(readPPTImageFileSource))) {
-      if (source) {
-        sources.push(source)
-      }
-    }
+    const sources = await readPPTImageFileSources(files)
 
     return insertPPTImageSources(sources, center)
   }
