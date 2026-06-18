@@ -126,6 +126,7 @@ import {
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
   getSlideEditColorSwatchJSONPasteValue,
+  getSlideEditColorSwatchPasteCommandEffects,
   getSlideEditColorWithAlphaCSS,
   getSlideEditDeckNavigationKeyboardIntent,
   getSlideEditLayoutApplyCommandEffect,
@@ -6551,39 +6552,41 @@ function App() {
   }
 
   function pastePPTColorSwatchSource(source: PPTColorSwatchImportSource) {
-    const targets = selectedElements
-      .filter((element) =>
-        element.locked !== true &&
-          element.visible !== false)
-      .map((element) => ({
-        channel: getPPTColorSwatchImportChannelForElement(
+    const swatch = createPPTColorSwatchImportSelection(source)
+    const pasteResult = getSlideEditColorSwatchPasteCommandEffects({
+      pasteValue: {
+        channelId: source.channel
+          ? getPPTColorSwatchPackageChannel(source.channel)
+          : null,
+        source: swatch.source,
+        swatchId: swatch.swatchId,
+        ...(swatch.tokenId ? { tokenId: swatch.tokenId } : {}),
+        value: swatch.value,
+      },
+      slideId: activeSlide.id,
+      targets: selectedElements.map((element) => {
+        const defaultChannel = getPPTColorSwatchImportChannelForElement(
           element,
-          source.channel,
-        ),
-        element,
-      }))
-      .filter((target): target is {
-        channel: PPTColorSwatchChannel
-        element: PPTElement
-      } => target.channel !== null)
+          undefined,
+        )
 
-    if (targets.length === 0) {
+        return {
+          defaultChannelId: defaultChannel
+            ? getPPTColorSwatchPackageChannel(defaultChannel)
+            : null,
+          isHidden: element.visible === false,
+          isLocked: element.locked === true,
+          objectId: element.id,
+          supportedChannelIds:
+            getPPTColorSwatchSupportedPackageChannelsForElement(element),
+        }
+      }),
+    })
+    const effects = pasteResult.effects
+
+    if (effects.length === 0) {
       return false
     }
-
-    const channels = uniquePPTCanvasValues(
-      targets.map((target) => target.channel),
-    )
-    const effects = channels.map((channel) =>
-      getSlideEditColorSwatchCommandEffect({
-        channelId: getPPTColorSwatchPackageChannel(channel),
-        id: 'apply-color-swatch',
-        objectIds: targets
-          .filter((target) => target.channel === channel)
-          .map((target) => target.element.id),
-        slideId: activeSlide.id,
-        swatch: createPPTColorSwatchImportSelection(source),
-      }))
 
     setLastColorSwatchEffect(effects[effects.length - 1])
     setLastColorSwatchImportEffect(createPPTColorSwatchImportEffect({
@@ -18215,6 +18218,22 @@ function isPPTColorSwatchChannelSupportedByElement(
     case 'text-color':
       return isPPTTextElement(element)
   }
+}
+
+function getPPTColorSwatchSupportedPackageChannelsForElement(
+  element: PPTElement,
+): readonly PPTColorSwatchPackageChannel[] {
+  return ([
+    'line-stroke',
+    'shape-fill',
+    'shape-stroke',
+    'text-color',
+  ] as const)
+    .filter((channel) => isPPTColorSwatchChannelSupportedByElement(
+      element,
+      channel,
+    ))
+    .map((channel) => getPPTColorSwatchPackageChannel(channel))
 }
 
 function applyPPTColorSwatchCommandEffectToElement(
