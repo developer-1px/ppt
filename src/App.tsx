@@ -210,6 +210,8 @@ import {
   getSlideEditTextFontSizeJSONPasteValue,
   getSlideEditTextFontWeightJSONPasteValue,
   getSlideEditTextFormattingKeyboardIntent,
+  getSlideEditTextRunFormattingCommandEffect,
+  getSlideEditTextRunFormattingJSONPasteValue,
   getSlideEditTextFrameInsetJSONPasteValue,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
@@ -271,6 +273,7 @@ import {
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
+  SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
@@ -376,6 +379,8 @@ import {
   type SlideEditTextFontFamilyHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
+  type SlideEditTextRunFormattingFieldId,
+  type SlideEditTextRunFormattingHostCommandEffect,
   type SlideEditTextAutoFitHostCommandEffect,
   type SlideEditTextBodyReplaceHostCommandEffect,
   type SlideEditTextBoxMeasurement,
@@ -1767,6 +1772,7 @@ type PPTTextRunColorImportSource = {
   jsonLength: number
 }
 type PPTTextRunBoldImportField =
+  | 'bold'
   | 'runBold'
   | 'textRunBold'
   | 'value'
@@ -2341,6 +2347,8 @@ type PPTTextBodyImportEffect = {
 }
 type PPTTextBodyReplaceHostCommandEffect =
   SlideEditTextBodyReplaceHostCommandEffect<string, string, PPTTextBody>
+type PPTTextRunFormattingHostCommandEffect =
+  SlideEditTextRunFormattingHostCommandEffect<string, string>
 type PPTTextRunSizeImportEffect = {
   commandFields: string
   commandIds: string
@@ -6726,14 +6734,16 @@ function App() {
       return false
     }
 
-    setLastTextRunBoldImportEffect(createPPTTextRunBoldImportEffect({
+    const effect = getPPTTextRunFormattingCommandEffect({
+      fieldId: 'bold',
       objectIds: textElements.map((element) => element.id),
-      runCount: textElements.reduce((count, element) =>
-        count + element.textBody.paragraphs.reduce(
-          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
-          0,
-        ), 0),
       slideId: activeSlide.id,
+      value: source.bold,
+    })
+
+    setLastTextRunBoldImportEffect(createPPTTextRunBoldImportEffect({
+      effect,
+      runCount: getPPTTextElementsRunCount(textElements),
       source,
     }))
 
@@ -6742,21 +6752,13 @@ function App() {
         ...slide,
         elements: mapPPTElementsByIds(
           slide.elements,
-          textElements.map((element) => element.id),
+          effect.payload.objectIds,
           (element) =>
             isPPTTextElement(element)
-              ? {
-                  ...element,
-                  textBody: {
-                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                      ...paragraph,
-                      runs: paragraph.runs.map((run) => ({
-                        ...run,
-                        bold: source.bold ? true : undefined,
-                      })),
-                    })),
-                  },
-                }
+              ? applyPPTTextRunFormattingCommandEffectToElement(
+                  element,
+                  effect,
+                )
               : element,
         ),
       })))
@@ -6774,14 +6776,16 @@ function App() {
       return false
     }
 
-    setLastTextRunItalicImportEffect(createPPTTextRunItalicImportEffect({
+    const effect = getPPTTextRunFormattingCommandEffect({
+      fieldId: 'italic',
       objectIds: textElements.map((element) => element.id),
-      runCount: textElements.reduce((count, element) =>
-        count + element.textBody.paragraphs.reduce(
-          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
-          0,
-        ), 0),
       slideId: activeSlide.id,
+      value: source.italic,
+    })
+
+    setLastTextRunItalicImportEffect(createPPTTextRunItalicImportEffect({
+      effect,
+      runCount: getPPTTextElementsRunCount(textElements),
       source,
     }))
 
@@ -6790,21 +6794,13 @@ function App() {
         ...slide,
         elements: mapPPTElementsByIds(
           slide.elements,
-          textElements.map((element) => element.id),
+          effect.payload.objectIds,
           (element) =>
             isPPTTextElement(element)
-              ? {
-                  ...element,
-                  textBody: {
-                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                      ...paragraph,
-                      runs: paragraph.runs.map((run) => ({
-                        ...run,
-                        italic: source.italic ? true : undefined,
-                      })),
-                    })),
-                  },
-                }
+              ? applyPPTTextRunFormattingCommandEffectToElement(
+                  element,
+                  effect,
+                )
               : element,
         ),
       })))
@@ -6824,14 +6820,16 @@ function App() {
       return false
     }
 
-    setLastTextRunUnderlineImportEffect(createPPTTextRunUnderlineImportEffect({
+    const effect = getPPTTextRunFormattingCommandEffect({
+      fieldId: 'underline',
       objectIds: textElements.map((element) => element.id),
-      runCount: textElements.reduce((count, element) =>
-        count + element.textBody.paragraphs.reduce(
-          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
-          0,
-        ), 0),
       slideId: activeSlide.id,
+      value: source.underline,
+    })
+
+    setLastTextRunUnderlineImportEffect(createPPTTextRunUnderlineImportEffect({
+      effect,
+      runCount: getPPTTextElementsRunCount(textElements),
       source,
     }))
 
@@ -6840,21 +6838,13 @@ function App() {
         ...slide,
         elements: mapPPTElementsByIds(
           slide.elements,
-          textElements.map((element) => element.id),
+          effect.payload.objectIds,
           (element) =>
             isPPTTextElement(element)
-              ? {
-                  ...element,
-                  textBody: {
-                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
-                      ...paragraph,
-                      runs: paragraph.runs.map((run) => ({
-                        ...run,
-                        underline: source.underline ? true : undefined,
-                      })),
-                    })),
-                  },
-                }
+              ? applyPPTTextRunFormattingCommandEffectToElement(
+                  element,
+                  effect,
+                )
               : element,
         ),
       })))
@@ -17940,94 +17930,137 @@ function createPPTTextRunColorImportEffect({
   }
 }
 
-function createPPTTextRunBoldImportEffect({
+function getPPTTextRunFormattingCommandEffect({
+  fieldId,
   objectIds,
-  runCount,
   slideId,
+  value,
+}: {
+  fieldId: SlideEditTextRunFormattingFieldId
+  objectIds: readonly string[]
+  slideId: string
+  value: boolean
+}): PPTTextRunFormattingHostCommandEffect {
+  return getSlideEditTextRunFormattingCommandEffect({
+    fieldId,
+    id: 'update-text-run-formatting',
+    objectIds,
+    slideId,
+    value,
+  })
+}
+
+function createPPTTextRunBoldImportEffect({
+  effect,
+  runCount,
   source,
 }: {
-  objectIds: readonly string[]
+  effect: PPTTextRunFormattingHostCommandEffect
   runCount: number
-  slideId: string
   source: PPTTextRunBoldImportSource
 }): PPTTextRunBoldImportEffect {
   const value = String(source.bold)
 
   return {
     bold: value,
-    commandFields: 'bold',
-    commandIds: 'update-text-run-style',
-    commandTargets: objectIds.join(' '),
-    commandTypes: 'slide-command-effect',
-    commandValues: value,
+    commandFields: effect.payload.fieldId,
+    commandIds: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandTypes: effect.type,
+    commandValues: String(effect.payload.value),
     fields: source.fields.join(' '),
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_RUN_BOLD_IMPORT_MODEL,
-    objectIds: objectIds.join(' '),
+    objectIds: effect.payload.objectIds.join(' '),
     runCount,
-    slideId,
+    slideId: effect.payload.slideId,
   }
 }
 
 function createPPTTextRunItalicImportEffect({
-  objectIds,
+  effect,
   runCount,
-  slideId,
   source,
 }: {
-  objectIds: readonly string[]
+  effect: PPTTextRunFormattingHostCommandEffect
   runCount: number
-  slideId: string
   source: PPTTextRunItalicImportSource
 }): PPTTextRunItalicImportEffect {
   const value = String(source.italic)
 
   return {
-    commandFields: 'italic',
-    commandIds: 'update-text-run-style',
-    commandTargets: objectIds.join(' '),
-    commandTypes: 'slide-command-effect',
-    commandValues: value,
+    commandFields: effect.payload.fieldId,
+    commandIds: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandTypes: effect.type,
+    commandValues: String(effect.payload.value),
     fields: source.fields.join(' '),
     format: source.format,
     italic: value,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_RUN_ITALIC_IMPORT_MODEL,
-    objectIds: objectIds.join(' '),
+    objectIds: effect.payload.objectIds.join(' '),
     runCount,
-    slideId,
+    slideId: effect.payload.slideId,
   }
 }
 
 function createPPTTextRunUnderlineImportEffect({
-  objectIds,
+  effect,
   runCount,
-  slideId,
   source,
 }: {
-  objectIds: readonly string[]
+  effect: PPTTextRunFormattingHostCommandEffect
   runCount: number
-  slideId: string
   source: PPTTextRunUnderlineImportSource
 }): PPTTextRunUnderlineImportEffect {
   const value = String(source.underline)
 
   return {
-    commandFields: 'underline',
-    commandIds: 'update-text-run-style',
-    commandTargets: objectIds.join(' '),
-    commandTypes: 'slide-command-effect',
-    commandValues: value,
+    commandFields: effect.payload.fieldId,
+    commandIds: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandTypes: effect.type,
+    commandValues: String(effect.payload.value),
     fields: source.fields.join(' '),
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_RUN_UNDERLINE_IMPORT_MODEL,
-    objectIds: objectIds.join(' '),
+    objectIds: effect.payload.objectIds.join(' '),
     runCount,
-    slideId,
+    slideId: effect.payload.slideId,
     underline: value,
   }
+}
+
+function applyPPTTextRunFormattingCommandEffectToElement(
+  element: PPTTextElement,
+  effect: PPTTextRunFormattingHostCommandEffect,
+): PPTTextElement {
+  const field = effect.payload.fieldId
+  const value = effect.payload.value ? true : undefined
+
+  return {
+    ...element,
+    textBody: {
+      paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+        ...paragraph,
+        runs: paragraph.runs.map((run) => ({
+          ...run,
+          [field]: value,
+        })),
+      })),
+    },
+  }
+}
+
+function getPPTTextElementsRunCount(elements: readonly PPTTextElement[]) {
+  return elements.reduce((count, element) =>
+    count + element.textBody.paragraphs.reduce(
+      (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
+      0,
+    ), 0)
 }
 
 function createPPTTextParagraphAlignImportEffect({
@@ -25330,6 +25363,13 @@ function getPPTTextRunBoldSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextRunBoldSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25373,6 +25413,25 @@ function getPPTTextRunBoldSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTTextRunBoldSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunBoldImportSource | null {
+  const source = getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
+    dataTransfer,
+    fieldId: 'bold',
+    pptJsonMimeType: PPT_TEXT_RUN_BOLD_JSON_MIME_TYPE,
+  })
+
+  return source === null
+    ? null
+    : {
+        bold: source.value,
+        fields: source.fields as readonly PPTTextRunBoldImportField[],
+        format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
+        jsonLength: source.jsonLength,
+      }
 }
 
 function getPPTTextRunBoldSourceFromText(
@@ -25456,6 +25515,7 @@ function getPPTTextRunBoldPayloadEntry(
   for (const field of [
     'textRunBold',
     'runBold',
+    'bold',
     'value',
   ] as const) {
     if (value[field] !== undefined) {
@@ -25539,6 +25599,13 @@ function getPPTTextRunItalicSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextRunItalicSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25582,6 +25649,25 @@ function getPPTTextRunItalicSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTTextRunItalicSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunItalicImportSource | null {
+  const source = getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
+    dataTransfer,
+    fieldId: 'italic',
+    pptJsonMimeType: PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE,
+  })
+
+  return source === null
+    ? null
+    : {
+        fields: source.fields as readonly PPTTextRunItalicImportField[],
+        format: PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT,
+        italic: source.value,
+        jsonLength: source.jsonLength,
+      }
 }
 
 function getPPTTextRunItalicSourceFromText(
@@ -25751,6 +25837,13 @@ function getPPTTextRunUnderlineSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextRunUnderlineSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25794,6 +25887,120 @@ function getPPTTextRunUnderlineSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTTextRunUnderlineSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunUnderlineImportSource | null {
+  const source = getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
+    dataTransfer,
+    fieldId: 'underline',
+    pptJsonMimeType: PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE,
+  })
+
+  return source === null
+    ? null
+    : {
+        fields: source.fields as readonly PPTTextRunUnderlineImportField[],
+        format: PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT,
+        jsonLength: source.jsonLength,
+        underline: source.value,
+      }
+}
+
+type PPTTextRunFormattingImportField =
+  | PPTTextRunBoldImportField
+  | PPTTextRunItalicImportField
+  | PPTTextRunUnderlineImportField
+
+function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
+  dataTransfer,
+  fieldId,
+  pptJsonMimeType,
+}: {
+  dataTransfer: DataTransfer
+  fieldId: SlideEditTextRunFormattingFieldId
+  pptJsonMimeType: string
+}): {
+  fields: readonly PPTTextRunFormattingImportField[]
+  jsonLength: number
+  value: boolean
+} | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    pptJsonMimeType,
+    getPPTTextRunFormattingJSONMimeType(fieldId),
+  ]) {
+    if (!customMimeType) {
+      continue
+    }
+
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const value = getSlideEditTextRunFormattingJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        fieldId,
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (value === null) {
+        continue
+      }
+
+      const payload = getPPTTextRunFormattingPayloadEntry(
+        fieldId,
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        jsonLength: json.length,
+        value,
+      }
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunFormattingJSONMimeType(
+  fieldId: SlideEditTextRunFormattingFieldId,
+) {
+  return SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS.find((field) =>
+    field.id === fieldId)?.jsonMimeType ?? ''
+}
+
+function getPPTTextRunFormattingPayloadEntry(
+  fieldId: SlideEditTextRunFormattingFieldId,
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunFormattingImportField[]
+  value: unknown
+} | null {
+  switch (fieldId) {
+    case 'bold':
+      return getPPTTextRunBoldPayloadEntry(value, allowDirect)
+    case 'italic':
+      return getPPTTextRunItalicPayloadEntry(value, allowDirect)
+    case 'underline':
+      return getPPTTextRunUnderlinePayloadEntry(value, allowDirect)
+  }
 }
 
 function getPPTTextRunUnderlineSourceFromText(

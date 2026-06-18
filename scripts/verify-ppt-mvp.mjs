@@ -7001,7 +7001,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunBoldPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run bold JSON through run style command effect',
+    'pastes PPT text run bold JSON through run formatting command effect',
     summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletRestore.boldRunCount === 0 &&
       summaryAfterTextRunBoldPaste.selected === 'true' &&
@@ -7010,7 +7010,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunBoldPaste.boldRunCount > 0 &&
       summaryAfterTextRunBoldPaste.textRunBoldImportModel === 'ppt-text-run-bold-import' &&
       summaryAfterTextRunBoldPaste.textRunBoldImportFormat === 'application-json-ppt-text-run-bold' &&
-      summaryAfterTextRunBoldPaste.textRunBoldImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandIds === 'update-text-run-formatting' &&
       summaryAfterTextRunBoldPaste.textRunBoldImportCommandFields === 'bold' &&
       summaryAfterTextRunBoldPaste.textRunBoldImportCommandTargets === 's1-summary' &&
       summaryAfterTextRunBoldPaste.textRunBoldImportCommandTypes === 'slide-command-effect' &&
@@ -7073,10 +7073,9 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify(true)
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-run-italic+json',
+      'application/vnd.interactive-os.slide-edit.text-run-italic+json',
       json,
     )
-    dataTransfer.setData('text/plain', json)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -7088,7 +7087,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunItalicPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run italic JSON through run style command effect',
+    'pastes canvas text run italic JSON through run formatting command effect',
     summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletRestore.italicRunCount === 0 &&
       summaryAfterTextRunItalicPaste.selected === 'true' &&
@@ -7097,7 +7096,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunItalicPaste.italicRunCount > 0 &&
       summaryAfterTextRunItalicPaste.textRunItalicImportModel === 'ppt-text-run-italic-import' &&
       summaryAfterTextRunItalicPaste.textRunItalicImportFormat === 'application-json-ppt-text-run-italic' &&
-      summaryAfterTextRunItalicPaste.textRunItalicImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandIds === 'update-text-run-formatting' &&
       summaryAfterTextRunItalicPaste.textRunItalicImportCommandFields === 'italic' &&
       summaryAfterTextRunItalicPaste.textRunItalicImportCommandTargets === 's1-summary' &&
       summaryAfterTextRunItalicPaste.textRunItalicImportCommandTypes === 'slide-command-effect' &&
@@ -7176,7 +7175,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunUnderlinePaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run underline JSON through run style command effect',
+    'pastes PPT text run underline JSON through run formatting command effect',
     summaryAfterTextRunItalicRestore.italicRunCount === 0 &&
       summaryAfterTextRunItalicRestore.underlineRunCount === 0 &&
       summaryAfterTextRunUnderlinePaste.selected === 'true' &&
@@ -7185,7 +7184,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunUnderlinePaste.underlineRunCount > 0 &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportModel === 'ppt-text-run-underline-import' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportFormat === 'application-json-ppt-text-run-underline' &&
-      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandIds === 'update-text-run-formatting' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandFields === 'underline' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandTargets === 's1-summary' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandTypes === 'slide-command-effect' &&
