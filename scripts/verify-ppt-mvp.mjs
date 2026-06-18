@@ -6126,6 +6126,86 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textRunStyle: {
+        color: '#0f766e',
+        italic: true,
+        size: '31px',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterStandaloneTextRunStylePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes standalone PPT textRunStyle JSON through style clipboard run category',
+    summaryAfterStandaloneTextRunStylePaste.selected === 'true' &&
+      summaryAfterStandaloneTextRunStylePaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportModel === 'ppt-text-style-import' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportFormat === 'application-json-ppt-text-style' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportCommand === 'paste-object-formatting' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportCommandTargets === 's1-summary' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportCommandType === 'slide-command-effect' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportCategories.includes('object-effect') &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportCategories.includes('text-run-style') &&
+      !summaryAfterStandaloneTextRunStylePaste.textStyleImportCategories.includes('text-style') &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportFields === 'runColor runItalic runSize' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportRunColor === '#0f766e' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportRunItalic === 'true' &&
+      summaryAfterStandaloneTextRunStylePaste.textStyleImportRunSize === '31' &&
+      summaryAfterStandaloneTextRunStylePaste.runColor === 'rgb(15, 118, 110)' &&
+      summaryAfterStandaloneTextRunStylePaste.runColorCount > 0 &&
+      summaryAfterStandaloneTextRunStylePaste.runColorValue === '#0f766e' &&
+      summaryAfterStandaloneTextRunStylePaste.italicRun === 'italic' &&
+      summaryAfterStandaloneTextRunStylePaste.italicRunCount > 0 &&
+      summaryAfterStandaloneTextRunStylePaste.runSize === '31px' &&
+      summaryAfterStandaloneTextRunStylePaste.runSizeCount > 0 &&
+      summaryAfterStandaloneTextRunStylePaste.runSizeValue === '31' &&
+      summaryAfterStandaloneTextRunStylePaste.styleClipboardCategories.includes('text-run') &&
+      summaryAfterStandaloneTextRunStylePaste.styleClipboardPackageCategories.includes('text-run-style') &&
+      summaryAfterStandaloneTextRunStylePaste.styleClipboardCommandApplications.includes('text-run-style') &&
+      summaryAfterStandaloneTextRunStylePaste.styleClipboardRunItalic === 'true',
+    {
+      summaryAfterStandaloneTextRunStylePaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterStandaloneTextRunStyleUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes standalone PPT textRunStyle JSON as one history step',
+    summaryAfterStandaloneTextRunStyleUndo.runColorCount === 0 &&
+      summaryAfterStandaloneTextRunStyleUndo.italicRunCount === 0 &&
+      summaryAfterStandaloneTextRunStyleUndo.runSizeCount === 0 &&
+      summaryAfterStandaloneTextRunStyleUndo.textAlign === summaryAfterTextStylePaste.textAlign &&
+      summaryAfterStandaloneTextRunStyleUndo.fontSize === summaryAfterTextStylePaste.fontSize,
+    {
+      summaryAfterStandaloneTextRunStylePaste,
+      summaryAfterStandaloneTextRunStyleUndo,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
     const json = JSON.stringify(42)
 
     dataTransfer.setData(

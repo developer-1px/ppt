@@ -22031,12 +22031,7 @@ function getPPTTextStyleSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTTextStyleImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.textStyle)
-    ? value.textStyle
-    : allowDirect
-      ? value
-      : null
+  const payloadValue = getPPTTextStylePayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -22175,6 +22170,25 @@ function getPPTTextStyleSourceFromJSONValue(
         ...(Object.keys(text).length > 0 ? { text } : {}),
       }
     : null
+}
+
+function getPPTTextStylePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+) {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.textStyle)) {
+    return value.textStyle
+  }
+
+  if (isPPTRecord(value.runStyle) || isPPTRecord(value.textRunStyle)) {
+    return value
+  }
+
+  return allowDirect ? value : null
 }
 
 function getPPTTextStyleRunStyleFromJSONValue(
