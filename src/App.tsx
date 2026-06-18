@@ -1080,6 +1080,12 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_VERTICAL_ALIGN_IMPORT_MODEL =
+  'ppt-text-vertical-align-import' as const
+const PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-vertical-align' as const
+const PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-vertical-align+json'
 const PPT_TEXT_AUTOFIT_IMPORT_MODEL = 'ppt-text-autofit-import' as const
 const PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-autofit' as const
@@ -1422,6 +1428,19 @@ type PPTTextBodyImportSource = {
   jsonLength: number
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
+}
+type PPTTextVerticalAlignImportField =
+  | 'alignItems'
+  | 'textVerticalAlign'
+  | 'textVerticalAlignment'
+  | 'value'
+  | 'verticalAlign'
+  | 'verticalAlignment'
+type PPTTextVerticalAlignImportSource = {
+  fields: readonly PPTTextVerticalAlignImportField[]
+  format: typeof PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT
+  jsonLength: number
+  value: PPTTextVerticalAlign
 }
 type PPTTextAutoFitImportField =
   | 'handle'
@@ -1774,6 +1793,19 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextVerticalAlignImportEffect = {
+  alignItems: string
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  fields: string
+  format: typeof PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_VERTICAL_ALIGN_IMPORT_MODEL
+  objectIds: string
+  value: string
 }
 type PPTTextAutoFitImportEffect = {
   commandHandles: string
@@ -2935,6 +2967,10 @@ function App() {
     useState<PPTTextBodyImportEffect | null>(null)
   const [lastTextAutoFitImportEffect, setLastTextAutoFitImportEffect] =
     useState<PPTTextAutoFitImportEffect | null>(null)
+  const [
+    lastTextVerticalAlignImportEffect,
+    setLastTextVerticalAlignImportEffect,
+  ] = useState<PPTTextVerticalAlignImportEffect | null>(null)
   const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
     useState<PPTLineStyleImportEffect | null>(null)
   const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
@@ -3940,6 +3976,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textVerticalAlignSource =
+        getPPTTextVerticalAlignSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textVerticalAlignSource &&
+        pastePPTTextVerticalAlignSource(textVerticalAlignSource)
       ) {
         event.preventDefault()
         return
@@ -5324,6 +5371,50 @@ function App() {
 
           return effect
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
+            : element
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextVerticalAlignSource(
+    source: PPTTextVerticalAlignImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element): element is PPTTextElement =>
+        isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getSlideEditTextVerticalAlignmentCommandEffect({
+          fieldId: 'verticalAlignment',
+          id: 'update-text-vertical-alignment',
+          objectId: element.id,
+          slideId: activeSlide.id,
+          value: source.value,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastTextVerticalAlignmentEffect(effects[effects.length - 1])
+    setLastTextVerticalAlignImportEffect(
+      createPPTTextVerticalAlignImportEffect({
+        effects,
+        source,
+      }),
+    )
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect
+            ? applyPPTTextVerticalAlignCommandEffectToElement(element, effect)
             : element
         }),
       })))
@@ -11744,6 +11835,17 @@ function App() {
         data-ppt-text-vertical-align-command-slide={lastTextVerticalAlignmentEffect?.payload.slideId}
         data-ppt-text-vertical-align-command-type={lastTextVerticalAlignmentEffect?.type}
         data-ppt-text-vertical-align-command-value={lastTextVerticalAlignmentEffect?.payload.value}
+        data-ppt-text-vertical-align-import-align-items={lastTextVerticalAlignImportEffect?.alignItems}
+        data-ppt-text-vertical-align-import-command-fields={lastTextVerticalAlignImportEffect?.commandFields}
+        data-ppt-text-vertical-align-import-command-targets={lastTextVerticalAlignImportEffect?.commandTargets}
+        data-ppt-text-vertical-align-import-command-types={lastTextVerticalAlignImportEffect?.commandTypes}
+        data-ppt-text-vertical-align-import-commands={lastTextVerticalAlignImportEffect?.commandIds}
+        data-ppt-text-vertical-align-import-fields={lastTextVerticalAlignImportEffect?.fields}
+        data-ppt-text-vertical-align-import-format={lastTextVerticalAlignImportEffect?.format}
+        data-ppt-text-vertical-align-import-json-length={lastTextVerticalAlignImportEffect?.jsonLength}
+        data-ppt-text-vertical-align-import-model={lastTextVerticalAlignImportEffect?.model}
+        data-ppt-text-vertical-align-import-objects={lastTextVerticalAlignImportEffect?.objectIds}
+        data-ppt-text-vertical-align-import-value={lastTextVerticalAlignImportEffect?.value}
         data-ppt-text-vertical-align-model="slide-edit-text-vertical-alignment"
         data-ppt-text-autofit-command={lastTextAutoFitEffect?.payload.id}
         data-ppt-text-autofit-command-handle={lastTextAutoFitEffect?.payload.handle}
@@ -14777,6 +14879,47 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextVerticalAlignImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditTextVerticalAlignmentHostCommandEffect<string, string>[]
+  source: PPTTextVerticalAlignImportSource
+}): PPTTextVerticalAlignImportEffect {
+  return {
+    alignItems: getPPTTextVerticalAlignCSS(source.value),
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_VERTICAL_ALIGN_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    value: source.value,
+  }
+}
+
+function applyPPTTextVerticalAlignCommandEffectToElement(
+  element: PPTElement,
+  effect: SlideEditTextVerticalAlignmentHostCommandEffect<string, string>,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  return {
+    ...element,
+    style: {
+      ...getPPTTextElementStyle(element),
+      verticalAlign: effect.payload.value,
+    },
   }
 }
 
@@ -18142,6 +18285,182 @@ function getPPTTextStyleVerticalAlignFromJSONValue(
   return value === 'top' || value === 'middle' || value === 'bottom'
     ? value
     : undefined
+}
+
+function getPPTTextVerticalAlignSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextVerticalAlignSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextVerticalAlignSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextVerticalAlignImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextVerticalAlignSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextVerticalAlignSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextVerticalAlignImportSource | null {
+  const payload = getPPTTextVerticalAlignPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const verticalAlign = getPPTTextVerticalAlignImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return verticalAlign
+    ? {
+        fields: payload.fields,
+        format: PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT,
+        jsonLength,
+        value: verticalAlign,
+      }
+    : null
+}
+
+function getPPTTextVerticalAlignPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextVerticalAlignImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textVerticalAlign',
+    'textVerticalAlignment',
+    'verticalAlign',
+    'verticalAlignment',
+    'alignItems',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextVerticalAlignImportValueFromJSONValue(
+  value: unknown,
+): PPTTextVerticalAlign | undefined {
+  if (isPPTRecord(value)) {
+    return getPPTTextVerticalAlignImportValueFromJSONValue(
+      value.value ??
+        value.mode ??
+        value.verticalAlign ??
+        value.verticalAlignment ??
+        value.textVerticalAlign ??
+        value.textVerticalAlignment ??
+        value.alignItems,
+    )
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const verticalAlign = value.trim().replace(/[\s_]/g, '-').toLowerCase()
+
+  switch (verticalAlign) {
+    case 'flex-start':
+    case 'start':
+    case 'top':
+      return 'top'
+    case 'center':
+    case 'centre':
+    case 'middle':
+      return 'middle'
+    case 'bottom':
+    case 'end':
+    case 'flex-end':
+      return 'bottom'
+    default:
+      return undefined
+  }
 }
 
 function getPPTTextStyleInsetFromJSONValue(

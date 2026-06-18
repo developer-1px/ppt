@@ -6428,6 +6428,86 @@ async function runTextVerticalAlignScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textVerticalAlign: 'bottom',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'pastes PPT text vertical alignment JSON through slide-edit command effect',
+    afterJSONPaste.command === 'update-text-vertical-alignment' &&
+      afterJSONPaste.commandField === 'verticalAlignment' &&
+      afterJSONPaste.commandObject === 's1-title' &&
+      afterJSONPaste.commandType === 'slide-command-effect' &&
+      afterJSONPaste.commandValue === 'bottom' &&
+      afterJSONPaste.importAlignItems === 'flex-end' &&
+      afterJSONPaste.importCommandFields === 'verticalAlignment' &&
+      afterJSONPaste.importCommandTargets === 's1-title' &&
+      afterJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterJSONPaste.importCommands === 'update-text-vertical-alignment' &&
+      afterJSONPaste.importFields === 'textVerticalAlign' &&
+      afterJSONPaste.importFormat === 'application-json-ppt-text-vertical-align' &&
+      afterJSONPaste.importJsonLength > 25 &&
+      afterJSONPaste.importModel === 'ppt-text-vertical-align-import' &&
+      afterJSONPaste.importObjects === 's1-title' &&
+      afterJSONPaste.importValue === 'bottom' &&
+      afterJSONPaste.selectedStyleAlignItems === 'flex-end' &&
+      afterJSONPaste.selectedVerticalAlign === 'bottom' &&
+      afterJSONPaste.thumbStyleAlignItems === 'flex-end' &&
+      afterJSONPaste.thumbVerticalAlign === 'bottom' &&
+      afterJSONPaste.verticalAlign === 'bottom',
+    {
+      afterJSONPaste,
+      afterRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONUndo = await getPPTTextVerticalAlignState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterJSONRedo = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'undoes and redoes PPT text vertical alignment JSON as one history step',
+    afterJSONUndo.selectedVerticalAlign === 'middle' &&
+      afterJSONUndo.selectedStyleAlignItems === 'center' &&
+      afterJSONRedo.selectedVerticalAlign === 'bottom' &&
+      afterJSONRedo.selectedStyleAlignItems === 'flex-end',
+    {
+      afterJSONPaste,
+      afterJSONRedo,
+      afterJSONUndo,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -6445,8 +6525,8 @@ async function runTextVerticalAlignScenario(page) {
   record(
     'keeps PPT text vertical alignment metadata in presentation preview',
     preview.open &&
-      preview.verticalAlign === 'middle' &&
-      preview.alignItems === 'center',
+      preview.verticalAlign === 'bottom' &&
+      preview.alignItems === 'flex-end',
     preview,
   )
 
@@ -6728,8 +6808,8 @@ async function runExportScenario(page) {
       hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
       hasTextFrameInsetMarkup: code.includes('data-ppt-text-inset="8,12,16,20"') && code.includes('padding:8px 12px 16px 20px'),
       hasTextFrameInsetModel: code.includes('"textInset"') && code.includes('"top": 8') && code.includes('"right": 12') && code.includes('"bottom": 16') && code.includes('"left": 20'),
-      hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="middle"') && code.includes('align-items:center'),
-      hasTextVerticalAlignModel: code.includes('"verticalAlign": "middle"'),
+      hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="bottom"') && code.includes('align-items:flex-end'),
+      hasTextVerticalAlignModel: code.includes('"verticalAlign": "bottom"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
       hasImageFitMarkup: code.includes('data-ppt-image-fit="contain"') && code.includes('object-fit:contain'),
       hasImageFitModel: code.includes('"fit": "contain"'),
@@ -7670,7 +7750,7 @@ async function runExportScenario(page) {
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
       hasTextFrameInset: text.includes('data-ppt-text-inset="8,12,16,20"'),
-      hasTextVerticalAlign: text.includes('data-ppt-vertical-align="middle"'),
+      hasTextVerticalAlign: text.includes('data-ppt-vertical-align="bottom"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
       hasImage: text.includes('data-ppt-kind="image"') && text.includes('href="data:image/svg+xml'),
@@ -17746,6 +17826,17 @@ function getPPTTextVerticalAlignState(page) {
       descriptorDefaultValue: field?.getAttribute('data-ppt-text-vertical-align-default-value') ?? '',
       descriptorOptions: field?.getAttribute('data-ppt-text-vertical-align-options') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-text-vertical-align-surface') ?? '',
+      importAlignItems: stage?.getAttribute('data-ppt-text-vertical-align-import-align-items') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-text-vertical-align-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-text-vertical-align-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-text-vertical-align-import-command-types') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-text-vertical-align-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-text-vertical-align-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-text-vertical-align-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-text-vertical-align-import-json-length') ?? '0'),
+      importModel: stage?.getAttribute('data-ppt-text-vertical-align-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-text-vertical-align-import-objects') ?? '',
+      importValue: stage?.getAttribute('data-ppt-text-vertical-align-import-value') ?? '',
       model: stage?.getAttribute('data-ppt-text-vertical-align-model') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedStyleAlignItems: selected?.style.alignItems ?? '',
