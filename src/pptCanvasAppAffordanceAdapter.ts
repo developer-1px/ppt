@@ -61,6 +61,7 @@ import {
   getCanvasFindInputKeyboardIntent,
   getCanvasFloatingAnchorForBounds,
   getCanvasImportedImageSize,
+  getCanvasImageInsertCenter,
   getCanvasInlineEditKeyboardIntent,
   getCanvasKeyboardBuiltinCommandShortcutIntent,
   getCanvasKeyboardNudgeShortcutIntent,
@@ -68,6 +69,7 @@ import {
   getCanvasKeyboardToolShortcutIntent,
   getCanvasKeyboardViewportShortcutIntent,
   getCanvasMergedEraserHitIds,
+  getCanvasMediaInsertPosition,
   getCanvasMenuTriggerKeyboardIntent,
   getCanvasModalBackdropPointerIntent,
   getCanvasModalKeyboardIntent,
@@ -87,10 +89,12 @@ import {
   getCanvasTableFileFromList,
   getCanvasTableFilesFromDataTransfer,
   getCanvasTableFilesFromList,
+  getCanvasTableInsertCenter,
   getCanvasTableSourceFromDataTransfer,
   getCanvasTableSourceFromHTML,
   getCanvasTableSourceFromText,
   getCanvasTabsKeyboardIntent,
+  getCanvasTextPasteInsertPosition,
   getCanvasTextPasteSourcesFromDataTransfer,
   getCanvasWorldClientPoint,
   handleCanvasRadioGroupKeyDown,
@@ -328,6 +332,8 @@ export const getPPTCanvasFloatingAnchorForBounds =
   getCanvasFloatingAnchorForBounds
 export const getPPTCanvasImportedImageSize =
   getCanvasImportedImageSize
+export const getPPTCanvasImageInsertCenter =
+  getCanvasImageInsertCenter
 export const getPPTCanvasInlineEditKeyboardIntent =
   getCanvasInlineEditKeyboardIntent
 export const getPPTCanvasKeyboardBuiltinCommandShortcutIntent =
@@ -430,6 +436,8 @@ export const getPPTCanvasMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer
 export const getPPTCanvasMediaSourceFromText =
   getCanvasMediaSourceFromText
+export const getPPTCanvasMediaInsertPosition =
+  getCanvasMediaInsertPosition
 export const routePPTCanvasMediaSourceObjectHyperlink =
   routeCanvasMediaSourceObjectHyperlink
 export const getPPTMinimapPointFromViewportOffset =
@@ -456,6 +464,8 @@ export const getPPTCanvasTableFilesFromDataTransfer =
   getCanvasTableFilesFromDataTransfer
 export const getPPTCanvasTableFilesFromList =
   getCanvasTableFilesFromList
+export const getPPTCanvasTableInsertCenter =
+  getCanvasTableInsertCenter
 export const getPPTCanvasTableSourceFromDataTransfer =
   getCanvasTableSourceFromDataTransfer
 export const getPPTCanvasTableSourceFromHTML =
@@ -466,6 +476,8 @@ export const routePPTCanvasTableImportTargetReplace =
   routeCanvasTableImportTargetReplace
 export const getPPTCanvasTextPasteSourcesFromDataTransfer =
   getCanvasTextPasteSourcesFromDataTransfer
+export const getPPTCanvasTextPasteInsertPosition =
+  getCanvasTextPasteInsertPosition
 export const routePPTCanvasTextPasteReplace =
   routeCanvasTextPasteReplace
 export const getPPTInlineEditHistoryDirectionFromInputType =

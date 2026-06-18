@@ -608,12 +608,14 @@ import {
   getPPTCanvasEditableFieldKeyboardIntent,
   getPPTCanvasFindInputKeyboardIntent,
   getPPTCanvasFloatingAnchorForBounds,
+  getPPTCanvasImageInsertCenter,
   getPPTCanvasInlineEditKeyboardIntent,
   getPPTCanvasKeyboardBuiltinCommandShortcutIntent,
   getPPTCanvasKeyboardNudgeShortcutIntent,
   getPPTCanvasKeyboardSystemShortcutIntent,
   getPPTCanvasKeyboardToolShortcutIntent,
   getPPTCanvasKeyboardViewportShortcutIntent,
+  getPPTCanvasMediaInsertPosition,
   getPPTCanvasMenuTriggerKeyboardIntent,
   getPPTMinimapPointFromViewportOffset,
   getPPTMinimapReadModel,
@@ -628,7 +630,9 @@ import {
   getPPTCanvasRadioTabIndex,
   getPPTCanvasResizeHandleDoubleClickIntent,
   getPPTCanvasSelectionListModifierState,
+  getPPTCanvasTableInsertCenter,
   getPPTCanvasTabsKeyboardIntent,
+  getPPTCanvasTextPasteInsertPosition,
   getPPTCanvasWorldClientPoint,
   handlePPTCanvasRadioGroupKeyDown,
   insertPPTInlineEditText,
@@ -8692,14 +8696,14 @@ function App() {
 
   function insertPPTImageSource(
     source: PPTImageImportSource,
-    center = getPPTViewportCenter(),
+    center = getPPTImageInsertCenter(),
   ) {
     insertPPTImageSources([source], center)
   }
 
   function insertPPTImageSources(
     sources: readonly PPTImageImportSource[],
-    center = getPPTViewportCenter(),
+    center = getPPTImageInsertCenter(),
   ) {
     if (sources.length === 0) {
       return false
@@ -8747,7 +8751,7 @@ function App() {
 
   async function insertPPTImageFile(
     file: Blob & { name?: string },
-    center = getPPTViewportCenter(),
+    center = getPPTImageInsertCenter(),
   ) {
     const source = await readPPTImageFileSource(file)
 
@@ -8761,7 +8765,7 @@ function App() {
 
   async function pasteOrInsertPPTImageFile(
     file: Blob & { name?: string },
-    center = getPPTViewportCenter(),
+    center = getPPTImageInsertCenter(),
   ) {
     const source = await readPPTImageFileSource(file)
 
@@ -8774,7 +8778,7 @@ function App() {
 
   async function insertPPTImageFiles(
     files: readonly (Blob & { name?: string })[],
-    center = getPPTViewportCenter(),
+    center = getPPTImageInsertCenter(),
   ) {
     const sources = await readPPTImageFileSources(files)
 
@@ -9066,14 +9070,14 @@ function App() {
 
   function insertPPTTableSource(
     source: PPTTableImportSource = { format: 'default', rows: PPT_DEFAULT_TABLE_ROWS },
-    center = getPPTViewportCenter(),
+    center = getPPTTableInsertCenter(),
   ) {
     return insertPPTTableSources([source], center)
   }
 
   function insertPPTTableSources(
     sources: readonly PPTTableImportSource[],
-    center = getPPTViewportCenter(),
+    center = getPPTTableInsertCenter(),
   ) {
     if (sources.length === 0) {
       return false
@@ -9121,7 +9125,7 @@ function App() {
 
   async function insertPPTTableFile(
     file: Blob & { name?: string },
-    center = getPPTViewportCenter(),
+    center = getPPTTableInsertCenter(),
   ) {
     const source = await readPPTTableFileSource(file)
 
@@ -9135,7 +9139,7 @@ function App() {
 
   async function insertPPTTableFiles(
     files: readonly (Blob & { name?: string })[],
-    center = getPPTViewportCenter(),
+    center = getPPTTableInsertCenter(),
   ) {
     const sources = await readPPTTableFileSources(files)
 
@@ -9144,7 +9148,7 @@ function App() {
 
   function insertPPTMediaSource(
     source: PPTMediaImportSource,
-    center = getPPTViewportCenter(),
+    center = getPPTMediaInsertPosition(),
     options: {
       onResult?: (result: PPTMediaImportResult) => void
     } = {},
@@ -9183,7 +9187,7 @@ function App() {
   }
 
   function pastePPTMediaJSONSource(source: PPTMediaJSONImportSource) {
-    return insertPPTMediaSource(source.source, getPPTViewportCenter(), {
+    return insertPPTMediaSource(source.source, getPPTMediaInsertPosition(), {
       onResult: (result) => {
         setLastMediaJSONImportEffect(createPPTMediaJSONImportEffect({
           result,
@@ -9195,7 +9199,7 @@ function App() {
 
   function insertPPTTextPasteSource(
     text: string,
-    center = getPPTViewportCenter(),
+    center = getPPTTextPasteInsertPosition(),
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTTextPasteElement({
@@ -9231,7 +9235,7 @@ function App() {
 
   function insertPPTRichTextPasteSource(
     source: PPTRichTextPasteSource,
-    center = getPPTViewportCenter(),
+    center = getPPTTextPasteInsertPosition(),
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTRichTextPasteElement({
@@ -11227,6 +11231,63 @@ function App() {
     }
   }
 
+  function getPPTImageInsertCenter(
+    event?: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getPPTCanvasImageInsertCenter({
+      event,
+      stageElement: canvasStageElement,
+      viewport,
+    })
+  }
+
+  function getPPTTableInsertCenter(
+    event?: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getPPTCanvasTableInsertCenter({
+      event,
+      stageElement: canvasStageElement,
+      viewport,
+    })
+  }
+
+  function getPPTMediaInsertPosition(
+    event?: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getPPTCanvasMediaInsertPosition({
+      event,
+      stageElement: canvasStageElement,
+      viewport,
+    })
+  }
+
+  function getPPTTextPasteInsertPosition(
+    event?: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    return getPPTCanvasTextPasteInsertPosition({
+      event,
+      stageElement: canvasStageElement,
+      viewport,
+    })
+  }
+
+  function getPPTStageDropInsertPosition(
+    action: PPTStageDropImportAction,
+    event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  ) {
+    switch (action.kind) {
+      case 'image-file':
+      case 'image-file-batch':
+        return getPPTImageInsertCenter(event)
+      case 'table-file':
+      case 'table-file-batch':
+      case 'table-source':
+        return getPPTTableInsertCenter(event)
+      case 'media-source':
+        return getPPTMediaInsertPosition(event)
+    }
+  }
+
   function worldToScreen(point: Point) {
     return getPPTCanvasWorldClientPoint({
       point,
@@ -11278,7 +11339,7 @@ function App() {
       return
     }
 
-    const point = screenToWorld(event.nativeEvent)
+    const point = getPPTStageDropInsertPosition(action, event.nativeEvent)
 
     if (runPPTStageDropImportAction(action, point)) {
       event.preventDefault()
