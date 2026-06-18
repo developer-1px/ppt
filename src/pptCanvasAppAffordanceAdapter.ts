@@ -102,6 +102,9 @@ import {
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
   type CanvasPointerClickMemory,
+  previewCanvasPointerPanInteraction,
+  startCanvasPointerPanInteraction,
+  type CanvasPointerPanInteraction,
   type CanvasRichClipboardReadFormat,
   type CanvasRichClipboardWriteMode,
   type CanvasTabsDescriptor,
@@ -204,11 +207,6 @@ import {
   startCanvasPointerLaserInteraction,
   type CanvasPointerLaserInteraction,
 } from 'canvas/app/pointer-laser'
-import {
-  previewCanvasPointerPanInteraction,
-  startCanvasPointerPanInteraction,
-  type CanvasPointerPanInteraction,
-} from 'canvas/app/pointer-pan-interaction'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 import {
   getCanvasEraserHitItemIds,
