@@ -227,6 +227,7 @@ import {
 import {
   CANVAS_MEDIA_IMPORT_MODEL,
   CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
+  CANVAS_MEDIA_SOURCE_JSON_TYPES,
   getCanvasMediaSourceFromDataTransfer,
   getCanvasMediaSourceFromJSONDataTransfer,
   getCanvasMediaSourceFromText,
@@ -521,6 +522,8 @@ export const getPPTCanvasMediaSourceFromText =
   getCanvasMediaSourceFromText
 export const PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE =
   CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE
+export const PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES =
+  CANVAS_MEDIA_SOURCE_JSON_TYPES
 export const getPPTCanvasMediaInsertPosition =
   getCanvasMediaInsertPosition
 export const routePPTCanvasMediaSourceObjectHyperlink =

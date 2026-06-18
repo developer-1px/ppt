@@ -3,6 +3,7 @@ import {
   createPPTCanvasDataTransferImportRegistry,
   getPPTCanvasDataTransferImportRegistryMetadata,
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
+  PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
   type PPTCanvasDataTransferImportRegistryResolver,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
@@ -383,7 +384,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
     supportedFormats: [
       PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
-      'application/json',
+      ...PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
       'text/plain',
       'text/uri-list',
     ],
