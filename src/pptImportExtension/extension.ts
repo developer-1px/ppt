@@ -2,6 +2,7 @@ import {
   createPPTCanvasDataTransferImportActionPlanFromRegistry,
   createPPTCanvasDataTransferImportRegistry,
   getPPTCanvasDataTransferImportRegistryMetadata,
+  PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
   type PPTCanvasDataTransferImportRegistryResolver,
@@ -328,7 +329,11 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
         : null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['image/svg+xml', 'text/html', 'text/plain'],
+    supportedFormats: [
+      'image/svg+xml',
+      'text/html',
+      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+    ],
     title: 'Image source',
   },
   {
@@ -344,7 +349,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       'text/html',
       'text/markdown',
       'text/x-markdown',
-      'text/plain',
+      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
       'text/csv',
       'text/tab-separated-values',
     ],
@@ -369,7 +374,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       'text/html',
       'text/markdown',
       'text/x-markdown',
-      'text/plain',
+      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     ],
     title: 'Rich text source',
   },
@@ -385,7 +390,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
     supportedFormats: [
       PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
       ...PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
-      'text/plain',
+      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
       'text/uri-list',
     ],
     title: 'Media source',
@@ -399,7 +404,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
           candidate.kind === 'text-source' ? [candidate] : []
         ),
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['text/plain'],
+    supportedFormats: [PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE],
     title: 'Text source',
   },
 ] satisfies readonly PPTCanvasDataTransferImportRegistryResolver<

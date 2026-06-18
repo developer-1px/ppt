@@ -41,6 +41,7 @@ import {
   createCanvasDataTransferImportActionPlan,
   createCanvasDataTransferImportActionPlanFromRegistry,
   createCanvasDataTransferImportRegistry,
+  CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
   createCanvasExternalClipboardImagePasteActionResolver,
   createCanvasExternalClipboardPasteActionPlan,
   createCanvasClipboardCommandEffectPlan,
@@ -391,6 +392,8 @@ export const getPPTCanvasContextMenuKeyboardIntent =
 export const getPPTCanvasContextMenuPosition =
   getCanvasContextMenuPosition
 export const getPPTCanvasDataTransferText = getCanvasDataTransferText
+export const PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE =
+  CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE
 export const getPPTCanvasDataTransferImportRegistryMetadata =
   getCanvasDataTransferImportRegistryMetadata
 export const getPPTCanvasEditableFieldKeyboardIntent =
