@@ -27043,49 +27043,43 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextParagraphAlignImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE),
+      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextParagraphAlignSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextParagraphAlignSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextParagraphAlignSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(
@@ -27266,49 +27260,43 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextParagraphBulletImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE),
+      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextParagraphBulletSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextParagraphBulletSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextParagraphBulletSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextParagraphBulletSourceFromSlideEditJSONPasteValue(
@@ -27527,49 +27515,43 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextParagraphSpacingImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE),
+      format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTextParagraphSpacingSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextParagraphSpacingSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextParagraphSpacingSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
