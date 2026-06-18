@@ -18,6 +18,8 @@ const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
+const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-image-replace+json'
 
 const checks = []
 const browserErrors = []
@@ -13660,6 +13662,80 @@ async function runImageImportScenario(page) {
     {
       afterJSONReplaceRedo,
       afterJSONReplaceRestore,
+      afterReplace,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const svg = '<svg width="180" height="100" viewBox="0 0 180 100" xmlns="http://www.w3.org/2000/svg"><rect width="180" height="100" fill="#2563eb"/><text x="20" y="58" font-family="Arial" font-size="24" fill="white">CANVAS</text></svg>'
+    const json = JSON.stringify({
+      altText: 'Canvas MIME image source',
+      mimeType: 'image/svg+xml',
+      name: 'canvas-mime-replacement.svg',
+      naturalHeight: 100,
+      naturalWidth: 180,
+      src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEReplace = await getPPTImageImportState(page)
+
+  record(
+    'pastes canvas MIME image source into selected PPT image through slide-edit replace parser',
+    afterCanvasMIMEReplace.imageReplaceImportModel === 'ppt-image-replace-import' &&
+      afterCanvasMIMEReplace.imageReplaceImportFormat === 'application-json-ppt-image-replace' &&
+      afterCanvasMIMEReplace.imageReplaceImportSlide === 'slide-1' &&
+      afterCanvasMIMEReplace.imageReplaceImportObject === afterReplace.selectedId &&
+      afterCanvasMIMEReplace.imageReplaceImportFields ===
+        'src mimeType name altText naturalWidth naturalHeight' &&
+      afterCanvasMIMEReplace.imageReplaceImportCommand === 'replace-object-image' &&
+      afterCanvasMIMEReplace.imageReplaceImportCommandType === 'slide-command-effect' &&
+      afterCanvasMIMEReplace.imageReplaceImportMime === 'image/svg+xml' &&
+      afterCanvasMIMEReplace.imageReplaceImportName === 'canvas-mime-replacement.svg' &&
+      afterCanvasMIMEReplace.imageReplaceImportAltTextLength === 'Canvas MIME image source'.length &&
+      afterCanvasMIMEReplace.imageReplaceImportNaturalWidth === '180' &&
+      afterCanvasMIMEReplace.imageReplaceImportNaturalHeight === '100' &&
+      afterCanvasMIMEReplace.imageReplaceCommand === 'replace-object-image' &&
+      afterCanvasMIMEReplace.imageReplaceCommandName === 'canvas-mime-replacement.svg' &&
+      afterCanvasMIMEReplace.imageReplaceCommandMime === 'image/svg+xml' &&
+      afterCanvasMIMEReplace.imageReplaceCommandObject === afterReplace.selectedId &&
+      afterCanvasMIMEReplace.imageCount === afterReplace.imageCount &&
+      afterCanvasMIMEReplace.selectedName === 'canvas-mime-replacement.svg' &&
+      afterCanvasMIMEReplace.selectedAltText === 'Canvas MIME image source' &&
+      afterCanvasMIMEReplace.selectedImageDecoded.includes('#2563eb') &&
+      afterCanvasMIMEReplace.selectedImageFit === afterReplace.selectedImageFit &&
+      afterCanvasMIMEReplace.selectedImagePosition === afterReplace.selectedImagePosition,
+    {
+      afterCanvasMIMEReplace,
+      afterJSONReplaceRestore,
+      afterReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterCanvasMIMEReplaceRestore = await getPPTImageImportState(page)
+
+  record(
+    'restores PPT image source after canvas MIME image replacement probe',
+    afterCanvasMIMEReplaceRestore.selectedName === afterReplace.selectedName &&
+      afterCanvasMIMEReplaceRestore.selectedAltText === afterReplace.selectedAltText &&
+      afterCanvasMIMEReplaceRestore.selectedImageSrc === afterReplace.selectedImageSrc &&
+      afterCanvasMIMEReplaceRestore.selectedImageFit === afterReplace.selectedImageFit &&
+      afterCanvasMIMEReplaceRestore.selectedImagePosition === afterReplace.selectedImagePosition,
+    {
+      afterCanvasMIMEReplace,
+      afterCanvasMIMEReplaceRestore,
       afterReplace,
     },
   )

@@ -231,6 +231,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
@@ -21982,23 +21983,41 @@ function getPPTImageReplaceSourceFromDataTransfer(
 function getPPTImageReplaceSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTImageReplaceImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_IMAGE_REPLACE_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditObjectImageReplaceJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
+  for (const customMimeType of [
+    PPT_IMAGE_REPLACE_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectImageReplaceJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return createPPTImageReplaceSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
     }
-
-    return createPPTImageReplaceSourceFromSlideEditJSONPasteValue(
-      pasteValue,
-      candidate.text.length,
-    )
   }
 
   return null
