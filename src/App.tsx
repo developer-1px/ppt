@@ -140,8 +140,10 @@ import {
   getSlideEditObjectAnimationCSSStyle,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectCornerRadiusCSS,
+  getSlideEditObjectCornerRadiusJSONPasteValue,
   getSlideEditObjectCornerRadiusPreviewCSS,
   getSlideEditObjectFillOpacityCommandEffect,
+  getSlideEditObjectFillOpacityJSONPasteValue,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectImageCropCommandEffect,
   getSlideEditObjectImageCropPositionCSS,
@@ -150,12 +152,14 @@ import {
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
+  getSlideEditObjectShadowJSONPasteValue,
   normalizeSlideEditObjectAltTextStorageValue,
   normalizeSlideEditObjectHyperlinkStorageUrl,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditObjectStrokeLineStyleDashArray,
+  getSlideEditObjectStrokeLineStyleJSONPasteValue,
   getSlideEditObjectAccessibilityJSONPasteValue,
   getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
@@ -19810,6 +19814,13 @@ function getPPTObjectShadowSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectShadowSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -19853,6 +19864,96 @@ function getPPTObjectShadowSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectShadowImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_SHADOW_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditObjectShadowJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
+      pasteValue,
+      candidate.text.length,
+    )
+  }
+
+  return null
+}
+
+function createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditObjectShadowJSONPasteValue>>,
+  jsonLength: number,
+): PPTObjectShadowImportSource {
+  const hasDisabledShadow = pasteValue.fields.some((field) =>
+    field.fieldId === 'enabled' && field.value === false)
+
+  if (hasDisabledShadow) {
+    return {
+      fields: ['enabled'],
+      format: PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT,
+      jsonLength,
+      shadow: null,
+    }
+  }
+
+  const pastedFields = new Set(pasteValue.fields.map((field) => field.fieldId))
+  const fields = ([
+    'enabled',
+    'color',
+    'opacity',
+    'blur',
+    'distance',
+    'angle',
+  ] as const).filter((field) => pastedFields.has(field))
+  const shadow: Partial<PPTElementShadow> = {}
+
+  for (const field of fields) {
+    if (field === 'color') {
+      shadow.color = normalizePPTElementShadowColor(pasteValue.shadow.color)
+      continue
+    }
+
+    if (field === 'opacity') {
+      shadow.opacity = normalizePPTElementShadowOpacity(
+        pasteValue.shadow.opacity,
+      )
+      continue
+    }
+
+    if (field === 'blur') {
+      shadow.blur = normalizePPTElementShadowBlur(pasteValue.shadow.blur)
+      continue
+    }
+
+    if (field === 'distance') {
+      shadow.distance = normalizePPTElementShadowDistance(
+        pasteValue.shadow.distance,
+      )
+      continue
+    }
+
+    if (field === 'angle') {
+      shadow.angle = normalizePPTElementShadowAngle(pasteValue.shadow.angle)
+    }
+  }
+
+  return {
+    fields,
+    format: PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT,
+    jsonLength,
+    shadow,
+  }
 }
 
 function getPPTObjectShadowSourceFromText(
@@ -21846,6 +21947,13 @@ function getPPTObjectFillOpacitySourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectFillOpacitySourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -21885,6 +21993,43 @@ function getPPTObjectFillOpacitySourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectFillOpacitySourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectFillOpacityImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const value = getPPTJSONValueFromText(candidate.text)
+
+    if (
+      !candidate.allowDirect &&
+      isPPTRecord(value) &&
+      shouldDeferPPTObjectFillOpacityToShapeStyle(value)
+    ) {
+      continue
+    }
+
+    const pasteValue = getSlideEditObjectFillOpacityJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return {
+      fields: ['fillOpacity'],
+      fillOpacity: normalizePPTFillOpacity(pasteValue.value),
+      format: PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -22000,6 +22145,13 @@ function getPPTObjectCornerRadiusSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -22039,6 +22191,43 @@ function getPPTObjectCornerRadiusSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectCornerRadiusImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const value = getPPTJSONValueFromText(candidate.text)
+
+    if (
+      !candidate.allowDirect &&
+      isPPTRecord(value) &&
+      shouldDeferPPTObjectCornerRadiusToShapeStyle(value)
+    ) {
+      continue
+    }
+
+    const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return {
+      cornerRadius: normalizePPTShapeCornerRadius(pasteValue.value),
+      fields: ['cornerRadius'],
+      format: PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -22598,6 +22787,13 @@ function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -22637,6 +22833,43 @@ function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectStrokeLineStyleImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const value = getPPTJSONValueFromText(candidate.text)
+
+    if (
+      !candidate.allowDirect &&
+      isPPTRecord(value) &&
+      shouldDeferPPTObjectStrokeLineStyleToLineStyle(value)
+    ) {
+      continue
+    }
+
+    const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (strokeLineStyle === null) {
+      continue
+    }
+
+    return {
+      fields: ['strokeLineStyle'],
+      format: PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
+      strokeLineStyle: normalizePPTStrokeDash(strokeLineStyle),
     }
   }
 
@@ -23278,6 +23511,11 @@ function getPPTSlideEditJSONPasteCandidates({
       allowDirect: false,
       customMimeType: '',
       type: 'application/json',
+    },
+    {
+      allowDirect: false,
+      customMimeType: '',
+      type: 'text/json',
     },
     {
       allowDirect: false,
