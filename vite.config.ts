@@ -19,7 +19,6 @@ const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canv
 const canvasStageElementEntry = fileURLToPath(new URL('../canvas/src/canvas/app/rendering/stage/CanvasAppStageElement.ts', import.meta.url))
 const canvasTableImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/table-import/CanvasTableImport.ts', import.meta.url))
 const canvasTextPasteImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/text-paste-import/CanvasTextPasteImport.ts', import.meta.url))
-const canvasViewportControlsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/viewport/CanvasViewportControlExecution.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
 const canvasEngineEntry = fileURLToPath(new URL('../canvas/src/canvas/engine/index.ts', import.meta.url))
@@ -48,7 +47,6 @@ export default defineConfig({
       { find: 'canvas/app/stage-element', replacement: canvasStageElementEntry },
       { find: 'canvas/app/table-import', replacement: canvasTableImportEntry },
       { find: 'canvas/app/text-paste-import', replacement: canvasTextPasteImportEntry },
-      { find: 'canvas/app/viewport-controls', replacement: canvasViewportControlsEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },
       { find: 'canvas/engine', replacement: canvasEngineEntry },
