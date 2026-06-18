@@ -1148,6 +1148,9 @@ type PPTClipboardSourcePasteAction = {
 type PPTDataTransferTextReader = {
   getData?: (format: string) => string
 }
+type PPTDataTransferTextSource = {
+  getData: (format: string) => string
+}
 type PPTJSONDataTransferCandidate<TFormat extends string> = {
   format: TFormat
   mimeType: string
@@ -1156,6 +1159,13 @@ type PPTDirectJSONDataTransferCandidate<TFormat extends string> =
   PPTJSONDataTransferCandidate<TFormat> & {
     allowDirect: boolean
   }
+type PPTSlideEditJSONPasteCandidate = {
+  allowDirect: boolean
+  customMimeType: string
+  dataTransfer: PPTDataTransferTextSource
+  text: string
+  type: string
+}
 type PPTJSONDataTransferSourceParseInput<
   TCandidate extends PPTJSONDataTransferCandidate<string>,
 > = {
@@ -1170,6 +1180,18 @@ function readPPTDataTransferText(
   mimeType: string,
 ) {
   return getPPTCanvasDataTransferText({ dataTransfer, mimeType })
+}
+
+function createPPTTextDataTransferReader({
+  mimeType,
+  text,
+}: {
+  mimeType: string
+  text: string
+}): PPTDataTransferTextSource {
+  return {
+    getData: (format: string) => format === mimeType ? text : '',
+  }
 }
 
 function readPPTJSONDataTransferSource<
@@ -19761,10 +19783,10 @@ function getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditLayoutJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -20734,10 +20756,10 @@ function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectShadowJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -21110,10 +21132,10 @@ function getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -21307,10 +21329,10 @@ function getPPTObjectAccessibilitySourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
         storagePolicy: {
           maxLength: PPT_ALT_TEXT_MAX_LENGTH,
@@ -21559,10 +21581,10 @@ function getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditLayerPaneRenameJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeTypes: candidate.customMimeType
           ? [candidate.customMimeType]
           : [],
@@ -21860,10 +21882,10 @@ function getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
         storagePolicy: {
           blockedSchemes: ['javascript', 'data', 'vbscript'],
@@ -22091,10 +22113,10 @@ function getPPTObjectStateSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditLayerPaneObjectStateJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -22322,10 +22344,10 @@ function getPPTObjectLayerSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditLayerPaneObjectLayerJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -22559,10 +22581,10 @@ function getPPTObjectTransformSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectTransformJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -22822,10 +22844,10 @@ function getPPTImageReplaceSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectImageReplaceJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -23180,10 +23202,10 @@ function getPPTImageCropSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditObjectImageCropJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -23450,10 +23472,10 @@ function getPPTObjectFillOpacitySourceFromSlideEditJSONPasteValue(
       }
 
       const pasteValue = getSlideEditObjectFillOpacityJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -23660,10 +23682,10 @@ function getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(
       }
 
       const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -24302,10 +24324,10 @@ function getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(
       }
 
       const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -24948,7 +24970,7 @@ function getPPTSlideEditJSONPasteCandidates({
 }: {
   customMimeType: string
   dataTransfer: DataTransfer
-}) {
+}): PPTSlideEditJSONPasteCandidate[] {
   const seen = new Set<string>()
 
   return [
@@ -24984,11 +25006,23 @@ function getPPTSlideEditJSONPasteCandidates({
     return [{
       allowDirect: candidate.allowDirect,
       customMimeType: candidate.customMimeType,
-      dataTransfer: {
-        getData: (type: string) => type === candidate.type ? text : '',
-      },
+      dataTransfer: createPPTTextDataTransferReader({
+        mimeType: candidate.type,
+        text,
+      }),
       text,
+      type: candidate.type,
     }]
+  })
+}
+
+function createPPTSlideEditJSONPasteCandidateDataTransfer(
+  candidate: PPTSlideEditJSONPasteCandidate,
+  json: string,
+) {
+  return createPPTTextDataTransferReader({
+    mimeType: candidate.type,
+    text: json,
   })
 }
 
@@ -25299,10 +25333,10 @@ function getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const size = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         fieldId: 'size',
         jsonMimeType: candidate.customMimeType,
       })
@@ -25560,10 +25594,10 @@ function getPPTTextRunColorSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const color = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         fieldId: 'color',
         jsonMimeType: candidate.customMimeType,
       })
@@ -26307,10 +26341,10 @@ function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
       seen.add(json)
 
       const value = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         fieldId,
         jsonMimeType: candidate.customMimeType,
       })
@@ -26849,10 +26883,10 @@ function getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -27576,10 +27610,10 @@ function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -28638,10 +28672,10 @@ function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
       seen.add(json)
 
       const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
-        dataTransfer: {
-          getData: (type: string) =>
-            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
-        },
+        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
+          candidate,
+          json,
+        ),
         jsonMimeType: candidate.customMimeType,
       })
 
@@ -29458,9 +29492,10 @@ function getPPTCommentSourceFromSlideEditJSONPasteValue(
 
     const json = getPPTImportJSONText(text) ?? text
     const pasteValue = getSlideEditCommentThreadJSONPasteValue({
-      dataTransfer: {
-        getData: (type: string) => type === candidate.type ? json : '',
-      },
+      dataTransfer: createPPTTextDataTransferReader({
+        mimeType: candidate.type,
+        text: json,
+      }),
       jsonMimeType: candidate.jsonMimeType,
       storagePolicy: {
         maxBodyLength: PPT_COMMENT_BODY_MAX_LENGTH,
