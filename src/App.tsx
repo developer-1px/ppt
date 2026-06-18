@@ -218,6 +218,7 @@ import {
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextParagraphSpacingJSONPasteValue,
+  getSlideEditTextParagraphSpacingPasteCommands,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTextVerticalAlignmentJSONPasteValue,
@@ -266,6 +267,7 @@ import {
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
+  SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
@@ -7021,17 +7023,67 @@ function App() {
   function pastePPTTextParagraphSpacingSource(
     source: PPTTextParagraphSpacingImportSource,
   ) {
-    const effects = selectedElements
-      .filter((element): element is PPTTextElement =>
+    const textElements = selectedElements.filter(
+      (element): element is PPTTextElement =>
         isPPTTextElement(element) &&
-          element.locked !== true &&
-          element.visible !== false)
-      .flatMap((element) =>
-        createPPTTextParagraphSpacingImportCommandEffects({
-          element,
-          slideId: activeSlide.id,
-          source,
-        }))
+        element.locked !== true &&
+        element.visible !== false,
+    )
+    const lineHeight = source.spacing.lineHeight
+    const spacingBefore = source.spacing.spacingBefore
+    const spacingAfter = source.spacing.spacingAfter
+
+    const effects = textElements.flatMap((element) =>
+      getSlideEditTextParagraphSpacingPasteCommands({
+        objectId: element.id,
+        pasteValue: {
+          fields: source.fields.flatMap((field) => {
+            const value = source.spacing[field]
+
+            if (value === undefined) {
+              return []
+            }
+
+            if (field === 'lineHeight') {
+              return [{
+                fieldId: 'lineHeightRatio',
+                value,
+              }]
+            }
+
+            return [{
+              fieldId: field === 'spacingBefore'
+                ? 'paragraphBefore'
+                : 'paragraphAfter',
+              value: {
+                unit: 'px',
+                value,
+              },
+            }]
+          }),
+          surface: 'text-paragraph-spacing',
+          values: {
+            ...(lineHeight === undefined ? {} : { lineHeightRatio: lineHeight }),
+            ...(spacingBefore === undefined
+              ? {}
+              : {
+                  paragraphBefore: {
+                    unit: 'px',
+                    value: spacingBefore,
+                  },
+                }),
+            ...(spacingAfter === undefined
+              ? {}
+              : {
+                  paragraphAfter: {
+                    unit: 'px',
+                    value: spacingAfter,
+                  },
+                }),
+          },
+        },
+        slideId: activeSlide.id,
+      }).map(getSlideEditTextParagraphSpacingCommandEffect))
 
     if (effects.length === 0) {
       return false
@@ -18091,26 +18143,6 @@ function createPPTTextParagraphSpacingImportEffect({
   }
 }
 
-function createPPTTextParagraphSpacingImportCommandEffects({
-  element,
-  slideId,
-  source,
-}: {
-  element: PPTTextElement
-  slideId: string
-  source: PPTTextParagraphSpacingImportSource
-}): SlideEditTextParagraphSpacingHostCommandEffect<string, string>[] {
-  return source.fields.map((field) =>
-    getSlideEditTextParagraphSpacingCommandEffect(
-      toSlideEditParagraphSpacingCommand({
-        elementId: element.id,
-        field,
-        slideId,
-        value: source.spacing[field] ?? 0,
-      }),
-    ))
-}
-
 function applyPPTTextParagraphSpacingCommandEffectsToElement(
   element: PPTTextElement,
   effects: readonly SlideEditTextParagraphSpacingHostCommandEffect<string, string>[],
@@ -26812,23 +26844,41 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
 function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextParagraphSpacingImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
+  for (const customMimeType of [
+    PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return createPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
     }
-
-    return createPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
-      pasteValue,
-      candidate.text.length,
-    )
   }
 
   return null

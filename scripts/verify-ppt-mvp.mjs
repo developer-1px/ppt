@@ -44,6 +44,8 @@ const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-state+json'
 const SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.text-frame-inset+json'
+const SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.text-paragraph-spacing+json'
 const SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.text-vertical-alignment+json'
 
@@ -7576,6 +7578,87 @@ async function runTextParagraphSpacingScenario(page) {
       afterJSONPaste,
       afterJSONRedo,
       afterJSONUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      lineHeightRatio: 1.64,
+      paragraphAfter: 22,
+      paragraphBefore: 13,
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEPaste = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'pastes canvas MIME paragraph spacing through slide-edit command effects',
+    afterCanvasMIMEPaste.command === 'update-text-paragraph-spacing' &&
+      afterCanvasMIMEPaste.commandField === 'paragraphAfter' &&
+      afterCanvasMIMEPaste.commandObject === 's1-title' &&
+      afterCanvasMIMEPaste.commandSlide === 'slide-1' &&
+      afterCanvasMIMEPaste.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEPaste.commandUnit === 'px' &&
+      afterCanvasMIMEPaste.commandValue === '22' &&
+      afterCanvasMIMEPaste.importCommandFields === 'lineHeightRatio paragraphBefore paragraphAfter' &&
+      afterCanvasMIMEPaste.importCommandTargets === 's1-title s1-title s1-title' &&
+      afterCanvasMIMEPaste.importCommandTypes === 'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterCanvasMIMEPaste.importCommandUnits === 'ratio px px' &&
+      afterCanvasMIMEPaste.importCommandValues === '1.64 13 22' &&
+      afterCanvasMIMEPaste.importCommands === 'update-text-paragraph-spacing update-text-paragraph-spacing update-text-paragraph-spacing' &&
+      afterCanvasMIMEPaste.importFields === 'lineHeight spacingBefore spacingAfter' &&
+      afterCanvasMIMEPaste.importFormat === 'application-json-ppt-text-paragraph-spacing' &&
+      afterCanvasMIMEPaste.importJsonLength > 50 &&
+      afterCanvasMIMEPaste.importLineHeight === '1.64' &&
+      afterCanvasMIMEPaste.importModel === 'ppt-text-paragraph-spacing-import' &&
+      afterCanvasMIMEPaste.importObjects === 's1-title' &&
+      afterCanvasMIMEPaste.importSpacingAfter === '22' &&
+      afterCanvasMIMEPaste.importSpacingBefore === '13' &&
+      afterCanvasMIMEPaste.lineHeight === '1.64' &&
+      afterCanvasMIMEPaste.spacingBefore === '13' &&
+      afterCanvasMIMEPaste.spacingAfter === '22' &&
+      afterCanvasMIMEPaste.selectedLineHeight === '1.64' &&
+      afterCanvasMIMEPaste.selectedSpacingBefore === '13' &&
+      afterCanvasMIMEPaste.selectedSpacingAfter === '22' &&
+      afterCanvasMIMEPaste.selectedStyleLineHeight === '1.64' &&
+      afterCanvasMIMEPaste.selectedStyleMarginTop === '13px' &&
+      afterCanvasMIMEPaste.selectedStyleMarginBottom === '22px',
+    {
+      afterCanvasMIMEPaste,
+      afterJSONRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEUndo = await getPPTTextParagraphSpacingState(page)
+
+  record(
+    'undoes canvas MIME paragraph spacing as one history step',
+    afterCanvasMIMEUndo.lineHeight === '1.28' &&
+      afterCanvasMIMEUndo.spacingBefore === '9' &&
+      afterCanvasMIMEUndo.spacingAfter === '15' &&
+      afterCanvasMIMEUndo.selectedLineHeight === '1.28' &&
+      afterCanvasMIMEUndo.selectedSpacingBefore === '9' &&
+      afterCanvasMIMEUndo.selectedSpacingAfter === '15',
+    {
+      afterCanvasMIMEPaste,
+      afterCanvasMIMEUndo,
     },
   )
 }
