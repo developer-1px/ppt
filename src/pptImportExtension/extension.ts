@@ -3,6 +3,8 @@ import {
   createPPTCanvasDataTransferImportRegistry,
   getPPTCanvasDataTransferImportRegistryMetadata,
   PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+  PPT_CANVAS_IMAGE_FILE_IMPORT_SUPPORTED_FORMATS,
+  PPT_CANVAS_IMAGE_SOURCE_IMPORT_SUPPORTED_FORMATS,
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
   PPT_CANVAS_RICH_TEXT_PASTE_SUPPORTED_FORMATS,
@@ -190,7 +192,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
         : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: ['Files', 'image/*'],
+    supportedFormats: PPT_CANVAS_IMAGE_FILE_IMPORT_SUPPORTED_FORMATS,
     title: 'Image file batch',
   },
   {
@@ -205,7 +207,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return file ? { file, kind: 'image-file' } : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: ['Files', 'image/*'],
+    supportedFormats: PPT_CANVAS_IMAGE_FILE_IMPORT_SUPPORTED_FORMATS,
     title: 'Image file',
   },
   {
@@ -333,11 +335,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
         : null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: [
-      'image/svg+xml',
-      'text/html',
-      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
-    ],
+    supportedFormats: PPT_CANVAS_IMAGE_SOURCE_IMPORT_SUPPORTED_FORMATS,
     title: 'Image source',
   },
   {
