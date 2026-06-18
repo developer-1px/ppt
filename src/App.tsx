@@ -143,6 +143,8 @@ import {
   getSlideEditLayerPaneRenameJSONPasteValue,
   getSlideEditLayerPaneRenamePasteCommandEffect,
   getSlideEditLayerPaneResolvedFocusObjectId,
+  getSlideEditLayoutJSONPasteCommandEffects,
+  getSlideEditLayoutJSONPasteValue,
   getSlideEditInspectorSurface,
   getSlideEditObjectVisibilityCommandAvailability,
   getSlideEditObjectVisibilityCommandEffect,
@@ -280,6 +282,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
+  SLIDE_EDIT_LAYOUT_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
@@ -299,6 +302,8 @@ import {
   type SlideEditLayerPaneRowDescriptor,
   type SlideEditLayoutApplyHostCommandEffect,
   type SlideEditLayoutDescriptor,
+  type SlideEditLayoutJSONPasteValue,
+  type SlideEditLayoutPlaceholderVisibilityHostCommandEffect,
   type SlideEditMasterDescriptor,
   type SlideEditObjectAccessibilityDescriptor,
   type SlideEditObjectAccessibilityHostCommandEffect,
@@ -1479,12 +1484,18 @@ type PPTSlideLayoutImportField =
   | 'hiddenPlaceholderIds'
   | 'layoutId'
   | 'themeId'
+type PPTSlideLayoutImportPlaceholderVisibility = {
+  isVisible: boolean
+  placeholderId: string
+  sourceField: string
+}
 type PPTSlideLayoutImportSource = {
   fields: readonly PPTSlideLayoutImportField[]
   format: typeof PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT
   hiddenPlaceholderIds?: readonly string[]
   jsonLength: number
   layoutId?: string
+  placeholderVisibility?: readonly PPTSlideLayoutImportPlaceholderVisibility[]
   themeId?: string
 }
 type PPTSlideTransitionImportField =
@@ -2011,6 +2022,8 @@ type PPTSlideMetadataImportEffect = {
 }
 type PPTSlideLayoutApplyHostCommandEffect =
   SlideEditLayoutApplyHostCommandEffect<string, string, string, string>
+type PPTLayoutPlaceholderVisibilityHostCommandEffect =
+  SlideEditLayoutPlaceholderVisibilityHostCommandEffect<string, string>
 type PPTSlideLayoutImportEffect = {
   commandFields: string
   commandIds: string
@@ -2866,20 +2879,6 @@ type PPTSlideMetadataInspectorDescriptor =
 type PPTSlideMetadataUpdateCommand = SlideEditSlideMetadataUpdateCommand<string>
 type PPTSlideMetadataHostCommandEffect =
   SlideEditSlideMetadataHostCommandEffect<string>
-type PPTLayoutPlaceholderVisibilityCommand = {
-  id: 'update-placeholder-visibility'
-  isVisible: boolean
-  placeholderId: string
-  slideId: string
-}
-type PPTLayoutPlaceholderVisibilityHostCommandEffect = {
-  payload: PPTLayoutPlaceholderVisibilityCommand
-  selection: {
-    objectIds: readonly string[]
-    slideId: string
-  }
-  type: 'slide-command-effect'
-}
 type PPTSlideTransitionType = PPTSlideTransition['type']
 type PPTSlideTransitionUpdateField =
   | 'advanceAfterMs'
@@ -5666,30 +5665,26 @@ function App() {
 
   function pastePPTSlideLayoutSource(source: PPTSlideLayoutImportSource) {
     const layout = getPPTLayoutDescriptor(source.layoutId ?? activeSlide.layoutId)
-    const layoutEffect = source.layoutId === undefined
-      ? null
-      : getSlideEditLayoutApplyCommandEffect({
-        existingObjectPolicy: 'preserve-existing-objects',
-        layoutId: layout.layoutId,
-        selectedObjectIds: selection,
-        slideId: activeSlide.id,
-      })
-    const placeholderEffects = source.hiddenPlaceholderIds === undefined
-      ? []
-      : createPPTSlideLayoutPlaceholderImportCommandEffects({
-        hiddenPlaceholderIds: source.hiddenPlaceholderIds,
+    const pasteEffects = getSlideEditLayoutJSONPasteCommandEffects({
+      activeLayoutId: activeSlide.layoutId,
+      existingObjectPolicy: 'preserve-existing-objects',
+      layouts: PPT_LAYOUT_DESCRIPTORS,
+      pasteValue: createPPTSlideLayoutJSONPasteValue({
         layout,
-        selectedObjectIds: selection,
-        slideId: activeSlide.id,
-      })
+        source,
+      }),
+      selectedObjectIds: selection,
+      slideId: activeSlide.id,
+      themes: [PPT_THEME_DESCRIPTOR],
+    })
 
-    if (
-      !layoutEffect &&
-      placeholderEffects.length === 0 &&
-      source.themeId === undefined
-    ) {
+    if (!pasteEffects) {
       return false
     }
+
+    const layoutEffect = pasteEffects.applyLayoutEffect
+    const placeholderEffects = pasteEffects.placeholderVisibilityEffects
+    const themeId = pasteEffects.themeId
 
     if (placeholderEffects.length > 0) {
       setLastPlaceholderVisibilityEffect(
@@ -5711,12 +5706,12 @@ function App() {
           nextSlide = {
             ...nextSlide,
             layoutId: layoutEffect.payload.layoutId,
-            themeId: source.themeId ?? PPT_THEME_DESCRIPTOR.themeId,
+            themeId: themeId ?? PPT_THEME_DESCRIPTOR.themeId,
           }
-        } else if (source.themeId !== undefined) {
+        } else if (themeId !== null) {
           nextSlide = {
             ...nextSlide,
-            themeId: source.themeId,
+            themeId,
           }
         }
 
@@ -11084,11 +11079,10 @@ function App() {
     isVisible: boolean,
   ) {
     const effect = toPPTLayoutPlaceholderVisibilityHostCommandEffect({
-      id: 'update-placeholder-visibility',
       isVisible,
       placeholderId,
       slideId: activeSlide.id,
-    }, selection)
+    })
 
     setLastPlaceholderVisibilityEffect(effect)
     commitDeck((current) =>
@@ -13992,8 +13986,8 @@ function App() {
         data-ppt-color-swatch-import-value={lastColorSwatchImportEffect?.value}
         data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
         data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
-        data-ppt-placeholder-visibility-command-selection={lastPlaceholderVisibilityEffect?.selection.objectIds.join(' ') ?? undefined}
-        data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.payload.slideId}
+        data-ppt-placeholder-visibility-command-selection={lastPlaceholderVisibilityEffect?.selection.placeholderIds.join(' ') ?? undefined}
+        data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.selection.slideId}
         data-ppt-placeholder-visibility-command-type={lastPlaceholderVisibilityEffect?.type}
         data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
           ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
@@ -16101,13 +16095,20 @@ function applyPPTSlideMetadataHostCommandEffect(
 }
 
 function toPPTLayoutPlaceholderVisibilityHostCommandEffect(
-  command: PPTLayoutPlaceholderVisibilityCommand,
-  selectedObjectIds: readonly string[],
+  command: {
+    isVisible: boolean
+    placeholderId: string
+    slideId: string
+  },
 ): PPTLayoutPlaceholderVisibilityHostCommandEffect {
   return {
-    payload: command,
+    payload: {
+      id: 'set-placeholder-visibility',
+      isVisible: command.isVisible,
+      placeholderId: command.placeholderId,
+    },
     selection: {
-      objectIds: selectedObjectIds,
+      placeholderIds: [command.placeholderId],
       slideId: command.slideId,
     },
     type: 'slide-command-effect',
@@ -16439,28 +16440,40 @@ function createPPTSlideLayoutImportEffect({
   }
 }
 
-function createPPTSlideLayoutPlaceholderImportCommandEffects({
-  hiddenPlaceholderIds,
+function createPPTSlideLayoutJSONPasteValue({
   layout,
-  selectedObjectIds,
-  slideId,
+  source,
 }: {
-  hiddenPlaceholderIds: readonly string[]
   layout: SlideEditLayoutDescriptor
-  selectedObjectIds: readonly string[]
-  slideId: string
-}): PPTLayoutPlaceholderVisibilityHostCommandEffect[] {
+  source: PPTSlideLayoutImportSource
+}): SlideEditLayoutJSONPasteValue<string, string, string> {
+  return {
+    ...(source.layoutId === undefined ? {} : { layoutId: source.layoutId }),
+    placeholderVisibility:
+      source.hiddenPlaceholderIds === undefined
+        ? source.placeholderVisibility ?? []
+        : getPPTSlideLayoutHiddenPlaceholderVisibilityPasteValues(
+          source.hiddenPlaceholderIds,
+          layout,
+        ),
+    surface: 'layout-placeholder',
+    ...(source.themeId === undefined ? {} : { themeId: source.themeId }),
+  }
+}
+
+function getPPTSlideLayoutHiddenPlaceholderVisibilityPasteValues(
+  hiddenPlaceholderIds: readonly string[],
+  layout: SlideEditLayoutDescriptor,
+): PPTSlideLayoutImportPlaceholderVisibility[] {
   const hiddenPlaceholderIdSet = new Set(
     normalizePPTSlideLayoutHiddenPlaceholderIds(hiddenPlaceholderIds, layout),
   )
 
-  return layout.placeholders.map((placeholder) =>
-    toPPTLayoutPlaceholderVisibilityHostCommandEffect({
-      id: 'update-placeholder-visibility',
-      isVisible: !hiddenPlaceholderIdSet.has(placeholder.placeholderId),
-      placeholderId: placeholder.placeholderId,
-      slideId,
-    }, selectedObjectIds))
+  return layout.placeholders.map((placeholder) => ({
+    isVisible: !hiddenPlaceholderIdSet.has(placeholder.placeholderId),
+    placeholderId: placeholder.placeholderId,
+    sourceField: 'hiddenPlaceholderIds',
+  }))
 }
 
 function normalizePPTSlideLayoutHiddenPlaceholderIds(
@@ -19307,6 +19320,13 @@ function getPPTSlideLayoutSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates = [
     dataTransfer.getData(PPT_SLIDE_LAYOUT_JSON_MIME_TYPE),
     dataTransfer.getData('application/json'),
@@ -19332,6 +19352,95 @@ function getPPTSlideLayoutSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTSlideLayoutImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_SLIDE_LAYOUT_JSON_MIME_TYPE,
+    SLIDE_EDIT_LAYOUT_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditLayoutJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      const source = createPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+
+      if (source) {
+        return source
+      }
+    }
+  }
+
+  return null
+}
+
+function createPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditLayoutJSONPasteValue,
+  jsonLength: number,
+): PPTSlideLayoutImportSource | null {
+  const layoutId = getPPTSlideLayoutIdFromJSONValue(pasteValue.layoutId)
+  const themeId = getPPTSlideLayoutThemeIdFromJSONValue(pasteValue.themeId)
+  const placeholderVisibility =
+    getPPTSlideLayoutPlaceholderVisibilityFromPasteValue(pasteValue)
+  const hiddenPlaceholderIds =
+    getPPTSlideLayoutHiddenPlaceholderIdsFromPasteVisibility(
+      placeholderVisibility,
+      layoutId,
+    )
+  const fields: PPTSlideLayoutImportField[] = []
+
+  if (layoutId !== undefined) {
+    fields.push('layoutId')
+  }
+
+  if (themeId !== undefined) {
+    fields.push('themeId')
+  }
+
+  if (placeholderVisibility.length > 0) {
+    fields.push('hiddenPlaceholderIds')
+  }
+
+  return fields.length > 0
+    ? {
+        fields,
+        format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
+        ...(hiddenPlaceholderIds === undefined ? {} : { hiddenPlaceholderIds }),
+        jsonLength,
+        ...(layoutId === undefined ? {} : { layoutId }),
+        ...(placeholderVisibility.length === 0
+          ? {}
+          : { placeholderVisibility }),
+        ...(themeId === undefined ? {} : { themeId }),
+      }
+    : null
 }
 
 function getPPTSlideLayoutSourceFromText(
@@ -19407,6 +19516,59 @@ function getPPTSlideLayoutSourceFromJSONValue(
         ...(themeId === undefined ? {} : { themeId }),
       }
     : null
+}
+
+function getPPTSlideLayoutPlaceholderVisibilityFromPasteValue(
+  pasteValue: SlideEditLayoutJSONPasteValue,
+): PPTSlideLayoutImportPlaceholderVisibility[] {
+  return pasteValue.placeholderVisibility
+    .map((value) => {
+      const placeholderId = getPPTSlideLayoutPlaceholderIdFromJSONValue(
+        value.placeholderId,
+      )
+
+      return placeholderId === undefined
+        ? null
+        : {
+            isVisible: value.isVisible,
+            placeholderId,
+            sourceField: value.sourceField,
+          }
+    })
+    .filter((value): value is PPTSlideLayoutImportPlaceholderVisibility =>
+      value !== null)
+}
+
+function getPPTSlideLayoutHiddenPlaceholderIdsFromPasteVisibility(
+  placeholderVisibility: readonly PPTSlideLayoutImportPlaceholderVisibility[],
+  layoutId: string | undefined,
+): readonly string[] | undefined {
+  if (placeholderVisibility.length === 0) {
+    return undefined
+  }
+
+  const hiddenPlaceholderIds = placeholderVisibility
+    .filter((value) => !value.isVisible)
+    .map((value) => value.placeholderId)
+  const visiblePlaceholderIds = placeholderVisibility
+    .filter((value) => value.isVisible)
+    .map((value) => value.placeholderId)
+
+  if (visiblePlaceholderIds.length > 0 && layoutId !== undefined) {
+    const visiblePlaceholderIdSet = new Set(visiblePlaceholderIds)
+
+    return uniquePPTCanvasValues([
+      ...hiddenPlaceholderIds,
+      ...getPPTSlideLayoutHiddenPlaceholderIdsFromVisibleIds(
+        visiblePlaceholderIds,
+        getPPTLayoutDescriptor(layoutId),
+      ),
+    ].filter((placeholderId) => !visiblePlaceholderIdSet.has(placeholderId)))
+  }
+
+  return hiddenPlaceholderIds.length === 0
+    ? undefined
+    : uniquePPTCanvasValues(hiddenPlaceholderIds)
 }
 
 function getPPTSlideLayoutPayloadValue(value: unknown): unknown {
@@ -33755,7 +33917,7 @@ function Inspector({
           data-ppt-layout-placeholder-hidden-count={hiddenPlaceholderCount}
           data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
           data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
-          data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.payload.slideId}
+          data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.selection.slideId}
           data-ppt-placeholder-visibility-command-type={lastPlaceholderVisibilityEffect?.type}
           data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
             ? String(lastPlaceholderVisibilityEffect.payload.isVisible)

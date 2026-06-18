@@ -11337,7 +11337,7 @@ async function runViewAndShapeScenario(page) {
       afterPlaceholderHide.hiddenCount === beforePlaceholderVisibility.hiddenCount + 1 &&
       afterPlaceholderHide.slideHiddenPlaceholders.split(' ').includes('media') &&
       afterPlaceholderHide.selectedIds === beforePlaceholderVisibility.selectedIds &&
-      afterPlaceholderHide.command === 'update-placeholder-visibility' &&
+      afterPlaceholderHide.command === 'set-placeholder-visibility' &&
       afterPlaceholderHide.commandPlaceholder === 'media' &&
       afterPlaceholderHide.commandSlide === beforePlaceholderVisibility.slideId &&
       afterPlaceholderHide.commandType === 'slide-command-effect' &&
@@ -11383,7 +11383,7 @@ async function runViewAndShapeScenario(page) {
     afterPlaceholderShow.visible === 'true' &&
       !afterPlaceholderShow.slideHiddenPlaceholders.split(' ').includes('media') &&
       afterPlaceholderShow.selectedIds === beforePlaceholderVisibility.selectedIds &&
-      afterPlaceholderShow.command === 'update-placeholder-visibility' &&
+      afterPlaceholderShow.command === 'set-placeholder-visibility' &&
       afterPlaceholderShow.commandPlaceholder === 'media' &&
       afterPlaceholderShow.commandVisible === 'true',
     {
@@ -11437,7 +11437,7 @@ async function runViewAndShapeScenario(page) {
       afterSlideLayoutPaste.importSlide === 'slide-1' &&
       afterSlideLayoutPaste.importFields === 'layoutId themeId hiddenPlaceholderIds' &&
       afterSlideLayoutPaste.importCommands ===
-        'apply-layout update-placeholder-visibility update-placeholder-visibility' &&
+        'apply-layout set-placeholder-visibility set-placeholder-visibility' &&
       afterSlideLayoutPaste.commandFields === 'layoutId title body' &&
       afterSlideLayoutPaste.commandTypes ===
         'slide-command-effect slide-command-effect slide-command-effect' &&
@@ -11452,7 +11452,7 @@ async function runViewAndShapeScenario(page) {
       afterSlideLayoutPaste.visible === 'false' &&
       afterSlideLayoutPaste.hiddenCount === 1 &&
       afterSlideLayoutPaste.slideHiddenPlaceholders === 'body' &&
-      afterSlideLayoutPaste.command === 'update-placeholder-visibility' &&
+      afterSlideLayoutPaste.command === 'set-placeholder-visibility' &&
       afterSlideLayoutPaste.commandPlaceholder === 'body' &&
       afterSlideLayoutPaste.commandVisible === 'false',
     {
