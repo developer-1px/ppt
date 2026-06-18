@@ -541,6 +541,7 @@ import {
   routePPTCanvasImagePasteReplace,
   routePPTCanvasMediaSourceObjectHyperlink,
   routePPTCanvasTableImportTargetReplace,
+  routePPTCanvasTextPasteReplace,
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
@@ -569,6 +570,8 @@ import {
   type PPTCanvasTabsDescriptor,
   type PPTCanvasTableImportTargetReplaceTarget,
   type PPTCanvasTableImportSource,
+  type PPTCanvasTextPasteReplaceTarget,
+  type PPTCanvasTextPasteSource,
   type PPTCommandPaletteItemBase,
   type PPTMinimapItemBounds as PPTMinimapItemBoundsBase,
   type PPTMinimapReadModel as PPTMinimapReadModelBase,
@@ -7369,18 +7372,30 @@ function App() {
   }
 
   function pastePPTTextBodySource(source: PPTTextBodyImportSource) {
-    const objectIds = activeSlide.elements
-      .filter((element) =>
-        selection.includes(element.id) &&
-        isPPTTextElement(element) &&
-        element.locked !== true &&
-        element.visible !== false)
-      .map((element) => element.id)
+    const route = routePPTCanvasTextPasteReplace({
+      getTarget: ({ selection: targetSelection }) =>
+        getPPTTextPasteReplaceRouteTarget(targetSelection),
+      selection,
+      source: createPPTCanvasTextPasteSourceFromTextBodySource(source),
+    })
 
-    if (objectIds.length === 0) {
+    if (route.kind !== 'text-replace') {
       return false
     }
 
+    return pastePPTTextBodySourceToObjectIds({
+      objectIds: route.intent.target.selection,
+      source,
+    })
+  }
+
+  function pastePPTTextBodySourceToObjectIds({
+    objectIds,
+    source,
+  }: {
+    objectIds: readonly string[]
+    source: PPTTextBodyImportSource
+  }) {
     setLastTextBodyImportEffect(createPPTTextBodyImportEffect({
       objectIds,
       source,
@@ -7402,6 +7417,33 @@ function App() {
       })))
 
     return true
+  }
+
+  function getPPTTextPasteReplaceRouteTarget(
+    targetSelection: readonly string[],
+  ): PPTCanvasTextPasteReplaceTarget | null {
+    const objectIds = getPPTTextPasteReplaceObjectIds(targetSelection)
+
+    return objectIds.length === 0
+      ? null
+      : {
+          id: objectIds[0],
+          selection: objectIds,
+        }
+  }
+
+  function getPPTTextPasteReplaceObjectIds(
+    targetSelection: readonly string[],
+  ) {
+    const targetIds = new Set(targetSelection)
+
+    return selectedElements
+      .filter((element) =>
+        targetIds.has(element.id) &&
+          isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) => element.id)
   }
 
   function pastePPTTableRowsSource(source: PPTTableRowsImportSource) {
@@ -17563,6 +17605,15 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTCanvasTextPasteSourceFromTextBodySource(
+  source: PPTTextBodyImportSource,
+): PPTCanvasTextPasteSource {
+  return {
+    format: 'text-plain',
+    text: readPPTText(source.textBody),
   }
 }
 

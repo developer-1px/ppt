@@ -190,7 +190,11 @@ import {
   createCanvasTextPasteItems,
   getCanvasRichTextPasteSourceFromDataTransfer,
   getCanvasTextPasteSourcesFromDataTransfer,
+  routeCanvasTextPasteReplace,
   type CanvasRichTextPasteSource,
+  type CanvasTextPasteReplaceRoute,
+  type CanvasTextPasteReplaceTarget,
+  type CanvasTextPasteSource,
 } from 'canvas/app/text-paste-import'
 import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
@@ -491,6 +495,8 @@ export const routePPTCanvasTableImportTargetReplace =
   routeCanvasTableImportTargetReplace
 export const getPPTCanvasTextPasteSourcesFromDataTransfer =
   getCanvasTextPasteSourcesFromDataTransfer
+export const routePPTCanvasTextPasteReplace =
+  routeCanvasTextPasteReplace
 export const getPPTInlineEditHistoryDirectionFromInputType =
   inlineEditHistoryDirectionFromInputType
 export const insertPPTInlineEditText = insertInlineEditText
@@ -522,6 +528,11 @@ export type PPTCanvasMediaObjectHyperlinkRoute =
 export type PPTCanvasMediaObjectHyperlinkTarget =
   CanvasMediaObjectHyperlinkTarget
 export type PPTCanvasRichTextPasteSource = CanvasRichTextPasteSource
+export type PPTCanvasTextPasteReplaceRoute =
+  CanvasTextPasteReplaceRoute
+export type PPTCanvasTextPasteReplaceTarget =
+  CanvasTextPasteReplaceTarget
+export type PPTCanvasTextPasteSource = CanvasTextPasteSource
 export type PPTCanvasTableImportFormat = CanvasTableImportFormat
 export type PPTCanvasTableImportTargetReplaceRoute =
   CanvasTableImportTargetReplaceRoute
