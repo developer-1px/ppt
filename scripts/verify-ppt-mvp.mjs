@@ -9609,7 +9609,7 @@ async function runViewAndShapeScenario(page) {
   })
   await delay(50)
 
-  await page.eval(`document.querySelector('[data-ppt-view-grid]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-view-grid]')?.click()`)
   await delay(50)
 
   const afterGridToggle = await page.eval(`(() => ({
@@ -9621,7 +9621,7 @@ async function runViewAndShapeScenario(page) {
   record('toggles PPT editing grid visibility', afterGridToggle.grid === 'false' && afterGridToggle.pressed === 'false', afterGridToggle)
   record('shows PPT zoom percentage', /\d+%/.test(afterGridToggle.zoomLabel), afterGridToggle)
 
-  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]')?.click()`)
   await delay(50)
 
   const afterFrameGuideToggle = await page.eval(`(() => ({
@@ -9632,10 +9632,10 @@ async function runViewAndShapeScenario(page) {
 
   record('toggles PPT frame guide visibility from toolbar', afterFrameGuideToggle.frameGuides === 'false' && afterFrameGuideToggle.pressed === 'false' && afterFrameGuideToggle.guideLayerCount === 0, afterFrameGuideToggle)
 
-  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]')?.click()`)
   await delay(50)
 
-  await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]')?.click()`)
   await delay(20)
 
   const createEllipse = await page.eval(`(() => {
@@ -14808,6 +14808,13 @@ async function runTextPasteScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   const before = await getPPTTextPasteState(page)
 
   await page.eval(`(() => {
@@ -15205,6 +15212,182 @@ async function runTextPasteScenario(page) {
     {
       afterPaste,
       afterRedo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', '<article><p><strong>Selected bold</strong> replacement</p><ul><li>Second point</li></ul></article>')
+    dataTransfer.setData('text/plain', 'Selected bold replacement\\nSecond point')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterSelectedHTMLTextReplace = await getPPTTextPasteState(page)
+
+  record(
+    'pastes HTML rich text into selected PPT text body without creating a new object',
+    afterSelectedHTMLTextReplace.textBodyImportModel === 'ppt-text-body-import' &&
+      afterSelectedHTMLTextReplace.textBodyImportFormat === 'text-html-rich' &&
+      afterSelectedHTMLTextReplace.textBodyImportMode === 'rich-text' &&
+      afterSelectedHTMLTextReplace.textBodyImportObjects === afterRedo.selectedId &&
+      afterSelectedHTMLTextReplace.textBodyImportTargets === afterRedo.selectedId &&
+      afterSelectedHTMLTextReplace.textBodyImportParagraphs === 2 &&
+      afterSelectedHTMLTextReplace.textBodyImportRuns === 3 &&
+      afterSelectedHTMLTextReplace.textBodyImportTextLength > 35 &&
+      afterSelectedHTMLTextReplace.textBodyImportJsonLength > 35 &&
+      afterSelectedHTMLTextReplace.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedHTMLTextReplace.selectedId === afterRedo.selectedId &&
+      afterSelectedHTMLTextReplace.selectedName === afterRedo.selectedName &&
+      afterSelectedHTMLTextReplace.selectedLeft === afterRedo.selectedLeft &&
+      afterSelectedHTMLTextReplace.selectedTop === afterRedo.selectedTop &&
+      afterSelectedHTMLTextReplace.selectedWidth === afterRedo.selectedWidth &&
+      afterSelectedHTMLTextReplace.selectedHeight === afterRedo.selectedHeight &&
+      afterSelectedHTMLTextReplace.selectedBoldRunCount >= 1 &&
+      afterSelectedHTMLTextReplace.selectedBulletParagraphCount === 1 &&
+      afterSelectedHTMLTextReplace.selectedText.includes('Selected bold replacement') &&
+      afterSelectedHTMLTextReplace.selectedText.includes('Second point'),
+    {
+      afterRedo,
+      afterSelectedHTMLTextReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterSelectedHTMLTextUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes selected PPT HTML text body paste as one history step',
+    afterSelectedHTMLTextUndo.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedHTMLTextUndo.selectedId === afterRedo.selectedId &&
+      afterSelectedHTMLTextUndo.selectedText.includes('Pasted plain text') &&
+      afterSelectedHTMLTextUndo.selectedText.includes('from clipboard') &&
+      !afterSelectedHTMLTextUndo.selectedText.includes('Selected bold'),
+    {
+      afterRedo,
+      afterSelectedHTMLTextReplace,
+      afterSelectedHTMLTextUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const markdown = '# Selected heading\\n- **Markdown** replacement\\n1. _Review_ line'
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterSelectedMarkdownTextReplace = await getPPTTextPasteState(page)
+
+  record(
+    'pastes Markdown rich text into selected PPT text body without creating a new object',
+    afterSelectedMarkdownTextReplace.textBodyImportModel === 'ppt-text-body-import' &&
+      afterSelectedMarkdownTextReplace.textBodyImportFormat === 'text-markdown-rich' &&
+      afterSelectedMarkdownTextReplace.textBodyImportMode === 'rich-text' &&
+      afterSelectedMarkdownTextReplace.textBodyImportObjects === afterRedo.selectedId &&
+      afterSelectedMarkdownTextReplace.textBodyImportTargets === afterRedo.selectedId &&
+      afterSelectedMarkdownTextReplace.textBodyImportParagraphs === 3 &&
+      afterSelectedMarkdownTextReplace.textBodyImportRuns === 5 &&
+      afterSelectedMarkdownTextReplace.textBodyImportTextLength > 45 &&
+      afterSelectedMarkdownTextReplace.textBodyImportJsonLength > 45 &&
+      afterSelectedMarkdownTextReplace.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedMarkdownTextReplace.selectedId === afterRedo.selectedId &&
+      afterSelectedMarkdownTextReplace.selectedBoldRunCount >= 2 &&
+      afterSelectedMarkdownTextReplace.selectedItalicRunCount >= 1 &&
+      afterSelectedMarkdownTextReplace.selectedBulletParagraphCount === 1 &&
+      afterSelectedMarkdownTextReplace.selectedNumberedParagraphCount === 1 &&
+      afterSelectedMarkdownTextReplace.selectedText.includes('Selected heading') &&
+      afterSelectedMarkdownTextReplace.selectedText.includes('Markdown replacement') &&
+      afterSelectedMarkdownTextReplace.selectedText.includes('Review line'),
+    {
+      afterRedo,
+      afterSelectedMarkdownTextReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterSelectedMarkdownTextUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes selected PPT Markdown text body paste as one history step',
+    afterSelectedMarkdownTextUndo.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedMarkdownTextUndo.selectedId === afterRedo.selectedId &&
+      afterSelectedMarkdownTextUndo.selectedText.includes('Pasted plain text') &&
+      !afterSelectedMarkdownTextUndo.selectedText.includes('Selected heading'),
+    {
+      afterRedo,
+      afterSelectedMarkdownTextReplace,
+      afterSelectedMarkdownTextUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/plain', 'Selected plain replacement\\nfrom external clipboard')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterSelectedPlainTextReplace = await getPPTTextPasteState(page)
+
+  record(
+    'pastes plain text into selected PPT text body without creating a new object',
+    afterSelectedPlainTextReplace.textBodyImportModel === 'ppt-text-body-import' &&
+      afterSelectedPlainTextReplace.textBodyImportFormat === 'text-plain' &&
+      afterSelectedPlainTextReplace.textBodyImportMode === 'plain-text' &&
+      afterSelectedPlainTextReplace.textBodyImportObjects === afterRedo.selectedId &&
+      afterSelectedPlainTextReplace.textBodyImportTargets === afterRedo.selectedId &&
+      afterSelectedPlainTextReplace.textBodyImportParagraphs === 2 &&
+      afterSelectedPlainTextReplace.textBodyImportRuns === 2 &&
+      afterSelectedPlainTextReplace.textBodyImportTextLength > 40 &&
+      afterSelectedPlainTextReplace.textBodyImportJsonLength > 40 &&
+      afterSelectedPlainTextReplace.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedPlainTextReplace.selectedId === afterRedo.selectedId &&
+      afterSelectedPlainTextReplace.selectedName === afterRedo.selectedName &&
+      afterSelectedPlainTextReplace.selectedText.includes('Selected plain replacement') &&
+      afterSelectedPlainTextReplace.selectedText.includes('from external clipboard'),
+    {
+      afterRedo,
+      afterSelectedPlainTextReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await delay(80)
+
+  const afterSelectedPlainTextUndo = await getPPTTextPasteState(page)
+
+  record(
+    'undoes selected PPT plain text body paste as one history step',
+    afterSelectedPlainTextUndo.textBoxCount === afterRedo.textBoxCount &&
+      afterSelectedPlainTextUndo.selectedId === afterRedo.selectedId &&
+      afterSelectedPlainTextUndo.selectedText.includes('Pasted plain text') &&
+      !afterSelectedPlainTextUndo.selectedText.includes('Selected plain replacement'),
+    {
+      afterRedo,
+      afterSelectedPlainTextReplace,
+      afterSelectedPlainTextUndo,
     },
   )
 

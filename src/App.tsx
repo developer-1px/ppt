@@ -1614,10 +1614,13 @@ type PPTTextFontFamilyImportSource = {
   format: typeof PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT
   jsonLength: number
 }
+type PPTTextBodyImportFormat =
+  | typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
+  | PPTTextPasteImportResult['format']
 type PPTTextBodyImportSource = {
-  format: typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
+  format: PPTTextBodyImportFormat
   jsonLength: number
-  mode: 'plain-text' | 'text-body'
+  mode: 'plain-text' | 'rich-text' | 'text-body'
   textBody: PPTTextBody
 }
 type PPTTextRunSizeImportField =
@@ -2202,7 +2205,7 @@ type PPTTextFontFamilyImportEffect = {
 }
 type PPTTextBodyImportEffect = {
   commandTargets: string
-  format: typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
+  format: PPTTextBodyImportFormat
   jsonLength: number
   mode: PPTTextBodyImportSource['mode']
   model: typeof PPT_TEXT_BODY_IMPORT_MODEL
@@ -8278,9 +8281,15 @@ function App() {
       case 'media-source':
         return insertPPTMediaSource(action.source)
       case 'rich-text-source':
-        return insertPPTRichTextPasteSource(action.source)
+        return pastePPTTextBodySource(
+            createPPTTextBodySourceFromRichTextPasteSource(action.source),
+          ) ||
+          insertPPTRichTextPasteSource(action.source)
       case 'text-source':
-        return insertPPTTextPasteSource(action.text)
+        return pastePPTTextBodySource(
+            createPPTTextBodySourceFromPlainTextPaste(action.text),
+          ) ||
+          insertPPTTextPasteSource(action.text)
     }
   }
 
@@ -25090,6 +25099,30 @@ function getPPTTextBodySourceFromJSONValue(
         textBody,
       }
     : null
+}
+
+function createPPTTextBodySourceFromRichTextPasteSource(
+  source: PPTRichTextPasteSource,
+): PPTTextBodyImportSource {
+  return {
+    format: source.format ?? 'text-html-rich',
+    jsonLength: source.text.length,
+    mode: 'rich-text',
+    textBody: source.textBody,
+  }
+}
+
+function createPPTTextBodySourceFromPlainTextPaste(
+  text: string,
+): PPTTextBodyImportSource {
+  const normalizedText = text.replace(/\r\n?/g, '\n')
+
+  return {
+    format: 'text-plain',
+    jsonLength: normalizedText.length,
+    mode: 'plain-text',
+    textBody: createPPTTextBody(normalizedText),
+  }
 }
 
 function getPPTTextBodyPayloadValue(
