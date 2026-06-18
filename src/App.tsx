@@ -275,6 +275,7 @@ import {
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
+  SLIDE_EDIT_TEXT_FONT_FAMILY_FIELD,
   SLIDE_EDIT_TEXT_FONT_SIZE_FIELD,
   SLIDE_EDIT_TEXT_FONT_WEIGHT_FIELD,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
@@ -26179,31 +26180,44 @@ function getPPTTextFontFamilySourceFromDataTransfer(
 function getPPTTextFontFamilySourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextFontFamilyImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const fontFamily = getSlideEditTextFontFamilyJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-      jsonMimeType: candidate.customMimeType,
-      options: getPPTTextFontFamilyDescriptorOptions(),
-    })
+  const seen = new Set<string>()
 
-    if (fontFamily === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_FONT_FAMILY_FIELD.jsonMimeType,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      if (seen.has(candidate.text)) {
+        continue
+      }
 
-    const payload = getPPTTextFontFamilyPayloadEntry(
-      getPPTJSONValueFromText(candidate.text),
-      candidate.allowDirect,
-    )
+      seen.add(candidate.text)
 
-    return {
-      fields: payload?.fields ?? ['value'],
-      fontFamily: normalizePPTTextFontFamily(fontFamily),
-      format: PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
+      const fontFamily = getSlideEditTextFontFamilyJSONPasteValue({
+        dataTransfer: candidate.dataTransfer,
+        fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+        jsonMimeType: candidate.customMimeType,
+        options: getPPTTextFontFamilyDescriptorOptions(),
+      })
+
+      if (fontFamily === null) {
+        continue
+      }
+
+      const payload = getPPTTextFontFamilyPayloadEntry(
+        getPPTJSONValueFromText(candidate.text),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        fontFamily: normalizePPTTextFontFamily(fontFamily),
+        format: PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT,
+        jsonLength: candidate.text.length,
+      }
     }
   }
 

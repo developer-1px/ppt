@@ -7752,10 +7752,9 @@ async function runTextFontFamilyScenario(page) {
     const json = JSON.stringify('Courier New')
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-font-family+json',
+      'application/vnd.interactive-os.slide-edit.text-font-family+json',
       json,
     )
-    dataTransfer.setData('text/plain', json)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -7767,7 +7766,7 @@ async function runTextFontFamilyScenario(page) {
   const afterJSONPaste = await getPPTTextFontFamilyState(page)
 
   record(
-    'pastes PPT text font family JSON through slide-edit command effect',
+    'pastes canvas text font family JSON through slide-edit command effect',
     afterJSONPaste.command === 'update-text-font-family' &&
       afterJSONPaste.commandField === 'fontFamily' &&
       afterJSONPaste.commandObject === 's1-title' &&
