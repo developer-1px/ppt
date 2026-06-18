@@ -1605,6 +1605,122 @@ async function runAffordanceScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      height: 120,
+      rotate: 30,
+      width: 300,
+      x: 244,
+      y: 148,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterStandaloneTransformPaste = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      fieldH: document.querySelector('[data-ppt-geometry-field="h"]')?.value ?? '',
+      fieldRotation: document.querySelector('[data-ppt-geometry-field="rotation"]')?.value ?? '',
+      fieldW: document.querySelector('[data-ppt-geometry-field="w"]')?.value ?? '',
+      fieldX: document.querySelector('[data-ppt-geometry-field="x"]')?.value ?? '',
+      fieldY: document.querySelector('[data-ppt-geometry-field="y"]')?.value ?? '',
+      height: parseFloat(element.style.height),
+      importFields: stage?.getAttribute('data-ppt-object-transform-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-object-transform-import-format') ?? '',
+      importH: stage?.getAttribute('data-ppt-object-transform-import-h') ?? '',
+      importJsonLength: stage?.getAttribute('data-ppt-object-transform-import-json-length') ?? '',
+      importModel: stage?.getAttribute('data-ppt-object-transform-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-object-transform-import-objects') ?? '',
+      importRotation: stage?.getAttribute('data-ppt-object-transform-import-rotation') ?? '',
+      importTargets: stage?.getAttribute('data-ppt-object-transform-import-command-targets') ?? '',
+      importW: stage?.getAttribute('data-ppt-object-transform-import-w') ?? '',
+      importX: stage?.getAttribute('data-ppt-object-transform-import-x') ?? '',
+      importY: stage?.getAttribute('data-ppt-object-transform-import-y') ?? '',
+      left: parseFloat(element.style.left),
+      rotation: element.getAttribute('data-rotation'),
+      top: parseFloat(element.style.top),
+      transform: element.style.transform,
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+
+  record(
+    'pastes standalone JSON object transform into selected PPT object',
+    afterStandaloneTransformPaste.importModel === 'ppt-object-transform-import' &&
+      afterStandaloneTransformPaste.importFormat === 'application-json-ppt-object-transform' &&
+      afterStandaloneTransformPaste.importTargets === 's1-card-1' &&
+      afterStandaloneTransformPaste.importObjects === 's1-card-1' &&
+      afterStandaloneTransformPaste.importFields === 'x y w h rotation' &&
+      afterStandaloneTransformPaste.importX === '244' &&
+      afterStandaloneTransformPaste.importY === '148' &&
+      afterStandaloneTransformPaste.importW === '300' &&
+      afterStandaloneTransformPaste.importH === '120' &&
+      afterStandaloneTransformPaste.importRotation === '30' &&
+      Number(afterStandaloneTransformPaste.importJsonLength) > 50 &&
+      afterStandaloneTransformPaste.left === 244 &&
+      afterStandaloneTransformPaste.top === 148 &&
+      afterStandaloneTransformPaste.width === 300 &&
+      afterStandaloneTransformPaste.height === 120 &&
+      afterStandaloneTransformPaste.rotation === '30' &&
+      afterStandaloneTransformPaste.transform.includes('rotate(30deg)') &&
+      afterStandaloneTransformPaste.fieldX === '244' &&
+      afterStandaloneTransformPaste.fieldY === '148' &&
+      afterStandaloneTransformPaste.fieldW === '300' &&
+      afterStandaloneTransformPaste.fieldH === '120' &&
+      afterStandaloneTransformPaste.fieldRotation === '30',
+    {
+      afterStandaloneTransformPaste,
+      afterTransformPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneTransformUndo = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      height: parseFloat(element.style.height),
+      left: parseFloat(element.style.left),
+      rotation: element.getAttribute('data-rotation'),
+      top: parseFloat(element.style.top),
+      transform: element.style.transform,
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+
+  record(
+    'undoes standalone JSON object transform as one history step',
+    afterStandaloneTransformUndo.left === afterTransformPaste.left &&
+      afterStandaloneTransformUndo.top === afterTransformPaste.top &&
+      afterStandaloneTransformUndo.width === afterTransformPaste.width &&
+      afterStandaloneTransformUndo.height === afterTransformPaste.height &&
+      afterStandaloneTransformUndo.rotation === afterTransformPaste.rotation &&
+      afterStandaloneTransformUndo.transform.includes('rotate(45deg)'),
+    {
+      afterStandaloneTransformPaste,
+      afterStandaloneTransformUndo,
+      afterTransformPaste,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-command="align-center-x"]').click()`)
   await delay(50)
 

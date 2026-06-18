@@ -20807,18 +20807,7 @@ function getPPTObjectTransformSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTObjectTransformImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.objectTransform)
-    ? value.objectTransform
-    : isPPTRecord(value) && isPPTRecord(value.objectGeometry)
-      ? value.objectGeometry
-      : isPPTRecord(value) && isPPTRecord(value.transform)
-        ? value.transform
-        : isPPTRecord(value) && isPPTRecord(value.geometry)
-          ? value.geometry
-          : allowDirect
-            ? value
-            : null
+  const payloadValue = getPPTObjectTransformPayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -20871,6 +20860,68 @@ function getPPTObjectTransformSourceFromJSONValue(
         transform,
       }
     : null
+}
+
+function getPPTObjectTransformPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.objectTransform)) {
+    return value.objectTransform
+  }
+
+  if (isPPTRecord(value.objectGeometry)) {
+    return value.objectGeometry
+  }
+
+  if (isPPTRecord(value.transform)) {
+    return value.transform
+  }
+
+  if (isPPTRecord(value.geometry)) {
+    return value.geometry
+  }
+
+  if (
+    hasPPTObjectTransformStandalonePayloadFields(value) ||
+    (allowDirect && hasPPTObjectTransformPayloadFields(value))
+  ) {
+    return value
+  }
+
+  return null
+}
+
+function hasPPTObjectTransformPayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.x !== undefined ||
+    value.y !== undefined ||
+    value.w !== undefined ||
+    value.width !== undefined ||
+    value.h !== undefined ||
+    value.height !== undefined ||
+    value.rotation !== undefined ||
+    value.rotate !== undefined
+  )
+}
+
+function hasPPTObjectTransformStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.w !== undefined ||
+    value.width !== undefined ||
+    value.h !== undefined ||
+    value.height !== undefined ||
+    value.rotation !== undefined ||
+    value.rotate !== undefined
+  )
 }
 
 function getPPTObjectTransformNumberFromJSONValue(value: unknown) {
