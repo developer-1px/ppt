@@ -20,6 +20,8 @@ const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
 const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
+const SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-fill-opacity+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
 const SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE =
@@ -10147,6 +10149,71 @@ async function runViewAndShapeScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ value: 0.58 })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEFillOpacityJSONPaste = await getPPTShapeFillOpacityState(page)
+
+  record(
+    'pastes canvas MIME object fill opacity through slide-edit command effect',
+    afterCanvasMIMEFillOpacityJSONPaste.importModel === 'ppt-object-fill-opacity-import' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importFormat === 'application-json-ppt-object-fill-opacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importSlide === 'slide-1' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importObjects === afterCanvasMIMEFillOpacityJSONPaste.selectedId &&
+      afterCanvasMIMEFillOpacityJSONPaste.importFields === 'fillOpacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importCommands === 'update-object-fill-opacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importCommandFields === 'fillOpacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importCommandTargets === afterCanvasMIMEFillOpacityJSONPaste.selectedId &&
+      afterCanvasMIMEFillOpacityJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importCommandValues === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importValue === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.importJsonLength > 10 &&
+      afterCanvasMIMEFillOpacityJSONPaste.command === 'update-object-fill-opacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.commandField === 'fillOpacity' &&
+      afterCanvasMIMEFillOpacityJSONPaste.commandValue === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.inspectorOpacity === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.selectedFillOpacity === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.selectedBackground.includes('0.58') &&
+      afterCanvasMIMEFillOpacityJSONPaste.selectedObjectOpacity === '1' &&
+      afterCanvasMIMEFillOpacityJSONPaste.thumbFillOpacity === '0.58' &&
+      afterCanvasMIMEFillOpacityJSONPaste.thumbBackground.includes('0.58'),
+    {
+      afterCanvasMIMEFillOpacityJSONPaste,
+      afterFillOpacityJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEFillOpacityJSONUndo = await getPPTShapeFillOpacityState(page)
+
+  record(
+    'restores PPT object fill opacity after canvas MIME object fill opacity probe',
+    afterCanvasMIMEFillOpacityJSONUndo.inspectorOpacity === '0.35' &&
+      afterCanvasMIMEFillOpacityJSONUndo.selectedFillOpacity === '0.35' &&
+      afterCanvasMIMEFillOpacityJSONUndo.thumbFillOpacity === '0.35',
+    {
+      afterCanvasMIMEFillOpacityJSONPaste,
+      afterCanvasMIMEFillOpacityJSONUndo,
+    },
+  )
 
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="shape-corner-radius"]')
