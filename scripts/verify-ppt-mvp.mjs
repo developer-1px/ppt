@@ -30,6 +30,8 @@ const SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-opacity+json'
 const SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-shadow+json'
+const SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-stroke-line-style+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-layer+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE =
@@ -9992,6 +9994,71 @@ async function runViewAndShapeScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ value: 'solid' })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEStrokeLineStyleJSONPaste = await getPPTShapeStrokeDashState(page)
+
+  record(
+    'pastes canvas MIME object stroke line style through slide-edit command effect',
+    afterCanvasMIMEStrokeLineStyleJSONPaste.importModel === 'ppt-object-stroke-line-style-import' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importFormat === 'application-json-ppt-object-stroke-line-style' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importSlide === 'slide-1' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importObjects === afterCanvasMIMEStrokeLineStyleJSONPaste.selectedId &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importFields === 'strokeLineStyle' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importCommands === 'update-object-stroke-line-style' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importCommandFields === 'strokeLineStyle' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importCommandTargets === afterCanvasMIMEStrokeLineStyleJSONPaste.selectedId &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importCommandValues === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importValue === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.importJsonLength > 10 &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.command === 'update-object-stroke-line-style' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.commandField === 'strokeLineStyle' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.commandValue === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.inspectorDash === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.selectedDash === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.selectedBorderStyle === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.thumbDash === 'solid' &&
+      afterCanvasMIMEStrokeLineStyleJSONPaste.thumbBorderStyle === 'solid',
+    {
+      afterCanvasMIMEStrokeLineStyleJSONPaste,
+      afterShapeDashJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEStrokeLineStyleJSONUndo = await getPPTShapeStrokeDashState(page)
+
+  record(
+    'restores PPT object stroke line style after canvas MIME object stroke line style probe',
+    afterCanvasMIMEStrokeLineStyleJSONUndo.inspectorDash === 'dash' &&
+      afterCanvasMIMEStrokeLineStyleJSONUndo.selectedDash === 'dash' &&
+      afterCanvasMIMEStrokeLineStyleJSONUndo.selectedBorderStyle === 'dashed' &&
+      afterCanvasMIMEStrokeLineStyleJSONUndo.thumbDash === 'dash',
+    {
+      afterCanvasMIMEStrokeLineStyleJSONPaste,
+      afterCanvasMIMEStrokeLineStyleJSONUndo,
+    },
+  )
 
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="fill-opacity"]')

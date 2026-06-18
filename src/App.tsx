@@ -181,6 +181,7 @@ import {
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditObjectStrokeLineStyleJSONPasteValue,
+  getSlideEditObjectStrokeLineStylePasteCommand,
   getSlideEditObjectTransformJSONPasteValue,
   getSlideEditObjectTransformPasteCommandEffects,
   getSlideEditObjectAccessibilityJSONPasteValue,
@@ -252,6 +253,7 @@ import {
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
+  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
   SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
@@ -6082,13 +6084,13 @@ function App() {
           element.locked !== true &&
           element.visible !== false)
       .map((element) =>
-        getSlideEditObjectStrokeLineStyleCommandEffect({
-          fieldId: 'strokeLineStyle',
-          id: 'update-object-stroke-line-style',
-          objectId: element.id,
-          slideId: activeSlide.id,
-          value: source.strokeLineStyle,
-        }))
+        getSlideEditObjectStrokeLineStyleCommandEffect(
+          getSlideEditObjectStrokeLineStylePasteCommand({
+            objectId: element.id,
+            slideId: activeSlide.id,
+            value: source.strokeLineStyle,
+          }),
+        ))
 
     if (effects.length === 0) {
       return false
@@ -23764,34 +23766,52 @@ function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
 function getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTObjectStrokeLineStyleImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const value = getPPTJSONValueFromText(candidate.text)
+  const seen = new Set<string>()
 
-    if (
-      !candidate.allowDirect &&
-      isPPTRecord(value) &&
-      shouldDeferPPTObjectStrokeLineStyleToLineStyle(value)
-    ) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+      if (seen.has(json)) {
+        continue
+      }
 
-    if (strokeLineStyle === null) {
-      continue
-    }
+      seen.add(json)
 
-    return {
-      fields: ['strokeLineStyle'],
-      format: PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
-      strokeLineStyle: normalizePPTStrokeDash(strokeLineStyle),
+      const value = getPPTJSONValueFromText(json)
+
+      if (
+        !candidate.allowDirect &&
+        isPPTRecord(value) &&
+        shouldDeferPPTObjectStrokeLineStyleToLineStyle(value)
+      ) {
+        continue
+      }
+
+      const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (strokeLineStyle === null) {
+        continue
+      }
+
+      return {
+        fields: ['strokeLineStyle'],
+        format: PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+        strokeLineStyle: normalizePPTStrokeDash(strokeLineStyle),
+      }
     }
   }
 
