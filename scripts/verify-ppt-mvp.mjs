@@ -10588,6 +10588,102 @@ async function runImageImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const svg = '<svg width="160" height="90" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg"><rect width="160" height="90" fill="#059669"/><text x="18" y="52" font-family="Arial" font-size="22" fill="white">JSON</text></svg>'
+    const json = JSON.stringify({
+      imageReplace: {
+        altText: 'AI chart replacement',
+        mimeType: 'image/svg+xml',
+        name: 'json-replacement.svg',
+        naturalHeight: 90,
+        naturalWidth: 160,
+        src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterJSONReplace = await getPPTImageImportState(page)
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterJSONReplaceUndo = await getPPTImageImportState(page)
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(80)
+
+  const afterJSONReplaceRedo = await getPPTImageImportState(page)
+
+  record(
+    'pastes JSON image source into selected PPT image through slide-edit replace command-effect',
+    afterJSONReplace.imageReplaceImportModel === 'ppt-image-replace-import' &&
+      afterJSONReplace.imageReplaceImportFormat === 'application-json-ppt-image-replace' &&
+      afterJSONReplace.imageReplaceImportSlide === 'slide-1' &&
+      afterJSONReplace.imageReplaceImportObject === afterReplace.selectedId &&
+      afterJSONReplace.imageReplaceImportFields ===
+        'src mimeType name altText naturalWidth naturalHeight' &&
+      afterJSONReplace.imageReplaceImportCommand === 'replace-object-image' &&
+      afterJSONReplace.imageReplaceImportCommandType === 'slide-command-effect' &&
+      afterJSONReplace.imageReplaceImportMime === 'image/svg+xml' &&
+      afterJSONReplace.imageReplaceImportName === 'json-replacement.svg' &&
+      afterJSONReplace.imageReplaceImportAltTextLength === 'AI chart replacement'.length &&
+      afterJSONReplace.imageReplaceImportNaturalWidth === '160' &&
+      afterJSONReplace.imageReplaceImportNaturalHeight === '90' &&
+      afterJSONReplace.imageReplaceImportSrcPrefix.startsWith('data:image/svg+xml') &&
+      afterJSONReplace.imageReplaceCommand === 'replace-object-image' &&
+      afterJSONReplace.imageReplaceCommandName === 'json-replacement.svg' &&
+      afterJSONReplace.imageReplaceCommandMime === 'image/svg+xml' &&
+      afterJSONReplace.imageReplaceCommandObject === afterReplace.selectedId &&
+      afterJSONReplace.imageCount === afterReplace.imageCount &&
+      afterJSONReplace.selectedName === 'json-replacement.svg' &&
+      afterJSONReplace.selectedAltText === 'AI chart replacement' &&
+      afterJSONReplace.selectedImageSrc !== afterReplace.selectedImageSrc &&
+      afterJSONReplace.selectedImageDecoded.includes('#059669') &&
+      afterJSONReplace.selectedImageFit === 'contain' &&
+      afterJSONReplace.selectedImagePosition === '25% 70%' &&
+      afterJSONReplaceUndo.selectedName === afterReplace.selectedName &&
+      afterJSONReplaceUndo.selectedAltText === afterReplace.selectedAltText &&
+      afterJSONReplaceUndo.selectedImageSrc === afterReplace.selectedImageSrc &&
+      afterJSONReplaceRedo.selectedName === 'json-replacement.svg' &&
+      afterJSONReplaceRedo.selectedAltText === 'AI chart replacement' &&
+      afterJSONReplaceRedo.selectedImageDecoded.includes('#059669'),
+    {
+      afterJSONReplace,
+      afterJSONReplaceRedo,
+      afterJSONReplaceUndo,
+      afterReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterJSONReplaceRestore = await getPPTImageImportState(page)
+
+  record(
+    'restores PPT image source after JSON image replacement probe',
+    afterJSONReplaceRestore.selectedName === afterReplace.selectedName &&
+      afterJSONReplaceRestore.selectedAltText === afterReplace.selectedAltText &&
+      afterJSONReplaceRestore.selectedImageSrc === afterReplace.selectedImageSrc &&
+      afterJSONReplaceRestore.selectedImageFit === afterReplace.selectedImageFit &&
+      afterJSONReplaceRestore.selectedImagePosition === afterReplace.selectedImagePosition,
+    {
+      afterJSONReplaceRedo,
+      afterJSONReplaceRestore,
+      afterReplace,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptRetouchedImageRichClipboardItemTypes = []
     window.__pptRetouchedImageRichClipboardWriteCount = 0
     window.__pptRetouchedImageRichClipboardHTML = ''
@@ -16035,6 +16131,20 @@ function getPPTImageImportState(page) {
       imageReplaceCommandSlide: stage?.getAttribute('data-ppt-image-replace-command-slide') ?? '',
       imageReplaceCommandSrcPrefix: stage?.getAttribute('data-ppt-image-replace-command-src-prefix') ?? '',
       imageReplaceCommandType: stage?.getAttribute('data-ppt-image-replace-command-type') ?? '',
+      imageReplaceImportAltTextLength: Number(stage?.getAttribute('data-ppt-image-replace-import-alt-text-length') ?? 0),
+      imageReplaceImportCommand: stage?.getAttribute('data-ppt-image-replace-import-command') ?? '',
+      imageReplaceImportCommandType: stage?.getAttribute('data-ppt-image-replace-import-command-type') ?? '',
+      imageReplaceImportFields: stage?.getAttribute('data-ppt-image-replace-import-fields') ?? '',
+      imageReplaceImportFormat: stage?.getAttribute('data-ppt-image-replace-import-format') ?? '',
+      imageReplaceImportJsonLength: Number(stage?.getAttribute('data-ppt-image-replace-import-json-length') ?? 0),
+      imageReplaceImportMime: stage?.getAttribute('data-ppt-image-replace-import-mime') ?? '',
+      imageReplaceImportModel: stage?.getAttribute('data-ppt-image-replace-import-model') ?? '',
+      imageReplaceImportName: stage?.getAttribute('data-ppt-image-replace-import-name') ?? '',
+      imageReplaceImportNaturalHeight: stage?.getAttribute('data-ppt-image-replace-import-natural-height') ?? '',
+      imageReplaceImportNaturalWidth: stage?.getAttribute('data-ppt-image-replace-import-natural-width') ?? '',
+      imageReplaceImportObject: stage?.getAttribute('data-ppt-image-replace-import-object') ?? '',
+      imageReplaceImportSlide: stage?.getAttribute('data-ppt-image-replace-import-slide') ?? '',
+      imageReplaceImportSrcPrefix: stage?.getAttribute('data-ppt-image-replace-import-src-prefix') ?? '',
       imageReplaceDescriptorAttribute: document.querySelector('[data-ppt-image-replace-input]')?.getAttribute('data-ppt-image-replace-attribute') ?? '',
       imageReplaceDescriptorAttributeValue: document.querySelector('[data-ppt-image-replace-input]')?.getAttribute('data-ppt-image-replace-attribute-value') ?? '',
       imageReplaceDescriptorCommand: document.querySelector('[data-ppt-image-replace-action]')?.getAttribute('data-ppt-image-replace-command') ?? '',

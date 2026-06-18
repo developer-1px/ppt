@@ -1059,6 +1059,11 @@ const PPT_IMAGE_CROP_JSON_IMPORT_FORMAT =
   'application-json-ppt-image-crop' as const
 const PPT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.image-crop+json'
+const PPT_IMAGE_REPLACE_IMPORT_MODEL = 'ppt-image-replace-import' as const
+const PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-image-replace' as const
+const PPT_IMAGE_REPLACE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.image-replace+json'
 const PPT_SHAPE_STYLE_IMPORT_MODEL = 'ppt-shape-style-import' as const
 const PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-shape-style' as const
@@ -1331,6 +1336,23 @@ type PPTImageCropImportSource = {
     fit?: PPTImageFit
   }
   jsonLength: number
+}
+type PPTImageReplaceImportField =
+  | 'altText'
+  | 'mimeType'
+  | 'name'
+  | 'naturalHeight'
+  | 'naturalWidth'
+  | 'src'
+type PPTImageReplaceImportImageSource = PPTImageImportSource & {
+  altText?: string
+}
+type PPTImageReplaceImportSource = {
+  fields: readonly PPTImageReplaceImportField[]
+  format: typeof PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT
+  image: PPTImageReplaceImportImageSource
+  jsonLength: number
+  resolveNaturalSize: boolean
 }
 type PPTShapeStyleImportField =
   | 'cornerRadius'
@@ -1624,6 +1646,22 @@ type PPTImageCropImportEffect = {
   slideId: string
   x: string
   y: string
+}
+type PPTImageReplaceImportEffect = {
+  altTextLength: number
+  commandId: string
+  commandType: string
+  fields: string
+  format: typeof PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  mimeType: string
+  model: typeof PPT_IMAGE_REPLACE_IMPORT_MODEL
+  name: string
+  naturalHeight: string
+  naturalWidth: string
+  objectId: string
+  slideId: string
+  srcPrefix: string
 }
 type PPTShapeStyleImportEffect = {
   categories: string
@@ -2769,6 +2807,8 @@ function App() {
     useState<PPTObjectLayerImportEffect | null>(null)
   const [lastImageCropImportEffect, setLastImageCropImportEffect] =
     useState<PPTImageCropImportEffect | null>(null)
+  const [lastImageReplaceImportEffect, setLastImageReplaceImportEffect] =
+    useState<PPTImageReplaceImportEffect | null>(null)
   const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
     useState<PPTShapeStyleImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
@@ -3788,6 +3828,17 @@ function App() {
         getPPTCommentSourceFromDataTransfer(event.clipboardData)
 
       if (commentSource && pastePPTCommentSource(commentSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const imageReplaceSource =
+        getPPTImageReplaceSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        imageReplaceSource &&
+        pastePPTImageReplaceSource(imageReplaceSource)
+      ) {
         event.preventDefault()
         return
       }
@@ -5160,6 +5211,52 @@ function App() {
     return true
   }
 
+  function pastePPTImageReplaceSource(source: PPTImageReplaceImportSource) {
+    const imageElements = activeSlide.elements
+      .filter((element): element is PPTImage =>
+        selection.includes(element.id) &&
+          element.kind === 'image' &&
+          element.locked !== true &&
+          element.visible !== false)
+
+    if (imageElements.length !== 1) {
+      return false
+    }
+
+    const elementId = imageElements[0].id
+    const replaceImage = (image: PPTImageReplaceImportImageSource) => {
+      const effect = createPPTImageReplaceCommandEffect({
+        elementId,
+        slideId: activeSlide.id,
+        source: image,
+      })
+
+      setLastImageReplaceEffect(effect)
+      setLastImageReplaceImportEffect(createPPTImageReplaceImportEffect({
+        effect,
+        source: {
+          ...source,
+          image,
+        },
+      }))
+      commitPPTImageReplaceEffect(effect)
+      finishPPTImageReplace(elementId)
+    }
+
+    if (source.resolveNaturalSize) {
+      void resolvePPTImageSourceNaturalSize(source.image).then((image) => {
+        replaceImage({
+          ...source.image,
+          ...image,
+        })
+      })
+    } else {
+      replaceImage(source.image)
+    }
+
+    return true
+  }
+
   function pastePPTImageCropSource(source: PPTImageCropImportSource) {
     const objectIds = activeSlide.elements
       .filter((element) =>
@@ -6264,14 +6361,34 @@ function App() {
 
   function replacePPTImageSource(
     elementId: string,
-    source: PPTImageImportSource,
+    source: PPTImageReplaceImportImageSource,
   ) {
-    const effect = getSlideEditObjectImageReplaceCommandEffect({
+    const effect = createPPTImageReplaceCommandEffect({
+      elementId,
+      slideId: activeSlide.id,
+      source,
+    })
+
+    setLastImageReplaceEffect(effect)
+    commitPPTImageReplaceEffect(effect)
+    finishPPTImageReplace(elementId)
+  }
+
+  function createPPTImageReplaceCommandEffect({
+    elementId,
+    slideId,
+    source,
+  }: {
+    elementId: string
+    slideId: string
+    source: PPTImageReplaceImportImageSource
+  }) {
+    return getSlideEditObjectImageReplaceCommandEffect({
       id: 'replace-object-image',
       objectId: elementId,
-      slideId: activeSlide.id,
+      slideId,
       source: {
-        altText: source.name,
+        altText: source.altText ?? source.name,
         mimeType: source.mimeType,
         name: source.name,
         naturalHeight: source.naturalHeight,
@@ -6279,25 +6396,24 @@ function App() {
         src: source.dataUrl,
       },
     })
+  }
 
-    setLastImageReplaceEffect(effect)
-    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+  function commitPPTImageReplaceEffect(
+    effect: SlideEditObjectImageReplaceHostCommandEffect<string, string>,
+  ) {
+    commitDeck((current) => updatePPTDeckSlide(current, effect.selection.slideId, (slide) => ({
       ...slide,
-      elements: mapPPTElementsByIds(slide.elements, [elementId], (element) => {
+      elements: mapPPTElementsByIds(slide.elements, [effect.payload.objectId], (element) => {
         if (element.kind !== 'image') {
           return element
         }
 
-        return {
-          ...element,
-          alt: effect.payload.source.altText ??
-            effect.payload.source.name ??
-            element.alt,
-          name: effect.payload.source.name ?? element.name,
-          src: effect.payload.source.src,
-        }
+        return applyPPTImageReplaceCommandEffectToElement(element, effect)
       }),
     })))
+  }
+
+  function finishPPTImageReplace(elementId: string) {
     setSelection([elementId])
     setEditingId(null)
     setLineCreationMode(null)
@@ -11147,6 +11263,20 @@ function App() {
         data-ppt-image-replace-command-slide={lastImageReplaceEffect?.payload.slideId}
         data-ppt-image-replace-command-src-prefix={lastImageReplaceEffect?.payload.source.src.slice(0, 19)}
         data-ppt-image-replace-command-type={lastImageReplaceEffect?.type}
+        data-ppt-image-replace-import-alt-text-length={lastImageReplaceImportEffect?.altTextLength}
+        data-ppt-image-replace-import-command={lastImageReplaceImportEffect?.commandId}
+        data-ppt-image-replace-import-command-type={lastImageReplaceImportEffect?.commandType}
+        data-ppt-image-replace-import-fields={lastImageReplaceImportEffect?.fields}
+        data-ppt-image-replace-import-format={lastImageReplaceImportEffect?.format}
+        data-ppt-image-replace-import-json-length={lastImageReplaceImportEffect?.jsonLength}
+        data-ppt-image-replace-import-mime={lastImageReplaceImportEffect?.mimeType}
+        data-ppt-image-replace-import-model={lastImageReplaceImportEffect?.model}
+        data-ppt-image-replace-import-name={lastImageReplaceImportEffect?.name}
+        data-ppt-image-replace-import-natural-height={lastImageReplaceImportEffect?.naturalHeight}
+        data-ppt-image-replace-import-natural-width={lastImageReplaceImportEffect?.naturalWidth}
+        data-ppt-image-replace-import-object={lastImageReplaceImportEffect?.objectId}
+        data-ppt-image-replace-import-slide={lastImageReplaceImportEffect?.slideId}
+        data-ppt-image-replace-import-src-prefix={lastImageReplaceImportEffect?.srcPrefix}
         data-ppt-image-replace-model="slide-edit-object-image-replace"
         data-ppt-object-animation-command={lastObjectAnimationEffect?.payload.id}
         data-ppt-object-animation-command-field={lastObjectAnimationEffect?.payload.fieldId}
@@ -14031,6 +14161,38 @@ function createPPTImageCropImportEffect({
   }
 }
 
+function createPPTImageReplaceImportEffect({
+  effect,
+  source,
+}: {
+  effect: SlideEditObjectImageReplaceHostCommandEffect<string, string>
+  source: PPTImageReplaceImportSource
+}): PPTImageReplaceImportEffect {
+  const image = source.image
+  const altText = image.altText ?? ''
+
+  return {
+    altTextLength: altText.length,
+    commandId: effect.payload.id,
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    mimeType: effect.payload.source.mimeType,
+    model: PPT_IMAGE_REPLACE_IMPORT_MODEL,
+    name: effect.payload.source.name ?? '',
+    naturalHeight: effect.payload.source.naturalHeight === undefined
+      ? ''
+      : String(effect.payload.source.naturalHeight),
+    naturalWidth: effect.payload.source.naturalWidth === undefined
+      ? ''
+      : String(effect.payload.source.naturalWidth),
+    objectId: effect.payload.objectId,
+    slideId: effect.payload.slideId,
+    srcPrefix: effect.payload.source.src.slice(0, 19),
+  }
+}
+
 function createPPTImageCropImportCommandEffects({
   objectIds,
   slideId,
@@ -14107,6 +14269,20 @@ function applyPPTImageCropCommandEffectToElement(
       ...getPPTImageCrop(element),
       [payload.fieldId]: Number(payload.value),
     },
+  }
+}
+
+function applyPPTImageReplaceCommandEffectToElement(
+  element: PPTImage,
+  effect: SlideEditObjectImageReplaceHostCommandEffect<string, string>,
+): PPTImage {
+  return {
+    ...element,
+    alt: effect.payload.source.altText ??
+      effect.payload.source.name ??
+      element.alt,
+    name: effect.payload.source.name ?? element.name,
+    src: effect.payload.source.src,
   }
 }
 
@@ -16361,6 +16537,244 @@ function getPPTObjectTransformRotationFromJSONValue(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value)
     ? normalizePPTCanvasRotationDegrees(value)
     : undefined
+}
+
+function getPPTImageReplaceSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_IMAGE_REPLACE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTImageReplaceSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTImageReplaceSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTImageReplaceImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTImageReplaceSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTImageReplaceSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTImageReplaceImportSource | null {
+  const payloadValue = getPPTImageReplacePayloadValue(value, allowDirect)
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const dataUrl = getPPTImageReplaceDataUrlFromJSONValue(
+    payloadValue.src ??
+      payloadValue.dataUrl ??
+      payloadValue.url,
+  )
+
+  if (!dataUrl) {
+    return null
+  }
+
+  const mimeType = getPPTImageReplaceMimeTypeFromJSONValue(
+    payloadValue.mimeType ??
+      payloadValue.type,
+    dataUrl,
+  )
+
+  if (!mimeType) {
+    return null
+  }
+
+  const name = getPPTImageReplaceTextFromJSONValue(
+    payloadValue.name ??
+      payloadValue.fileName,
+  )
+  const altText = getPPTImageReplaceTextFromJSONValue(
+    payloadValue.altText ??
+      payloadValue.alt,
+  )
+  const naturalWidth = getPPTImageReplaceNaturalSizeFromJSONValue(
+    payloadValue.naturalWidth ??
+      payloadValue.width ??
+      (isPPTRecord(payloadValue.naturalSize)
+        ? payloadValue.naturalSize.width
+        : undefined),
+  )
+  const naturalHeight = getPPTImageReplaceNaturalSizeFromJSONValue(
+    payloadValue.naturalHeight ??
+      payloadValue.height ??
+      (isPPTRecord(payloadValue.naturalSize)
+        ? payloadValue.naturalSize.height
+        : undefined),
+  )
+  const fields: PPTImageReplaceImportField[] = [
+    'src',
+    'mimeType',
+  ]
+
+  if (name !== undefined) {
+    fields.push('name')
+  }
+
+  if (altText !== undefined) {
+    fields.push('altText')
+  }
+
+  if (naturalWidth !== undefined) {
+    fields.push('naturalWidth')
+  }
+
+  if (naturalHeight !== undefined) {
+    fields.push('naturalHeight')
+  }
+
+  return {
+    fields,
+    format: PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT,
+    image: {
+      ...(altText === undefined ? {} : { altText }),
+      dataUrl,
+      mimeType,
+      ...(name === undefined ? {} : { name }),
+      ...(naturalHeight === undefined ? {} : { naturalHeight }),
+      ...(naturalWidth === undefined ? {} : { naturalWidth }),
+    },
+    jsonLength,
+    resolveNaturalSize: naturalWidth === undefined || naturalHeight === undefined,
+  }
+}
+
+function getPPTImageReplacePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (isPPTRecord(value.imageReplace)) {
+    return value.imageReplace
+  }
+
+  if (isPPTRecord(value.imageSource)) {
+    return value.imageSource
+  }
+
+  if (isPPTRecord(value.objectImage)) {
+    return value.objectImage
+  }
+
+  if (isPPTRecord(value.replacementImage)) {
+    return value.replacementImage
+  }
+
+  if (isPPTRecord(value.image)) {
+    return value.image
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTImageReplaceDataUrlFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const dataUrl = value.trim()
+
+  return /^data:image\/[a-z0-9.+-]+[;,]/i.test(dataUrl)
+    ? dataUrl
+    : null
+}
+
+function getPPTImageReplaceMimeTypeFromJSONValue(
+  value: unknown,
+  dataUrl: string,
+) {
+  const rawMimeType = typeof value === 'string'
+    ? value
+    : dataUrl.match(/^data:([^;,]+)/i)?.[1]
+  const mimeType = rawMimeType?.trim().toLowerCase() ?? ''
+
+  return /^image\/[a-z0-9.+-]+$/i.test(mimeType)
+    ? mimeType
+    : null
+}
+
+function getPPTImageReplaceTextFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const text = value.replace(/\s+/g, ' ').trim()
+
+  return text || undefined
+}
+
+function getPPTImageReplaceNaturalSizeFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined
+  }
+
+  return Math.round(value)
 }
 
 function getPPTImageCropSourceFromDataTransfer(
