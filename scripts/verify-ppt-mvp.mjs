@@ -18,6 +18,8 @@ const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
+const SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-corner-radius+json'
 const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE =
@@ -10364,6 +10366,71 @@ async function runViewAndShapeScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ value: 14 })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMECornerRadiusJSONPaste = await getPPTShapeCornerRadiusState(page)
+
+  record(
+    'pastes canvas MIME object corner radius through slide-edit command effect',
+    afterCanvasMIMECornerRadiusJSONPaste.importModel === 'ppt-object-corner-radius-import' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importFormat === 'application-json-ppt-object-corner-radius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importSlide === 'slide-1' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importObjects === afterCanvasMIMECornerRadiusJSONPaste.selectedId &&
+      afterCanvasMIMECornerRadiusJSONPaste.importFields === 'cornerRadius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importCommands === 'update-object-corner-radius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importCommandFields === 'cornerRadius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importCommandTargets === afterCanvasMIMECornerRadiusJSONPaste.selectedId &&
+      afterCanvasMIMECornerRadiusJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importCommandValues === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importValue === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.importJsonLength > 10 &&
+      afterCanvasMIMECornerRadiusJSONPaste.command === 'update-object-corner-radius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.commandField === 'cornerRadius' &&
+      afterCanvasMIMECornerRadiusJSONPaste.commandValue === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.inspectorRadius === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.selectedCornerRadius === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.selectedBorderRadius === '14px' &&
+      afterCanvasMIMECornerRadiusJSONPaste.thumbCornerRadius === '14' &&
+      afterCanvasMIMECornerRadiusJSONPaste.thumbBorderRadius !== '',
+    {
+      afterCanvasMIMECornerRadiusJSONPaste,
+      afterCornerRadiusJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMECornerRadiusJSONUndo = await getPPTShapeCornerRadiusState(page)
+
+  record(
+    'restores PPT object corner radius after canvas MIME object corner radius probe',
+    afterCanvasMIMECornerRadiusJSONUndo.inspectorRadius === '36' &&
+      afterCanvasMIMECornerRadiusJSONUndo.selectedCornerRadius === '36' &&
+      afterCanvasMIMECornerRadiusJSONUndo.selectedBorderRadius === '36px' &&
+      afterCanvasMIMECornerRadiusJSONUndo.thumbCornerRadius === '36',
+    {
+      afterCanvasMIMECornerRadiusJSONPaste,
+      afterCanvasMIMECornerRadiusJSONUndo,
+    },
+  )
 
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)

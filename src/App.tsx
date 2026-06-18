@@ -152,6 +152,7 @@ import {
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectCornerRadiusCSS,
   getSlideEditObjectCornerRadiusJSONPasteValue,
+  getSlideEditObjectCornerRadiusPasteCommand,
   getSlideEditObjectCornerRadiusPreviewCSS,
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectFillOpacityJSONPasteValue,
@@ -242,6 +243,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
@@ -6021,13 +6023,15 @@ function App() {
           element.locked !== true &&
           element.visible !== false)
       .map((element) =>
-        getSlideEditObjectCornerRadiusCommandEffect({
-          fieldId: 'cornerRadius',
-          id: 'update-object-corner-radius',
-          objectId: element.id,
-          slideId: activeSlide.id,
-          value: source.cornerRadius,
-        }))
+        getSlideEditObjectCornerRadiusCommandEffect(
+          getSlideEditObjectCornerRadiusPasteCommand({
+            objectId: element.id,
+            pasteValue: {
+              value: source.cornerRadius,
+            },
+            slideId: activeSlide.id,
+          }),
+        ))
 
     if (effects.length === 0) {
       return false
@@ -23100,34 +23104,52 @@ function getPPTObjectCornerRadiusSourceFromDataTransfer(
 function getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTObjectCornerRadiusImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const value = getPPTJSONValueFromText(candidate.text)
+  const seen = new Set<string>()
 
-    if (
-      !candidate.allowDirect &&
-      isPPTRecord(value) &&
-      shouldDeferPPTObjectCornerRadiusToShapeStyle(value)
-    ) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+      if (seen.has(json)) {
+        continue
+      }
 
-    if (pasteValue === null) {
-      continue
-    }
+      seen.add(json)
 
-    return {
-      cornerRadius: normalizePPTShapeCornerRadius(pasteValue.value),
-      fields: ['cornerRadius'],
-      format: PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
+      const value = getPPTJSONValueFromText(json)
+
+      if (
+        !candidate.allowDirect &&
+        isPPTRecord(value) &&
+        shouldDeferPPTObjectCornerRadiusToShapeStyle(value)
+      ) {
+        continue
+      }
+
+      const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return {
+        cornerRadius: normalizePPTShapeCornerRadius(pasteValue.value),
+        fields: ['cornerRadius'],
+        format: PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+      }
     }
   }
 
