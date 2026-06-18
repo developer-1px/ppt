@@ -134,6 +134,7 @@ import {
   normalizeCanvasTableRows,
   applyCanvasClipboardCommandEffect,
   applyCanvasStandardDocumentEffect,
+  commitCanvasAppHostItemsChange,
   executeCanvasClipboardCommand,
   executeCanvasStandardCommand,
   pasteCanvasClipboardSelection,
@@ -155,6 +156,8 @@ import {
   type CanvasClipboardCommandExecutionResult,
   type CanvasAppItemsChange,
   type CanvasAppItemsChangeTransformer,
+  type CanvasAppHostItemsChangeCommitResult,
+  type CommitCanvasAppHostItemsChangeArgs,
   type CanvasStandardCommand,
   type CanvasStandardCommandDocumentEffect,
   type CanvasStandardCommandDocumentEffectContext,
@@ -330,6 +333,8 @@ export const applyPPTCanvasClipboardCommandEffect =
   applyCanvasClipboardCommandEffect
 export const applyPPTCanvasStandardDocumentEffect =
   applyCanvasStandardDocumentEffect
+export const commitPPTCanvasAppHostItemsChange =
+  commitCanvasAppHostItemsChange
 export const createPPTCanvasClipboardCommandEffectPlan =
   createCanvasClipboardCommandEffectPlan
 export const createPPTCanvasDataTransferImportActionPlan =
@@ -587,6 +592,12 @@ export type PPTCanvasAppItemsChange<TItem extends { id: string }> =
 export type PPTCanvasAppItemsChangeTransformer<
   TItem extends { id: string },
 > = CanvasAppItemsChangeTransformer<TItem>
+export type PPTCanvasAppHostItemsChangeCommitResult<
+  TItem extends { id: string },
+> = CanvasAppHostItemsChangeCommitResult<TItem>
+export type CommitPPTCanvasAppHostItemsChangeArgs<
+  TItem extends { id: string },
+> = CommitCanvasAppHostItemsChangeArgs<TItem>
 export type PPTCanvasStandardCommand = CanvasStandardCommand
 export type PPTCanvasStandardCommandDocumentEffect<
   TItem extends { id: string },

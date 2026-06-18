@@ -660,6 +660,7 @@ import {
   PPT_WHEEL_VIEWPORT_MODEL,
   PPT_WHEEL_VIEWPORT_PAN_MODE,
   PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
+  commitPPTCanvasAppHostItemsChange,
   pastePPTCanvasClipboardSelection,
   readPPTCanvasRichClipboardFromDataTransfer,
   resetPPTCanvasViewport,
@@ -4965,15 +4966,33 @@ function App() {
   ) {
     setSelection([...nextSelection])
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const nextItems = transformPPTCanvasChangedItems(
-        items,
-        nextSelection,
-        slide.elements,
-      )
+      const result = commitPPTCanvasAppHostItemsChange<PPTElement>({
+        change: {
+          items,
+          type: 'replace-changed',
+        },
+        commitItemsChange: (change) => change.type === 'replace-changed',
+        componentDefinitionRegistry: PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+        currentItems: slide.elements,
+        itemsChangeTransformers: [
+          createPPTLineConnectionItemsChangeTransformer(nextSelection),
+        ],
+        selection: {
+          after: [...nextSelection],
+          before: [...selection],
+        },
+      })
+
+      if (
+        !result.committed ||
+        result.transformedChange.type !== 'replace-changed'
+      ) {
+        return slide
+      }
 
       return {
         ...slide,
-        elements: nextItems,
+        elements: result.transformedChange.items,
       }
     }))
     return true
@@ -4989,15 +5008,33 @@ function App() {
 
     setSelection([...nextSelection])
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
-      const nextItems = transformPPTCanvasChangedItems(
-        [...slide.elements, ...items],
-        nextSelection,
-        slide.elements,
-      )
+      const result = commitPPTCanvasAppHostItemsChange<PPTElement>({
+        change: {
+          items: [...slide.elements, ...items],
+          type: 'replace-changed',
+        },
+        commitItemsChange: (change) => change.type === 'replace-changed',
+        componentDefinitionRegistry: PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+        currentItems: slide.elements,
+        itemsChangeTransformers: [
+          createPPTLineConnectionItemsChangeTransformer(nextSelection),
+        ],
+        selection: {
+          after: [...nextSelection],
+          before: [...selection],
+        },
+      })
+
+      if (
+        !result.committed ||
+        result.transformedChange.type !== 'replace-changed'
+      ) {
+        return slide
+      }
 
       return {
         ...slide,
-        elements: nextItems,
+        elements: result.transformedChange.items,
       }
     }))
     return true
