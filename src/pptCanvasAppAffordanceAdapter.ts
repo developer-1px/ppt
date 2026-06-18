@@ -85,6 +85,7 @@ import {
   getCanvasTableComponentSize,
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
+  getCanvasTableFilesFromDataTransfer,
   getCanvasTableSourceFromDataTransfer,
   getCanvasTableSourceFromHTML,
   getCanvasTableSourceFromText,
@@ -164,8 +165,8 @@ import {
   getCanvasDataImageSourceFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
+  getCanvasImageFilesFromDataTransfer,
   getCanvasSVGImageSourceFromDataTransfer,
-  isCanvasImageBlob,
   readCanvasImageFileSource,
   resolveCanvasImageSourceNaturalSize,
   routeCanvasImagePasteReplace,
@@ -418,44 +419,8 @@ export const readPPTCanvasClipboardImageSource =
 export const getPPTCanvasImageFileFromDataTransfer =
   getCanvasImageFileFromDataTransfer
 export const getPPTCanvasImageFileFromList = getCanvasImageFileFromList
-export function getPPTCanvasDataTransferFiles(
-  dataTransfer: DataTransfer | null,
-) {
-  const fileList = Array.from(dataTransfer?.files ?? [])
-  const types = Array.from(dataTransfer?.types ?? [])
-  const shouldReadItemFiles = fileList.length === 0 &&
-    (types.length === 0 || types.includes('Files'))
-  const files = [
-    ...fileList,
-    ...(shouldReadItemFiles
-      ? Array.from(dataTransfer?.items ?? [])
-        .map((item) => item.kind === 'file' ? item.getAsFile() : null)
-        .filter((file): file is File => file !== null)
-      : []),
-  ]
-  const seen = new Set<string>()
-
-  return files.filter((file) => {
-    const key = [
-      file.name,
-      file.type,
-      file.size,
-      file.lastModified,
-    ].join(':')
-
-    if (seen.has(key)) {
-      return false
-    }
-
-    seen.add(key)
-    return true
-  })
-}
-export function getPPTCanvasImageFilesFromDataTransfer(
-  dataTransfer: DataTransfer | null,
-) {
-  return getPPTCanvasDataTransferFiles(dataTransfer).filter(isCanvasImageBlob)
-}
+export const getPPTCanvasImageFilesFromDataTransfer =
+  getCanvasImageFilesFromDataTransfer
 export const routePPTCanvasImagePasteReplace =
   routeCanvasImagePasteReplace
 export const getPPTCanvasMediaSourceFromDataTransfer =
@@ -484,6 +449,8 @@ export const getPPTCanvasTableComponentSize =
 export const getPPTCanvasTableFileFromDataTransfer =
   getCanvasTableFileFromDataTransfer
 export const getPPTCanvasTableFileFromList = getCanvasTableFileFromList
+export const getPPTCanvasTableFilesFromDataTransfer =
+  getCanvasTableFilesFromDataTransfer
 export const getPPTCanvasTableSourceFromDataTransfer =
   getCanvasTableSourceFromDataTransfer
 export const getPPTCanvasTableSourceFromHTML =
