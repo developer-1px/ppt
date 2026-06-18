@@ -5400,6 +5400,22 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
       textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
       textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
+      runSize: element?.querySelector('[data-ppt-run-size]')?.style.fontSize ?? '',
+      runSizeCount: element?.querySelectorAll('[data-ppt-run-size]').length ?? 0,
+      runSizeValue: element?.querySelector('[data-ppt-run-size]')?.getAttribute('data-ppt-run-size') ?? '',
+      textRunSizeImportCommandFields: stage?.getAttribute('data-ppt-text-run-size-import-command-fields') ?? '',
+      textRunSizeImportCommandIds: stage?.getAttribute('data-ppt-text-run-size-import-command-ids') ?? '',
+      textRunSizeImportCommandTargets: stage?.getAttribute('data-ppt-text-run-size-import-command-targets') ?? '',
+      textRunSizeImportCommandTypes: stage?.getAttribute('data-ppt-text-run-size-import-command-types') ?? '',
+      textRunSizeImportCommandValues: stage?.getAttribute('data-ppt-text-run-size-import-command-values') ?? '',
+      textRunSizeImportFields: stage?.getAttribute('data-ppt-text-run-size-import-fields') ?? '',
+      textRunSizeImportFormat: stage?.getAttribute('data-ppt-text-run-size-import-format') ?? '',
+      textRunSizeImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-size-import-json-length') ?? 0),
+      textRunSizeImportModel: stage?.getAttribute('data-ppt-text-run-size-import-model') ?? '',
+      textRunSizeImportObjects: stage?.getAttribute('data-ppt-text-run-size-import-objects') ?? '',
+      textRunSizeImportRuns: Number(stage?.getAttribute('data-ppt-text-run-size-import-runs') ?? 0),
+      textRunSizeImportSlide: stage?.getAttribute('data-ppt-text-run-size-import-slide') ?? '',
+      textRunSizeImportValue: stage?.getAttribute('data-ppt-text-run-size-import-value') ?? '',
       runColor: element?.querySelector('[data-ppt-run-color]')?.style.color ?? '',
       runColorCount: element?.querySelectorAll('[data-ppt-run-color]').length ?? 0,
       runColorValue: element?.querySelector('[data-ppt-run-color]')?.getAttribute('data-ppt-run-color') ?? '',
@@ -6426,6 +6442,93 @@ async function runTextQuickFormatScenario(page) {
   await delay(80)
 
   const summaryAfterTextParagraphBulletRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('28px')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-run-size+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunSizePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text run size JSON through run style command effect',
+    summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletRestore.runSizeCount === 0 &&
+      summaryAfterTextRunSizePaste.selected === 'true' &&
+      summaryAfterTextRunSizePaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextRunSizePaste.runSize === '28px' &&
+      summaryAfterTextRunSizePaste.runSizeCount > 0 &&
+      summaryAfterTextRunSizePaste.runSizeValue === '28' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportModel === 'ppt-text-run-size-import' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportFormat === 'application-json-ppt-text-run-size' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportCommandFields === 'size' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportCommandValues === '28' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportFields === 'value' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportJsonLength >= 6 &&
+      summaryAfterTextRunSizePaste.textRunSizeImportObjects === 's1-summary' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportRuns > 0 &&
+      summaryAfterTextRunSizePaste.textRunSizeImportSlide === 'slide-1' &&
+      summaryAfterTextRunSizePaste.textRunSizeImportValue === '28',
+    {
+      summaryAfterTextParagraphBulletRestore,
+      summaryAfterTextRunSizePaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunSizeUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunSizeRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text run size JSON as one history step',
+    summaryAfterTextRunSizeUndo.runSizeCount === 0 &&
+      summaryAfterTextRunSizeRedo.runSize === '28px' &&
+      summaryAfterTextRunSizeRedo.runSizeCount > 0,
+    {
+      summaryAfterTextRunSizePaste,
+      summaryAfterTextRunSizeRedo,
+      summaryAfterTextRunSizeUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
@@ -10933,6 +11036,10 @@ async function runObjectOpacityScenario(page) {
   await delay(50)
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('[data-ppt-element="s1-card-1"]')`),
+    'Expected overview card to render before object opacity selection',
+  )
 
   const cardPoint = await getElementCenter(page, 's1-card-1')
   await clickMouse(page, cardPoint.x, cardPoint.y, 1)
@@ -11142,6 +11249,10 @@ async function runObjectShadowScenario(page) {
   await delay(50)
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('[data-ppt-element="s1-card-1"]')`),
+    'Expected overview card to render before object hyperlink selection',
+  )
 
   const cardPoint = await getElementCenter(page, 's1-card-1')
   await clickMouse(page, cardPoint.x, cardPoint.y, 1)
