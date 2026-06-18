@@ -5,6 +5,10 @@ import {
   PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_TYPES,
+  PPT_CANVAS_RICH_TEXT_PASTE_SUPPORTED_FORMATS,
+  PPT_CANVAS_TABLE_FILE_IMPORT_SUPPORTED_FORMATS,
+  PPT_CANVAS_TABLE_IMPORT_SUPPORTED_FORMATS,
+  PPT_CANVAS_TEXT_PASTE_SUPPORTED_FORMATS,
   type PPTCanvasDataTransferImportRegistryResolver,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
@@ -215,7 +219,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
         : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    supportedFormats: PPT_CANVAS_TABLE_FILE_IMPORT_SUPPORTED_FORMATS,
     title: 'Table file batch',
   },
   {
@@ -230,7 +234,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return file ? { file, kind: 'table-file' } : null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    supportedFormats: PPT_CANVAS_TABLE_FILE_IMPORT_SUPPORTED_FORMATS,
     title: 'Table file',
   },
   {
@@ -248,7 +252,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
         : null
     },
     scope: PPT_STAGE_DROP_IMPORT_SCOPE,
-    supportedFormats: ['Files', 'text/csv', 'text/tab-separated-values'],
+    supportedFormats: PPT_CANVAS_TABLE_FILE_IMPORT_SUPPORTED_FORMATS,
     title: 'Table file',
   },
   {
@@ -345,14 +349,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return source ? { kind: 'table-source', source } : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: [
-      'text/html',
-      'text/markdown',
-      'text/x-markdown',
-      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
-      'text/csv',
-      'text/tab-separated-values',
-    ],
+    supportedFormats: PPT_CANVAS_TABLE_IMPORT_SUPPORTED_FORMATS,
     title: 'Table source',
   },
   {
@@ -370,12 +367,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: [
-      'text/html',
-      'text/markdown',
-      'text/x-markdown',
-      PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
-    ],
+    supportedFormats: PPT_CANVAS_RICH_TEXT_PASTE_SUPPORTED_FORMATS,
     title: 'Rich text source',
   },
   {
@@ -404,7 +396,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
           candidate.kind === 'text-source' ? [candidate] : []
         ),
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: [PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE],
+    supportedFormats: PPT_CANVAS_TEXT_PASTE_SUPPORTED_FORMATS,
     title: 'Text source',
   },
 ] satisfies readonly PPTCanvasDataTransferImportRegistryResolver<
