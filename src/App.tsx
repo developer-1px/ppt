@@ -1050,6 +1050,12 @@ const PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-opacity' as const
 const PPT_OBJECT_OPACITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-opacity+json'
+const PPT_OBJECT_ACCESSIBILITY_IMPORT_MODEL =
+  'ppt-object-accessibility-import' as const
+const PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-accessibility' as const
+const PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-accessibility+json'
 const PPT_OBJECT_METADATA_IMPORT_MODEL = 'ppt-object-metadata-import' as const
 const PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-metadata' as const
@@ -1359,6 +1365,13 @@ type PPTObjectOpacityImportSource = {
   format: typeof PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT
   jsonLength: number
   opacity: number
+}
+type PPTObjectAccessibilityImportField = 'altText'
+type PPTObjectAccessibilityImportSource = {
+  altText: string | null
+  fields: readonly PPTObjectAccessibilityImportField[]
+  format: typeof PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT
+  jsonLength: number
 }
 type PPTObjectMetadataImportField =
   | 'altText'
@@ -1791,6 +1804,21 @@ type PPTObjectOpacityImportEffect = {
   model: typeof PPT_OBJECT_OPACITY_IMPORT_MODEL
   objectIds: string
   opacity: string
+  slideId: string
+}
+type PPTObjectAccessibilityImportEffect = {
+  altTextLength: number
+  altTextPresent: string
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_ACCESSIBILITY_IMPORT_MODEL
+  objectIds: string
   slideId: string
 }
 type PPTObjectMetadataImportEffect = {
@@ -3146,6 +3174,8 @@ function App() {
     useState<PPTObjectShadowImportEffect | null>(null)
   const [lastObjectOpacityImportEffect, setLastObjectOpacityImportEffect] =
     useState<PPTObjectOpacityImportEffect | null>(null)
+  const [lastObjectAccessibilityImportEffect, setLastObjectAccessibilityImportEffect] =
+    useState<PPTObjectAccessibilityImportEffect | null>(null)
   const [lastObjectMetadataImportEffect, setLastObjectMetadataImportEffect] =
     useState<PPTObjectMetadataImportEffect | null>(null)
   const [lastObjectHyperlinkImportEffect, setLastObjectHyperlinkImportEffect] =
@@ -4185,6 +4215,17 @@ function App() {
       if (
         objectStrokeLineStyleSource &&
         pastePPTObjectStrokeLineStyleSource(objectStrokeLineStyleSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectAccessibilitySource =
+        getPPTObjectAccessibilitySourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectAccessibilitySource &&
+        pastePPTObjectAccessibilitySource(objectAccessibilitySource)
       ) {
         event.preventDefault()
         return
@@ -5614,6 +5655,50 @@ function App() {
               dash: normalizePPTStrokeDash(effect.payload.value),
             }),
           }
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectAccessibilitySource(
+    source: PPTObjectAccessibilityImportSource,
+  ) {
+    const effects = createPPTObjectAccessibilityImportCommandEffects({
+      objectIds: selectedElements
+        .filter((element) =>
+          element.locked !== true &&
+            element.visible !== false)
+        .map((element) => element.id),
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastAccessibilityEffect(effects[effects.length - 1])
+    setLastObjectAccessibilityImportEffect(
+      createPPTObjectAccessibilityImportEffect({
+        effects,
+        source,
+      }),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect
+            ? applyPPTObjectAccessibilityCommandEffectToElement(
+                element,
+                effect,
+              )
+            : element
         }),
       })))
 
@@ -12246,6 +12331,19 @@ function App() {
         data-ppt-accessibility-command-value={lastAccessibilityEffect?.payload.id === 'update-object-accessibility'
           ? String(lastAccessibilityEffect.payload.value)
           : undefined}
+        data-ppt-accessibility-import-alt-text-length={lastObjectAccessibilityImportEffect?.altTextLength}
+        data-ppt-accessibility-import-alt-text-present={lastObjectAccessibilityImportEffect?.altTextPresent}
+        data-ppt-accessibility-import-command-fields={lastObjectAccessibilityImportEffect?.commandFields}
+        data-ppt-accessibility-import-command-targets={lastObjectAccessibilityImportEffect?.commandTargets}
+        data-ppt-accessibility-import-command-types={lastObjectAccessibilityImportEffect?.commandTypes}
+        data-ppt-accessibility-import-command-values={lastObjectAccessibilityImportEffect?.commandValues}
+        data-ppt-accessibility-import-commands={lastObjectAccessibilityImportEffect?.commandIds}
+        data-ppt-accessibility-import-fields={lastObjectAccessibilityImportEffect?.fields}
+        data-ppt-accessibility-import-format={lastObjectAccessibilityImportEffect?.format}
+        data-ppt-accessibility-import-json-length={lastObjectAccessibilityImportEffect?.jsonLength}
+        data-ppt-accessibility-import-model={lastObjectAccessibilityImportEffect?.model}
+        data-ppt-accessibility-import-objects={lastObjectAccessibilityImportEffect?.objectIds}
+        data-ppt-accessibility-import-slide={lastObjectAccessibilityImportEffect?.slideId}
         data-ppt-accessibility-model="slide-edit-object-accessibility"
         data-ppt-corner-radius-command={lastCornerRadiusEffect?.payload.id}
         data-ppt-corner-radius-command-field={lastCornerRadiusEffect?.payload.fieldId}
@@ -14898,6 +14996,65 @@ function createPPTObjectOpacityImportEffect({
     opacity: String(source.opacity),
     slideId: effects[0]?.payload.slideId ?? '',
   }
+}
+
+function createPPTObjectAccessibilityImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectAccessibilityHostCommandEffect<string, string>[]
+  source: PPTObjectAccessibilityImportSource
+}): PPTObjectAccessibilityImportEffect {
+  return {
+    altTextLength: source.altText?.length ?? 0,
+    altTextPresent: String(source.altText !== null),
+    commandFields: effects.map((effect) =>
+      effect.payload.id === 'update-object-accessibility'
+        ? effect.payload.fieldId
+        : '').join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) =>
+      effect.payload.id === 'update-object-accessibility'
+        ? String(effect.payload.value)
+        : '').join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_ACCESSIBILITY_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+  }
+}
+
+function createPPTObjectAccessibilityImportCommandEffects({
+  objectIds,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  slideId: string
+  source: PPTObjectAccessibilityImportSource
+}): SlideEditObjectAccessibilityHostCommandEffect<string, string>[] {
+  return objectIds.map((objectId) =>
+    getSlideEditObjectAccessibilityCommandEffect(
+      source.altText
+        ? {
+            fieldId: 'altText',
+            id: 'update-object-accessibility',
+            objectId,
+            slideId,
+            value: source.altText,
+          }
+        : {
+            id: 'remove-object-alt-text',
+            objectId,
+            slideId,
+          },
+    ))
 }
 
 function createPPTObjectMetadataImportEffect({
@@ -18053,6 +18210,158 @@ function getPPTObjectOpacityFromJSONValue(value: unknown): number | undefined {
 
   return Number.isFinite(numberValue)
     ? normalizePPTElementOpacity(numberValue)
+    : undefined
+}
+
+function getPPTObjectAccessibilitySourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectAccessibilitySourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectAccessibilitySourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectAccessibilityImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectAccessibilitySourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectAccessibilitySourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectAccessibilityImportSource | null {
+  const altText = getPPTObjectAccessibilityAltTextFromJSONValue(
+    getPPTObjectAccessibilityPayloadValue(value, allowDirect),
+  )
+
+  return altText === undefined
+    ? null
+    : {
+        altText,
+        fields: ['altText'],
+        format: PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+}
+
+function getPPTObjectAccessibilityPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (value.objectAccessibility !== undefined) {
+    return value.objectAccessibility
+  }
+
+  if (value.accessibility !== undefined) {
+    return value.accessibility
+  }
+
+  if (value.objectAltText !== undefined) {
+    return value.objectAltText
+  }
+
+  return allowDirect &&
+    (
+      value.altText !== undefined ||
+      value.decorative !== undefined ||
+      value.value !== undefined
+    )
+    ? value
+    : undefined
+}
+
+function getPPTObjectAccessibilityAltTextFromJSONValue(
+  value: unknown,
+): string | null | undefined {
+  if (value === null || value === false) {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    return normalizePPTAltText(value) || null
+  }
+
+  if (!isPPTRecord(value)) {
+    return undefined
+  }
+
+  if (value.decorative === true) {
+    return null
+  }
+
+  const raw = value.altText ?? value.text ?? value.value
+
+  if (raw === null || raw === false) {
+    return null
+  }
+
+  return typeof raw === 'string'
+    ? normalizePPTAltText(raw) || null
     : undefined
 }
 

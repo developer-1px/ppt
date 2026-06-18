@@ -11909,6 +11909,110 @@ async function runObjectAltTextScenario(page) {
     },
   )
 
+  const jsonAltText = 'JSON chart replacement description'
+
+  await page.eval(`((altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectAccessibility: {
+        altText,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(jsonAltText)})`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'pastes JSON object accessibility alt text through slide-edit command effect',
+    afterJSONPaste.importModel === 'ppt-object-accessibility-import' &&
+      afterJSONPaste.importFormat === 'application-json-ppt-object-accessibility' &&
+      afterJSONPaste.importSlide === 'slide-1' &&
+      afterJSONPaste.importObjects === imageId &&
+      afterJSONPaste.importFields === 'altText' &&
+      afterJSONPaste.importCommands === 'update-object-accessibility' &&
+      afterJSONPaste.importCommandFields === 'altText' &&
+      afterJSONPaste.importCommandTargets === imageId &&
+      afterJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterJSONPaste.importCommandValues === jsonAltText &&
+      afterJSONPaste.importAltTextLength === jsonAltText.length &&
+      afterJSONPaste.importAltTextPresent === 'true' &&
+      afterJSONPaste.importJsonLength > 60 &&
+      afterJSONPaste.command === 'update-object-accessibility' &&
+      afterJSONPaste.commandField === 'altText' &&
+      afterJSONPaste.commandObject === imageId &&
+      afterJSONPaste.commandSlide === 'slide-1' &&
+      afterJSONPaste.commandType === 'slide-command-effect' &&
+      afterJSONPaste.commandValue === jsonAltText &&
+      afterJSONPaste.altText === jsonAltText &&
+      afterJSONPaste.descriptorAltText === jsonAltText &&
+      afterJSONPaste.selectedAltText === jsonAltText &&
+      afterJSONPaste.thumbAltText === jsonAltText &&
+      afterJSONPaste.imageAlt === jsonAltText,
+    {
+      afterJSONPaste,
+      afterRestore,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONUndo = await getPPTObjectAltTextState(page, imageId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterJSONRedo = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'undoes and redoes PPT object accessibility JSON as one history step',
+    afterJSONUndo.altText === PPT_OBJECT_ALT_TEXT &&
+      afterJSONUndo.selectedAltText === PPT_OBJECT_ALT_TEXT &&
+      afterJSONRedo.altText === jsonAltText &&
+      afterJSONRedo.selectedAltText === jsonAltText,
+    {
+      afterJSONRedo,
+      afterJSONUndo,
+    },
+  )
+
+  await page.eval(`((altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectAccessibility: {
+        altText,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(PPT_OBJECT_ALT_TEXT)})`)
+  await delay(120)
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -18529,6 +18633,19 @@ function getPPTObjectAltTextState(page, elementId) {
       descriptorDescribed: field?.getAttribute('data-ppt-accessibility-described') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-accessibility-surface') ?? '',
       imageAlt: image?.getAttribute('alt') ?? '',
+      importAltTextLength: Number(stage?.getAttribute('data-ppt-accessibility-import-alt-text-length') ?? 0),
+      importAltTextPresent: stage?.getAttribute('data-ppt-accessibility-import-alt-text-present') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-accessibility-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-accessibility-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-accessibility-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-accessibility-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-accessibility-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-accessibility-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-accessibility-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-accessibility-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-accessibility-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-accessibility-import-objects') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-accessibility-import-slide') ?? '',
       model: stage?.getAttribute('data-ppt-accessibility-model') ?? '',
       selectedAltText: target?.getAttribute('data-ppt-alt-text') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
