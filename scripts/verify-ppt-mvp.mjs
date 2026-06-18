@@ -5349,6 +5349,8 @@ function getPPTTextFormatPainterState(page, elementId) {
     const stage = document.querySelector('.ppt-stage-shell')
 
     return {
+      boldRun: element?.querySelector('[data-ppt-run-bold="true"]')?.style.fontWeight ?? '',
+      boldRunCount: element?.querySelectorAll('[data-ppt-run-bold="true"]').length ?? 0,
       bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
       color: element?.style.color ?? '',
       fontFamily: element?.getAttribute('data-ppt-font-family') ?? '',
@@ -5398,6 +5400,19 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
       textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
       textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
+      textRunBoldImportCommandFields: stage?.getAttribute('data-ppt-text-run-bold-import-command-fields') ?? '',
+      textRunBoldImportCommandIds: stage?.getAttribute('data-ppt-text-run-bold-import-command-ids') ?? '',
+      textRunBoldImportCommandTargets: stage?.getAttribute('data-ppt-text-run-bold-import-command-targets') ?? '',
+      textRunBoldImportCommandTypes: stage?.getAttribute('data-ppt-text-run-bold-import-command-types') ?? '',
+      textRunBoldImportCommandValues: stage?.getAttribute('data-ppt-text-run-bold-import-command-values') ?? '',
+      textRunBoldImportFields: stage?.getAttribute('data-ppt-text-run-bold-import-fields') ?? '',
+      textRunBoldImportFormat: stage?.getAttribute('data-ppt-text-run-bold-import-format') ?? '',
+      textRunBoldImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-bold-import-json-length') ?? 0),
+      textRunBoldImportModel: stage?.getAttribute('data-ppt-text-run-bold-import-model') ?? '',
+      textRunBoldImportObjects: stage?.getAttribute('data-ppt-text-run-bold-import-objects') ?? '',
+      textRunBoldImportRuns: Number(stage?.getAttribute('data-ppt-text-run-bold-import-runs') ?? 0),
+      textRunBoldImportSlide: stage?.getAttribute('data-ppt-text-run-bold-import-slide') ?? '',
+      textRunBoldImportValue: stage?.getAttribute('data-ppt-text-run-bold-import-value') ?? '',
       textRunItalicImportCommandFields: stage?.getAttribute('data-ppt-text-run-italic-import-command-fields') ?? '',
       textRunItalicImportCommandIds: stage?.getAttribute('data-ppt-text-run-italic-import-command-ids') ?? '',
       textRunItalicImportCommandTargets: stage?.getAttribute('data-ppt-text-run-italic-import-command-targets') ?? '',
@@ -6401,6 +6416,92 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify(true)
 
     dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-run-bold+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunBoldPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text run bold JSON through run style command effect',
+    summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletRestore.boldRunCount === 0 &&
+      summaryAfterTextRunBoldPaste.selected === 'true' &&
+      summaryAfterTextRunBoldPaste.text === summaryAfterTextStylePaste.text &&
+      ['700', 'bold'].includes(summaryAfterTextRunBoldPaste.boldRun) &&
+      summaryAfterTextRunBoldPaste.boldRunCount > 0 &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportModel === 'ppt-text-run-bold-import' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportFormat === 'application-json-ppt-text-run-bold' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandFields === 'bold' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportCommandValues === 'true' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportFields === 'value' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportJsonLength >= 4 &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportObjects === 's1-summary' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportRuns > 0 &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportSlide === 'slide-1' &&
+      summaryAfterTextRunBoldPaste.textRunBoldImportValue === 'true',
+    {
+      summaryAfterTextParagraphBulletRestore,
+      summaryAfterTextRunBoldPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunBoldUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunBoldRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text run bold JSON as one history step',
+    summaryAfterTextRunBoldUndo.boldRunCount === 0 &&
+      ['700', 'bold'].includes(summaryAfterTextRunBoldRedo.boldRun) &&
+      summaryAfterTextRunBoldRedo.boldRunCount > 0,
+    {
+      summaryAfterTextRunBoldPaste,
+      summaryAfterTextRunBoldRedo,
+      summaryAfterTextRunBoldUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify(true)
+
+    dataTransfer.setData(
       'application/vnd.interactive-os.ppt.text-run-italic+json',
       json,
     )
@@ -6577,6 +6678,10 @@ async function runTextQuickFormatScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('[data-ppt-element="s1-title"]') && !!document.querySelector('[data-ppt-element="s1-summary"]')`),
+    'Expected PPT title and summary to render before multi-text selection',
+  )
   titlePoint = await getElementCenter(page, 's1-title')
   const summaryPoint = await getElementCenter(page, 's1-summary')
   await clickMouse(page, titlePoint.x, titlePoint.y, 1)
