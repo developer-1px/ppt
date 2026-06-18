@@ -1,5 +1,6 @@
 import {
   getSlideEditColorWithAlphaCSS,
+  getSlideEditObjectShadowFilter,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditTextFrameInsetPaddingCSS,
@@ -956,10 +957,14 @@ function getPPTElementShadowAttrEntries(element: PPTElement) {
 
 function getPPTElementShadowStyle(element: PPTElement) {
   const shadow = getPPTElementShadow(element)
+  const filter = shadow
+    ? getSlideEditObjectShadowFilter({
+        ...shadow,
+        enabled: true,
+      })
+    : undefined
 
-  return shadow
-    ? `filter:drop-shadow(${getPPTElementShadowFilterCSS(shadow)})`
-    : ''
+  return filter ? `filter:${filter}` : ''
 }
 
 function getPPTElementShadowSVGStyleAttr(element: PPTElement) {
@@ -1439,26 +1444,6 @@ function formatPPTElementShadowOpacity(value: number) {
 
 function normalizePPTElementShadowColor(color: string) {
   return /^#[\da-f]{6}$/i.test(color) ? color : PPT_DEFAULT_ELEMENT_SHADOW.color
-}
-
-function getPPTElementShadowFilterCSS(shadow: PPTElementShadow) {
-  const radians = (shadow.angle * Math.PI) / 180
-  const offsetX = formatNumber(Math.cos(radians) * shadow.distance)
-  const offsetY = formatNumber(Math.sin(radians) * shadow.distance)
-
-  return `${offsetX}px ${offsetY}px ${shadow.blur}px ${getPPTElementShadowColorCSS(shadow)}`
-}
-
-function getPPTElementShadowColorCSS(shadow: PPTElementShadow) {
-  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(shadow.color)
-
-  if (!match) {
-    return shadow.color
-  }
-
-  const [, red, green, blue] = match
-
-  return `rgb(${Number.parseInt(red, 16)} ${Number.parseInt(green, 16)} ${Number.parseInt(blue, 16)} / ${formatPPTElementShadowOpacity(shadow.opacity)})`
 }
 
 function getPPTTextVerticalAlignOffset({
