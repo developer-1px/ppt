@@ -175,13 +175,17 @@ import {
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
+  getSlideEditTextFontFamilyJSONPasteValue,
   getSlideEditTextFontSizeJSONPasteValue,
   getSlideEditTextFontWeightJSONPasteValue,
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
+  getSlideEditTextParagraphAlignJSONPasteValue,
+  getSlideEditTextParagraphBulletJSONPasteValue,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
+  getSlideEditTextParagraphSpacingJSONPasteValue,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTransitionCSSStyle,
@@ -24799,6 +24803,13 @@ function getPPTTextFontFamilySourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextFontFamilySourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -24838,6 +24849,40 @@ function getPPTTextFontFamilySourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFontFamilySourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextFontFamilyImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const fontFamily = getSlideEditTextFontFamilyJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+      jsonMimeType: candidate.customMimeType,
+      options: getPPTTextFontFamilyDescriptorOptions(),
+    })
+
+    if (fontFamily === null) {
+      continue
+    }
+
+    const payload = getPPTTextFontFamilyPayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      fields: payload?.fields ?? ['value'],
+      fontFamily: normalizePPTTextFontFamily(fontFamily),
+      format: PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -25200,6 +25245,13 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25239,6 +25291,38 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextParagraphAlignImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const align = getSlideEditTextParagraphAlignJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (align === null) {
+      continue
+    }
+
+    const payload = getPPTTextParagraphAlignPayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      align,
+      fields: payload?.fields ?? ['value'],
+      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -25371,6 +25455,13 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextParagraphBulletSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25410,6 +25501,38 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextParagraphBulletSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextParagraphBulletImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const bullet = getSlideEditTextParagraphBulletJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (bullet === null) {
+      continue
+    }
+
+    const payload = getPPTTextParagraphBulletPayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      bullet: bullet === 'none' ? null : bullet,
+      fields: payload?.fields ?? ['value'],
+      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -25580,6 +25703,13 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25623,6 +25753,67 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextParagraphSpacingImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return createPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
+      pasteValue,
+      candidate.text.length,
+    )
+  }
+
+  return null
+}
+
+function createPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextParagraphSpacingJSONPasteValue>>,
+  jsonLength: number,
+): PPTTextParagraphSpacingImportSource | null {
+  const fields: PPTTextParagraphSpacingImportField[] = []
+  const spacing: Partial<Record<PPTParagraphSpacingField, number>> = {}
+
+  for (const field of pasteValue.fields) {
+    if (field.fieldId === 'lineHeightRatio') {
+      fields.push('lineHeight')
+      spacing.lineHeight = normalizePPTParagraphLineHeight(field.value)
+      continue
+    }
+
+    if (field.fieldId === 'paragraphBefore') {
+      fields.push('spacingBefore')
+      spacing.spacingBefore = normalizePPTParagraphSpacing(field.value.value)
+      continue
+    }
+
+    if (field.fieldId === 'paragraphAfter') {
+      fields.push('spacingAfter')
+      spacing.spacingAfter = normalizePPTParagraphSpacing(field.value.value)
+    }
+  }
+
+  return fields.length === 0
+    ? null
+    : {
+        fields,
+        format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
+        jsonLength,
+        spacing,
+      }
 }
 
 function getPPTTextParagraphSpacingSourceFromText(
