@@ -159,6 +159,7 @@ import {
   getSlideEditObjectFillOpacityPasteCommand,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectHyperlinkJSONPasteValue,
+  getSlideEditObjectHyperlinkPasteCommands,
   getSlideEditObjectImageCropCommandEffect,
   getSlideEditObjectImageCropJSONPasteValue,
   getSlideEditObjectImageCropPasteCommandEffects,
@@ -246,6 +247,7 @@ import {
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE,
+  SLIDE_EDIT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE,
@@ -16834,22 +16836,34 @@ function createPPTObjectHyperlinkImportCommandEffects({
   slideId: string
   source: PPTObjectHyperlinkImportSource
 }): SlideEditObjectHyperlinkHostCommandEffect<string, string>[] {
-  return objectIds.map((objectId) =>
-    getSlideEditObjectHyperlinkCommandEffect(
-      source.hyperlinkUrl
+  return objectIds.flatMap((objectId) =>
+    getSlideEditObjectHyperlinkPasteCommands({
+      objectId,
+      pasteValue: source.hyperlinkUrl
         ? {
-            fieldId: 'url',
-            id: 'update-object-hyperlink',
-            objectId,
-            slideId,
-            value: source.hyperlinkUrl,
+            fields: [{
+              fieldId: 'url',
+              value: source.hyperlinkUrl,
+            }],
+            hyperlink: {
+              target: '_blank',
+              title: '',
+              url: source.hyperlinkUrl,
+            },
+            kind: 'set-hyperlink',
+            surface: 'object-hyperlink',
           }
         : {
-            id: 'remove-object-hyperlink',
-            objectId,
-            slideId,
+            hyperlink: {
+              target: '_blank',
+              title: '',
+              url: '',
+            },
+            kind: 'remove-hyperlink',
+            surface: 'object-hyperlink',
           },
-    ))
+      slideId,
+    }).map((command) => getSlideEditObjectHyperlinkCommandEffect(command)))
 }
 
 function createPPTObjectTransformImportEffect({
@@ -21292,30 +21306,48 @@ function getPPTObjectHyperlinkSourceFromDataTransfer(
 function getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTObjectHyperlinkImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-      storagePolicy: {
-        blockedSchemes: ['javascript', 'data', 'vbscript'],
-        maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
-      },
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    return {
-      fields: ['url'],
-      format: PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT,
-      hyperlinkUrl: pasteValue.kind === 'remove-hyperlink'
-        ? null
-        : normalizePPTElementHyperlinkUrl(pasteValue.hyperlink.url ?? ''),
-      jsonLength: candidate.text.length,
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+        storagePolicy: {
+          blockedSchemes: ['javascript', 'data', 'vbscript'],
+          maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
+        },
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return {
+        fields: ['url'],
+        format: PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT,
+        hyperlinkUrl: pasteValue.kind === 'remove-hyperlink'
+          ? null
+          : normalizePPTElementHyperlinkUrl(pasteValue.hyperlink.url ?? ''),
+        jsonLength: json.length,
+      }
     }
   }
 

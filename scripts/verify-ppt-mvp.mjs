@@ -24,6 +24,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-fill-opacity+json'
+const SLIDE_EDIT_OBJECT_HYPERLINK_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-hyperlink+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
 const SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE =
@@ -13160,6 +13162,68 @@ async function runObjectHyperlinkScenario(page) {
     {
       afterStandaloneHyperlinkPaste,
       afterStandaloneHyperlinkUndo,
+    },
+  )
+
+  const canvasMIMEUrl = 'https://example.com/canvas-mime-ppt-link'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ url })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_HYPERLINK_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(canvasMIMEUrl)})`)
+  await delay(120)
+
+  const afterCanvasMIMEHyperlinkPaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes canvas MIME object hyperlink through slide-edit command effect',
+    afterCanvasMIMEHyperlinkPaste.hyperlinkImportModel === 'ppt-object-hyperlink-import' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportFormat === 'application-json-ppt-object-hyperlink' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportSlide === 'slide-1' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportObjects === targetId &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportFields === 'url' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportCommands === 'update-object-hyperlink' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportCommandFields === 'url' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportCommandTargets === targetId &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportEnabled === 'true' &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportUrl === canvasMIMEUrl &&
+      afterCanvasMIMEHyperlinkPaste.hyperlinkImportJsonLength > 30 &&
+      afterCanvasMIMEHyperlinkPaste.command === 'update-object-hyperlink' &&
+      afterCanvasMIMEHyperlinkPaste.commandField === 'url' &&
+      afterCanvasMIMEHyperlinkPaste.commandValue === canvasMIMEUrl &&
+      afterCanvasMIMEHyperlinkPaste.selectedUrl === canvasMIMEUrl &&
+      afterCanvasMIMEHyperlinkPaste.thumbUrl === canvasMIMEUrl,
+    {
+      afterCanvasMIMEHyperlinkPaste,
+      afterStandaloneHyperlinkUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEHyperlinkUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'restores PPT object hyperlink after canvas MIME object hyperlink probe',
+    afterCanvasMIMEHyperlinkUndo.selectedUrl === importedUrl &&
+      afterCanvasMIMEHyperlinkUndo.thumbUrl === importedUrl,
+    {
+      afterCanvasMIMEHyperlinkPaste,
+      afterCanvasMIMEHyperlinkUndo,
     },
   )
 
