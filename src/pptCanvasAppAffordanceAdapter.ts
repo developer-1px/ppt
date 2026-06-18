@@ -60,6 +60,7 @@ import {
   getCanvasDataTransferImportRegistryMetadata,
   getCanvasEditableFieldKeyboardIntent,
   getCanvasEraserHitItemIds,
+  getCanvasExternalClipboardPasteCommandRoute,
   getCanvasFindInputKeyboardIntent,
   getCanvasFloatingAnchorForBounds,
   getCanvasImportedImageSize,
@@ -335,6 +336,8 @@ export const getPPTCanvasDataTransferImportRegistryMetadata =
   getCanvasDataTransferImportRegistryMetadata
 export const getPPTCanvasEditableFieldKeyboardIntent =
   getCanvasEditableFieldKeyboardIntent
+export const getPPTCanvasExternalClipboardPasteCommandRoute =
+  getCanvasExternalClipboardPasteCommandRoute
 export const getPPTCanvasFindInputKeyboardIntent =
   getCanvasFindInputKeyboardIntent
 export const getPPTCanvasFloatingAnchorForBounds =

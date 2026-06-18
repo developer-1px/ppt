@@ -606,6 +606,7 @@ import {
   getPPTCanvasContextMenuPosition,
   getPPTCanvasDataTransferText,
   getPPTCanvasEditableFieldKeyboardIntent,
+  getPPTCanvasExternalClipboardPasteCommandRoute,
   getPPTCanvasFindInputKeyboardIntent,
   getPPTCanvasFloatingAnchorForBounds,
   getPPTCanvasImageInsertCenter,
@@ -3961,9 +3962,10 @@ function App() {
         shape: selectedElement.shape,
       }
     : null
+  const hasInternalClipboard = (clipboard?.objects.length ?? 0) > 0
   const commandAvailability = useMemo<PPTCommandAvailability>(() => ({
     ...getPPTCanvasCommandAvailability({
-      canPaste: (clipboard?.objects.length ?? 0) > 0,
+      canPaste: hasInternalClipboard,
       canRedo: future.length > 0,
       canUndo: past.length > 0,
       config: PPT_CANVAS_COMMAND_CONFIG,
@@ -3982,7 +3984,6 @@ function App() {
     canCopyFormatting,
     canFlipSelection,
     canPasteFormatting,
-    clipboard?.objects.length,
     canSelectSameType,
     canTidySelection,
     future.length,
@@ -3990,6 +3991,7 @@ function App() {
     hasHiddenSelection,
     hasLockedItems,
     hasLockedSelection,
+    hasInternalClipboard,
     past.length,
     selection,
   ])
@@ -9571,7 +9573,16 @@ function App() {
   }
 
   function pasteSelection() {
-    if (!commandAvailability.paste || !clipboard) {
+    const pasteCommandRoute = getPPTCanvasExternalClipboardPasteCommandRoute({
+      hasInternalClipboard,
+    })
+
+    if (pasteCommandRoute === 'external-clipboard') {
+      void pastePPTClipboardImage()
+      return
+    }
+
+    if (pasteCommandRoute !== 'internal-clipboard' || !clipboard) {
       return
     }
 
