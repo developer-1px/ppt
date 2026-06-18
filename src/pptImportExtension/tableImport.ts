@@ -1,6 +1,5 @@
 import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
-  getPPTCanvasDataTransferText,
   getPPTCanvasTableColumnCount,
   getPPTCanvasTableComponentSize,
   getPPTCanvasTableFileFromDataTransfer,
@@ -188,14 +187,7 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
     return createPPTTableImportSourceFromCanvas(source)
   }
 
-  if (!dataTransfer) {
-    return null
-  }
-
-  return getPPTMarkdownTableSourceFromText(
-    getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/markdown' }) ||
-      getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/plain' }),
-  )
+  return null
 }
 
 export async function readPPTTableFileSource(file: Blob & { name?: string }) {
@@ -247,15 +239,16 @@ export function getPPTTableSourceFromHTML(value: string) {
 export function getPPTMarkdownTableSourceFromText(
   text: string,
 ): PPTTableImportSource | null {
-  const rows = getPPTMarkdownTableRows(text)
+  const source = getPPTCanvasTableSourceFromText(text, {
+    format: 'text-markdown',
+    name: 'Markdown Table',
+  })
 
-  return isPPTTableImportRows(rows)
-    ? {
-        format: 'text-markdown',
-        name: 'Markdown Table',
-        rows,
-      }
-    : null
+  if (!source) {
+    return null
+  }
+
+  return createPPTTableImportSourceFromCanvas(source)
 }
 
 export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
@@ -298,96 +291,6 @@ function getPPTTableImportSourceSize(source: PPTTableImportSource) {
     columnCount: getPPTTableColumnCount(normalizedRows),
     rowCount: normalizedRows.length,
   }, PPT_TABLE_SIZE_OPTIONS)
-}
-
-function getPPTMarkdownTableRows(text: string) {
-  const lines = text.split(/\r?\n/).map((line) => line.trim())
-
-  for (let index = 0; index < lines.length - 1; index += 1) {
-    if (!lines[index] || !lines[index + 1]) {
-      continue
-    }
-
-    const header = parsePPTMarkdownTableRow(lines[index])
-    const separator = parsePPTMarkdownTableRow(lines[index + 1])
-
-    if (
-      header.length < 2 ||
-      separator.length !== header.length ||
-      !separator.every(isPPTMarkdownTableSeparatorCell)
-    ) {
-      continue
-    }
-
-    const bodyRows: string[][] = []
-
-    for (let rowIndex = index + 2; rowIndex < lines.length; rowIndex += 1) {
-      if (!lines[rowIndex]) {
-        break
-      }
-
-      const row = parsePPTMarkdownTableRow(lines[rowIndex])
-
-      if (row.length !== header.length) {
-        break
-      }
-
-      bodyRows.push(row)
-    }
-
-    if (bodyRows.length === 0) {
-      continue
-    }
-
-    return [header, ...bodyRows]
-  }
-
-  return []
-}
-
-function parsePPTMarkdownTableRow(line: string) {
-  const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '')
-  const cells: string[] = []
-  let cell = ''
-  let escaped = false
-
-  for (const char of trimmed) {
-    if (escaped) {
-      cell += char
-      escaped = false
-      continue
-    }
-
-    if (char === '\\') {
-      escaped = true
-      continue
-    }
-
-    if (char === '|') {
-      cells.push(normalizePPTMarkdownTableCell(cell))
-      cell = ''
-      continue
-    }
-
-    cell += char
-  }
-
-  cells.push(normalizePPTMarkdownTableCell(cell))
-
-  return cells
-}
-
-function normalizePPTMarkdownTableCell(value: string) {
-  return value
-    .trim()
-    .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-}
-
-function isPPTMarkdownTableSeparatorCell(value: string) {
-  return /^:?-{3,}:?$/.test(value.replace(/\s+/g, ''))
 }
 
 function isPPTTableImportRows(rows: readonly (readonly string[])[]) {
