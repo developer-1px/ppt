@@ -590,9 +590,11 @@ import {
   cancelPPTCanvasDeferredFocus,
   capturePPTCanvasPointerFromEvent,
   centerPPTCanvasViewportAtWorldPoint,
+  copyPPTCanvasClipboardSelection,
   createPPTCanvasPastePositionKey,
   createPPTCanvasRichClipboardHTML,
   createPPTCanvasTabsDescriptor,
+  cutPPTCanvasClipboardSelection,
   downloadPPTCanvasTextFile,
   filterPPTCommandPaletteItems,
   fitPPTCanvasViewportToBounds,
@@ -658,6 +660,7 @@ import {
   PPT_WHEEL_VIEWPORT_MODEL,
   PPT_WHEEL_VIEWPORT_PAN_MODE,
   PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
+  pastePPTCanvasClipboardSelection,
   readPPTCanvasRichClipboardFromDataTransfer,
   resetPPTCanvasViewport,
   routePPTCanvasImagePasteReplace,
@@ -679,6 +682,7 @@ import {
   usePPTCanvasToolbarRovingFocus,
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
+  type PPTCanvasClipboardCommand,
   type PPTCanvasFloatingAnchor,
   type PPTCanvasImagePasteReplaceRoute,
   type PPTCanvasImagePasteReplaceTarget,
@@ -9509,7 +9513,7 @@ function App() {
     )
   }
 
-  function copySelection(operation: PPTClipboardOperation = 'copy') {
+  function writePPTSelectionClipboard(operation: PPTClipboardOperation) {
     const selected = getPPTCanvasSelectedItems({
       getItemId: (element) => element.id,
       items: activeSlide.elements,
@@ -9563,16 +9567,63 @@ function App() {
     })
   }
 
+  function runPPTClipboardCommand(command: PPTCanvasClipboardCommand) {
+    switch (command.kind) {
+      case 'copy':
+        writePPTSelectionClipboard('copy')
+        return []
+      case 'cut':
+        if (commandAvailability.cut) {
+          writePPTSelectionClipboard('cut')
+          deleteSelection()
+        }
+        return []
+      case 'paste':
+        runPPTPasteSelectionCommand()
+        return []
+      case 'clone':
+      case 'duplicate':
+        return []
+    }
+  }
+
+  function getPPTClipboardCommandPasteIndex() {
+    if (!clipboard) {
+      return 0
+    }
+
+    return getPPTCanvasPastePositionSession({
+      key: getPPTClipboardPastePositionKey(clipboard, activeSlide.id),
+      memory: clipboardPastePositionMemoryRef.current,
+    }).pasteIndex
+  }
+
+  function copySelection() {
+    copyPPTCanvasClipboardSelection({
+      pasteIndex: 0,
+      runClipboardCommand: runPPTClipboardCommand,
+    })
+  }
+
   function cutSelection() {
     if (!commandAvailability.cut) {
       return
     }
 
-    copySelection('cut')
-    deleteSelection()
+    cutPPTCanvasClipboardSelection({
+      pasteIndex: 0,
+      runClipboardCommand: runPPTClipboardCommand,
+    })
   }
 
   function pasteSelection() {
+    pastePPTCanvasClipboardSelection({
+      pasteIndex: getPPTClipboardCommandPasteIndex(),
+      runClipboardCommand: runPPTClipboardCommand,
+    })
+  }
+
+  function runPPTPasteSelectionCommand() {
     const pasteCommandRoute = getPPTCanvasExternalClipboardPasteCommandRoute({
       hasInternalClipboard,
     })

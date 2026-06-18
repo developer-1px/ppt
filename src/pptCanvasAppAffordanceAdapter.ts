@@ -46,6 +46,8 @@ import {
   createCanvasPastePositionKey,
   createCanvasRichClipboardHTML,
   createCanvasTabsDescriptor,
+  copyCanvasClipboardSelection,
+  cutCanvasClipboardSelection,
   createCanvasTextPasteItems,
   downloadCanvasTextFile,
   fitCanvasViewportToBounds,
@@ -128,6 +130,7 @@ import {
   shouldReleaseCanvasKeyboardTemporaryPan,
   stringifyCanvasRichClipboardPayload,
   normalizeCanvasTableRows,
+  pasteCanvasClipboardSelection,
   trapCanvasModalTabFocus,
   useCanvasMenuRovingFocus,
   useCanvasModalFocusLifecycle,
@@ -137,6 +140,7 @@ import {
   writeCanvasRichClipboardPayload,
   zoomCanvasViewport,
   type CanvasFloatingAnchor,
+  type CanvasClipboardCommand,
   type CanvasDeferredSelectorFocusInput,
   type CanvasDataTransferImportRegistry,
   type CanvasDataTransferImportRegistryResolver,
@@ -154,6 +158,7 @@ import {
   type CanvasRichClipboardReadFormat,
   type CanvasRichClipboardWriteMode,
   type CanvasRichTextPasteSource,
+  type RunCanvasClipboardCommand,
   type CanvasTabsDescriptor,
   type CanvasTableImportFormat,
   type CanvasTableImportSource,
@@ -313,6 +318,10 @@ export const createPPTCanvasPastePositionKey =
 export const createPPTCanvasRichClipboardHTML =
   createCanvasRichClipboardHTML
 export const createPPTCanvasTabsDescriptor = createCanvasTabsDescriptor
+export const copyPPTCanvasClipboardSelection =
+  copyCanvasClipboardSelection
+export const cutPPTCanvasClipboardSelection =
+  cutCanvasClipboardSelection
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
 export const fitPPTCanvasViewportToBounds = fitCanvasViewportToBounds
 export const focusPPTCanvasElement = focusCanvasElement
@@ -502,6 +511,8 @@ export const getPPTInlineEditHistoryDirectionFromInputType =
 export const insertPPTInlineEditText = insertInlineEditText
 export const isPPTInlineEditLineBreakInput = isInlineEditLineBreakInput
 export const normalizePPTCanvasTableRows = normalizeCanvasTableRows
+export const pastePPTCanvasClipboardSelection =
+  pasteCanvasClipboardSelection
 export const previewPPTCanvasPointerLaserInteraction =
   previewCanvasPointerLaserInteraction
 export const previewPPTCanvasPointerPanInteraction =
@@ -519,6 +530,7 @@ export const resolvePPTCanvasImageSourceNaturalSize =
 export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
+export type PPTCanvasClipboardCommand = CanvasClipboardCommand
 export type PPTCanvasDataTransferImportRegistry<
   TAction,
   TScope extends string,
@@ -569,5 +581,6 @@ export type PPTCanvasRichClipboardReadFormat =
   CanvasRichClipboardReadFormat
 export type PPTCanvasRichClipboardWriteMode =
   CanvasRichClipboardWriteMode
+export type RunPPTCanvasClipboardCommand = RunCanvasClipboardCommand
 export type PPTCanvasTabsDescriptor<TId extends string> =
   CanvasTabsDescriptor<TId>
