@@ -276,6 +276,7 @@ import {
   type SlideEditRailThumbnailDescriptor,
   type SlideEditResolvedLayoutPlaceholder,
   type SlideEditStyleClipboardBuiltInCategoryId,
+  type SlideEditStyleClipboardCategoryDescriptor,
   type SlideEditStyleClipboardCopyFormattingCommand,
   type SlideEditStyleClipboardDescriptor,
   type SlideEditStyleClipboardHostCommandEffect,
@@ -2490,10 +2491,12 @@ type PPTStyleClipboardCategory =
   | 'shape'
   | 'stroke'
   | 'text'
+  | 'text-run'
 type PPTStyleClipboardParagraph = Pick<
   PPTParagraph,
   'align' | 'bullet' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
 >
+type PPTStyleClipboardRunStyle = PPTTextRunStyle
 type PPTStyleClipboard = {
   categories: readonly PPTStyleClipboardCategory[]
   object: {
@@ -2510,9 +2513,12 @@ type PPTStyleClipboard = {
   sourceKind: PPTElement['kind']
   stroke?: PPTStroke
   text?: PPTTextStyle
+  runStyle?: PPTStyleClipboardRunStyle
   type: 'slide-style-clipboard'
 }
-type PPTStyleClipboardPackageCategory = SlideEditStyleClipboardBuiltInCategoryId
+type PPTStyleClipboardPackageCategory =
+  | SlideEditStyleClipboardBuiltInCategoryId
+  | 'text-run-style'
 type PPTStyleClipboardPackageStyle =
   | {
     categoryId: 'line-style'
@@ -2536,6 +2542,10 @@ type PPTStyleClipboardPackageStyle =
       paragraph?: PPTStyleClipboardParagraph
       text?: PPTTextStyle
     }
+  }
+  | {
+    categoryId: 'text-run-style'
+    value: PPTStyleClipboardRunStyle
   }
 type PPTStyleClipboardDescriptor = SlideEditStyleClipboardDescriptor<
   string,
@@ -2562,6 +2572,23 @@ type PPTStyleClipboardHostCommandEffect = SlideEditStyleClipboardHostCommandEffe
     unknown
   >
 >
+
+const PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY = 'text-run-style' as const
+const PPT_STYLE_CLIPBOARD_PACKAGE_CATEGORY_REGISTRY = [
+  ...getSlideEditStyleClipboardCategoryDescriptors({
+    categoryIds: [
+      'shape-fill',
+      'shape-stroke',
+      'line-style',
+      'text-style',
+      'object-effect',
+    ] satisfies readonly SlideEditStyleClipboardBuiltInCategoryId[],
+  }),
+  {
+    id: PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY,
+    label: 'Text Run Style',
+  },
+] satisfies readonly SlideEditStyleClipboardCategoryDescriptor<PPTStyleClipboardPackageCategory>[]
 type PPTColorSwatchChannel =
   | 'line-stroke'
   | 'shape-fill'
@@ -13104,6 +13131,17 @@ function App() {
         data-ppt-style-clipboard-package-categories={styleClipboard
           ? getPPTStyleClipboardPackageCategoryIds(styleClipboard).join(' ')
           : undefined}
+        data-ppt-style-clipboard-run-bold={styleClipboard?.runStyle?.bold === undefined
+          ? undefined
+          : String(styleClipboard.runStyle.bold)}
+        data-ppt-style-clipboard-run-color={styleClipboard?.runStyle?.color}
+        data-ppt-style-clipboard-run-italic={styleClipboard?.runStyle?.italic === undefined
+          ? undefined
+          : String(styleClipboard.runStyle.italic)}
+        data-ppt-style-clipboard-run-size={styleClipboard?.runStyle?.size}
+        data-ppt-style-clipboard-run-underline={styleClipboard?.runStyle?.underline === undefined
+          ? undefined
+          : String(styleClipboard.runStyle.underline)}
         data-ppt-style-clipboard-source-id={styleClipboard?.sourceId ?? undefined}
         data-ppt-style-clipboard-source-kind={styleClipboard?.sourceKind ?? undefined}
         data-ppt-style-clipboard-supported-targets={styleClipboardPasteAvailability?.targets
@@ -32495,8 +32533,11 @@ function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null 
   if (isPPTTextElement(element)) {
     const paragraph = element.textBody.paragraphs[0]
 
-    categories.push('text')
+    categories.push('text', 'text-run')
     clipboard.text = clonePPTTextStyle(getPPTTextElementStyle(element))
+    clipboard.runStyle = clonePPTTextRunStyle(
+      paragraph ? getPPTParagraphFallbackRunStyle(paragraph) : {},
+    )
 
     if (paragraph) {
       categories.push('paragraph')
@@ -32517,6 +32558,8 @@ function createPPTStyleClipboardDescriptor(
   slideId: string,
   clipboard: PPTStyleClipboard,
 ): PPTStyleClipboardDescriptor {
+  const categoryIds = getPPTStyleClipboardPackageCategoryIds(clipboard)
+
   return createSlideEditStyleClipboardDescriptor<
     string,
     string,
@@ -32525,7 +32568,8 @@ function createPPTStyleClipboardDescriptor(
     unknown
   >({
     categories: getSlideEditStyleClipboardCategoryDescriptors({
-      categoryIds: getPPTStyleClipboardPackageCategoryIds(clipboard),
+      categoryIds,
+      registry: PPT_STYLE_CLIPBOARD_PACKAGE_CATEGORY_REGISTRY,
     }),
     source: {
       kind: clipboard.sourceKind,
@@ -32555,6 +32599,10 @@ function getPPTStyleClipboardPackageCategoryIds(
 
   if (clipboard.text || clipboard.paragraph) {
     categoryIds.push('text-style')
+  }
+
+  if (clipboard.runStyle) {
+    categoryIds.push(PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY)
   }
 
   return uniquePPTCanvasValues(categoryIds)
@@ -32604,6 +32652,13 @@ function getPPTStyleClipboardPackageStyles(
     })
   }
 
+  if (clipboard.runStyle) {
+    styles.push({
+      categoryId: PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY,
+      value: clonePPTTextRunStyle(clipboard.runStyle),
+    })
+  }
+
   return styles
 }
 
@@ -32643,7 +32698,7 @@ function getPPTElementSupportedStyleClipboardCategoryIds(
   }
 
   if (isPPTTextElement(element)) {
-    categoryIds.push('text-style')
+    categoryIds.push('text-style', PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY)
   }
 
   return categoryIds
@@ -32743,6 +32798,23 @@ function applyPPTStyleClipboardToElement(
     }
   }
 
+  if (
+    isPPTTextElement(next) &&
+    clipboard.runStyle &&
+    appliedCategories.has(PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY)
+  ) {
+    next = {
+      ...next,
+      textBody: {
+        paragraphs: next.textBody.paragraphs.map((paragraph) => ({
+          ...paragraph,
+          runs: paragraph.runs.map((run) =>
+            applyPPTTextRunStyle(run, clipboard.runStyle ?? {})),
+        })),
+      },
+    }
+  }
+
   return next
 }
 
@@ -32763,6 +32835,30 @@ function clonePPTTextStyle(style: PPTTextStyle): PPTTextStyle {
     ...getDefaultPPTTextStyle(),
     ...style,
     ...(style.textInset ? { textInset: { ...style.textInset } } : {}),
+  }
+}
+
+function clonePPTTextRunStyle(style: PPTTextRunStyle): PPTTextRunStyle {
+  return {
+    ...(style.bold === undefined ? {} : { bold: style.bold }),
+    ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.italic === undefined ? {} : { italic: style.italic }),
+    ...(style.size === undefined ? {} : { size: style.size }),
+    ...(style.underline === undefined ? {} : { underline: style.underline }),
+  }
+}
+
+function applyPPTTextRunStyle(
+  run: PPTRun,
+  style: PPTTextRunStyle,
+): PPTRun {
+  return {
+    text: run.text,
+    ...(style.bold === true ? { bold: true } : {}),
+    ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.italic === true ? { italic: true } : {}),
+    ...(style.size === undefined ? {} : { size: style.size }),
+    ...(style.underline === true ? { underline: true } : {}),
   }
 }
 

@@ -5371,11 +5371,15 @@ function getPPTTextFormatPainterState(page, elementId) {
       paragraphSpacingBefore: paragraph?.getAttribute('data-ppt-spacing-before') ?? '',
       selected: element?.getAttribute('data-selected') ?? '',
       styleAlignItems: element?.style.alignItems ?? '',
+      styleClipboardCategories: stage?.getAttribute('data-ppt-style-clipboard-categories') ?? '',
       styleClipboardCommand: stage?.getAttribute('data-ppt-style-clipboard-command') ?? '',
       styleClipboardCommandApplications: stage?.getAttribute('data-ppt-style-clipboard-command-applications') ?? '',
       styleClipboardCommandTargets: stage?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
       styleClipboardCommandType: stage?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
       styleFontFamily: element?.style.fontFamily ?? '',
+      styleClipboardPackageCategories: stage?.getAttribute('data-ppt-style-clipboard-package-categories') ?? '',
+      styleClipboardRunItalic: stage?.getAttribute('data-ppt-style-clipboard-run-italic') ?? '',
+      styleClipboardRunUnderline: stage?.getAttribute('data-ppt-style-clipboard-run-underline') ?? '',
       stylePadding: element?.style.padding ?? '',
       text: element?.textContent ?? '',
       textAlign: element?.style.textAlign ?? '',
@@ -5976,7 +5980,16 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterFormatPaste.fontSize === `${afterSingleFormat.fontSize}px` &&
       summaryAfterFormatPaste.textAlign === 'right' &&
       summaryAfterFormatPaste.bulletList === 'true' &&
-      summaryAfterFormatPaste.paragraphBullet.length > 0,
+      summaryAfterFormatPaste.paragraphBullet.length > 0 &&
+      summaryAfterFormatPaste.italicRun === 'italic' &&
+      summaryAfterFormatPaste.italicRunCount > 0 &&
+      summaryAfterFormatPaste.underlineRun.includes('underline') &&
+      summaryAfterFormatPaste.underlineRunCount > 0 &&
+      summaryAfterFormatPaste.styleClipboardCategories.includes('text-run') &&
+      summaryAfterFormatPaste.styleClipboardPackageCategories.includes('text-run-style') &&
+      summaryAfterFormatPaste.styleClipboardCommandApplications.includes('text-run-style') &&
+      summaryAfterFormatPaste.styleClipboardRunItalic === 'true' &&
+      summaryAfterFormatPaste.styleClipboardRunUnderline === 'true',
     {
       afterSingleFormat,
       summaryAfterFormatPaste,
