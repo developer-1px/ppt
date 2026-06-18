@@ -12441,6 +12441,69 @@ async function runObjectHyperlinkScenario(page) {
     },
   )
 
+  const standaloneUrl = 'https://example.com/standalone-ppt-link'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ url })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(standaloneUrl)})`)
+  await delay(120)
+
+  const afterStandaloneHyperlinkPaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes standalone JSON object hyperlink through slide-edit command effect',
+    afterStandaloneHyperlinkPaste.hyperlinkImportModel === 'ppt-object-hyperlink-import' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportFormat === 'application-json-ppt-object-hyperlink' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportSlide === 'slide-1' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportObjects === targetId &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportFields === 'url' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportCommands === 'update-object-hyperlink' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportCommandFields === 'url' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportCommandTargets === targetId &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportCommandTypes === 'slide-command-effect' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportEnabled === 'true' &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportUrl === standaloneUrl &&
+      afterStandaloneHyperlinkPaste.hyperlinkImportJsonLength > 30 &&
+      afterStandaloneHyperlinkPaste.command === 'update-object-hyperlink' &&
+      afterStandaloneHyperlinkPaste.commandField === 'url' &&
+      afterStandaloneHyperlinkPaste.commandValue === standaloneUrl &&
+      afterStandaloneHyperlinkPaste.selectedUrl === standaloneUrl &&
+      afterStandaloneHyperlinkPaste.thumbUrl === standaloneUrl,
+    {
+      afterHyperlinkJSONRedo,
+      afterStandaloneHyperlinkPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneHyperlinkUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'undoes standalone JSON object hyperlink as one history step',
+    afterStandaloneHyperlinkUndo.selectedUrl === importedUrl &&
+      afterStandaloneHyperlinkUndo.thumbUrl === importedUrl,
+    {
+      afterStandaloneHyperlinkPaste,
+      afterStandaloneHyperlinkUndo,
+    },
+  )
+
   const metadataAltText = 'AI generated card linking to PPT reference.'
 
   await page.eval(`((url, altText) => {
@@ -12493,6 +12556,78 @@ async function runObjectHyperlinkScenario(page) {
     {
       afterMetadataPaste,
       afterRestore,
+    },
+  )
+
+  const standaloneMetadataUrl = 'https://example.com/standalone-ppt-metadata'
+  const standaloneMetadataAltText = 'Standalone metadata card description.'
+
+  await page.eval(`((url, altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      altText,
+      url,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(standaloneMetadataUrl)}, ${JSON.stringify(standaloneMetadataAltText)})`)
+  await delay(120)
+
+  const afterStandaloneMetadataPaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes standalone JSON object metadata into selected PPT object',
+    afterStandaloneMetadataPaste.objectMetadataImportModel === 'ppt-object-metadata-import' &&
+      afterStandaloneMetadataPaste.objectMetadataImportFormat === 'application-json-ppt-object-metadata' &&
+      afterStandaloneMetadataPaste.objectMetadataImportSlide === 'slide-1' &&
+      afterStandaloneMetadataPaste.objectMetadataImportObjects === targetId &&
+      afterStandaloneMetadataPaste.objectMetadataImportFields === 'hyperlinkUrl altText' &&
+      afterStandaloneMetadataPaste.objectMetadataImportCommands ===
+        'update-object-hyperlink update-object-accessibility' &&
+      afterStandaloneMetadataPaste.objectMetadataImportCommandFields === 'url altText' &&
+      afterStandaloneMetadataPaste.objectMetadataImportCommandTypes ===
+        'slide-command-effect slide-command-effect' &&
+      afterStandaloneMetadataPaste.objectMetadataImportHyperlinkUrl === standaloneMetadataUrl &&
+      afterStandaloneMetadataPaste.objectMetadataImportAltTextPresent === 'true' &&
+      afterStandaloneMetadataPaste.objectMetadataImportAltTextLength === standaloneMetadataAltText.length &&
+      afterStandaloneMetadataPaste.objectMetadataImportJsonLength > 80 &&
+      afterStandaloneMetadataPaste.command === 'update-object-hyperlink' &&
+      afterStandaloneMetadataPaste.commandField === 'url' &&
+      afterStandaloneMetadataPaste.commandValue === standaloneMetadataUrl &&
+      afterStandaloneMetadataPaste.accessibilityCommand === 'update-object-accessibility' &&
+      afterStandaloneMetadataPaste.accessibilityCommandField === 'altText' &&
+      afterStandaloneMetadataPaste.accessibilityCommandValue === standaloneMetadataAltText &&
+      afterStandaloneMetadataPaste.selectedUrl === standaloneMetadataUrl &&
+      afterStandaloneMetadataPaste.selectedAltText === standaloneMetadataAltText &&
+      afterStandaloneMetadataPaste.thumbUrl === standaloneMetadataUrl &&
+      afterStandaloneMetadataPaste.thumbAltText === standaloneMetadataAltText,
+    {
+      afterMetadataPaste,
+      afterStandaloneMetadataPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterStandaloneMetadataUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'undoes standalone JSON object metadata as one history step',
+    afterStandaloneMetadataUndo.selectedUrl === url &&
+      afterStandaloneMetadataUndo.selectedAltText === metadataAltText &&
+      afterStandaloneMetadataUndo.thumbUrl === url &&
+      afterStandaloneMetadataUndo.thumbAltText === metadataAltText,
+    {
+      afterMetadataPaste,
+      afterStandaloneMetadataPaste,
+      afterStandaloneMetadataUndo,
     },
   )
 
@@ -13552,6 +13687,77 @@ async function runObjectAltTextScenario(page) {
     {
       afterJSONRedo,
       afterJSONUndo,
+    },
+  )
+
+  const standaloneAltText = 'Standalone JSON object alt text'
+
+  await page.eval(`((altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ altText })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(standaloneAltText)})`)
+  await delay(120)
+
+  const afterStandaloneAltTextPaste = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'pastes standalone JSON object accessibility alt text through slide-edit command effect',
+    afterStandaloneAltTextPaste.importModel === 'ppt-object-accessibility-import' &&
+      afterStandaloneAltTextPaste.importFormat === 'application-json-ppt-object-accessibility' &&
+      afterStandaloneAltTextPaste.importSlide === 'slide-1' &&
+      afterStandaloneAltTextPaste.importObjects === imageId &&
+      afterStandaloneAltTextPaste.importFields === 'altText' &&
+      afterStandaloneAltTextPaste.importCommands === 'update-object-accessibility' &&
+      afterStandaloneAltTextPaste.importCommandFields === 'altText' &&
+      afterStandaloneAltTextPaste.importCommandTargets === imageId &&
+      afterStandaloneAltTextPaste.importCommandTypes === 'slide-command-effect' &&
+      afterStandaloneAltTextPaste.importCommandValues === standaloneAltText &&
+      afterStandaloneAltTextPaste.importAltTextLength === standaloneAltText.length &&
+      afterStandaloneAltTextPaste.importAltTextPresent === 'true' &&
+      afterStandaloneAltTextPaste.importJsonLength > 20 &&
+      afterStandaloneAltTextPaste.command === 'update-object-accessibility' &&
+      afterStandaloneAltTextPaste.commandField === 'altText' &&
+      afterStandaloneAltTextPaste.commandObject === imageId &&
+      afterStandaloneAltTextPaste.commandSlide === 'slide-1' &&
+      afterStandaloneAltTextPaste.commandType === 'slide-command-effect' &&
+      afterStandaloneAltTextPaste.commandValue === standaloneAltText &&
+      afterStandaloneAltTextPaste.altText === standaloneAltText &&
+      afterStandaloneAltTextPaste.descriptorAltText === standaloneAltText &&
+      afterStandaloneAltTextPaste.selectedAltText === standaloneAltText &&
+      afterStandaloneAltTextPaste.thumbAltText === standaloneAltText &&
+      afterStandaloneAltTextPaste.imageAlt === standaloneAltText,
+    {
+      afterJSONRedo,
+      afterStandaloneAltTextPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneAltTextUndo = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'undoes standalone JSON object accessibility alt text as one history step',
+    afterStandaloneAltTextUndo.altText === jsonAltText &&
+      afterStandaloneAltTextUndo.selectedAltText === jsonAltText &&
+      afterStandaloneAltTextUndo.imageAlt === jsonAltText,
+    {
+      afterStandaloneAltTextPaste,
+      afterStandaloneAltTextUndo,
     },
   )
 

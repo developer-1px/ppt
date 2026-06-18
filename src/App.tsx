@@ -19916,12 +19916,22 @@ function getPPTObjectAccessibilityPayloadValue(
     return value.objectAccessibility
   }
 
-  if (value.accessibility !== undefined) {
+  if (
+    value.accessibility !== undefined &&
+    !hasPPTObjectMetadataStandalonePayloadFields(value)
+  ) {
     return value.accessibility
   }
 
-  if (value.objectAltText !== undefined) {
+  if (
+    value.objectAltText !== undefined &&
+    !hasPPTObjectMetadataStandalonePayloadFields(value)
+  ) {
     return value.objectAltText
+  }
+
+  if (hasPPTObjectAccessibilityStandalonePayloadFields(value)) {
+    return value
   }
 
   return allowDirect &&
@@ -19932,6 +19942,15 @@ function getPPTObjectAccessibilityPayloadValue(
     )
     ? value
     : undefined
+}
+
+function hasPPTObjectAccessibilityStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.altText !== undefined ||
+    value.decorative !== undefined
+  ) && !hasPPTObjectMetadataStandalonePayloadFields(value)
 }
 
 function getPPTObjectAccessibilityAltTextFromJSONValue(
@@ -20053,6 +20072,7 @@ function getPPTObjectMetadataSourceFromJSONValue(
   const hyperlinkUrl = getPPTObjectMetadataHyperlinkURLFromJSONValue(
     payloadValue.hyperlink ??
       payloadValue.hyperlinkUrl ??
+      payloadValue.href ??
       payloadValue.url,
   )
   const altText = getPPTObjectMetadataAltTextFromJSONValue(
@@ -20121,7 +20141,25 @@ function getPPTObjectMetadataPayloadValue(
       : value.layerName
   }
 
+  if (hasPPTObjectMetadataStandalonePayloadFields(value)) {
+    return value
+  }
+
   return allowDirect ? value : null
+}
+
+function hasPPTObjectMetadataStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.url !== undefined ||
+    value.href !== undefined ||
+    value.hyperlink !== undefined ||
+    value.hyperlinkUrl !== undefined
+  ) && (
+    value.altText !== undefined ||
+    value.accessibility !== undefined
+  )
 }
 
 function getPPTObjectMetadataHyperlinkURLFromJSONValue(
@@ -20299,6 +20337,16 @@ function getPPTObjectHyperlinkPayloadValue(
     value.link === false
   ) {
     return value.link
+  }
+
+  if (
+    (
+      value.url !== undefined ||
+      value.href !== undefined
+    ) &&
+    !hasPPTObjectMetadataStandalonePayloadFields(value)
+  ) {
+    return value
   }
 
   if (
