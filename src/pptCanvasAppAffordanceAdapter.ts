@@ -53,6 +53,7 @@ import {
   getCanvasContextMenuPosition,
   getCanvasDataTransferText,
   getCanvasEditableFieldKeyboardIntent,
+  getCanvasEraserHitItemIds,
   getCanvasFindInputKeyboardIntent,
   getCanvasFloatingAnchorForBounds,
   getCanvasImportedImageSize,
@@ -62,6 +63,7 @@ import {
   getCanvasKeyboardSystemShortcutIntent,
   getCanvasKeyboardToolShortcutIntent,
   getCanvasKeyboardViewportShortcutIntent,
+  getCanvasMergedEraserHitIds,
   getCanvasMenuTriggerKeyboardIntent,
   getCanvasModalBackdropPointerIntent,
   getCanvasModalKeyboardIntent,
@@ -202,11 +204,6 @@ import {
   type CanvasPointerLaserInteraction,
 } from 'canvas/app/pointer-laser'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
-import {
-  getCanvasEraserHitItemIds,
-  getCanvasMergedEraserHitIds,
-} from 'canvas/app/eraser-hit-testing'
-
 export const PPT_COMMAND_PALETTE_ITEMS_MODEL =
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL
 export const PPT_CANVAS_IMAGE_IMPORT_MODEL = CANVAS_IMAGE_IMPORT_MODEL

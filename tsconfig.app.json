@@ -12,7 +12,6 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "canvas/app/command-palette-items": ["../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts"],
-      "canvas/app/eraser-hit-testing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts"],
       "canvas/app/pointer-drawing": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts"],
       "canvas/app/image-clipboard": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageClipboard.ts"],
       "canvas/app/image-import": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts"],

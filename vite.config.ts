@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
-const canvasEraserHitTestingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasEraserHitTesting.ts', import.meta.url))
 const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
 const canvasImageClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageClipboard.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
@@ -29,7 +28,6 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
-      { find: 'canvas/app/eraser-hit-testing', replacement: canvasEraserHitTestingEntry },
       { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
       { find: 'canvas/app/image-clipboard', replacement: canvasImageClipboardEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
