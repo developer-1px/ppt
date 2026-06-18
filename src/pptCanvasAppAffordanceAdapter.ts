@@ -87,6 +87,7 @@ import {
   getCanvasPointerTransformModifierState,
   getCanvasPresentationKeyboardIntent,
   getCanvasRadioTabIndex,
+  getCanvasRichClipboardJSONFromHTML,
   getCanvasResizeHandleDoubleClickIntent,
   getCanvasRichTextPasteSourceFromDataTransfer,
   getCanvasSelectionListModifierState,
@@ -357,6 +358,8 @@ export const createPPTCanvasPastePositionKey =
   createCanvasPastePositionKey
 export const createPPTCanvasRichClipboardHTML =
   createCanvasRichClipboardHTML
+export const getPPTCanvasRichClipboardJSONFromHTML =
+  getCanvasRichClipboardJSONFromHTML
 export const createPPTCanvasTabsDescriptor = createCanvasTabsDescriptor
 export const copyPPTCanvasClipboardSelection =
   copyCanvasClipboardSelection

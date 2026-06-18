@@ -632,6 +632,7 @@ import {
   getPPTCanvasPresentationKeyboardIntent,
   getPPTCanvasRadioTabIndex,
   getPPTCanvasResizeHandleDoubleClickIntent,
+  getPPTCanvasRichClipboardJSONFromHTML,
   getPPTCanvasSelectionListModifierState,
   getPPTCanvasTableInsertCenter,
   getPPTCanvasTabsKeyboardIntent,
@@ -19408,15 +19409,13 @@ function getPPTDeckHTMLSourceFromDataTransfer(
 function getPPTDeckHTMLSourceFromHTML(
   html: string,
 ): PPTDeckHTMLImportSource | null {
-  if (!html || typeof DOMParser === 'undefined') {
+  if (!html) {
     return null
   }
 
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const script = doc.querySelector<HTMLScriptElement>(
-    'script[type="application/json"][data-ppt-deck],script[data-ppt-deck]',
-  )
-  const json = script?.textContent?.trim() ?? ''
+  const json = getPPTCanvasRichClipboardJSONFromHTML(html, {
+    scriptAttribute: 'data-ppt-deck',
+  })?.trim() ?? ''
 
   if (!json) {
     return null
