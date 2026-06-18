@@ -136,6 +136,7 @@ import {
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
+  getSlideEditLayerPaneObjectStateJSONPasteValue,
   getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditInspectorSurface,
   getSlideEditObjectVisibilityCommandAvailability,
@@ -249,6 +250,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
+  SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
@@ -21312,6 +21314,13 @@ function getPPTObjectStateSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectStateSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -21355,6 +21364,76 @@ function getPPTObjectStateSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTObjectStateSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectStateImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_OBJECT_STATE_JSON_MIME_TYPE,
+    SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditLayerPaneObjectStateJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (!pasteValue) {
+        continue
+      }
+
+      return createPPTObjectStateSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
+}
+
+function createPPTObjectStateSourceFromSlideEditJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectStateJSONPasteValue>>,
+  jsonLength: number,
+): PPTObjectStateImportSource | null {
+  const state: PPTObjectStateImportSource['state'] = {}
+  const fields: PPTObjectStateImportField[] = []
+
+  if (pasteValue.visibility) {
+    state.visible = !pasteValue.visibility.isHidden
+    fields.push('visible')
+  }
+
+  if (pasteValue.lock) {
+    state.locked = pasteValue.lock.isLocked
+    fields.push('locked')
+  }
+
+  return fields.length === 0
+    ? null
+    : {
+        fields,
+        format: PPT_OBJECT_STATE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        state,
+      }
 }
 
 function getPPTObjectStateSourceFromText(

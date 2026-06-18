@@ -22,6 +22,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
+const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-state+json'
 
 const checks = []
 const browserErrors = []
@@ -18751,6 +18753,63 @@ async function runSelectionPaneScenario(page) {
     {
       afterStandaloneObjectStateHideLock,
       afterStandaloneObjectStateShowUnlock,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      hidden: true,
+      locked: true,
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEObjectStateHideLock =
+    await readPPTObjectStateImportState(page, layerTargetId)
+
+  record(
+    'pastes canvas MIME object visible and locked state into selected PPT object',
+    afterCanvasMIMEObjectStateHideLock.model === 'ppt-object-state-import' &&
+      afterCanvasMIMEObjectStateHideLock.format === 'application-json-ppt-object-state' &&
+      afterCanvasMIMEObjectStateHideLock.fields === 'visible locked' &&
+      afterCanvasMIMEObjectStateHideLock.commands === 'hide-objects lock-objects' &&
+      afterCanvasMIMEObjectStateHideLock.importVisible === 'false' &&
+      afterCanvasMIMEObjectStateHideLock.importLocked === 'true' &&
+      afterCanvasMIMEObjectStateHideLock.objectIds === layerTargetId &&
+      afterCanvasMIMEObjectStateHideLock.visibilityTargets === layerTargetId &&
+      afterCanvasMIMEObjectStateHideLock.lockTargets === layerTargetId &&
+      afterCanvasMIMEObjectStateHideLock.hidden === 'true' &&
+      afterCanvasMIMEObjectStateHideLock.locked === 'true' &&
+      !afterCanvasMIMEObjectStateHideLock.stageElementExists,
+    {
+      afterCanvasMIMEObjectStateHideLock,
+      afterStandaloneObjectStateShowUnlock,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterCanvasMIMEObjectStateUndo =
+    await readPPTObjectStateImportState(page, layerTargetId)
+
+  record(
+    'restores PPT object state after canvas MIME object state probe',
+    afterCanvasMIMEObjectStateUndo.hidden === 'false' &&
+      afterCanvasMIMEObjectStateUndo.locked === 'false' &&
+      afterCanvasMIMEObjectStateUndo.stageElementExists &&
+      afterCanvasMIMEObjectStateUndo.stageSelected === 'true',
+    {
+      afterCanvasMIMEObjectStateHideLock,
+      afterCanvasMIMEObjectStateUndo,
     },
   )
 
