@@ -117,6 +117,7 @@ import {
   createSlideEditStyleClipboardDescriptor,
   createSlideEditStyleClipboardPasteCommandEffect,
   createSlideEditThemeDescriptor,
+  createSlideEditSlideClipboardPasteCommandEffect,
   createSlideEditSlideClipboardPayload,
   createSlideEditTextFontFamilyDescriptor,
   createSlideEditTextFrameInsetDescriptor,
@@ -200,7 +201,9 @@ import {
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardKeyboardIntent,
   getSlideEditStyleClipboardPasteAvailability,
+  mapSlideEditSlideClipboardPasteSlides,
   parseSlideEditSlideClipboardPayload,
+  resolveSlideEditSlideClipboardPastePlacement,
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextAutoFitJSONPasteValue,
   getSlideEditTextAutoFitPasteCommandEffects,
@@ -378,6 +381,7 @@ import {
   type SlideEditSlideMetadataInspectorDescriptor,
   type SlideEditSlideMetadataReadModel,
   type SlideEditSlideMetadataUpdateCommand,
+  type SlideEditSlideClipboardPasteHostCommandEffect,
   type SlideEditSlideOrientation,
   type SlideEditSlideSizeDescriptor,
   type SlideEditStyleClipboardBuiltInCategoryId,
@@ -1435,6 +1439,8 @@ type PPTSlideClipboardPayload = {
   slide: PPTSlide
   sourceSlideId: string
 }
+type PPTSlideClipboardPasteCommandEffect =
+  SlideEditSlideClipboardPasteHostCommandEffect<string, string, PPTSlide>
 type PPTSlideClipboardFallbackHTMLSource = {
   htmlLength: number
   name: string
@@ -1457,6 +1463,14 @@ type PPTSlideClipboardEffect = {
   imported?: boolean
   jsonMimeType: typeof PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE
   model: typeof PPT_SLIDE_CLIPBOARD_MODEL
+  pasteAfterSlideId?: string | null
+  pasteCommandId?: PPTSlideClipboardPasteCommandEffect['payload']['id']
+  pasteCommandType?: PPTSlideClipboardPasteCommandEffect['type']
+  pasteInsertIndex?: number
+  pasteMappingCount?: number
+  pasteObjectMappingCount?: number
+  pasteSelectionSlideId?: string
+  pasteTargetSlideIds?: readonly string[]
   slideName: string
   sourceSlideId: string
   targetSlideId?: string
@@ -5377,38 +5391,71 @@ function App() {
       const targetSlideId = current.slides.some((slide) =>
         slide.id === activeSlide.id)
         ? activeSlide.id
-        : current.slides.at(-1)?.id
+        : current.slides.at(-1)?.id ?? null
+      const slideEditPayload = createPPTSlideEditClipboardPayload(payload)
 
-      if (!targetSlideId) {
+      if (!slideEditPayload) {
         return current
       }
 
       const id = createPPTSlideId(current)
       const slide = clonePPTSlide(payload.slide, id)
-      const result = insertPPTSlideAtTargetPlacement({
-        placement: 'after',
-        slide,
-        slides: current.slides,
-        targetSlideId,
+      const targetObjectIds = slide.elements.map((element) => element.id)
+      const placement = resolveSlideEditSlideClipboardPastePlacement({
+        slideOrder: current.slides.map((deckSlide) => deckSlide.id),
+        target: {
+          kind: 'after-slide',
+          slideId: targetSlideId,
+        },
+      })
+      const pasteEffect = createSlideEditSlideClipboardPasteCommandEffect({
+        payload: slideEditPayload,
+        placement,
+        remapPolicy: {
+          createObjectId: ({ objectIndex, sourceObjectId }) =>
+            targetObjectIds[objectIndex] ?? `${id}-${sourceObjectId}`,
+          createSlideId: () => id,
+          getObjectIds: (sourceSlide) =>
+            sourceSlide.elements.map((element) => element.id),
+        },
       })
 
-      if (!result) {
+      if (!pasteEffect) {
         return current
       }
 
-      pastedSlide = slide
+      const pastedSlides = mapSlideEditSlideClipboardPasteSlides({
+        pastePlan: pasteEffect.payload.pastePlan,
+        payload: slideEditPayload,
+        transform: ({ mapping }) =>
+          mapping.targetSlideId === slide.id ? slide : null,
+      })
+
+      if (pastedSlides.length === 0) {
+        return current
+      }
+
+      const nextSlides = [...current.slides]
+      nextSlides.splice(
+        pasteEffect.payload.pastePlan.insertIndex,
+        0,
+        ...pastedSlides,
+      )
+
+      pastedSlide = pastedSlides[0] ?? null
       setSlideClipboard(payload)
       setLastSlideClipboardEffect(createPPTSlideClipboardEffect({
         imported: Boolean(options.importFormat),
         importFormat: options.importFormat,
+        pasteEffect,
         payload,
-        targetSlideId: slide.id,
+        targetSlideId: pasteEffect.selection.slideId,
       }))
-      selectSlide(slide.id)
+      selectSlide(pasteEffect.selection.slideId)
 
       return {
         ...current,
-        slides: result.items,
+        slides: nextSlides,
       }
     })
 
@@ -13395,6 +13442,14 @@ function App() {
           : undefined}
         data-ppt-slide-clipboard-json-mime-type={lastSlideClipboardEffect?.jsonMimeType}
         data-ppt-slide-clipboard-model={lastSlideClipboardEffect?.model}
+        data-ppt-slide-clipboard-paste-after-slide={lastSlideClipboardEffect?.pasteAfterSlideId ?? undefined}
+        data-ppt-slide-clipboard-paste-command={lastSlideClipboardEffect?.pasteCommandId}
+        data-ppt-slide-clipboard-paste-command-type={lastSlideClipboardEffect?.pasteCommandType}
+        data-ppt-slide-clipboard-paste-insert-index={lastSlideClipboardEffect?.pasteInsertIndex}
+        data-ppt-slide-clipboard-paste-mapping-count={lastSlideClipboardEffect?.pasteMappingCount}
+        data-ppt-slide-clipboard-paste-object-mapping-count={lastSlideClipboardEffect?.pasteObjectMappingCount}
+        data-ppt-slide-clipboard-paste-selection-slide={lastSlideClipboardEffect?.pasteSelectionSlideId}
+        data-ppt-slide-clipboard-paste-target-slides={lastSlideClipboardEffect?.pasteTargetSlideIds?.join(' ')}
         data-ppt-slide-clipboard-slide-name={lastSlideClipboardEffect?.slideName}
         data-ppt-slide-clipboard-source-slide={lastSlideClipboardEffect?.sourceSlideId}
         data-ppt-slide-clipboard-target-slide={lastSlideClipboardEffect?.targetSlideId}
@@ -16072,6 +16127,7 @@ function createPPTSlideClipboardEffect({
   html,
   importFormat,
   imported,
+  pasteEffect,
   payload,
   targetSlideId,
   writeMode,
@@ -16079,10 +16135,13 @@ function createPPTSlideClipboardEffect({
   html?: string
   importFormat?: PPTRichClipboardImportFormat
   imported?: boolean
+  pasteEffect?: PPTSlideClipboardPasteCommandEffect
   payload: PPTSlideClipboardPayload
   targetSlideId?: string
   writeMode?: PPTRichClipboardWriteMode
 }): PPTSlideClipboardEffect {
+  const pastePlan = pasteEffect?.payload.pastePlan
+
   return {
     elementCount: payload.slide.elements.length,
     htmlLength: html?.length ?? createPPTSlideClipboardHTML(payload).length,
@@ -16090,6 +16149,17 @@ function createPPTSlideClipboardEffect({
     importFormat,
     jsonMimeType: PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE,
     model: PPT_SLIDE_CLIPBOARD_MODEL,
+    pasteAfterSlideId: pastePlan?.afterSlideId,
+    pasteCommandId: pasteEffect?.payload.id,
+    pasteCommandType: pasteEffect?.type,
+    pasteInsertIndex: pastePlan?.insertIndex,
+    pasteMappingCount: pastePlan?.mappings.length,
+    pasteObjectMappingCount: pastePlan?.mappings.reduce(
+      (total, mapping) => total + mapping.objectMappings.length,
+      0,
+    ),
+    pasteSelectionSlideId: pasteEffect?.selection.slideId,
+    pasteTargetSlideIds: pastePlan?.targetSlideIds,
     slideName: payload.slide.name,
     sourceSlideId: payload.sourceSlideId,
     targetSlideId,

@@ -21114,6 +21114,13 @@ async function runSlideManagementScenario(page) {
       afterPasteSlideButton.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
       afterPasteSlideButton.slideClipboardSourceSlide === afterDuplicate.activeId &&
       afterPasteSlideButton.slideClipboardTargetSlide === afterPasteSlideButton.activeId &&
+      afterPasteSlideButton.slideClipboardPasteAfterSlide === afterDuplicate.activeId &&
+      afterPasteSlideButton.slideClipboardPasteCommand === 'paste-slides' &&
+      afterPasteSlideButton.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterPasteSlideButton.slideClipboardPasteMappingCount === 1 &&
+      afterPasteSlideButton.slideClipboardPasteObjectMappingCount > 0 &&
+      afterPasteSlideButton.slideClipboardPasteSelectionSlide === afterPasteSlideButton.activeId &&
+      afterPasteSlideButton.slideClipboardPasteTargetSlides === afterPasteSlideButton.activeId &&
       afterPasteSlideButton.slideClipboardImported !== 'true',
     {
       afterDuplicate,
@@ -21150,6 +21157,13 @@ async function runSlideManagementScenario(page) {
       afterPasteSlideCustomJSON.slideClipboardImported === 'true' &&
       afterPasteSlideCustomJSON.slideClipboardImportFormat === 'custom-json' &&
       afterPasteSlideCustomJSON.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideCustomJSON.slideClipboardPasteAfterSlide === afterDuplicate.activeId &&
+      afterPasteSlideCustomJSON.slideClipboardPasteCommand === 'paste-slides' &&
+      afterPasteSlideCustomJSON.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterPasteSlideCustomJSON.slideClipboardPasteMappingCount === 1 &&
+      afterPasteSlideCustomJSON.slideClipboardPasteObjectMappingCount > 0 &&
+      afterPasteSlideCustomJSON.slideClipboardPasteSelectionSlide === afterPasteSlideCustomJSON.activeId &&
+      afterPasteSlideCustomJSON.slideClipboardPasteTargetSlides === afterPasteSlideCustomJSON.activeId &&
       afterPasteSlideCustomJSON.slideClipboardTargetSlide === afterPasteSlideCustomJSON.activeId,
     {
       afterDuplicate,
@@ -21186,6 +21200,13 @@ async function runSlideManagementScenario(page) {
       afterPasteSlideEditCustomJSON.slideClipboardImported === 'true' &&
       afterPasteSlideEditCustomJSON.slideClipboardImportFormat === 'custom-json' &&
       afterPasteSlideEditCustomJSON.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteAfterSlide === afterDuplicate.activeId &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteCommand === 'paste-slides' &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteMappingCount === 1 &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteObjectMappingCount > 0 &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteSelectionSlide === afterPasteSlideEditCustomJSON.activeId &&
+      afterPasteSlideEditCustomJSON.slideClipboardPasteTargetSlides === afterPasteSlideEditCustomJSON.activeId &&
       afterPasteSlideEditCustomJSON.slideClipboardTargetSlide === afterPasteSlideEditCustomJSON.activeId,
     {
       afterDuplicate,
@@ -23341,6 +23362,14 @@ function getSlideRailState(page) {
       slideClipboardImported: stage?.getAttribute('data-ppt-slide-clipboard-imported') ?? '',
       slideClipboardJsonMimeType: stage?.getAttribute('data-ppt-slide-clipboard-json-mime-type') ?? '',
       slideClipboardModel: stage?.getAttribute('data-ppt-slide-clipboard-model') ?? '',
+      slideClipboardPasteAfterSlide: stage?.getAttribute('data-ppt-slide-clipboard-paste-after-slide') ?? '',
+      slideClipboardPasteCommand: stage?.getAttribute('data-ppt-slide-clipboard-paste-command') ?? '',
+      slideClipboardPasteCommandType: stage?.getAttribute('data-ppt-slide-clipboard-paste-command-type') ?? '',
+      slideClipboardPasteInsertIndex: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-insert-index') ?? -1),
+      slideClipboardPasteMappingCount: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-mapping-count') ?? 0),
+      slideClipboardPasteObjectMappingCount: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-object-mapping-count') ?? 0),
+      slideClipboardPasteSelectionSlide: stage?.getAttribute('data-ppt-slide-clipboard-paste-selection-slide') ?? '',
+      slideClipboardPasteTargetSlides: stage?.getAttribute('data-ppt-slide-clipboard-paste-target-slides') ?? '',
       slideClipboardSlideName: stage?.getAttribute('data-ppt-slide-clipboard-slide-name') ?? '',
       slideClipboardSourceSlide: stage?.getAttribute('data-ppt-slide-clipboard-source-slide') ?? '',
       slideClipboardTargetSlide: stage?.getAttribute('data-ppt-slide-clipboard-target-slide') ?? '',
