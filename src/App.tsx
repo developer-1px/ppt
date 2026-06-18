@@ -1137,6 +1137,12 @@ const PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-run-italic' as const
 const PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-run-italic+json'
+const PPT_TEXT_RUN_UNDERLINE_IMPORT_MODEL =
+  'ppt-text-run-underline-import' as const
+const PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-run-underline' as const
+const PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-run-underline+json'
 const PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL =
   'ppt-text-paragraph-align-import' as const
 const PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT =
@@ -1597,6 +1603,17 @@ type PPTTextRunItalicImportSource = {
   format: typeof PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT
   italic: boolean
   jsonLength: number
+}
+type PPTTextRunUnderlineImportField =
+  | 'runUnderline'
+  | 'textRunUnderline'
+  | 'underline'
+  | 'value'
+type PPTTextRunUnderlineImportSource = {
+  fields: readonly PPTTextRunUnderlineImportField[]
+  format: typeof PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  underline: boolean
 }
 type PPTTextParagraphAlignImportField =
   | 'align'
@@ -2143,6 +2160,21 @@ type PPTTextRunItalicImportEffect = {
   objectIds: string
   runCount: number
   slideId: string
+}
+type PPTTextRunUnderlineImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_RUN_UNDERLINE_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
+  underline: string
 }
 type PPTTextParagraphAlignImportEffect = {
   align: string
@@ -3383,6 +3415,8 @@ function App() {
     useState<PPTTextBodyImportEffect | null>(null)
   const [lastTextRunItalicImportEffect, setLastTextRunItalicImportEffect] =
     useState<PPTTextRunItalicImportEffect | null>(null)
+  const [lastTextRunUnderlineImportEffect, setLastTextRunUnderlineImportEffect] =
+    useState<PPTTextRunUnderlineImportEffect | null>(null)
   const [lastTextParagraphAlignImportEffect, setLastTextParagraphAlignImportEffect] =
     useState<PPTTextParagraphAlignImportEffect | null>(null)
   const [lastTextParagraphBulletImportEffect, setLastTextParagraphBulletImportEffect] =
@@ -4498,6 +4532,17 @@ function App() {
       if (
         textRunItalicSource &&
         pastePPTTextRunItalicSource(textRunItalicSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textRunUnderlineSource =
+        getPPTTextRunUnderlineSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textRunUnderlineSource &&
+        pastePPTTextRunUnderlineSource(textRunUnderlineSource)
       ) {
         event.preventDefault()
         return
@@ -6341,6 +6386,56 @@ function App() {
                       runs: paragraph.runs.map((run) => ({
                         ...run,
                         italic: source.italic ? true : undefined,
+                      })),
+                    })),
+                  },
+                }
+              : element,
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextRunUnderlineSource(
+    source: PPTTextRunUnderlineImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    setLastTextRunUnderlineImportEffect(createPPTTextRunUnderlineImportEffect({
+      objectIds: textElements.map((element) => element.id),
+      runCount: textElements.reduce((count, element) =>
+        count + element.textBody.paragraphs.reduce(
+          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
+          0,
+        ), 0),
+      slideId: activeSlide.id,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          textElements.map((element) => element.id),
+          (element) =>
+            isPPTTextElement(element)
+              ? {
+                  ...element,
+                  textBody: {
+                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                      ...paragraph,
+                      runs: paragraph.runs.map((run) => ({
+                        ...run,
+                        underline: source.underline ? true : undefined,
                       })),
                     })),
                   },
@@ -12811,6 +12906,19 @@ function App() {
         data-ppt-text-run-italic-import-runs={lastTextRunItalicImportEffect?.runCount}
         data-ppt-text-run-italic-import-slide={lastTextRunItalicImportEffect?.slideId}
         data-ppt-text-run-italic-import-value={lastTextRunItalicImportEffect?.italic}
+        data-ppt-text-run-underline-import-command-fields={lastTextRunUnderlineImportEffect?.commandFields}
+        data-ppt-text-run-underline-import-command-ids={lastTextRunUnderlineImportEffect?.commandIds}
+        data-ppt-text-run-underline-import-command-targets={lastTextRunUnderlineImportEffect?.commandTargets}
+        data-ppt-text-run-underline-import-command-types={lastTextRunUnderlineImportEffect?.commandTypes}
+        data-ppt-text-run-underline-import-command-values={lastTextRunUnderlineImportEffect?.commandValues}
+        data-ppt-text-run-underline-import-fields={lastTextRunUnderlineImportEffect?.fields}
+        data-ppt-text-run-underline-import-format={lastTextRunUnderlineImportEffect?.format}
+        data-ppt-text-run-underline-import-json-length={lastTextRunUnderlineImportEffect?.jsonLength}
+        data-ppt-text-run-underline-import-model={lastTextRunUnderlineImportEffect?.model}
+        data-ppt-text-run-underline-import-objects={lastTextRunUnderlineImportEffect?.objectIds}
+        data-ppt-text-run-underline-import-runs={lastTextRunUnderlineImportEffect?.runCount}
+        data-ppt-text-run-underline-import-slide={lastTextRunUnderlineImportEffect?.slideId}
+        data-ppt-text-run-underline-import-value={lastTextRunUnderlineImportEffect?.underline}
         data-ppt-text-paragraph-align-import-categories={lastTextParagraphAlignImportEffect?.categories}
         data-ppt-text-paragraph-align-import-command={lastTextParagraphAlignImportEffect?.commandId}
         data-ppt-text-paragraph-align-import-command-targets={lastTextParagraphAlignImportEffect?.commandTargets}
@@ -16824,6 +16932,36 @@ function createPPTTextRunItalicImportEffect({
     objectIds: objectIds.join(' '),
     runCount,
     slideId,
+  }
+}
+
+function createPPTTextRunUnderlineImportEffect({
+  objectIds,
+  runCount,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  runCount: number
+  slideId: string
+  source: PPTTextRunUnderlineImportSource
+}): PPTTextRunUnderlineImportEffect {
+  const value = String(source.underline)
+
+  return {
+    commandFields: 'underline',
+    commandIds: 'update-text-run-style',
+    commandTargets: objectIds.join(' '),
+    commandTypes: 'slide-command-effect',
+    commandValues: value,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_RUN_UNDERLINE_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    runCount,
+    slideId,
+    underline: value,
   }
 }
 
@@ -22114,6 +22252,218 @@ function getPPTTextRunItalicImportValueFromJSONValue(
     case 'upright':
     case 'none':
     case 'no':
+      return false
+    default:
+      return undefined
+  }
+}
+
+function getPPTTextRunUnderlineSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextRunUnderlineSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunUnderlineSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextRunUnderlineImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextRunUnderlineSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextRunUnderlineSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextRunUnderlineSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextRunUnderlineSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextRunUnderlineImportSource | null {
+  const payload = getPPTTextRunUnderlinePayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const underline = getPPTTextRunUnderlineImportValueFromJSONValue(payload.value)
+
+  return underline === undefined
+    ? null
+    : {
+        fields: payload.fields,
+        format: PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT,
+        jsonLength,
+        underline,
+      }
+}
+
+function getPPTTextRunUnderlinePayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunUnderlineImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textRunUnderline',
+    'runUnderline',
+    'underline',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextRunUnderlineImportValueFromJSONValue(
+  value: unknown,
+): boolean | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'underline',
+      'runUnderline',
+      'textRunUnderline',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextRunUnderlineImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return true
+    }
+
+    if (value === 0) {
+      return false
+    }
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  switch (value.trim().replace(/[\s_]/g, '-').toLowerCase()) {
+    case '1':
+    case 'enabled':
+    case 'on':
+    case 'true':
+    case 'underline':
+    case 'underlined':
+    case 'yes':
+      return true
+    case '0':
+    case 'disabled':
+    case 'false':
+    case 'none':
+    case 'no':
+    case 'normal':
+    case 'off':
+    case 'regular':
+    case 'upright':
       return false
     default:
       return undefined

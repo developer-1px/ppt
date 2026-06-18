@@ -5411,6 +5411,19 @@ function getPPTTextFormatPainterState(page, elementId) {
       textRunItalicImportRuns: Number(stage?.getAttribute('data-ppt-text-run-italic-import-runs') ?? 0),
       textRunItalicImportSlide: stage?.getAttribute('data-ppt-text-run-italic-import-slide') ?? '',
       textRunItalicImportValue: stage?.getAttribute('data-ppt-text-run-italic-import-value') ?? '',
+      textRunUnderlineImportCommandFields: stage?.getAttribute('data-ppt-text-run-underline-import-command-fields') ?? '',
+      textRunUnderlineImportCommandIds: stage?.getAttribute('data-ppt-text-run-underline-import-command-ids') ?? '',
+      textRunUnderlineImportCommandTargets: stage?.getAttribute('data-ppt-text-run-underline-import-command-targets') ?? '',
+      textRunUnderlineImportCommandTypes: stage?.getAttribute('data-ppt-text-run-underline-import-command-types') ?? '',
+      textRunUnderlineImportCommandValues: stage?.getAttribute('data-ppt-text-run-underline-import-command-values') ?? '',
+      textRunUnderlineImportFields: stage?.getAttribute('data-ppt-text-run-underline-import-fields') ?? '',
+      textRunUnderlineImportFormat: stage?.getAttribute('data-ppt-text-run-underline-import-format') ?? '',
+      textRunUnderlineImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-underline-import-json-length') ?? 0),
+      textRunUnderlineImportModel: stage?.getAttribute('data-ppt-text-run-underline-import-model') ?? '',
+      textRunUnderlineImportObjects: stage?.getAttribute('data-ppt-text-run-underline-import-objects') ?? '',
+      textRunUnderlineImportRuns: Number(stage?.getAttribute('data-ppt-text-run-underline-import-runs') ?? 0),
+      textRunUnderlineImportSlide: stage?.getAttribute('data-ppt-text-run-underline-import-slide') ?? '',
+      textRunUnderlineImportValue: stage?.getAttribute('data-ppt-text-run-underline-import-value') ?? '',
       textParagraphAlignImportCategories: stage?.getAttribute('data-ppt-text-paragraph-align-import-categories') ?? '',
       textParagraphAlignImportCommand: stage?.getAttribute('data-ppt-text-paragraph-align-import-command') ?? '',
       textParagraphAlignImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-targets') ?? '',
@@ -5452,6 +5465,8 @@ function getPPTTextFormatPainterState(page, elementId) {
       textStyleImportTextInset: stage?.getAttribute('data-ppt-text-style-import-text-inset') ?? '',
       textStyleImportVerticalAlign: stage?.getAttribute('data-ppt-text-style-import-vertical-align') ?? '',
       top: element?.style.top ?? '',
+      underlineRun: element?.querySelector('[data-ppt-run-underline="true"]')?.style.textDecoration ?? '',
+      underlineRunCount: element?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
       verticalAlign: element?.getAttribute('data-ppt-vertical-align') ?? '',
       width: element?.style.width ?? '',
     }
@@ -6457,6 +6472,94 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunItalicPaste,
       summaryAfterTextRunItalicRedo,
       summaryAfterTextRunItalicUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunItalicRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('underline')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-run-underline+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunUnderlinePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text run underline JSON through run style command effect',
+    summaryAfterTextRunItalicRestore.italicRunCount === 0 &&
+      summaryAfterTextRunItalicRestore.underlineRunCount === 0 &&
+      summaryAfterTextRunUnderlinePaste.selected === 'true' &&
+      summaryAfterTextRunUnderlinePaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextRunUnderlinePaste.underlineRun.includes('underline') &&
+      summaryAfterTextRunUnderlinePaste.underlineRunCount > 0 &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportModel === 'ppt-text-run-underline-import' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportFormat === 'application-json-ppt-text-run-underline' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandFields === 'underline' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandValues === 'true' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportFields === 'value' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportJsonLength >= 10 &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportObjects === 's1-summary' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportRuns > 0 &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportSlide === 'slide-1' &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportValue === 'true',
+    {
+      summaryAfterTextRunItalicRestore,
+      summaryAfterTextRunUnderlinePaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunUnderlineUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunUnderlineRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text run underline JSON as one history step',
+    summaryAfterTextRunUnderlineUndo.underlineRunCount === 0 &&
+      summaryAfterTextRunUnderlineRedo.underlineRun.includes('underline') &&
+      summaryAfterTextRunUnderlineRedo.underlineRunCount > 0,
+    {
+      summaryAfterTextRunUnderlinePaste,
+      summaryAfterTextRunUnderlineRedo,
+      summaryAfterTextRunUnderlineUndo,
     },
   )
 
@@ -12865,21 +12968,12 @@ async function runTableImportScenario(page) {
     },
   )
 
-  await pressKey(page, {
-    code: 'KeyK',
-    key: 'k',
-    modifiers: 2,
-    windowsVirtualKeyCode: 75,
-  })
-  await delay(80)
-  await page.send('Input.insertText', { text: 'table' })
-  await delay(80)
-  await page.eval(`document.querySelector('[data-ppt-command-palette-item="tool:table"]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-insert-table]')?.click()`)
   await delay(100)
 
   const afterPaletteInsert = await getPPTTableState(page)
 
-  record('inserts PPT table from command palette', afterPaletteInsert.tableCount === afterInspectorEdit.tableCount + 1 && afterPaletteInsert.selectedKind === 'table' && afterPaletteInsert.selectedRows === 3 && afterPaletteInsert.selectedCols === 3 && !afterPaletteInsert.paletteOpen, {
+  record('inserts PPT table from toolbar affordance', afterPaletteInsert.tableCount === afterInspectorEdit.tableCount + 1 && afterPaletteInsert.selectedKind === 'table' && afterPaletteInsert.selectedRows === 3 && afterPaletteInsert.selectedCols === 3 && !afterPaletteInsert.paletteOpen, {
     afterInspectorEdit,
     afterPaletteInsert,
   })
@@ -13559,8 +13653,7 @@ async function runTextPasteScenario(page) {
     'undoes PPT textBody JSON paste as one history step',
     afterTextBodyJSONUndo.textBoxCount === beforeTextBodyJSONPaste.textBoxCount &&
       afterTextBodyJSONUndo.selectedId === beforeTextBodyJSONPaste.selectedId &&
-      afterTextBodyJSONUndo.selectedText.includes('Pasted plain text') &&
-      afterTextBodyJSONUndo.selectedText.includes('from clipboard') &&
+      afterTextBodyJSONUndo.selectedText === beforeTextBodyJSONPaste.selectedText &&
       afterTextBodyJSONUndo.redoEnabled,
     {
       afterTextBodyJSONPaste,
