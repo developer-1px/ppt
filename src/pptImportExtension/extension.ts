@@ -42,8 +42,7 @@ import {
   type PPTTableImportSource,
 } from './tableImport'
 import {
-  getPPTRichTextPasteSourceFromDataTransfer,
-  getPPTTextPasteSourcesFromDataTransfer,
+  getPPTTextPasteSourceCandidatesFromDataTransfer,
   type PPTRichTextPasteSource,
 } from './textPasteImport'
 import type {
@@ -346,9 +345,15 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
     id: 'rich-text-source',
     mode: 'exclusive',
     resolve: ({ dataTransfer }) => {
-      const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
+      for (const candidate of getPPTTextPasteSourceCandidatesFromDataTransfer(
+        dataTransfer,
+      )) {
+        if (candidate.kind === 'rich-text-source') {
+          return candidate
+        }
+      }
 
-      return source ? { kind: 'rich-text-source', source } : null
+      return null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
     supportedFormats: ['text/html', 'text/markdown', 'text/plain'],
@@ -370,8 +375,10 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
     id: 'text-source',
     mode: 'append',
     resolve: ({ dataTransfer }) =>
-      getPPTTextPasteSourcesFromDataTransfer(dataTransfer)
-        .map((text): PPTClipboardImportAction => ({ kind: 'text-source', text })),
+      getPPTTextPasteSourceCandidatesFromDataTransfer(dataTransfer)
+        .flatMap((candidate): PPTClipboardImportAction[] =>
+          candidate.kind === 'text-source' ? [candidate] : []
+        ),
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
     supportedFormats: ['text/plain'],
     title: 'Text source',

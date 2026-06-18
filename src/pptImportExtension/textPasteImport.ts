@@ -6,10 +6,12 @@ import {
 } from '../pptCanvasCoreAdapter'
 import {
   createPPTCanvasTextPasteItems,
-  getPPTCanvasRichTextPasteSourceFromDataTransfer,
+  getPPTCanvasTextPasteSourceCandidatesFromDataTransfer,
+  getPPTCanvasTextPasteSourceText,
   getPPTCanvasTextPasteSourcesFromDataTransfer,
   PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL,
   type PPTCanvasRichTextPasteSource,
+  type PPTCanvasTextPasteSource,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
   createPPTTextBody,
@@ -60,6 +62,15 @@ export type PPTRichTextPasteSource = {
   textBody: PPTTextBody
   underlineRunCount: number
 }
+export type PPTTextPasteSourceCandidate =
+  | {
+      kind: 'rich-text-source'
+      source: PPTRichTextPasteSource
+    }
+  | {
+      kind: 'text-source'
+      text: string
+    }
 
 const PPT_TEXT_PASTE_WIDTH = 460
 const PPT_TEXT_PASTE_LINE_HEIGHT = 38
@@ -94,16 +105,51 @@ export const PPT_TEXT_PASTE_IMPORT_MODEL = PPT_CANVAS_TEXT_PASTE_IMPORT_MODEL
 export const getPPTTextPasteSourcesFromDataTransfer =
   getPPTCanvasTextPasteSourcesFromDataTransfer
 
+export function getPPTTextPasteSourceCandidatesFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+): PPTTextPasteSourceCandidate[] {
+  return getPPTCanvasTextPasteSourceCandidatesFromDataTransfer(dataTransfer)
+    .flatMap((source) => {
+      const candidate = createPPTTextPasteSourceCandidate(source, {
+        html: dataTransfer?.getData('text/html') ?? '',
+      })
+
+      return candidate ? [candidate] : []
+    })
+}
+
 export function getPPTRichTextPasteSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ): PPTRichTextPasteSource | null {
-  const source = getPPTCanvasRichTextPasteSourceFromDataTransfer(dataTransfer)
+  for (const candidate of getPPTTextPasteSourceCandidatesFromDataTransfer(
+    dataTransfer,
+  )) {
+    if (candidate.kind === 'rich-text-source') {
+      return candidate.source
+    }
+  }
 
-  return source
-    ? createPPTRichTextPasteSource(source, {
-        html: dataTransfer?.getData('text/html') ?? '',
-      })
-    : null
+  return null
+}
+
+function createPPTTextPasteSourceCandidate(
+  source: PPTCanvasTextPasteSource,
+  {
+    html,
+  }: {
+    html: string
+  },
+): PPTTextPasteSourceCandidate | null {
+  if (source.format === 'text-plain') {
+    const text = getPPTCanvasTextPasteSourceText(source)
+
+    return text ? { kind: 'text-source', text } : null
+  }
+
+  return {
+    kind: 'rich-text-source',
+    source: createPPTRichTextPasteSource(source, { html }),
+  }
 }
 
 export function createPPTTextPasteElement({

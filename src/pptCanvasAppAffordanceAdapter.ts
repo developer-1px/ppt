@@ -95,6 +95,8 @@ import {
   getCanvasTableSourceFromText,
   getCanvasTabsKeyboardIntent,
   getCanvasTextPasteInsertPosition,
+  getCanvasTextPasteSourceCandidatesFromDataTransfer,
+  getCanvasTextPasteSourceText,
   getCanvasTextPasteSourcesFromDataTransfer,
   getCanvasWorldClientPoint,
   handleCanvasRadioGroupKeyDown,
@@ -479,6 +481,9 @@ export const routePPTCanvasTableImportTargetReplace =
   routeCanvasTableImportTargetReplace
 export const getPPTCanvasTextPasteSourcesFromDataTransfer =
   getCanvasTextPasteSourcesFromDataTransfer
+export const getPPTCanvasTextPasteSourceCandidatesFromDataTransfer =
+  getCanvasTextPasteSourceCandidatesFromDataTransfer
+export const getPPTCanvasTextPasteSourceText = getCanvasTextPasteSourceText
 export const getPPTCanvasTextPasteInsertPosition =
   getCanvasTextPasteInsertPosition
 export const routePPTCanvasTextPasteReplace =
