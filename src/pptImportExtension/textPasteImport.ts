@@ -6,7 +6,6 @@ import {
 } from '../pptCanvasCoreAdapter'
 import {
   createPPTCanvasTextPasteItems,
-  getPPTCanvasDataTransferText,
   getPPTCanvasTextPasteSourceCandidatesFromDataTransfer,
   getPPTCanvasTextPasteSourceText,
   getPPTCanvasTextPasteSourcesFromDataTransfer,
@@ -77,24 +76,6 @@ const PPT_TEXT_PASTE_WIDTH = 460
 const PPT_TEXT_PASTE_LINE_HEIGHT = 38
 const PPT_TEXT_PASTE_MIN_HEIGHT = 92
 const PPT_TEXT_PASTE_MAX_HEIGHT = 320
-const PPT_HTML_RICH_TEXT_BLOCK_TAGS = new Set([
-  'article',
-  'blockquote',
-  'br',
-  'div',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'li',
-  'main',
-  'ol',
-  'p',
-  'section',
-  'ul',
-])
 const PPT_RICH_TEXT_HYPERLINK_ALLOWED_SCHEMES = new Set([
   'http',
   'https',
@@ -111,12 +92,7 @@ export function getPPTTextPasteSourceCandidatesFromDataTransfer(
 ): PPTTextPasteSourceCandidate[] {
   return getPPTCanvasTextPasteSourceCandidatesFromDataTransfer(dataTransfer)
     .flatMap((source) => {
-      const candidate = createPPTTextPasteSourceCandidate(source, {
-        html: getPPTCanvasDataTransferText({
-          dataTransfer,
-          mimeType: 'text/html',
-        }),
-      })
+      const candidate = createPPTTextPasteSourceCandidate(source)
 
       return candidate ? [candidate] : []
     })
@@ -138,11 +114,6 @@ export function getPPTRichTextPasteSourceFromDataTransfer(
 
 function createPPTTextPasteSourceCandidate(
   source: PPTCanvasTextPasteSource,
-  {
-    html,
-  }: {
-    html: string
-  },
 ): PPTTextPasteSourceCandidate | null {
   if (source.format === 'text-plain') {
     const text = getPPTCanvasTextPasteSourceText(source)
@@ -152,7 +123,7 @@ function createPPTTextPasteSourceCandidate(
 
   return {
     kind: 'rich-text-source',
-    source: createPPTRichTextPasteSource(source, { html }),
+    source: createPPTRichTextPasteSource(source),
   }
 }
 
@@ -307,18 +278,15 @@ function isPPTTextPasteTextItem(
 
 function createPPTRichTextPasteSource(
   source: PPTCanvasRichTextPasteSource,
-  options: { html?: string } = {},
 ): PPTRichTextPasteSource {
-  const listKinds = getPPTHTMLRichTextParagraphListKinds(options.html ?? '')
   const hyperlinkUrl = getPPTRichTextSingleHyperlinkUrl(source)
   const textBody: PPTTextBody = {
-    paragraphs: source.paragraphs.map((paragraph, index): PPTParagraph => {
-      const bullet = listKinds[index] ?? paragraph.bullet
+    paragraphs: source.paragraphs.map((paragraph): PPTParagraph => {
       const align = normalizePPTRichTextParagraphAlign(paragraph.align)
 
       return {
         ...(align ? { align } : {}),
-        ...(bullet ? { bullet } : {}),
+        ...(paragraph.bullet ? { bullet: paragraph.bullet } : {}),
         ...(paragraph.lineHeight === undefined
           ? {}
           : { lineHeight: paragraph.lineHeight }),
@@ -363,68 +331,6 @@ function createPPTRichTextPasteSource(
     textBody,
     underlineRunCount: getPPTTextBodyRunCount(textBody, 'underline'),
   }
-}
-
-function getPPTHTMLRichTextParagraphListKinds(
-  html: string,
-): Array<PPTParagraph['bullet'] | undefined> {
-  if (!html || typeof DOMParser === 'undefined') {
-    return []
-  }
-
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-
-  doc.body.querySelectorAll('script, style, noscript')
-    .forEach((node) => node.remove())
-
-  return getPPTHTMLRichTextParagraphListKindsFromElement(doc.body)
-}
-
-function getPPTHTMLRichTextParagraphListKindsFromElement(
-  root: Element,
-): Array<PPTParagraph['bullet'] | undefined> {
-  const blockNodes = Array.from(root.children).filter(isPPTHTMLRichTextBlock)
-
-  if (blockNodes.length === 0) {
-    return root.textContent?.trim() ? [undefined] : []
-  }
-
-  return blockNodes.flatMap((node) =>
-    getPPTHTMLRichTextParagraphListKindFromBlock(node))
-}
-
-function getPPTHTMLRichTextParagraphListKindFromBlock(
-  node: Element,
-): Array<PPTParagraph['bullet'] | undefined> {
-  const tagName = node.tagName.toLowerCase()
-
-  if (tagName === 'br') {
-    return []
-  }
-
-  const nestedBlocks = Array.from(node.children).filter((child) =>
-    isPPTHTMLRichTextBlock(child) && child.tagName.toLowerCase() !== 'br')
-
-  if (nestedBlocks.length > 0 && !['li', 'p'].includes(tagName)) {
-    return nestedBlocks.flatMap((child) =>
-      getPPTHTMLRichTextParagraphListKindFromBlock(child))
-  }
-
-  if (!node.textContent?.trim()) {
-    return []
-  }
-
-  if (tagName !== 'li') {
-    return [undefined]
-  }
-
-  return [node.parentElement?.tagName.toLowerCase() === 'ol'
-    ? 'numbered'
-    : 'bullet']
-}
-
-function isPPTHTMLRichTextBlock(node: Element) {
-  return PPT_HTML_RICH_TEXT_BLOCK_TAGS.has(node.tagName.toLowerCase())
 }
 
 function getPPTRichTextSingleHyperlinkUrl(
