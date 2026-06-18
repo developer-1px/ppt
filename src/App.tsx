@@ -587,6 +587,7 @@ import {
   capturePPTCanvasPointerFromEvent,
   centerPPTCanvasViewportAtWorldPoint,
   copyPPTCanvasClipboardSelection,
+  createPPTCanvasDataTransferImportActionPlan,
   createPPTCanvasPastePositionKey,
   createPPTCanvasRichClipboardHTML,
   createPPTCanvasTabsDescriptor,
@@ -1137,6 +1138,10 @@ type PPTClipboardPastePositionEffect = {
   viewportCenter: Point | null
 }
 type PPTClipboardPastePositionMemory = PPTCanvasPastePositionMemory
+type PPTClipboardSourcePasteAction = {
+  kind: string
+  run: () => boolean
+}
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
 const PPT_RICH_CLIPBOARD_VERSION = 1
@@ -4494,6 +4499,282 @@ function App() {
     }
   })
 
+  function createPPTClipboardSourcePasteResolver<TSource>(
+    dataTransfer: DataTransfer | null,
+    kind: string,
+    getSource: (dataTransfer: DataTransfer | null) => TSource | null | undefined,
+    pasteSource: (source: TSource) => boolean,
+  ) {
+    return {
+      mode: 'append' as const,
+      resolve: (): PPTClipboardSourcePasteAction | null => {
+        const source = getSource(dataTransfer)
+
+        return source
+          ? {
+              kind,
+              run: () => pasteSource(source),
+            }
+          : null
+      },
+    }
+  }
+
+  function getPPTStructuredClipboardPasteActions(
+    dataTransfer: DataTransfer | null,
+  ) {
+    return createPPTCanvasDataTransferImportActionPlan<PPTClipboardSourcePasteAction>({
+      resolvers: [
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'slide-metadata-source',
+          getPPTSlideMetadataSourceFromDataTransfer,
+          pastePPTSlideMetadataSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'slide-layout-source',
+          getPPTSlideLayoutSourceFromDataTransfer,
+          pastePPTSlideLayoutSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'slide-transition-source',
+          getPPTSlideTransitionSourceFromDataTransfer,
+          pastePPTSlideTransitionSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-animation-source',
+          getPPTObjectAnimationSourceFromDataTransfer,
+          pastePPTObjectAnimationSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-style-source',
+          getPPTObjectStyleSourceFromDataTransfer,
+          pastePPTObjectStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-shadow-source',
+          getPPTObjectShadowSourceFromDataTransfer,
+          pastePPTObjectShadowSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-opacity-source',
+          getPPTObjectOpacitySourceFromDataTransfer,
+          pastePPTObjectOpacitySource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-fill-opacity-source',
+          getPPTObjectFillOpacitySourceFromDataTransfer,
+          pastePPTObjectFillOpacitySource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-corner-radius-source',
+          getPPTObjectCornerRadiusSourceFromDataTransfer,
+          pastePPTObjectCornerRadiusSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-stroke-line-style-source',
+          getPPTObjectStrokeLineStyleSourceFromDataTransfer,
+          pastePPTObjectStrokeLineStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'image-replace-source',
+          getPPTImageReplaceSourceFromDataTransfer,
+          pastePPTImageReplaceSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-metadata-source',
+          getPPTObjectMetadataSourceFromDataTransfer,
+          pastePPTObjectMetadataSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-accessibility-source',
+          getPPTObjectAccessibilitySourceFromDataTransfer,
+          pastePPTObjectAccessibilitySource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-hyperlink-source',
+          getPPTObjectHyperlinkSourceFromDataTransfer,
+          pastePPTObjectHyperlinkSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-state-source',
+          getPPTObjectStateSourceFromDataTransfer,
+          pastePPTObjectStateSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-layer-source',
+          getPPTObjectLayerSourceFromDataTransfer,
+          pastePPTObjectLayerSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'object-transform-source',
+          getPPTObjectTransformSourceFromDataTransfer,
+          pastePPTObjectTransformSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'color-swatch-source',
+          getPPTColorSwatchSourceFromDataTransfer,
+          pastePPTColorSwatchSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-style-source',
+          getPPTTextStyleSourceFromDataTransfer,
+          pastePPTTextStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-size-source',
+          getPPTTextRunSizeSourceFromDataTransfer,
+          pastePPTTextRunSizeSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-color-source',
+          getPPTTextRunColorSourceFromDataTransfer,
+          pastePPTTextRunColorSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-bold-source',
+          getPPTTextRunBoldSourceFromDataTransfer,
+          pastePPTTextRunBoldSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-italic-source',
+          getPPTTextRunItalicSourceFromDataTransfer,
+          pastePPTTextRunItalicSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-underline-source',
+          getPPTTextRunUnderlineSourceFromDataTransfer,
+          pastePPTTextRunUnderlineSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-paragraph-align-source',
+          getPPTTextParagraphAlignSourceFromDataTransfer,
+          pastePPTTextParagraphAlignSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-paragraph-bullet-source',
+          getPPTTextParagraphBulletSourceFromDataTransfer,
+          pastePPTTextParagraphBulletSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-paragraph-spacing-source',
+          getPPTTextParagraphSpacingSourceFromDataTransfer,
+          pastePPTTextParagraphSpacingSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-vertical-align-source',
+          getPPTTextVerticalAlignSourceFromDataTransfer,
+          pastePPTTextVerticalAlignSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-frame-inset-source',
+          getPPTTextFrameInsetSourceFromDataTransfer,
+          pastePPTTextFrameInsetSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-font-size-source',
+          getPPTTextFontSizeSourceFromDataTransfer,
+          pastePPTTextFontSizeSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-font-weight-source',
+          getPPTTextFontWeightSourceFromDataTransfer,
+          pastePPTTextFontWeightSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-font-family-source',
+          getPPTTextFontFamilySourceFromDataTransfer,
+          pastePPTTextFontFamilySource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-auto-fit-source',
+          getPPTTextAutoFitSourceFromDataTransfer,
+          pastePPTTextAutoFitSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-body-source',
+          getPPTTextBodySourceFromDataTransfer,
+          pastePPTTextBodySource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'table-rows-source',
+          getPPTTableRowsSourceFromDataTransfer,
+          pastePPTTableRowsSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'comment-source',
+          getPPTCommentSourceFromDataTransfer,
+          pastePPTCommentSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'image-crop-source',
+          getPPTImageCropSourceFromDataTransfer,
+          pastePPTImageCropSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'shape-style-source',
+          getPPTShapeStyleSourceFromDataTransfer,
+          pastePPTShapeStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'line-style-source',
+          getPPTLineStyleSourceFromDataTransfer,
+          pastePPTLineStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'slide-notes-source',
+          getPPTSlideNotesSourceFromDataTransfer,
+          pastePPTSlideNotesSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'media-json-source',
+          getPPTMediaJSONSourceFromDataTransfer,
+          pastePPTMediaJSONSource,
+        ),
+      ],
+    })
+  }
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (isPPTCanvasKeyboardTypingTarget(event.target)) {
@@ -4576,428 +4857,13 @@ function App() {
         return
       }
 
-      const slideMetadataSource =
-        getPPTSlideMetadataSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        slideMetadataSource &&
-        pastePPTSlideMetadataSource(slideMetadataSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const slideLayoutSource =
-        getPPTSlideLayoutSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        slideLayoutSource &&
-        pastePPTSlideLayoutSource(slideLayoutSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const slideTransitionSource =
-        getPPTSlideTransitionSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        slideTransitionSource &&
-        pastePPTSlideTransitionSource(slideTransitionSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectAnimationSource =
-        getPPTObjectAnimationSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectAnimationSource &&
-        pastePPTObjectAnimationSource(objectAnimationSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectStyleSource =
-        getPPTObjectStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectStyleSource &&
-        pastePPTObjectStyleSource(objectStyleSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectShadowSource =
-        getPPTObjectShadowSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectShadowSource &&
-        pastePPTObjectShadowSource(objectShadowSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectOpacitySource =
-        getPPTObjectOpacitySourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectOpacitySource &&
-        pastePPTObjectOpacitySource(objectOpacitySource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectFillOpacitySource =
-        getPPTObjectFillOpacitySourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectFillOpacitySource &&
-        pastePPTObjectFillOpacitySource(objectFillOpacitySource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectCornerRadiusSource =
-        getPPTObjectCornerRadiusSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectCornerRadiusSource &&
-        pastePPTObjectCornerRadiusSource(objectCornerRadiusSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectStrokeLineStyleSource =
-        getPPTObjectStrokeLineStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectStrokeLineStyleSource &&
-        pastePPTObjectStrokeLineStyleSource(objectStrokeLineStyleSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const imageReplaceSource =
-        getPPTImageReplaceSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        imageReplaceSource &&
-        pastePPTImageReplaceSource(imageReplaceSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectMetadataSource =
-        getPPTObjectMetadataSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectMetadataSource &&
-        pastePPTObjectMetadataSource(objectMetadataSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectAccessibilitySource =
-        getPPTObjectAccessibilitySourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectAccessibilitySource &&
-        pastePPTObjectAccessibilitySource(objectAccessibilitySource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectHyperlinkSource =
-        getPPTObjectHyperlinkSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectHyperlinkSource &&
-        pastePPTObjectHyperlinkSource(objectHyperlinkSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectStateSource =
-        getPPTObjectStateSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectStateSource &&
-        pastePPTObjectStateSource(objectStateSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectLayerSource =
-        getPPTObjectLayerSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectLayerSource &&
-        pastePPTObjectLayerSource(objectLayerSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const objectTransformSource =
-        getPPTObjectTransformSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        objectTransformSource &&
-        pastePPTObjectTransformSource(objectTransformSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const colorSwatchSource =
-        getPPTColorSwatchSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        colorSwatchSource &&
-        pastePPTColorSwatchSource(colorSwatchSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textStyleSource =
-        getPPTTextStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (textStyleSource && pastePPTTextStyleSource(textStyleSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const textRunSizeSource =
-        getPPTTextRunSizeSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textRunSizeSource &&
-        pastePPTTextRunSizeSource(textRunSizeSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textRunColorSource =
-        getPPTTextRunColorSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textRunColorSource &&
-        pastePPTTextRunColorSource(textRunColorSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textRunBoldSource =
-        getPPTTextRunBoldSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textRunBoldSource &&
-        pastePPTTextRunBoldSource(textRunBoldSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textRunItalicSource =
-        getPPTTextRunItalicSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textRunItalicSource &&
-        pastePPTTextRunItalicSource(textRunItalicSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textRunUnderlineSource =
-        getPPTTextRunUnderlineSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textRunUnderlineSource &&
-        pastePPTTextRunUnderlineSource(textRunUnderlineSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textParagraphAlignSource =
-        getPPTTextParagraphAlignSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textParagraphAlignSource &&
-        pastePPTTextParagraphAlignSource(textParagraphAlignSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textParagraphBulletSource =
-        getPPTTextParagraphBulletSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textParagraphBulletSource &&
-        pastePPTTextParagraphBulletSource(textParagraphBulletSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textParagraphSpacingSource =
-        getPPTTextParagraphSpacingSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textParagraphSpacingSource &&
-        pastePPTTextParagraphSpacingSource(textParagraphSpacingSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textVerticalAlignSource =
-        getPPTTextVerticalAlignSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textVerticalAlignSource &&
-        pastePPTTextVerticalAlignSource(textVerticalAlignSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textFrameInsetSource =
-        getPPTTextFrameInsetSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textFrameInsetSource &&
-        pastePPTTextFrameInsetSource(textFrameInsetSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textFontSizeSource =
-        getPPTTextFontSizeSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textFontSizeSource &&
-        pastePPTTextFontSizeSource(textFontSizeSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textFontWeightSource =
-        getPPTTextFontWeightSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textFontWeightSource &&
-        pastePPTTextFontWeightSource(textFontWeightSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textFontFamilySource =
-        getPPTTextFontFamilySourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textFontFamilySource &&
-        pastePPTTextFontFamilySource(textFontFamilySource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textAutoFitSource =
-        getPPTTextAutoFitSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        textAutoFitSource &&
-        pastePPTTextAutoFitSource(textAutoFitSource)
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const textBodySource =
-        getPPTTextBodySourceFromDataTransfer(event.clipboardData)
-
-      if (textBodySource && pastePPTTextBodySource(textBodySource)) {
-        event.preventDefault()
-        return
-      }
-
-      const tableRowsSource =
-        getPPTTableRowsSourceFromDataTransfer(event.clipboardData)
-
-      if (tableRowsSource && pastePPTTableRowsSource(tableRowsSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const commentSource =
-        getPPTCommentSourceFromDataTransfer(event.clipboardData)
-
-      if (commentSource && pastePPTCommentSource(commentSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const imageCropSource =
-        getPPTImageCropSourceFromDataTransfer(event.clipboardData)
-
-      if (imageCropSource && pastePPTImageCropSource(imageCropSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const shapeStyleSource =
-        getPPTShapeStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (shapeStyleSource && pastePPTShapeStyleSource(shapeStyleSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const lineStyleSource =
-        getPPTLineStyleSourceFromDataTransfer(event.clipboardData)
-
-      if (lineStyleSource && pastePPTLineStyleSource(lineStyleSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const slideNotesSource =
-        getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
-
-      if (slideNotesSource && pastePPTSlideNotesSource(slideNotesSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const mediaJSONSource =
-        getPPTMediaJSONSourceFromDataTransfer(event.clipboardData)
-
-      if (mediaJSONSource && pastePPTMediaJSONSource(mediaJSONSource)) {
-        event.preventDefault()
-        return
+      for (const action of getPPTStructuredClipboardPasteActions(
+        event.clipboardData,
+      )) {
+        if (action.run()) {
+          event.preventDefault()
+          return
+        }
       }
 
       const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
