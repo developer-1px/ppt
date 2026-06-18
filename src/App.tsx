@@ -145,11 +145,13 @@ import {
   getSlideEditObjectFillOpacityCommandEffect,
   getSlideEditObjectFillOpacityJSONPasteValue,
   getSlideEditObjectHyperlinkCommandEffect,
+  getSlideEditObjectHyperlinkJSONPasteValue,
   getSlideEditObjectImageCropCommandEffect,
   getSlideEditObjectImageCropPositionCSS,
   getSlideEditObjectImageReplaceCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
+  getSlideEditObjectOpacityJSONPasteValue,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
   getSlideEditObjectShadowJSONPasteValue,
@@ -20182,6 +20184,13 @@ function getPPTObjectOpacitySourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -20221,6 +20230,33 @@ function getPPTObjectOpacitySourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectOpacityImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_OPACITY_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return {
+      fields: ['opacity'],
+      format: PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
+      opacity: normalizePPTElementOpacity(pasteValue.value),
     }
   }
 
@@ -20794,6 +20830,13 @@ function getPPTObjectHyperlinkSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -20833,6 +20876,39 @@ function getPPTObjectHyperlinkSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectHyperlinkImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+      storagePolicy: {
+        blockedSchemes: ['javascript', 'data', 'vbscript'],
+        maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
+      },
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return {
+      fields: ['url'],
+      format: PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT,
+      hyperlinkUrl: pasteValue.kind === 'remove-hyperlink'
+        ? null
+        : normalizePPTElementHyperlinkUrl(pasteValue.hyperlink.url ?? ''),
+      jsonLength: candidate.text.length,
     }
   }
 
