@@ -596,6 +596,7 @@ import {
   createPPTCanvasTabsDescriptor,
   cutPPTCanvasClipboardSelection,
   downloadPPTCanvasTextFile,
+  executePPTCanvasClipboardCommand,
   filterPPTCommandPaletteItems,
   fitPPTCanvasViewportToBounds,
   focusPPTCanvasElement,
@@ -9513,15 +9514,18 @@ function App() {
     )
   }
 
-  function writePPTSelectionClipboard(operation: PPTClipboardOperation) {
+  function writePPTSelectionClipboard(
+    operation: PPTClipboardOperation,
+    sourceSelection: readonly string[] = selection,
+  ) {
     const selected = getPPTCanvasSelectedItems({
       getItemId: (element) => element.id,
       items: activeSlide.elements,
-      selection,
+      selection: [...sourceSelection],
     })
 
     if (selected.length === 0) {
-      return
+      return false
     }
 
     const payload = createPPTClipboardPayload({
@@ -9565,17 +9569,129 @@ function App() {
             }
           : current)
     })
+    return true
+  }
+
+  function executePPTCanvasClipboardSelectionCommand(
+    command: Extract<PPTCanvasClipboardCommand, { kind: 'copy' | 'cut' }>,
+  ) {
+    const operation: PPTClipboardOperation =
+      command.kind === 'cut' ? 'cut' : 'copy'
+
+    executePPTCanvasClipboardCommand<PPTElement>({
+      command,
+      context: {
+        commandAdapter,
+        commitItemsChange: (change, selectionHistory) => {
+          switch (change.type) {
+            case 'add':
+              if (change.items.length === 0) {
+                return false
+              }
+
+              setSelection(
+                selectionHistory?.after ?? change.items.map((item) => item.id),
+              )
+              commitDeck((current) =>
+                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+                  ...slide,
+                  elements: syncPPTLineConnections(
+                    [...slide.elements, ...change.items],
+                    getPPTSelectedLineIds(
+                      [...slide.elements, ...change.items],
+                      selectionHistory?.after ??
+                        change.items.map((item) => item.id),
+                    ),
+                  ),
+                })))
+              return true
+            case 'remove-selection': {
+              const result = deletePPTCanvasCommand({
+                adapter: commandAdapter,
+                config: PPT_CANVAS_COMMAND_CONFIG,
+                items: activeSlide.elements,
+                selection: change.selection,
+              })
+
+              if (!result) {
+                return false
+              }
+
+              setSelection(selectionHistory?.after ?? result.selection)
+              commitDeck((current) =>
+                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+                  ...slide,
+                  elements: syncPPTLineConnections(
+                    result.items,
+                    getPPTSelectedLineIds(
+                      result.items,
+                      selectionHistory?.after ?? result.selection,
+                    ),
+                  ),
+                })))
+              return true
+            }
+            case 'transform':
+              setSelection(selectionHistory?.after ?? selection)
+              commitDeck((current) =>
+                updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+                  ...slide,
+                  elements: syncPPTLineConnections(
+                    change.afterItems,
+                    getPPTSelectedLineIds(
+                      change.afterItems,
+                      selectionHistory?.after ?? selection,
+                    ),
+                  ),
+                })))
+              return true
+          }
+        },
+        commitSelection: (action) => {
+          setSelection((current) =>
+            typeof action === 'function' ? action(current) : [...action])
+          return true
+        },
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        copyItemsToClipboard: (sourceSelection) =>
+          writePPTSelectionClipboard(operation, sourceSelection),
+        createId: createPPTElementIdFactory(activeSlide),
+        getClipboardBounds: getPPTElementsBounds,
+        getClipboardItems: () => clipboard ? [...clipboard.objects] : [],
+        items: activeSlide.elements,
+        selection,
+        setClipboardItems: (items) => {
+          setClipboard(createPPTClipboardPayload({
+            objects: [...items],
+            operation,
+            selectedObjectIds: items.map((item) => item.id),
+            sourceSlideId: activeSlide.id,
+          }))
+          return true
+        },
+        setEditing: (editing) => {
+          if (typeof editing === 'function') {
+            setEditingId((current) =>
+              editing(current ? { id: current, value: '' } : null)?.id ?? null)
+            return
+          }
+
+          setEditingId(editing?.id ?? null)
+        },
+        stageElement: canvasStageElement,
+        viewport,
+      },
+    })
   }
 
   function runPPTClipboardCommand(command: PPTCanvasClipboardCommand) {
     switch (command.kind) {
       case 'copy':
-        writePPTSelectionClipboard('copy')
+        executePPTCanvasClipboardSelectionCommand(command)
         return []
       case 'cut':
         if (commandAvailability.cut) {
-          writePPTSelectionClipboard('cut')
-          deleteSelection()
+          executePPTCanvasClipboardSelectionCommand(command)
         }
         return []
       case 'paste':

@@ -43,6 +43,7 @@ import {
   createCanvasDataTransferImportRegistry,
   createCanvasExternalClipboardImagePasteActionResolver,
   createCanvasExternalClipboardPasteActionPlan,
+  createCanvasClipboardCommandEffectPlan,
   createCanvasPastePositionKey,
   createCanvasRichClipboardHTML,
   createCanvasTabsDescriptor,
@@ -130,6 +131,8 @@ import {
   shouldReleaseCanvasKeyboardTemporaryPan,
   stringifyCanvasRichClipboardPayload,
   normalizeCanvasTableRows,
+  applyCanvasClipboardCommandEffect,
+  executeCanvasClipboardCommand,
   pasteCanvasClipboardSelection,
   trapCanvasModalTabFocus,
   useCanvasMenuRovingFocus,
@@ -141,6 +144,11 @@ import {
   zoomCanvasViewport,
   type CanvasFloatingAnchor,
   type CanvasClipboardCommand,
+  type CanvasClipboardCommandEffect,
+  type CanvasClipboardCommandEffectContext,
+  type CanvasClipboardCommandEffectPlanContext,
+  type CanvasClipboardCommandExecutionContext,
+  type CanvasClipboardCommandExecutionResult,
   type CanvasDeferredSelectorFocusInput,
   type CanvasDataTransferImportRegistry,
   type CanvasDataTransferImportRegistryResolver,
@@ -303,6 +311,10 @@ export const capturePPTCanvasPointerFromEvent =
   captureCanvasPointerFromEvent
 export const centerPPTCanvasViewportAtWorldPoint =
   centerCanvasViewportAtWorldPoint
+export const applyPPTCanvasClipboardCommandEffect =
+  applyCanvasClipboardCommandEffect
+export const createPPTCanvasClipboardCommandEffectPlan =
+  createCanvasClipboardCommandEffectPlan
 export const createPPTCanvasDataTransferImportActionPlan =
   createCanvasDataTransferImportActionPlan
 export const createPPTCanvasDataTransferImportActionPlanFromRegistry =
@@ -323,6 +335,8 @@ export const copyPPTCanvasClipboardSelection =
 export const cutPPTCanvasClipboardSelection =
   cutCanvasClipboardSelection
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
+export const executePPTCanvasClipboardCommand =
+  executeCanvasClipboardCommand
 export const fitPPTCanvasViewportToBounds = fitCanvasViewportToBounds
 export const focusPPTCanvasElement = focusCanvasElement
 export function focusPPTCanvasElementBySelectorOnNextFrame<
@@ -531,6 +545,20 @@ export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
 export type PPTCanvasClipboardCommand = CanvasClipboardCommand
+export type PPTCanvasClipboardCommandEffect<TItem extends { id: string }> =
+  CanvasClipboardCommandEffect<TItem>
+export type PPTCanvasClipboardCommandEffectContext<
+  TItem extends { id: string },
+> = CanvasClipboardCommandEffectContext<TItem>
+export type PPTCanvasClipboardCommandEffectPlanContext<
+  TItem extends { id: string },
+> = CanvasClipboardCommandEffectPlanContext<TItem>
+export type PPTCanvasClipboardCommandExecutionContext<
+  TItem extends { id: string },
+> = CanvasClipboardCommandExecutionContext<TItem>
+export type PPTCanvasClipboardCommandExecutionResult<
+  TItem extends { id: string },
+> = CanvasClipboardCommandExecutionResult<TItem>
 export type PPTCanvasDataTransferImportRegistry<
   TAction,
   TScope extends string,
