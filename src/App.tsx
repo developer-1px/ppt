@@ -689,6 +689,7 @@ import {
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
   PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+  PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   type PPTCanvasAppItemsChangeTransformer,
   type PPTCanvasClipboardCommand,
@@ -1555,7 +1556,7 @@ const PPT_RICH_CLIPBOARD_FORMATS = [
   PPT_RICH_CLIPBOARD_JSON_MIME_TYPE,
   'text/html',
   'image/svg+xml',
-  'text/plain',
+  PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
 ] as const
 type PPTRichClipboardImportFormat = PPTCanvasRichClipboardReadFormat
 type PPTRichClipboardWriteMode = PPTCanvasRichClipboardWriteMode | 'pending'
@@ -19400,7 +19401,10 @@ function getPPTDeckHTMLSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   const html = readPPTDataTransferText(dataTransfer, 'text/html')
-  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain')
+  const plainText = readPPTDataTransferText(
+    dataTransfer,
+    PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+  )
 
   return getPPTDeckHTMLSourceFromHTML(html) ??
     getPPTDeckHTMLSourceFromHTML(plainText)
@@ -29068,7 +29072,7 @@ function getPPTTableRowsTableImportTextLengthFromDataTransfer(
     'text/html',
     'text/markdown',
     'text/x-markdown',
-    'text/plain',
+    PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
   ] as const) {
     const text = readPPTDataTransferText(dataTransfer, mimeType).trim()
 
@@ -30149,7 +30153,10 @@ function getPPTDeckFallbackHTMLSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   const html = readPPTDataTransferText(dataTransfer, 'text/html')
-  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain')
+  const plainText = readPPTDataTransferText(
+    dataTransfer,
+    PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+  )
 
   return getPPTDeckFallbackHTMLSourceFromHTML(html) ??
     getPPTDeckFallbackHTMLSourceFromHTML(plainText)
