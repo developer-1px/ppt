@@ -156,6 +156,8 @@ import {
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditObjectStrokeLineStyleDashArray,
+  getSlideEditObjectAccessibilityJSONPasteValue,
+  getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailListboxKeyboardIntent,
@@ -232,6 +234,7 @@ import {
   type SlideEditMasterDescriptor,
   type SlideEditObjectAccessibilityDescriptor,
   type SlideEditObjectAccessibilityHostCommandEffect,
+  type SlideEditObjectAccessibilityJSONPasteValue,
   type SlideEditObjectCornerRadiusDescriptor,
   type SlideEditObjectCornerRadiusHostCommandEffect,
   type SlideEditObjectFillOpacityDescriptor,
@@ -1451,6 +1454,7 @@ type PPTObjectAccessibilityImportSource = {
   fields: readonly PPTObjectAccessibilityImportField[]
   format: typeof PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT
   jsonLength: number
+  pasteValue: SlideEditObjectAccessibilityJSONPasteValue
 }
 type PPTObjectMetadataImportField =
   | 'altText'
@@ -16550,19 +16554,12 @@ function createPPTObjectAccessibilityImportCommandEffects({
 }): SlideEditObjectAccessibilityHostCommandEffect<string, string>[] {
   return objectIds.map((objectId) =>
     getSlideEditObjectAccessibilityCommandEffect(
-      source.altText
-        ? {
-            fieldId: 'altText',
-            id: 'update-object-accessibility',
-            objectId,
-            slideId,
-            value: source.altText,
-          }
-        : {
-            id: 'remove-object-alt-text',
-            objectId,
-            slideId,
-          },
+      getSlideEditObjectAccessibilityPasteCommand({
+        objectId,
+        pasteValue: source.pasteValue,
+        slideId,
+        supportsDecorative: false,
+      }),
     ))
 }
 
@@ -20229,6 +20226,21 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
     return null
   }
 
+  const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
+    dataTransfer,
+    jsonMimeType: PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
+    storagePolicy: {
+      maxLength: PPT_ALT_TEXT_MAX_LENGTH,
+    },
+  })
+
+  if (pasteValue) {
+    return createPPTObjectAccessibilitySourceFromPasteValue(
+      pasteValue,
+      getPPTObjectAccessibilityJSONLengthFromDataTransfer(dataTransfer),
+    )
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -20274,6 +20286,19 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
   return null
 }
 
+function getPPTObjectAccessibilityJSONLengthFromDataTransfer(
+  dataTransfer: DataTransfer,
+) {
+  return [
+    PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
+    'application/json',
+    'text/json',
+    'text/plain',
+  ]
+    .map((type) => dataTransfer.getData(type).trim())
+    .find((text) => text.length > 0)?.length ?? 0
+}
+
 function getPPTObjectAccessibilitySourceFromText(
   text: string,
   allowDirect: boolean,
@@ -20306,12 +20331,45 @@ function getPPTObjectAccessibilitySourceFromJSONValue(
 
   return altText === undefined
     ? null
-    : {
-        altText,
-        fields: ['altText'],
-        format: PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT,
-        jsonLength,
-      }
+    : createPPTObjectAccessibilitySourceFromAltText(altText, jsonLength)
+}
+
+function createPPTObjectAccessibilitySourceFromPasteValue(
+  pasteValue: SlideEditObjectAccessibilityJSONPasteValue,
+  jsonLength: number,
+): PPTObjectAccessibilityImportSource {
+  return {
+    altText: pasteValue.kind === 'alt-text' ? pasteValue.altText : null,
+    fields: ['altText'],
+    format: PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT,
+    jsonLength,
+    pasteValue,
+  }
+}
+
+function createPPTObjectAccessibilitySourceFromAltText(
+  altText: string | null,
+  jsonLength: number,
+): PPTObjectAccessibilityImportSource {
+  return createPPTObjectAccessibilitySourceFromPasteValue(
+    altText
+      ? {
+          altText,
+          kind: 'alt-text',
+          value: {
+            altText,
+            decorative: false,
+          },
+        }
+      : {
+          kind: 'remove-alt-text',
+          value: {
+            altText: '',
+            decorative: false,
+          },
+        },
+    jsonLength,
+  )
 }
 
 function getPPTObjectAccessibilityPayloadValue(
