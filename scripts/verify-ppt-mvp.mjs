@@ -13268,6 +13268,75 @@ async function runImageImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      crop: { x: 40, y: 60 },
+      fit: 'cover',
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterStandaloneCropPaste = await getPPTImageImportState(page)
+
+  record(
+    'pastes standalone JSON image crop into selected PPT image',
+    afterStandaloneCropPaste.imageCropImportModel === 'ppt-image-crop-import' &&
+      afterStandaloneCropPaste.imageCropImportFormat === 'application-json-ppt-image-crop' &&
+      afterStandaloneCropPaste.imageCropImportSlide === 'slide-1' &&
+      afterStandaloneCropPaste.imageCropImportObjects === afterStandaloneCropPaste.selectedId &&
+      afterStandaloneCropPaste.imageCropImportFields === 'fit x y' &&
+      afterStandaloneCropPaste.imageCropImportCommands ===
+        'update-object-image-crop update-object-image-crop update-object-image-crop' &&
+      afterStandaloneCropPaste.imageCropImportCommandFields === 'fit x y' &&
+      afterStandaloneCropPaste.imageCropImportCommandTypes ===
+        'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterStandaloneCropPaste.imageCropImportFit === 'cover' &&
+      afterStandaloneCropPaste.imageCropImportX === '40' &&
+      afterStandaloneCropPaste.imageCropImportY === '60' &&
+      afterStandaloneCropPaste.imageCropImportJsonLength > 35 &&
+      afterStandaloneCropPaste.imageCropCommand === 'update-object-image-crop' &&
+      afterStandaloneCropPaste.imageCropCommandField === 'y' &&
+      afterStandaloneCropPaste.imageCropCommandObject === afterStandaloneCropPaste.selectedId &&
+      afterStandaloneCropPaste.imageCropCommandValue === '60' &&
+      afterStandaloneCropPaste.inspectorImageFit === 'cover' &&
+      afterStandaloneCropPaste.inspectorCropX === 40 &&
+      afterStandaloneCropPaste.inspectorCropY === 60 &&
+      afterStandaloneCropPaste.selectedImageFit === 'cover' &&
+      afterStandaloneCropPaste.selectedImagePosition === '40% 60%',
+    {
+      afterCropPaste,
+      afterStandaloneCropPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterStandaloneCropUndo = await getPPTImageImportState(page)
+
+  record(
+    'undoes standalone JSON image crop as one history step',
+    afterStandaloneCropUndo.inspectorImageFit === 'contain' &&
+      afterStandaloneCropUndo.inspectorCropX === 25 &&
+      afterStandaloneCropUndo.inspectorCropY === 70 &&
+      afterStandaloneCropUndo.selectedImageFit === 'contain' &&
+      afterStandaloneCropUndo.selectedImagePosition === '25% 70%',
+    {
+      afterCropPaste,
+      afterStandaloneCropPaste,
+      afterStandaloneCropUndo,
+    },
+  )
+
+  await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-image-replace-input]')
     const filesSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files').set
     const dataTransfer = new DataTransfer()

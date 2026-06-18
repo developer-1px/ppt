@@ -21252,12 +21252,7 @@ function getPPTImageCropSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTImageCropImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.imageCrop)
-    ? value.imageCrop
-    : allowDirect
-      ? value
-      : null
+  const payloadValue = getPPTImageCropPayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -21298,6 +21293,49 @@ function getPPTImageCropSourceFromJSONValue(
         jsonLength,
       }
     : null
+}
+
+function getPPTImageCropPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (isPPTRecord(value.imageCrop)) {
+    return value.imageCrop
+  }
+
+  if (
+    hasPPTImageCropStandalonePayloadFields(value) ||
+    (allowDirect && hasPPTImageCropPayloadFields(value))
+  ) {
+    return value
+  }
+
+  return null
+}
+
+function hasPPTImageCropPayloadFields(value: Record<string, unknown>): boolean {
+  return (
+    value.fit !== undefined ||
+    value.crop !== undefined ||
+    value.x !== undefined ||
+    value.y !== undefined
+  )
+}
+
+function hasPPTImageCropStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return isPPTRecord(value.crop) || (
+    value.fit !== undefined &&
+    (
+      value.x !== undefined ||
+      value.y !== undefined
+    )
+  )
 }
 
 function getPPTImageCropFitFromJSONValue(
