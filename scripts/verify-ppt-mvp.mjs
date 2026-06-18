@@ -22,6 +22,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
+const SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-opacity+json'
 const SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-shadow+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE =
@@ -11835,6 +11837,71 @@ async function runObjectOpacityScenario(page) {
     {
       afterStandaloneOpacityJSONPaste,
       afterStandaloneOpacityJSONUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ value: 0.58 })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEOpacityJSONPaste = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'pastes canvas MIME object opacity through slide-edit command effect',
+    afterCanvasMIMEOpacityJSONPaste.opacityImportModel === 'ppt-object-opacity-import' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportFormat === 'application-json-ppt-object-opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportSlide === 'slide-1' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportObjects === targetId &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportFields === 'opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportCommands === 'update-object-opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportCommandFields === 'opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportCommandTargets === targetId &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportCommandValues === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportValue === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportJsonLength > 10 &&
+      afterCanvasMIMEOpacityJSONPaste.command === 'update-object-opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.commandField === 'opacity' &&
+      afterCanvasMIMEOpacityJSONPaste.commandValue === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.opacity === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.selectedOpacity === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.selectedStyleOpacity === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.thumbOpacity === '0.58' &&
+      afterCanvasMIMEOpacityJSONPaste.thumbStyleOpacity === '0.58',
+    {
+      afterCanvasMIMEOpacityJSONPaste,
+      afterStandaloneOpacityJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEOpacityJSONUndo = await getPPTObjectOpacityState(page, targetId)
+
+  record(
+    'restores PPT object opacity after canvas MIME object opacity probe',
+    afterCanvasMIMEOpacityJSONUndo.opacity === '0.42' &&
+      afterCanvasMIMEOpacityJSONUndo.selectedOpacity === '0.42' &&
+      afterCanvasMIMEOpacityJSONUndo.selectedStyleOpacity === '0.42' &&
+      afterCanvasMIMEOpacityJSONUndo.thumbOpacity === '0.42',
+    {
+      afterCanvasMIMEOpacityJSONPaste,
+      afterCanvasMIMEOpacityJSONUndo,
     },
   )
 

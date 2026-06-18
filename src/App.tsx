@@ -167,6 +167,7 @@ import {
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
   getSlideEditObjectOpacityJSONPasteValue,
+  getSlideEditObjectOpacityPasteCommand,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
   getSlideEditObjectShadowJSONPasteValue,
@@ -242,6 +243,7 @@ import {
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
+  SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
@@ -5913,13 +5915,15 @@ function App() {
         element.locked !== true &&
           element.visible !== false)
       .map((element) =>
-        getSlideEditObjectOpacityCommandEffect({
-          fieldId: 'opacity',
-          id: 'update-object-opacity',
-          objectId: element.id,
-          slideId: activeSlide.id,
-          value: source.opacity,
-        }))
+        getSlideEditObjectOpacityCommandEffect(
+          getSlideEditObjectOpacityPasteCommand({
+            objectId: element.id,
+            pasteValue: {
+              value: source.opacity,
+            },
+            slideId: activeSlide.id,
+          }),
+        ))
 
     if (effects.length === 0) {
       return false
@@ -20535,24 +20539,42 @@ function getPPTObjectOpacitySourceFromDataTransfer(
 function getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTObjectOpacityImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_OBJECT_OPACITY_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_OBJECT_OPACITY_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    return {
-      fields: ['opacity'],
-      format: PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
-      opacity: normalizePPTElementOpacity(pasteValue.value),
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return {
+        fields: ['opacity'],
+        format: PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+        opacity: normalizePPTElementOpacity(pasteValue.value),
+      }
     }
   }
 
