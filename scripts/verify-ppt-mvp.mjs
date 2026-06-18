@@ -8763,6 +8763,93 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectCornerRadius: { value: '18' },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCornerRadiusJSONPaste = await getPPTShapeCornerRadiusState(page)
+
+  record(
+    'pastes JSON object corner radius through slide-edit command effect',
+    afterCornerRadiusJSONPaste.importModel === 'ppt-object-corner-radius-import' &&
+      afterCornerRadiusJSONPaste.importFormat === 'application-json-ppt-object-corner-radius' &&
+      afterCornerRadiusJSONPaste.importSlide === 'slide-1' &&
+      afterCornerRadiusJSONPaste.importObjects === afterCornerRadiusJSONPaste.selectedId &&
+      afterCornerRadiusJSONPaste.importFields === 'cornerRadius' &&
+      afterCornerRadiusJSONPaste.importCommands === 'update-object-corner-radius' &&
+      afterCornerRadiusJSONPaste.importCommandFields === 'cornerRadius' &&
+      afterCornerRadiusJSONPaste.importCommandTargets === afterCornerRadiusJSONPaste.selectedId &&
+      afterCornerRadiusJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCornerRadiusJSONPaste.importCommandValues === '18' &&
+      afterCornerRadiusJSONPaste.importValue === '18' &&
+      afterCornerRadiusJSONPaste.importJsonLength > 35 &&
+      afterCornerRadiusJSONPaste.command === 'update-object-corner-radius' &&
+      afterCornerRadiusJSONPaste.commandField === 'cornerRadius' &&
+      afterCornerRadiusJSONPaste.commandValue === '18' &&
+      afterCornerRadiusJSONPaste.inspectorRadius === '18' &&
+      afterCornerRadiusJSONPaste.selectedCornerRadius === '18' &&
+      afterCornerRadiusJSONPaste.selectedBorderRadius === '18px' &&
+      afterCornerRadiusJSONPaste.thumbCornerRadius === '18' &&
+      afterCornerRadiusJSONPaste.thumbBorderRadius !== '',
+    {
+      afterCornerRadiusJSONPaste,
+      afterCornerRadiusRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCornerRadiusJSONUndo = await getPPTShapeCornerRadiusState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterCornerRadiusJSONRedo = await getPPTShapeCornerRadiusState(page)
+
+  record(
+    'undoes and redoes PPT object corner radius JSON as one history step',
+    afterCornerRadiusJSONUndo.inspectorRadius === '36' &&
+      afterCornerRadiusJSONUndo.selectedCornerRadius === '36' &&
+      afterCornerRadiusJSONRedo.inspectorRadius === '18' &&
+      afterCornerRadiusJSONRedo.selectedCornerRadius === '18',
+    {
+      afterCornerRadiusJSONPaste,
+      afterCornerRadiusJSONRedo,
+      afterCornerRadiusJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -17465,6 +17552,18 @@ function getPPTShapeCornerRadiusState(page) {
       descriptorControl: field?.getAttribute('data-ppt-corner-radius-control') ?? '',
       descriptorSupported: field?.getAttribute('data-ppt-corner-radius-supported') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-corner-radius-surface') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-corner-radius-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-corner-radius-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-corner-radius-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-corner-radius-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-corner-radius-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-corner-radius-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-corner-radius-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-corner-radius-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-corner-radius-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-corner-radius-import-objects') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-corner-radius-import-slide') ?? '',
+      importValue: stage?.getAttribute('data-ppt-corner-radius-import-value') ?? '',
       inspectorRadius: field?.value ?? '',
       model: stage?.getAttribute('data-ppt-corner-radius-model') ?? '',
       selectedBorderRadius: selected?.style.borderRadius ?? '',

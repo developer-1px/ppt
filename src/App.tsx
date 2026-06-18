@@ -1086,6 +1086,12 @@ const PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-fill-opacity' as const
 const PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-fill-opacity+json'
+const PPT_OBJECT_CORNER_RADIUS_IMPORT_MODEL =
+  'ppt-object-corner-radius-import' as const
+const PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-corner-radius' as const
+const PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-corner-radius+json'
 const PPT_TEXT_STYLE_IMPORT_MODEL = 'ppt-text-style-import' as const
 const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-style' as const
@@ -1435,6 +1441,13 @@ type PPTObjectFillOpacityImportSource = {
   fields: readonly PPTObjectFillOpacityImportField[]
   fillOpacity: number
   format: typeof PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
+type PPTObjectCornerRadiusImportField = 'cornerRadius'
+type PPTObjectCornerRadiusImportSource = {
+  cornerRadius: number
+  fields: readonly PPTObjectCornerRadiusImportField[]
+  format: typeof PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT
   jsonLength: number
 }
 type PPTTextStyleImportField =
@@ -1850,6 +1863,20 @@ type PPTObjectFillOpacityImportEffect = {
   format: typeof PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT
   jsonLength: number
   model: typeof PPT_OBJECT_FILL_OPACITY_IMPORT_MODEL
+  objectIds: string
+  slideId: string
+}
+type PPTObjectCornerRadiusImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  cornerRadius: string
+  fields: string
+  format: typeof PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_CORNER_RADIUS_IMPORT_MODEL
   objectIds: string
   slideId: string
 }
@@ -3075,6 +3102,8 @@ function App() {
     useState<PPTShapeStyleImportEffect | null>(null)
   const [lastObjectFillOpacityImportEffect, setLastObjectFillOpacityImportEffect] =
     useState<PPTObjectFillOpacityImportEffect | null>(null)
+  const [lastObjectCornerRadiusImportEffect, setLastObjectCornerRadiusImportEffect] =
+    useState<PPTObjectCornerRadiusImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
@@ -4061,6 +4090,17 @@ function App() {
       if (
         objectFillOpacitySource &&
         pastePPTObjectFillOpacitySource(objectFillOpacitySource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectCornerRadiusSource =
+        getPPTObjectCornerRadiusSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectCornerRadiusSource &&
+        pastePPTObjectCornerRadiusSource(objectCornerRadiusSource)
       ) {
         event.preventDefault()
         return
@@ -5332,6 +5372,63 @@ function App() {
                 }),
               }
             : element
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectCornerRadiusSource(
+    source: PPTObjectCornerRadiusImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element): element is PPTShape =>
+        element.kind === 'shape' &&
+          element.shape === 'rect' &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getSlideEditObjectCornerRadiusCommandEffect({
+          fieldId: 'cornerRadius',
+          id: 'update-object-corner-radius',
+          objectId: element.id,
+          slideId: activeSlide.id,
+          value: source.cornerRadius,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastCornerRadiusEffect(effects[effects.length - 1])
+    setLastObjectCornerRadiusImportEffect(createPPTObjectCornerRadiusImportEffect({
+      effects,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (element.kind !== 'shape' || element.shape !== 'rect') {
+            return element
+          }
+
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          if (!effect) {
+            return element
+          }
+
+          const normalized = normalizePPTShapeCornerRadius(effect.payload.value)
+
+          return {
+            ...element,
+            cornerRadius: normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
+              ? undefined
+              : normalized,
+          }
         }),
       })))
 
@@ -11971,6 +12068,18 @@ function App() {
         data-ppt-corner-radius-command-slide={lastCornerRadiusEffect?.payload.slideId}
         data-ppt-corner-radius-command-type={lastCornerRadiusEffect?.type}
         data-ppt-corner-radius-command-value={lastCornerRadiusEffect?.payload.value}
+        data-ppt-corner-radius-import-command-fields={lastObjectCornerRadiusImportEffect?.commandFields}
+        data-ppt-corner-radius-import-command-targets={lastObjectCornerRadiusImportEffect?.commandTargets}
+        data-ppt-corner-radius-import-command-types={lastObjectCornerRadiusImportEffect?.commandTypes}
+        data-ppt-corner-radius-import-command-values={lastObjectCornerRadiusImportEffect?.commandValues}
+        data-ppt-corner-radius-import-commands={lastObjectCornerRadiusImportEffect?.commandIds}
+        data-ppt-corner-radius-import-fields={lastObjectCornerRadiusImportEffect?.fields}
+        data-ppt-corner-radius-import-format={lastObjectCornerRadiusImportEffect?.format}
+        data-ppt-corner-radius-import-json-length={lastObjectCornerRadiusImportEffect?.jsonLength}
+        data-ppt-corner-radius-import-model={lastObjectCornerRadiusImportEffect?.model}
+        data-ppt-corner-radius-import-objects={lastObjectCornerRadiusImportEffect?.objectIds}
+        data-ppt-corner-radius-import-slide={lastObjectCornerRadiusImportEffect?.slideId}
+        data-ppt-corner-radius-import-value={lastObjectCornerRadiusImportEffect?.cornerRadius}
         data-ppt-corner-radius-model="slide-edit-object-corner-radius"
         data-ppt-fill-opacity-command={lastFillOpacityEffect?.payload.id}
         data-ppt-fill-opacity-command-field={lastFillOpacityEffect?.payload.fieldId}
@@ -15287,6 +15396,31 @@ function createPPTObjectFillOpacityImportEffect({
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_OBJECT_FILL_OPACITY_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+  }
+}
+
+function createPPTObjectCornerRadiusImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectCornerRadiusHostCommandEffect<string, string>[]
+  source: PPTObjectCornerRadiusImportSource
+}): PPTObjectCornerRadiusImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => String(effect.payload.value)).join(' '),
+    cornerRadius: String(source.cornerRadius),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_CORNER_RADIUS_IMPORT_MODEL,
     objectIds: uniquePPTCanvasValues(
       effects.map((effect) => effect.payload.objectId),
     ).join(' '),
@@ -18728,6 +18862,156 @@ function getPPTObjectFillOpacityFromJSONValue(
 
   return Number.isFinite(numberValue)
     ? normalizePPTFillOpacity(numberValue)
+    : undefined
+}
+
+function getPPTObjectCornerRadiusSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectCornerRadiusSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectCornerRadiusSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectCornerRadiusImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectCornerRadiusSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectCornerRadiusSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectCornerRadiusImportSource | null {
+  const cornerRadius = getPPTObjectCornerRadiusFromJSONValue(
+    getPPTObjectCornerRadiusPayloadValue(value, allowDirect),
+  )
+
+  return cornerRadius === undefined
+    ? null
+    : {
+        cornerRadius,
+        fields: ['cornerRadius'],
+        format: PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+}
+
+function getPPTObjectCornerRadiusPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (value.objectCornerRadius !== undefined) {
+    return value.objectCornerRadius
+  }
+
+  if (value.shapeCornerRadius !== undefined) {
+    return value.shapeCornerRadius
+  }
+
+  if (value.cornerRadius !== undefined) {
+    return value.cornerRadius
+  }
+
+  return allowDirect &&
+    (
+      value.radius !== undefined ||
+      value.value !== undefined ||
+      value.amount !== undefined
+    )
+    ? value
+    : undefined
+}
+
+function getPPTObjectCornerRadiusFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const raw = isPPTRecord(value)
+    ? value.cornerRadius ?? value.radius ?? value.value ?? value.amount
+    : value
+
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? normalizePPTShapeCornerRadius(raw) : undefined
+  }
+
+  if (typeof raw !== 'string') {
+    return undefined
+  }
+
+  const trimmed = raw.trim()
+
+  if (!trimmed) {
+    return undefined
+  }
+
+  const numberValue = Number(trimmed)
+
+  return Number.isFinite(numberValue)
+    ? normalizePPTShapeCornerRadius(numberValue)
     : undefined
 }
 
