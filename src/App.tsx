@@ -318,6 +318,7 @@ import {
   type SlideEditLayerPaneHostCommandEffect,
   type SlideEditLayerPaneIntent,
   type SlideEditLayerPaneKeyboardIntent,
+  type SlideEditLayerPaneObjectLayerJSONPasteValue,
   type SlideEditLayerPaneRowDescriptor,
   type SlideEditLayoutApplyHostCommandEffect,
   type SlideEditLayoutDescriptor,
@@ -358,6 +359,8 @@ import {
   type SlideEditObjectOpacityHostCommandEffect,
   type SlideEditObjectShadowDescriptor,
   type SlideEditObjectShadowHostCommandEffect,
+  type SlideEditObjectShadowJSONPasteValue,
+  type SlideEditObjectShadowPasteFieldValue,
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditObjectTransformHostCommandEffect,
@@ -400,6 +403,9 @@ import {
   type SlideEditTextFrameInsetHostCommandEffect,
   type SlideEditTextParagraphAlignHostCommandEffect,
   type SlideEditTextParagraphBulletHostCommandEffect,
+  type SlideEditTextBodyJSONPasteValue,
+  type SlideEditTextParagraphSpacingPasteFieldValue,
+  type SlideEditTextRunFormattingBooleanFieldId,
   type SlideEditTextRunFormattingFieldId,
   type SlideEditTextRunFormattingHostCommandEffect,
   type SlideEditTextAutoFitHostCommandEffect,
@@ -2972,9 +2978,19 @@ type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
   | 'spacingBefore'
+type PPTParagraphTextAlign =
+  | 'center'
+  | 'justify'
+  | 'left'
+  | 'right'
+  | 'start'
+  | 'end'
+  | 'match-parent'
 type PPTParagraphCSSStyle = ReturnType<
   typeof getSlideEditTextParagraphSpacingCSSStyle
-> & Pick<CSSProperties, 'textAlign'>
+> & {
+  textAlign?: PPTParagraphTextAlign
+}
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
 type PPTTextInsetField = keyof PPTTextInset
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
@@ -2982,12 +2998,21 @@ type PPTLayerPaneRowDescriptor = SlideEditLayerPaneRowDescriptor<string, string,
 type PPTLayerPaneDescriptor = SlideEditLayerPaneDescriptor<string, string, string>
 type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
+type PPTObjectStateVisibilityCommand = {
+  id: 'hide-objects' | 'show-objects'
+  objectIds: readonly string[]
+}
+type PPTObjectStateLockCommand = {
+  id: 'lock-objects' | 'unlock-objects'
+  objectIds: readonly string[]
+}
 type PPTObjectStateVisibilityHostCommandEffect =
   PPTLayerPaneHostCommandEffect & {
-    payload: Extract<
-      PPTLayerPaneHostCommandEffect['payload'],
-      { id: 'hide-objects' | 'show-objects' }
-    >
+    payload: PPTObjectStateVisibilityCommand
+  }
+type PPTObjectStateLockHostCommandEffect =
+  PPTLayerPaneHostCommandEffect & {
+    payload: PPTObjectStateLockCommand
   }
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
@@ -6480,8 +6505,10 @@ function App() {
       slide: activeSlide,
       source,
     })
-    const visibilityEffects = effects.filter(isPPTObjectStateVisibilityEffect)
-    const lockEffects = effects.filter(isPPTObjectStateLockEffect)
+    const visibilityEffects: PPTObjectStateVisibilityHostCommandEffect[] =
+      effects.filter(isPPTObjectStateVisibilityEffect)
+    const lockEffects: PPTObjectStateLockHostCommandEffect[] =
+      effects.filter(isPPTObjectStateLockEffect)
 
     if (effects.length === 0) {
       return false
@@ -7038,7 +7065,7 @@ function App() {
       getSlideEditTextParagraphSpacingPasteCommands({
         objectId: element.id,
         pasteValue: {
-          fields: source.fields.flatMap((field) => {
+          fields: source.fields.flatMap((field): SlideEditTextParagraphSpacingPasteFieldValue[] => {
             const value = source.spacing[field]
 
             if (value === undefined) {
@@ -9148,7 +9175,9 @@ function App() {
     files: readonly (Blob & { name?: string })[],
     center = getPPTTableInsertCenter(),
   ) {
-    const sources = await readPPTTableFileSources(files)
+    const sources = (await readPPTTableFileSources(files)).filter(
+      (source): source is PPTTableImportSource => source !== null,
+    )
 
     return insertPPTTableSources(sources, center)
   }
@@ -16906,11 +16935,11 @@ function createPPTObjectShadowImportCommandEffects({
 
 function createSlideEditObjectShadowPasteValueFromPPTSource(
   source: PPTObjectShadowImportSource,
-): NonNullable<ReturnType<typeof getSlideEditObjectShadowJSONPasteValue>> {
+): SlideEditObjectShadowJSONPasteValue {
   const shadow = normalizeSlideEditObjectShadow(source.shadow)
 
   return {
-    fields: source.fields.flatMap((field) => {
+    fields: source.fields.flatMap((field): SlideEditObjectShadowPasteFieldValue[] => {
       if (field === 'enabled') {
         return [{
           fieldId: 'enabled',
@@ -17134,7 +17163,7 @@ function createPPTObjectHyperlinkImportCommandEffects({
               value: source.hyperlinkUrl,
             }],
             hyperlink: {
-              target: '_blank',
+              target: 'new-context',
               title: '',
               url: source.hyperlinkUrl,
             },
@@ -17143,7 +17172,7 @@ function createPPTObjectHyperlinkImportCommandEffects({
           }
         : {
             hyperlink: {
-              target: '_blank',
+              target: 'new-context',
               title: '',
               url: '',
             },
@@ -17436,8 +17465,10 @@ function createPPTObjectStateImportEffect({
   objectIds: readonly string[]
   source: PPTObjectStateImportSource
 }): PPTObjectStateImportEffect {
-  const lockEffects = effects.filter(isPPTObjectStateLockEffect)
-  const visibilityEffects = effects.filter(isPPTObjectStateVisibilityEffect)
+  const lockEffects: PPTObjectStateLockHostCommandEffect[] =
+    effects.filter(isPPTObjectStateLockEffect)
+  const visibilityEffects: PPTObjectStateVisibilityHostCommandEffect[] =
+    effects.filter(isPPTObjectStateVisibilityEffect)
   const lockTargets = uniquePPTCanvasValues(lockEffects.flatMap((effect) =>
     effect.payload.objectIds))
   const visibilityTargets = uniquePPTCanvasValues(
@@ -17523,12 +17554,7 @@ function createSlideEditLayerPaneObjectStatePasteValueFromPPTSource(
 
 function isPPTObjectStateLockEffect(
   effect: PPTLayerPaneHostCommandEffect,
-): effect is PPTLayerPaneHostCommandEffect & {
-  payload: Extract<
-    PPTLayerPaneHostCommandEffect['payload'],
-    { id: 'lock-objects' | 'unlock-objects' }
-  >
-} {
+): effect is PPTObjectStateLockHostCommandEffect {
   return effect.payload.id === 'lock-objects' ||
     effect.payload.id === 'unlock-objects'
 }
@@ -17596,8 +17622,8 @@ function createPPTObjectLayerImportCommandEffect({
 }
 
 function createSlideEditLayerPaneObjectLayerPasteValueFromPPTSource(
-  source,
-): NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectLayerJSONPasteValue>> | null {
+  source: PPTObjectLayerImportSource,
+): SlideEditLayerPaneObjectLayerJSONPasteValue | null {
   if (source.layer.toIndex !== undefined) {
     return {
       sourceField: 'toIndex',
@@ -18033,7 +18059,9 @@ function createPPTCanvasTextPasteSourceFromTextBodySource(
   }
 }
 
-function createPPTTextBodyPasteValue(source: PPTTextBodyImportSource) {
+function createPPTTextBodyPasteValue(
+  source: PPTTextBodyImportSource,
+): SlideEditTextBodyJSONPasteValue {
   const body = {
     paragraphs: source.textBody.paragraphs.map((paragraph) => ({
       runs: paragraph.runs.map((run) => ({ text: run.text })),
@@ -18046,6 +18074,8 @@ function createPPTTextBodyPasteValue(source: PPTTextBodyImportSource) {
     format: 'json',
     paragraphCount: body.paragraphs.length,
     payloadLength: source.jsonLength,
+    rawBody: source.textBody,
+    rawPayload: source.textBody,
     runCount: body.paragraphs.reduce(
       (count, paragraph) => count + paragraph.runs.length,
       0,
@@ -18119,7 +18149,7 @@ function getPPTTextRunFormattingCommandEffect({
   slideId,
   value,
 }: {
-  fieldId: SlideEditTextRunFormattingFieldId
+  fieldId: SlideEditTextRunFormattingBooleanFieldId
   objectIds: readonly string[]
   slideId: string
   value: boolean
@@ -26336,7 +26366,7 @@ function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
   pptJsonMimeType,
 }: {
   dataTransfer: DataTransfer
-  fieldId: SlideEditTextRunFormattingFieldId
+  fieldId: SlideEditTextRunFormattingBooleanFieldId
   pptJsonMimeType: string
 }): {
   fields: readonly PPTTextRunFormattingImportField[]
@@ -26403,7 +26433,7 @@ function getPPTTextRunFormattingJSONMimeType(
 }
 
 function getPPTTextRunFormattingPayloadEntry(
-  fieldId: SlideEditTextRunFormattingFieldId,
+  fieldId: SlideEditTextRunFormattingBooleanFieldId,
   value: unknown,
   allowDirect: boolean,
 ): {
