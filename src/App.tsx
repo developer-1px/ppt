@@ -171,6 +171,8 @@ import {
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
+  getSlideEditTextFontSizeJSONPasteValue,
+  getSlideEditTextFontWeightJSONPasteValue,
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
@@ -4623,12 +4625,12 @@ function App() {
         return
       }
 
-      const objectAccessibilitySource =
-        getPPTObjectAccessibilitySourceFromDataTransfer(event.clipboardData)
+      const imageReplaceSource =
+        getPPTImageReplaceSourceFromDataTransfer(event.clipboardData)
 
       if (
-        objectAccessibilitySource &&
-        pastePPTObjectAccessibilitySource(objectAccessibilitySource)
+        imageReplaceSource &&
+        pastePPTImageReplaceSource(imageReplaceSource)
       ) {
         event.preventDefault()
         return
@@ -4640,6 +4642,17 @@ function App() {
       if (
         objectMetadataSource &&
         pastePPTObjectMetadataSource(objectMetadataSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectAccessibilitySource =
+        getPPTObjectAccessibilitySourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectAccessibilitySource &&
+        pastePPTObjectAccessibilitySource(objectAccessibilitySource)
       ) {
         event.preventDefault()
         return
@@ -4882,17 +4895,6 @@ function App() {
         getPPTCommentSourceFromDataTransfer(event.clipboardData)
 
       if (commentSource && pastePPTCommentSource(commentSource)) {
-        event.preventDefault()
-        return
-      }
-
-      const imageReplaceSource =
-        getPPTImageReplaceSourceFromDataTransfer(event.clipboardData)
-
-      if (
-        imageReplaceSource &&
-        pastePPTImageReplaceSource(imageReplaceSource)
-      ) {
         event.preventDefault()
         return
       }
@@ -23044,6 +23046,13 @@ function getPPTTextFontSizeSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextFontSizeSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -23083,6 +23092,38 @@ function getPPTTextFontSizeSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFontSizeSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextFontSizeImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const fontSize = getSlideEditTextFontSizeJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (fontSize === null) {
+      continue
+    }
+
+    const payload = getPPTTextFontSizePayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      fields: payload?.fields ?? ['value'],
+      fontSize: normalizePPTTextFontSize(fontSize),
+      format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
@@ -23207,11 +23248,70 @@ function getPPTTextFontSizeImportValueFromJSONValue(
 
   return numberValue === undefined
     ? undefined
-    : clampPPTCanvasValue(
-        numberValue,
-        PPT_TEXT_FONT_SIZE_MIN,
-        PPT_TEXT_FONT_SIZE_MAX,
-      )
+    : normalizePPTTextFontSize(numberValue)
+}
+
+function normalizePPTTextFontSize(value: number) {
+  return clampPPTCanvasValue(
+    value,
+    PPT_TEXT_FONT_SIZE_MIN,
+    PPT_TEXT_FONT_SIZE_MAX,
+  )
+}
+
+function getPPTSlideEditJSONPasteCandidates({
+  customMimeType,
+  dataTransfer,
+}: {
+  customMimeType: string
+  dataTransfer: DataTransfer
+}) {
+  const seen = new Set<string>()
+
+  return [
+    {
+      allowDirect: true,
+      customMimeType,
+      type: customMimeType,
+    },
+    {
+      allowDirect: false,
+      customMimeType: '',
+      type: 'application/json',
+    },
+    {
+      allowDirect: false,
+      customMimeType: '',
+      type: 'text/plain',
+    },
+  ].flatMap((candidate) => {
+    const text = dataTransfer.getData(candidate.type).trim()
+
+    if (!text || seen.has(text)) {
+      return []
+    }
+
+    seen.add(text)
+
+    return [{
+      allowDirect: candidate.allowDirect,
+      customMimeType: candidate.customMimeType,
+      dataTransfer: {
+        getData: (type: string) => type === candidate.type ? text : '',
+      },
+      text,
+    }]
+  })
+}
+
+function getPPTJSONValueFromText(text: string): unknown {
+  const json = getPPTImportJSONText(text) ?? text.trim()
+
+  try {
+    return JSON.parse(json)
+  } catch {
+    return text
+  }
 }
 
 function getPPTTextFontWeightSourceFromDataTransfer(
@@ -23219,6 +23319,13 @@ function getPPTTextFontWeightSourceFromDataTransfer(
 ) {
   if (!dataTransfer) {
     return null
+  }
+
+  const slideEditSource =
+    getPPTTextFontWeightSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
   }
 
   const candidates: Array<{
@@ -23260,6 +23367,38 @@ function getPPTTextFontWeightSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFontWeightSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextFontWeightImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const fontWeight = getSlideEditTextFontWeightJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (fontWeight === null) {
+      continue
+    }
+
+    const payload = getPPTTextFontWeightPayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      fields: payload?.fields ?? ['value'],
+      fontWeight,
+      format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
     }
   }
 
