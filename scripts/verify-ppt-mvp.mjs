@@ -24,6 +24,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-layer+json'
+const SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-name+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-state+json'
 
@@ -12967,6 +12969,52 @@ async function runObjectHyperlinkScenario(page) {
       afterMetadataNameRedo,
       afterMetadataNameUndo,
       afterMetadataPaste,
+    },
+  )
+
+  const canvasMetadataName = 'Canvas MIME layer name'
+
+  await page.eval(`((name) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ name })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(canvasMetadataName)})`)
+  await delay(120)
+
+  const afterCanvasMetadataNamePaste =
+    await getPPTObjectHyperlinkState(page, targetId)
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterCanvasMetadataNameUndo =
+    await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes canvas MIME object name through slide-edit layer pane rename parser',
+    afterCanvasMetadataNamePaste.objectMetadataImportModel === 'ppt-object-metadata-import' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportFormat === 'application-json-ppt-object-metadata' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportSlide === 'slide-1' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportObjects === targetId &&
+      afterCanvasMetadataNamePaste.objectMetadataImportFields === 'name' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportCommands === 'rename-object' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportCommandFields === 'name' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportCommandTypes === 'slide-command-effect' &&
+      afterCanvasMetadataNamePaste.objectMetadataImportName === canvasMetadataName &&
+      afterCanvasMetadataNamePaste.selectedName === canvasMetadataName &&
+      afterCanvasMetadataNamePaste.rowName === canvasMetadataName &&
+      afterCanvasMetadataNameUndo.selectedName === metadataName &&
+      afterCanvasMetadataNameUndo.rowName === metadataName,
+    {
+      afterCanvasMetadataNamePaste,
+      afterCanvasMetadataNameUndo,
+      afterMetadataNameRedo,
     },
   )
 

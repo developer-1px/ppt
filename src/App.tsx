@@ -139,6 +139,8 @@ import {
   getSlideEditLayerPaneObjectLayerJSONPasteValue,
   getSlideEditLayerPaneObjectLayerPasteCommandEffect,
   getSlideEditLayerPaneObjectStateJSONPasteValue,
+  getSlideEditLayerPaneRenameJSONPasteValue,
+  getSlideEditLayerPaneRenamePasteCommandEffect,
   getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditInspectorSurface,
   getSlideEditObjectVisibilityCommandAvailability,
@@ -252,6 +254,8 @@ import {
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
+  SLIDE_EDIT_LAYER_PANE_OBJECT_METADATA_JSON_MIME_TYPE,
+  SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
@@ -17023,6 +17027,9 @@ function createPPTObjectMetadataRenameEffects({
     return []
   }
 
+  const pasteValue = createSlideEditLayerPaneRenamePasteValueFromPPTSource(
+    source,
+  )
   const descriptor = createPPTLayerPaneDescriptor({
     activeObjectId: null,
     collapsedGroupIds: new Set(),
@@ -17032,13 +17039,23 @@ function createPPTObjectMetadataRenameEffects({
 
   return objectIds
     .map((objectId) =>
-      getSlideEditLayerPaneCommandEffect(descriptor, {
-        name: source.metadata.name ?? '',
+      getSlideEditLayerPaneRenamePasteCommandEffect({
+        descriptor,
         objectId,
-        type: 'rename-submit',
+        pasteValue,
       }))
     .filter((effect): effect is PPTLayerPaneHostCommandEffect =>
       effect !== null)
+}
+
+function createSlideEditLayerPaneRenamePasteValueFromPPTSource(
+  source: PPTObjectMetadataImportSource,
+): NonNullable<ReturnType<typeof getSlideEditLayerPaneRenameJSONPasteValue>> {
+  return {
+    name: source.metadata.name ?? '',
+    nameField: 'name',
+    surface: 'object-layer-pane-rename',
+  }
 }
 
 function applyPPTObjectHyperlinkCommandEffectToElement(
@@ -20853,6 +20870,13 @@ function getPPTObjectMetadataSourceFromDataTransfer(
     return null
   }
 
+  const slideEditRenameSource =
+    getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(dataTransfer)
+
+  if (slideEditRenameSource) {
+    return slideEditRenameSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -20896,6 +20920,78 @@ function getPPTObjectMetadataSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectMetadataImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_OBJECT_METADATA_JSON_MIME_TYPE,
+    SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE,
+    SLIDE_EDIT_LAYER_PANE_OBJECT_METADATA_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditLayerPaneRenameJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeTypes: candidate.customMimeType
+          ? [candidate.customMimeType]
+          : [],
+      })
+
+      if (!pasteValue) {
+        continue
+      }
+
+      const fallbackSource = getPPTObjectMetadataSourceFromText(
+        json,
+        candidate.allowDirect,
+      )
+
+      if (
+        fallbackSource &&
+        fallbackSource.fields.some((field) => field !== 'name')
+      ) {
+        continue
+      }
+
+      return createPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
+}
+
+function createPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneRenameJSONPasteValue>>,
+  jsonLength: number,
+): PPTObjectMetadataImportSource {
+  return {
+    fields: ['name'],
+    format: PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT,
+    jsonLength,
+    metadata: {
+      name: pasteValue.name,
+    },
+  }
 }
 
 function getPPTObjectMetadataSourceFromText(
