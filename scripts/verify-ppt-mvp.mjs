@@ -10328,6 +10328,82 @@ async function runObjectHyperlinkScenario(page) {
     },
   )
 
+  const importedUrl = 'https://example.com/imported-ppt-link'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectHyperlink: { url },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(importedUrl)})`)
+  await delay(120)
+
+  const afterHyperlinkJSONPaste = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'pastes JSON object hyperlink through slide-edit command effect',
+    afterHyperlinkJSONPaste.hyperlinkImportModel === 'ppt-object-hyperlink-import' &&
+      afterHyperlinkJSONPaste.hyperlinkImportFormat === 'application-json-ppt-object-hyperlink' &&
+      afterHyperlinkJSONPaste.hyperlinkImportSlide === 'slide-1' &&
+      afterHyperlinkJSONPaste.hyperlinkImportObjects === targetId &&
+      afterHyperlinkJSONPaste.hyperlinkImportFields === 'url' &&
+      afterHyperlinkJSONPaste.hyperlinkImportCommands === 'update-object-hyperlink' &&
+      afterHyperlinkJSONPaste.hyperlinkImportCommandFields === 'url' &&
+      afterHyperlinkJSONPaste.hyperlinkImportCommandTargets === targetId &&
+      afterHyperlinkJSONPaste.hyperlinkImportCommandTypes === 'slide-command-effect' &&
+      afterHyperlinkJSONPaste.hyperlinkImportEnabled === 'true' &&
+      afterHyperlinkJSONPaste.hyperlinkImportUrl === importedUrl &&
+      afterHyperlinkJSONPaste.hyperlinkImportJsonLength > 40 &&
+      afterHyperlinkJSONPaste.command === 'update-object-hyperlink' &&
+      afterHyperlinkJSONPaste.commandField === 'url' &&
+      afterHyperlinkJSONPaste.commandValue === importedUrl &&
+      afterHyperlinkJSONPaste.selectedUrl === importedUrl &&
+      afterHyperlinkJSONPaste.thumbUrl === importedUrl,
+    {
+      afterHyperlinkJSONPaste,
+      afterRestore,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterHyperlinkJSONUndo = await getPPTObjectHyperlinkState(page, targetId)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterHyperlinkJSONRedo = await getPPTObjectHyperlinkState(page, targetId)
+
+  record(
+    'undoes and redoes PPT object hyperlink JSON as one history step',
+    afterHyperlinkJSONUndo.selectedUrl === url &&
+      afterHyperlinkJSONRedo.selectedUrl === importedUrl,
+    {
+      afterHyperlinkJSONPaste,
+      afterHyperlinkJSONRedo,
+      afterHyperlinkJSONUndo,
+    },
+  )
+
   const metadataAltText = 'AI generated card linking to PPT reference.'
 
   await page.eval(`((url, altText) => {
@@ -17831,6 +17907,18 @@ function getPPTObjectHyperlinkState(page, elementId) {
       descriptorTarget: descriptor?.target ?? '',
       descriptorUrl: descriptor?.url ?? '',
       descriptorValidation: field?.getAttribute('data-ppt-hyperlink-validation') ?? '',
+      hyperlinkImportCommandFields: stage?.getAttribute('data-ppt-hyperlink-import-command-fields') ?? '',
+      hyperlinkImportCommandTargets: stage?.getAttribute('data-ppt-hyperlink-import-command-targets') ?? '',
+      hyperlinkImportCommandTypes: stage?.getAttribute('data-ppt-hyperlink-import-command-types') ?? '',
+      hyperlinkImportCommands: stage?.getAttribute('data-ppt-hyperlink-import-commands') ?? '',
+      hyperlinkImportEnabled: stage?.getAttribute('data-ppt-hyperlink-import-enabled') ?? '',
+      hyperlinkImportFields: stage?.getAttribute('data-ppt-hyperlink-import-fields') ?? '',
+      hyperlinkImportFormat: stage?.getAttribute('data-ppt-hyperlink-import-format') ?? '',
+      hyperlinkImportJsonLength: Number(stage?.getAttribute('data-ppt-hyperlink-import-json-length') ?? 0),
+      hyperlinkImportModel: stage?.getAttribute('data-ppt-hyperlink-import-model') ?? '',
+      hyperlinkImportObjects: stage?.getAttribute('data-ppt-hyperlink-import-objects') ?? '',
+      hyperlinkImportSlide: stage?.getAttribute('data-ppt-hyperlink-import-slide') ?? '',
+      hyperlinkImportUrl: stage?.getAttribute('data-ppt-hyperlink-import-url') ?? '',
       model: stage?.getAttribute('data-ppt-hyperlink-model') ?? '',
       objectMetadataImportAltTextLength: Number(stage?.getAttribute('data-ppt-object-metadata-import-alt-text-length') ?? 0),
       objectMetadataImportAltTextPresent: stage?.getAttribute('data-ppt-object-metadata-import-alt-text-present') ?? '',

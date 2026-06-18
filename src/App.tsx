@@ -1045,6 +1045,11 @@ const PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-metadata' as const
 const PPT_OBJECT_METADATA_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-metadata+json'
+const PPT_OBJECT_HYPERLINK_IMPORT_MODEL = 'ppt-object-hyperlink-import' as const
+const PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-hyperlink' as const
+const PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-hyperlink+json'
 const PPT_OBJECT_STATE_IMPORT_MODEL = 'ppt-object-state-import' as const
 const PPT_OBJECT_STATE_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-state' as const
@@ -1326,6 +1331,13 @@ type PPTObjectMetadataImportSource = {
     hyperlinkUrl?: string | null
     name?: string
   }
+}
+type PPTObjectHyperlinkImportField = 'url'
+type PPTObjectHyperlinkImportSource = {
+  fields: readonly PPTObjectHyperlinkImportField[]
+  format: typeof PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT
+  hyperlinkUrl: string | null
+  jsonLength: number
 }
 type PPTObjectStateImportField =
   | 'locked'
@@ -1699,6 +1711,20 @@ type PPTObjectMetadataImportEffect = {
   name: string
   objectIds: string
   slideId: string
+}
+type PPTObjectHyperlinkImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  enabled: string
+  fields: string
+  format: typeof PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_HYPERLINK_IMPORT_MODEL
+  objectIds: string
+  slideId: string
+  url: string
 }
 type PPTObjectStateImportEffect = {
   commandIds: string
@@ -2980,6 +3006,8 @@ function App() {
     useState<PPTObjectStyleImportEffect | null>(null)
   const [lastObjectMetadataImportEffect, setLastObjectMetadataImportEffect] =
     useState<PPTObjectMetadataImportEffect | null>(null)
+  const [lastObjectHyperlinkImportEffect, setLastObjectHyperlinkImportEffect] =
+    useState<PPTObjectHyperlinkImportEffect | null>(null)
   const [lastObjectStateImportEffect, setLastObjectStateImportEffect] =
     useState<PPTObjectStateImportEffect | null>(null)
   const [lastObjectLayerImportEffect, setLastObjectLayerImportEffect] =
@@ -3965,6 +3993,17 @@ function App() {
       if (
         objectMetadataSource &&
         pastePPTObjectMetadataSource(objectMetadataSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectHyperlinkSource =
+        getPPTObjectHyperlinkSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectHyperlinkSource &&
+        pastePPTObjectHyperlinkSource(objectHyperlinkSource)
       ) {
         event.preventDefault()
         return
@@ -5217,6 +5256,46 @@ function App() {
               ),
             ),
           )
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectHyperlinkSource(
+    source: PPTObjectHyperlinkImportSource,
+  ) {
+    const objectIds = selectedElements
+      .filter((element) =>
+        element.locked !== true &&
+          element.visible !== false)
+      .map((element) => element.id)
+    const effects = createPPTObjectHyperlinkImportCommandEffects({
+      objectIds,
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastHyperlinkEffect(effects[effects.length - 1])
+    setLastObjectHyperlinkImportEffect(createPPTObjectHyperlinkImportEffect({
+      effects,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect
+            ? applyPPTObjectHyperlinkCommandEffectToElement(element, effect)
+            : element
         }),
       })))
 
@@ -11735,6 +11814,18 @@ function App() {
         data-ppt-hyperlink-command-value={lastHyperlinkEffect?.payload.id === 'update-object-hyperlink'
           ? lastHyperlinkEffect.payload.value
           : undefined}
+        data-ppt-hyperlink-import-command-fields={lastObjectHyperlinkImportEffect?.commandFields}
+        data-ppt-hyperlink-import-command-targets={lastObjectHyperlinkImportEffect?.commandTargets}
+        data-ppt-hyperlink-import-command-types={lastObjectHyperlinkImportEffect?.commandTypes}
+        data-ppt-hyperlink-import-commands={lastObjectHyperlinkImportEffect?.commandIds}
+        data-ppt-hyperlink-import-enabled={lastObjectHyperlinkImportEffect?.enabled}
+        data-ppt-hyperlink-import-fields={lastObjectHyperlinkImportEffect?.fields}
+        data-ppt-hyperlink-import-format={lastObjectHyperlinkImportEffect?.format}
+        data-ppt-hyperlink-import-json-length={lastObjectHyperlinkImportEffect?.jsonLength}
+        data-ppt-hyperlink-import-model={lastObjectHyperlinkImportEffect?.model}
+        data-ppt-hyperlink-import-objects={lastObjectHyperlinkImportEffect?.objectIds}
+        data-ppt-hyperlink-import-slide={lastObjectHyperlinkImportEffect?.slideId}
+        data-ppt-hyperlink-import-url={lastObjectHyperlinkImportEffect?.url}
         data-ppt-hyperlink-model="slide-edit-object-hyperlink"
         data-ppt-image-crop-command={lastImageCropEffect?.payload.id}
         data-ppt-image-crop-command-crop-x={lastImageCropEffect?.payload.id === 'reset-object-image-crop'
@@ -14195,6 +14286,61 @@ function createPPTObjectMetadataImportEffect({
       .join(' '),
     slideId: getPPTObjectMetadataEffectSlideId(effects[0]) ?? '',
   }
+}
+
+function createPPTObjectHyperlinkImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectHyperlinkHostCommandEffect<string, string>[]
+  source: PPTObjectHyperlinkImportSource
+}): PPTObjectHyperlinkImportEffect {
+  return {
+    commandFields: effects.map((effect) =>
+      effect.payload.id === 'update-object-hyperlink'
+        ? effect.payload.fieldId
+        : '').join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    enabled: String(source.hyperlinkUrl !== null),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_HYPERLINK_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+    url: source.hyperlinkUrl ?? '',
+  }
+}
+
+function createPPTObjectHyperlinkImportCommandEffects({
+  objectIds,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  slideId: string
+  source: PPTObjectHyperlinkImportSource
+}): SlideEditObjectHyperlinkHostCommandEffect<string, string>[] {
+  return objectIds.map((objectId) =>
+    getSlideEditObjectHyperlinkCommandEffect(
+      source.hyperlinkUrl
+        ? {
+            fieldId: 'url',
+            id: 'update-object-hyperlink',
+            objectId,
+            slideId,
+            value: source.hyperlinkUrl,
+          }
+        : {
+            id: 'remove-object-hyperlink',
+            objectId,
+            slideId,
+          },
+    ))
 }
 
 function createPPTObjectTransformImportEffect({
@@ -16997,6 +17143,174 @@ function getPPTObjectMetadataNameFromJSONValue(value: unknown) {
   const name = value.trim()
 
   return name.length > 0 ? name : undefined
+}
+
+function getPPTObjectHyperlinkSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectHyperlinkSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectHyperlinkSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectHyperlinkImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectHyperlinkSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectHyperlinkSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectHyperlinkImportSource | null {
+  const hyperlinkUrl = getPPTObjectHyperlinkURLFromJSONValue(
+    getPPTObjectHyperlinkPayloadValue(value, allowDirect),
+  )
+
+  return hyperlinkUrl === undefined
+    ? null
+    : {
+        fields: ['url'],
+        format: PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT,
+        hyperlinkUrl,
+        jsonLength,
+      }
+}
+
+function getPPTObjectHyperlinkPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (
+    isPPTRecord(value.objectHyperlink) ||
+    typeof value.objectHyperlink === 'string' ||
+    value.objectHyperlink === null ||
+    value.objectHyperlink === false
+  ) {
+    return value.objectHyperlink
+  }
+
+  if (
+    isPPTRecord(value.hyperlink) ||
+    typeof value.hyperlink === 'string' ||
+    value.hyperlink === null ||
+    value.hyperlink === false
+  ) {
+    return value.hyperlink
+  }
+
+  if (
+    isPPTRecord(value.link) ||
+    typeof value.link === 'string' ||
+    value.link === null ||
+    value.link === false
+  ) {
+    return value.link
+  }
+
+  if (
+    allowDirect &&
+    (
+      value.url !== undefined ||
+      value.href !== undefined
+    )
+  ) {
+    return value
+  }
+
+  return undefined
+}
+
+function getPPTObjectHyperlinkURLFromJSONValue(
+  value: unknown,
+): string | null | undefined {
+  if (value === null || value === false) {
+    return null
+  }
+
+  const rawUrl = typeof value === 'string'
+    ? value
+    : isPPTRecord(value) && typeof value.url === 'string'
+      ? value.url
+      : isPPTRecord(value) && typeof value.href === 'string'
+        ? value.href
+        : null
+
+  if (rawUrl === null) {
+    return undefined
+  }
+
+  const trimmed = rawUrl.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  return normalizePPTElementHyperlinkUrl(trimmed) || undefined
 }
 
 function getPPTObjectStateSourceFromDataTransfer(
