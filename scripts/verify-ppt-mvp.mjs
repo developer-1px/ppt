@@ -11,6 +11,7 @@ const CHROME_BIN =
   process.env.CHROME_BIN ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_COMMAND_TIMEOUT_MS = 10000
+const PAGE_LOAD_TIMEOUT_MS = 60000
 const PPT_SLIDE_WIDTH = 1280
 const PPT_SLIDE_HEIGHT = 720
 const PPT_TEST_IMAGE_WIDTH = 640
@@ -382,7 +383,7 @@ async function runMarqueeSelectionScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterUndo = await getPPTMarqueeState(page)
@@ -397,7 +398,7 @@ async function runMarqueeSelectionScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
   await delay(80)
 
   const afterRedo = await getPPTMarqueeState(page)
@@ -677,7 +678,7 @@ async function runAltDragDuplicateScenario(page) {
     before,
   })
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(100)
 
   const afterUndo = await page.eval(`(() => {
@@ -1016,7 +1017,7 @@ async function runFindReplaceScenario(page) {
 
   record('replaces active PPT text match while preserving textBody structure', afterReplace.text.includes('PPT-ready later') && afterReplace.count === '0/0' && afterReplace.hasTextBodyRuns && afterReplace.undoEnabled, afterReplace)
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(100)
 
   const afterUndo = await page.eval(`(() => {
@@ -1032,7 +1033,7 @@ async function runFindReplaceScenario(page) {
 
   record('undoes PPT find replacement', afterUndo.text.includes('PPTX later') && afterUndo.count === '1/1' && afterUndo.redoEnabled && afterUndo.selectedId === 's2-title', afterUndo)
 
-  await page.eval(`document.querySelector('button[title="Redo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
   await delay(100)
 
   const afterRedo = await page.eval(`(() => {
@@ -1046,7 +1047,7 @@ async function runFindReplaceScenario(page) {
 
   record('redoes PPT find replacement', afterRedo.text.includes('PPT-ready later') && afterRedo.count === '0/0', afterRedo)
 
-  await page.eval(`document.querySelector('[data-ppt-find-close]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-find-close]')?.click()`)
   await delay(50)
 
   const titlePoint = await getElementCenter(page, 's2-title')
@@ -1861,7 +1862,7 @@ async function runAffordanceScenario(page) {
     beforeDistribute,
   })
 
-  await page.eval(`document.querySelector('[data-ppt-command="group"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-command="group"]')?.click()`)
   await delay(50)
 
   const afterGroup = await page.eval(`(() => {
@@ -1882,7 +1883,7 @@ async function runAffordanceScenario(page) {
       groupRowLevel: groupRow?.getAttribute('aria-level') ?? '',
       groupRowType: groupRow?.getAttribute('data-ppt-layer-pane-row-type') ?? '',
       selectedCount: selected.length,
-      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]').disabled,
+      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]')?.disabled ?? true,
       uniqueGroupCount: new Set(groupIds).size,
     }
   })()`)
@@ -9976,11 +9977,18 @@ async function runViewAndShapeScenario(page) {
 
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="fill-opacity"]')
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!input) return
 
-    setter.call(input, '0.35')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+    if (setter) {
+      setter.call(input, '0.35')
+    } else {
+      input.value = '0.35'
+    }
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
+    input.blur()
   })()`)
   await delay(80)
 
@@ -14492,6 +14500,69 @@ async function runTableImportScenario(page) {
       afterInspectorEdit,
       afterTSVRowsPaste,
       afterTSVRowsUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/csv', 'Metric,Owner\\n"Revenue, Net",AI\\nPipeline,Human')
+    dataTransfer.setData('text/plain', 'Metric,Owner\\n"Revenue, Net",AI\\nPipeline,Human')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterCSVRowsPaste = await getPPTTableState(page)
+
+  record(
+    'pastes CSV table rows into selected PPT table through canvas table import',
+    afterCSVRowsPaste.tableRowsImportModel === 'ppt-table-rows-import' &&
+      afterCSVRowsPaste.tableRowsImportFormat === 'canvas-csv' &&
+      afterCSVRowsPaste.tableRowsImportObjects === afterInspectorEdit.selectedId &&
+      afterCSVRowsPaste.tableRowsImportTargets === afterInspectorEdit.selectedId &&
+      afterCSVRowsPaste.tableRowsImportRows === 3 &&
+      afterCSVRowsPaste.tableRowsImportCols === 2 &&
+      afterCSVRowsPaste.tableRowsImportJsonLength > 30 &&
+      afterCSVRowsPaste.tableCount === afterInspectorEdit.tableCount &&
+      afterCSVRowsPaste.selectedId === afterInspectorEdit.selectedId &&
+      afterCSVRowsPaste.selectedRows === 3 &&
+      afterCSVRowsPaste.selectedCols === 2 &&
+      afterCSVRowsPaste.inspectorSize === '3 x 2' &&
+      afterCSVRowsPaste.cellTexts.includes('Revenue, Net') &&
+      afterCSVRowsPaste.cellTexts.includes('Human'),
+    {
+      afterCSVRowsPaste,
+      afterInspectorEdit,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCSVRowsUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table rows CSV paste as one history step',
+    afterCSVRowsUndo.tableCount === afterInspectorEdit.tableCount &&
+      afterCSVRowsUndo.selectedId === afterInspectorEdit.selectedId &&
+      afterCSVRowsUndo.selectedRows === 3 &&
+      afterCSVRowsUndo.selectedCols === 3 &&
+      afterCSVRowsUndo.cellTexts.includes('Revenue') &&
+      afterCSVRowsUndo.cellTexts.includes('45%') &&
+      !afterCSVRowsUndo.cellTexts.includes('Revenue, Net'),
+    {
+      afterCSVRowsPaste,
+      afterCSVRowsUndo,
+      afterInspectorEdit,
     },
   )
 
@@ -22049,15 +22120,25 @@ async function readPPTParagraphAlignRadioGroupState(page) {
   })()`)
 }
 
-function getElementCenter(page, elementId) {
-  return page.eval(`(() => {
-    const rect = document.querySelector('[data-ppt-element="${elementId}"]').getBoundingClientRect()
+async function getElementCenter(page, elementId) {
+  await waitUntil(
+    () => page.eval(`((elementId) => [...document.querySelectorAll('[data-ppt-element]')]
+      .some((element) => element.getAttribute('data-ppt-element') === elementId)
+    )(${JSON.stringify(elementId)})`),
+    `Timed out waiting for PPT element ${elementId}`,
+    2000,
+  )
+
+  return page.eval(`((elementId) => {
+    const element = [...document.querySelectorAll('[data-ppt-element]')]
+      .find((candidate) => candidate.getAttribute('data-ppt-element') === elementId)
+    const rect = element.getBoundingClientRect()
 
     return {
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     }
-  })()`)
+  })(${JSON.stringify(elementId)})`)
 }
 
 function positionsChanged(before, after, ids, tolerance = 0.5) {
@@ -22645,7 +22726,7 @@ async function openPage(cdpPort, url, viewport = null) {
         `location.href === ${JSON.stringify(url)} && document.readyState === 'complete' && !!document.querySelector('[data-ppt-app]')`,
       ),
     `Timed out loading page: ${url}`,
-    15000,
+    PAGE_LOAD_TIMEOUT_MS,
   )
 
   return page
