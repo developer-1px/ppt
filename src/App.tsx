@@ -20392,7 +20392,8 @@ function getPPTObjectHyperlinkPayloadValue(
       value.url !== undefined ||
       value.href !== undefined
     ) &&
-    !hasPPTObjectMetadataStandalonePayloadFields(value)
+    !hasPPTObjectMetadataStandalonePayloadFields(value) &&
+    !hasPPTMediaJSONStandalonePayloadFields(value)
   ) {
     return value
   }
@@ -26181,7 +26182,24 @@ function getPPTMediaJSONPayloadValue(
     return value.embed
   }
 
+  if (hasPPTMediaJSONStandalonePayloadFields(value)) {
+    return value
+  }
+
   return allowDirect ? value : null
+}
+
+function hasPPTMediaJSONStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.url !== undefined ||
+    value.href !== undefined ||
+    value.src !== undefined
+  ) && (
+    value.title !== undefined ||
+    value.label !== undefined
+  )
 }
 
 function getPPTMediaJSONTextFromJSONValue(value: unknown) {

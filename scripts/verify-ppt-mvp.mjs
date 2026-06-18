@@ -15220,6 +15220,55 @@ async function runMediaImportScenario(page) {
     },
   )
 
+  const standaloneJSONUrl = 'https://example.com/standalone-json-media-card'
+  const standaloneJSONTitle = 'Standalone media brief'
+
+  await page.eval(`((url, title) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      title,
+      url,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(standaloneJSONUrl)}, ${JSON.stringify(standaloneJSONTitle)})`)
+  await delay(120)
+
+  const afterStandaloneJSONPaste = await getPPTMediaImportState(page)
+
+  record(
+    'pastes standalone JSON media source into PPT link card via canvas media import',
+    afterStandaloneJSONPaste.mediaImportModel === 'canvas-media-import' &&
+      afterStandaloneJSONPaste.mediaImportImporter === 'ppt-link-card' &&
+      afterStandaloneJSONPaste.mediaImportUrl === standaloneJSONUrl &&
+      afterStandaloneJSONPaste.mediaImportSelection === afterStandaloneJSONPaste.selectedId &&
+      afterStandaloneJSONPaste.mediaJSONImportModel === 'ppt-media-json-import' &&
+      afterStandaloneJSONPaste.mediaJSONImportFormat === 'application-json-ppt-media' &&
+      afterStandaloneJSONPaste.mediaJSONImportFields === 'url title' &&
+      afterStandaloneJSONPaste.mediaJSONImportImporter === 'ppt-link-card' &&
+      afterStandaloneJSONPaste.mediaJSONImportObject === afterStandaloneJSONPaste.selectedId &&
+      afterStandaloneJSONPaste.mediaJSONImportTitle === standaloneJSONTitle &&
+      afterStandaloneJSONPaste.mediaJSONImportUrl === standaloneJSONUrl &&
+      afterStandaloneJSONPaste.mediaJSONImportJsonLength > 60 &&
+      afterStandaloneJSONPaste.shapeCount === afterJSONPaste.shapeCount + 1 &&
+      afterStandaloneJSONPaste.selectedKind === 'shape' &&
+      afterStandaloneJSONPaste.selectedName === 'Link card' &&
+      afterStandaloneJSONPaste.selectedHyperlink === standaloneJSONUrl &&
+      afterStandaloneJSONPaste.selectedText.includes(standaloneJSONTitle) &&
+      afterStandaloneJSONPaste.selectedText.includes(standaloneJSONUrl) &&
+      afterStandaloneJSONPaste.exportCode.includes(`data-ppt-hyperlink-url="${standaloneJSONUrl}"`),
+    {
+      afterJSONPaste,
+      afterStandaloneJSONPaste,
+    },
+  )
+
   const dropUrl = 'https://example.com/dropped-resource'
 
   const dropDispatch = await page.eval(`((url) => {
@@ -15267,18 +15316,18 @@ async function runMediaImportScenario(page) {
 
   record(
     'drops URL media source onto PPT stage as link card',
-    afterDrop.shapeCount === afterJSONPaste.shapeCount + 1 &&
+    afterDrop.shapeCount === afterStandaloneJSONPaste.shapeCount + 1 &&
       afterDrop.selectedKind === 'shape' &&
       afterDrop.selectedName === 'Link card' &&
       afterDrop.selectedHyperlink === dropUrl &&
       afterDrop.mediaImportUrl === dropUrl &&
       dropDispatch.defaultPrevented &&
       dropDispatch.captured?.uri === dropUrl &&
-      afterDrop.selectedLeft > afterJSONPaste.selectedLeft &&
-      afterDrop.selectedTop > afterJSONPaste.selectedTop,
+      afterDrop.selectedLeft > afterStandaloneJSONPaste.selectedLeft &&
+      afterDrop.selectedTop > afterStandaloneJSONPaste.selectedTop,
     {
       afterDrop,
-      afterJSONPaste,
+      afterStandaloneJSONPaste,
       dropDispatch,
     },
   )
