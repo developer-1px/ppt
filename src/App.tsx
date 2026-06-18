@@ -1040,6 +1040,11 @@ const PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-style' as const
 const PPT_OBJECT_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-style+json'
+const PPT_OBJECT_SHADOW_IMPORT_MODEL = 'ppt-object-shadow-import' as const
+const PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-shadow' as const
+const PPT_OBJECT_SHADOW_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-shadow+json'
 const PPT_OBJECT_OPACITY_IMPORT_MODEL = 'ppt-object-opacity-import' as const
 const PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-opacity' as const
@@ -1340,6 +1345,13 @@ type PPTObjectStyleImportSource = {
     opacity?: number
     shadow?: PPTElementShadow | null
   }
+}
+type PPTObjectShadowImportField = PPTElementShadowUpdateField
+type PPTObjectShadowImportSource = {
+  fields: readonly PPTObjectShadowImportField[]
+  format: typeof PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT
+  jsonLength: number
+  shadow: Partial<PPTElementShadow> | null
 }
 type PPTObjectOpacityImportField = 'opacity'
 type PPTObjectOpacityImportSource = {
@@ -1747,6 +1759,25 @@ type PPTObjectStyleImportEffect = {
   shadowDistance: string
   shadowEnabled: string
   shadowOpacity: string
+}
+type PPTObjectShadowImportEffect = {
+  angle: string
+  blur: string
+  color: string
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  distance: string
+  enabled: string
+  fields: string
+  format: typeof PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_SHADOW_IMPORT_MODEL
+  objectIds: string
+  opacity: string
+  slideId: string
 }
 type PPTObjectOpacityImportEffect = {
   commandFields: string
@@ -3111,6 +3142,8 @@ function App() {
     useState<PPTObjectAnimationImportEffect | null>(null)
   const [lastObjectStyleImportEffect, setLastObjectStyleImportEffect] =
     useState<PPTObjectStyleImportEffect | null>(null)
+  const [lastObjectShadowImportEffect, setLastObjectShadowImportEffect] =
+    useState<PPTObjectShadowImportEffect | null>(null)
   const [lastObjectOpacityImportEffect, setLastObjectOpacityImportEffect] =
     useState<PPTObjectOpacityImportEffect | null>(null)
   const [lastObjectMetadataImportEffect, setLastObjectMetadataImportEffect] =
@@ -4097,6 +4130,17 @@ function App() {
       if (
         objectStyleSource &&
         pastePPTObjectStyleSource(objectStyleSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectShadowSource =
+        getPPTObjectShadowSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectShadowSource &&
+        pastePPTObjectShadowSource(objectShadowSource)
       ) {
         event.preventDefault()
         return
@@ -5317,6 +5361,43 @@ function App() {
               : element
           },
         ),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectShadowSource(source: PPTObjectShadowImportSource) {
+    const effects = createPPTObjectShadowImportCommandEffects({
+      objectIds: selectedElements
+        .filter((element) =>
+          element.locked !== true &&
+            element.visible !== false)
+        .map((element) => element.id),
+      slideId: activeSlide.id,
+      source,
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastShadowEffect(effects[effects.length - 1])
+    setLastObjectShadowImportEffect(createPPTObjectShadowImportEffect({
+      effects,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const elementEffects = effects.filter((effect) =>
+            effect.payload.objectId === element.id)
+
+          return elementEffects.length === 0
+            ? element
+            : applyPPTObjectShadowEffectsToElement(element, elementEffects)
+        }),
       })))
 
     return true
@@ -12369,6 +12450,23 @@ function App() {
         data-ppt-shadow-command-value={lastShadowEffect
           ? String(lastShadowEffect.payload.value)
           : undefined}
+        data-ppt-shadow-import-angle={lastObjectShadowImportEffect?.angle}
+        data-ppt-shadow-import-blur={lastObjectShadowImportEffect?.blur}
+        data-ppt-shadow-import-color={lastObjectShadowImportEffect?.color}
+        data-ppt-shadow-import-command-fields={lastObjectShadowImportEffect?.commandFields}
+        data-ppt-shadow-import-command-targets={lastObjectShadowImportEffect?.commandTargets}
+        data-ppt-shadow-import-command-types={lastObjectShadowImportEffect?.commandTypes}
+        data-ppt-shadow-import-command-values={lastObjectShadowImportEffect?.commandValues}
+        data-ppt-shadow-import-commands={lastObjectShadowImportEffect?.commandIds}
+        data-ppt-shadow-import-distance={lastObjectShadowImportEffect?.distance}
+        data-ppt-shadow-import-enabled={lastObjectShadowImportEffect?.enabled}
+        data-ppt-shadow-import-fields={lastObjectShadowImportEffect?.fields}
+        data-ppt-shadow-import-format={lastObjectShadowImportEffect?.format}
+        data-ppt-shadow-import-json-length={lastObjectShadowImportEffect?.jsonLength}
+        data-ppt-shadow-import-model={lastObjectShadowImportEffect?.model}
+        data-ppt-shadow-import-objects={lastObjectShadowImportEffect?.objectIds}
+        data-ppt-shadow-import-opacity={lastObjectShadowImportEffect?.opacity}
+        data-ppt-shadow-import-slide={lastObjectShadowImportEffect?.slideId}
         data-ppt-shadow-model="slide-edit-object-shadow"
         data-ppt-stroke-line-style-command={lastStrokeLineStyleEffect?.payload.id}
         data-ppt-stroke-line-style-command-field={lastStrokeLineStyleEffect?.payload.fieldId}
@@ -14670,6 +14768,111 @@ function createPPTObjectStyleImportEffect({
     shadowEnabled: shadow === undefined ? '' : String(shadow !== null),
     shadowOpacity: shadow ? String(shadow.opacity) : '',
   }
+}
+
+function createPPTObjectShadowImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectShadowHostCommandEffect<string, string>[]
+  source: PPTObjectShadowImportSource
+}): PPTObjectShadowImportEffect {
+  const shadow = source.shadow === null
+    ? null
+    : normalizePPTElementShadow(source.shadow)
+
+  return {
+    angle: shadow ? String(shadow.angle) : '',
+    blur: shadow ? String(shadow.blur) : '',
+    color: shadow?.color ?? '',
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => String(effect.payload.value)).join(' '),
+    distance: shadow ? String(shadow.distance) : '',
+    enabled: String(source.shadow !== null),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_SHADOW_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    opacity: shadow ? String(shadow.opacity) : '',
+    slideId: effects[0]?.payload.slideId ?? '',
+  }
+}
+
+function createPPTObjectShadowImportCommandEffects({
+  objectIds,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  slideId: string
+  source: PPTObjectShadowImportSource
+}): SlideEditObjectShadowHostCommandEffect<string, string>[] {
+  const effects: SlideEditObjectShadowHostCommandEffect<string, string>[] = []
+
+  for (const objectId of objectIds) {
+    for (const field of source.fields) {
+      const value = getPPTObjectShadowImportFieldValue(source, field)
+
+      if (value === undefined) {
+        continue
+      }
+
+      effects.push(getSlideEditObjectShadowCommandEffect({
+        fieldId: field,
+        id: 'update-object-shadow',
+        objectId,
+        slideId,
+        value,
+      }))
+    }
+  }
+
+  return effects
+}
+
+function getPPTObjectShadowImportFieldValue(
+  source: PPTObjectShadowImportSource,
+  field: PPTObjectShadowImportField,
+): boolean | number | string | undefined {
+  if (field === 'enabled') {
+    return source.shadow !== null
+  }
+
+  if (source.shadow === null) {
+    return undefined
+  }
+
+  return source.shadow[field]
+}
+
+function applyPPTObjectShadowEffectsToElement(
+  element: PPTElement,
+  effects: readonly SlideEditObjectShadowHostCommandEffect<string, string>[],
+): PPTElement {
+  return effects.reduce((current, effect) => {
+    const { fieldId, value } = effect.payload
+
+    if (fieldId === 'enabled') {
+      return {
+        ...current,
+        shadow: value === true ? getPPTElementShadow(current) : undefined,
+      }
+    }
+
+    return {
+      ...current,
+      shadow: normalizePPTElementShadow({
+        ...getPPTElementShadow(current),
+        [fieldId]: value,
+      }),
+    }
+  }, element)
 }
 
 function createPPTObjectOpacityImportEffect({
@@ -17457,6 +17660,256 @@ function getPPTObjectStyleShadowFromJSONValue(
     distance: typeof value.distance === 'number' ? value.distance : undefined,
     opacity: typeof value.opacity === 'number' ? value.opacity : undefined,
   })
+}
+
+function getPPTObjectShadowSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_SHADOW_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectShadowSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectShadowSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectShadowImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectShadowSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectShadowSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectShadowImportSource | null {
+  const source = getPPTObjectShadowFromJSONValue(
+    getPPTObjectShadowPayloadValue(value, allowDirect),
+  )
+
+  return source
+    ? {
+        ...source,
+        format: PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTObjectShadowPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (value.objectShadow !== undefined) {
+    return value.objectShadow
+  }
+
+  if (value.objectEffectShadow !== undefined) {
+    return value.objectEffectShadow
+  }
+
+  if (value.shadow !== undefined) {
+    return value.shadow
+  }
+
+  if (allowDirect && value.value !== undefined) {
+    return value.value
+  }
+
+  return allowDirect &&
+    (
+      value.enabled !== undefined ||
+      value.color !== undefined ||
+      value.opacity !== undefined ||
+      value.blur !== undefined ||
+      value.distance !== undefined ||
+      value.angle !== undefined
+    )
+    ? value
+    : undefined
+}
+
+function getPPTObjectShadowFromJSONValue(
+  value: unknown,
+): Omit<PPTObjectShadowImportSource, 'format' | 'jsonLength'> | null {
+  if (value === null || value === false) {
+    return {
+      fields: ['enabled'],
+      shadow: null,
+    }
+  }
+
+  if (value === true) {
+    return {
+      fields: ['enabled'],
+      shadow: {},
+    }
+  }
+
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (value.enabled === false || value.enabled === null) {
+    return {
+      fields: ['enabled'],
+      shadow: null,
+    }
+  }
+
+  const fields: PPTObjectShadowImportField[] = []
+  const shadow: Partial<PPTElementShadow> = {}
+
+  if (value.enabled === true) {
+    fields.push('enabled')
+  }
+
+  const color = getPPTObjectShadowColorFromJSONValue(value.color)
+  const opacity = getPPTObjectShadowOpacityFromJSONValue(value.opacity)
+  const blur = getPPTObjectShadowBlurFromJSONValue(value.blur)
+  const distance = getPPTObjectShadowDistanceFromJSONValue(value.distance)
+  const angle = getPPTObjectShadowAngleFromJSONValue(value.angle)
+
+  if (color !== undefined) {
+    shadow.color = color
+    fields.push('color')
+  }
+
+  if (opacity !== undefined) {
+    shadow.opacity = opacity
+    fields.push('opacity')
+  }
+
+  if (blur !== undefined) {
+    shadow.blur = blur
+    fields.push('blur')
+  }
+
+  if (distance !== undefined) {
+    shadow.distance = distance
+    fields.push('distance')
+  }
+
+  if (angle !== undefined) {
+    shadow.angle = angle
+    fields.push('angle')
+  }
+
+  return fields.length === 0
+    ? null
+    : {
+        fields,
+        shadow,
+      }
+}
+
+function getPPTObjectShadowColorFromJSONValue(
+  value: unknown,
+): string | undefined {
+  return typeof value === 'string'
+    ? normalizePPTElementShadowColor(value.trim())
+    : undefined
+}
+
+function getPPTObjectShadowOpacityFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTElementShadowOpacity(numberValue)
+}
+
+function getPPTObjectShadowBlurFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTElementShadowBlur(numberValue)
+}
+
+function getPPTObjectShadowDistanceFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTElementShadowDistance(numberValue)
+}
+
+function getPPTObjectShadowAngleFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const numberValue = getPPTJSONFiniteNumber(value)
+
+  return numberValue === undefined
+    ? undefined
+    : normalizePPTElementShadowAngle(numberValue)
 }
 
 function getPPTObjectOpacitySourceFromDataTransfer(
