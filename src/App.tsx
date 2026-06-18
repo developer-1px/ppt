@@ -153,6 +153,8 @@ import {
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectHyperlinkJSONPasteValue,
   getSlideEditObjectImageCropCommandEffect,
+  getSlideEditObjectImageCropJSONPasteValue,
+  getSlideEditObjectImageCropPasteCommandEffects,
   getSlideEditObjectImageCropPositionCSS,
   getSlideEditObjectImageReplaceCommandEffect,
   getSlideEditObjectImageReplaceJSONPasteValue,
@@ -231,6 +233,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
@@ -278,6 +281,7 @@ import {
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectImageCropDescriptor,
   type SlideEditObjectImageCropHostCommandEffect,
+  type SlideEditObjectImageCropJSONPasteValue,
   type SlideEditObjectImageReplaceDescriptor,
   type SlideEditObjectImageReplaceHostCommandEffect,
   type SlideEditBuiltInAnimationTrigger,
@@ -17423,44 +17427,32 @@ function createPPTImageCropImportCommandEffects({
   slideId: string
   source: PPTImageCropImportSource
 }): SlideEditObjectImageCropHostCommandEffect<string, string>[] {
-  const effects: SlideEditObjectImageCropHostCommandEffect<string, string>[] = []
+  const pasteResult = getSlideEditObjectImageCropPasteCommandEffects({
+    pasteValue: createSlideEditObjectImageCropPasteValueFromPPTSource(source),
+    slideId,
+    targets: objectIds.map((objectId) => ({ objectId })),
+  })
 
-  for (const objectId of objectIds) {
-    for (const field of source.fields) {
-      if (field === 'fit') {
-        const fit = source.imageCrop.fit
+  return [...pasteResult.effects]
+}
 
-        if (fit === undefined) {
-          continue
-        }
-
-        effects.push(getSlideEditObjectImageCropCommandEffect({
-          fieldId: 'fit',
-          id: 'update-object-image-crop',
-          objectId,
-          slideId,
-          value: normalizeSlideEditObjectImageCropFit(fit),
-        }))
-        continue
-      }
-
-      const value = source.imageCrop.crop?.[field]
-
-      if (value === undefined) {
-        continue
-      }
-
-      effects.push(getSlideEditObjectImageCropCommandEffect({
-        fieldId: field,
-        id: 'update-object-image-crop',
-        objectId,
-        slideId,
-        value: normalizeSlideEditObjectImageCropValue(value),
-      }))
-    }
+function createSlideEditObjectImageCropPasteValueFromPPTSource(
+  source: PPTImageCropImportSource,
+): SlideEditObjectImageCropJSONPasteValue {
+  return {
+    crop: source.imageCrop.crop ?? {},
+    fields: source.fields,
+    ...(source.imageCrop.fit === undefined
+      ? {}
+      : { fit: source.imageCrop.fit }),
+    format: 'json',
+    payloadLength: source.jsonLength,
+    sourceFields: Object.fromEntries(
+      source.fields.map((field) => [field, field]),
+    ),
+    sourceType: source.format,
+    surface: 'object-image-crop',
   }
-
-  return effects
 }
 
 function applyPPTImageCropCommandEffectToElement(
@@ -22292,6 +22284,13 @@ function getPPTImageCropSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTImageCropSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -22335,6 +22334,85 @@ function getPPTImageCropSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTImageCropSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTImageCropImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_IMAGE_CROP_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectImageCropJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (!pasteValue) {
+        continue
+      }
+
+      const jsonValue = getPPTJSONValueFromText(json)
+
+      if (
+        !candidate.customMimeType &&
+        pasteValue.wrapper === 'crop' &&
+        isPPTRecord(jsonValue) &&
+        jsonValue.fit !== undefined
+      ) {
+        continue
+      }
+
+      return createPPTImageCropSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
+}
+
+function createPPTImageCropSourceFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditObjectImageCropJSONPasteValue,
+  jsonLength: number,
+): PPTImageCropImportSource {
+  const crop: Partial<PPTImageCrop> = {}
+
+  if (pasteValue.crop.x !== undefined) {
+    crop.x = pasteValue.crop.x
+  }
+
+  if (pasteValue.crop.y !== undefined) {
+    crop.y = pasteValue.crop.y
+  }
+
+  return {
+    fields: pasteValue.fields,
+    format: PPT_IMAGE_CROP_JSON_IMPORT_FORMAT,
+    imageCrop: {
+      ...(Object.keys(crop).length === 0 ? {} : { crop }),
+      ...(pasteValue.fit === undefined ? {} : { fit: pasteValue.fit }),
+    },
+    jsonLength,
+  }
 }
 
 function getPPTImageCropSourceFromText(

@@ -18,6 +18,8 @@ const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
+const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
 
@@ -13446,6 +13448,73 @@ async function runImageImportScenario(page) {
     {
       afterCropPaste,
       afterResetUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      crop: { x: 30, y: 65 },
+      fit: 'cover',
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(80)
+
+  const afterCanvasMIMECropPaste = await getPPTImageImportState(page)
+
+  record(
+    'pastes canvas MIME image crop into selected PPT image through slide-edit crop parser',
+    afterCanvasMIMECropPaste.imageCropImportModel === 'ppt-image-crop-import' &&
+      afterCanvasMIMECropPaste.imageCropImportFormat === 'application-json-ppt-image-crop' &&
+      afterCanvasMIMECropPaste.imageCropImportSlide === 'slide-1' &&
+      afterCanvasMIMECropPaste.imageCropImportObjects === afterCanvasMIMECropPaste.selectedId &&
+      afterCanvasMIMECropPaste.imageCropImportFields === 'fit x y' &&
+      afterCanvasMIMECropPaste.imageCropImportCommands ===
+        'update-object-image-crop update-object-image-crop update-object-image-crop' &&
+      afterCanvasMIMECropPaste.imageCropImportCommandFields === 'fit x y' &&
+      afterCanvasMIMECropPaste.imageCropImportCommandTypes ===
+        'slide-command-effect slide-command-effect slide-command-effect' &&
+      afterCanvasMIMECropPaste.imageCropImportFit === 'cover' &&
+      afterCanvasMIMECropPaste.imageCropImportX === '30' &&
+      afterCanvasMIMECropPaste.imageCropImportY === '65' &&
+      afterCanvasMIMECropPaste.imageCropCommand === 'update-object-image-crop' &&
+      afterCanvasMIMECropPaste.imageCropCommandField === 'y' &&
+      afterCanvasMIMECropPaste.imageCropCommandObject === afterCanvasMIMECropPaste.selectedId &&
+      afterCanvasMIMECropPaste.imageCropCommandValue === '65' &&
+      afterCanvasMIMECropPaste.inspectorImageFit === 'cover' &&
+      afterCanvasMIMECropPaste.inspectorCropX === 30 &&
+      afterCanvasMIMECropPaste.inspectorCropY === 65 &&
+      afterCanvasMIMECropPaste.selectedImageFit === 'cover' &&
+      afterCanvasMIMECropPaste.selectedImagePosition === '30% 65%',
+    {
+      afterCanvasMIMECropPaste,
+      afterCropPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterCanvasMIMECropUndo = await getPPTImageImportState(page)
+
+  record(
+    'restores PPT image crop after canvas MIME image crop probe',
+    afterCanvasMIMECropUndo.inspectorImageFit === 'contain' &&
+      afterCanvasMIMECropUndo.inspectorCropX === 25 &&
+      afterCanvasMIMECropUndo.inspectorCropY === 70 &&
+      afterCanvasMIMECropUndo.selectedImageFit === 'contain' &&
+      afterCanvasMIMECropUndo.selectedImagePosition === '25% 70%',
+    {
+      afterCanvasMIMECropPaste,
+      afterCanvasMIMECropUndo,
+      afterCropPaste,
     },
   )
 
