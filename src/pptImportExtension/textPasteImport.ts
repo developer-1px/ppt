@@ -6,6 +6,7 @@ import {
 } from '../pptCanvasCoreAdapter'
 import {
   createPPTCanvasTextPasteItems,
+  getPPTCanvasDataTransferText,
   getPPTCanvasTextPasteSourceCandidatesFromDataTransfer,
   getPPTCanvasTextPasteSourceText,
   getPPTCanvasTextPasteSourcesFromDataTransfer,
@@ -111,7 +112,10 @@ export function getPPTTextPasteSourceCandidatesFromDataTransfer(
   return getPPTCanvasTextPasteSourceCandidatesFromDataTransfer(dataTransfer)
     .flatMap((source) => {
       const candidate = createPPTTextPasteSourceCandidate(source, {
-        html: dataTransfer?.getData('text/html') ?? '',
+        html: getPPTCanvasDataTransferText({
+          dataTransfer,
+          mimeType: 'text/html',
+        }),
       })
 
       return candidate ? [candidate] : []

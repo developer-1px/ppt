@@ -1,5 +1,6 @@
 import { clampPPTCanvasBoundsToFrame } from '../pptCanvasCoreAdapter'
 import {
+  getPPTCanvasDataTransferText,
   getPPTCanvasTableColumnCount,
   getPPTCanvasTableComponentSize,
   getPPTCanvasTableFileFromDataTransfer,
@@ -192,8 +193,8 @@ export function getPPTTableSourceFromDataTransfer(dataTransfer: DataTransfer | n
   }
 
   return getPPTMarkdownTableSourceFromText(
-    dataTransfer.getData('text/markdown') ||
-      dataTransfer.getData('text/plain'),
+    getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/markdown' }) ||
+      getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/plain' }),
   )
 }
 

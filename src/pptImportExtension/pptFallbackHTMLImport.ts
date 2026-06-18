@@ -4,6 +4,9 @@ import {
   type Point,
 } from '../pptCanvasCoreAdapter'
 import {
+  getPPTCanvasDataTransferText,
+} from '../pptCanvasAppAffordanceAdapter'
+import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -144,12 +147,13 @@ const PPT_FALLBACK_TEXT_MAX_WIDTH = 980
 const PPT_FALLBACK_TEXT_MAX_HEIGHT = 560
 const PPT_FALLBACK_SELECTION_GRID_GAP = 24
 const PPT_FALLBACK_SELECTION_GRID_MAX_COLUMNS = 2
+const PPT_FALLBACK_HTML_MIME_TYPE = 'text/html'
 
 export function getPPTFallbackHTMLShapeSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   return getPPTFallbackHTMLShapeSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    getPPTFallbackHTMLTextFromDataTransfer(dataTransfer),
   )
 }
 
@@ -157,7 +161,7 @@ export function getPPTFallbackHTMLTextSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   return getPPTFallbackHTMLTextSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    getPPTFallbackHTMLTextFromDataTransfer(dataTransfer),
   )
 }
 
@@ -167,7 +171,7 @@ export function getPPTFallbackHTMLImageSourceFromDataTransfer(
   const image = getPPTImageSourceFromDataTransfer(dataTransfer)
 
   return getPPTFallbackHTMLImageSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    getPPTFallbackHTMLTextFromDataTransfer(dataTransfer),
     image,
   )
 }
@@ -176,7 +180,7 @@ export function getPPTFallbackHTMLTableSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   return getPPTFallbackHTMLTableSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    getPPTFallbackHTMLTextFromDataTransfer(dataTransfer),
   )
 }
 
@@ -186,9 +190,18 @@ export function getPPTFallbackHTMLSelectionSourceFromDataTransfer(
   const image = getPPTImageSourceFromDataTransfer(dataTransfer)
 
   return getPPTFallbackHTMLSelectionSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    getPPTFallbackHTMLTextFromDataTransfer(dataTransfer),
     image,
   )
+}
+
+function getPPTFallbackHTMLTextFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTCanvasDataTransferText({
+    dataTransfer,
+    mimeType: PPT_FALLBACK_HTML_MIME_TYPE,
+  })
 }
 
 export function getPPTFallbackHTMLSelectionSourceFromHTML(

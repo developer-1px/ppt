@@ -6,6 +6,9 @@ import {
   type PPTTextBody,
 } from '../pptModel'
 import {
+  getPPTCanvasDataTransferText,
+} from '../pptCanvasAppAffordanceAdapter'
+import {
   getSlideEditMarkdownDeckSource,
   getSlideEditMarkdownDeckSourceFromDataTransfer,
   type SlideEditMarkdownDeckSource,
@@ -60,8 +63,8 @@ export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
   }
 
   return getPPTDeckMarkdownOutlineSourceFromText(
-    dataTransfer.getData('text/markdown') ||
-      dataTransfer.getData('text/plain'),
+    getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/markdown' }) ||
+      getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/plain' }),
   )
 }
 
