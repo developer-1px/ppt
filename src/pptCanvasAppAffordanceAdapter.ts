@@ -96,6 +96,7 @@ import {
   trapCanvasModalTabFocus,
   useCanvasMenuRovingFocus,
   useCanvasModalFocusLifecycle,
+  useCanvasAppStageElement,
   useCanvasToolbarRovingFocus,
   writeCanvasClipboardText,
   writeCanvasRichClipboardPayload,
@@ -197,7 +198,6 @@ import {
   type CanvasTextPasteReplaceTarget,
   type CanvasTextPasteSource,
 } from 'canvas/app/text-paste-import'
-import { useCanvasAppStageElement } from 'canvas/app/stage-element'
 import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
 import {
   CANVAS_LASER_TRAIL_OVERLAY_MODEL,
