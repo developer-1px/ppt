@@ -122,6 +122,8 @@ import {
   createSlideEditTextParagraphSpacingDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
   createSlideEditTransitionDescriptor,
+  getSlideEditCommentThreadJSONPasteValue,
+  getSlideEditCommentThreadPasteCommandEffect,
   getSlideEditFrameGuideGeometry,
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
@@ -238,11 +240,14 @@ import {
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
+  SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
+  type SlideEditCommentThreadJSONPasteValue,
+  type SlideEditCommentThreadPatchHostCommandEffect,
   type SlideEditFrameGuideConfig,
   type SlideEditFrameGuideGeometry,
   type SlideEditLayerPaneCommandDescriptor,
@@ -2959,6 +2964,8 @@ type PPTCommentThreadHostCommandEffect = {
   }
   type: 'slide-command-effect'
 }
+type PPTCommentThreadPatchHostCommandEffect =
+  SlideEditCommentThreadPatchHostCommandEffect<string, string, string>
 type PPTInlineEditHistoryDirection = 'redo' | 'undo'
 type PPTInlineEditEffect = {
   elementId: string
@@ -7654,17 +7661,32 @@ function App() {
   }
 
   function pastePPTCommentSource(source: PPTCommentImportSource) {
-    const objectIds = activeSlide.elements
+    const targetElements = activeSlide.elements
       .filter((element) =>
         selection.includes(element.id) &&
         element.kind === 'comment' &&
         element.locked !== true &&
         element.visible !== false)
-      .map((element) => element.id)
+    const pasteValue = createPPTCommentThreadPasteValue(source)
+    const effects = targetElements.flatMap((element) => {
+      const effect = getSlideEditCommentThreadPasteCommandEffect({
+        pasteValue,
+        slideId: activeSlide.id,
+        target: {
+          commentId: element.id,
+          isHidden: element.visible === false,
+          isLocked: element.locked === true,
+        },
+      })
 
-    if (objectIds.length === 0) {
+      return effect ? [effect] : []
+    })
+
+    if (effects.length === 0) {
       return false
     }
+
+    const objectIds = effects.map((effect) => effect.payload.commentId)
 
     setLastCommentImportEffect(createPPTCommentImportEffect({
       objectIds,
@@ -7677,9 +7699,18 @@ function App() {
         elements: mapPPTElementsByIds(
           slide.elements,
           objectIds,
-          (element) => element.kind === 'comment'
-            ? applyPPTCommentImportSourceToElement(element, source)
-            : element,
+          (element) => {
+            const effect = effects.find((effect) =>
+              effect.payload.commentId === element.id)
+
+            return element.kind === 'comment' && effect
+              ? applyPPTCommentThreadPatchEffectToElement(
+                  element,
+                  effect,
+                  source,
+                )
+              : element
+          },
         ),
       })))
 
@@ -18441,6 +18472,83 @@ function createPPTCommentImportEffect({
   }
 }
 
+function createPPTCommentThreadPasteValue(
+  source: PPTCommentImportSource,
+): SlideEditCommentThreadJSONPasteValue<string> {
+  const patch = {
+    ...(source.comment.body === undefined ? {} : { body: source.comment.body }),
+    ...(source.comment.createdAt === undefined
+      ? {}
+      : { createdAt: source.comment.createdAt }),
+    messages: source.comment.thread?.map((message) => ({
+      ...(message.authorName ? { authorName: message.authorName } : {}),
+      body: message.body,
+      ...(message.createdAt ? { createdAt: message.createdAt } : {}),
+      ...(message.id ? { id: message.id } : {}),
+    })) ?? [],
+    ...(source.comment.resolved === undefined
+      ? {}
+      : { resolved: source.comment.resolved }),
+  }
+
+  return {
+    fields: source.fields.map((field) =>
+      field === 'thread' ? 'messages' : field),
+    format: 'json',
+    patch,
+    payloadLength: source.jsonLength,
+    sourceType: source.format,
+    surface: 'comment-thread',
+  }
+}
+
+function applyPPTCommentThreadPatchEffectToElement(
+  element: PPTComment,
+  effect: PPTCommentThreadPatchHostCommandEffect,
+  source: PPTCommentImportSource,
+) {
+  return applyPPTCommentImportSourceToElement(
+    element,
+    createPPTCommentImportSourceFromThreadPatchEffect(effect, source),
+  )
+}
+
+function createPPTCommentImportSourceFromThreadPatchEffect(
+  effect: PPTCommentThreadPatchHostCommandEffect,
+  source: PPTCommentImportSource,
+): PPTCommentImportSource {
+  const { patch } = effect.payload
+  const comment: PPTCommentImportSource['comment'] = {}
+  const body = source.fields.includes('body') && patch.body !== undefined
+    ? normalizePPTCommentBody(patch.body.replace(/\r\n?/g, '\n'))
+    : undefined
+
+  if (body !== undefined) {
+    comment.body = body
+  }
+
+  if (source.fields.includes('resolved') && patch.resolved !== undefined) {
+    comment.resolved = patch.resolved
+  }
+
+  if (source.fields.includes('createdAt') && patch.createdAt !== undefined) {
+    comment.createdAt = normalizePPTCommentCreatedAt(patch.createdAt)
+  }
+
+  if (source.fields.includes('thread')) {
+    const thread = getPPTCommentThreadFromJSONValue(patch.messages, body)
+
+    if (thread !== undefined) {
+      comment.thread = thread
+    }
+  }
+
+  return {
+    ...source,
+    comment,
+  }
+}
+
 function createPPTMediaJSONImportEffect({
   result,
   source,
@@ -27973,6 +28081,13 @@ function getPPTCommentSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTCommentSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -28016,6 +28131,155 @@ function getPPTCommentSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTCommentSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTCommentImportSource | null {
+  const candidates = [
+    {
+      jsonMimeType: PPT_COMMENT_JSON_MIME_TYPE,
+      type: PPT_COMMENT_JSON_MIME_TYPE,
+    },
+    {
+      jsonMimeType: SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
+      type: SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
+    },
+    {
+      jsonMimeType: '',
+      type: 'application/json',
+    },
+    {
+      jsonMimeType: '',
+      type: 'text/json',
+    },
+    {
+      jsonMimeType: '',
+      type: 'text/plain',
+    },
+  ] as const
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = dataTransfer.getData(candidate.type).trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const json = getPPTImportJSONText(text) ?? text
+    const pasteValue = getSlideEditCommentThreadJSONPasteValue({
+      dataTransfer: {
+        getData: (type: string) => type === candidate.type ? json : '',
+      },
+      jsonMimeType: candidate.jsonMimeType,
+      storagePolicy: {
+        maxBodyLength: PPT_COMMENT_BODY_MAX_LENGTH,
+        maxMessageBodyLength: PPT_COMMENT_REPLY_MAX_LENGTH,
+      },
+    })
+
+    if (!pasteValue) {
+      continue
+    }
+
+    const source = createPPTCommentSourceFromSlideEditJSONPasteValue(
+      pasteValue,
+      json.length,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function createPPTCommentSourceFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditCommentThreadJSONPasteValue,
+  jsonLength: number,
+): PPTCommentImportSource | null {
+  const fields = getPPTCommentImportFieldsFromSlideEditJSONPasteValue(pasteValue)
+  const { patch } = pasteValue
+
+  if (fields.length === 0) {
+    return null
+  }
+
+  const comment: PPTCommentImportSource['comment'] = {}
+  const body = fields.includes('body') && patch.body !== undefined
+    ? normalizePPTCommentBody(patch.body.replace(/\r\n?/g, '\n'))
+    : undefined
+
+  if (body !== undefined) {
+    comment.body = body
+  }
+
+  if (fields.includes('resolved') && patch.resolved !== undefined) {
+    comment.resolved = patch.resolved
+  }
+
+  if (fields.includes('createdAt') && patch.createdAt !== undefined) {
+    comment.createdAt = normalizePPTCommentCreatedAt(patch.createdAt)
+  }
+
+  if (fields.includes('thread')) {
+    const thread = getPPTCommentThreadFromJSONValue(patch.messages, body)
+
+    if (thread !== undefined) {
+      comment.thread = thread
+    }
+  }
+
+  return {
+    comment,
+    fields,
+    format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+    jsonLength,
+  }
+}
+
+function getPPTCommentImportFieldsFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditCommentThreadJSONPasteValue,
+): PPTCommentImportField[] {
+  const { patch } = pasteValue
+
+  return [
+    ...(patch.body === undefined ? [] : ['body' as const]),
+    ...(patch.resolved === undefined ? [] : ['resolved' as const]),
+    ...(patch.createdAt === undefined ? [] : ['createdAt' as const]),
+    ...(hasPPTCommentThreadFromSlideEditJSONPasteValue(pasteValue)
+      ? ['thread' as const]
+      : []),
+  ]
+}
+
+function hasPPTCommentThreadFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditCommentThreadJSONPasteValue,
+) {
+  if (
+    !pasteValue.fields.includes('messages') ||
+    pasteValue.patch.messages.length === 0
+  ) {
+    return false
+  }
+
+  if (
+    pasteValue.patch.messages.length !== 1 ||
+    pasteValue.patch.body === undefined
+  ) {
+    return true
+  }
+
+  const [message] = pasteValue.patch.messages
+
+  return message.body !== pasteValue.patch.body ||
+    message.authorName !== undefined ||
+    message.createdAt !== undefined ||
+    message.id !== undefined
 }
 
 function getPPTCommentSourceFromText(
