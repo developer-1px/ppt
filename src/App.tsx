@@ -168,6 +168,8 @@ import {
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditObjectStrokeLineStyleJSONPasteValue,
+  getSlideEditObjectTransformJSONPasteValue,
+  getSlideEditObjectTransformPasteCommandEffects,
   getSlideEditObjectAccessibilityJSONPasteValue,
   getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
@@ -227,6 +229,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
@@ -295,6 +298,8 @@ import {
   type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
+  type SlideEditObjectTransformHostCommandEffect,
+  type SlideEditObjectTransformJSONPasteValue,
   type SlideEditObjectVisibilityCommandAvailability,
   type SlideEditObjectVisibilityCommandId,
   type SlideEditObjectVisibilityDescriptor,
@@ -1841,6 +1846,9 @@ type PPTObjectTransformImportSource = {
     rotation: number
   }>
 }
+type PPTObjectTransformCommandValue = Pick<Bounds, 'h' | 'w' | 'x' | 'y'> & {
+  rotation: number
+}
 type PPTCommentImportField =
   | 'body'
   | 'createdAt'
@@ -2486,6 +2494,12 @@ type PPTObjectTransformImportEffect = {
   x: string
   y: string
 }
+type PPTObjectTransformHostCommandEffect =
+  SlideEditObjectTransformHostCommandEffect<
+    string,
+    string,
+    PPTObjectTransformCommandValue
+  >
 type PPTCommentImportEffect = {
   bodyLength: number
   commandTargets: string
@@ -6537,16 +6551,54 @@ function App() {
   function pastePPTObjectTransformSource(
     source: PPTObjectTransformImportSource,
   ) {
-    const objectIds = activeSlide.elements
-      .filter((element) =>
-        selection.includes(element.id) &&
-        element.locked !== true &&
-        element.visible !== false)
-      .map((element) => element.id)
+    const targets = activeSlide.elements
+      .filter((element) => selection.includes(element.id))
+      .map((element) => ({
+        bounds: pptGeometryToBounds(element.geometry),
+        frameBounds: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+          x: 0,
+          y: 0,
+        },
+        isHidden: element.visible === false,
+        isLocked: element.locked === true,
+        minSize: {
+          h: 24,
+          w: 24,
+        },
+        objectId: element.id,
+        rotation: element.geometry.rotation ?? 0,
+      }))
+    const pasteResult = getSlideEditObjectTransformPasteCommandEffects({
+      frameBounds: {
+        h: PPT_SLIDE_HEIGHT,
+        w: PPT_SLIDE_WIDTH,
+        x: 0,
+        y: 0,
+      },
+      minSize: {
+        h: 24,
+        w: 24,
+      },
+      normalizeTransform: ({ nextTransform }) => ({
+        h: nextTransform.h,
+        rotation: normalizePPTCanvasRotationDegrees(nextTransform.rotation),
+        w: nextTransform.w,
+        x: nextTransform.x,
+        y: nextTransform.y,
+      }),
+      pasteValue: createPPTObjectTransformPasteValue(source),
+      slideId: activeSlide.id,
+      targets,
+    })
+    const effects = pasteResult.effects
 
-    if (objectIds.length === 0) {
+    if (effects.length === 0) {
       return false
     }
+
+    const objectIds = effects.map((effect) => effect.payload.objectId)
 
     setLastObjectTransformImportEffect(createPPTObjectTransformImportEffect({
       objectIds,
@@ -6559,7 +6611,14 @@ function App() {
         elements: mapPPTElementsByIds(
           slide.elements,
           objectIds,
-          (element) => applyPPTObjectTransformSourceToElement(element, source),
+          (element) => {
+            const effect = effects.find((effect) =>
+              effect.payload.objectId === element.id)
+
+            return effect
+              ? applyPPTObjectTransformEffectToElement(element, effect)
+              : element
+          },
         ),
       })))
 
@@ -16873,37 +16932,41 @@ function createPPTObjectTransformImportEffect({
   }
 }
 
-function applyPPTObjectTransformSourceToElement(
-  element: PPTElement,
+function createPPTObjectTransformPasteValue(
   source: PPTObjectTransformImportSource,
+): SlideEditObjectTransformJSONPasteValue {
+  return {
+    fields: source.fields,
+    format: 'json',
+    payloadLength: source.jsonLength,
+    sourceFields: {},
+    sourceType: source.format,
+    surface: 'object-transform',
+    transform: source.transform,
+  }
+}
+
+function applyPPTObjectTransformEffectToElement(
+  element: PPTElement,
+  effect: PPTObjectTransformHostCommandEffect,
 ): PPTElement {
-  const bounds = clampPPTCanvasBoundsToFrame({
-    bounds: {
-      ...pptGeometryToBounds(element.geometry),
-      ...(source.transform.h === undefined ? {} : { h: source.transform.h }),
-      ...(source.transform.w === undefined ? {} : { w: source.transform.w }),
-      ...(source.transform.x === undefined ? {} : { x: source.transform.x }),
-      ...(source.transform.y === undefined ? {} : { y: source.transform.y }),
-    },
-    frame: {
-      h: PPT_SLIDE_HEIGHT,
-      w: PPT_SLIDE_WIDTH,
-      x: 0,
-      y: 0,
-    },
-    minHeight: 24,
-    minWidth: 24,
-  })
+  const { transform } = effect.payload
+  const bounds = {
+    h: transform.h,
+    w: transform.w,
+    x: transform.x,
+    y: transform.y,
+  }
   const next = updatePPTElementBounds(element, bounds)
 
-  return source.transform.rotation === undefined
+  return !effect.payload.fields.includes('rotation')
     ? next
     : {
         ...next,
         geometry: {
           ...next.geometry,
           rotation: normalizePPTCanvasRotationDegrees(
-            source.transform.rotation,
+            transform.rotation,
           ),
         },
       }
@@ -21688,6 +21751,13 @@ function getPPTObjectTransformSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectTransformSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -21731,6 +21801,61 @@ function getPPTObjectTransformSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTObjectTransformSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectTransformImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectTransformJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (!pasteValue) {
+        continue
+      }
+
+      return createPPTObjectTransformSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
+}
+
+function createPPTObjectTransformSourceFromSlideEditJSONPasteValue(
+  pasteValue: SlideEditObjectTransformJSONPasteValue,
+  jsonLength: number,
+): PPTObjectTransformImportSource {
+  return {
+    fields: pasteValue.fields,
+    format: PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
+    jsonLength,
+    transform: pasteValue.transform,
+  }
 }
 
 function getPPTObjectTransformSourceFromText(
