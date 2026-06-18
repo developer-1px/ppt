@@ -501,6 +501,7 @@ import {
   deletePPTCanvasCommand,
   distributePPTCanvasCommand,
   duplicatePPTCanvasCommand,
+  getPPTCanvasCreatedRectBounds,
   getPPTCanvasWheelViewport,
   groupPPTCanvasCommand,
   lockPPTCanvasCommand,
@@ -36939,17 +36940,11 @@ function getPPTCreatedTextBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
-
-  if (bounds.w > 6 && bounds.h > 6) {
-    return clampPPTCreationBounds(bounds)
-  }
-
-  return clampPPTCreationBounds({
-    ...PPT_DEFAULT_TEXT_BOUNDS,
-    x: startWorld.x,
-    y: startWorld.y,
-  })
+  return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
+    currentWorld,
+    defaultSize: PPT_DEFAULT_TEXT_BOUNDS,
+    startWorld,
+  }))
 }
 
 function getPPTCreatedStickyBounds({
@@ -36959,17 +36954,11 @@ function getPPTCreatedStickyBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
-
-  if (bounds.w > 6 && bounds.h > 6) {
-    return clampPPTCreationBounds(bounds)
-  }
-
-  return clampPPTCreationBounds({
-    ...PPT_STICKY_BOUNDS,
-    x: startWorld.x,
-    y: startWorld.y,
-  })
+  return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
+    currentWorld,
+    defaultSize: PPT_STICKY_BOUNDS,
+    startWorld,
+  }))
 }
 
 function getPPTCreatedSectionBounds({
@@ -36979,17 +36968,12 @@ function getPPTCreatedSectionBounds({
   currentWorld: Point
   startWorld: Point
 }): Bounds {
-  const bounds = normalizePPTCanvasBounds(startWorld, currentWorld)
-
-  if (bounds.w > 12 && bounds.h > 12) {
-    return clampPPTCreationBounds(bounds)
-  }
-
-  return clampPPTCreationBounds({
-    ...PPT_SECTION_BOUNDS,
-    x: startWorld.x,
-    y: startWorld.y,
-  })
+  return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
+    currentWorld,
+    defaultSize: PPT_SECTION_BOUNDS,
+    dragThreshold: 12,
+    startWorld,
+  }))
 }
 
 function clampPPTCreationBounds(bounds: Bounds): Bounds {

@@ -8,6 +8,7 @@ import {
   deleteCanvasCommand,
   distributeCanvasCommand,
   duplicateCanvasCommand,
+  getCanvasCreatedRectBounds,
   getCanvasWheelViewport,
   groupCanvasCommand,
   lockCanvasCommand,
@@ -36,6 +37,7 @@ export const createPPTCanvasText = createCanvasText
 export const deletePPTCanvasCommand = deleteCanvasCommand
 export const distributePPTCanvasCommand = distributeCanvasCommand
 export const duplicatePPTCanvasCommand = duplicateCanvasCommand
+export const getPPTCanvasCreatedRectBounds = getCanvasCreatedRectBounds
 export const getPPTCanvasWheelViewport = getCanvasWheelViewport
 export const groupPPTCanvasCommand = groupCanvasCommand
 export const lockPPTCanvasCommand = lockCanvasCommand
