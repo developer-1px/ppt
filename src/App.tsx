@@ -1131,6 +1131,12 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_RUN_ITALIC_IMPORT_MODEL =
+  'ppt-text-run-italic-import' as const
+const PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-run-italic' as const
+const PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-run-italic+json'
 const PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL =
   'ppt-text-paragraph-align-import' as const
 const PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT =
@@ -1580,6 +1586,17 @@ type PPTTextBodyImportSource = {
   jsonLength: number
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
+}
+type PPTTextRunItalicImportField =
+  | 'italic'
+  | 'runItalic'
+  | 'textRunItalic'
+  | 'value'
+type PPTTextRunItalicImportSource = {
+  fields: readonly PPTTextRunItalicImportField[]
+  format: typeof PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT
+  italic: boolean
+  jsonLength: number
 }
 type PPTTextParagraphAlignImportField =
   | 'align'
@@ -2111,6 +2128,21 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextRunItalicImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT
+  italic: string
+  jsonLength: number
+  model: typeof PPT_TEXT_RUN_ITALIC_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
 }
 type PPTTextParagraphAlignImportEffect = {
   align: string
@@ -3349,6 +3381,8 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
+  const [lastTextRunItalicImportEffect, setLastTextRunItalicImportEffect] =
+    useState<PPTTextRunItalicImportEffect | null>(null)
   const [lastTextParagraphAlignImportEffect, setLastTextParagraphAlignImportEffect] =
     useState<PPTTextParagraphAlignImportEffect | null>(null)
   const [lastTextParagraphBulletImportEffect, setLastTextParagraphBulletImportEffect] =
@@ -4453,6 +4487,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textRunItalicSource =
+        getPPTTextRunItalicSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textRunItalicSource &&
+        pastePPTTextRunItalicSource(textRunItalicSource)
       ) {
         event.preventDefault()
         return
@@ -6254,6 +6299,54 @@ function App() {
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
             : element
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextRunItalicSource(source: PPTTextRunItalicImportSource) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    setLastTextRunItalicImportEffect(createPPTTextRunItalicImportEffect({
+      objectIds: textElements.map((element) => element.id),
+      runCount: textElements.reduce((count, element) =>
+        count + element.textBody.paragraphs.reduce(
+          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
+          0,
+        ), 0),
+      slideId: activeSlide.id,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          textElements.map((element) => element.id),
+          (element) =>
+            isPPTTextElement(element)
+              ? {
+                  ...element,
+                  textBody: {
+                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                      ...paragraph,
+                      runs: paragraph.runs.map((run) => ({
+                        ...run,
+                        italic: source.italic ? true : undefined,
+                      })),
+                    })),
+                  },
+                }
+              : element,
+        ),
       })))
 
     return true
@@ -12705,6 +12798,19 @@ function App() {
         data-ppt-text-body-import-paragraphs={lastTextBodyImportEffect?.paragraphCount}
         data-ppt-text-body-import-runs={lastTextBodyImportEffect?.runCount}
         data-ppt-text-body-import-text-length={lastTextBodyImportEffect?.textLength}
+        data-ppt-text-run-italic-import-command-fields={lastTextRunItalicImportEffect?.commandFields}
+        data-ppt-text-run-italic-import-command-ids={lastTextRunItalicImportEffect?.commandIds}
+        data-ppt-text-run-italic-import-command-targets={lastTextRunItalicImportEffect?.commandTargets}
+        data-ppt-text-run-italic-import-command-types={lastTextRunItalicImportEffect?.commandTypes}
+        data-ppt-text-run-italic-import-command-values={lastTextRunItalicImportEffect?.commandValues}
+        data-ppt-text-run-italic-import-fields={lastTextRunItalicImportEffect?.fields}
+        data-ppt-text-run-italic-import-format={lastTextRunItalicImportEffect?.format}
+        data-ppt-text-run-italic-import-json-length={lastTextRunItalicImportEffect?.jsonLength}
+        data-ppt-text-run-italic-import-model={lastTextRunItalicImportEffect?.model}
+        data-ppt-text-run-italic-import-objects={lastTextRunItalicImportEffect?.objectIds}
+        data-ppt-text-run-italic-import-runs={lastTextRunItalicImportEffect?.runCount}
+        data-ppt-text-run-italic-import-slide={lastTextRunItalicImportEffect?.slideId}
+        data-ppt-text-run-italic-import-value={lastTextRunItalicImportEffect?.italic}
         data-ppt-text-paragraph-align-import-categories={lastTextParagraphAlignImportEffect?.categories}
         data-ppt-text-paragraph-align-import-command={lastTextParagraphAlignImportEffect?.commandId}
         data-ppt-text-paragraph-align-import-command-targets={lastTextParagraphAlignImportEffect?.commandTargets}
@@ -16688,6 +16794,36 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextRunItalicImportEffect({
+  objectIds,
+  runCount,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  runCount: number
+  slideId: string
+  source: PPTTextRunItalicImportSource
+}): PPTTextRunItalicImportEffect {
+  const value = String(source.italic)
+
+  return {
+    commandFields: 'italic',
+    commandIds: 'update-text-run-style',
+    commandTargets: objectIds.join(' '),
+    commandTypes: 'slide-command-effect',
+    commandValues: value,
+    fields: source.fields.join(' '),
+    format: source.format,
+    italic: value,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_RUN_ITALIC_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    runCount,
+    slideId,
   }
 }
 
@@ -21770,6 +21906,218 @@ function getPPTTextFontWeightImportValueFromJSONValue(
 
   return getPPTTextStyleFontWeightFromJSONValue(value) ??
     getPPTTextStyleBoldFromJSONValue(value)
+}
+
+function getPPTTextRunItalicSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextRunItalicSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunItalicSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextRunItalicImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextRunItalicSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextRunItalicSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextRunItalicSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextRunItalicSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextRunItalicImportSource | null {
+  const payload = getPPTTextRunItalicPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const italic = getPPTTextRunItalicImportValueFromJSONValue(payload.value)
+
+  return italic === undefined
+    ? null
+    : {
+        fields: payload.fields,
+        format: PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT,
+        italic,
+        jsonLength,
+      }
+}
+
+function getPPTTextRunItalicPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunItalicImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textRunItalic',
+    'runItalic',
+    'italic',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextRunItalicImportValueFromJSONValue(
+  value: unknown,
+): boolean | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'italic',
+      'runItalic',
+      'textRunItalic',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextRunItalicImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return true
+    }
+
+    if (value === 0) {
+      return false
+    }
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  switch (value.trim().replace(/[\s_]/g, '-').toLowerCase()) {
+    case '1':
+    case 'enabled':
+    case 'italic':
+    case 'on':
+    case 'true':
+    case 'yes':
+      return true
+    case '0':
+    case 'disabled':
+    case 'false':
+    case 'normal':
+    case 'off':
+    case 'regular':
+    case 'roman':
+    case 'upright':
+    case 'none':
+    case 'no':
+      return false
+    default:
+      return undefined
+  }
 }
 
 function getPPTTextStyleFontFamilyFromJSONValue(value: unknown) {

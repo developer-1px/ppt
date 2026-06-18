@@ -1010,7 +1010,7 @@ async function runFindReplaceScenario(page) {
       count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
       hasTextBodyRuns: code.includes('"textBody"') && code.includes('"paragraphs"') && code.includes('"runs"'),
       text: selected?.textContent ?? '',
-      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+      undoEnabled: !(document.querySelector('button[title="Undo"]')?.disabled ?? true),
     }
   })()`)
 
@@ -1024,7 +1024,7 @@ async function runFindReplaceScenario(page) {
 
     return {
       count: document.querySelector('[data-ppt-find-count]')?.textContent ?? '',
-      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+      redoEnabled: !(document.querySelector('button[title="Redo"]')?.disabled ?? true),
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       text: selected?.textContent ?? '',
     }
@@ -1667,7 +1667,8 @@ async function runAffordanceScenario(page) {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
 
     return {
-      left: parseFloat(element.style.left),
+      hasElement: !!element,
+      left: parseFloat(element?.style.left ?? 'NaN'),
       selectedCount: document.querySelectorAll('[data-selected="true"]').length,
     }
   })()`)
@@ -5354,6 +5355,8 @@ function getPPTTextFormatPainterState(page, elementId) {
       fontSize: element?.style.fontSize ?? '',
       fontWeight: element?.style.fontWeight ?? '',
       height: element?.style.height ?? '',
+      italicRun: element?.querySelector('[data-ppt-run-italic="true"]')?.style.fontStyle ?? '',
+      italicRunCount: element?.querySelectorAll('[data-ppt-run-italic="true"]').length ?? 0,
       left: element?.style.left ?? '',
       name: layerName?.textContent ?? '',
       numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
@@ -5395,6 +5398,19 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
       textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
       textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
+      textRunItalicImportCommandFields: stage?.getAttribute('data-ppt-text-run-italic-import-command-fields') ?? '',
+      textRunItalicImportCommandIds: stage?.getAttribute('data-ppt-text-run-italic-import-command-ids') ?? '',
+      textRunItalicImportCommandTargets: stage?.getAttribute('data-ppt-text-run-italic-import-command-targets') ?? '',
+      textRunItalicImportCommandTypes: stage?.getAttribute('data-ppt-text-run-italic-import-command-types') ?? '',
+      textRunItalicImportCommandValues: stage?.getAttribute('data-ppt-text-run-italic-import-command-values') ?? '',
+      textRunItalicImportFields: stage?.getAttribute('data-ppt-text-run-italic-import-fields') ?? '',
+      textRunItalicImportFormat: stage?.getAttribute('data-ppt-text-run-italic-import-format') ?? '',
+      textRunItalicImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-italic-import-json-length') ?? 0),
+      textRunItalicImportModel: stage?.getAttribute('data-ppt-text-run-italic-import-model') ?? '',
+      textRunItalicImportObjects: stage?.getAttribute('data-ppt-text-run-italic-import-objects') ?? '',
+      textRunItalicImportRuns: Number(stage?.getAttribute('data-ppt-text-run-italic-import-runs') ?? 0),
+      textRunItalicImportSlide: stage?.getAttribute('data-ppt-text-run-italic-import-slide') ?? '',
+      textRunItalicImportValue: stage?.getAttribute('data-ppt-text-run-italic-import-value') ?? '',
       textParagraphAlignImportCategories: stage?.getAttribute('data-ppt-text-paragraph-align-import-categories') ?? '',
       textParagraphAlignImportCommand: stage?.getAttribute('data-ppt-text-paragraph-align-import-command') ?? '',
       textParagraphAlignImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-targets') ?? '',
@@ -6352,6 +6368,95 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextParagraphBulletPaste,
       summaryAfterTextParagraphBulletRedo,
       summaryAfterTextParagraphBulletUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphBulletRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify(true)
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-run-italic+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunItalicPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text run italic JSON through run style command effect',
+    summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletRestore.italicRunCount === 0 &&
+      summaryAfterTextRunItalicPaste.selected === 'true' &&
+      summaryAfterTextRunItalicPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextRunItalicPaste.italicRun === 'italic' &&
+      summaryAfterTextRunItalicPaste.italicRunCount > 0 &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportModel === 'ppt-text-run-italic-import' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportFormat === 'application-json-ppt-text-run-italic' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandFields === 'italic' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportCommandValues === 'true' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportFields === 'value' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportJsonLength >= 4 &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportObjects === 's1-summary' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportRuns > 0 &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportSlide === 'slide-1' &&
+      summaryAfterTextRunItalicPaste.textRunItalicImportValue === 'true',
+    {
+      summaryAfterTextParagraphBulletRestore,
+      summaryAfterTextRunItalicPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunItalicUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunItalicRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text run italic JSON as one history step',
+    summaryAfterTextRunItalicUndo.italicRunCount === 0 &&
+      summaryAfterTextRunItalicRedo.italicRun === 'italic' &&
+      summaryAfterTextRunItalicRedo.italicRunCount > 0,
+    {
+      summaryAfterTextRunItalicPaste,
+      summaryAfterTextRunItalicRedo,
+      summaryAfterTextRunItalicUndo,
     },
   )
 
@@ -11755,6 +11860,8 @@ async function runImageImportScenario(page) {
 
   await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
+    if (!stage) return
+
     const rect = stage.getBoundingClientRect()
     const dataTransfer = new DataTransfer()
     dataTransfer.items.add(${createPPTTestImageFileExpression('drop.svg', '#dc2626')})
@@ -12765,13 +12872,9 @@ async function runTableImportScenario(page) {
     windowsVirtualKeyCode: 75,
   })
   await delay(80)
-  await page.send('Input.insertText', { text: 'add table' })
+  await page.send('Input.insertText', { text: 'table' })
   await delay(80)
-  await pressKey(page, {
-    code: 'Enter',
-    key: 'Enter',
-    windowsVirtualKeyCode: 13,
-  })
+  await page.eval(`document.querySelector('[data-ppt-command-palette-item="tool:table"]')?.click()`)
   await delay(100)
 
   const afterPaletteInsert = await getPPTTableState(page)
@@ -12896,6 +12999,8 @@ async function runTableImportScenario(page) {
 
   await page.eval(`(() => {
     const stage = document.querySelector('.ppt-stage-shell')
+    if (!stage) return
+
     const rect = stage.getBoundingClientRect()
     const files = [
       ${createPPTTestTableFileExpression('north.csv', 'Region,Score\nNorth,81\nSouth,79')},
@@ -17426,7 +17531,7 @@ async function runSlideManagementScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
   await delay(60)
   await page.eval(`((slideId) => {
     const thumb = [...document.querySelectorAll('.ppt-thumb')]
@@ -17462,7 +17567,7 @@ async function runSlideManagementScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
   await delay(60)
   await page.eval(`((slideId) => {
     const thumb = [...document.querySelectorAll('.ppt-thumb')]
@@ -17503,7 +17608,7 @@ async function runSlideManagementScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
   await delay(60)
   await page.eval(`((slideId) => {
     const thumb = [...document.querySelectorAll('.ppt-thumb')]
@@ -17594,7 +17699,7 @@ async function runSlideManagementScenario(page) {
     beforeDrag,
   })
 
-  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]').click()`)
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
   await delay(50)
 
   const afterDelete = await getSlideRailState(page)
