@@ -1080,6 +1080,11 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_AUTOFIT_IMPORT_MODEL = 'ppt-text-autofit-import' as const
+const PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-autofit' as const
+const PPT_TEXT_AUTOFIT_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-autofit+json'
 const PPT_LINE_STYLE_IMPORT_MODEL = 'ppt-line-style-import' as const
 const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-line-style' as const
@@ -1408,6 +1413,16 @@ type PPTTextBodyImportSource = {
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
 }
+type PPTTextAutoFitImportField =
+  | 'handle'
+  | 'mode'
+type PPTTextAutoFitImportSource = {
+  fields: readonly PPTTextAutoFitImportField[]
+  format: typeof PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT
+  handle: ResizeHandle
+  jsonLength: number
+  mode: 'resize-to-fit'
+}
 type PPTLineStyleImportField =
   | 'color'
   | 'dash'
@@ -1726,6 +1741,18 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextAutoFitImportEffect = {
+  commandHandles: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  fields: string
+  format: typeof PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT
+  jsonLength: number
+  mode: string
+  model: typeof PPT_TEXT_AUTOFIT_IMPORT_MODEL
+  objectIds: string
 }
 type PPTLineStyleImportEffect = {
   categories: string
@@ -2839,6 +2866,8 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
+  const [lastTextAutoFitImportEffect, setLastTextAutoFitImportEffect] =
+    useState<PPTTextAutoFitImportEffect | null>(null)
   const [lastLineStyleImportEffect, setLastLineStyleImportEffect] =
     useState<PPTLineStyleImportEffect | null>(null)
   const [lastObjectTransformImportEffect, setLastObjectTransformImportEffect] =
@@ -3829,6 +3858,17 @@ function App() {
       if (
         objectTransformSource &&
         pastePPTObjectTransformSource(objectTransformSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textAutoFitSource =
+        getPPTTextAutoFitSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textAutoFitSource &&
+        pastePPTTextAutoFitSource(textAutoFitSource)
       ) {
         event.preventDefault()
         return
@@ -5137,6 +5177,53 @@ function App() {
           (element) => applyPPTObjectTransformSourceToElement(element, source),
         ),
       })))
+
+    return true
+  }
+
+  function pastePPTTextAutoFitSource(source: PPTTextAutoFitImportSource) {
+    const effects = selectedElements
+      .filter((element): element is PPTTextElement =>
+        isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getPPTTextAutoFitCommandEffect({
+          element,
+          handle: source.handle,
+          hasOverflow: textOverflowById[element.id] === true,
+          slideId: activeSlide.id,
+        }))
+      .filter((effect): effect is SlideEditTextAutoFitHostCommandEffect<string, string> =>
+        effect !== null)
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    const objectIds = effects.map((effect) => effect.payload.objectId)
+
+    setLastTextAutoFitEffect(effects[effects.length - 1])
+    setLastTextAutoFitImportEffect(createPPTTextAutoFitImportEffect({
+      effects,
+      source,
+    }))
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect && isPPTTextElement(element)
+            ? applyPPTTextAutoFitCommandEffectToElement(element, effect)
+            : element
+        }),
+      })))
+    setTextOverflowById((current) => ({
+      ...current,
+      ...Object.fromEntries(objectIds.map((objectId) => [objectId, false])),
+    }))
 
     return true
   }
@@ -7245,11 +7332,7 @@ function App() {
             return element
           }
 
-          return {
-            ...element,
-            geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
-            textAutoFit: PPT_TEXT_AUTOFIT,
-          }
+          return applyPPTTextAutoFitCommandEffectToElement(element, effect)
         }),
       })),
     )
@@ -11457,6 +11540,16 @@ function App() {
         data-ppt-text-autofit-size-modes={SLIDE_EDIT_TEXT_BOX_SIZE_MODES
           .map((mode) => mode.id)
           .join(' ')}
+        data-ppt-text-autofit-import-command-handles={lastTextAutoFitImportEffect?.commandHandles}
+        data-ppt-text-autofit-import-command-targets={lastTextAutoFitImportEffect?.commandTargets}
+        data-ppt-text-autofit-import-command-types={lastTextAutoFitImportEffect?.commandTypes}
+        data-ppt-text-autofit-import-commands={lastTextAutoFitImportEffect?.commandIds}
+        data-ppt-text-autofit-import-fields={lastTextAutoFitImportEffect?.fields}
+        data-ppt-text-autofit-import-format={lastTextAutoFitImportEffect?.format}
+        data-ppt-text-autofit-import-json-length={lastTextAutoFitImportEffect?.jsonLength}
+        data-ppt-text-autofit-import-mode={lastTextAutoFitImportEffect?.mode}
+        data-ppt-text-autofit-import-model={lastTextAutoFitImportEffect?.model}
+        data-ppt-text-autofit-import-objects={lastTextAutoFitImportEffect?.objectIds}
         data-ppt-resize-handle-click-double={lastResizeHandleClickMemoryEffect?.isDoubleClick ? 'true' : undefined}
         data-ppt-resize-handle-click-handle={lastResizeHandleClickMemoryEffect?.handle}
         data-ppt-resize-handle-click-id={lastResizeHandleClickMemoryEffect?.id}
@@ -14466,6 +14559,38 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextAutoFitImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditTextAutoFitHostCommandEffect<string, string>[]
+  source: PPTTextAutoFitImportSource
+}): PPTTextAutoFitImportEffect {
+  return {
+    commandHandles: effects.map((effect) => effect.payload.handle).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    mode: source.mode,
+    model: PPT_TEXT_AUTOFIT_IMPORT_MODEL,
+    objectIds: effects.map((effect) => effect.payload.objectId).join(' '),
+  }
+}
+
+function applyPPTTextAutoFitCommandEffectToElement(
+  element: PPTTextElement,
+  effect: SlideEditTextAutoFitHostCommandEffect<string, string>,
+): PPTTextElement {
+  return {
+    ...element,
+    geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
+    textAutoFit: PPT_TEXT_AUTOFIT,
   }
 }
 
@@ -17785,6 +17910,200 @@ function getPPTTextBodyPayloadValue(
   }
 
   return allowDirect ? value : null
+}
+
+function getPPTTextAutoFitSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_AUTOFIT_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextAutoFitSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextAutoFitSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextAutoFitImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextAutoFitSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextAutoFitSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextAutoFitImportSource | null {
+  const payloadValue = getPPTTextAutoFitPayloadValue(value, allowDirect)
+  const mode = getPPTTextAutoFitModeFromJSONValue(payloadValue)
+
+  if (mode === null) {
+    return null
+  }
+
+  const rawHandle = isPPTRecord(payloadValue)
+    ? payloadValue.handle ?? payloadValue.resizeHandle
+    : undefined
+  const handle = getPPTTextAutoFitHandleFromJSONValue(rawHandle)
+
+  if (rawHandle !== undefined && handle === undefined) {
+    return null
+  }
+
+  return {
+    fields: handle === undefined ? ['mode'] : ['mode', 'handle'],
+    format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
+    handle: handle ?? 'se',
+    jsonLength,
+    mode,
+  }
+}
+
+function getPPTTextAutoFitPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (
+    isPPTRecord(value.textAutoFit) ||
+    typeof value.textAutoFit === 'boolean' ||
+    typeof value.textAutoFit === 'string'
+  ) {
+    return value.textAutoFit
+  }
+
+  if (
+    isPPTRecord(value.autoFit) ||
+    typeof value.autoFit === 'boolean' ||
+    typeof value.autoFit === 'string'
+  ) {
+    return value.autoFit
+  }
+
+  if (
+    isPPTRecord(value.textBoxAutoFit) ||
+    typeof value.textBoxAutoFit === 'boolean' ||
+    typeof value.textBoxAutoFit === 'string'
+  ) {
+    return value.textBoxAutoFit
+  }
+
+  if (
+    isPPTRecord(value.textOverflow) ||
+    typeof value.textOverflow === 'boolean' ||
+    typeof value.textOverflow === 'string'
+  ) {
+    return value.textOverflow
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTTextAutoFitModeFromJSONValue(
+  value: unknown,
+): 'resize-to-fit' | null {
+  if (value === true) {
+    return 'resize-to-fit'
+  }
+
+  if (isPPTRecord(value)) {
+    const modeValue = value.mode ??
+      value.sizeMode ??
+      value.textAutoFit ??
+      value.autoFit ??
+      value.textOverflow
+
+    return getPPTTextAutoFitModeFromJSONValue(
+      modeValue,
+    )
+  }
+
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const mode = value.replace(/[\s_-]/g, '').toLowerCase()
+
+  return mode === 'auto' ||
+    mode === 'fit' ||
+    mode === 'resize' ||
+    mode === 'resizetofit' ||
+    mode === 'resizeshapetofittext'
+    ? 'resize-to-fit'
+    : null
+}
+
+function getPPTTextAutoFitHandleFromJSONValue(
+  value: unknown,
+): ResizeHandle | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const handle = value.trim().toLowerCase()
+
+  return PPT_RESIZE_HANDLES.includes(handle as ResizeHandle)
+    ? handle as ResizeHandle
+    : undefined
 }
 
 function getPPTTextBodyFromJSONValue(value: unknown): PPTTextBody | null {

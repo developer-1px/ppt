@@ -15508,6 +15508,48 @@ async function runTextOverflowScenario(page) {
     afterUndo,
   })
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textAutoFit: {
+        handle: 'se',
+        mode: 'resize-to-fit',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(220)
+
+  const afterJSONAutoFit = await getPPTTextOverflowState(page)
+
+  record('pastes PPT text auto-fit JSON through slide-edit command effect', afterJSONAutoFit.selectedId === afterUndo.selectedId && afterJSONAutoFit.selectedOverflow !== 'true' && afterJSONAutoFit.selectedAutoFit === 'resizeShapeToFitText' && afterJSONAutoFit.stageAutoFitImportModel === 'ppt-text-autofit-import' && afterJSONAutoFit.stageAutoFitImportFormat === 'application-json-ppt-text-autofit' && afterJSONAutoFit.stageAutoFitImportFields === 'mode handle' && afterJSONAutoFit.stageAutoFitImportCommands === 'resize-text-box-to-fit' && afterJSONAutoFit.stageAutoFitImportCommandHandles === 'se' && afterJSONAutoFit.stageAutoFitImportCommandTargets === afterJSONAutoFit.selectedId && afterJSONAutoFit.stageAutoFitImportCommandTypes === 'slide-command-effect' && afterJSONAutoFit.stageAutoFitImportMode === 'resize-to-fit' && afterJSONAutoFit.stageAutoFitImportObjects === afterJSONAutoFit.selectedId && afterJSONAutoFit.stageAutoFitImportJsonLength > 40 && (afterJSONAutoFit.selectedWidth > afterUndo.selectedWidth || afterJSONAutoFit.selectedHeight > afterUndo.selectedHeight), {
+    afterJSONAutoFit,
+    afterUndo,
+  })
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(160)
+
+  const afterJSONUndo = await getPPTTextOverflowState(page)
+
+  record('undoes pasted PPT text auto-fit JSON as one history step', afterJSONUndo.selectedId === afterJSONAutoFit.selectedId && afterJSONUndo.selectedOverflow === 'true' && afterJSONUndo.selectedAutoFit === '' && afterJSONUndo.selectedWidth === afterUndo.selectedWidth && afterJSONUndo.selectedHeight === afterUndo.selectedHeight, {
+    afterJSONAutoFit,
+    afterJSONUndo,
+    afterUndo,
+  })
+
   await pressKey(page, {
     code: 'KeyY',
     key: 'y',
@@ -15518,8 +15560,8 @@ async function runTextOverflowScenario(page) {
 
   const afterRedo = await getPPTTextOverflowState(page)
 
-  record('redoes PPT text auto-fit with model metadata', afterRedo.selectedId === afterAutoFit.selectedId && afterRedo.selectedOverflow !== 'true' && afterRedo.selectedAutoFit === 'resizeShapeToFitText' && afterRedo.inspectorAutoFit === 'resizeShapeToFitText' && afterRedo.selectedAutoFitSizeMode === 'resize-to-fit' && afterRedo.inspectorAutoFitSizeMode === 'resize-to-fit' && afterRedo.exportHasAutoFit, {
-    afterAutoFit,
+  record('redoes PPT text auto-fit with model metadata', afterRedo.selectedId === afterJSONAutoFit.selectedId && afterRedo.selectedOverflow !== 'true' && afterRedo.selectedAutoFit === 'resizeShapeToFitText' && afterRedo.inspectorAutoFit === 'resizeShapeToFitText' && afterRedo.selectedAutoFitSizeMode === 'resize-to-fit' && afterRedo.inspectorAutoFitSizeMode === 'resize-to-fit' && afterRedo.selectedWidth === afterJSONAutoFit.selectedWidth && afterRedo.selectedHeight === afterJSONAutoFit.selectedHeight && afterRedo.exportHasAutoFit, {
+    afterJSONAutoFit,
     afterRedo,
   })
 }
@@ -16916,6 +16958,16 @@ function getPPTTextOverflowState(page) {
       stageAutoFitCommandSizeMode: stage?.getAttribute('data-ppt-text-autofit-command-size-mode') ?? '',
       stageAutoFitCommandSlide: stage?.getAttribute('data-ppt-text-autofit-command-slide') ?? '',
       stageAutoFitCommandType: stage?.getAttribute('data-ppt-text-autofit-command-type') ?? '',
+      stageAutoFitImportCommandHandles: stage?.getAttribute('data-ppt-text-autofit-import-command-handles') ?? '',
+      stageAutoFitImportCommandTargets: stage?.getAttribute('data-ppt-text-autofit-import-command-targets') ?? '',
+      stageAutoFitImportCommandTypes: stage?.getAttribute('data-ppt-text-autofit-import-command-types') ?? '',
+      stageAutoFitImportCommands: stage?.getAttribute('data-ppt-text-autofit-import-commands') ?? '',
+      stageAutoFitImportFields: stage?.getAttribute('data-ppt-text-autofit-import-fields') ?? '',
+      stageAutoFitImportFormat: stage?.getAttribute('data-ppt-text-autofit-import-format') ?? '',
+      stageAutoFitImportJsonLength: Number(stage?.getAttribute('data-ppt-text-autofit-import-json-length') ?? 0),
+      stageAutoFitImportMode: stage?.getAttribute('data-ppt-text-autofit-import-mode') ?? '',
+      stageAutoFitImportModel: stage?.getAttribute('data-ppt-text-autofit-import-model') ?? '',
+      stageAutoFitImportObjects: stage?.getAttribute('data-ppt-text-autofit-import-objects') ?? '',
       stageAutoFitModel: stage?.getAttribute('data-ppt-text-autofit-model') ?? '',
       stageAutoFitSizeModes: stage?.getAttribute('data-ppt-text-autofit-size-modes') ?? '',
       stageOverflowAxis: stage?.getAttribute('data-ppt-text-overflow-indicator-axis') ?? '',
