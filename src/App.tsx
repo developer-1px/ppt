@@ -122,6 +122,7 @@ import {
   createSlideEditTextParagraphSpacingDescriptor,
   createSlideEditTextVerticalAlignmentDescriptor,
   createSlideEditTransitionDescriptor,
+  createSlideEditSlideMetadataInspectorDescriptor,
   getSlideEditCommentThreadJSONPasteValue,
   getSlideEditCommentThreadPasteCommandEffect,
   getSlideEditFrameGuideGeometry,
@@ -136,6 +137,7 @@ import {
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
   getSlideEditLayerPaneResolvedFocusObjectId,
+  getSlideEditInspectorSurface,
   getSlideEditObjectVisibilityCommandAvailability,
   getSlideEditObjectVisibilityCommandEffect,
   getSlideEditObjectVisibilityState,
@@ -249,6 +251,7 @@ import {
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
+  toSlideEditSlideMetadataHostCommandEffect,
   type SlideEditCommentThreadJSONPasteValue,
   type SlideEditCommentThreadPatchHostCommandEffect,
   type SlideEditFrameGuideConfig,
@@ -311,6 +314,16 @@ import {
   type SlideEditRailHostCommandEffect,
   type SlideEditRailThumbnailDescriptor,
   type SlideEditResolvedLayoutPlaceholder,
+  type SlideEditInspectorSurfaceId,
+  type SlideEditSlideBackgroundDescriptor,
+  type SlideEditSlideMetadataFieldDescriptor,
+  type SlideEditSlideMetadataFieldId,
+  type SlideEditSlideMetadataHostCommandEffect,
+  type SlideEditSlideMetadataInspectorDescriptor,
+  type SlideEditSlideMetadataReadModel,
+  type SlideEditSlideMetadataUpdateCommand,
+  type SlideEditSlideOrientation,
+  type SlideEditSlideSizeDescriptor,
   type SlideEditStyleClipboardBuiltInCategoryId,
   type SlideEditStyleClipboardCategoryDescriptor,
   type SlideEditStyleClipboardCopyFormattingCommand,
@@ -2778,58 +2791,16 @@ type PPTShortcutHelpSectionGroup = {
   items: PPTShortcutHelpItem[]
   section: string
 }
-type PPTSlideMetadataOrientation = 'landscape' | 'portrait'
-type PPTSlideMetadataBackgroundDescriptor =
-  | {
-      kind: 'none'
-    }
-  | {
-      color: string
-      kind: 'solid-color'
-      tokenId?: string
-    }
-type PPTSlideMetadataSizeDescriptor = {
-  h: number
-  w: number
-}
-type PPTSlideMetadataReadModel = {
-  background: PPTSlideMetadataBackgroundDescriptor
-  name: string
-  notes: string
+type PPTSlideMetadataOrientation = SlideEditSlideOrientation
+type PPTSlideMetadataBackgroundDescriptor = SlideEditSlideBackgroundDescriptor
+type PPTSlideMetadataSizeDescriptor = SlideEditSlideSizeDescriptor
+type PPTSlideMetadataReadModel = SlideEditSlideMetadataReadModel<string> & {
   orientation: PPTSlideMetadataOrientation
   size: PPTSlideMetadataSizeDescriptor
-  slideId: string
 }
-type PPTSlideMetadataFieldId =
-  | 'background'
-  | 'name'
-  | 'notes'
-  | 'orientation'
-  | 'size'
-type PPTSlideMetadataCommandId =
-  | 'update-slide-background'
-  | 'update-slide-name'
-  | 'update-slide-notes'
-  | 'update-slide-orientation'
-  | 'update-slide-size'
-type PPTSlideMetadataFieldControl =
-  | 'background-control'
-  | 'multiline-text'
-  | 'orientation-control'
-  | 'size-control'
-  | 'text'
-type PPTSlideMetadataFieldDescriptor = {
-  commandId: PPTSlideMetadataCommandId
-  control: PPTSlideMetadataFieldControl
-  id: PPTSlideMetadataFieldId
-  isEditable: boolean
-  isOptional: boolean
-  requiredAdapterSlot: 'command-effect'
-}
-type PPTInspectorSurfaceId =
-  | 'none'
-  | 'object-selection-inspector'
-  | 'slide-metadata-inspector'
+type PPTSlideMetadataFieldId = SlideEditSlideMetadataFieldId
+type PPTSlideMetadataFieldDescriptor = SlideEditSlideMetadataFieldDescriptor
+type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 type PPTInspectorTabId =
   | 'selection'
   | 'slide'
@@ -2852,55 +2823,13 @@ const PPT_INSPECTOR_TABS = [
   panelId: string
   tabId: string
 }[]
-type PPTSlideMetadataInspectorDescriptor = {
-  activeSlide: {
-    index: number | null
-    slideCount: number
-    slideId: string
+type PPTSlideMetadataInspectorDescriptor =
+  SlideEditSlideMetadataInspectorDescriptor<string> & {
+    metadata: PPTSlideMetadataReadModel
   }
-  fields: readonly PPTSlideMetadataFieldDescriptor[]
-  metadata: PPTSlideMetadataReadModel
-  surface: 'slide-metadata-inspector'
-}
-type PPTSlideMetadataUpdateCommand =
-  | {
-      fieldId: 'background'
-      id: 'update-slide-background'
-      slideId: string
-      value: PPTSlideMetadataBackgroundDescriptor
-    }
-  | {
-      fieldId: 'name'
-      id: 'update-slide-name'
-      slideId: string
-      value: string
-    }
-  | {
-      fieldId: 'notes'
-      id: 'update-slide-notes'
-      slideId: string
-      value: string
-    }
-  | {
-      fieldId: 'orientation'
-      id: 'update-slide-orientation'
-      slideId: string
-      value: PPTSlideMetadataOrientation
-    }
-  | {
-      fieldId: 'size'
-      id: 'update-slide-size'
-      slideId: string
-      value: PPTSlideMetadataSizeDescriptor
-    }
-type PPTSlideMetadataHostCommandEffect = {
-  payload: PPTSlideMetadataUpdateCommand
-  selection: {
-    objectIds: readonly string[]
-    slideId: string
-  }
-  type: 'slide-command-effect'
-}
+type PPTSlideMetadataUpdateCommand = SlideEditSlideMetadataUpdateCommand<string>
+type PPTSlideMetadataHostCommandEffect =
+  SlideEditSlideMetadataHostCommandEffect<string>
 type PPTLayoutPlaceholderVisibilityCommand = {
   id: 'update-placeholder-visibility'
   isVisible: boolean
@@ -3371,48 +3300,6 @@ const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Export',
   'System',
 ]
-const PPT_SLIDE_METADATA_FIELDS = Object.freeze([
-  {
-    commandId: 'update-slide-name',
-    control: 'text',
-    id: 'name',
-    isEditable: true,
-    isOptional: false,
-    requiredAdapterSlot: 'command-effect',
-  },
-  {
-    commandId: 'update-slide-background',
-    control: 'background-control',
-    id: 'background',
-    isEditable: true,
-    isOptional: false,
-    requiredAdapterSlot: 'command-effect',
-  },
-  {
-    commandId: 'update-slide-notes',
-    control: 'multiline-text',
-    id: 'notes',
-    isEditable: true,
-    isOptional: false,
-    requiredAdapterSlot: 'command-effect',
-  },
-  {
-    commandId: 'update-slide-size',
-    control: 'size-control',
-    id: 'size',
-    isEditable: false,
-    isOptional: true,
-    requiredAdapterSlot: 'command-effect',
-  },
-  {
-    commandId: 'update-slide-orientation',
-    control: 'orientation-control',
-    id: 'orientation',
-    isEditable: false,
-    isOptional: true,
-    requiredAdapterSlot: 'command-effect',
-  },
-] as const satisfies readonly PPTSlideMetadataFieldDescriptor[])
 const PPT_LAYER_PANE_COMMANDS = SLIDE_EDIT_LAYER_PANE_COMMANDS satisfies readonly PPTLayerPaneCommandDescriptor[]
 const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   h: 112,
@@ -3868,10 +3755,9 @@ function App() {
   const slideMetadataDescriptor = useMemo(
     () => createPPTSlideMetadataInspectorDescriptor({
       slide: activeSlide,
-      slideCount: deck.slides.length,
-      slideIndex: activeSlideIndex,
+      slideOrder: deck.slides.map((slide) => slide.id),
     }),
-    [activeSlide, activeSlideIndex, deck.slides.length],
+    [activeSlide, deck.slides],
   )
   const inspectorSurface = getPPTInspectorSurface({
     activeSlideId: activeSlide.id,
@@ -15943,33 +15829,62 @@ function formatPPTElementAnimationTrigger(trigger: PPTElementAnimationTrigger) {
 
 function createPPTSlideMetadataInspectorDescriptor({
   slide,
-  slideCount,
-  slideIndex,
+  slideOrder,
 }: {
   slide: PPTSlide
-  slideCount: number
-  slideIndex: number
+  slideOrder: readonly string[]
 }): PPTSlideMetadataInspectorDescriptor {
-  return {
-    activeSlide: {
-      index: slideIndex >= 0 ? slideIndex : null,
-      slideCount,
-      slideId: slide.id,
+  const descriptor = createSlideEditSlideMetadataInspectorDescriptor({
+    rail: {
+      activeSlideId: slide.id,
+      slideOrder,
     },
-    fields: PPT_SLIDE_METADATA_FIELDS,
+    readSlideMetadata: (slideId): PPTSlideMetadataReadModel | null => {
+      if (slideId !== slide.id) {
+        return null
+      }
+
+      return {
+        background: getPPTSlideMetadataBackground(slide),
+        name: slide.name,
+        notes: slide.notes ?? '',
+        orientation: getPPTSlideMetadataOrientation(),
+        size: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+        },
+        slideId: slide.id,
+      }
+    },
+  })
+
+  if (!descriptor) {
+    throw new Error(`Missing PPT slide metadata descriptor: ${slide.id}`)
+  }
+
+  return {
+    ...descriptor,
+    fields: getPPTSlideMetadataFieldDescriptors(descriptor.fields),
     metadata: {
-      background: getPPTSlideMetadataBackground(slide),
-      name: slide.name,
-      notes: slide.notes ?? '',
-      orientation: getPPTSlideMetadataOrientation(),
-      size: {
+      ...descriptor.metadata,
+      orientation: descriptor.metadata.orientation ??
+        getPPTSlideMetadataOrientation(),
+      size: descriptor.metadata.size ?? {
         h: PPT_SLIDE_HEIGHT,
         w: PPT_SLIDE_WIDTH,
       },
-      slideId: slide.id,
     },
-    surface: 'slide-metadata-inspector',
   }
+}
+
+function getPPTSlideMetadataFieldDescriptors(
+  fields: readonly PPTSlideMetadataFieldDescriptor[],
+): readonly PPTSlideMetadataFieldDescriptor[] {
+  return fields.map((field) =>
+    field.id === 'size' || field.id === 'orientation'
+      ? { ...field, isEditable: false }
+      : field
+  )
 }
 
 function getPPTInspectorSurface({
@@ -15979,11 +15894,10 @@ function getPPTInspectorSurface({
   activeSlideId: string | null
   selectedObjectIds: readonly string[]
 }): PPTInspectorSurfaceId {
-  if (selectedObjectIds.length > 0) {
-    return 'object-selection-inspector'
-  }
-
-  return activeSlideId ? 'slide-metadata-inspector' : 'none'
+  return getSlideEditInspectorSurface({
+    activeSlideId,
+    selectedObjectIds,
+  })
 }
 
 function getPPTSlideMetadataBackground(
@@ -16032,14 +15946,7 @@ function getPPTSlideMetadataFieldData(field: PPTSlideMetadataFieldDescriptor) {
 function toPPTSlideMetadataHostCommandEffect(
   command: PPTSlideMetadataUpdateCommand,
 ): PPTSlideMetadataHostCommandEffect {
-  return {
-    payload: command,
-    selection: {
-      objectIds: [],
-      slideId: command.slideId,
-    },
-    type: 'slide-command-effect',
-  }
+  return toSlideEditSlideMetadataHostCommandEffect(command)
 }
 
 function applyPPTSlideMetadataHostCommandEffect(
