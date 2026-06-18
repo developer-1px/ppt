@@ -759,7 +759,7 @@ import {
   getPPTMediaSourceFromText,
   normalizePPTTableRows,
   PPT_IMAGE_IMPORT_MODEL,
-  readPPTClipboardImageSource,
+  getPPTClipboardImageImportSources,
   readPPTImageFileSource,
   readPPTImageFileSources,
   readPPTTableFileSource,
@@ -8786,13 +8786,13 @@ function App() {
   }
 
   async function pastePPTClipboardImage() {
-    const source = await readPPTClipboardImageSource()
+    const sources = await getPPTClipboardImageImportSources()
 
-    if (!source) {
+    if (sources.length === 0) {
       return false
     }
 
-    insertPPTImageSource(source)
+    insertPPTImageSources(sources)
     return true
   }
 

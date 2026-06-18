@@ -41,6 +41,8 @@ import {
   createCanvasDataTransferImportActionPlan,
   createCanvasDataTransferImportActionPlanFromRegistry,
   createCanvasDataTransferImportRegistry,
+  createCanvasExternalClipboardImagePasteActionResolver,
+  createCanvasExternalClipboardPasteActionPlan,
   createCanvasPastePositionKey,
   createCanvasRichClipboardHTML,
   createCanvasTabsDescriptor,
@@ -301,6 +303,10 @@ export const createPPTCanvasDataTransferImportActionPlanFromRegistry =
   createCanvasDataTransferImportActionPlanFromRegistry
 export const createPPTCanvasDataTransferImportRegistry =
   createCanvasDataTransferImportRegistry
+export const createPPTCanvasExternalClipboardImagePasteActionResolver =
+  createCanvasExternalClipboardImagePasteActionResolver
+export const createPPTCanvasExternalClipboardPasteActionPlan =
+  createCanvasExternalClipboardPasteActionPlan
 export const createPPTCanvasPastePositionKey =
   createCanvasPastePositionKey
 export const createPPTCanvasRichClipboardHTML =

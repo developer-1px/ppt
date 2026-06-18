@@ -3,6 +3,8 @@ import {
   type Point,
 } from '../pptCanvasCoreAdapter'
 import {
+  createPPTCanvasExternalClipboardImagePasteActionResolver,
+  createPPTCanvasExternalClipboardPasteActionPlan,
   getPPTCanvasDataImageSourceFromDataTransfer,
   getPPTCanvasImageFileFromDataTransfer,
   getPPTCanvasImageFileFromList,
@@ -161,10 +163,23 @@ export async function readPPTImageFileSources(
 export async function readPPTClipboardImageSource() {
   const source = await readPPTCanvasClipboardImageSource()
 
-  if (!source) {
-    return null
-  }
+  return source ? normalizePPTClipboardImageSource(source) : null
+}
 
+export async function getPPTClipboardImageImportSources() {
+  return createPPTCanvasExternalClipboardPasteActionPlan<PPTImageImportSource>({
+    resolvers: [
+      createPPTCanvasExternalClipboardImagePasteActionResolver({
+        createAction: normalizePPTClipboardImageSource,
+        readImageSource: readPPTCanvasClipboardImageSource,
+      }),
+    ],
+  })
+}
+
+function normalizePPTClipboardImageSource(
+  source: PPTCanvasImageImportSource,
+): PPTImageImportSource {
   return {
     ...source,
     format: source.format ?? ('file' as const),
