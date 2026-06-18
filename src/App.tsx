@@ -19300,14 +19300,7 @@ function getPPTObjectStyleSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTObjectStyleImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.objectStyle)
-    ? value.objectStyle
-    : isPPTRecord(value) && isPPTRecord(value.objectEffect)
-      ? value.objectEffect
-      : allowDirect
-        ? value
-        : null
+  const payloadValue = getPPTObjectStylePayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -19336,6 +19329,33 @@ function getPPTObjectStyleSourceFromJSONValue(
         object,
       }
     : null
+}
+
+function getPPTObjectStylePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.objectStyle)) {
+    return value.objectStyle
+  }
+
+  if (isPPTRecord(value.objectEffect)) {
+    return value.objectEffect
+  }
+
+  if (hasPPTObjectStylePayloadFields(value)) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function hasPPTObjectStylePayloadFields(value: Record<string, unknown>) {
+  return value.opacity !== undefined && value.shadow !== undefined
 }
 
 function getPPTObjectStyleOpacityFromJSONValue(value: unknown) {

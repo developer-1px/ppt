@@ -11790,6 +11790,89 @@ async function runObjectShadowScenario(page) {
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
     const json = JSON.stringify({
+      opacity: 0.58,
+      shadow: {
+        angle: 30,
+        blur: 20,
+        color: '#0f766e',
+        distance: 8,
+        enabled: true,
+        opacity: 0.44,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneObjectStylePaste = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'pastes standalone PPT object style fields through style clipboard object category',
+    afterStandaloneObjectStylePaste.objectStyleImportModel === 'ppt-object-style-import' &&
+      afterStandaloneObjectStylePaste.objectStyleImportFormat === 'application-json-ppt-object-style' &&
+      afterStandaloneObjectStylePaste.objectStyleImportCommand === 'paste-object-formatting' &&
+      afterStandaloneObjectStylePaste.objectStyleImportCommandTargets === targetId &&
+      afterStandaloneObjectStylePaste.objectStyleImportCommandType === 'slide-command-effect' &&
+      afterStandaloneObjectStylePaste.objectStyleImportObjects === targetId &&
+      afterStandaloneObjectStylePaste.objectStyleImportCategories === 'object-effect' &&
+      afterStandaloneObjectStylePaste.objectStyleImportFields === 'opacity shadow' &&
+      afterStandaloneObjectStylePaste.objectStyleImportOpacity === '0.58' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowEnabled === 'true' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowColor === '#0f766e' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowOpacity === '0.44' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowBlur === '20' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowDistance === '8' &&
+      afterStandaloneObjectStylePaste.objectStyleImportShadowAngle === '30' &&
+      afterStandaloneObjectStylePaste.objectStyleImportJsonLength > 100 &&
+      afterStandaloneObjectStylePaste.selectedObjectOpacity === '0.58' &&
+      afterStandaloneObjectStylePaste.selectedShadow === 'true' &&
+      afterStandaloneObjectStylePaste.selectedColor === '#0f766e' &&
+      afterStandaloneObjectStylePaste.selectedOpacity === '0.44' &&
+      afterStandaloneObjectStylePaste.selectedBlur === '20' &&
+      afterStandaloneObjectStylePaste.selectedDistance === '8' &&
+      afterStandaloneObjectStylePaste.selectedAngle === '30' &&
+      afterStandaloneObjectStylePaste.thumbOpacity === '0.44',
+    {
+      afterStandaloneObjectStylePaste,
+      afterStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneObjectStyleUndo = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'undoes standalone PPT object style fields as one history step',
+    afterStandaloneObjectStyleUndo.selectedObjectOpacity === afterStylePaste.selectedObjectOpacity &&
+      afterStandaloneObjectStyleUndo.selectedColor === afterStylePaste.selectedColor &&
+      afterStandaloneObjectStyleUndo.selectedOpacity === afterStylePaste.selectedOpacity &&
+      afterStandaloneObjectStyleUndo.selectedBlur === afterStylePaste.selectedBlur &&
+      afterStandaloneObjectStyleUndo.selectedDistance === afterStylePaste.selectedDistance &&
+      afterStandaloneObjectStyleUndo.selectedAngle === afterStylePaste.selectedAngle,
+    {
+      afterStandaloneObjectStylePaste,
+      afterStandaloneObjectStyleUndo,
+      afterStylePaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
       objectShadow: {
         angle: 120,
         blur: 24,
