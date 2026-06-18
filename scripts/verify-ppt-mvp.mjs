@@ -10511,6 +10511,96 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      cornerRadius: 12,
+      fillColor: '#22c55e',
+      fillOpacity: 0.48,
+      strokeColor: '#1f2937',
+      strokeDash: 'dash',
+      strokeWidth: 4,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneShapeStylePaste = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'pastes standalone PPT shape style fields through style clipboard categories',
+    afterStandaloneShapeStylePaste.shapeStyleImportModel === 'ppt-shape-style-import' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportFormat === 'application-json-ppt-shape-style' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCommand === 'paste-object-formatting' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCommandTargets === afterStandaloneShapeStylePaste.selectedId &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCommandType === 'slide-command-effect' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportObjects === afterStandaloneShapeStylePaste.selectedId &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCategories.includes('object-effect') &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCategories.includes('shape-fill') &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCategories.includes('shape-stroke') &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCategories.includes('line-style') &&
+      afterStandaloneShapeStylePaste.shapeStyleImportFields === 'fill stroke cornerRadius' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportFillColor === '#22c55e' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportFillOpacity === '0.48' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportStrokeColor === '#1f2937' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportStrokeDash === 'dash' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportStrokeWidth === '4' &&
+      afterStandaloneShapeStylePaste.shapeStyleImportCornerRadius === '12' &&
+      Number(afterStandaloneShapeStylePaste.shapeStyleImportJsonLength) > 100 &&
+      afterStandaloneShapeStylePaste.fillOpacity === '0.48' &&
+      afterStandaloneShapeStylePaste.background.includes('0.48') &&
+      afterStandaloneShapeStylePaste.borderColor === 'rgb(31, 41, 55)' &&
+      afterStandaloneShapeStylePaste.borderStyle === 'dashed' &&
+      afterStandaloneShapeStylePaste.borderWidth === '4px' &&
+      afterStandaloneShapeStylePaste.strokeDash === 'dash' &&
+      afterStandaloneShapeStylePaste.cornerRadius === '12' &&
+      afterStandaloneShapeStylePaste.borderRadius === '12px' &&
+      afterStandaloneShapeStylePaste.objectOpacity === afterShapeStylePaste.objectOpacity &&
+      afterStandaloneShapeStylePaste.shadow === afterShapeStylePaste.shadow &&
+      afterStandaloneShapeStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      afterStandaloneShapeStylePaste.styleClipboardCommandApplications.includes(afterStandaloneShapeStylePaste.selectedId) &&
+      afterStandaloneShapeStylePaste.styleClipboardCommandApplications.includes('shape-fill') &&
+      afterStandaloneShapeStylePaste.styleClipboardCommandApplications.includes('shape-stroke') &&
+      afterStandaloneShapeStylePaste.styleClipboardCommandApplications.includes('line-style'),
+    {
+      afterShapeStylePaste,
+      afterStandaloneShapeStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterStandaloneShapeStyleUndo = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'undoes standalone PPT shape style fields as one history step',
+    afterStandaloneShapeStyleUndo.selectedId === afterShapeStylePaste.selectedId &&
+      afterStandaloneShapeStyleUndo.fillOpacity === afterShapeStylePaste.fillOpacity &&
+      afterStandaloneShapeStyleUndo.borderColor === afterShapeStylePaste.borderColor &&
+      afterStandaloneShapeStyleUndo.borderStyle === afterShapeStylePaste.borderStyle &&
+      afterStandaloneShapeStyleUndo.borderWidth === afterShapeStylePaste.borderWidth &&
+      afterStandaloneShapeStyleUndo.strokeDash === afterShapeStylePaste.strokeDash &&
+      afterStandaloneShapeStyleUndo.cornerRadius === afterShapeStylePaste.cornerRadius,
+    {
+      afterShapeStylePaste,
+      afterStandaloneShapeStylePaste,
+      afterStandaloneShapeStyleUndo,
+    },
+  )
+
   await pressKey(page, {
     code: 'KeyT',
     key: 't',
@@ -15139,6 +15229,59 @@ async function runLineAffordanceScenario(page) {
     {
       afterLineFormatPaste,
       afterLineStylePaste,
+      beforeLineFormatPaste,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      strokeColor: '#7c3aed',
+      strokeDash: 'dot',
+      strokeWidth: 3,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterStandaloneLineStylePaste = await getPPTLineState(page)
+
+  record(
+    'pastes standalone PPT line style fields through style clipboard line category',
+    afterStandaloneLineStylePaste.selectedId === beforeLineFormatPaste.selectedId &&
+      afterStandaloneLineStylePaste.selectedName === beforeLineFormatPaste.selectedName &&
+      afterStandaloneLineStylePaste.lineStyleImportModel === 'ppt-line-style-import' &&
+      afterStandaloneLineStylePaste.lineStyleImportFormat === 'application-json-ppt-line-style' &&
+      afterStandaloneLineStylePaste.lineStyleImportCommand === 'paste-object-formatting' &&
+      afterStandaloneLineStylePaste.lineStyleImportCommandTargets === afterStandaloneLineStylePaste.selectedId &&
+      afterStandaloneLineStylePaste.lineStyleImportCommandType === 'slide-command-effect' &&
+      afterStandaloneLineStylePaste.lineStyleImportObjects === afterStandaloneLineStylePaste.selectedId &&
+      afterStandaloneLineStylePaste.lineStyleImportCategories.includes('object-effect') &&
+      afterStandaloneLineStylePaste.lineStyleImportCategories.includes('line-style') &&
+      afterStandaloneLineStylePaste.lineStyleImportFields === 'color width dash' &&
+      afterStandaloneLineStylePaste.lineStyleImportStrokeColor === '#7c3aed' &&
+      afterStandaloneLineStylePaste.lineStyleImportStrokeDash === 'dot' &&
+      afterStandaloneLineStylePaste.lineStyleImportStrokeWidth === '3' &&
+      Number(afterStandaloneLineStylePaste.lineStyleImportJsonLength) > 50 &&
+      afterStandaloneLineStylePaste.stroke === '#7c3aed' &&
+      afterStandaloneLineStylePaste.strokeWidth === '3' &&
+      afterStandaloneLineStylePaste.selectedDash === 'dot' &&
+      afterStandaloneLineStylePaste.strokeDasharray !== '' &&
+      afterStandaloneLineStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      afterStandaloneLineStylePaste.styleClipboardCommandTargets === afterStandaloneLineStylePaste.selectedId &&
+      afterStandaloneLineStylePaste.styleClipboardCommandType === 'slide-command-effect' &&
+      afterStandaloneLineStylePaste.styleClipboardCommandApplications.includes(afterStandaloneLineStylePaste.selectedId) &&
+      afterStandaloneLineStylePaste.styleClipboardCommandApplications.includes('line-style'),
+    {
+      afterLineStylePaste,
+      afterStandaloneLineStylePaste,
       beforeLineFormatPaste,
     },
   )

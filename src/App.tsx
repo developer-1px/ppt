@@ -21273,6 +21273,10 @@ function getPPTObjectFillOpacityPayloadValue(
     return allowDirect ? value : undefined
   }
 
+  if (shouldDeferPPTObjectFillOpacityToShapeStyle(value)) {
+    return undefined
+  }
+
   if (value.objectFillOpacity !== undefined) {
     return value.objectFillOpacity
   }
@@ -21423,6 +21427,10 @@ function getPPTObjectCornerRadiusPayloadValue(
     return allowDirect ? value : undefined
   }
 
+  if (shouldDeferPPTObjectCornerRadiusToShapeStyle(value)) {
+    return undefined
+  }
+
   if (value.objectCornerRadius !== undefined) {
     return value.objectCornerRadius
   }
@@ -21551,12 +21559,7 @@ function getPPTShapeStyleSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTShapeStyleImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.shapeStyle)
-    ? value.shapeStyle
-    : allowDirect
-      ? value
-      : null
+  const payloadValue = getPPTShapeStylePayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -21604,6 +21607,88 @@ function getPPTShapeStyleSourceFromJSONValue(
         shape,
       }
     : null
+}
+
+function getPPTShapeStylePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.shapeStyle)) {
+    return value.shapeStyle
+  }
+
+  if (isPPTRecord(value.shape)) {
+    return value.shape
+  }
+
+  if (hasPPTShapeStylePayloadFields(value)) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function hasPPTShapeStylePayloadFields(value: Record<string, unknown>) {
+  return value.fill !== undefined ||
+    value.fillColor !== undefined ||
+    value.fillOpacity !== undefined ||
+    value.stroke !== undefined ||
+    value.strokeColor !== undefined ||
+    value.strokeDash !== undefined ||
+    value.strokeWidth !== undefined ||
+    value.cornerRadius !== undefined
+}
+
+function hasPPTShapeStyleCompanionFields(value: Record<string, unknown>) {
+  return value.fill !== undefined ||
+    value.fillColor !== undefined ||
+    value.stroke !== undefined ||
+    value.strokeColor !== undefined ||
+    value.strokeDash !== undefined ||
+    value.strokeWidth !== undefined ||
+    value.cornerRadius !== undefined
+}
+
+function hasPPTShapeStyleFillOrStrokeFields(value: Record<string, unknown>) {
+  return value.fill !== undefined ||
+    value.fillColor !== undefined ||
+    value.fillOpacity !== undefined ||
+    value.stroke !== undefined ||
+    value.strokeColor !== undefined ||
+    value.strokeDash !== undefined ||
+    value.strokeWidth !== undefined
+}
+
+function shouldDeferPPTObjectFillOpacityToShapeStyle(
+  value: Record<string, unknown>,
+) {
+  return value.fillOpacity !== undefined && hasPPTShapeStyleCompanionFields(value)
+}
+
+function shouldDeferPPTObjectCornerRadiusToShapeStyle(
+  value: Record<string, unknown>,
+) {
+  return value.cornerRadius !== undefined &&
+    hasPPTShapeStyleFillOrStrokeFields(value)
+}
+
+function shouldDeferPPTObjectStrokeLineStyleToLineStyle(
+  value: Record<string, unknown>,
+) {
+  return value.strokeDash !== undefined &&
+    (
+      value.strokeColor !== undefined ||
+      value.strokeWidth !== undefined ||
+      value.fill !== undefined ||
+      value.fillColor !== undefined ||
+      value.fillOpacity !== undefined ||
+      value.stroke !== undefined ||
+      value.cornerRadius !== undefined
+    )
 }
 
 function getPPTShapeStyleFillFromJSONValue(
@@ -21743,14 +21828,7 @@ function getPPTLineStyleSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTLineStyleImportSource | null {
-  const payloadValue = isPPTRecord(value) &&
-    isPPTRecord(value.lineStyle)
-    ? value.lineStyle
-    : isPPTRecord(value) && isPPTRecord(value.stroke)
-      ? value.stroke
-      : allowDirect
-        ? value
-        : null
+  const payloadValue = getPPTLineStylePayloadValue(value, allowDirect)
 
   if (!isPPTRecord(payloadValue)) {
     return null
@@ -21794,6 +21872,33 @@ function getPPTLineStyleSourceFromJSONValue(
         stroke,
       }
     : null
+}
+
+function getPPTLineStylePayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.lineStyle)) {
+    return value.lineStyle
+  }
+
+  if (isPPTRecord(value.stroke)) {
+    return value.stroke
+  }
+
+  if (
+    value.strokeColor !== undefined ||
+    value.strokeDash !== undefined ||
+    value.strokeWidth !== undefined
+  ) {
+    return value
+  }
+
+  return allowDirect ? value : null
 }
 
 function getPPTLineStyleColorFromJSONValue(value: unknown) {
@@ -21918,6 +22023,10 @@ function getPPTObjectStrokeLineStylePayloadValue(
 ): unknown {
   if (!isPPTRecord(value)) {
     return allowDirect ? value : undefined
+  }
+
+  if (shouldDeferPPTObjectStrokeLineStyleToLineStyle(value)) {
+    return undefined
   }
 
   if (value.objectStrokeLineStyle !== undefined) {
