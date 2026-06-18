@@ -29737,54 +29737,52 @@ function getPPTCommentThreadMessageFromJSONValue(
 function getPPTSlideNotesSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates: Array<{
-    format: PPTSlideNotesImportSource['format']
-    text: string
-  }> = [
+  const candidates: readonly PPTJSONDataTransferCandidate<
+    PPTSlideNotesImportSource['format']
+  >[] = [
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, PPT_SLIDE_NOTES_JSON_MIME_TYPE),
+      mimeType: PPT_SLIDE_NOTES_JSON_MIME_TYPE,
     },
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      mimeType: 'application/json',
     },
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      mimeType: 'text/json',
     },
     {
       format: PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
+      mimeType: 'text/markdown',
     },
     {
       format: PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) => {
+      if (candidate.format !== PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT) {
+        return null
+      }
 
-    if (!text || seen.has(text)) {
-      continue
-    }
+      const notes = getPPTSlideNotesFromJSONValue(json)
 
-    seen.add(text)
-
-    const source = getPPTSlideNotesSourceFromText(text, candidate.format)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+      return notes
+        ? {
+            format: candidate.format,
+            notes,
+            textLength: jsonLength,
+          }
+        : null
+    },
+    parseText: (text, candidate) =>
+      getPPTSlideNotesSourceFromText(text, candidate.format),
+  })
 }
 
 function getPPTSlideNotesSourceFromText(
@@ -29904,54 +29902,48 @@ function getPPTImportJSONText(text: string) {
 function getPPTElementsJSONSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates: Array<{
-    format: PPTElementsJSONImportSource['format']
-    text: string
-  }> = [
+  const candidates: readonly PPTJSONDataTransferCandidate<
+    PPTElementsJSONImportSource['format']
+  >[] = [
     {
       format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, PPT_ELEMENTS_JSON_MIME_TYPE),
+      mimeType: PPT_ELEMENTS_JSON_MIME_TYPE,
     },
     {
       format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      mimeType: 'application/json',
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      mimeType: 'text/json',
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
+      mimeType: 'text/markdown',
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) => {
+      const source = getPPTElementsJSONSourceFromValue(json)
 
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTElementsJSONSourceFromText(text, candidate.format)
-
-    if (source) {
       return source
-    }
-  }
-
-  return null
+        ? {
+            ...source,
+            format: candidate.format,
+            jsonLength,
+          }
+        : null
+    },
+    parseText: (text, candidate) =>
+      getPPTElementsJSONSourceFromText(text, candidate.format),
+  })
 }
 
 function getPPTElementsJSONSourceFromText(
