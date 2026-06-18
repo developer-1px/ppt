@@ -532,7 +532,6 @@ import {
   createPPTCanvasText,
   deletePPTCanvasCommand,
   distributePPTCanvasCommand,
-  duplicatePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
   getPPTCanvasWheelViewport,
   groupPPTCanvasCommand,
@@ -595,6 +594,7 @@ import {
   createPPTCanvasRichClipboardHTML,
   createPPTCanvasTabsDescriptor,
   cutPPTCanvasClipboardSelection,
+  duplicatePPTCanvasClipboardSelection,
   downloadPPTCanvasTextFile,
   executePPTCanvasClipboardCommand,
   filterPPTCommandPaletteItems,
@@ -9305,14 +9305,10 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      duplicatePPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        createId: createPPTElementIdFactory(slide),
-        items: slide.elements,
-        selection,
-      }))
+    duplicatePPTCanvasClipboardSelection({
+      runClipboardCommand: runPPTClipboardCommand,
+      selection,
+    })
   }
 
   function nudgeSelection(dx: number, dy: number) {
@@ -9573,7 +9569,10 @@ function App() {
   }
 
   function executePPTCanvasClipboardSelectionCommand(
-    command: Extract<PPTCanvasClipboardCommand, { kind: 'copy' | 'cut' }>,
+    command: Extract<
+      PPTCanvasClipboardCommand,
+      { kind: 'copy' | 'cut' | 'duplicate' }
+    >,
   ) {
     const operation: PPTClipboardOperation =
       command.kind === 'cut' ? 'cut' : 'copy'
@@ -9697,8 +9696,12 @@ function App() {
       case 'paste':
         runPPTPasteSelectionCommand()
         return []
-      case 'clone':
       case 'duplicate':
+        if (commandAvailability.duplicate) {
+          executePPTCanvasClipboardSelectionCommand(command)
+        }
+        return []
+      case 'clone':
         return []
     }
   }

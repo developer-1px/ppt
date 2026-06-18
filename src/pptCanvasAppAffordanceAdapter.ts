@@ -49,6 +49,7 @@ import {
   createCanvasTabsDescriptor,
   copyCanvasClipboardSelection,
   cutCanvasClipboardSelection,
+  duplicateCanvasClipboardSelection,
   createCanvasTextPasteItems,
   downloadCanvasTextFile,
   fitCanvasViewportToBounds,
@@ -334,6 +335,8 @@ export const copyPPTCanvasClipboardSelection =
   copyCanvasClipboardSelection
 export const cutPPTCanvasClipboardSelection =
   cutCanvasClipboardSelection
+export const duplicatePPTCanvasClipboardSelection =
+  duplicateCanvasClipboardSelection
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
 export const executePPTCanvasClipboardCommand =
   executeCanvasClipboardCommand
