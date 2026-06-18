@@ -176,6 +176,7 @@ import {
   getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextAutoFitJSONPasteValue,
+  getSlideEditTextAutoFitPasteCommandEffects,
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
@@ -7345,20 +7346,45 @@ function App() {
   }
 
   function pastePPTTextAutoFitSource(source: PPTTextAutoFitImportSource) {
-    const effects = selectedElements
+    const targets = selectedElements
       .filter((element): element is PPTTextElement =>
         isPPTTextElement(element) &&
           element.locked !== true &&
           element.visible !== false)
-      .map((element) =>
-        getPPTTextAutoFitCommandEffect({
+      .map((element) => ({
+        bounds: pptGeometryToBounds(element.geometry),
+        isHidden: element.visible === false,
+        isLocked: element.locked === true,
+        maxBounds: {
+          h: PPT_SLIDE_HEIGHT,
+          w: PPT_SLIDE_WIDTH,
+          x: 0,
+          y: 0,
+        },
+        measurement: getPPTTextAutoFitMeasurement(
           element,
-          handle: source.handle,
-          hasOverflow: textOverflowById[element.id] === true,
-          slideId: activeSlide.id,
-        }))
-      .filter((effect): effect is SlideEditTextAutoFitHostCommandEffect<string, string> =>
-        effect !== null)
+          textOverflowById[element.id] === true,
+        ),
+        minSize: {
+          h: 24,
+          w: 24,
+        },
+        objectId: element.id,
+      }))
+    const pasteResult = getSlideEditTextAutoFitPasteCommandEffects({
+      pasteValue: {
+        handle: source.handle as SlideEditTextResizeHandle,
+        mode: source.mode,
+        sourceFields: {
+          ...(source.fields.includes('handle') ? { handle: 'handle' } : {}),
+          mode: 'mode',
+        },
+        surface: 'text-auto-fit',
+      },
+      slideId: activeSlide.id,
+      targets,
+    })
+    const effects = pasteResult.effects
 
     if (effects.length === 0) {
       return false
