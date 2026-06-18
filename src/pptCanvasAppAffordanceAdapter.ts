@@ -122,6 +122,7 @@ import {
   resetCanvasViewport,
   routeCanvasTableImportTargetReplace,
   routeCanvasTextPasteReplace,
+  runCanvasDataTransferImportActionPlan,
   runCanvasKeyboardCommandIntent,
   runCanvasKeyboardToolIntent,
   runCanvasKeyboardViewportIntent,
@@ -453,6 +454,8 @@ export const measurePPTCanvasTextBlocks = measureCanvasTextBlocks
 export const readPPTCanvasRichClipboardFromDataTransfer =
   readCanvasRichClipboardFromDataTransfer
 export const resetPPTCanvasViewport = resetCanvasViewport
+export const runPPTCanvasDataTransferImportActionPlan =
+  runCanvasDataTransferImportActionPlan
 export const runPPTCanvasKeyboardCommandIntent =
   runCanvasKeyboardCommandIntent
 export const runPPTCanvasKeyboardToolIntent =

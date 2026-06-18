@@ -667,6 +667,7 @@ import {
   routePPTCanvasMediaSourceObjectHyperlink,
   routePPTCanvasTableImportTargetReplace,
   routePPTCanvasTextPasteReplace,
+  runPPTCanvasDataTransferImportActionPlan,
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
@@ -4858,13 +4859,14 @@ function App() {
         return
       }
 
-      for (const action of getPPTStructuredClipboardPasteActions(
-        event.clipboardData,
-      )) {
-        if (action.run()) {
-          event.preventDefault()
-          return
-        }
+      const structuredPasteResult = runPPTCanvasDataTransferImportActionPlan({
+        actions: getPPTStructuredClipboardPasteActions(event.clipboardData),
+        onConsumed: () => event.preventDefault(),
+        runAction: (action) => action.run(),
+      })
+
+      if (structuredPasteResult.consumed) {
+        return
       }
 
       const richClipboard = getPPTRichClipboardFromDataTransfer(event.clipboardData)
@@ -4881,11 +4883,14 @@ function App() {
         importActions.map((action) => action.kind).join(' '),
       )
 
-      for (const action of importActions) {
-        if (runPPTClipboardImportAction(action)) {
-          event.preventDefault()
-          return
-        }
+      const importResult = runPPTCanvasDataTransferImportActionPlan({
+        actions: importActions,
+        onConsumed: () => event.preventDefault(),
+        runAction: runPPTClipboardImportAction,
+      })
+
+      if (importResult.consumed) {
+        return
       }
     }
 
@@ -11529,11 +11534,15 @@ function App() {
       return
     }
 
-    const point = getPPTStageDropInsertPosition(action, event.nativeEvent)
-
-    if (runPPTStageDropImportAction(action, point)) {
-      event.preventDefault()
-    }
+    runPPTCanvasDataTransferImportActionPlan({
+      actions: [action],
+      onConsumed: () => event.preventDefault(),
+      runAction: (nextAction) =>
+        runPPTStageDropImportAction(
+          nextAction,
+          getPPTStageDropInsertPosition(nextAction, event.nativeEvent),
+        ),
+    })
   }
 
   function handleStageWheel(event: WheelEvent) {
