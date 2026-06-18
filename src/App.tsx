@@ -175,6 +175,7 @@ import {
   getSlideEditStyleClipboardKeyboardIntent,
   getSlideEditStyleClipboardPasteAvailability,
   getSlideEditTextAutoFitGestureCommandEffect,
+  getSlideEditTextAutoFitJSONPasteValue,
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
@@ -26652,6 +26653,13 @@ function getPPTTextAutoFitSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextAutoFitSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -26691,6 +26699,42 @@ function getPPTTextAutoFitSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextAutoFitSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextAutoFitImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_AUTOFIT_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditTextAutoFitJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    const handle = getPPTTextAutoFitHandleFromJSONValue(pasteValue.handle)
+
+    if (handle === undefined) {
+      continue
+    }
+
+    return {
+      fields: pasteValue.sourceFields.handle
+        ? ['mode', 'handle']
+        : ['mode'],
+      format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
+      handle,
+      jsonLength: candidate.text.length,
+      mode: pasteValue.mode,
     }
   }
 
