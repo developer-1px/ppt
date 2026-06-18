@@ -181,6 +181,7 @@ import {
   getSlideEditTextFontSizeJSONPasteValue,
   getSlideEditTextFontWeightJSONPasteValue,
   getSlideEditTextFormattingKeyboardIntent,
+  getSlideEditTextFrameInsetJSONPasteValue,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextParagraphAlignJSONPasteValue,
@@ -190,6 +191,7 @@ import {
   getSlideEditTextParagraphSpacingJSONPasteValue,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
+  getSlideEditTextVerticalAlignmentJSONPasteValue,
   getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
   mapSlideEditClipboardPasteObjects,
@@ -25117,6 +25119,13 @@ function getPPTTextVerticalAlignSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25156,6 +25165,38 @@ function getPPTTextVerticalAlignSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextVerticalAlignImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    const payload = getPPTTextVerticalAlignPayloadEntry(
+      getPPTJSONValueFromText(candidate.text),
+      candidate.allowDirect,
+    )
+
+    return {
+      fields: payload?.fields ?? ['value'],
+      format: PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
+      value: normalizePPTTextVerticalAlign(pasteValue.value),
     }
   }
 
@@ -26681,6 +26722,13 @@ function getPPTTextFrameInsetSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -26724,6 +26772,53 @@ function getPPTTextFrameInsetSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextFrameInsetImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return createPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
+      pasteValue,
+      candidate.text.length,
+    )
+  }
+
+  return null
+}
+
+function createPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextFrameInsetJSONPasteValue>>,
+  jsonLength: number,
+): PPTTextFrameInsetImportSource | null {
+  const fields: PPTTextFrameInsetImportField[] = []
+  const inset: Partial<PPTTextInset> = {}
+
+  for (const field of pasteValue.fields) {
+    fields.push(field.fieldId)
+    inset[field.fieldId] = normalizePPTTextInset(field.value)
+  }
+
+  return fields.length === 0
+    ? null
+    : {
+        fields,
+        format: PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT,
+        inset,
+        jsonLength,
+      }
 }
 
 function getPPTTextFrameInsetSourceFromText(
