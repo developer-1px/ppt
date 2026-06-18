@@ -1085,6 +1085,11 @@ const PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-autofit' as const
 const PPT_TEXT_AUTOFIT_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-autofit+json'
+const PPT_COLOR_SWATCH_IMPORT_MODEL = 'ppt-color-swatch-import' as const
+const PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT =
+  'application-json-ppt-color-swatch' as const
+const PPT_COLOR_SWATCH_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.color-swatch+json'
 const PPT_LINE_STYLE_IMPORT_MODEL = 'ppt-line-style-import' as const
 const PPT_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-line-style' as const
@@ -1423,6 +1428,22 @@ type PPTTextAutoFitImportSource = {
   jsonLength: number
   mode: 'resize-to-fit'
 }
+type PPTColorSwatchImportField =
+  | 'channel'
+  | 'color'
+  | 'source'
+  | 'swatchId'
+  | 'tokenId'
+type PPTColorSwatchImportSource = {
+  channel?: PPTColorSwatchChannel
+  color: string
+  fields: readonly PPTColorSwatchImportField[]
+  format: typeof PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT
+  jsonLength: number
+  source: PPTColorSwatchSelection['source']
+  swatchId?: string
+  tokenId?: string
+}
 type PPTLineStyleImportField =
   | 'color'
   | 'dash'
@@ -1753,6 +1774,25 @@ type PPTTextAutoFitImportEffect = {
   mode: string
   model: typeof PPT_TEXT_AUTOFIT_IMPORT_MODEL
   objectIds: string
+}
+type PPTColorSwatchImportEffect = {
+  commandChannels: string
+  commandIds: string
+  commandSources: string
+  commandSwatches: string
+  commandTargets: string
+  commandTokens: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_COLOR_SWATCH_IMPORT_MODEL
+  objectIds: string
+  source: string
+  swatchId: string
+  tokenId: string
+  value: string
 }
 type PPTLineStyleImportEffect = {
   categories: string
@@ -2912,6 +2952,8 @@ function App() {
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastColorSwatchImportEffect, setLastColorSwatchImportEffect] =
+    useState<PPTColorSwatchImportEffect | null>(null)
   const [lastInlineEditEffect, setLastInlineEditEffect] = useState<PPTInlineEditEffect | null>(null)
   const [lastResizeHandleClickMemoryEffect, setLastResizeHandleClickMemoryEffect] = useState<PPTResizeHandleClickMemoryEffect | null>(null)
   const [lastMediaImport, setLastMediaImport] = useState<PPTMediaImportResult | null>(null)
@@ -3858,6 +3900,17 @@ function App() {
       if (
         objectTransformSource &&
         pastePPTObjectTransformSource(objectTransformSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const colorSwatchSource =
+        getPPTColorSwatchSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        colorSwatchSource &&
+        pastePPTColorSwatchSource(colorSwatchSource)
       ) {
         event.preventDefault()
         return
@@ -5176,6 +5229,63 @@ function App() {
           objectIds,
           (element) => applyPPTObjectTransformSourceToElement(element, source),
         ),
+      })))
+
+    return true
+  }
+
+  function pastePPTColorSwatchSource(source: PPTColorSwatchImportSource) {
+    const targets = selectedElements
+      .filter((element) =>
+        element.locked !== true &&
+          element.visible !== false)
+      .map((element) => ({
+        channel: getPPTColorSwatchImportChannelForElement(
+          element,
+          source.channel,
+        ),
+        element,
+      }))
+      .filter((target): target is {
+        channel: PPTColorSwatchChannel
+        element: PPTElement
+      } => target.channel !== null)
+
+    if (targets.length === 0) {
+      return false
+    }
+
+    const channels = uniquePPTCanvasValues(
+      targets.map((target) => target.channel),
+    )
+    const effects = channels.map((channel) =>
+      getSlideEditColorSwatchCommandEffect({
+        channelId: getPPTColorSwatchPackageChannel(channel),
+        id: 'apply-color-swatch',
+        objectIds: targets
+          .filter((target) => target.channel === channel)
+          .map((target) => target.element.id),
+        slideId: activeSlide.id,
+        swatch: createPPTColorSwatchImportSelection(source),
+      }))
+
+    setLastColorSwatchEffect(effects[effects.length - 1])
+    setLastColorSwatchImportEffect(createPPTColorSwatchImportEffect({
+      effects,
+      source,
+    }))
+    rememberRecentColor(source.color)
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectIds.includes(element.id))
+
+          return effect
+            ? applyPPTColorSwatchCommandEffectToElement(element, effect)
+            : element
+        }),
       })))
 
     return true
@@ -11263,6 +11373,23 @@ function App() {
         data-ppt-color-swatch-command-type={lastColorSwatchEffect?.type}
         data-ppt-color-swatch-command-value={lastColorSwatchEffect?.payload.swatch.value}
         data-ppt-color-swatch-model="slide-edit-color-swatch-palette"
+        data-ppt-color-swatch-import-command-channels={lastColorSwatchImportEffect?.commandChannels}
+        data-ppt-color-swatch-import-command-sources={lastColorSwatchImportEffect?.commandSources}
+        data-ppt-color-swatch-import-command-swatches={lastColorSwatchImportEffect?.commandSwatches}
+        data-ppt-color-swatch-import-command-targets={lastColorSwatchImportEffect?.commandTargets}
+        data-ppt-color-swatch-import-command-tokens={lastColorSwatchImportEffect?.commandTokens}
+        data-ppt-color-swatch-import-command-types={lastColorSwatchImportEffect?.commandTypes}
+        data-ppt-color-swatch-import-command-values={lastColorSwatchImportEffect?.commandValues}
+        data-ppt-color-swatch-import-commands={lastColorSwatchImportEffect?.commandIds}
+        data-ppt-color-swatch-import-fields={lastColorSwatchImportEffect?.fields}
+        data-ppt-color-swatch-import-format={lastColorSwatchImportEffect?.format}
+        data-ppt-color-swatch-import-json-length={lastColorSwatchImportEffect?.jsonLength}
+        data-ppt-color-swatch-import-model={lastColorSwatchImportEffect?.model}
+        data-ppt-color-swatch-import-objects={lastColorSwatchImportEffect?.objectIds}
+        data-ppt-color-swatch-import-source={lastColorSwatchImportEffect?.source}
+        data-ppt-color-swatch-import-swatch={lastColorSwatchImportEffect?.swatchId}
+        data-ppt-color-swatch-import-token={lastColorSwatchImportEffect?.tokenId}
+        data-ppt-color-swatch-import-value={lastColorSwatchImportEffect?.value}
         data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
         data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
         data-ppt-placeholder-visibility-command-selection={lastPlaceholderVisibilityEffect?.selection.objectIds.join(' ') ?? undefined}
@@ -14594,6 +14721,148 @@ function applyPPTTextAutoFitCommandEffectToElement(
   }
 }
 
+function createPPTColorSwatchImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly PPTColorSwatchHostCommandEffect[]
+  source: PPTColorSwatchImportSource
+}): PPTColorSwatchImportEffect {
+  return {
+    commandChannels: effects.map((effect) => effect.payload.channelId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandSources: effects.map((effect) => effect.payload.swatch.source).join(' '),
+    commandSwatches: effects.map((effect) => effect.payload.swatch.swatchId).join(' '),
+    commandTargets: effects.flatMap((effect) => effect.payload.objectIds).join(' '),
+    commandTokens: effects.map((effect) => effect.payload.swatch.tokenId ?? '').join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => effect.payload.swatch.value).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_COLOR_SWATCH_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.flatMap((effect) => effect.payload.objectIds),
+    ).join(' '),
+    source: source.source,
+    swatchId: source.swatchId ?? '',
+    tokenId: source.tokenId ?? '',
+    value: source.color,
+  }
+}
+
+function createPPTColorSwatchImportSelection(
+  source: PPTColorSwatchImportSource,
+): PPTColorSwatchSelection {
+  return {
+    source: source.source,
+    swatchId: source.swatchId || getSlideEditColorSwatchId({
+      source: source.source,
+      tokenId: source.tokenId,
+      value: source.color,
+    }),
+    ...(source.tokenId ? { tokenId: source.tokenId } : {}),
+    value: source.color,
+  }
+}
+
+function getPPTColorSwatchImportChannelForElement(
+  element: PPTElement,
+  sourceChannel: PPTColorSwatchChannel | undefined,
+): PPTColorSwatchChannel | null {
+  if (sourceChannel) {
+    return isPPTColorSwatchChannelSupportedByElement(element, sourceChannel)
+      ? sourceChannel
+      : null
+  }
+
+  switch (element.kind) {
+    case 'textBox':
+      return 'text-color'
+    case 'shape':
+      return 'shape-fill'
+    case 'freeform':
+    case 'line':
+      return 'line-stroke'
+    default:
+      return null
+  }
+}
+
+function isPPTColorSwatchChannelSupportedByElement(
+  element: PPTElement,
+  channel: PPTColorSwatchChannel,
+) {
+  switch (channel) {
+    case 'line-stroke':
+      return element.kind === 'freeform' || element.kind === 'line'
+    case 'shape-fill':
+    case 'shape-stroke':
+      return element.kind === 'shape'
+    case 'text-color':
+      return isPPTTextElement(element)
+  }
+}
+
+function applyPPTColorSwatchCommandEffectToElement(
+  element: PPTElement,
+  effect: PPTColorSwatchHostCommandEffect,
+): PPTElement {
+  if (!effect.payload.objectIds.includes(element.id)) {
+    return element
+  }
+
+  const color = normalizePPTSwatchColor(effect.payload.swatch.value) ||
+    normalizeSlideEditColorSwatchValue(effect.payload.swatch.value)
+
+  if (!color) {
+    return element
+  }
+
+  switch (effect.payload.channelId) {
+    case 'fill':
+      return element.kind === 'shape'
+        ? {
+            ...element,
+            fill: normalizePPTFill({
+              ...element.fill,
+              color,
+            }),
+          }
+        : element
+    case 'line-stroke':
+      return element.kind === 'freeform' || element.kind === 'line'
+        ? {
+            ...element,
+            stroke: normalizePPTStroke({
+              ...element.stroke,
+              color,
+            }),
+          }
+        : element
+    case 'stroke':
+      return element.kind === 'shape'
+        ? {
+            ...element,
+            stroke: normalizePPTStroke({
+              ...element.stroke,
+              color,
+            }),
+          }
+        : element
+    case 'text':
+      return isPPTTextElement(element)
+        ? {
+            ...element,
+            style: {
+              ...getPPTTextElementStyle(element),
+              color,
+            },
+          }
+        : element
+  }
+}
+
 function createPPTCommentImportEffect({
   objectIds,
   source,
@@ -17910,6 +18179,270 @@ function getPPTTextBodyPayloadValue(
   }
 
   return allowDirect ? value : null
+}
+
+function getPPTColorSwatchSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_COLOR_SWATCH_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTColorSwatchSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTColorSwatchSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTColorSwatchImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTColorSwatchSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTColorSwatchSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTColorSwatchImportSource | null {
+  const payloadValue = getPPTColorSwatchPayloadValue(value, allowDirect)
+
+  if (typeof payloadValue === 'string') {
+    const color = normalizePPTSwatchColor(payloadValue)
+
+    return color
+      ? {
+          color,
+          fields: ['color'],
+          format: PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT,
+          jsonLength,
+          source: 'recent',
+        }
+      : null
+  }
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const channel = getPPTColorSwatchChannelFromJSONValue(
+    payloadValue.channel ??
+      payloadValue.target ??
+      payloadValue.field,
+  )
+  const explicitColorValue =
+    payloadValue.color ?? payloadValue.value ?? payloadValue.hex
+  const tokenId = getPPTColorSwatchTokenIdFromJSONValue(
+    payloadValue.tokenId ??
+      payloadValue.token ??
+      payloadValue.themeColorToken,
+  )
+  const color = getPPTColorSwatchColorFromJSONValue(explicitColorValue) ??
+    (tokenId ? getPPTColorSwatchTokenColor(tokenId) : undefined)
+  const source = getPPTColorSwatchSelectionSourceFromJSONValue(
+    payloadValue.source,
+    tokenId !== undefined,
+  )
+  const swatchId = getPPTColorSwatchSwatchIdFromJSONValue(
+    payloadValue.swatchId ?? payloadValue.id,
+  )
+
+  if (!color) {
+    return null
+  }
+
+  const fields: PPTColorSwatchImportField[] = []
+
+  if (channel !== undefined) {
+    fields.push('channel')
+  }
+
+  fields.push('color')
+
+  if (typeof payloadValue.source === 'string') {
+    fields.push('source')
+  }
+
+  if (swatchId !== undefined) {
+    fields.push('swatchId')
+  }
+
+  if (tokenId !== undefined) {
+    fields.push('tokenId')
+  }
+
+  return {
+    ...(channel === undefined ? {} : { channel }),
+    color,
+    fields,
+    format: PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT,
+    jsonLength,
+    source,
+    ...(swatchId === undefined ? {} : { swatchId }),
+    ...(tokenId === undefined ? {} : { tokenId }),
+  }
+}
+
+function getPPTColorSwatchPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (isPPTRecord(value.colorSwatch) || typeof value.colorSwatch === 'string') {
+    return value.colorSwatch
+  }
+
+  if (isPPTRecord(value.swatch) || typeof value.swatch === 'string') {
+    return value.swatch
+  }
+
+  if (
+    typeof value.color === 'string' ||
+    typeof value.value === 'string' ||
+    typeof value.hex === 'string' ||
+    typeof value.channel === 'string' ||
+    typeof value.tokenId === 'string'
+  ) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTColorSwatchColorFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  return normalizePPTSwatchColor(value) || undefined
+}
+
+function getPPTColorSwatchChannelFromJSONValue(
+  value: unknown,
+): PPTColorSwatchChannel | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const channel = value.replace(/[\s_-]/g, '').toLowerCase()
+
+  switch (channel) {
+    case 'fill':
+    case 'shapefill':
+      return 'shape-fill'
+    case 'fontcolor':
+    case 'text':
+    case 'textcolor':
+      return 'text-color'
+    case 'line':
+    case 'linestroke':
+      return 'line-stroke'
+    case 'shape':
+    case 'shapestroke':
+    case 'stroke':
+      return 'shape-stroke'
+    default:
+      return undefined
+  }
+}
+
+function getPPTColorSwatchSelectionSourceFromJSONValue(
+  value: unknown,
+  hasToken: boolean,
+): PPTColorSwatchSelection['source'] {
+  return value === 'theme' || (value !== 'recent' && hasToken)
+    ? 'theme'
+    : 'recent'
+}
+
+function getPPTColorSwatchSwatchIdFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const swatchId = value.trim()
+
+  return swatchId || undefined
+}
+
+function getPPTColorSwatchTokenIdFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const tokenId = value.trim()
+
+  return tokenId || undefined
+}
+
+function getPPTColorSwatchTokenColor(tokenId: string) {
+  const token = PPT_THEME_DESCRIPTOR.colorTokens.find((token) =>
+    token.tokenId === tokenId)
+
+  return token ? normalizePPTSwatchColor(token.value) || token.value : undefined
 }
 
 function getPPTTextAutoFitSourceFromDataTransfer(

@@ -5292,6 +5292,23 @@ function getPPTColorSwatchState(page, channel, elementId = '') {
       commandToken: stage?.getAttribute('data-ppt-color-swatch-command-token') ?? '',
       commandType: stage?.getAttribute('data-ppt-color-swatch-command-type') ?? '',
       commandValue: stage?.getAttribute('data-ppt-color-swatch-command-value') ?? '',
+      importCommandChannels: stage?.getAttribute('data-ppt-color-swatch-import-command-channels') ?? '',
+      importCommandSources: stage?.getAttribute('data-ppt-color-swatch-import-command-sources') ?? '',
+      importCommandSwatches: stage?.getAttribute('data-ppt-color-swatch-import-command-swatches') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-color-swatch-import-command-targets') ?? '',
+      importCommandTokens: stage?.getAttribute('data-ppt-color-swatch-import-command-tokens') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-color-swatch-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-color-swatch-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-color-swatch-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-color-swatch-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-color-swatch-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-color-swatch-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-color-swatch-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-color-swatch-import-objects') ?? '',
+      importSource: stage?.getAttribute('data-ppt-color-swatch-import-source') ?? '',
+      importSwatch: stage?.getAttribute('data-ppt-color-swatch-import-swatch') ?? '',
+      importToken: stage?.getAttribute('data-ppt-color-swatch-import-token') ?? '',
+      importValue: stage?.getAttribute('data-ppt-color-swatch-import-value') ?? '',
       descriptorCommand: palette?.getAttribute('data-ppt-color-swatch-command') ?? '',
       descriptorControl: palette?.getAttribute('data-ppt-color-swatch-control') ?? '',
       descriptorDisabled: palette?.getAttribute('data-ppt-color-swatch-disabled') ?? '',
@@ -5687,6 +5704,96 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`document.querySelector('[data-ppt-present-exit]')?.click()`)
   await delay(80)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      colorSwatch: {
+        channel: 'text-color',
+        color: '#0f766e',
+        source: 'recent',
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterTextColorJSONPaste = await getPPTColorSwatchState(page, 'text-color', 's1-title')
+
+  record(
+    'pastes PPT color swatch JSON through slide-edit color command effect',
+    afterTextColorJSONPaste.model === 'slide-edit-color-swatch-palette' &&
+      afterTextColorJSONPaste.importModel === 'ppt-color-swatch-import' &&
+      afterTextColorJSONPaste.importFormat === 'application-json-ppt-color-swatch' &&
+      afterTextColorJSONPaste.importFields === 'channel color source' &&
+      afterTextColorJSONPaste.importCommands === 'apply-color-swatch' &&
+      afterTextColorJSONPaste.importCommandChannels === 'text' &&
+      afterTextColorJSONPaste.importCommandTargets === 's1-title' &&
+      afterTextColorJSONPaste.importCommandSources === 'recent' &&
+      afterTextColorJSONPaste.importCommandSwatches === 'recent:#0f766e' &&
+      afterTextColorJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterTextColorJSONPaste.importCommandValues === '#0f766e' &&
+      afterTextColorJSONPaste.importObjects === 's1-title' &&
+      afterTextColorJSONPaste.importSource === 'recent' &&
+      afterTextColorJSONPaste.importValue === '#0f766e' &&
+      afterTextColorJSONPaste.importJsonLength > 60 &&
+      afterTextColorJSONPaste.command === 'apply-color-swatch' &&
+      afterTextColorJSONPaste.commandChannel === 'text' &&
+      afterTextColorJSONPaste.commandObjects.includes('s1-title') &&
+      afterTextColorJSONPaste.commandSource === 'recent' &&
+      afterTextColorJSONPaste.commandSwatch === 'recent:#0f766e' &&
+      afterTextColorJSONPaste.commandType === 'slide-command-effect' &&
+      afterTextColorJSONPaste.commandValue === '#0f766e' &&
+      afterTextColorJSONPaste.inputValue === '#0f766e' &&
+      afterTextColorJSONPaste.styleColor === 'rgb(15, 118, 110)' &&
+      afterTextColorJSONPaste.recentColors.includes('#0f766e') &&
+      afterTextColorJSONPaste.recentUnique &&
+      afterTextColorJSONPaste.exportSlice.includes('"color": "#0f766e"'),
+    {
+      afterTextColorJSONPaste,
+      afterTextColorSwatch,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const afterTextColorJSONUndo = await getPPTColorSwatchState(page, 'text-color', 's1-title')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(100)
+
+  const afterTextColorJSONRedo = await getPPTColorSwatchState(page, 'text-color', 's1-title')
+
+  record(
+    'undoes and redoes PPT color swatch JSON as one history step',
+    afterTextColorJSONUndo.styleColor === 'rgb(37, 99, 235)' &&
+      afterTextColorJSONUndo.inputValue === '#2563eb' &&
+      afterTextColorJSONRedo.styleColor === afterTextColorJSONPaste.styleColor &&
+      afterTextColorJSONRedo.inputValue === '#0f766e',
+    {
+      afterTextColorJSONPaste,
+      afterTextColorJSONRedo,
+      afterTextColorJSONUndo,
+    },
+  )
 
   await page.eval(`document.querySelector('[data-ppt-text-quick="bold"]')?.click()`)
   await page.eval(`document.querySelector('[data-ppt-text-quick="italic"]')?.click()`)
