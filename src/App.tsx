@@ -180,6 +180,7 @@ import {
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextAutoFitJSONPasteValue,
   getSlideEditTextAutoFitPasteCommandEffects,
+  getSlideEditTextBodyPasteCommandEffect,
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
@@ -313,6 +314,7 @@ import {
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
   type SlideEditTextAutoFitHostCommandEffect,
+  type SlideEditTextBodyReplaceHostCommandEffect,
   type SlideEditTextBoxMeasurement,
   type SlideEditTextBoxSizeMode,
   type SlideEditTextOverflowIndicatorState,
@@ -2262,6 +2264,8 @@ type PPTTextBodyImportEffect = {
   runCount: number
   textLength: number
 }
+type PPTTextBodyReplaceHostCommandEffect =
+  SlideEditTextBodyReplaceHostCommandEffect<string, string, PPTTextBody>
 type PPTTextRunSizeImportEffect = {
   commandFields: string
   commandIds: string
@@ -7436,19 +7440,40 @@ function App() {
       return false
     }
 
+    const pasteValue = createPPTTextBodyPasteValue(source)
+    const effects = route.intent.target.selection.flatMap((objectId) => {
+      const effect = getSlideEditTextBodyPasteCommandEffect({
+        normalizeBody: () => clonePPTTextBody(source.textBody),
+        pasteValue,
+        slideId: activeSlide.id,
+        target: {
+          isTextEditable: true,
+          objectId,
+        },
+      })
+
+      return effect ? [effect] : []
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
     return pastePPTTextBodySourceToObjectIds({
-      objectIds: route.intent.target.selection,
+      effects,
       source,
     })
   }
 
   function pastePPTTextBodySourceToObjectIds({
-    objectIds,
+    effects,
     source,
   }: {
-    objectIds: readonly string[]
+    effects: readonly PPTTextBodyReplaceHostCommandEffect[]
     source: PPTTextBodyImportSource
   }) {
+    const objectIds = effects.map((effect) => effect.payload.objectId)
+
     setLastTextBodyImportEffect(createPPTTextBodyImportEffect({
       objectIds,
       source,
@@ -7460,12 +7485,17 @@ function App() {
         elements: mapPPTElementsByIds(
           slide.elements,
           objectIds,
-          (element) => isPPTTextElement(element)
-            ? {
+          (element) => {
+            const effect = effects.find((effect) =>
+              effect.payload.objectId === element.id)
+
+            return effect && isPPTTextElement(element)
+              ? {
                 ...element,
-                textBody: clonePPTTextBody(source.textBody),
+                textBody: clonePPTTextBody(effect.payload.body),
               }
-            : element,
+              : element
+          },
         ),
       })))
 
@@ -17728,6 +17758,28 @@ function createPPTCanvasTextPasteSourceFromTextBodySource(
     format: 'text-plain',
     text: readPPTText(source.textBody),
   }
+}
+
+function createPPTTextBodyPasteValue(source: PPTTextBodyImportSource) {
+  const body = {
+    paragraphs: source.textBody.paragraphs.map((paragraph) => ({
+      runs: paragraph.runs.map((run) => ({ text: run.text })),
+      text: paragraph.runs.map((run) => run.text).join(''),
+    })),
+  }
+
+  return {
+    body,
+    format: 'json',
+    paragraphCount: body.paragraphs.length,
+    payloadLength: source.jsonLength,
+    runCount: body.paragraphs.reduce(
+      (count, paragraph) => count + paragraph.runs.length,
+      0,
+    ),
+    sourceType: source.format,
+    surface: 'text-body',
+  } as const
 }
 
 function createPPTTextRunSizeImportEffect({
