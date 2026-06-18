@@ -125,6 +125,7 @@ import {
   runCanvasKeyboardCommandIntent,
   runCanvasKeyboardToolIntent,
   runCanvasKeyboardViewportIntent,
+  runCanvasWheelViewport,
   scheduleCanvasAnimationFrameTask,
   scheduleCanvasTimeoutTask,
   setCanvasDataTransferDropEffect,
@@ -458,6 +459,7 @@ export const runPPTCanvasKeyboardToolIntent =
   runCanvasKeyboardToolIntent
 export const runPPTCanvasKeyboardViewportIntent =
   runCanvasKeyboardViewportIntent
+export const runPPTCanvasWheelViewport = runCanvasWheelViewport
 export const schedulePPTCanvasAnimationFrameTask =
   scheduleCanvasAnimationFrameTask
 export const schedulePPTCanvasTimeoutTask = scheduleCanvasTimeoutTask

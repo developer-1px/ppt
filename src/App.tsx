@@ -537,7 +537,6 @@ import {
   createPPTCanvasText,
   deletePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
-  getPPTCanvasWheelViewport,
   PPT_COMMAND_AFFORDANCES,
   PPT_TOOL_AFFORDANCES,
   type PPTCanvasAlignMode,
@@ -671,6 +670,7 @@ import {
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
+  runPPTCanvasWheelViewport,
   schedulePPTCanvasAnimationFrameTask,
   schedulePPTCanvasTimeoutTask,
   setPPTCanvasDataTransferDropEffect,
@@ -11551,26 +11551,12 @@ function App() {
       return
     }
 
-    const nextViewport = getPPTCanvasWheelViewport({
+    runPPTCanvasWheelViewport({
       config: PPT_CANVAS_COMMAND_CONFIG,
-      input: {
-        ctrlKey: event.ctrlKey,
-        deltaMode: event.deltaMode,
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        metaKey: event.metaKey,
-        shiftKey: event.shiftKey,
-      },
-      point: canvasStageElement.getScreenPoint(event),
-      viewport,
+      event,
+      rect,
+      setViewport,
     })
-
-    if (!nextViewport) {
-      return
-    }
-
-    event.preventDefault()
-    setViewport(nextViewport)
   }
 
   function beginTemporaryPan(event: ReactPointerEvent<HTMLElement>) {
