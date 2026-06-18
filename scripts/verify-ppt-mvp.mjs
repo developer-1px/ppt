@@ -12048,6 +12048,57 @@ async function runMediaImportScenario(page) {
     },
   )
 
+  const jsonUrl = 'https://example.com/json-media-card'
+  const jsonTitle = 'Quarterly media brief'
+
+  await page.eval(`((url, title) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      mediaSource: {
+        title,
+        url,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(jsonUrl)}, ${JSON.stringify(jsonTitle)})`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTMediaImportState(page)
+
+  record(
+    'pastes JSON media source into PPT link card via canvas media import',
+    afterJSONPaste.mediaImportModel === 'canvas-media-import' &&
+      afterJSONPaste.mediaImportImporter === 'ppt-link-card' &&
+      afterJSONPaste.mediaImportUrl === jsonUrl &&
+      afterJSONPaste.mediaImportSelection === afterJSONPaste.selectedId &&
+      afterJSONPaste.mediaJSONImportModel === 'ppt-media-json-import' &&
+      afterJSONPaste.mediaJSONImportFormat === 'application-json-ppt-media' &&
+      afterJSONPaste.mediaJSONImportFields === 'url title' &&
+      afterJSONPaste.mediaJSONImportImporter === 'ppt-link-card' &&
+      afterJSONPaste.mediaJSONImportObject === afterJSONPaste.selectedId &&
+      afterJSONPaste.mediaJSONImportTitle === jsonTitle &&
+      afterJSONPaste.mediaJSONImportUrl === jsonUrl &&
+      afterJSONPaste.mediaJSONImportJsonLength > 70 &&
+      afterJSONPaste.shapeCount === afterPaste.shapeCount + 1 &&
+      afterJSONPaste.selectedKind === 'shape' &&
+      afterJSONPaste.selectedName === 'Link card' &&
+      afterJSONPaste.selectedHyperlink === jsonUrl &&
+      afterJSONPaste.selectedText.includes(jsonTitle) &&
+      afterJSONPaste.selectedText.includes(jsonUrl) &&
+      afterJSONPaste.exportCode.includes(`data-ppt-hyperlink-url="${jsonUrl}"`),
+    {
+      afterJSONPaste,
+      afterPaste,
+    },
+  )
+
   const dropUrl = 'https://example.com/dropped-resource'
 
   const dropDispatch = await page.eval(`((url) => {
@@ -12095,18 +12146,18 @@ async function runMediaImportScenario(page) {
 
   record(
     'drops URL media source onto PPT stage as link card',
-    afterDrop.shapeCount === afterPaste.shapeCount + 1 &&
+    afterDrop.shapeCount === afterJSONPaste.shapeCount + 1 &&
       afterDrop.selectedKind === 'shape' &&
       afterDrop.selectedName === 'Link card' &&
       afterDrop.selectedHyperlink === dropUrl &&
       afterDrop.mediaImportUrl === dropUrl &&
       dropDispatch.defaultPrevented &&
       dropDispatch.captured?.uri === dropUrl &&
-      afterDrop.selectedLeft > afterPaste.selectedLeft &&
-      afterDrop.selectedTop > afterPaste.selectedTop,
+      afterDrop.selectedLeft > afterJSONPaste.selectedLeft &&
+      afterDrop.selectedTop > afterJSONPaste.selectedTop,
     {
       afterDrop,
-      afterPaste,
+      afterJSONPaste,
       dropDispatch,
     },
   )
@@ -16362,6 +16413,14 @@ function getPPTMediaImportState(page) {
       mediaImportModel: stage?.getAttribute('data-ppt-media-import-model') ?? '',
       mediaImportSelection: stage?.getAttribute('data-ppt-media-import-selection') ?? '',
       mediaImportUrl: stage?.getAttribute('data-ppt-media-import-url') ?? '',
+      mediaJSONImportFields: stage?.getAttribute('data-ppt-media-json-import-fields') ?? '',
+      mediaJSONImportFormat: stage?.getAttribute('data-ppt-media-json-import-format') ?? '',
+      mediaJSONImportImporter: stage?.getAttribute('data-ppt-media-json-import-importer') ?? '',
+      mediaJSONImportJsonLength: Number(stage?.getAttribute('data-ppt-media-json-import-json-length') ?? 0),
+      mediaJSONImportModel: stage?.getAttribute('data-ppt-media-json-import-model') ?? '',
+      mediaJSONImportObject: stage?.getAttribute('data-ppt-media-json-import-object') ?? '',
+      mediaJSONImportTitle: stage?.getAttribute('data-ppt-media-json-import-title') ?? '',
+      mediaJSONImportUrl: stage?.getAttribute('data-ppt-media-json-import-url') ?? '',
       selectedHyperlink: selected?.getAttribute('data-ppt-hyperlink-url') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',

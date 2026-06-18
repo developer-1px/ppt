@@ -621,6 +621,7 @@ import {
   getPPTStageDropImportAction,
   getPPTTableColumnCount,
   getPPTTextPasteSourcesFromDataTransfer,
+  getPPTMediaSourceFromText,
   normalizePPTTableRows,
   PPT_IMAGE_IMPORT_MODEL,
   readPPTClipboardImageSource,
@@ -1089,6 +1090,10 @@ const PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-transform' as const
 const PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-transform+json'
+const PPT_MEDIA_JSON_IMPORT_MODEL = 'ppt-media-json-import' as const
+const PPT_MEDIA_JSON_IMPORT_FORMAT = 'application-json-ppt-media' as const
+const PPT_MEDIA_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.media+json'
 const PPT_COMMENT_IMPORT_MODEL = 'ppt-comment-import' as const
 const PPT_COMMENT_JSON_IMPORT_FORMAT =
   'application-json-ppt-comment' as const
@@ -1443,6 +1448,15 @@ type PPTCommentImportSource = {
   format: typeof PPT_COMMENT_JSON_IMPORT_FORMAT
   jsonLength: number
 }
+type PPTMediaJSONImportField =
+  | 'title'
+  | 'url'
+type PPTMediaJSONImportSource = {
+  fields: readonly PPTMediaJSONImportField[]
+  format: typeof PPT_MEDIA_JSON_IMPORT_FORMAT
+  jsonLength: number
+  source: PPTMediaImportSource
+}
 type PPTElementsJSONImportSource = {
   format:
     | typeof PPT_ELEMENTS_JSON_IMPORT_FORMAT
@@ -1751,6 +1765,16 @@ type PPTCommentImportEffect = {
   model: typeof PPT_COMMENT_IMPORT_MODEL
   objectIds: string
   resolved: string
+}
+type PPTMediaJSONImportEffect = {
+  fields: string
+  format: typeof PPT_MEDIA_JSON_IMPORT_FORMAT
+  importerId: string
+  jsonLength: number
+  model: typeof PPT_MEDIA_JSON_IMPORT_MODEL
+  objectId: string
+  title: string
+  url: string
 }
 type PPTElementsJSONImportEffect = {
   format:
@@ -2862,6 +2886,8 @@ function App() {
   const [lastInlineEditEffect, setLastInlineEditEffect] = useState<PPTInlineEditEffect | null>(null)
   const [lastResizeHandleClickMemoryEffect, setLastResizeHandleClickMemoryEffect] = useState<PPTResizeHandleClickMemoryEffect | null>(null)
   const [lastMediaImport, setLastMediaImport] = useState<PPTMediaImportResult | null>(null)
+  const [lastMediaJSONImportEffect, setLastMediaJSONImportEffect] =
+    useState<PPTMediaJSONImportEffect | null>(null)
   const [lastTextPasteImport, setLastTextPasteImport] = useState<PPTTextPasteImportResult | null>(null)
   const [lastTextParagraphSpacingEffect, setLastTextParagraphSpacingEffect] = useState<SlideEditTextParagraphSpacingHostCommandEffect<string, string> | null>(null)
   const [lastTextVerticalAlignmentEffect, setLastTextVerticalAlignmentEffect] = useState<SlideEditTextVerticalAlignmentHostCommandEffect<string, string> | null>(null)
@@ -3879,6 +3905,14 @@ function App() {
         getPPTSlideNotesSourceFromDataTransfer(event.clipboardData)
 
       if (slideNotesSource && pastePPTSlideNotesSource(slideNotesSource)) {
+        event.preventDefault()
+        return
+      }
+
+      const mediaJSONSource =
+        getPPTMediaJSONSourceFromDataTransfer(event.clipboardData)
+
+      if (mediaJSONSource && pastePPTMediaJSONSource(mediaJSONSource)) {
         event.preventDefault()
         return
       }
@@ -6526,6 +6560,9 @@ function App() {
   function insertPPTMediaSource(
     source: PPTMediaImportSource,
     center = getPPTViewportCenter(),
+    options: {
+      onResult?: (result: PPTMediaImportResult) => void
+    } = {},
   ) {
     commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => {
       const result = createPPTMediaElement({
@@ -6540,6 +6577,7 @@ function App() {
       }
 
       setLastMediaImport(result)
+      options.onResult?.(result)
       setSelection([result.item.id])
       setEditingId(null)
       setLineCreationMode(null)
@@ -6557,6 +6595,17 @@ function App() {
     }))
 
     return true
+  }
+
+  function pastePPTMediaJSONSource(source: PPTMediaJSONImportSource) {
+    return insertPPTMediaSource(source.source, getPPTViewportCenter(), {
+      onResult: (result) => {
+        setLastMediaJSONImportEffect(createPPTMediaJSONImportEffect({
+          result,
+          source,
+        }))
+      },
+    })
   }
 
   function insertPPTTextPasteSource(
@@ -11086,6 +11135,14 @@ function App() {
         data-ppt-media-import-model={PPT_MEDIA_IMPORT_MODEL}
         data-ppt-media-import-selection={lastMediaImport?.item.id}
         data-ppt-media-import-url={lastMediaImport?.source.url}
+        data-ppt-media-json-import-fields={lastMediaJSONImportEffect?.fields}
+        data-ppt-media-json-import-format={lastMediaJSONImportEffect?.format}
+        data-ppt-media-json-import-importer={lastMediaJSONImportEffect?.importerId}
+        data-ppt-media-json-import-json-length={lastMediaJSONImportEffect?.jsonLength}
+        data-ppt-media-json-import-model={lastMediaJSONImportEffect?.model}
+        data-ppt-media-json-import-object={lastMediaJSONImportEffect?.objectId}
+        data-ppt-media-json-import-title={lastMediaJSONImportEffect?.title}
+        data-ppt-media-json-import-url={lastMediaJSONImportEffect?.url}
         data-ppt-inline-edit-element={lastInlineEditEffect?.elementId}
         data-ppt-inline-edit-history-direction={lastInlineEditEffect?.historyDirection}
         data-ppt-inline-edit-input-type={lastInlineEditEffect?.inputType}
@@ -14432,6 +14489,25 @@ function createPPTCommentImportEffect({
     resolved: source.comment.resolved === undefined
       ? ''
       : String(source.comment.resolved),
+  }
+}
+
+function createPPTMediaJSONImportEffect({
+  result,
+  source,
+}: {
+  result: PPTMediaImportResult
+  source: PPTMediaJSONImportSource
+}): PPTMediaJSONImportEffect {
+  return {
+    fields: source.fields.join(' '),
+    format: source.format,
+    importerId: result.importerId,
+    jsonLength: source.jsonLength,
+    model: PPT_MEDIA_JSON_IMPORT_MODEL,
+    objectId: result.item.id,
+    title: source.source.title ?? '',
+    url: result.source.url,
   }
 }
 
@@ -17939,6 +18015,177 @@ function isPPTTableRowsJSONValue(
   return rows.length > 0 &&
     rows.some((row) => row.some((cell) => cell.trim().length > 0)) &&
     getPPTTableColumnCount(rows) > 0
+}
+
+function getPPTMediaJSONSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_MEDIA_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTMediaJSONSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTMediaJSONSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTMediaJSONImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTMediaJSONSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTMediaJSONSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTMediaJSONImportSource | null {
+  const payloadValue = getPPTMediaJSONPayloadValue(value, allowDirect)
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  const urlText = getPPTMediaJSONTextFromJSONValue(
+    payloadValue.url ??
+      payloadValue.href ??
+      payloadValue.src,
+  )
+
+  if (!urlText) {
+    return null
+  }
+
+  const mediaSource = getPPTMediaSourceFromText(urlText)
+
+  if (!mediaSource) {
+    return null
+  }
+
+  const title = getPPTMediaJSONTextFromJSONValue(
+    payloadValue.title ??
+      payloadValue.name ??
+      payloadValue.label,
+  )
+  const fields: PPTMediaJSONImportField[] = ['url']
+
+  if (title !== undefined) {
+    fields.push('title')
+  }
+
+  return {
+    fields,
+    format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+    jsonLength,
+    source: {
+      ...mediaSource,
+      ...(title === undefined ? {} : { title }),
+    },
+  }
+}
+
+function getPPTMediaJSONPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return null
+  }
+
+  if (typeof value.media === 'string') {
+    return { url: value.media }
+  }
+
+  if (isPPTRecord(value.media)) {
+    return value.media
+  }
+
+  if (typeof value.mediaSource === 'string') {
+    return { url: value.mediaSource }
+  }
+
+  if (isPPTRecord(value.mediaSource)) {
+    return value.mediaSource
+  }
+
+  if (isPPTRecord(value.linkCard)) {
+    return value.linkCard
+  }
+
+  if (isPPTRecord(value.linkPreview)) {
+    return value.linkPreview
+  }
+
+  if (isPPTRecord(value.embed)) {
+    return value.embed
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTMediaJSONTextFromJSONValue(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const text = value.replace(/\s+/g, ' ').trim()
+
+  return text || undefined
 }
 
 function getPPTCommentSourceFromDataTransfer(

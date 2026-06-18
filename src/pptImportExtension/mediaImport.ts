@@ -48,6 +48,8 @@ export const PPT_MEDIA_IMPORT_MODEL = PPT_CANVAS_MEDIA_IMPORT_MODEL
 export const getPPTMediaSourceFromDataTransfer =
   getPPTCanvasMediaSourceFromDataTransfer
 
+export const getPPTMediaSourceFromText = getPPTCanvasMediaSourceFromText
+
 export function createPPTMediaElement({
   createId,
   position,
