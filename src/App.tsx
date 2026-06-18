@@ -618,6 +618,7 @@ import {
   getPPTCanvasKeyboardToolShortcutIntent,
   getPPTCanvasKeyboardViewportShortcutIntent,
   getPPTCanvasMediaInsertPosition,
+  getPPTCanvasMediaSourceFromJSONDataTransfer,
   getPPTCanvasMenuTriggerKeyboardIntent,
   getPPTMinimapPointFromViewportOffset,
   getPPTMinimapReadModel,
@@ -687,6 +688,7 @@ import {
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
   PPT_CANVAS_COMPONENT_DEFINITION_REGISTRY,
+  PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   type PPTCanvasAppItemsChangeTransformer,
   type PPTCanvasClipboardCommand,
   type PPTCanvasFloatingAnchor,
@@ -29254,9 +29256,9 @@ function getPPTMediaJSONSourceFromDataTransfer(
   return readPPTJSONDataTransferSource({
     candidates,
     dataTransfer,
-    parseJSONValue: ({ candidate, json, jsonLength }) =>
-      getPPTMediaJSONSourceFromJSONValue(
-        json,
+    parseJSONValue: ({ candidate, jsonLength, rawText }) =>
+      getPPTMediaJSONSourceFromJSONText(
+        rawText,
         jsonLength,
         candidate.allowDirect,
       ),
@@ -29275,14 +29277,59 @@ function getPPTMediaJSONSourceFromText(
     return null
   }
 
+  return getPPTMediaJSONSourceFromJSONText(json, json.length, allowDirect)
+}
+
+function getPPTMediaJSONSourceFromJSONText(
+  json: string,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTMediaJSONImportSource | null {
+  const canvasSource = getPPTCanvasMediaSourceFromJSONDataTransfer(
+    createPPTTextDataTransferReader({
+      mimeType: allowDirect
+        ? PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE
+        : 'application/json',
+      text: json,
+    }),
+  )
+
+  if (canvasSource) {
+    return createPPTMediaJSONImportSourceFromCanvasSource(
+      canvasSource,
+      jsonLength,
+    )
+  }
+
   try {
     return getPPTMediaJSONSourceFromJSONValue(
       JSON.parse(json),
-      json.length,
+      jsonLength,
       allowDirect,
     )
   } catch {
     return null
+  }
+}
+
+function createPPTMediaJSONImportSourceFromCanvasSource(
+  source: { title?: string; url: string },
+  jsonLength: number,
+): PPTMediaJSONImportSource {
+  const fields: PPTMediaJSONImportField[] = ['url']
+
+  if (source.title !== undefined) {
+    fields.push('title')
+  }
+
+  return {
+    fields,
+    format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+    jsonLength,
+    source: {
+      url: source.url,
+      ...(source.title === undefined ? {} : { title: source.title }),
+    },
   }
 }
 

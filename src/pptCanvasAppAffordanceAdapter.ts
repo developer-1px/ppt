@@ -225,7 +225,9 @@ import {
 } from 'canvas/app/image-import'
 import {
   CANVAS_MEDIA_IMPORT_MODEL,
+  CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   getCanvasMediaSourceFromDataTransfer,
+  getCanvasMediaSourceFromJSONDataTransfer,
   getCanvasMediaSourceFromText,
   routeCanvasMediaSourceObjectHyperlink,
   type CanvasMediaObjectHyperlinkRoute,
@@ -510,8 +512,12 @@ export const routePPTCanvasImagePasteReplace =
   routeCanvasImagePasteReplace
 export const getPPTCanvasMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer
+export const getPPTCanvasMediaSourceFromJSONDataTransfer =
+  getCanvasMediaSourceFromJSONDataTransfer
 export const getPPTCanvasMediaSourceFromText =
   getCanvasMediaSourceFromText
+export const PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE =
+  CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE
 export const getPPTCanvasMediaInsertPosition =
   getCanvasMediaInsertPosition
 export const routePPTCanvasMediaSourceObjectHyperlink =
