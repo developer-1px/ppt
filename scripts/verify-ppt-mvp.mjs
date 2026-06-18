@@ -5375,6 +5375,16 @@ function getPPTTextFormatPainterState(page, elementId) {
       text: element?.textContent ?? '',
       textAlign: element?.style.textAlign ?? '',
       textInset: element?.getAttribute('data-ppt-text-inset') ?? '',
+      textFontSizeImportCategories: stage?.getAttribute('data-ppt-text-font-size-import-categories') ?? '',
+      textFontSizeImportCommand: stage?.getAttribute('data-ppt-text-font-size-import-command') ?? '',
+      textFontSizeImportCommandTargets: stage?.getAttribute('data-ppt-text-font-size-import-command-targets') ?? '',
+      textFontSizeImportCommandType: stage?.getAttribute('data-ppt-text-font-size-import-command-type') ?? '',
+      textFontSizeImportFields: stage?.getAttribute('data-ppt-text-font-size-import-fields') ?? '',
+      textFontSizeImportFormat: stage?.getAttribute('data-ppt-text-font-size-import-format') ?? '',
+      textFontSizeImportJsonLength: Number(stage?.getAttribute('data-ppt-text-font-size-import-json-length') ?? 0),
+      textFontSizeImportModel: stage?.getAttribute('data-ppt-text-font-size-import-model') ?? '',
+      textFontSizeImportObjects: stage?.getAttribute('data-ppt-text-font-size-import-objects') ?? '',
+      textFontSizeImportValue: stage?.getAttribute('data-ppt-text-font-size-import-value') ?? '',
       textStyleImportCategories: stage?.getAttribute('data-ppt-text-style-import-categories') ?? '',
       textStyleImportColor: stage?.getAttribute('data-ppt-text-style-import-color') ?? '',
       textStyleImportCommand: stage?.getAttribute('data-ppt-text-style-import-command') ?? '',
@@ -5967,6 +5977,90 @@ async function runTextQuickFormatScenario(page) {
       summaryBeforeTextStylePaste,
     },
   )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify(42)
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-font-size+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextFontSizePaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text font size JSON through slide-edit style clipboard effect',
+    summaryAfterTextFontSizePaste.selected === 'true' &&
+      summaryAfterTextFontSizePaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextFontSizePaste.fontSize === '42px' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportModel === 'ppt-text-font-size-import' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportFormat === 'application-json-ppt-text-font-size' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportCommandTargets === 's1-summary' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportObjects === 's1-summary' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportCategories.includes('object-effect') &&
+      summaryAfterTextFontSizePaste.textFontSizeImportCategories.includes('text-style') &&
+      summaryAfterTextFontSizePaste.textFontSizeImportFields === 'value' &&
+      summaryAfterTextFontSizePaste.textFontSizeImportJsonLength >= 2 &&
+      summaryAfterTextFontSizePaste.textFontSizeImportValue === '42' &&
+      summaryAfterTextFontSizePaste.styleClipboardCommand === 'paste-object-formatting' &&
+      summaryAfterTextFontSizePaste.styleClipboardCommandTargets === 's1-summary' &&
+      summaryAfterTextFontSizePaste.styleClipboardCommandApplications.includes('s1-summary') &&
+      summaryAfterTextFontSizePaste.styleClipboardCommandApplications.includes('text-style'),
+    {
+      summaryAfterTextFontSizePaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontSizeUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontSizeRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text font size JSON as one history step',
+    summaryAfterTextFontSizeUndo.fontSize === '34px' &&
+      summaryAfterTextFontSizeRedo.fontSize === '42px',
+    {
+      summaryAfterTextFontSizePaste,
+      summaryAfterTextFontSizeRedo,
+      summaryAfterTextFontSizeUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 
   await pressKey(page, {
     code: 'Escape',
