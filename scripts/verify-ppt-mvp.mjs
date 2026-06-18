@@ -5645,8 +5645,10 @@ function getPPTTextFormatPainterState(page, elementId) {
       textRunUnderlineImportValue: stage?.getAttribute('data-ppt-text-run-underline-import-value') ?? '',
       textParagraphAlignImportCategories: stage?.getAttribute('data-ppt-text-paragraph-align-import-categories') ?? '',
       textParagraphAlignImportCommand: stage?.getAttribute('data-ppt-text-paragraph-align-import-command') ?? '',
+      textParagraphAlignImportCommandFields: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-fields') ?? '',
       textParagraphAlignImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-targets') ?? '',
       textParagraphAlignImportCommandType: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-type') ?? '',
+      textParagraphAlignImportCommandValues: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-values') ?? '',
       textParagraphAlignImportFields: stage?.getAttribute('data-ppt-text-paragraph-align-import-fields') ?? '',
       textParagraphAlignImportFormat: stage?.getAttribute('data-ppt-text-paragraph-align-import-format') ?? '',
       textParagraphAlignImportJsonLength: Number(stage?.getAttribute('data-ppt-text-paragraph-align-import-json-length') ?? 0),
@@ -5655,8 +5657,10 @@ function getPPTTextFormatPainterState(page, elementId) {
       textParagraphAlignImportValue: stage?.getAttribute('data-ppt-text-paragraph-align-import-value') ?? '',
       textParagraphBulletImportCategories: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-categories') ?? '',
       textParagraphBulletImportCommand: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command') ?? '',
+      textParagraphBulletImportCommandFields: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-fields') ?? '',
       textParagraphBulletImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-targets') ?? '',
       textParagraphBulletImportCommandType: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-type') ?? '',
+      textParagraphBulletImportCommandValues: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-command-values') ?? '',
       textParagraphBulletImportFields: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-fields') ?? '',
       textParagraphBulletImportFormat: stage?.getAttribute('data-ppt-text-paragraph-bullet-import-format') ?? '',
       textParagraphBulletImportJsonLength: Number(stage?.getAttribute('data-ppt-text-paragraph-bullet-import-json-length') ?? 0),
@@ -6626,10 +6630,9 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify('right')
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-paragraph-align+json',
+      'application/vnd.interactive-os.slide-edit.text-paragraph-align+json',
       json,
     )
-    dataTransfer.setData('text/plain', json)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -6641,7 +6644,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextParagraphAlignPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text paragraph align JSON through slide-edit style clipboard effect',
+    'pastes canvas text paragraph align JSON through slide-edit command effect',
     summaryAfterTextFontWeightRestore.fontWeight === '600' &&
       summaryAfterTextFontWeightRestore.textAlign === 'center' &&
       summaryAfterTextParagraphAlignPaste.selected === 'true' &&
@@ -6649,19 +6652,15 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextParagraphAlignPaste.textAlign === 'right' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportModel === 'ppt-text-paragraph-align-import' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFormat === 'application-json-ppt-text-paragraph-align' &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommand === 'update-text-paragraph-align' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandFields === 'paragraphAlign' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandTargets === 's1-summary' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandValues === 'right' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportObjects === 's1-summary' &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCategories.includes('object-effect') &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCategories.includes('text-style') &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFields === 'value' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportJsonLength > 6 &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportValue === 'right' &&
-      summaryAfterTextParagraphAlignPaste.styleClipboardCommand === 'paste-object-formatting' &&
-      summaryAfterTextParagraphAlignPaste.styleClipboardCommandTargets === 's1-summary' &&
-      summaryAfterTextParagraphAlignPaste.styleClipboardCommandApplications.includes('s1-summary') &&
-      summaryAfterTextParagraphAlignPaste.styleClipboardCommandApplications.includes('text-style'),
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportValue === 'right',
     {
       summaryAfterTextFontWeightRestore,
       summaryAfterTextParagraphAlignPaste,
@@ -6730,7 +6729,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextParagraphBulletPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text paragraph bullet JSON through slide-edit style clipboard effect',
+    'pastes PPT text paragraph bullet JSON through slide-edit command effect',
     summaryAfterTextParagraphAlignRestore.textAlign === 'center' &&
       summaryAfterTextParagraphAlignRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletPaste.selected === 'true' &&
@@ -6742,19 +6741,15 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextParagraphBulletPaste.paragraphBullet.length > 0 &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportModel === 'ppt-text-paragraph-bullet-import' &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportFormat === 'application-json-ppt-text-paragraph-bullet' &&
-      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommand === 'update-text-paragraph-bullet' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandFields === 'paragraphBullet' &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandTargets === 's1-summary' &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCommandValues === 'bullet' &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportObjects === 's1-summary' &&
-      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCategories.includes('object-effect') &&
-      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportCategories.includes('text-style') &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportFields === 'value' &&
       summaryAfterTextParagraphBulletPaste.textParagraphBulletImportJsonLength > 7 &&
-      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportValue === 'bullet' &&
-      summaryAfterTextParagraphBulletPaste.styleClipboardCommand === 'paste-object-formatting' &&
-      summaryAfterTextParagraphBulletPaste.styleClipboardCommandTargets === 's1-summary' &&
-      summaryAfterTextParagraphBulletPaste.styleClipboardCommandApplications.includes('s1-summary') &&
-      summaryAfterTextParagraphBulletPaste.styleClipboardCommandApplications.includes('text-style'),
+      summaryAfterTextParagraphBulletPaste.textParagraphBulletImportValue === 'bullet',
     {
       summaryAfterTextParagraphAlignRestore,
       summaryAfterTextParagraphBulletPaste,

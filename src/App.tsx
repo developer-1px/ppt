@@ -220,7 +220,9 @@ import {
   getSlideEditTextFrameInsetPasteCommands,
   getSlideEditTableRowsJSONPasteValue,
   getSlideEditTableRowsPasteCommandEffect,
+  getSlideEditTextParagraphAlignCommandEffect,
   getSlideEditTextParagraphAlignJSONPasteValue,
+  getSlideEditTextParagraphBulletCommandEffect,
   getSlideEditTextParagraphBulletJSONPasteValue,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
@@ -276,6 +278,8 @@ import {
   SLIDE_EDIT_TEXT_FONT_SIZE_FIELD,
   SLIDE_EDIT_TEXT_FONT_WEIGHT_FIELD,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
+  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
+  SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
@@ -385,6 +389,8 @@ import {
   type SlideEditTextFontWeightHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
+  type SlideEditTextParagraphAlignHostCommandEffect,
+  type SlideEditTextParagraphBulletHostCommandEffect,
   type SlideEditTextRunFormattingFieldId,
   type SlideEditTextRunFormattingHostCommandEffect,
   type SlideEditTextAutoFitHostCommandEffect,
@@ -2437,9 +2443,11 @@ type PPTTextRunUnderlineImportEffect = {
 type PPTTextParagraphAlignImportEffect = {
   align: string
   categories: string
+  commandFields: string
   commandId: string
   commandTargets: string
   commandType: string
+  commandValues: string
   fields: string
   format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
   jsonLength: number
@@ -2449,9 +2457,11 @@ type PPTTextParagraphAlignImportEffect = {
 type PPTTextParagraphBulletImportEffect = {
   bullet: string
   categories: string
+  commandFields: string
   commandId: string
   commandTargets: string
   commandType: string
+  commandValues: string
   fields: string
   format: typeof PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT
   jsonLength: number
@@ -6874,73 +6884,31 @@ function App() {
       return false
     }
 
-    const sourceElement = textElements[0]
-    const paragraph = sourceElement.textBody.paragraphs[0]
-    const styleClipboard: PPTStyleClipboard = {
-      categories: ['object', 'paragraph'],
-      object: {
-        opacity: getPPTElementOpacity(sourceElement),
-        shadow: hasPPTElementShadow(sourceElement)
-          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
-          : null,
-      },
-      paragraph: {
-        align: source.align,
-        ...(paragraph?.bullet ? { bullet: paragraph.bullet } : {}),
-        lineHeight: paragraph
-          ? getPPTParagraphLineHeight(paragraph)
-          : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
-        spacingAfter: paragraph ? getPPTParagraphSpacingAfter(paragraph) : 0,
-        spacingBefore: paragraph ? getPPTParagraphSpacingBefore(paragraph) : 0,
-      },
-      sourceId: 'ppt-text-paragraph-align-json',
-      sourceKind: sourceElement.kind,
-      type: 'slide-style-clipboard',
-    }
+    const effects = textElements.map((element) =>
+      getSlideEditTextParagraphAlignCommandEffect({
+        fieldId: 'paragraphAlign',
+        id: 'update-text-paragraph-align',
+        objectId: element.id,
+        slideId: activeSlide.id,
+        value: source.align,
+      }))
 
-    const effect = createSlideEditStyleClipboardPasteCommandEffect({
-      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
-      targetSlideId: activeSlide.id,
-      targets: getPPTStyleClipboardTargetInputs(textElements),
-    })
-
-    if (!effect) {
-      return false
-    }
-
-    setStyleClipboard(styleClipboard)
-    setLastStyleClipboardEffect(effect)
     setLastTextParagraphAlignImportEffect(createPPTTextParagraphAlignImportEffect({
-      effect,
+      effects,
       source,
     }))
-
-    const categoryApplicationsByObjectId = new Map(
-      effect.payload.categoryApplications.map((application) => [
-        application.objectId,
-        application.appliedCategoryIds,
-      ]),
-    )
 
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: mapPPTElementsByIds(
-          slide.elements,
-          effect.payload.categoryApplications.map((application) =>
-            application.objectId),
-          (element) => {
-            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
 
-            return appliedCategoryIds
-              ? applyPPTStyleClipboardToElement(
-                  element,
-                  styleClipboard,
-                  appliedCategoryIds,
-                )
-              : element
-          },
-        ),
+          return effect
+            ? applyPPTTextParagraphAlignCommandEffectToElement(element, effect)
+            : element
+        }),
       })))
 
     return true
@@ -6958,73 +6926,31 @@ function App() {
       return false
     }
 
-    const sourceElement = textElements[0]
-    const paragraph = sourceElement.textBody.paragraphs[0]
-    const styleClipboard: PPTStyleClipboard = {
-      categories: ['object', 'paragraph'],
-      object: {
-        opacity: getPPTElementOpacity(sourceElement),
-        shadow: hasPPTElementShadow(sourceElement)
-          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
-          : null,
-      },
-      paragraph: {
-        align: paragraph?.align ?? 'left',
-        ...(source.bullet ? { bullet: source.bullet } : {}),
-        lineHeight: paragraph
-          ? getPPTParagraphLineHeight(paragraph)
-          : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
-        spacingAfter: paragraph ? getPPTParagraphSpacingAfter(paragraph) : 0,
-        spacingBefore: paragraph ? getPPTParagraphSpacingBefore(paragraph) : 0,
-      },
-      sourceId: 'ppt-text-paragraph-bullet-json',
-      sourceKind: sourceElement.kind,
-      type: 'slide-style-clipboard',
-    }
+    const effects = textElements.map((element) =>
+      getSlideEditTextParagraphBulletCommandEffect({
+        fieldId: 'paragraphBullet',
+        id: 'update-text-paragraph-bullet',
+        objectId: element.id,
+        slideId: activeSlide.id,
+        value: source.bullet ?? 'none',
+      }))
 
-    const effect = createSlideEditStyleClipboardPasteCommandEffect({
-      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
-      targetSlideId: activeSlide.id,
-      targets: getPPTStyleClipboardTargetInputs(textElements),
-    })
-
-    if (!effect) {
-      return false
-    }
-
-    setStyleClipboard(styleClipboard)
-    setLastStyleClipboardEffect(effect)
     setLastTextParagraphBulletImportEffect(createPPTTextParagraphBulletImportEffect({
-      effect,
+      effects,
       source,
     }))
-
-    const categoryApplicationsByObjectId = new Map(
-      effect.payload.categoryApplications.map((application) => [
-        application.objectId,
-        application.appliedCategoryIds,
-      ]),
-    )
 
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
         ...slide,
-        elements: mapPPTElementsByIds(
-          slide.elements,
-          effect.payload.categoryApplications.map((application) =>
-            application.objectId),
-          (element) => {
-            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
 
-            return appliedCategoryIds
-              ? applyPPTStyleClipboardToElement(
-                  element,
-                  styleClipboard,
-                  appliedCategoryIds,
-                )
-              : element
-          },
-        ),
+          return effect
+            ? applyPPTTextParagraphBulletCommandEffectToElement(element, effect)
+            : element
+        }),
       })))
 
     return true
@@ -13745,8 +13671,10 @@ function App() {
         data-ppt-text-run-underline-import-value={lastTextRunUnderlineImportEffect?.underline}
         data-ppt-text-paragraph-align-import-categories={lastTextParagraphAlignImportEffect?.categories}
         data-ppt-text-paragraph-align-import-command={lastTextParagraphAlignImportEffect?.commandId}
+        data-ppt-text-paragraph-align-import-command-fields={lastTextParagraphAlignImportEffect?.commandFields}
         data-ppt-text-paragraph-align-import-command-targets={lastTextParagraphAlignImportEffect?.commandTargets}
         data-ppt-text-paragraph-align-import-command-type={lastTextParagraphAlignImportEffect?.commandType}
+        data-ppt-text-paragraph-align-import-command-values={lastTextParagraphAlignImportEffect?.commandValues}
         data-ppt-text-paragraph-align-import-fields={lastTextParagraphAlignImportEffect?.fields}
         data-ppt-text-paragraph-align-import-format={lastTextParagraphAlignImportEffect?.format}
         data-ppt-text-paragraph-align-import-json-length={lastTextParagraphAlignImportEffect?.jsonLength}
@@ -13755,8 +13683,10 @@ function App() {
         data-ppt-text-paragraph-align-import-value={lastTextParagraphAlignImportEffect?.align}
         data-ppt-text-paragraph-bullet-import-categories={lastTextParagraphBulletImportEffect?.categories}
         data-ppt-text-paragraph-bullet-import-command={lastTextParagraphBulletImportEffect?.commandId}
+        data-ppt-text-paragraph-bullet-import-command-fields={lastTextParagraphBulletImportEffect?.commandFields}
         data-ppt-text-paragraph-bullet-import-command-targets={lastTextParagraphBulletImportEffect?.commandTargets}
         data-ppt-text-paragraph-bullet-import-command-type={lastTextParagraphBulletImportEffect?.commandType}
+        data-ppt-text-paragraph-bullet-import-command-values={lastTextParagraphBulletImportEffect?.commandValues}
         data-ppt-text-paragraph-bullet-import-fields={lastTextParagraphBulletImportEffect?.fields}
         data-ppt-text-paragraph-bullet-import-format={lastTextParagraphBulletImportEffect?.format}
         data-ppt-text-paragraph-bullet-import-json-length={lastTextParagraphBulletImportEffect?.jsonLength}
@@ -17992,66 +17922,94 @@ function getPPTTextElementsRunCount(elements: readonly PPTTextElement[]) {
 }
 
 function createPPTTextParagraphAlignImportEffect({
-  effect,
+  effects,
   source,
 }: {
-  effect: PPTStyleClipboardHostCommandEffect
+  effects: readonly SlideEditTextParagraphAlignHostCommandEffect<string, string>[]
   source: PPTTextParagraphAlignImportSource
 }): PPTTextParagraphAlignImportEffect {
-  const payload = effect.payload.id === 'paste-object-formatting'
-    ? effect.payload
-    : null
-  const categories = payload
-    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
-        (application) => application.appliedCategoryIds,
-      )).join(' ')
-    : ''
-
   return {
     align: source.align,
-    categories,
-    commandId: effect.payload.id,
-    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
-    commandType: effect.type,
+    categories: '',
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandId: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandType: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => effect.payload.value).join(' '),
     fields: source.fields.join(' '),
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL,
-    objectIds: payload?.categoryApplications
-      .map((application) => application.objectId)
-      .join(' ') ?? '',
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
   }
 }
 
 function createPPTTextParagraphBulletImportEffect({
-  effect,
+  effects,
   source,
 }: {
-  effect: PPTStyleClipboardHostCommandEffect
+  effects: readonly SlideEditTextParagraphBulletHostCommandEffect<string, string>[]
   source: PPTTextParagraphBulletImportSource
 }): PPTTextParagraphBulletImportEffect {
-  const payload = effect.payload.id === 'paste-object-formatting'
-    ? effect.payload
-    : null
-  const categories = payload
-    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
-        (application) => application.appliedCategoryIds,
-      )).join(' ')
-    : ''
-
   return {
     bullet: source.bullet ?? 'none',
-    categories,
-    commandId: effect.payload.id,
-    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
-    commandType: effect.type,
+    categories: '',
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandId: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandType: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => effect.payload.value).join(' '),
     fields: source.fields.join(' '),
     format: source.format,
     jsonLength: source.jsonLength,
     model: PPT_TEXT_PARAGRAPH_BULLET_IMPORT_MODEL,
-    objectIds: payload?.categoryApplications
-      .map((application) => application.objectId)
-      .join(' ') ?? '',
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+  }
+}
+
+function applyPPTTextParagraphAlignCommandEffectToElement(
+  element: PPTElement,
+  effect: SlideEditTextParagraphAlignHostCommandEffect<string, string>,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  return {
+    ...element,
+    textBody: {
+      paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+        ...paragraph,
+        align: effect.payload.value,
+      })),
+    },
+  }
+}
+
+function applyPPTTextParagraphBulletCommandEffectToElement(
+  element: PPTElement,
+  effect: SlideEditTextParagraphBulletHostCommandEffect<string, string>,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  const bullet = effect.payload.value === 'none'
+    ? undefined
+    : effect.payload.value
+
+  return {
+    ...element,
+    textBody: {
+      paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+        ...paragraph,
+        bullet,
+      })),
+    },
   }
 }
 
@@ -26720,29 +26678,42 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
 function getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextParagraphAlignImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const align = getSlideEditTextParagraphAlignJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (align === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD.jsonMimeType,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      if (seen.has(candidate.text)) {
+        continue
+      }
 
-    const payload = getPPTTextParagraphAlignPayloadEntry(
-      getPPTJSONValueFromText(candidate.text),
-      candidate.allowDirect,
-    )
+      seen.add(candidate.text)
 
-    return {
-      align,
-      fields: payload?.fields ?? ['value'],
-      format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
+      const align = getSlideEditTextParagraphAlignJSONPasteValue({
+        dataTransfer: candidate.dataTransfer,
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (align === null) {
+        continue
+      }
+
+      const payload = getPPTTextParagraphAlignPayloadEntry(
+        getPPTJSONValueFromText(candidate.text),
+        candidate.allowDirect,
+      )
+
+      return {
+        align,
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+        jsonLength: candidate.text.length,
+      }
     }
   }
 
@@ -26930,29 +26901,42 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
 function getPPTTextParagraphBulletSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextParagraphBulletImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const bullet = getSlideEditTextParagraphBulletJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (bullet === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD.jsonMimeType,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      if (seen.has(candidate.text)) {
+        continue
+      }
 
-    const payload = getPPTTextParagraphBulletPayloadEntry(
-      getPPTJSONValueFromText(candidate.text),
-      candidate.allowDirect,
-    )
+      seen.add(candidate.text)
 
-    return {
-      bullet: bullet === 'none' ? null : bullet,
-      fields: payload?.fields ?? ['value'],
-      format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
+      const bullet = getSlideEditTextParagraphBulletJSONPasteValue({
+        dataTransfer: candidate.dataTransfer,
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (bullet === null) {
+        continue
+      }
+
+      const payload = getPPTTextParagraphBulletPayloadEntry(
+        getPPTJSONValueFromText(candidate.text),
+        candidate.allowDirect,
+      )
+
+      return {
+        bullet: bullet === 'none' ? null : bullet,
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
+        jsonLength: candidate.text.length,
+      }
     }
   }
 
