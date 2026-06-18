@@ -245,6 +245,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_HYPERLINK_JSON_MIME_TYPE,
@@ -20711,19 +20712,11 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
     return null
   }
 
-  const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
-    dataTransfer,
-    jsonMimeType: PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
-    storagePolicy: {
-      maxLength: PPT_ALT_TEXT_MAX_LENGTH,
-    },
-  })
+  const slideEditSource =
+    getPPTObjectAccessibilitySourceFromSlideEditJSONPasteValue(dataTransfer)
 
-  if (pasteValue) {
-    return createPPTObjectAccessibilitySourceFromPasteValue(
-      pasteValue,
-      getPPTObjectAccessibilityJSONLengthFromDataTransfer(dataTransfer),
-    )
+  if (slideEditSource) {
+    return slideEditSource
   }
 
   const candidates: Array<{
@@ -20771,17 +20764,50 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
   return null
 }
 
-function getPPTObjectAccessibilityJSONLengthFromDataTransfer(
+function getPPTObjectAccessibilitySourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
-) {
-  return [
+): PPTObjectAccessibilityImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
     PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
-    'application/json',
-    'text/json',
-    'text/plain',
-  ]
-    .map((type) => dataTransfer.getData(type).trim())
-    .find((text) => text.length > 0)?.length ?? 0
+    SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+        storagePolicy: {
+          maxLength: PPT_ALT_TEXT_MAX_LENGTH,
+        },
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return createPPTObjectAccessibilitySourceFromPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
 }
 
 function getPPTObjectAccessibilitySourceFromText(

@@ -18,6 +18,8 @@ const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
+const SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-accessibility+json'
 const SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-corner-radius+json'
 const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
@@ -14923,6 +14925,76 @@ async function runObjectAltTextScenario(page) {
     {
       afterStandaloneAltTextPaste,
       afterStandaloneAltTextUndo,
+    },
+  )
+
+  const canvasMIMEAltText = 'Canvas MIME object alt text'
+
+  await page.eval(`((altText) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({ altText })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(canvasMIMEAltText)})`)
+  await delay(120)
+
+  const afterCanvasMIMEAltTextPaste = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'pastes canvas MIME object accessibility alt text through slide-edit command effect',
+    afterCanvasMIMEAltTextPaste.importModel === 'ppt-object-accessibility-import' &&
+      afterCanvasMIMEAltTextPaste.importFormat === 'application-json-ppt-object-accessibility' &&
+      afterCanvasMIMEAltTextPaste.importSlide === 'slide-1' &&
+      afterCanvasMIMEAltTextPaste.importObjects === imageId &&
+      afterCanvasMIMEAltTextPaste.importFields === 'altText' &&
+      afterCanvasMIMEAltTextPaste.importCommands === 'update-object-accessibility' &&
+      afterCanvasMIMEAltTextPaste.importCommandFields === 'altText' &&
+      afterCanvasMIMEAltTextPaste.importCommandTargets === imageId &&
+      afterCanvasMIMEAltTextPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEAltTextPaste.importCommandValues === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.importAltTextLength === canvasMIMEAltText.length &&
+      afterCanvasMIMEAltTextPaste.importAltTextPresent === 'true' &&
+      afterCanvasMIMEAltTextPaste.importJsonLength > 20 &&
+      afterCanvasMIMEAltTextPaste.command === 'update-object-accessibility' &&
+      afterCanvasMIMEAltTextPaste.commandField === 'altText' &&
+      afterCanvasMIMEAltTextPaste.commandObject === imageId &&
+      afterCanvasMIMEAltTextPaste.commandSlide === 'slide-1' &&
+      afterCanvasMIMEAltTextPaste.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEAltTextPaste.commandValue === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.altText === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.descriptorAltText === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.selectedAltText === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.thumbAltText === canvasMIMEAltText &&
+      afterCanvasMIMEAltTextPaste.imageAlt === canvasMIMEAltText,
+    {
+      afterCanvasMIMEAltTextPaste,
+      afterStandaloneAltTextUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEAltTextUndo = await getPPTObjectAltTextState(page, imageId)
+
+  record(
+    'restores PPT object accessibility alt text after canvas MIME object accessibility probe',
+    afterCanvasMIMEAltTextUndo.altText === jsonAltText &&
+      afterCanvasMIMEAltTextUndo.selectedAltText === jsonAltText &&
+      afterCanvasMIMEAltTextUndo.imageAlt === jsonAltText,
+    {
+      afterCanvasMIMEAltTextPaste,
+      afterCanvasMIMEAltTextUndo,
     },
   )
 
