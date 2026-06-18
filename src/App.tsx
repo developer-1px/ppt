@@ -1552,6 +1552,11 @@ type PPTTextStyleImportField =
   | 'paragraphLineHeight'
   | 'paragraphSpacingAfter'
   | 'paragraphSpacingBefore'
+  | 'runBold'
+  | 'runColor'
+  | 'runItalic'
+  | 'runSize'
+  | 'runUnderline'
   | 'textInset'
   | 'verticalAlign'
 type PPTTextStyleImportText = Partial<Omit<PPTTextStyle, 'textInset'>> & {
@@ -1569,6 +1574,7 @@ type PPTTextStyleImportSource = {
   format: typeof PPT_TEXT_STYLE_JSON_IMPORT_FORMAT
   jsonLength: number
   paragraph?: PPTTextStyleImportParagraph
+  runStyle?: PPTStyleClipboardRunStyle
   text?: PPTTextStyleImportText
 }
 type PPTTextFontSizeImportField =
@@ -2146,6 +2152,11 @@ type PPTTextStyleImportEffect = {
   paragraphLineHeight: string
   paragraphSpacingAfter: string
   paragraphSpacingBefore: string
+  runBold: string
+  runColor: string
+  runItalic: string
+  runSize: string
+  runUnderline: string
   textInset: string
   verticalAlign: string
 }
@@ -7708,6 +7719,10 @@ function App() {
       categories.push('paragraph')
     }
 
+    if (source.runStyle) {
+      categories.push('text-run')
+    }
+
     const styleClipboard: PPTStyleClipboard = {
       categories,
       object: {
@@ -7717,6 +7732,7 @@ function App() {
           : null,
       },
       ...(nextParagraph ? { paragraph: nextParagraph } : {}),
+      ...(source.runStyle ? { runStyle: clonePPTTextRunStyle(source.runStyle) } : {}),
       sourceId: 'ppt-text-style-json',
       sourceKind: sourceElement.kind,
       ...(nextTextStyle ? { text: nextTextStyle } : {}),
@@ -13199,6 +13215,11 @@ function App() {
         data-ppt-text-style-import-paragraph-line-height={lastTextStyleImportEffect?.paragraphLineHeight}
         data-ppt-text-style-import-paragraph-spacing-after={lastTextStyleImportEffect?.paragraphSpacingAfter}
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
+        data-ppt-text-style-import-run-bold={lastTextStyleImportEffect?.runBold}
+        data-ppt-text-style-import-run-color={lastTextStyleImportEffect?.runColor}
+        data-ppt-text-style-import-run-italic={lastTextStyleImportEffect?.runItalic}
+        data-ppt-text-style-import-run-size={lastTextStyleImportEffect?.runSize}
+        data-ppt-text-style-import-run-underline={lastTextStyleImportEffect?.runUnderline}
         data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
         data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
         data-ppt-text-body-import-command-targets={lastTextBodyImportEffect?.commandTargets}
@@ -17131,6 +17152,7 @@ function createPPTTextStyleImportEffect({
     : ''
   const text = source.text
   const paragraph = source.paragraph
+  const runStyle = source.runStyle
 
   return {
     categories,
@@ -17159,6 +17181,11 @@ function createPPTTextStyleImportEffect({
     paragraphSpacingBefore: paragraph?.spacingBefore === undefined
       ? ''
       : String(paragraph.spacingBefore),
+    runBold: runStyle?.bold === undefined ? '' : String(runStyle.bold),
+    runColor: runStyle?.color ?? '',
+    runItalic: runStyle?.italic === undefined ? '' : String(runStyle.italic),
+    runSize: runStyle?.size === undefined ? '' : String(runStyle.size),
+    runUnderline: runStyle?.underline === undefined ? '' : String(runStyle.underline),
     textInset: text?.textInset
       ? formatPPTTextStyleImportInsetData(text.textInset)
       : '',
@@ -22023,6 +22050,11 @@ function getPPTTextStyleSourceFromJSONValue(
     : isPPTRecord(payloadValue.paragraphStyle)
       ? payloadValue.paragraphStyle
       : payloadValue
+  const runStyleValue = isPPTRecord(payloadValue.runStyle)
+    ? payloadValue.runStyle
+    : isPPTRecord(payloadValue.textRunStyle)
+      ? payloadValue.textRunStyle
+      : null
   const color = getPPTTextStyleColorFromJSONValue(payloadValue.color)
   const fontSize = getPPTTextStyleFontSizeFromJSONValue(
     payloadValue.fontSize ?? payloadValue.size,
@@ -22054,6 +22086,9 @@ function getPPTTextStyleSourceFromJSONValue(
   const spacingAfter = getPPTTextStyleParagraphSpacingFromJSONValue(
     paragraphValue.spacingAfter,
   )
+  const runStyle = runStyleValue
+    ? getPPTTextStyleRunStyleFromJSONValue(runStyleValue)
+    : undefined
 
   if (color !== undefined) {
     text.color = color
@@ -22110,15 +22145,79 @@ function getPPTTextStyleSourceFromJSONValue(
     fields.push('paragraphSpacingAfter')
   }
 
+  if (runStyle?.bold !== undefined) {
+    fields.push('runBold')
+  }
+
+  if (runStyle?.color !== undefined) {
+    fields.push('runColor')
+  }
+
+  if (runStyle?.italic !== undefined) {
+    fields.push('runItalic')
+  }
+
+  if (runStyle?.size !== undefined) {
+    fields.push('runSize')
+  }
+
+  if (runStyle?.underline !== undefined) {
+    fields.push('runUnderline')
+  }
+
   return fields.length > 0
     ? {
         fields,
         format: PPT_TEXT_STYLE_JSON_IMPORT_FORMAT,
         jsonLength,
         ...(Object.keys(paragraph).length > 0 ? { paragraph } : {}),
+        ...(runStyle && Object.keys(runStyle).length > 0 ? { runStyle } : {}),
         ...(Object.keys(text).length > 0 ? { text } : {}),
       }
     : null
+}
+
+function getPPTTextStyleRunStyleFromJSONValue(
+  value: Record<string, unknown>,
+): PPTStyleClipboardRunStyle | undefined {
+  const runStyle: PPTStyleClipboardRunStyle = {}
+  const bold = getPPTTextRunBoldImportValueFromJSONValue(
+    value.bold ?? value.runBold ?? value.textRunBold,
+  )
+  const color = getPPTTextRunColorImportValueFromJSONValue(
+    value.color ?? value.runColor ?? value.textRunColor,
+  )
+  const italic = getPPTTextRunItalicImportValueFromJSONValue(
+    value.italic ?? value.runItalic ?? value.textRunItalic,
+  )
+  const size = getPPTTextRunSizeImportValueFromJSONValue(
+    value.size ?? value.fontSize ?? value.runSize ?? value.textRunSize,
+  )
+  const underline = getPPTTextRunUnderlineImportValueFromJSONValue(
+    value.underline ?? value.runUnderline ?? value.textRunUnderline,
+  )
+
+  if (bold !== undefined) {
+    runStyle.bold = bold
+  }
+
+  if (color !== undefined) {
+    runStyle.color = color
+  }
+
+  if (italic !== undefined) {
+    runStyle.italic = italic
+  }
+
+  if (size !== undefined) {
+    runStyle.size = size
+  }
+
+  if (underline !== undefined) {
+    runStyle.underline = underline
+  }
+
+  return Object.keys(runStyle).length > 0 ? runStyle : undefined
 }
 
 function getPPTTextStyleColorFromJSONValue(value: unknown) {

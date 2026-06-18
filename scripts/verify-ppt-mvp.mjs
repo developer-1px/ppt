@@ -5513,6 +5513,11 @@ function getPPTTextFormatPainterState(page, elementId) {
       textStyleImportParagraphLineHeight: stage?.getAttribute('data-ppt-text-style-import-paragraph-line-height') ?? '',
       textStyleImportParagraphSpacingAfter: stage?.getAttribute('data-ppt-text-style-import-paragraph-spacing-after') ?? '',
       textStyleImportParagraphSpacingBefore: stage?.getAttribute('data-ppt-text-style-import-paragraph-spacing-before') ?? '',
+      textStyleImportRunBold: stage?.getAttribute('data-ppt-text-style-import-run-bold') ?? '',
+      textStyleImportRunColor: stage?.getAttribute('data-ppt-text-style-import-run-color') ?? '',
+      textStyleImportRunItalic: stage?.getAttribute('data-ppt-text-style-import-run-italic') ?? '',
+      textStyleImportRunSize: stage?.getAttribute('data-ppt-text-style-import-run-size') ?? '',
+      textStyleImportRunUnderline: stage?.getAttribute('data-ppt-text-style-import-run-underline') ?? '',
       textStyleImportTextInset: stage?.getAttribute('data-ppt-text-style-import-text-inset') ?? '',
       textStyleImportVerticalAlign: stage?.getAttribute('data-ppt-text-style-import-vertical-align') ?? '',
       top: element?.style.top ?? '',
@@ -6022,6 +6027,11 @@ async function runTextQuickFormatScenario(page) {
           spacingAfter: 10,
           spacingBefore: 4,
         },
+        runStyle: {
+          bold: false,
+          italic: false,
+          underline: false,
+        },
         textInset: {
           bottom: 12,
           left: 14,
@@ -6061,7 +6071,8 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.textStyleImportObjects === 's1-summary' &&
       summaryAfterTextStylePaste.textStyleImportCategories.includes('object-effect') &&
       summaryAfterTextStylePaste.textStyleImportCategories.includes('text-style') &&
-      summaryAfterTextStylePaste.textStyleImportFields === 'color fontSize fontFamily fontWeight verticalAlign textInset paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter' &&
+      summaryAfterTextStylePaste.textStyleImportCategories.includes('text-run-style') &&
+      summaryAfterTextStylePaste.textStyleImportFields === 'color fontSize fontFamily fontWeight verticalAlign textInset paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter runBold runItalic runUnderline' &&
       summaryAfterTextStylePaste.textStyleImportColor === '#7c3aed' &&
       summaryAfterTextStylePaste.textStyleImportFontFamily === 'Georgia' &&
       summaryAfterTextStylePaste.textStyleImportFontSize === '34' &&
@@ -6073,12 +6084,22 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.textStyleImportParagraphLineHeight === '1.32' &&
       summaryAfterTextStylePaste.textStyleImportParagraphSpacingAfter === '10' &&
       summaryAfterTextStylePaste.textStyleImportParagraphSpacingBefore === '4' &&
-      Number(summaryAfterTextStylePaste.textStyleImportJsonLength) > 180 &&
+      summaryAfterTextStylePaste.textStyleImportRunBold === 'false' &&
+      summaryAfterTextStylePaste.textStyleImportRunColor === '' &&
+      summaryAfterTextStylePaste.textStyleImportRunItalic === 'false' &&
+      summaryAfterTextStylePaste.textStyleImportRunSize === '' &&
+      summaryAfterTextStylePaste.textStyleImportRunUnderline === 'false' &&
+      Number(summaryAfterTextStylePaste.textStyleImportJsonLength) > 220 &&
       summaryAfterTextStylePaste.color === 'rgb(124, 58, 237)' &&
       summaryAfterTextStylePaste.fontFamily === 'Georgia' &&
       summaryAfterTextStylePaste.styleFontFamily.includes('Georgia') &&
       summaryAfterTextStylePaste.fontSize === '34px' &&
       summaryAfterTextStylePaste.fontWeight === '600' &&
+      summaryAfterTextStylePaste.boldRunCount === 0 &&
+      summaryAfterTextStylePaste.italicRunCount === 0 &&
+      summaryAfterTextStylePaste.runColorCount === 0 &&
+      summaryAfterTextStylePaste.runSizeCount === 0 &&
+      summaryAfterTextStylePaste.underlineRunCount === 0 &&
       summaryAfterTextStylePaste.verticalAlign === 'middle' &&
       summaryAfterTextStylePaste.styleAlignItems === 'center' &&
       summaryAfterTextStylePaste.textInset === '8,10,12,14' &&
@@ -6092,7 +6113,11 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.styleClipboardCommand === 'paste-object-formatting' &&
       summaryAfterTextStylePaste.styleClipboardCommandTargets === 's1-summary' &&
       summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('s1-summary') &&
-      summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('text-style'),
+      summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('text-style') &&
+      summaryAfterTextStylePaste.styleClipboardCommandApplications.includes('text-run-style') &&
+      summaryAfterTextStylePaste.styleClipboardPackageCategories.includes('text-run-style') &&
+      summaryAfterTextStylePaste.styleClipboardRunItalic === 'false' &&
+      summaryAfterTextStylePaste.styleClipboardRunUnderline === 'false',
     {
       summaryAfterTextStylePaste,
       summaryBeforeTextStylePaste,
