@@ -2962,7 +2962,7 @@ type PPTParagraphSpacingField =
   | 'spacingBefore'
 type PPTParagraphCSSStyle = ReturnType<
   typeof getSlideEditTextParagraphSpacingCSSStyle
->
+> & Pick<CSSProperties, 'textAlign'>
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
 type PPTTextInsetField = keyof PPTTextInset
 type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
@@ -15822,17 +15822,20 @@ function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
 }
 
 function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
-  return getSlideEditTextParagraphSpacingCSSStyle({
-    lineHeightRatio: getPPTParagraphLineHeight(paragraph),
-    paragraphAfter: {
-      unit: 'px',
-      value: getPPTParagraphSpacingAfter(paragraph),
-    },
-    paragraphBefore: {
-      unit: 'px',
-      value: getPPTParagraphSpacingBefore(paragraph),
-    },
-  })
+  return {
+    ...getSlideEditTextParagraphSpacingCSSStyle({
+      lineHeightRatio: getPPTParagraphLineHeight(paragraph),
+      paragraphAfter: {
+        unit: 'px',
+        value: getPPTParagraphSpacingAfter(paragraph),
+      },
+      paragraphBefore: {
+        unit: 'px',
+        value: getPPTParagraphSpacingBefore(paragraph),
+      },
+    }),
+    textAlign: paragraph.align,
+  }
 }
 
 function getPPTElementAnimationStyle(

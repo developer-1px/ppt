@@ -15961,7 +15961,7 @@ async function runTextPasteScenario(page) {
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
 
-    dataTransfer.setData('text/html', '<article><p><strong>Bold plan</strong> and <em>italic note</em> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul><ol><li>First step</li><li><strong>Second step</strong></li></ol></article>')
+    dataTransfer.setData('text/html', '<article><p style="text-align:center;line-height:140%;margin-top:12px;margin-bottom:8px"><strong style="font-size:20px">Bold plan</strong> and <span style="font-size:18px"><em>italic note</em></span> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul><ol><li>First step</li><li><strong>Second step</strong></li></ol></article>')
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -15975,7 +15975,7 @@ async function runTextPasteScenario(page) {
   record(
     'pastes HTML rich text clipboard data into PPT text body',
       afterRichPaste.textPasteModel === 'canvas-text-paste-import' &&
-      afterRichPaste.textPasteImporter === 'ppt-rich-html-text' &&
+      afterRichPaste.textPasteImporter === 'canvas-rich-html-text' &&
       afterRichPaste.textPasteFormat === 'text-html-rich' &&
       afterRichPaste.textPasteRichFallback === '' &&
       afterRichPaste.textPasteBoldRuns >= 2 &&
@@ -15991,6 +15991,12 @@ async function runTextPasteScenario(page) {
       afterRichPaste.selectedUnderlineRunCount >= 2 &&
       afterRichPaste.selectedBulletParagraphCount === 2 &&
       afterRichPaste.selectedNumberedParagraphCount === 2 &&
+      afterRichPaste.selectedParagraphTextAligns.includes('center') &&
+      afterRichPaste.selectedParagraphLineHeights.includes('1.4') &&
+      afterRichPaste.selectedParagraphSpacingBefore.includes('12') &&
+      afterRichPaste.selectedParagraphSpacingAfter.includes('8') &&
+      afterRichPaste.selectedRunFontSizes.includes('20px') &&
+      afterRichPaste.selectedRunFontSizes.includes('18px') &&
       afterRichPaste.selectedText.includes('Bold plan') &&
       afterRichPaste.selectedText.includes('Second bullet') &&
       afterRichPaste.selectedText.includes('Second step'),
@@ -16124,7 +16130,7 @@ async function runTextPasteScenario(page) {
   record(
     'pastes single HTML link as PPT linked text box',
     afterHTMLLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
-      afterHTMLLinkPaste.textPasteImporter === 'ppt-rich-html-text' &&
+      afterHTMLLinkPaste.textPasteImporter === 'canvas-rich-html-text' &&
       afterHTMLLinkPaste.textPasteFormat === 'text-html-rich' &&
       afterHTMLLinkPaste.textPasteHyperlinkUrl === htmlLinkUrl &&
       afterHTMLLinkPaste.selectedHyperlink === htmlLinkUrl &&
@@ -16167,7 +16173,7 @@ async function runTextPasteScenario(page) {
     'pastes single Markdown link as PPT linked text box',
     afterMarkdownLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
       afterMarkdownLinkPaste.importExtensionLastClipboardActions === 'rich-text-source' &&
-      afterMarkdownLinkPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
+      afterMarkdownLinkPaste.textPasteImporter === 'canvas-rich-markdown-text' &&
       afterMarkdownLinkPaste.textPasteFormat === 'text-markdown-rich' &&
       afterMarkdownLinkPaste.textPasteHyperlinkUrl === markdownLinkUrl &&
       afterMarkdownLinkPaste.selectedHyperlink === markdownLinkUrl &&
@@ -16206,16 +16212,18 @@ async function runTextPasteScenario(page) {
   record(
     'blocks unsafe Markdown link paste from PPT hyperlink metadata',
     afterUnsafeMarkdownLinkPaste.textPasteModel === 'canvas-text-paste-import' &&
-      afterUnsafeMarkdownLinkPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
-      afterUnsafeMarkdownLinkPaste.textPasteFormat === 'text-markdown-rich' &&
+      afterUnsafeMarkdownLinkPaste.importExtensionLastClipboardActions === 'text-source' &&
+      afterUnsafeMarkdownLinkPaste.textPasteImporter === 'ppt-plain-text' &&
+      afterUnsafeMarkdownLinkPaste.textPasteFormat === 'text-plain' &&
       afterUnsafeMarkdownLinkPaste.textPasteHyperlinkUrl === '' &&
       afterUnsafeMarkdownLinkPaste.selectedHyperlink === '' &&
-      afterUnsafeMarkdownLinkPaste.textPasteLinkRuns === 1 &&
+      afterUnsafeMarkdownLinkPaste.textPasteLinkRuns === 0 &&
       afterUnsafeMarkdownLinkPaste.textBoxCount === before.textBoxCount + 1 &&
       afterUnsafeMarkdownLinkPaste.selectedKind === 'textBox' &&
-      afterUnsafeMarkdownLinkPaste.selectedName === 'Markdown Text' &&
-      afterUnsafeMarkdownLinkPaste.selectedText.includes('Trap') &&
-      !afterUnsafeMarkdownLinkPaste.exportCode.includes('javascript:alert'),
+      afterUnsafeMarkdownLinkPaste.selectedName === 'Text' &&
+      afterUnsafeMarkdownLinkPaste.selectedText.includes('[Trap](javascript:alert)') &&
+      !afterUnsafeMarkdownLinkPaste.exportCode.includes('data-ppt-hyperlink-url="javascript:alert') &&
+      !afterUnsafeMarkdownLinkPaste.exportCode.includes('"url": "javascript:alert'),
     {
       afterUnsafeMarkdownLinkPaste,
       before,
@@ -16245,7 +16253,7 @@ async function runTextPasteScenario(page) {
     'pastes Markdown rich text clipboard data into PPT text body',
     afterMarkdownPaste.textPasteModel === 'canvas-text-paste-import' &&
       afterMarkdownPaste.importExtensionLastClipboardActions === 'rich-text-source' &&
-      afterMarkdownPaste.textPasteImporter === 'ppt-rich-markdown-text' &&
+      afterMarkdownPaste.textPasteImporter === 'canvas-rich-markdown-text' &&
       afterMarkdownPaste.textPasteFormat === 'text-markdown-rich' &&
       afterMarkdownPaste.textPasteBoldRuns >= 2 &&
       afterMarkdownPaste.textPasteBulletParagraphs === 1 &&
@@ -21724,6 +21732,7 @@ function getPPTTextPasteState(page) {
       selectedParagraphLineHeights: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-line-height') ?? ''),
       selectedParagraphSpacingAfter: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-after') ?? ''),
       selectedParagraphSpacingBefore: selectedParagraphs.map((paragraph) => paragraph.getAttribute('data-ppt-spacing-before') ?? ''),
+      selectedParagraphTextAligns: selectedParagraphs.map((paragraph) => getComputedStyle(paragraph).textAlign),
       selectedRunColors: selectedRuns.map((run) => getComputedStyle(run).color),
       selectedRunFontSizes: selectedRuns.map((run) => getComputedStyle(run).fontSize),
       selectedText: selected?.textContent ?? '',

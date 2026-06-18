@@ -39,7 +39,6 @@ import {
   type PPTTableImportSource,
 } from './tableImport'
 import {
-  getPPTMarkdownTextPasteSourceFromDataTransfer,
   getPPTRichTextPasteSourceFromDataTransfer,
   getPPTTextPasteSourcesFromDataTransfer,
   type PPTRichTextPasteSource,
@@ -308,9 +307,7 @@ export function getPPTClipboardImportActions(
       {
         mode: 'exclusive',
         resolve: () => {
-          const source =
-            getPPTMarkdownTextPasteSourceFromDataTransfer(dataTransfer) ??
-            getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
+          const source = getPPTRichTextPasteSourceFromDataTransfer(dataTransfer)
 
           return source ? { kind: 'rich-text-source', source } : null
         },
