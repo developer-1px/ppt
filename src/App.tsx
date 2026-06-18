@@ -1080,6 +1080,12 @@ const PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-shape-style' as const
 const PPT_SHAPE_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.shape-style+json'
+const PPT_OBJECT_FILL_OPACITY_IMPORT_MODEL =
+  'ppt-object-fill-opacity-import' as const
+const PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT =
+  'application-json-ppt-object-fill-opacity' as const
+const PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.object-fill-opacity+json'
 const PPT_TEXT_STYLE_IMPORT_MODEL = 'ppt-text-style-import' as const
 const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-style' as const
@@ -1423,6 +1429,13 @@ type PPTShapeStyleImportSource = {
     fill?: PPTFill
     stroke?: PPTStroke
   }
+}
+type PPTObjectFillOpacityImportField = 'fillOpacity'
+type PPTObjectFillOpacityImportSource = {
+  fields: readonly PPTObjectFillOpacityImportField[]
+  fillOpacity: number
+  format: typeof PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT
+  jsonLength: number
 }
 type PPTTextStyleImportField =
   | 'color'
@@ -1825,6 +1838,20 @@ type PPTShapeStyleImportEffect = {
   strokeColor: string
   strokeDash: string
   strokeWidth: string
+}
+type PPTObjectFillOpacityImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  fillOpacity: string
+  format: typeof PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_OBJECT_FILL_OPACITY_IMPORT_MODEL
+  objectIds: string
+  slideId: string
 }
 type PPTTextStyleImportEffect = {
   categories: string
@@ -3046,6 +3073,8 @@ function App() {
     useState<PPTImageReplaceImportEffect | null>(null)
   const [lastShapeStyleImportEffect, setLastShapeStyleImportEffect] =
     useState<PPTShapeStyleImportEffect | null>(null)
+  const [lastObjectFillOpacityImportEffect, setLastObjectFillOpacityImportEffect] =
+    useState<PPTObjectFillOpacityImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
@@ -4021,6 +4050,17 @@ function App() {
       if (
         objectOpacitySource &&
         pastePPTObjectOpacitySource(objectOpacitySource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const objectFillOpacitySource =
+        getPPTObjectFillOpacitySourceFromDataTransfer(event.clipboardData)
+
+      if (
+        objectFillOpacitySource &&
+        pastePPTObjectFillOpacitySource(objectFillOpacitySource)
       ) {
         event.preventDefault()
         return
@@ -5237,6 +5277,59 @@ function App() {
             ? {
                 ...element,
                 opacity: normalizePPTElementOpacity(effect.payload.value),
+              }
+            : element
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTObjectFillOpacitySource(
+    source: PPTObjectFillOpacityImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element): element is PPTShape =>
+        element.kind === 'shape' &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getSlideEditObjectFillOpacityCommandEffect({
+          fieldId: 'fillOpacity',
+          id: 'update-object-fill-opacity',
+          objectId: element.id,
+          slideId: activeSlide.id,
+          value: source.fillOpacity,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastFillOpacityEffect(effects[effects.length - 1])
+    setLastObjectFillOpacityImportEffect(createPPTObjectFillOpacityImportEffect({
+      effects,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          if (element.kind !== 'shape') {
+            return element
+          }
+
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect
+            ? {
+                ...element,
+                fill: normalizePPTFill({
+                  ...element.fill,
+                  opacity: normalizePPTFillOpacity(effect.payload.value),
+                }),
               }
             : element
         }),
@@ -11885,6 +11978,18 @@ function App() {
         data-ppt-fill-opacity-command-slide={lastFillOpacityEffect?.payload.slideId}
         data-ppt-fill-opacity-command-type={lastFillOpacityEffect?.type}
         data-ppt-fill-opacity-command-value={lastFillOpacityEffect?.payload.value}
+        data-ppt-fill-opacity-import-command-fields={lastObjectFillOpacityImportEffect?.commandFields}
+        data-ppt-fill-opacity-import-command-targets={lastObjectFillOpacityImportEffect?.commandTargets}
+        data-ppt-fill-opacity-import-command-types={lastObjectFillOpacityImportEffect?.commandTypes}
+        data-ppt-fill-opacity-import-command-values={lastObjectFillOpacityImportEffect?.commandValues}
+        data-ppt-fill-opacity-import-commands={lastObjectFillOpacityImportEffect?.commandIds}
+        data-ppt-fill-opacity-import-fields={lastObjectFillOpacityImportEffect?.fields}
+        data-ppt-fill-opacity-import-format={lastObjectFillOpacityImportEffect?.format}
+        data-ppt-fill-opacity-import-json-length={lastObjectFillOpacityImportEffect?.jsonLength}
+        data-ppt-fill-opacity-import-model={lastObjectFillOpacityImportEffect?.model}
+        data-ppt-fill-opacity-import-objects={lastObjectFillOpacityImportEffect?.objectIds}
+        data-ppt-fill-opacity-import-slide={lastObjectFillOpacityImportEffect?.slideId}
+        data-ppt-fill-opacity-import-value={lastObjectFillOpacityImportEffect?.fillOpacity}
         data-ppt-fill-opacity-model="slide-edit-object-fill-opacity"
         data-ppt-hyperlink-command={lastHyperlinkEffect?.payload.id}
         data-ppt-hyperlink-command-field={lastHyperlinkEffect?.payload.id === 'update-object-hyperlink'
@@ -15161,6 +15266,31 @@ function createPPTShapeStyleImportEffect({
     strokeWidth: source.shape.stroke?.width === undefined
       ? ''
       : String(source.shape.stroke.width),
+  }
+}
+
+function createPPTObjectFillOpacityImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditObjectFillOpacityHostCommandEffect<string, string>[]
+  source: PPTObjectFillOpacityImportSource
+}): PPTObjectFillOpacityImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => String(effect.payload.value)).join(' '),
+    fields: source.fields.join(' '),
+    fillOpacity: String(source.fillOpacity),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_OBJECT_FILL_OPACITY_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
   }
 }
 
@@ -18449,6 +18579,156 @@ function getPPTImageCropPositionFromJSONValue(value: unknown) {
   }
 
   return normalizeSlideEditObjectImageCropValue(value)
+}
+
+function getPPTObjectFillOpacitySourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTObjectFillOpacitySourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTObjectFillOpacitySourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTObjectFillOpacityImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTObjectFillOpacitySourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTObjectFillOpacitySourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTObjectFillOpacityImportSource | null {
+  const fillOpacity = getPPTObjectFillOpacityFromJSONValue(
+    getPPTObjectFillOpacityPayloadValue(value, allowDirect),
+  )
+
+  return fillOpacity === undefined
+    ? null
+    : {
+        fields: ['fillOpacity'],
+        fillOpacity,
+        format: PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+}
+
+function getPPTObjectFillOpacityPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : undefined
+  }
+
+  if (value.objectFillOpacity !== undefined) {
+    return value.objectFillOpacity
+  }
+
+  if (value.shapeFillOpacity !== undefined) {
+    return value.shapeFillOpacity
+  }
+
+  if (value.fillOpacity !== undefined) {
+    return value.fillOpacity
+  }
+
+  return allowDirect &&
+    (
+      value.opacity !== undefined ||
+      value.value !== undefined ||
+      value.amount !== undefined
+    )
+    ? value
+    : undefined
+}
+
+function getPPTObjectFillOpacityFromJSONValue(
+  value: unknown,
+): number | undefined {
+  const raw = isPPTRecord(value)
+    ? value.fillOpacity ?? value.opacity ?? value.value ?? value.amount
+    : value
+
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? normalizePPTFillOpacity(raw) : undefined
+  }
+
+  if (typeof raw !== 'string') {
+    return undefined
+  }
+
+  const trimmed = raw.trim()
+
+  if (!trimmed) {
+    return undefined
+  }
+
+  const numberValue = Number(trimmed)
+
+  return Number.isFinite(numberValue)
+    ? normalizePPTFillOpacity(numberValue)
+    : undefined
 }
 
 function getPPTShapeStyleSourceFromDataTransfer(

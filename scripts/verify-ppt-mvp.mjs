@@ -8613,6 +8613,94 @@ async function runViewAndShapeScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      objectFillOpacity: { value: '0.62' },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterFillOpacityJSONPaste = await getPPTShapeFillOpacityState(page)
+
+  record(
+    'pastes JSON object fill opacity through slide-edit command effect',
+    afterFillOpacityJSONPaste.importModel === 'ppt-object-fill-opacity-import' &&
+      afterFillOpacityJSONPaste.importFormat === 'application-json-ppt-object-fill-opacity' &&
+      afterFillOpacityJSONPaste.importSlide === 'slide-1' &&
+      afterFillOpacityJSONPaste.importObjects === afterFillOpacityJSONPaste.selectedId &&
+      afterFillOpacityJSONPaste.importFields === 'fillOpacity' &&
+      afterFillOpacityJSONPaste.importCommands === 'update-object-fill-opacity' &&
+      afterFillOpacityJSONPaste.importCommandFields === 'fillOpacity' &&
+      afterFillOpacityJSONPaste.importCommandTargets === afterFillOpacityJSONPaste.selectedId &&
+      afterFillOpacityJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterFillOpacityJSONPaste.importCommandValues === '0.62' &&
+      afterFillOpacityJSONPaste.importValue === '0.62' &&
+      afterFillOpacityJSONPaste.importJsonLength > 35 &&
+      afterFillOpacityJSONPaste.command === 'update-object-fill-opacity' &&
+      afterFillOpacityJSONPaste.commandField === 'fillOpacity' &&
+      afterFillOpacityJSONPaste.commandValue === '0.62' &&
+      afterFillOpacityJSONPaste.inspectorOpacity === '0.62' &&
+      afterFillOpacityJSONPaste.selectedFillOpacity === '0.62' &&
+      afterFillOpacityJSONPaste.selectedBackground.includes('0.62') &&
+      afterFillOpacityJSONPaste.selectedObjectOpacity === '1' &&
+      afterFillOpacityJSONPaste.thumbFillOpacity === '0.62' &&
+      afterFillOpacityJSONPaste.thumbBackground.includes('0.62'),
+    {
+      afterFillOpacityJSONPaste,
+      afterFillOpacityRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterFillOpacityJSONUndo = await getPPTShapeFillOpacityState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterFillOpacityJSONRedo = await getPPTShapeFillOpacityState(page)
+
+  record(
+    'undoes and redoes PPT object fill opacity JSON as one history step',
+    afterFillOpacityJSONUndo.inspectorOpacity === '0.35' &&
+      afterFillOpacityJSONUndo.selectedFillOpacity === '0.35' &&
+      afterFillOpacityJSONRedo.inspectorOpacity === '0.62' &&
+      afterFillOpacityJSONRedo.selectedFillOpacity === '0.62',
+    {
+      afterFillOpacityJSONPaste,
+      afterFillOpacityJSONRedo,
+      afterFillOpacityJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="shape-corner-radius"]')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
 
@@ -17330,6 +17418,18 @@ function getPPTShapeFillOpacityState(page) {
       descriptorCommand: field?.getAttribute('data-ppt-fill-opacity-command') ?? '',
       descriptorControl: field?.getAttribute('data-ppt-fill-opacity-control') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-fill-opacity-surface') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-fill-opacity-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-fill-opacity-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-fill-opacity-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-fill-opacity-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-fill-opacity-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-fill-opacity-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-fill-opacity-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-fill-opacity-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-fill-opacity-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-fill-opacity-import-objects') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-fill-opacity-import-slide') ?? '',
+      importValue: stage?.getAttribute('data-ppt-fill-opacity-import-value') ?? '',
       inspectorOpacity: field?.value ?? '',
       model: stage?.getAttribute('data-ppt-fill-opacity-model') ?? '',
       selectedBackground: selected?.style.background ?? '',
