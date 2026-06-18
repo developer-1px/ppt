@@ -5,6 +5,7 @@ import {
   getPPTCanvasTableFileFromDataTransfer,
   getPPTCanvasTableFilesFromDataTransfer,
   getPPTCanvasTableFileFromList,
+  getPPTCanvasTableFilesFromList,
   getPPTCanvasTableSourceFromDataTransfer,
   getPPTCanvasTableSourceFromHTML,
   getPPTCanvasTableSourceFromText,
@@ -166,6 +167,10 @@ export function getPPTTableFileFromList(files: FileList | null) {
   return getPPTCanvasTableFileFromList(files)
 }
 
+export function getPPTTableFilesFromList(files: FileList | null) {
+  return getPPTCanvasTableFilesFromList(files)
+}
+
 export function getPPTTableFileFromDataTransfer(dataTransfer: DataTransfer | null) {
   return getPPTCanvasTableFileFromDataTransfer(dataTransfer)
 }
@@ -199,6 +204,22 @@ export async function readPPTTableFileSource(file: Blob & { name?: string }) {
   }
 
   return createPPTTableImportSourceFromCanvas(source)
+}
+
+export async function readPPTTableFileSources(
+  files: readonly (Blob & { name?: string })[],
+) {
+  const sources: PPTTableImportSource[] = []
+
+  for (const file of files) {
+    const source = await readPPTTableFileSource(file)
+
+    if (source) {
+      sources.push(source)
+    }
+  }
+
+  return sources
 }
 
 export function getPPTTableSourceFromText(

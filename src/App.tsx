@@ -759,6 +759,7 @@ import {
   readPPTImageFileSource,
   readPPTImageFileSources,
   readPPTTableFileSource,
+  readPPTTableFileSources,
   resolvePPTImageSourceNaturalSize,
   type PPTImageImportFormat,
   type PPTImageImportSource,
@@ -9136,13 +9137,7 @@ function App() {
     files: readonly (Blob & { name?: string })[],
     center = getPPTViewportCenter(),
   ) {
-    const sources: PPTTableImportSource[] = []
-
-    for (const source of await Promise.all(files.map(readPPTTableFileSource))) {
-      if (source) {
-        sources.push(source)
-      }
-    }
+    const sources = await readPPTTableFileSources(files)
 
     return insertPPTTableSources(sources, center)
   }

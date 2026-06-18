@@ -86,6 +86,7 @@ import {
   getCanvasTableFileFromDataTransfer,
   getCanvasTableFileFromList,
   getCanvasTableFilesFromDataTransfer,
+  getCanvasTableFilesFromList,
   getCanvasTableSourceFromDataTransfer,
   getCanvasTableSourceFromHTML,
   getCanvasTableSourceFromText,
@@ -452,6 +453,8 @@ export const getPPTCanvasTableFileFromDataTransfer =
 export const getPPTCanvasTableFileFromList = getCanvasTableFileFromList
 export const getPPTCanvasTableFilesFromDataTransfer =
   getCanvasTableFilesFromDataTransfer
+export const getPPTCanvasTableFilesFromList =
+  getCanvasTableFilesFromList
 export const getPPTCanvasTableSourceFromDataTransfer =
   getCanvasTableSourceFromDataTransfer
 export const getPPTCanvasTableSourceFromHTML =
