@@ -5395,6 +5395,16 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
       textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
       textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
+      textParagraphAlignImportCategories: stage?.getAttribute('data-ppt-text-paragraph-align-import-categories') ?? '',
+      textParagraphAlignImportCommand: stage?.getAttribute('data-ppt-text-paragraph-align-import-command') ?? '',
+      textParagraphAlignImportCommandTargets: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-targets') ?? '',
+      textParagraphAlignImportCommandType: stage?.getAttribute('data-ppt-text-paragraph-align-import-command-type') ?? '',
+      textParagraphAlignImportFields: stage?.getAttribute('data-ppt-text-paragraph-align-import-fields') ?? '',
+      textParagraphAlignImportFormat: stage?.getAttribute('data-ppt-text-paragraph-align-import-format') ?? '',
+      textParagraphAlignImportJsonLength: Number(stage?.getAttribute('data-ppt-text-paragraph-align-import-json-length') ?? 0),
+      textParagraphAlignImportModel: stage?.getAttribute('data-ppt-text-paragraph-align-import-model') ?? '',
+      textParagraphAlignImportObjects: stage?.getAttribute('data-ppt-text-paragraph-align-import-objects') ?? '',
+      textParagraphAlignImportValue: stage?.getAttribute('data-ppt-text-paragraph-align-import-value') ?? '',
       textStyleImportCategories: stage?.getAttribute('data-ppt-text-style-import-categories') ?? '',
       textStyleImportColor: stage?.getAttribute('data-ppt-text-style-import-color') ?? '',
       textStyleImportCommand: stage?.getAttribute('data-ppt-text-style-import-command') ?? '',
@@ -6150,6 +6160,95 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextFontWeightPaste,
       summaryAfterTextFontWeightRedo,
       summaryAfterTextFontWeightUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextFontWeightRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('right')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-paragraph-align+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextParagraphAlignPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text paragraph align JSON through slide-edit style clipboard effect',
+    summaryAfterTextFontWeightRestore.fontWeight === '600' &&
+      summaryAfterTextFontWeightRestore.textAlign === 'center' &&
+      summaryAfterTextParagraphAlignPaste.selected === 'true' &&
+      summaryAfterTextParagraphAlignPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextParagraphAlignPaste.textAlign === 'right' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportModel === 'ppt-text-paragraph-align-import' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFormat === 'application-json-ppt-text-paragraph-align' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandTargets === 's1-summary' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportObjects === 's1-summary' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCategories.includes('object-effect') &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCategories.includes('text-style') &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFields === 'value' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportJsonLength > 6 &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportValue === 'right' &&
+      summaryAfterTextParagraphAlignPaste.styleClipboardCommand === 'paste-object-formatting' &&
+      summaryAfterTextParagraphAlignPaste.styleClipboardCommandTargets === 's1-summary' &&
+      summaryAfterTextParagraphAlignPaste.styleClipboardCommandApplications.includes('s1-summary') &&
+      summaryAfterTextParagraphAlignPaste.styleClipboardCommandApplications.includes('text-style'),
+    {
+      summaryAfterTextFontWeightRestore,
+      summaryAfterTextParagraphAlignPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphAlignUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextParagraphAlignRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text paragraph align JSON as one history step',
+    summaryAfterTextParagraphAlignUndo.textAlign === 'center' &&
+      summaryAfterTextParagraphAlignRedo.textAlign === 'right',
+    {
+      summaryAfterTextParagraphAlignPaste,
+      summaryAfterTextParagraphAlignRedo,
+      summaryAfterTextParagraphAlignUndo,
     },
   )
 

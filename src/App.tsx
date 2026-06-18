@@ -1131,6 +1131,12 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL =
+  'ppt-text-paragraph-align-import' as const
+const PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-paragraph-align' as const
+const PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-paragraph-align+json'
 const PPT_TEXT_PARAGRAPH_SPACING_IMPORT_MODEL =
   'ppt-text-paragraph-spacing-import' as const
 const PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT =
@@ -1568,6 +1574,18 @@ type PPTTextBodyImportSource = {
   jsonLength: number
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
+}
+type PPTTextParagraphAlignImportField =
+  | 'align'
+  | 'paragraphAlign'
+  | 'textAlign'
+  | 'textParagraphAlign'
+  | 'value'
+type PPTTextParagraphAlignImportSource = {
+  align: NonNullable<PPTParagraph['align']>
+  fields: readonly PPTTextParagraphAlignImportField[]
+  format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
+  jsonLength: number
 }
 type PPTTextParagraphSpacingImportField = PPTParagraphSpacingField
 type PPTTextParagraphSpacingImportSource = {
@@ -2075,6 +2093,18 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextParagraphAlignImportEffect = {
+  align: string
+  categories: string
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL
+  objectIds: string
 }
 type PPTTextParagraphSpacingImportEffect = {
   commandFields: string
@@ -3289,6 +3319,8 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
+  const [lastTextParagraphAlignImportEffect, setLastTextParagraphAlignImportEffect] =
+    useState<PPTTextParagraphAlignImportEffect | null>(null)
   const [
     lastTextParagraphSpacingImportEffect,
     setLastTextParagraphSpacingImportEffect,
@@ -4389,6 +4421,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textParagraphAlignSource =
+        getPPTTextParagraphAlignSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textParagraphAlignSource &&
+        pastePPTTextParagraphAlignSource(textParagraphAlignSource)
       ) {
         event.preventDefault()
         return
@@ -6168,6 +6211,90 @@ function App() {
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
             : element
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextParagraphAlignSource(
+    source: PPTTextParagraphAlignImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const sourceElement = textElements[0]
+    const paragraph = sourceElement.textBody.paragraphs[0]
+    const styleClipboard: PPTStyleClipboard = {
+      categories: ['object', 'paragraph'],
+      object: {
+        opacity: getPPTElementOpacity(sourceElement),
+        shadow: hasPPTElementShadow(sourceElement)
+          ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
+          : null,
+      },
+      paragraph: {
+        align: source.align,
+        ...(paragraph?.bullet ? { bullet: paragraph.bullet } : {}),
+        lineHeight: paragraph
+          ? getPPTParagraphLineHeight(paragraph)
+          : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+        spacingAfter: paragraph ? getPPTParagraphSpacingAfter(paragraph) : 0,
+        spacingBefore: paragraph ? getPPTParagraphSpacingBefore(paragraph) : 0,
+      },
+      sourceId: 'ppt-text-paragraph-align-json',
+      sourceKind: sourceElement.kind,
+      type: 'slide-style-clipboard',
+    }
+
+    const effect = createSlideEditStyleClipboardPasteCommandEffect({
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      targetSlideId: activeSlide.id,
+      targets: getPPTStyleClipboardTargetInputs(textElements),
+    })
+
+    if (!effect) {
+      return false
+    }
+
+    setStyleClipboard(styleClipboard)
+    setLastStyleClipboardEffect(effect)
+    setLastTextParagraphAlignImportEffect(createPPTTextParagraphAlignImportEffect({
+      effect,
+      source,
+    }))
+
+    const categoryApplicationsByObjectId = new Map(
+      effect.payload.categoryApplications.map((application) => [
+        application.objectId,
+        application.appliedCategoryIds,
+      ]),
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.categoryApplications.map((application) =>
+            application.objectId),
+          (element) => {
+            const appliedCategoryIds = categoryApplicationsByObjectId.get(element.id)
+
+            return appliedCategoryIds
+              ? applyPPTStyleClipboardToElement(
+                  element,
+                  styleClipboard,
+                  appliedCategoryIds,
+                )
+              : element
+          },
+        ),
       })))
 
     return true
@@ -12451,6 +12578,16 @@ function App() {
         data-ppt-text-body-import-paragraphs={lastTextBodyImportEffect?.paragraphCount}
         data-ppt-text-body-import-runs={lastTextBodyImportEffect?.runCount}
         data-ppt-text-body-import-text-length={lastTextBodyImportEffect?.textLength}
+        data-ppt-text-paragraph-align-import-categories={lastTextParagraphAlignImportEffect?.categories}
+        data-ppt-text-paragraph-align-import-command={lastTextParagraphAlignImportEffect?.commandId}
+        data-ppt-text-paragraph-align-import-command-targets={lastTextParagraphAlignImportEffect?.commandTargets}
+        data-ppt-text-paragraph-align-import-command-type={lastTextParagraphAlignImportEffect?.commandType}
+        data-ppt-text-paragraph-align-import-fields={lastTextParagraphAlignImportEffect?.fields}
+        data-ppt-text-paragraph-align-import-format={lastTextParagraphAlignImportEffect?.format}
+        data-ppt-text-paragraph-align-import-json-length={lastTextParagraphAlignImportEffect?.jsonLength}
+        data-ppt-text-paragraph-align-import-model={lastTextParagraphAlignImportEffect?.model}
+        data-ppt-text-paragraph-align-import-objects={lastTextParagraphAlignImportEffect?.objectIds}
+        data-ppt-text-paragraph-align-import-value={lastTextParagraphAlignImportEffect?.align}
         data-ppt-line-style-import-categories={lastLineStyleImportEffect?.categories}
         data-ppt-line-style-import-command={lastLineStyleImportEffect?.commandId}
         data-ppt-line-style-import-command-targets={lastLineStyleImportEffect?.commandTargets}
@@ -16414,6 +16551,38 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextParagraphAlignImportEffect({
+  effect,
+  source,
+}: {
+  effect: PPTStyleClipboardHostCommandEffect
+  source: PPTTextParagraphAlignImportSource
+}): PPTTextParagraphAlignImportEffect {
+  const payload = effect.payload.id === 'paste-object-formatting'
+    ? effect.payload
+    : null
+  const categories = payload
+    ? uniquePPTCanvasValues(payload.categoryApplications.flatMap(
+        (application) => application.appliedCategoryIds,
+      )).join(' ')
+    : ''
+
+  return {
+    align: source.align,
+    categories,
+    commandId: effect.payload.id,
+    commandTargets: payload?.targetObjectIds.join(' ') ?? '',
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL,
+    objectIds: payload?.categoryApplications
+      .map((application) => application.objectId)
+      .join(' ') ?? '',
   }
 }
 
@@ -21841,6 +22010,177 @@ function getPPTTextStyleParagraphAlignFromJSONValue(
   return value === 'left' || value === 'center' || value === 'right'
     ? value
     : undefined
+}
+
+function getPPTTextParagraphAlignSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextParagraphAlignSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextParagraphAlignSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextParagraphAlignImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextParagraphAlignSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextParagraphAlignSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextParagraphAlignSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextParagraphAlignSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextParagraphAlignImportSource | null {
+  const payload = getPPTTextParagraphAlignPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const align = getPPTTextParagraphAlignImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return align
+    ? {
+        align,
+        fields: payload.fields,
+        format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTTextParagraphAlignPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextParagraphAlignImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textParagraphAlign',
+    'paragraphAlign',
+    'textAlign',
+    'align',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextParagraphAlignImportValueFromJSONValue(
+  value: unknown,
+): NonNullable<PPTParagraph['align']> | undefined {
+  if (isPPTRecord(value)) {
+    return getPPTTextParagraphAlignImportValueFromJSONValue(
+      value.value ??
+        value.align ??
+        value.paragraphAlign ??
+        value.textAlign ??
+        value.textParagraphAlign,
+    )
+  }
+
+  return getPPTTextStyleParagraphAlignFromJSONValue(value)
 }
 
 function getPPTTextStyleParagraphBulletFromJSONValue(
