@@ -14367,6 +14367,133 @@ async function runTableImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/html', '<table><thead><tr><th>Stage</th><th>Status</th></tr></thead><tbody><tr><td>Draft</td><td>Queued</td></tr><tr><td>Review</td><td>Approved</td></tr></tbody></table>')
+    dataTransfer.setData('text/plain', 'Stage\\tStatus\\nDraft\\tQueued\\nReview\\tApproved')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterHTMLRowsPaste = await getPPTTableState(page)
+
+  record(
+    'pastes external HTML table rows into selected PPT table',
+    afterHTMLRowsPaste.tableRowsImportModel === 'ppt-table-rows-import' &&
+      afterHTMLRowsPaste.tableRowsImportFormat === 'text-html' &&
+      afterHTMLRowsPaste.tableRowsImportObjects === afterInspectorEdit.selectedId &&
+      afterHTMLRowsPaste.tableRowsImportTargets === afterInspectorEdit.selectedId &&
+      afterHTMLRowsPaste.tableRowsImportRows === 3 &&
+      afterHTMLRowsPaste.tableRowsImportCols === 2 &&
+      afterHTMLRowsPaste.tableRowsImportJsonLength > 120 &&
+      afterHTMLRowsPaste.tableCount === afterInspectorEdit.tableCount &&
+      afterHTMLRowsPaste.selectedId === afterInspectorEdit.selectedId &&
+      afterHTMLRowsPaste.selectedRows === 3 &&
+      afterHTMLRowsPaste.selectedCols === 2 &&
+      afterHTMLRowsPaste.inspectorSize === '3 x 2' &&
+      afterHTMLRowsPaste.cellTexts.includes('Review') &&
+      afterHTMLRowsPaste.cellTexts.includes('Approved'),
+    {
+      afterHTMLRowsPaste,
+      afterInspectorEdit,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterHTMLRowsUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table rows HTML paste as one history step',
+    afterHTMLRowsUndo.tableCount === afterInspectorEdit.tableCount &&
+      afterHTMLRowsUndo.selectedId === afterInspectorEdit.selectedId &&
+      afterHTMLRowsUndo.selectedRows === 3 &&
+      afterHTMLRowsUndo.selectedCols === 3 &&
+      afterHTMLRowsUndo.cellTexts.includes('Revenue') &&
+      afterHTMLRowsUndo.cellTexts.includes('45%') &&
+      !afterHTMLRowsUndo.cellTexts.includes('Approved'),
+    {
+      afterHTMLRowsPaste,
+      afterHTMLRowsUndo,
+      afterInspectorEdit,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const markdown = '| Step | Owner |\\n| --- | --- |\\n| Outline | AI |\\n| Polish | Human |'
+
+    dataTransfer.setData('text/markdown', markdown)
+    dataTransfer.setData('text/plain', markdown)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterMarkdownRowsPaste = await getPPTTableState(page)
+
+  record(
+    'pastes Markdown table rows into selected PPT table',
+    afterMarkdownRowsPaste.tableRowsImportModel === 'ppt-table-rows-import' &&
+      afterMarkdownRowsPaste.tableRowsImportFormat === 'text-markdown' &&
+      afterMarkdownRowsPaste.tableRowsImportObjects === afterInspectorEdit.selectedId &&
+      afterMarkdownRowsPaste.tableRowsImportTargets === afterInspectorEdit.selectedId &&
+      afterMarkdownRowsPaste.tableRowsImportRows === 3 &&
+      afterMarkdownRowsPaste.tableRowsImportCols === 2 &&
+      afterMarkdownRowsPaste.tableRowsImportJsonLength > 60 &&
+      afterMarkdownRowsPaste.tableCount === afterInspectorEdit.tableCount &&
+      afterMarkdownRowsPaste.selectedId === afterInspectorEdit.selectedId &&
+      afterMarkdownRowsPaste.selectedRows === 3 &&
+      afterMarkdownRowsPaste.selectedCols === 2 &&
+      afterMarkdownRowsPaste.inspectorSize === '3 x 2' &&
+      afterMarkdownRowsPaste.cellTexts.includes('Polish') &&
+      afterMarkdownRowsPaste.cellTexts.includes('Human'),
+    {
+      afterInspectorEdit,
+      afterMarkdownRowsPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterMarkdownRowsUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table rows Markdown paste as one history step',
+    afterMarkdownRowsUndo.tableCount === afterInspectorEdit.tableCount &&
+      afterMarkdownRowsUndo.selectedId === afterInspectorEdit.selectedId &&
+      afterMarkdownRowsUndo.selectedRows === 3 &&
+      afterMarkdownRowsUndo.selectedCols === 3 &&
+      afterMarkdownRowsUndo.cellTexts.includes('Revenue') &&
+      afterMarkdownRowsUndo.cellTexts.includes('45%') &&
+      !afterMarkdownRowsUndo.cellTexts.includes('Polish'),
+    {
+      afterInspectorEdit,
+      afterMarkdownRowsPaste,
+      afterMarkdownRowsUndo,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptTableClipboardItemTypes = []
     window.__pptTableClipboardWriteCount = 0
     window.__pptTableClipboardHTML = ''
@@ -14529,6 +14656,13 @@ async function runTableImportScenario(page) {
     afterPaste,
   })
 
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
 
@@ -14547,6 +14681,13 @@ async function runTableImportScenario(page) {
     afterHtmlPaste,
     afterPaste,
   })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()

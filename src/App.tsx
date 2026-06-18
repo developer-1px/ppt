@@ -25963,16 +25963,48 @@ function getPPTTableRowsTableImportTextFromDataTransfer(
     }
   }
 
-  if (
-    dataTransfer.getData('text/html').trim() ||
-    dataTransfer.getData('text/markdown').trim()
-  ) {
-    return ''
+  const markdownText = dataTransfer.getData('text/markdown').trim()
+
+  if (markdownText) {
+    return markdownText
+  }
+
+  const htmlText = dataTransfer.getData('text/html').trim()
+
+  if (htmlText) {
+    return isPPTTableRowsExternalHTMLTableClipboard(htmlText) ? htmlText : ''
   }
 
   const plainText = dataTransfer.getData('text/plain').trim()
 
-  return plainText && /[\t,]/.test(plainText) ? plainText : ''
+  return plainText &&
+      (/[\t,]/.test(plainText) || isPPTTableRowsMarkdownTableText(plainText))
+    ? plainText
+    : ''
+}
+
+function isPPTTableRowsExternalHTMLTableClipboard(html: string) {
+  if (
+    !html ||
+    /data-ppt-(rich-clipboard|selection-|table-export)/i.test(html)
+  ) {
+    return false
+  }
+
+  if (typeof DOMParser === 'undefined') {
+    return /<table[\s>]/i.test(html)
+  }
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+
+  return !!doc.querySelector('table') &&
+    !doc.querySelector(
+      '[data-ppt-rich-clipboard], [data-ppt-selection-object], [data-ppt-selection-table], [data-ppt-table-export]',
+    )
+}
+
+function isPPTTableRowsMarkdownTableText(text: string) {
+  return /^\s*\|.+\|\s*\n\s*\|[\s:|-]+\|\s*\n/m.test(text)
 }
 
 function getPPTTableRowsPayloadValue(
