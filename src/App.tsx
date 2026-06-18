@@ -538,6 +538,7 @@ import {
   PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
   readPPTCanvasRichClipboardFromDataTransfer,
   resetPPTCanvasViewport,
+  routePPTCanvasMediaSourceObjectHyperlink,
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
@@ -555,6 +556,8 @@ import {
   zoomPPTCanvasViewport,
   type PPTCanvasFloatingAnchor,
   type PPTCanvasKeyboardToolIntent,
+  type PPTCanvasMediaObjectHyperlinkRoute,
+  type PPTCanvasMediaObjectHyperlinkTarget,
   type PPTCanvasPastePositionMemory,
   type PPTCanvasPointerClickMemory,
   type PPTCanvasRichClipboardReadFormat,
@@ -6300,14 +6303,39 @@ function App() {
     return true
   }
 
-  function pastePPTObjectHyperlinkSource(
-    source: PPTObjectHyperlinkImportSource,
+  function getPPTObjectHyperlinkTargetIds(
+    targetSelection: readonly string[],
   ) {
-    const objectIds = selectedElements
+    const targetIds = new Set(targetSelection)
+
+    return selectedElements
       .filter((element) =>
-        element.locked !== true &&
+        targetIds.has(element.id) &&
+          element.locked !== true &&
           element.visible !== false)
       .map((element) => element.id)
+  }
+
+  function getPPTMediaObjectHyperlinkRouteTarget(
+    targetSelection: readonly string[],
+  ): PPTCanvasMediaObjectHyperlinkTarget | null {
+    const objectIds = getPPTObjectHyperlinkTargetIds(targetSelection)
+
+    return objectIds.length === 0
+      ? null
+      : {
+          id: objectIds[0],
+          selection: objectIds,
+        }
+  }
+
+  function pastePPTObjectHyperlinkSourceToObjectIds({
+    objectIds,
+    source,
+  }: {
+    objectIds: readonly string[]
+    source: PPTObjectHyperlinkImportSource
+  }) {
     const effects = createPPTObjectHyperlinkImportCommandEffects({
       objectIds,
       slideId: activeSlide.id,
@@ -6338,6 +6366,15 @@ function App() {
       })))
 
     return true
+  }
+
+  function pastePPTObjectHyperlinkSource(
+    source: PPTObjectHyperlinkImportSource,
+  ) {
+    return pastePPTObjectHyperlinkSourceToObjectIds({
+      objectIds: getPPTObjectHyperlinkTargetIds(selection),
+      source,
+    })
   }
 
   function pastePPTObjectStateSource(source: PPTObjectStateImportSource) {
@@ -7428,10 +7465,22 @@ function App() {
     return true
   }
 
-  function pastePPTMediaSourceAsObjectHyperlink(source: PPTMediaImportSource) {
-    return pastePPTObjectHyperlinkSource(
-      createPPTObjectHyperlinkSourceFromMediaSource(source),
-    )
+  function pastePPTMediaSource(source: PPTMediaImportSource) {
+    const route = routePPTCanvasMediaSourceObjectHyperlink({
+      getTarget: ({ selection: targetSelection }) =>
+        getPPTMediaObjectHyperlinkRouteTarget(targetSelection),
+      selection,
+      source,
+    })
+
+    if (route.kind === 'object-hyperlink') {
+      return pastePPTObjectHyperlinkSourceToObjectIds({
+        objectIds: route.intent.target.selection,
+        source: createPPTObjectHyperlinkSourceFromMediaRoute(route),
+      })
+    }
+
+    return insertPPTMediaSource(route.source)
   }
 
   function pastePPTImageReplaceSource(source: PPTImageReplaceImportSource) {
@@ -8304,8 +8353,7 @@ function App() {
         insertPPTTableSource(action.source)
         return true
       case 'media-source':
-        return pastePPTMediaSourceAsObjectHyperlink(action.source) ||
-          insertPPTMediaSource(action.source)
+        return pastePPTMediaSource(action.source)
       case 'rich-text-source':
         return pastePPTTextBodySource(
             createPPTTextBodySourceFromRichTextPasteSource(action.source),
@@ -16414,14 +16462,17 @@ function createPPTObjectHyperlinkImportEffect({
   }
 }
 
-function createPPTObjectHyperlinkSourceFromMediaSource(
-  source: PPTMediaImportSource,
+function createPPTObjectHyperlinkSourceFromMediaRoute(
+  route: Extract<
+    PPTCanvasMediaObjectHyperlinkRoute,
+    { kind: 'object-hyperlink' }
+  >,
 ): PPTObjectHyperlinkImportSource {
   return {
     fields: ['url'],
     format: PPT_OBJECT_HYPERLINK_MEDIA_IMPORT_FORMAT,
-    hyperlinkUrl: source.url,
-    jsonLength: source.url.length,
+    hyperlinkUrl: route.intent.url,
+    jsonLength: route.intent.url.length,
   }
 }
 

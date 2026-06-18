@@ -130,6 +130,9 @@ import {
   CANVAS_MEDIA_IMPORT_MODEL,
   getCanvasMediaSourceFromDataTransfer,
   getCanvasMediaSourceFromText,
+  routeCanvasMediaSourceObjectHyperlink,
+  type CanvasMediaObjectHyperlinkRoute,
+  type CanvasMediaObjectHyperlinkTarget,
 } from 'canvas/app/media-import'
 import {
   CANVAS_MINIMAP_READ_MODEL,
@@ -448,6 +451,8 @@ export const getPPTCanvasMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer
 export const getPPTCanvasMediaSourceFromText =
   getCanvasMediaSourceFromText
+export const routePPTCanvasMediaSourceObjectHyperlink =
+  routeCanvasMediaSourceObjectHyperlink
 export const getPPTMinimapPointFromViewportOffset =
   getCanvasMinimapPointFromViewportOffset
 export const getPPTMinimapReadModel = getCanvasMinimapReadModel
@@ -498,6 +503,10 @@ export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
 export type PPTCanvasImageImportFormat = CanvasImageImportFormat
 export type PPTCanvasImageImportSource = CanvasImageImportSource
+export type PPTCanvasMediaObjectHyperlinkRoute =
+  CanvasMediaObjectHyperlinkRoute
+export type PPTCanvasMediaObjectHyperlinkTarget =
+  CanvasMediaObjectHyperlinkTarget
 export type PPTCanvasRichTextPasteSource = CanvasRichTextPasteSource
 export type PPTCanvasTableImportFormat = CanvasTableImportFormat
 export type PPTCanvasTableImportSource = CanvasTableImportSource
