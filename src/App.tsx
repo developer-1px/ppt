@@ -138,6 +138,7 @@ import {
   getSlideEditLayerPaneKeyboardIntent,
   getSlideEditLayerPaneObjectLayerJSONPasteValue,
   getSlideEditLayerPaneObjectLayerPasteCommandEffect,
+  getSlideEditLayerPaneObjectStatePasteCommandEffects,
   getSlideEditLayerPaneObjectStateJSONPasteValue,
   getSlideEditLayerPaneRenameJSONPasteValue,
   getSlideEditLayerPaneRenamePasteCommandEffect,
@@ -2923,6 +2924,13 @@ type PPTLayerPaneRowDescriptor = SlideEditLayerPaneRowDescriptor<string, string,
 type PPTLayerPaneDescriptor = SlideEditLayerPaneDescriptor<string, string, string>
 type PPTLayerPaneCommandDescriptor = SlideEditLayerPaneCommandDescriptor
 type PPTLayerPaneHostCommandEffect = SlideEditLayerPaneHostCommandEffect<string, string>
+type PPTObjectStateVisibilityHostCommandEffect =
+  PPTLayerPaneHostCommandEffect & {
+    payload: Extract<
+      PPTLayerPaneHostCommandEffect['payload'],
+      { id: 'hide-objects' | 'show-objects' }
+    >
+  }
 type PPTLayerPaneIntent = SlideEditLayerPaneIntent<string>
 type PPTLayerPaneKeyboardIntent = SlideEditLayerPaneKeyboardIntent<string>
 type PPTObjectVisibilityDescriptor = SlideEditObjectVisibilityDescriptor<string, string, string>
@@ -3614,7 +3622,12 @@ function App() {
   const [lastImageReplaceEffect, setLastImageReplaceEffect] = useState<SlideEditObjectImageReplaceHostCommandEffect<string, string> | null>(null)
   const [lastObjectAnimationEffect, setLastObjectAnimationEffect] = useState<SlideEditObjectAnimationHostCommandEffect<string, string> | null>(null)
   const [lastObjectOpacityEffect, setLastObjectOpacityEffect] = useState<SlideEditObjectOpacityHostCommandEffect<string, string> | null>(null)
-  const [lastObjectVisibilityEffect, setLastObjectVisibilityEffect] = useState<PPTObjectVisibilityHostCommandEffect | null>(null)
+  const [lastObjectVisibilityEffect, setLastObjectVisibilityEffect] =
+    useState<
+      PPTObjectStateVisibilityHostCommandEffect |
+      PPTObjectVisibilityHostCommandEffect |
+      null
+    >(null)
   const [lastShadowEffect, setLastShadowEffect] = useState<SlideEditObjectShadowHostCommandEffect<string, string> | null>(null)
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
@@ -6379,28 +6392,29 @@ function App() {
       slide: activeSlide,
       source,
     })
+    const visibilityEffects = effects.filter(isPPTObjectStateVisibilityEffect)
+    const lockEffects = effects.filter(isPPTObjectStateLockEffect)
 
-    if (
-      !effects.visibilityEffect &&
-      effects.lockEffects.length === 0
-    ) {
+    if (effects.length === 0) {
       return false
     }
 
-    if (effects.visibilityEffect) {
-      setLastObjectVisibilityEffect(effects.visibilityEffect)
+    const lastVisibilityEffect = visibilityEffects.at(-1)
+
+    if (lastVisibilityEffect) {
+      setLastObjectVisibilityEffect(lastVisibilityEffect)
     }
 
     setLastObjectStateImportEffect(createPPTObjectStateImportEffect({
+      effects,
       objectIds,
       source,
-      ...effects,
     }))
 
     const visibilityObjectIds = new Set(
-      effects.visibilityEffect?.payload.objectIds ?? [],
+      visibilityEffects.flatMap((effect) => effect.payload.objectIds),
     )
-    const lockObjectIds = new Set(effects.lockEffects.flatMap((effect) =>
+    const lockObjectIds = new Set(lockEffects.flatMap((effect) =>
       effect.payload.id === 'lock-objects' ||
         effect.payload.id === 'unlock-objects'
         ? effect.payload.objectIds
@@ -17214,25 +17228,21 @@ function applyPPTObjectAccessibilityCommandEffectToElement(
 }
 
 function createPPTObjectStateImportEffect({
-  lockEffects,
+  effects,
   objectIds,
   source,
-  visibilityEffect,
 }: {
-  lockEffects: readonly PPTLayerPaneHostCommandEffect[]
+  effects: readonly PPTLayerPaneHostCommandEffect[]
   objectIds: readonly string[]
   source: PPTObjectStateImportSource
-  visibilityEffect: PPTObjectVisibilityHostCommandEffect | null
 }): PPTObjectStateImportEffect {
-  const visibilityEffects = visibilityEffect ? [visibilityEffect] : []
-  const effects = source.state.locked === false
-    ? [...lockEffects, ...visibilityEffects]
-    : [...visibilityEffects, ...lockEffects]
+  const lockEffects = effects.filter(isPPTObjectStateLockEffect)
+  const visibilityEffects = effects.filter(isPPTObjectStateVisibilityEffect)
   const lockTargets = uniquePPTCanvasValues(lockEffects.flatMap((effect) =>
-    effect.payload.id === 'lock-objects' ||
-      effect.payload.id === 'unlock-objects'
-      ? effect.payload.objectIds
-      : []))
+    effect.payload.objectIds))
+  const visibilityTargets = uniquePPTCanvasValues(
+    visibilityEffects.flatMap((effect) => effect.payload.objectIds),
+  )
 
   return {
     commandIds: effects.map((effect) => effect.payload.id).join(' '),
@@ -17250,7 +17260,7 @@ function createPPTObjectStateImportEffect({
     visible: source.state.visible === undefined
       ? ''
       : String(source.state.visible),
-    visibilityTargets: visibilityEffect?.payload.objectIds.join(' ') ?? '',
+    visibilityTargets: visibilityTargets.join(' '),
   }
 }
 
@@ -17262,67 +17272,15 @@ function createPPTObjectStateImportCommandEffects({
   objectIds: readonly string[]
   slide: PPTSlide
   source: PPTObjectStateImportSource
-}): {
-  lockEffects: PPTLayerPaneHostCommandEffect[]
-  visibilityEffect: PPTObjectVisibilityHostCommandEffect | null
-} {
-  const lockEffects = source.state.locked === undefined
-    ? []
-    : createPPTObjectStateLockCommandEffects({
-      locked: source.state.locked,
-      objectIds,
-      slide,
-    })
-  const visibilitySlide = source.state.locked === false
-    ? applyPPTObjectStateVirtualLock(slide, objectIds, false)
-    : slide
-  const visibilityEffect = source.state.visible === undefined
-    ? null
-    : createPPTObjectStateVisibilityCommandEffect({
-      objectIds,
-      slide: visibilitySlide,
-      visible: source.state.visible,
-    })
-
-  return {
-    lockEffects,
-    visibilityEffect,
-  }
-}
-
-function createPPTObjectStateVisibilityCommandEffect({
-  objectIds,
-  slide,
-  visible,
-}: {
-  objectIds: readonly string[]
-  slide: PPTSlide
-  visible: boolean
-}): PPTObjectVisibilityHostCommandEffect | null {
-  const descriptor = createPPTLayerPaneDescriptor({
-    activeObjectId: null,
-    collapsedGroupIds: new Set(),
-    selectedObjectIds: objectIds,
-    slide,
-  })
-
-  return getSlideEditObjectVisibilityCommandEffect({
-    commandId: visible ? 'show-objects' : 'hide-objects',
-    objects: getPPTObjectVisibilityDescriptors(slide.id, descriptor.rows),
-    selectedObjectIds: objectIds,
-    slideId: slide.id,
-  })
-}
-
-function createPPTObjectStateLockCommandEffects({
-  locked,
-  objectIds,
-  slide,
-}: {
-  locked: boolean
-  objectIds: readonly string[]
-  slide: PPTSlide
 }): PPTLayerPaneHostCommandEffect[] {
+  const pasteValue = createSlideEditLayerPaneObjectStatePasteValueFromPPTSource(
+    source,
+  )
+
+  if (!pasteValue) {
+    return []
+  }
+
   const descriptor = createPPTLayerPaneDescriptor({
     activeObjectId: null,
     collapsedGroupIds: new Set(),
@@ -17330,38 +17288,56 @@ function createPPTObjectStateLockCommandEffects({
     slide,
   })
 
-  return objectIds
-    .map((objectId) => {
-      const row = descriptor.rows.find((candidate) =>
-        candidate.objectId === objectId)
+  return objectIds.flatMap((objectId) =>
+    getSlideEditLayerPaneObjectStatePasteCommandEffects({
+      descriptor,
+      objectId,
+      pasteValue,
+    }) ?? [])
+}
 
-      if (!row || row.isLocked === locked) {
-        return null
+function createSlideEditLayerPaneObjectStatePasteValueFromPPTSource(
+  source: PPTObjectStateImportSource,
+): NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectStateJSONPasteValue>> | null {
+  const lock = source.state.locked === undefined
+    ? undefined
+    : {
+        isLocked: source.state.locked,
+        sourceField: 'locked',
+      }
+  const visibility = source.state.visible === undefined
+    ? undefined
+    : {
+        isHidden: !source.state.visible,
+        sourceField: 'visible',
       }
 
-      return getSlideEditLayerPaneCommandEffect(descriptor, {
-        objectId,
-        type: 'lock-toggle',
-      })
-    })
-    .filter((effect): effect is PPTLayerPaneHostCommandEffect =>
-      effect !== null)
+  return lock || visibility
+    ? {
+        ...(lock ? { lock } : {}),
+        surface: 'object-layer-pane-state',
+        ...(visibility ? { visibility } : {}),
+      }
+    : null
 }
 
-function applyPPTObjectStateVirtualLock(
-  slide: PPTSlide,
-  objectIds: readonly string[],
-  locked: boolean,
-): PPTSlide {
-  const objectIdSet = new Set(objectIds)
+function isPPTObjectStateLockEffect(
+  effect: PPTLayerPaneHostCommandEffect,
+): effect is PPTLayerPaneHostCommandEffect & {
+  payload: Extract<
+    PPTLayerPaneHostCommandEffect['payload'],
+    { id: 'lock-objects' | 'unlock-objects' }
+  >
+} {
+  return effect.payload.id === 'lock-objects' ||
+    effect.payload.id === 'unlock-objects'
+}
 
-  return {
-    ...slide,
-    elements: slide.elements.map((element) =>
-      objectIdSet.has(element.id)
-        ? { ...element, locked }
-        : element),
-  }
+function isPPTObjectStateVisibilityEffect(
+  effect: PPTLayerPaneHostCommandEffect,
+): effect is PPTObjectStateVisibilityHostCommandEffect {
+  return effect.payload.id === 'hide-objects' ||
+    effect.payload.id === 'show-objects'
 }
 
 function createPPTObjectLayerImportEffect({
