@@ -15074,6 +15074,64 @@ async function runTextPasteScenario(page) {
     },
   )
 
+  const beforeStandaloneTextBodyJSONPaste = await getPPTTextPasteState(page)
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      plainText: 'ignored fallback',
+      paragraphs: [
+        {
+          align: 'right',
+          runs: [
+            { text: 'Standalone direct textBody ' },
+            { bold: true, text: 'keeps runs' },
+          ],
+        },
+        {
+          bullet: 'bullet',
+          runs: [{ italic: true, text: 'Works from application/json' }],
+          spacingAfter: 6,
+        },
+      ],
+    })
+
+    dataTransfer.setData('application/json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneTextBodyJSONPaste = await getPPTTextPasteState(page)
+
+  record(
+    'pastes standalone JSON textBody into selected PPT text object',
+    afterStandaloneTextBodyJSONPaste.textBodyImportModel === 'ppt-text-body-import' &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportFormat === 'application-json-ppt-text-body' &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportMode === 'text-body' &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportObjects === beforeStandaloneTextBodyJSONPaste.selectedId &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportTargets === beforeStandaloneTextBodyJSONPaste.selectedId &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportParagraphs === 2 &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportRuns === 3 &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportTextLength > 60 &&
+      afterStandaloneTextBodyJSONPaste.textBodyImportJsonLength > 170 &&
+      afterStandaloneTextBodyJSONPaste.textBoxCount === beforeStandaloneTextBodyJSONPaste.textBoxCount &&
+      afterStandaloneTextBodyJSONPaste.selectedId === beforeStandaloneTextBodyJSONPaste.selectedId &&
+      afterStandaloneTextBodyJSONPaste.selectedText.includes('Standalone direct textBody') &&
+      afterStandaloneTextBodyJSONPaste.selectedText.includes('Works from application/json') &&
+      !afterStandaloneTextBodyJSONPaste.selectedText.includes('ignored fallback') &&
+      afterStandaloneTextBodyJSONPaste.selectedBoldRunCount >= 1 &&
+      afterStandaloneTextBodyJSONPaste.selectedItalicRunCount >= 1 &&
+      afterStandaloneTextBodyJSONPaste.selectedBulletParagraphCount === 1,
+    {
+      afterStandaloneTextBodyJSONPaste,
+      beforeStandaloneTextBodyJSONPaste,
+    },
+  )
+
   const beforeStyledFallbackPaste = await getPPTTextPasteState(page)
 
   await page.eval(`(() => {

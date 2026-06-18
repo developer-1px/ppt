@@ -25107,6 +25107,10 @@ function getPPTTextBodyPayloadValue(
     return value.content
   }
 
+  if (hasPPTTextBodyStandalonePayloadFields(value)) {
+    return value
+  }
+
   if (typeof value.text === 'string') {
     return value.text
   }
@@ -25116,6 +25120,12 @@ function getPPTTextBodyPayloadValue(
   }
 
   return allowDirect ? value : null
+}
+
+function hasPPTTextBodyStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return Array.isArray(value.paragraphs)
 }
 
 function getPPTColorSwatchSourceFromDataTransfer(
