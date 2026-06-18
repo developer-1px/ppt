@@ -11090,6 +11090,57 @@ async function runSlideTransitionScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      advance: {
+        afterMs: 1800,
+        onClick: true,
+      },
+      duration: 640,
+      type: 'fade',
+    })
+
+    dataTransfer.setData('application/json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneTransitionPaste = await getPPTSlideTransitionState(page)
+
+  record(
+    'pastes standalone JSON slide transition into active PPT slide',
+    afterStandaloneTransitionPaste.importModel === 'ppt-slide-transition-import' &&
+      afterStandaloneTransitionPaste.importFormat === 'application-json-ppt-slide-transition' &&
+      afterStandaloneTransitionPaste.importSlide === 'slide-1' &&
+      afterStandaloneTransitionPaste.importFields ===
+        'type durationMs advanceOnClick advanceAfterMs' &&
+      afterStandaloneTransitionPaste.importCommands ===
+        'update-slide-transition update-slide-transition update-slide-transition update-slide-transition' &&
+      afterStandaloneTransitionPaste.importCommandFields === 'type durationMs advance advance' &&
+      afterStandaloneTransitionPaste.importType === 'fade' &&
+      afterStandaloneTransitionPaste.importDuration === '640' &&
+      afterStandaloneTransitionPaste.importAdvanceOnClick === 'true' &&
+      afterStandaloneTransitionPaste.importAdvanceAfter === '1800' &&
+      afterStandaloneTransitionPaste.importJsonLength > 70 &&
+      afterStandaloneTransitionPaste.type === 'fade' &&
+      afterStandaloneTransitionPaste.duration === '640' &&
+      afterStandaloneTransitionPaste.advanceOnClick === 'true' &&
+      afterStandaloneTransitionPaste.advanceAfter === '1800' &&
+      afterStandaloneTransitionPaste.stageType === 'fade' &&
+      afterStandaloneTransitionPaste.stageDuration === '640' &&
+      afterStandaloneTransitionPaste.stageAdvanceOnClick === 'true' &&
+      afterStandaloneTransitionPaste.stageAdvanceAfter === '1800',
+    {
+      afterStandaloneTransitionPaste,
+      afterTransitionPaste,
+    },
+  )
+
+  await page.eval(`(() => {
     const type = document.querySelector('[data-ppt-slide-transition-field="type"]')
     const duration = document.querySelector('[data-ppt-slide-transition-field="durationMs"]')
     const advanceOnClick = document.querySelector('[data-ppt-slide-transition-field="advanceOnClick"]')
@@ -17793,6 +17844,86 @@ async function runSelectionPaneScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      hidden: true,
+      locked: true,
+    })
+
+    dataTransfer.setData('application/json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneObjectStateHideLock = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes standalone JSON object visible and locked state into selected PPT object',
+    afterStandaloneObjectStateHideLock.model === 'ppt-object-state-import' &&
+      afterStandaloneObjectStateHideLock.format === 'application-json-ppt-object-state' &&
+      afterStandaloneObjectStateHideLock.fields === 'visible locked' &&
+      afterStandaloneObjectStateHideLock.commands === 'hide-objects lock-objects' &&
+      afterStandaloneObjectStateHideLock.importVisible === 'false' &&
+      afterStandaloneObjectStateHideLock.importLocked === 'true' &&
+      afterStandaloneObjectStateHideLock.objectIds === layerTargetId &&
+      afterStandaloneObjectStateHideLock.visibilityTargets === layerTargetId &&
+      afterStandaloneObjectStateHideLock.lockTargets === layerTargetId &&
+      afterStandaloneObjectStateHideLock.hidden === 'true' &&
+      afterStandaloneObjectStateHideLock.locked === 'true' &&
+      !afterStandaloneObjectStateHideLock.stageElementExists,
+    {
+      afterObjectStateShowUnlockRedo,
+      afterStandaloneObjectStateHideLock,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      locked: false,
+      visible: true,
+    })
+
+    dataTransfer.setData('application/json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneObjectStateShowUnlock = await readPPTObjectStateImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes standalone JSON object unlock and show state into selected PPT object',
+    afterStandaloneObjectStateShowUnlock.model === 'ppt-object-state-import' &&
+      afterStandaloneObjectStateShowUnlock.commands === 'unlock-objects show-objects' &&
+      afterStandaloneObjectStateShowUnlock.importVisible === 'true' &&
+      afterStandaloneObjectStateShowUnlock.importLocked === 'false' &&
+      afterStandaloneObjectStateShowUnlock.visibilityTargets === layerTargetId &&
+      afterStandaloneObjectStateShowUnlock.lockTargets === layerTargetId &&
+      afterStandaloneObjectStateShowUnlock.hidden === 'false' &&
+      afterStandaloneObjectStateShowUnlock.locked === 'false' &&
+      afterStandaloneObjectStateShowUnlock.stageElementExists &&
+      afterStandaloneObjectStateShowUnlock.stageSelected === 'true',
+    {
+      afterStandaloneObjectStateHideLock,
+      afterStandaloneObjectStateShowUnlock,
+    },
+  )
+
   const beforeObjectLayerImport = await readPPTObjectLayerImportState(
     page,
     layerTargetId,
@@ -17904,6 +18035,47 @@ async function runSelectionPaneScenario(page) {
       afterObjectLayerBackRedo,
       afterObjectLayerBackUndo,
       afterObjectLayerFront,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      arrange: 'bring-to-front',
+    })
+
+    dataTransfer.setData('application/json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneObjectLayerFront = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes standalone JSON object layer front state through slide-edit layer pane reorder effect',
+    afterStandaloneObjectLayerFront.model === 'ppt-object-layer-import' &&
+      afterStandaloneObjectLayerFront.format === 'application-json-ppt-object-layer' &&
+      afterStandaloneObjectLayerFront.fields === 'position' &&
+      afterStandaloneObjectLayerFront.command === 'reorder-object' &&
+      afterStandaloneObjectLayerFront.commandType === 'slide-command-effect' &&
+      afterStandaloneObjectLayerFront.fromIndex === afterObjectLayerBackRedo.layerIndex &&
+      afterStandaloneObjectLayerFront.toIndex === afterObjectLayerBackRedo.layerOrder.length &&
+      afterStandaloneObjectLayerFront.objectId === layerTargetId &&
+      afterStandaloneObjectLayerFront.position === 'front' &&
+      afterStandaloneObjectLayerFront.layerOrder.at(-1) === layerTargetId &&
+      afterStandaloneObjectLayerFront.stageOrder.at(-1) === layerTargetId &&
+      afterStandaloneObjectLayerFront.rowSelected === 'true' &&
+      afterStandaloneObjectLayerFront.stageSelected === 'true',
+    {
+      afterObjectLayerBackRedo,
+      afterStandaloneObjectLayerFront,
     },
   )
 }
