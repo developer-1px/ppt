@@ -125,6 +125,7 @@ import {
   getSlideEditFrameGuideGeometry,
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
+  getSlideEditColorSwatchJSONPasteValue,
   getSlideEditColorWithAlphaCSS,
   getSlideEditDeckNavigationKeyboardIntent,
   getSlideEditLayoutApplyCommandEffect,
@@ -26264,6 +26265,13 @@ function getPPTColorSwatchSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTColorSwatchSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -26307,6 +26315,122 @@ function getPPTColorSwatchSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTColorSwatchSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTColorSwatchImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_COLOR_SWATCH_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditColorSwatchJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    const source = createPPTColorSwatchSourceFromSlideEditJSONPasteValue({
+      allowDirect: candidate.allowDirect,
+      jsonLength: candidate.text.length,
+      pasteValue,
+      value: getPPTJSONValueFromText(candidate.text),
+    })
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function createPPTColorSwatchSourceFromSlideEditJSONPasteValue({
+  allowDirect,
+  jsonLength,
+  pasteValue,
+  value,
+}: {
+  allowDirect: boolean
+  jsonLength: number
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValue>>
+  value: unknown
+}): PPTColorSwatchImportSource | null {
+  const color = normalizePPTSwatchColor(pasteValue.value)
+
+  if (!color) {
+    return null
+  }
+
+  const channel = getPPTColorSwatchChannelFromJSONValue(pasteValue.channelId)
+  const fields = getPPTColorSwatchImportFieldsFromSlideEditJSONPasteValue({
+    allowDirect,
+    pasteValue,
+    value,
+  })
+
+  return {
+    ...(channel === undefined ? {} : { channel }),
+    color,
+    fields,
+    format: PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT,
+    jsonLength,
+    source: pasteValue.source,
+    ...(fields.includes('swatchId') ? { swatchId: pasteValue.swatchId } : {}),
+    ...(
+      fields.includes('tokenId') && pasteValue.tokenId
+        ? { tokenId: pasteValue.tokenId }
+        : {}
+    ),
+  }
+}
+
+function getPPTColorSwatchImportFieldsFromSlideEditJSONPasteValue({
+  allowDirect,
+  pasteValue,
+  value,
+}: {
+  allowDirect: boolean
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValue>>
+  value: unknown
+}): readonly PPTColorSwatchImportField[] {
+  const payloadValue = getPPTColorSwatchPayloadValue(value, allowDirect)
+
+  if (typeof payloadValue === 'string' || !isPPTRecord(payloadValue)) {
+    return ['color']
+  }
+
+  const fields: PPTColorSwatchImportField[] = []
+
+  if (pasteValue.channelId !== null) {
+    fields.push('channel')
+  }
+
+  fields.push('color')
+
+  if (typeof payloadValue.source === 'string') {
+    fields.push('source')
+  }
+
+  if (
+    typeof payloadValue.swatchId === 'string' ||
+    typeof payloadValue.id === 'string'
+  ) {
+    fields.push('swatchId')
+  }
+
+  if (
+    typeof payloadValue.tokenId === 'string' ||
+    typeof payloadValue.token === 'string' ||
+    typeof payloadValue.themeColorToken === 'string'
+  ) {
+    fields.push('tokenId')
+  }
+
+  return fields
 }
 
 function getPPTColorSwatchSourceFromText(
