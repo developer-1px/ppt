@@ -10,6 +10,7 @@ import {
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_MODEL,
+  CANVAS_LASER_TRAIL_OVERLAY_MODEL,
   CANVAS_MENU_FOCUS_MODEL,
   CANVAS_MENU_ITEM_PROPS,
   CANVAS_MENU_KEYBOARD_KEYS,
@@ -67,6 +68,7 @@ import {
   getCanvasMenuTriggerKeyboardIntent,
   getCanvasModalBackdropPointerIntent,
   getCanvasModalKeyboardIntent,
+  getNextCanvasDrawingPoints,
   getCanvasPasteOffsetForBounds,
   getCanvasPastePositionSession,
   getCanvasPointerLocalGeometry,
@@ -125,7 +127,10 @@ import {
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
   type CanvasPointerClickMemory,
+  previewCanvasPointerLaserInteraction,
   previewCanvasPointerPanInteraction,
+  startCanvasPointerLaserInteraction,
+  type CanvasPointerLaserInteraction,
   startCanvasPointerPanInteraction,
   type CanvasPointerPanInteraction,
   type CanvasRichClipboardReadFormat,
@@ -196,13 +201,6 @@ import {
 import {
   CANVAS_POINTER_CLICK_MEMORY_MODEL,
 } from 'canvas/app/pointer-click-memory'
-import { getNextCanvasDrawingPoints } from 'canvas/app/pointer-drawing'
-import {
-  CANVAS_LASER_TRAIL_OVERLAY_MODEL,
-  previewCanvasPointerLaserInteraction,
-  startCanvasPointerLaserInteraction,
-  type CanvasPointerLaserInteraction,
-} from 'canvas/app/pointer-laser'
 import { getCanvasPointerStartProjection } from 'canvas/app/pointer-start-session'
 export const PPT_COMMAND_PALETTE_ITEMS_MODEL =
   CANVAS_COMMAND_PALETTE_ITEMS_MODEL

@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 const canvasCommandPaletteItemsEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts', import.meta.url))
-const canvasPointerDrawingEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerDrawing.ts', import.meta.url))
 const canvasImageClipboardEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageClipboard.ts', import.meta.url))
 const canvasImageImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/image-io/CanvasImageImport.ts', import.meta.url))
 const canvasInlineEditDomEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts', import.meta.url))
@@ -13,7 +12,6 @@ const canvasMediaImportEntry = fileURLToPath(new URL('../canvas/src/canvas/app/f
 const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts', import.meta.url))
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
-const canvasPointerLaserEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerLaser.ts', import.meta.url))
 const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
@@ -28,7 +26,6 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: 'canvas/app/command-palette-items', replacement: canvasCommandPaletteItemsEntry },
-      { find: 'canvas/app/pointer-drawing', replacement: canvasPointerDrawingEntry },
       { find: 'canvas/app/image-clipboard', replacement: canvasImageClipboardEntry },
       { find: 'canvas/app/image-import', replacement: canvasImageImportEntry },
       { find: 'canvas/app/inline-edit-dom', replacement: canvasInlineEditDomEntry },
@@ -37,7 +34,6 @@ export default defineConfig({
       { find: 'canvas/app/minimap-model', replacement: canvasMinimapModelEntry },
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
-      { find: 'canvas/app/pointer-laser', replacement: canvasPointerLaserEntry },
       { find: 'canvas/app/pointer-start-session', replacement: canvasPointerStartSessionEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },
