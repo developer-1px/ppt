@@ -21024,6 +21024,7 @@ async function runSlideManagementScenario(page) {
     window.__pptSlideClipboardWriteCount = 0
     window.__pptSlideClipboardHTML = ''
     window.__pptSlideClipboardJSON = ''
+    window.__pptSlideClipboardSlideEditJSON = ''
     window.__pptSlideClipboardPlainText = ''
     window.__pptSlideClipboardSVG = ''
     window.ClipboardItem = class PPTSlideClipboardItem {
@@ -21040,12 +21041,17 @@ async function runSlideManagementScenario(page) {
           const item = items[0]
           const jsonMimeType = Object.keys(item.items)
             .find((type) => type.includes('ppt.slide+json')) ?? ''
+          const slideEditJsonMimeType = Object.keys(item.items)
+            .find((type) => type.includes('slide-edit.slides+json')) ?? ''
 
           window.__pptSlideClipboardHTML = await item.items['text/html'].text()
           window.__pptSlideClipboardPlainText = await item.items['text/plain'].text()
           window.__pptSlideClipboardSVG = await item.items['image/svg+xml'].text()
           window.__pptSlideClipboardJSON = jsonMimeType
             ? await item.items[jsonMimeType].text()
+            : ''
+          window.__pptSlideClipboardSlideEditJSON = slideEditJsonMimeType
+            ? await item.items[slideEditJsonMimeType].text()
             : ''
         },
         async writeText(text) {
@@ -21064,6 +21070,7 @@ async function runSlideManagementScenario(page) {
     itemTypes: window.__pptSlideClipboardItemTypes?.at(-1) ?? [],
     json: window.__pptSlideClipboardJSON ?? '',
     plainText: window.__pptSlideClipboardPlainText ?? '',
+    slideEditJson: window.__pptSlideClipboardSlideEditJSON ?? '',
     svg: window.__pptSlideClipboardSVG ?? '',
     writeCount: window.__pptSlideClipboardWriteCount ?? 0,
   }))()`)
@@ -21078,11 +21085,13 @@ async function runSlideManagementScenario(page) {
       afterCopySlide.slideClipboardWriteMode === 'clipboard-item' &&
       slideClipboardWrite.writeCount === 1 &&
       slideClipboardWrite.itemTypes.includes('application/vnd.interactive-os.ppt.slide+json') &&
+      slideClipboardWrite.itemTypes.includes('application/vnd.interactive-os.slide-edit.slides+json') &&
       slideClipboardWrite.itemTypes.includes('text/html') &&
       slideClipboardWrite.itemTypes.includes('text/plain') &&
       slideClipboardWrite.itemTypes.includes('image/svg+xml') &&
       slideClipboardWrite.html.includes('data-ppt-slide-clipboard-json') &&
       slideClipboardWrite.json.includes('"kind": "interactive-os.ppt.slide"') &&
+      slideClipboardWrite.slideEditJson.includes('"type": "slide-clipboard"') &&
       slideClipboardWrite.plainText.includes('Overview') &&
       slideClipboardWrite.svg.includes('<svg'),
     {
@@ -21145,6 +21154,42 @@ async function runSlideManagementScenario(page) {
     {
       afterDuplicate,
       afterPasteSlideCustomJSON,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(60)
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+    thumb?.click()
+  })(${JSON.stringify(afterDuplicate.activeId)})`)
+  await delay(60)
+
+  await page.eval(`((json) => {
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('application/vnd.interactive-os.slide-edit.slides+json', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(slideClipboardWrite.slideEditJson)})`)
+  await delay(80)
+
+  const afterPasteSlideEditCustomJSON = await getSlideRailState(page)
+
+  record(
+    'pastes canvas slide clipboard custom JSON as PPT slide',
+    afterPasteSlideEditCustomJSON.count === afterDuplicate.count + 1 &&
+      afterPasteSlideEditCustomJSON.activeId !== afterDuplicate.activeId &&
+      afterPasteSlideEditCustomJSON.slideClipboardImported === 'true' &&
+      afterPasteSlideEditCustomJSON.slideClipboardImportFormat === 'custom-json' &&
+      afterPasteSlideEditCustomJSON.slideClipboardSourceSlide === afterDuplicate.activeId &&
+      afterPasteSlideEditCustomJSON.slideClipboardTargetSlide === afterPasteSlideEditCustomJSON.activeId,
+    {
+      afterDuplicate,
+      afterPasteSlideEditCustomJSON,
     },
   )
 

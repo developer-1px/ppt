@@ -117,6 +117,7 @@ import {
   createSlideEditStyleClipboardDescriptor,
   createSlideEditStyleClipboardPasteCommandEffect,
   createSlideEditThemeDescriptor,
+  createSlideEditSlideClipboardPayload,
   createSlideEditTextFontFamilyDescriptor,
   createSlideEditTextFrameInsetDescriptor,
   createSlideEditTextParagraphSpacingDescriptor,
@@ -199,6 +200,7 @@ import {
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardKeyboardIntent,
   getSlideEditStyleClipboardPasteAvailability,
+  parseSlideEditSlideClipboardPayload,
   getSlideEditTextAutoFitGestureCommandEffect,
   getSlideEditTextAutoFitJSONPasteValue,
   getSlideEditTextAutoFitPasteCommandEffects,
@@ -272,6 +274,8 @@ import {
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
   SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
+  SLIDE_EDIT_SLIDE_CLIPBOARD_HTML_SCRIPT_ATTRIBUTE,
+  SLIDE_EDIT_SLIDE_CLIPBOARD_MIME_TYPE,
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
@@ -16050,6 +16054,20 @@ function createPPTSlideClipboardPayload(slide: PPTSlide): PPTSlideClipboardPaylo
   }
 }
 
+function createPPTSlideEditClipboardPayload(
+  payload: PPTSlideClipboardPayload,
+) {
+  return createSlideEditSlideClipboardPayload({
+    activeSlideId: payload.slide.id,
+    getObjectCount: (slide) => slide.elements.length,
+    getSlideId: (slide) => slide.id,
+    getTitle: (slide) => slide.name,
+    selectedSlideIds: [payload.slide.id],
+    slides: [payload.slide],
+    sourceSlideId: payload.sourceSlideId,
+  })
+}
+
 function createPPTSlideClipboardEffect({
   html,
   importFormat,
@@ -18861,6 +18879,16 @@ function stringifyPPTSlideClipboardPayload(payload: PPTSlideClipboardPayload) {
   return stringifyPPTCanvasRichClipboardPayload(
     createPPTSlideClipboardExportPayload(payload),
   )
+}
+
+function stringifyPPTSlideEditClipboardPayload(
+  payload: PPTSlideClipboardPayload,
+) {
+  const slideEditPayload = createPPTSlideEditClipboardPayload(payload)
+
+  return slideEditPayload
+    ? stringifyPPTCanvasRichClipboardPayload(slideEditPayload)
+    : ''
 }
 
 function createPPTSlideClipboardPlainText(slide: PPTSlide) {
@@ -30504,10 +30532,14 @@ async function writePPTSlideClipboardPayload({
   payload: PPTSlideClipboardPayload
 }): Promise<PPTRichClipboardWriteMode> {
   const json = stringifyPPTSlideClipboardPayload(payload)
+  const slideEditJSON = stringifyPPTSlideEditClipboardPayload(payload)
   const html = createPPTSlideClipboardHTML(payload)
   const slideSvg = exportPPTSlideSVG(payload.slide)
 
   return writePPTCanvasRichClipboardPayload({
+    extraItems: slideEditJSON
+      ? { [SLIDE_EDIT_SLIDE_CLIPBOARD_MIME_TYPE]: slideEditJSON }
+      : undefined,
     html,
     json,
     jsonMimeType: PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE,
@@ -30645,11 +30677,18 @@ function getPPTRichClipboardFromDataTransfer(dataTransfer: DataTransfer | null) 
 function getPPTSlideClipboardFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  return readPPTCanvasRichClipboardFromDataTransfer({
+  const pptClipboard = readPPTCanvasRichClipboardFromDataTransfer({
     dataTransfer,
     jsonMimeType: PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE,
     parsePayload: normalizePPTSlideClipboardPayload,
     scriptAttribute: PPT_SLIDE_CLIPBOARD_HTML_JSON_SCRIPT_ATTRIBUTE,
+  })
+
+  return pptClipboard ?? readPPTCanvasRichClipboardFromDataTransfer({
+    dataTransfer,
+    jsonMimeType: SLIDE_EDIT_SLIDE_CLIPBOARD_MIME_TYPE,
+    parsePayload: normalizePPTSlideEditClipboardPayload,
+    scriptAttribute: SLIDE_EDIT_SLIDE_CLIPBOARD_HTML_SCRIPT_ATTRIBUTE,
   })
 }
 
@@ -30677,6 +30716,28 @@ function normalizePPTSlideClipboardPayload(
     sourceSlideId: typeof payloadValue.sourceSlideId === 'string'
       ? payloadValue.sourceSlideId
       : parsed.data.id,
+  }
+}
+
+function normalizePPTSlideEditClipboardPayload(
+  value: unknown,
+): PPTSlideClipboardPayload | null {
+  const payload = parseSlideEditSlideClipboardPayload(value)
+  const slideValue = payload?.slides[0]
+
+  if (!payload || slideValue === undefined) {
+    return null
+  }
+
+  const parsed = PPTSlideSchema.safeParse(slideValue)
+
+  if (!parsed.success) {
+    return null
+  }
+
+  return {
+    slide: parsed.data,
+    sourceSlideId: payload.metadata[0]?.slideId ?? payload.sourceSlideId,
   }
 }
 
