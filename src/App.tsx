@@ -532,23 +532,14 @@ import {
   tidyPPTElements,
 } from './pptCanvasAdapter'
 import {
-  alignPPTCanvasCommand,
   createPPTCanvasAffordanceConfig,
   createPPTCanvasShape,
   createPPTCanvasText,
   deletePPTCanvasCommand,
-  distributePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
   getPPTCanvasWheelViewport,
-  groupPPTCanvasCommand,
-  lockPPTCanvasCommand,
-  nudgePPTCanvasCommand,
   PPT_COMMAND_AFFORDANCES,
   PPT_TOOL_AFFORDANCES,
-  reorderPPTCanvasCommand,
-  selectAllPPTCanvasCommand,
-  ungroupPPTCanvasCommand,
-  unlockAllPPTCanvasCommand,
   type PPTCanvasAlignMode,
   type PPTCanvasCommandItemsResult,
   type PPTCanvasCreatedShapeKind,
@@ -603,6 +594,7 @@ import {
   duplicatePPTCanvasClipboardSelection,
   downloadPPTCanvasTextFile,
   executePPTCanvasClipboardCommand,
+  executePPTCanvasStandardCommand,
   filterPPTCommandPaletteItems,
   fitPPTCanvasViewportToBounds,
   focusPPTCanvasElement,
@@ -700,6 +692,9 @@ import {
   type PPTCanvasPointerClickMemory,
   type PPTCanvasRichClipboardReadFormat,
   type PPTCanvasRichClipboardWriteMode,
+  type PPTCanvasStandardCommand,
+  type PPTCanvasStandardCommandExecutionContext,
+  type PPTCanvasStandardCommandItemsChange,
   type PPTCanvasTabsDescriptor,
   type PPTCanvasTableImportTargetReplaceTarget,
   type PPTCanvasTableImportSource,
@@ -5072,6 +5067,139 @@ function App() {
     }))
   }
 
+  function commitPPTCanvasStandardItems(
+    items: PPTElement[],
+    nextSelection: readonly string[] = selection,
+  ) {
+    setSelection([...nextSelection])
+    commitDeck((current) => updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+      ...slide,
+      elements: syncPPTLineConnections(
+        items,
+        getPPTSelectedLineIds(items, [...nextSelection]),
+      ),
+    })))
+    return true
+  }
+
+  function commitPPTCanvasStandardItemsChange(
+    change: PPTCanvasStandardCommandItemsChange<PPTElement>,
+    selectionHistory?: Parameters<
+      PPTCanvasStandardCommandExecutionContext<PPTElement>['commitItemsChange']
+    >[1],
+  ) {
+    const nextSelection = selectionHistory?.after ?? selection
+
+    switch (change.type) {
+      case 'add':
+        if (change.items.length === 0) {
+          return false
+        }
+
+        return commitPPTCanvasStandardItems(
+          [...activeSlide.elements, ...change.items],
+          nextSelection.length > 0
+            ? nextSelection
+            : change.items.map((item) => item.id),
+        )
+      case 'group-selection': {
+        const result = commandAdapter.groupSelection({
+          groupId: change.groupId,
+          items: activeSlide.elements,
+          selection: [...change.selection],
+        })
+
+        return commitPPTCanvasStandardItems(
+          result.items,
+          nextSelection.length > 0 ? nextSelection : result.selection,
+        )
+      }
+      case 'remove-selection': {
+        const result = deletePPTCanvasCommand({
+          adapter: commandAdapter,
+          config: PPT_CANVAS_COMMAND_CONFIG,
+          items: activeSlide.elements,
+          selection: [...change.selection],
+        })
+
+        if (!result) {
+          return false
+        }
+
+        return commitPPTCanvasStandardItems(
+          result.items,
+          nextSelection.length > 0 ? nextSelection : result.selection,
+        )
+      }
+      case 'replace-changed':
+        return commitPPTCanvasStandardItems(change.items, nextSelection)
+      case 'reorder-selection': {
+        const items = commandAdapter.reorderSelection({
+          items: activeSlide.elements,
+          mode: change.mode,
+          selection: [...change.selection],
+        })
+
+        return commitPPTCanvasStandardItems(items, nextSelection)
+      }
+      case 'transform':
+        return commitPPTCanvasStandardItems(change.afterItems, nextSelection)
+      case 'ungroup-selection': {
+        const result = commandAdapter.ungroupSelection({
+          items: activeSlide.elements,
+          selection: [...change.selection],
+        })
+
+        return commitPPTCanvasStandardItems(
+          result.items,
+          nextSelection.length > 0 ? nextSelection : result.selection,
+        )
+      }
+      case 'resize-selection':
+      case 'set-text':
+        return false
+    }
+  }
+
+  function executePPTCanvasStandardSelectionCommand(
+    command: PPTCanvasStandardCommand,
+  ) {
+    return executePPTCanvasStandardCommand<PPTElement>({
+      command,
+      context: {
+        commandAdapter,
+        commitItemsChange: commitPPTCanvasStandardItemsChange,
+        commitSelection: (action) => {
+          setSelection((current) =>
+            typeof action === 'function' ? action(current) : [...action])
+          return true
+        },
+        config: PPT_CANVAS_COMMAND_CONFIG,
+        createId: createPPTElementIdFactory(activeSlide),
+        items: activeSlide.elements,
+        redo: () => {
+          redo()
+          return undefined
+        },
+        selection,
+        setEditing: (editing) => {
+          if (typeof editing === 'function') {
+            setEditingId((current) =>
+              editing(current ? { id: current, value: '' } : null)?.id ?? null)
+            return
+          }
+
+          setEditingId(editing?.id ?? null)
+        },
+        setSelection,
+        undo: () => {
+          undo()
+          return undefined
+        },
+      },
+    })
+  }
+
   function undo() {
     setPast((history) => {
       const previous = history.at(-1)
@@ -9320,13 +9448,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      deletePPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'delete' })
   }
 
   function duplicateSelection() {
@@ -9345,18 +9467,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) => {
-      const items = nudgePPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        dx,
-        dy,
-        items: slide.elements,
-        selection,
-      })
-
-      return items ? { items, selection } : null
-    })
+    executePPTCanvasStandardSelectionCommand({ dx, dy, kind: 'nudge' })
   }
 
   function alignSelection(mode: PPTCanvasAlignMode) {
@@ -9364,26 +9475,19 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) => {
-      if (selection.length === 1) {
-        return {
-          items: commandAdapter.alignSelection({
-            items: slide.elements,
-            mode,
-            selection,
-          }),
+    if (selection.length === 1) {
+      commitElementCommand((slide) => ({
+        items: commandAdapter.alignSelection({
+          items: slide.elements,
+          mode,
           selection,
-        }
-      }
-
-      return alignPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        mode,
+        }),
         selection,
-      })
-    })
+      }))
+      return
+    }
+
+    executePPTCanvasStandardSelectionCommand({ kind: 'align', mode })
   }
 
   function distributeSelection(mode: PPTCanvasDistributeMode) {
@@ -9391,14 +9495,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      distributePPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        mode,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'distribute', mode })
   }
 
   function groupSelection() {
@@ -9406,14 +9503,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      groupPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        createId: createPPTElementIdFactory(slide),
-        items: slide.elements,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'group' })
   }
 
   function ungroupSelection() {
@@ -9421,13 +9511,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      ungroupPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'ungroup' })
   }
 
   function reorderSelection(mode: PPTCanvasReorderMode) {
@@ -9435,14 +9519,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      reorderPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        mode,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'reorder', mode })
   }
 
   function lockSelectedElements() {
@@ -9450,13 +9527,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      lockPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'lock' })
   }
 
   function unlockAllElements() {
@@ -9464,13 +9535,7 @@ function App() {
       return
     }
 
-    commitElementCommand((slide) =>
-      unlockAllPPTCanvasCommand({
-        adapter: commandAdapter,
-        config: PPT_CANVAS_COMMAND_CONFIG,
-        items: slide.elements,
-        selection,
-      }))
+    executePPTCanvasStandardSelectionCommand({ kind: 'unlock-all' })
   }
 
   function copyFormatting() {
@@ -9861,15 +9926,7 @@ function App() {
   }
 
   function selectAllElements() {
-    const nextSelection = selectAllPPTCanvasCommand({
-      adapter: commandAdapter,
-      config: PPT_CANVAS_COMMAND_CONFIG,
-      items: activeSlide.elements,
-    })
-
-    if (nextSelection) {
-      setSelection(nextSelection)
-    }
+    executePPTCanvasStandardSelectionCommand({ kind: 'select-all' })
   }
 
   function selectSameTypeElements() {

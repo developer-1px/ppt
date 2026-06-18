@@ -133,7 +133,9 @@ import {
   stringifyCanvasRichClipboardPayload,
   normalizeCanvasTableRows,
   applyCanvasClipboardCommandEffect,
+  applyCanvasStandardDocumentEffect,
   executeCanvasClipboardCommand,
+  executeCanvasStandardCommand,
   pasteCanvasClipboardSelection,
   trapCanvasModalTabFocus,
   useCanvasMenuRovingFocus,
@@ -150,6 +152,12 @@ import {
   type CanvasClipboardCommandEffectPlanContext,
   type CanvasClipboardCommandExecutionContext,
   type CanvasClipboardCommandExecutionResult,
+  type CanvasStandardCommand,
+  type CanvasStandardCommandDocumentEffect,
+  type CanvasStandardCommandDocumentEffectContext,
+  type CanvasStandardCommandEffectPlanContext,
+  type CanvasStandardCommandExecutionContext,
+  type CanvasStandardCommandItemsChange,
   type CanvasDeferredSelectorFocusInput,
   type CanvasDataTransferImportRegistry,
   type CanvasDataTransferImportRegistryResolver,
@@ -314,6 +322,8 @@ export const centerPPTCanvasViewportAtWorldPoint =
   centerCanvasViewportAtWorldPoint
 export const applyPPTCanvasClipboardCommandEffect =
   applyCanvasClipboardCommandEffect
+export const applyPPTCanvasStandardDocumentEffect =
+  applyCanvasStandardDocumentEffect
 export const createPPTCanvasClipboardCommandEffectPlan =
   createCanvasClipboardCommandEffectPlan
 export const createPPTCanvasDataTransferImportActionPlan =
@@ -340,6 +350,8 @@ export const duplicatePPTCanvasClipboardSelection =
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
 export const executePPTCanvasClipboardCommand =
   executeCanvasClipboardCommand
+export const executePPTCanvasStandardCommand =
+  executeCanvasStandardCommand
 export const fitPPTCanvasViewportToBounds = fitCanvasViewportToBounds
 export const focusPPTCanvasElement = focusCanvasElement
 export function focusPPTCanvasElementBySelectorOnNextFrame<
@@ -562,6 +574,22 @@ export type PPTCanvasClipboardCommandExecutionContext<
 export type PPTCanvasClipboardCommandExecutionResult<
   TItem extends { id: string },
 > = CanvasClipboardCommandExecutionResult<TItem>
+export type PPTCanvasStandardCommand = CanvasStandardCommand
+export type PPTCanvasStandardCommandDocumentEffect<
+  TItem extends { id: string },
+> = CanvasStandardCommandDocumentEffect<TItem>
+export type PPTCanvasStandardCommandDocumentEffectContext<
+  TItem extends { id: string },
+> = CanvasStandardCommandDocumentEffectContext<TItem>
+export type PPTCanvasStandardCommandEffectPlanContext<
+  TItem extends { id: string },
+> = CanvasStandardCommandEffectPlanContext<TItem>
+export type PPTCanvasStandardCommandExecutionContext<
+  TItem extends { id: string },
+> = CanvasStandardCommandExecutionContext<TItem>
+export type PPTCanvasStandardCommandItemsChange<
+  TItem extends { id: string },
+> = CanvasStandardCommandItemsChange<TItem>
 export type PPTCanvasDataTransferImportRegistry<
   TAction,
   TScope extends string,
