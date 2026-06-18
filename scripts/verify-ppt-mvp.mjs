@@ -12973,6 +12973,13 @@ async function runImageImportScenario(page) {
     },
   )
 
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
     dataTransfer.items.add(${createPPTTestImageFileExpression('paste.svg', '#16a34a')})
@@ -13028,6 +13035,13 @@ async function runImageImportScenario(page) {
     afterSvgMimePaste,
   })
 
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
     dataTransfer.setData('text/html', '<section><svg viewBox="0 0 90 60" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="20" fill="#0ea5e9"/></svg></section>')
@@ -13045,6 +13059,13 @@ async function runImageImportScenario(page) {
     afterSvgHTMLPaste,
     afterSvgMimePaste,
   })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 
   await page.eval(`(() => {
     const canvas = document.createElement('canvas')
@@ -13795,6 +13816,77 @@ async function runImageImportScenario(page) {
     {
       afterImageFallbackHTMLPaste,
       afterRetouchedImageCopy,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('image/svg+xml', '<svg width="150" height="84" viewBox="0 0 150 84" xmlns="http://www.w3.org/2000/svg"><rect width="150" height="84" fill="#be123c"/><text x="18" y="50" font-family="Arial" font-size="22" fill="white">PASTE</text></svg>')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterSelectedImageClipboardReplace = await getPPTImageImportState(page)
+
+  record(
+    'pastes external image clipboard source into selected PPT image through slide-edit replace command-effect',
+    afterSelectedImageClipboardReplace.imageReplaceImportModel === 'ppt-image-replace-import' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportFormat === 'svg-mime' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportSlide === 'slide-1' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportObject === afterImageFallbackHTMLPaste.selectedId &&
+      afterSelectedImageClipboardReplace.imageReplaceImportFields ===
+        'src mimeType name naturalWidth naturalHeight' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportCommand === 'replace-object-image' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportCommandType === 'slide-command-effect' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportMime === 'image/svg+xml' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportName === 'clipboard.svg' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportNaturalWidth === '150' &&
+      afterSelectedImageClipboardReplace.imageReplaceImportNaturalHeight === '84' &&
+      afterSelectedImageClipboardReplace.imageReplaceCommand === 'replace-object-image' &&
+      afterSelectedImageClipboardReplace.imageReplaceCommandName === 'clipboard.svg' &&
+      afterSelectedImageClipboardReplace.imageReplaceCommandMime === 'image/svg+xml' &&
+      afterSelectedImageClipboardReplace.imageReplaceCommandObject === afterImageFallbackHTMLPaste.selectedId &&
+      afterSelectedImageClipboardReplace.imageCount === afterImageFallbackHTMLPaste.imageCount &&
+      afterSelectedImageClipboardReplace.selectedId === afterImageFallbackHTMLPaste.selectedId &&
+      afterSelectedImageClipboardReplace.selectedName === 'clipboard.svg' &&
+      afterSelectedImageClipboardReplace.selectedAltText === 'clipboard.svg' &&
+      afterSelectedImageClipboardReplace.selectedImageSrc !== afterImageFallbackHTMLPaste.selectedImageSrc &&
+      afterSelectedImageClipboardReplace.selectedImageDecoded.includes('#be123c') &&
+      afterSelectedImageClipboardReplace.selectedLeft === afterImageFallbackHTMLPaste.selectedLeft &&
+      afterSelectedImageClipboardReplace.selectedTop === afterImageFallbackHTMLPaste.selectedTop &&
+      afterSelectedImageClipboardReplace.selectedWidth === afterImageFallbackHTMLPaste.selectedWidth &&
+      afterSelectedImageClipboardReplace.selectedHeight === afterImageFallbackHTMLPaste.selectedHeight &&
+      afterSelectedImageClipboardReplace.selectedImageFit === afterImageFallbackHTMLPaste.selectedImageFit &&
+      afterSelectedImageClipboardReplace.selectedImagePosition === afterImageFallbackHTMLPaste.selectedImagePosition,
+    {
+      afterImageFallbackHTMLPaste,
+      afterSelectedImageClipboardReplace,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterSelectedImageClipboardReplaceUndo = await getPPTImageImportState(page)
+
+  record(
+    'undoes selected PPT image clipboard source replacement as one history step',
+    afterSelectedImageClipboardReplaceUndo.imageCount === afterImageFallbackHTMLPaste.imageCount &&
+      afterSelectedImageClipboardReplaceUndo.selectedId === afterImageFallbackHTMLPaste.selectedId &&
+      afterSelectedImageClipboardReplaceUndo.selectedName === afterImageFallbackHTMLPaste.selectedName &&
+      afterSelectedImageClipboardReplaceUndo.selectedAltText === afterImageFallbackHTMLPaste.selectedAltText &&
+      afterSelectedImageClipboardReplaceUndo.selectedImageSrc === afterImageFallbackHTMLPaste.selectedImageSrc &&
+      afterSelectedImageClipboardReplaceUndo.selectedImageFit === afterImageFallbackHTMLPaste.selectedImageFit &&
+      afterSelectedImageClipboardReplaceUndo.selectedImagePosition === afterImageFallbackHTMLPaste.selectedImagePosition,
+    {
+      afterImageFallbackHTMLPaste,
+      afterSelectedImageClipboardReplace,
+      afterSelectedImageClipboardReplaceUndo,
     },
   )
 

@@ -630,6 +630,7 @@ import {
   readPPTImageFileSource,
   readPPTTableFileSource,
   resolvePPTImageSourceNaturalSize,
+  type PPTImageImportFormat,
   type PPTImageImportSource,
   stringifyPPTTableRows,
   PPT_MEDIA_IMPORT_MODEL,
@@ -1506,12 +1507,15 @@ type PPTImageReplaceImportField =
   | 'naturalHeight'
   | 'naturalWidth'
   | 'src'
+type PPTImageReplaceImportFormat =
+  | typeof PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT
+  | PPTImageImportFormat
 type PPTImageReplaceImportImageSource = PPTImageImportSource & {
   altText?: string
 }
 type PPTImageReplaceImportSource = {
   fields: readonly PPTImageReplaceImportField[]
-  format: typeof PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT
+  format: PPTImageReplaceImportFormat
   image: PPTImageReplaceImportImageSource
   jsonLength: number
   resolveNaturalSize: boolean
@@ -2082,7 +2086,7 @@ type PPTImageReplaceImportEffect = {
   commandId: string
   commandType: string
   fields: string
-  format: typeof PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT
+  format: PPTImageReplaceImportFormat
   jsonLength: number
   mimeType: string
   model: typeof PPT_IMAGE_REPLACE_IMPORT_MODEL
@@ -7465,6 +7469,12 @@ function App() {
     return true
   }
 
+  function pastePPTImageImportSourceAsReplace(source: PPTImageImportSource) {
+    return pastePPTImageReplaceSource(
+      createPPTImageReplaceSourceFromImageImportSource(source),
+    )
+  }
+
   function pastePPTImageCropSource(source: PPTImageCropImportSource) {
     const objectIds = activeSlide.elements
       .filter((element) =>
@@ -8243,7 +8253,7 @@ function App() {
         void insertPPTImageFiles(action.files)
         return true
       case 'image-file':
-        void insertPPTImageFile(action.file)
+        void pasteOrInsertPPTImageFile(action.file)
         return true
       case 'table-file-batch':
         void insertPPTTableFiles(action.files)
@@ -8252,6 +8262,10 @@ function App() {
         void insertPPTTableFile(action.file)
         return true
       case 'image-source':
+        if (pastePPTImageImportSourceAsReplace(action.source)) {
+          return true
+        }
+
         if (action.resolveNaturalSize) {
           void resolvePPTImageSourceNaturalSize(action.source).then((source) => {
             insertPPTImageSource(source)
@@ -8386,6 +8400,24 @@ function App() {
 
     if (!source) {
       return false
+    }
+
+    insertPPTImageSource(source, center)
+    return true
+  }
+
+  async function pasteOrInsertPPTImageFile(
+    file: Blob & { name?: string },
+    center = getPPTViewportCenter(),
+  ) {
+    const source = await readPPTImageFileSource(file)
+
+    if (!source) {
+      return false
+    }
+
+    if (pastePPTImageImportSourceAsReplace(source)) {
+      return true
     }
 
     insertPPTImageSource(source, center)
@@ -16960,6 +16992,34 @@ function createPPTImageReplaceImportEffect({
     objectId: effect.payload.objectId,
     slideId: effect.payload.slideId,
     srcPrefix: effect.payload.source.src.slice(0, 19),
+  }
+}
+
+function createPPTImageReplaceSourceFromImageImportSource(
+  source: PPTImageImportSource,
+): PPTImageReplaceImportSource {
+  const fields: PPTImageReplaceImportField[] = ['src', 'mimeType']
+
+  if (source.name !== undefined) {
+    fields.push('name')
+  }
+
+  if (source.naturalWidth !== undefined) {
+    fields.push('naturalWidth')
+  }
+
+  if (source.naturalHeight !== undefined) {
+    fields.push('naturalHeight')
+  }
+
+  return {
+    fields,
+    format: source.format ?? 'file',
+    image: { ...source },
+    jsonLength: source.dataUrl.length,
+    resolveNaturalSize:
+      source.naturalWidth === undefined ||
+      source.naturalHeight === undefined,
   }
 }
 
