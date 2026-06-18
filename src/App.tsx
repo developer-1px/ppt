@@ -1152,6 +1152,10 @@ type PPTJSONDataTransferCandidate<TFormat extends string> = {
   format: TFormat
   mimeType: string
 }
+type PPTDirectJSONDataTransferCandidate<TFormat extends string> =
+  PPTJSONDataTransferCandidate<TFormat> & {
+    allowDirect: boolean
+  }
 type PPTJSONDataTransferSourceParseInput<
   TCandidate extends PPTJSONDataTransferCandidate<string>,
 > = {
@@ -20303,53 +20307,43 @@ function getPPTSlideTransitionAdvanceAfterFromJSONValue(value: unknown) {
 function getPPTObjectAnimationSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTObjectAnimationImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_ANIMATION_JSON_MIME_TYPE),
+      format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
+      mimeType: PPT_OBJECT_ANIMATION_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTObjectAnimationSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTObjectAnimationSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTObjectAnimationSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTObjectAnimationSourceFromText(
@@ -20506,50 +20500,43 @@ function getPPTElementAnimationOrderFromJSONValue(value: unknown) {
 function getPPTObjectStyleSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  if (!dataTransfer) {
-    return null
-  }
-
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTObjectStyleImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_STYLE_JSON_MIME_TYPE),
+      format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
+      mimeType: PPT_OBJECT_STYLE_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTObjectStyleSourceFromText(text, candidate.allowDirect)
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTObjectStyleSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTObjectStyleSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTObjectStyleSourceFromText(
