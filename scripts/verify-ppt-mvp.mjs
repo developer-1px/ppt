@@ -22,6 +22,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
+const SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-shadow+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-layer+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE =
@@ -12433,6 +12435,110 @@ async function runObjectShadowScenario(page) {
     {
       afterStandaloneShadowJSONPaste,
       afterStandaloneShadowJSONUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      angle: 150,
+      blur: 28,
+      color: '#7c3aed',
+      distance: 16,
+      enabled: true,
+      opacity: 0.52,
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEShadowJSONPaste = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'pastes canvas MIME object shadow through slide-edit command effects',
+    afterCanvasMIMEShadowJSONPaste.shadowImportModel === 'ppt-object-shadow-import' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportFormat === 'application-json-ppt-object-shadow' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportSlide === 'slide-1' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportObjects === targetId &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportFields === 'enabled color opacity blur distance angle' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportCommands === [
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+        'update-object-shadow',
+      ].join(' ') &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportCommandFields === 'enabled color opacity blur distance angle' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportCommandTargets === [
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+        targetId,
+      ].join(' ') &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportCommandTypes === [
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+        'slide-command-effect',
+      ].join(' ') &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportCommandValues === 'true #7c3aed 0.52 28 16 150' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportEnabled === 'true' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportColor === '#7c3aed' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportOpacity === '0.52' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportBlur === '28' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportDistance === '16' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportAngle === '150' &&
+      afterCanvasMIMEShadowJSONPaste.shadowImportJsonLength > 70 &&
+      afterCanvasMIMEShadowJSONPaste.command === 'update-object-shadow' &&
+      afterCanvasMIMEShadowJSONPaste.commandField === 'angle' &&
+      afterCanvasMIMEShadowJSONPaste.commandObject === targetId &&
+      afterCanvasMIMEShadowJSONPaste.commandSlide === 'slide-1' &&
+      afterCanvasMIMEShadowJSONPaste.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEShadowJSONPaste.commandValue === '150' &&
+      afterCanvasMIMEShadowJSONPaste.selectedShadow === 'true' &&
+      afterCanvasMIMEShadowJSONPaste.selectedColor === '#7c3aed' &&
+      afterCanvasMIMEShadowJSONPaste.selectedOpacity === '0.52' &&
+      afterCanvasMIMEShadowJSONPaste.selectedBlur === '28' &&
+      afterCanvasMIMEShadowJSONPaste.selectedDistance === '16' &&
+      afterCanvasMIMEShadowJSONPaste.selectedAngle === '150' &&
+      afterCanvasMIMEShadowJSONPaste.thumbOpacity === '0.52',
+    {
+      afterCanvasMIMEShadowJSONPaste,
+      afterStandaloneShadowJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEShadowJSONUndo = await getPPTObjectShadowState(page, targetId)
+
+  record(
+    'restores PPT object shadow after canvas MIME object shadow probe',
+    afterCanvasMIMEShadowJSONUndo.selectedColor === '#334155' &&
+      afterCanvasMIMEShadowJSONUndo.selectedOpacity === '0.36' &&
+      afterCanvasMIMEShadowJSONUndo.selectedBlur === '18' &&
+      afterCanvasMIMEShadowJSONUndo.selectedDistance === '12' &&
+      afterCanvasMIMEShadowJSONUndo.selectedAngle === '60',
+    {
+      afterCanvasMIMEShadowJSONPaste,
+      afterCanvasMIMEShadowJSONUndo,
     },
   )
 

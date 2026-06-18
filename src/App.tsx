@@ -170,6 +170,7 @@ import {
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
   getSlideEditObjectShadowJSONPasteValue,
+  getSlideEditObjectShadowPasteCommands,
   normalizeSlideEditObjectAltTextStorageValue,
   normalizeSlideEditObjectHyperlinkStorageUrl,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
@@ -227,6 +228,7 @@ import {
   normalizeSlideEditObjectImageCropFit,
   normalizeSlideEditObjectImageCropValue,
   normalizeSlideEditObjectOpacity,
+  normalizeSlideEditObjectShadow,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
   normalizeSlideEditColorHex,
@@ -240,6 +242,7 @@ import {
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
+  SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
@@ -16582,41 +16585,47 @@ function createPPTObjectShadowImportCommandEffects({
   source: PPTObjectShadowImportSource
 }): SlideEditObjectShadowHostCommandEffect<string, string>[] {
   const effects: SlideEditObjectShadowHostCommandEffect<string, string>[] = []
+  const pasteValue = createSlideEditObjectShadowPasteValueFromPPTSource(source)
 
   for (const objectId of objectIds) {
-    for (const field of source.fields) {
-      const value = getPPTObjectShadowImportFieldValue(source, field)
-
-      if (value === undefined) {
-        continue
-      }
-
-      effects.push(getSlideEditObjectShadowCommandEffect({
-        fieldId: field,
-        id: 'update-object-shadow',
-        objectId,
-        slideId,
-        value,
-      }))
+    for (const command of getSlideEditObjectShadowPasteCommands({
+      objectId,
+      pasteValue,
+      slideId,
+    })) {
+      effects.push(getSlideEditObjectShadowCommandEffect(command))
     }
   }
 
   return effects
 }
 
-function getPPTObjectShadowImportFieldValue(
+function createSlideEditObjectShadowPasteValueFromPPTSource(
   source: PPTObjectShadowImportSource,
-  field: PPTObjectShadowImportField,
-): boolean | number | string | undefined {
-  if (field === 'enabled') {
-    return source.shadow !== null
-  }
+): NonNullable<ReturnType<typeof getSlideEditObjectShadowJSONPasteValue>> {
+  const shadow = normalizeSlideEditObjectShadow(source.shadow)
 
-  if (source.shadow === null) {
-    return undefined
-  }
+  return {
+    fields: source.fields.flatMap((field) => {
+      if (field === 'enabled') {
+        return [{
+          fieldId: 'enabled',
+          value: source.shadow !== null,
+        }]
+      }
 
-  return source.shadow[field]
+      if (source.shadow === null) {
+        return []
+      }
+
+      return [{
+        fieldId: field,
+        value: shadow[field],
+      }]
+    }),
+    shadow,
+    surface: 'object-shadow',
+  }
 }
 
 function applyPPTObjectShadowEffectsToElement(
@@ -20144,23 +20153,41 @@ function getPPTObjectShadowSourceFromDataTransfer(
 function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTObjectShadowImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_OBJECT_SHADOW_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditObjectShadowJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
+  for (const customMimeType of [
+    PPT_OBJECT_SHADOW_JSON_MIME_TYPE,
+    SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditObjectShadowJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
     }
-
-    return createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
-      pasteValue,
-      candidate.text.length,
-    )
   }
 
   return null
