@@ -19465,7 +19465,7 @@ function getPPTDeckJSONSourceFromDataTransfer(
     },
     {
       format: PPT_DECK_JSON_TEXT_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -19537,7 +19537,7 @@ function getPPTSlideJSONSourceFromDataTransfer(
     },
     {
       format: PPT_SLIDE_JSON_TEXT_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -19605,7 +19605,7 @@ function getPPTSlideMetadataSourceFromDataTransfer(
     },
     {
       format: PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -19753,7 +19753,7 @@ function getPPTSlideLayoutSourceFromDataTransfer(
     },
     {
       format: PPT_SLIDE_LAYOUT_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -20200,7 +20200,7 @@ function getPPTSlideTransitionSourceFromDataTransfer(
     },
     {
       format: PPT_SLIDE_TRANSITION_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -20355,7 +20355,7 @@ function getPPTObjectAnimationSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_ANIMATION_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -20548,7 +20548,7 @@ function getPPTObjectStyleSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_STYLE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -20721,7 +20721,7 @@ function getPPTObjectShadowSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_SHADOW_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -21097,7 +21097,7 @@ function getPPTObjectOpacitySourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_OPACITY_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -21294,7 +21294,7 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_ACCESSIBILITY_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -21545,7 +21545,7 @@ function getPPTObjectMetadataSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_METADATA_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -21847,7 +21847,7 @@ function getPPTObjectHyperlinkSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -22078,7 +22078,7 @@ function getPPTObjectStateSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_STATE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -22309,7 +22309,7 @@ function getPPTObjectLayerSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -22546,7 +22546,7 @@ function getPPTObjectTransformSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -22809,7 +22809,7 @@ function getPPTImageReplaceSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_IMAGE_REPLACE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -23167,7 +23167,7 @@ function getPPTImageCropSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_IMAGE_CROP_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -23427,7 +23427,7 @@ function getPPTObjectFillOpacitySourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_FILL_OPACITY_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -23637,7 +23637,7 @@ function getPPTObjectCornerRadiusSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_CORNER_RADIUS_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -23840,7 +23840,7 @@ function getPPTShapeStyleSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_SHAPE_STYLE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -24103,7 +24103,7 @@ function getPPTLineStyleSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_LINE_STYLE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -24279,7 +24279,7 @@ function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -24465,7 +24465,7 @@ function getPPTTextStyleSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_STYLE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -24777,7 +24777,7 @@ function getPPTTextFontSizeSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_FONT_SIZE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -24997,7 +24997,7 @@ function getPPTSlideEditJSONPasteCandidates({
     {
       allowDirect: false,
       customMimeType: '',
-      type: 'text/plain',
+      type: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ].flatMap((candidate) => {
     const text = readPPTDataTransferText(dataTransfer, candidate.type).trim()
@@ -25076,7 +25076,7 @@ function getPPTTextFontWeightSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_FONT_WEIGHT_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -25294,7 +25294,7 @@ function getPPTTextRunSizeSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -25555,7 +25555,7 @@ function getPPTTextRunColorSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -25806,7 +25806,7 @@ function getPPTTextRunBoldSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -26036,7 +26036,7 @@ function getPPTTextRunItalicSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_RUN_ITALIC_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -26268,7 +26268,7 @@ function getPPTTextRunUnderlineSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -26603,7 +26603,7 @@ function getPPTTextFontFamilySourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -26848,7 +26848,7 @@ function getPPTTextVerticalAlignSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -27103,7 +27103,7 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -27320,7 +27320,7 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_PARAGRAPH_BULLET_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -27575,7 +27575,7 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_PARAGRAPH_SPACING_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -27854,7 +27854,7 @@ function getPPTTextBodySourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_BODY_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -28025,7 +28025,7 @@ function getPPTColorSwatchSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -28406,7 +28406,7 @@ function getPPTTextAutoFitSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -28637,7 +28637,7 @@ function getPPTTextFrameInsetSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -28951,7 +28951,7 @@ function getPPTTableRowsSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -29222,7 +29222,7 @@ function getPPTMediaJSONSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_MEDIA_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -29456,7 +29456,7 @@ function getPPTCommentSourceFromDataTransfer(
     {
       allowDirect: false,
       format: PPT_COMMENT_JSON_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -29496,7 +29496,7 @@ function getPPTCommentSourceFromSlideEditJSONPasteValue(
     },
     {
       jsonMimeType: '',
-      type: 'text/plain',
+      type: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ] as const
   const seen = new Set<string>()
@@ -29813,7 +29813,7 @@ function getPPTSlideNotesSourceFromDataTransfer(
     },
     {
       format: PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
@@ -29978,7 +29978,7 @@ function getPPTElementsJSONSourceFromDataTransfer(
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      mimeType: 'text/plain',
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
     },
   ]
 
