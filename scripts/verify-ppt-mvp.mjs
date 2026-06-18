@@ -6545,10 +6545,9 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify('bold')
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-font-weight+json',
+      'application/vnd.interactive-os.slide-edit.text-font-weight+json',
       json,
     )
-    dataTransfer.setData('text/plain', json)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -6560,7 +6559,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextFontWeightPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text font weight JSON through slide-edit command effect',
+    'pastes canvas text font weight JSON through slide-edit command effect',
     summaryAfterTextFontSizeRestore.fontSize === '34px' &&
       summaryAfterTextFontWeightPaste.selected === 'true' &&
       summaryAfterTextFontWeightPaste.text === summaryAfterTextStylePaste.text &&
@@ -6714,10 +6713,9 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify('bullet')
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-paragraph-bullet+json',
+      'application/vnd.interactive-os.slide-edit.text-paragraph-bullet+json',
       json,
     )
-    dataTransfer.setData('text/plain', json)
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -6729,7 +6727,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextParagraphBulletPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text paragraph bullet JSON through slide-edit command effect',
+    'pastes canvas text paragraph bullet JSON through slide-edit command effect',
     summaryAfterTextParagraphAlignRestore.textAlign === 'center' &&
       summaryAfterTextParagraphAlignRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletPaste.selected === 'true' &&
@@ -6977,7 +6975,7 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify(true)
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-run-bold+json',
+      'application/vnd.interactive-os.slide-edit.text-run-bold+json',
       json,
     )
     window.dispatchEvent(new ClipboardEvent('paste', {
@@ -6991,7 +6989,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunBoldPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run bold JSON through run formatting command effect',
+    'pastes canvas text run bold JSON through run formatting command effect',
     summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletRestore.boldRunCount === 0 &&
       summaryAfterTextRunBoldPaste.selected === 'true' &&
@@ -7148,10 +7146,10 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
-    const json = JSON.stringify('underline')
+    const json = JSON.stringify(true)
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-run-underline+json',
+      'application/vnd.interactive-os.slide-edit.text-run-underline+json',
       json,
     )
     window.dispatchEvent(new ClipboardEvent('paste', {
@@ -7165,7 +7163,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunUnderlinePaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run underline JSON through run formatting command effect',
+    'pastes canvas text run underline JSON through run formatting command effect',
     summaryAfterTextRunItalicRestore.italicRunCount === 0 &&
       summaryAfterTextRunItalicRestore.underlineRunCount === 0 &&
       summaryAfterTextRunUnderlinePaste.selected === 'true' &&
@@ -7180,7 +7178,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandTypes === 'slide-command-effect' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportCommandValues === 'true' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportFields === 'value' &&
-      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportJsonLength >= 10 &&
+      summaryAfterTextRunUnderlinePaste.textRunUnderlineImportJsonLength >= 4 &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportObjects === 's1-summary' &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportRuns > 0 &&
       summaryAfterTextRunUnderlinePaste.textRunUnderlineImportSlide === 'slide-1' &&
