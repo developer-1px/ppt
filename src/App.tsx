@@ -28886,53 +28886,50 @@ function getPPTTableRowsSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTableRowsImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TABLE_ROWS_JSON_MIME_TYPE),
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TABLE_ROWS_JSON_MIME_TYPE,
     },
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE),
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
+  const jsonSource = readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTableRowsSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTableRowsSourceFromText(text, candidate.allowDirect),
+  })
 
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTTableRowsSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return getPPTTableRowsSourceFromTableImportDataTransfer(dataTransfer)
+  return jsonSource ?? getPPTTableRowsSourceFromTableImportDataTransfer(dataTransfer)
 }
 
 function getPPTTableRowsSourceFromSlideEditJSONPasteValue(
@@ -29195,49 +29192,43 @@ function getPPTMediaJSONSourceFromDataTransfer(
     return null
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTMediaJSONImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_MEDIA_JSON_MIME_TYPE),
+      format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+      mimeType: PPT_MEDIA_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_MEDIA_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTMediaJSONSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTMediaJSONSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTMediaJSONSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTMediaJSONSourceFromText(
@@ -29390,49 +29381,43 @@ function getPPTCommentSourceFromDataTransfer(
     return slideEditSource
   }
 
-  const candidates: Array<{
-    allowDirect: boolean
-    text: string
-  }> = [
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTCommentImportSource['format']
+  >[] = [
     {
       allowDirect: true,
-      text: readPPTDataTransferText(dataTransfer, PPT_COMMENT_JSON_MIME_TYPE),
+      format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+      mimeType: PPT_COMMENT_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'application/json'),
+      format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/json'),
+      format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
     },
     {
       allowDirect: false,
-      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
+      format: PPT_COMMENT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/plain',
     },
   ]
-  const seen = new Set<string>()
 
-  for (const candidate of candidates) {
-    const text = candidate.text.trim()
-
-    if (!text || seen.has(text)) {
-      continue
-    }
-
-    seen.add(text)
-
-    const source = getPPTCommentSourceFromText(
-      text,
-      candidate.allowDirect,
-    )
-
-    if (source) {
-      return source
-    }
-  }
-
-  return null
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTCommentSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTCommentSourceFromText(text, candidate.allowDirect),
+  })
 }
 
 function getPPTCommentSourceFromSlideEditJSONPasteValue(
