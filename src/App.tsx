@@ -540,6 +540,7 @@ import {
   resetPPTCanvasViewport,
   routePPTCanvasImagePasteReplace,
   routePPTCanvasMediaSourceObjectHyperlink,
+  routePPTCanvasTableImportTargetReplace,
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
@@ -566,6 +567,8 @@ import {
   type PPTCanvasRichClipboardReadFormat,
   type PPTCanvasRichClipboardWriteMode,
   type PPTCanvasTabsDescriptor,
+  type PPTCanvasTableImportTargetReplaceTarget,
+  type PPTCanvasTableImportSource,
   type PPTCommandPaletteItemBase,
   type PPTMinimapItemBounds as PPTMinimapItemBoundsBase,
   type PPTMinimapReadModel as PPTMinimapReadModelBase,
@@ -7402,22 +7405,39 @@ function App() {
   }
 
   function pastePPTTableRowsSource(source: PPTTableRowsImportSource) {
-    const rows = normalizePPTTableRows(source.rows)
-    const objectIds = activeSlide.elements
-      .filter((element) =>
-        selection.includes(element.id) &&
-        element.kind === 'table' &&
-        element.locked !== true &&
-        element.visible !== false)
-      .map((element) => element.id)
+    const route = routePPTCanvasTableImportTargetReplace({
+      getTarget: ({ selection: targetSelection }) =>
+        getPPTTableImportTargetReplaceRouteTarget(targetSelection),
+      normalizeRows: ({ source }) => normalizePPTTableRows(source.rows),
+      selection,
+      source: createPPTCanvasTableImportSourceFromTableRowsSource(source),
+    })
 
-    if (objectIds.length === 0) {
+    if (route.kind !== 'table-rows-replace') {
       return false
     }
 
+    return pastePPTTableRowsSourceToObjectIds({
+      objectIds: route.intent.target.selection,
+      rows: route.intent.rows,
+      source,
+    })
+  }
+
+  function pastePPTTableRowsSourceToObjectIds({
+    objectIds,
+    rows,
+    source,
+  }: {
+    objectIds: readonly string[]
+    rows: readonly (readonly string[])[]
+    source: PPTTableRowsImportSource
+  }) {
+    const tableRows = createPPTTableElementRows(rows)
+
     setLastTableRowsImportEffect(createPPTTableRowsImportEffect({
       objectIds,
-      rows,
+      rows: tableRows,
       source,
     }))
 
@@ -7428,12 +7448,63 @@ function App() {
           slide.elements,
           objectIds,
           (element) => element.kind === 'table'
-            ? { ...element, rows }
+            ? { ...element, rows: tableRows }
             : element,
         ),
       })))
 
     return true
+  }
+
+  function pasteOrInsertPPTTableSource(source: PPTTableImportSource) {
+    const route = routePPTCanvasTableImportTargetReplace({
+      getTarget: ({ selection: targetSelection }) =>
+        getPPTTableImportTargetReplaceRouteTarget(targetSelection),
+      normalizeRows: ({ source }) => normalizePPTTableRows(source.rows),
+      selection,
+      source: createPPTCanvasTableImportSourceFromTableImportSource(source),
+    })
+
+    if (route.kind === 'table-rows-replace') {
+      return pastePPTTableRowsSourceToObjectIds({
+        objectIds: route.intent.target.selection,
+        rows: route.intent.rows,
+        source: createPPTTableRowsSourceFromTableImportSource(
+          source,
+          route.intent.rows,
+        ),
+      })
+    }
+
+    insertPPTTableSource(source)
+    return true
+  }
+
+  function getPPTTableImportTargetReplaceRouteTarget(
+    targetSelection: readonly string[],
+  ): PPTCanvasTableImportTargetReplaceTarget | null {
+    const tableIds = getPPTTableImportTargetReplaceObjectIds(targetSelection)
+
+    return tableIds.length === 0
+      ? null
+      : {
+          id: tableIds[0],
+          selection: tableIds,
+        }
+  }
+
+  function getPPTTableImportTargetReplaceObjectIds(
+    targetSelection: readonly string[],
+  ) {
+    const targetIds = new Set(targetSelection)
+
+    return selectedElements
+      .filter((element) =>
+        targetIds.has(element.id) &&
+          element.kind === 'table' &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) => element.id)
   }
 
   function pastePPTCommentSource(source: PPTCommentImportSource) {
@@ -8413,8 +8484,7 @@ function App() {
         insertPPTFallbackHTMLTextSource(action.source)
         return true
       case 'table-source':
-        insertPPTTableSource(action.source)
-        return true
+        return pasteOrInsertPPTTableSource(action.source)
       case 'media-source':
         return pastePPTMediaSource(action.source)
       case 'rich-text-source':
@@ -18373,6 +18443,39 @@ function createPPTTableRowsImportEffect({
     objectIds: objectIds.join(' '),
     rowCount: rows.length,
   }
+}
+
+function createPPTCanvasTableImportSourceFromTableRowsSource(
+  source: PPTTableRowsImportSource,
+): PPTCanvasTableImportSource {
+  return {
+    rows: source.rows,
+  }
+}
+
+function createPPTCanvasTableImportSourceFromTableImportSource(
+  source: PPTTableImportSource,
+): PPTCanvasTableImportSource {
+  return {
+    rows: source.rows,
+  }
+}
+
+function createPPTTableRowsSourceFromTableImportSource(
+  source: PPTTableImportSource,
+  rows: readonly (readonly string[])[],
+): PPTTableRowsImportSource {
+  return {
+    format: source.format ?? 'default',
+    jsonLength: stringifyPPTTableRows(rows).length,
+    rows,
+  }
+}
+
+function createPPTTableElementRows(
+  rows: readonly (readonly string[])[],
+): string[][] {
+  return rows.map((row) => [...row])
 }
 
 function createPPTRichClipboardExportPayload(

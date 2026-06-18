@@ -160,7 +160,10 @@ import {
   getCanvasTableSourceFromText,
   normalizeCanvasTableRows,
   readCanvasTableFileSource,
+  routeCanvasTableImportTargetReplace,
   type CanvasTableImportFormat,
+  type CanvasTableImportTargetReplaceRoute,
+  type CanvasTableImportTargetReplaceTarget,
   type CanvasTableImportSource,
 } from 'canvas/app/table-import'
 import {
@@ -484,6 +487,8 @@ export const getPPTCanvasTableSourceFromHTML =
   getCanvasTableSourceFromHTML
 export const getPPTCanvasTableSourceFromText =
   getCanvasTableSourceFromText
+export const routePPTCanvasTableImportTargetReplace =
+  routeCanvasTableImportTargetReplace
 export const getPPTCanvasTextPasteSourcesFromDataTransfer =
   getCanvasTextPasteSourcesFromDataTransfer
 export const getPPTInlineEditHistoryDirectionFromInputType =
@@ -518,6 +523,10 @@ export type PPTCanvasMediaObjectHyperlinkTarget =
   CanvasMediaObjectHyperlinkTarget
 export type PPTCanvasRichTextPasteSource = CanvasRichTextPasteSource
 export type PPTCanvasTableImportFormat = CanvasTableImportFormat
+export type PPTCanvasTableImportTargetReplaceRoute =
+  CanvasTableImportTargetReplaceRoute
+export type PPTCanvasTableImportTargetReplaceTarget =
+  CanvasTableImportTargetReplaceTarget
 export type PPTCanvasTableImportSource = CanvasTableImportSource
 export type PPTMinimapItemBounds = CanvasMinimapItemBounds
 export type PPTMinimapReadModel = CanvasMinimapReadModel
