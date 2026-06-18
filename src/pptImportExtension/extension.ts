@@ -338,7 +338,13 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return source ? { kind: 'table-source', source } : null
     },
     scope: [PPT_CLIPBOARD_IMPORT_SCOPE, PPT_STAGE_DROP_IMPORT_SCOPE],
-    supportedFormats: ['text/html', 'text/markdown', 'text/plain', 'text/csv'],
+    supportedFormats: [
+      'text/html',
+      'text/markdown',
+      'text/x-markdown',
+      'text/plain',
+      'text/csv',
+    ],
     title: 'Table source',
   },
   {
@@ -356,7 +362,12 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       return null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['text/html', 'text/markdown', 'text/plain'],
+    supportedFormats: [
+      'text/html',
+      'text/markdown',
+      'text/x-markdown',
+      'text/plain',
+    ],
     title: 'Rich text source',
   },
   {

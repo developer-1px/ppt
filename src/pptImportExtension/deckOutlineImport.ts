@@ -64,6 +64,10 @@ export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
 
   return getPPTDeckMarkdownOutlineSourceFromText(
     getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/markdown' }) ||
+      getPPTCanvasDataTransferText({
+        dataTransfer,
+        mimeType: 'text/x-markdown',
+      }) ||
       getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/plain' }),
   )
 }
