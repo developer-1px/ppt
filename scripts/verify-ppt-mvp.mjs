@@ -6398,6 +6398,97 @@ async function runTextFontFamilyScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('Courier New')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-font-family+json',
+      json,
+    )
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTTextFontFamilyState(page)
+
+  record(
+    'pastes PPT text font family JSON through slide-edit command effect',
+    afterJSONPaste.command === 'update-text-font-family' &&
+      afterJSONPaste.commandField === 'fontFamily' &&
+      afterJSONPaste.commandObject === 's1-title' &&
+      afterJSONPaste.commandSlide === 'slide-1' &&
+      afterJSONPaste.commandType === 'slide-command-effect' &&
+      afterJSONPaste.commandValue === 'Courier New' &&
+      afterJSONPaste.fontFamily === 'Courier New' &&
+      afterJSONPaste.importCommandFields === 'fontFamily' &&
+      afterJSONPaste.importCommandTargets === 's1-title' &&
+      afterJSONPaste.importCommandTypes === 'slide-command-effect' &&
+      afterJSONPaste.importCommandValues === 'Courier New' &&
+      afterJSONPaste.importCommands === 'update-text-font-family' &&
+      afterJSONPaste.importFields === 'value' &&
+      afterJSONPaste.importFormat === 'application-json-ppt-text-font-family' &&
+      afterJSONPaste.importJsonLength > 10 &&
+      afterJSONPaste.importModel === 'ppt-text-font-family-import' &&
+      afterJSONPaste.importObjects === 's1-title' &&
+      afterJSONPaste.importSlide === 'slide-1' &&
+      afterJSONPaste.importValue === 'Courier New' &&
+      afterJSONPaste.selectedFontFamily === 'Courier New' &&
+      afterJSONPaste.selectedStyleFontFamily.includes('Courier New') &&
+      afterJSONPaste.thumbFontFamily === 'Courier New' &&
+      afterJSONPaste.thumbStyleFontFamily.includes('Courier New'),
+    {
+      afterGeorgia,
+      afterJSONPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONUndo = await getPPTTextFontFamilyState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterJSONRedo = await getPPTTextFontFamilyState(page)
+
+  record(
+    'undoes and redoes PPT text font family JSON as one history step',
+    afterJSONUndo.fontFamily === 'Georgia' &&
+      afterJSONUndo.selectedFontFamily === 'Georgia' &&
+      afterJSONRedo.fontFamily === 'Courier New' &&
+      afterJSONRedo.selectedFontFamily === 'Courier New',
+    {
+      afterJSONPaste,
+      afterJSONRedo,
+      afterJSONUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -18735,6 +18826,18 @@ function getPPTTextFontFamilyState(page) {
       descriptorOptions: field?.getAttribute('data-ppt-text-font-family-options') ?? '',
       descriptorSurface: field?.getAttribute('data-ppt-text-font-family-surface') ?? '',
       fontFamily: field?.value ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-text-font-family-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-text-font-family-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-text-font-family-import-command-types') ?? '',
+      importCommandValues: stage?.getAttribute('data-ppt-text-font-family-import-command-values') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-text-font-family-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-text-font-family-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-text-font-family-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-text-font-family-import-json-length') ?? 0),
+      importModel: stage?.getAttribute('data-ppt-text-font-family-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-text-font-family-import-objects') ?? '',
+      importSlide: stage?.getAttribute('data-ppt-text-font-family-import-slide') ?? '',
+      importValue: stage?.getAttribute('data-ppt-text-font-family-import-value') ?? '',
       model: stage?.getAttribute('data-ppt-text-font-family-model') ?? '',
       selectedFontFamily: selected?.getAttribute('data-ppt-font-family') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',

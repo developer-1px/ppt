@@ -1108,6 +1108,12 @@ const PPT_TEXT_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-style' as const
 const PPT_TEXT_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-style+json'
+const PPT_TEXT_FONT_FAMILY_IMPORT_MODEL =
+  'ppt-text-font-family-import' as const
+const PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-font-family' as const
+const PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-font-family+json'
 const PPT_TEXT_BODY_IMPORT_MODEL = 'ppt-text-body-import' as const
 const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
@@ -1509,6 +1515,18 @@ type PPTTextStyleImportSource = {
   jsonLength: number
   paragraph?: PPTTextStyleImportParagraph
   text?: PPTTextStyleImportText
+}
+type PPTTextFontFamilyImportField =
+  | 'family'
+  | 'font'
+  | 'fontFamily'
+  | 'textFontFamily'
+  | 'value'
+type PPTTextFontFamilyImportSource = {
+  fields: readonly PPTTextFontFamilyImportField[]
+  fontFamily: string
+  format: typeof PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT
+  jsonLength: number
 }
 type PPTTextBodyImportSource = {
   format: typeof PPT_TEXT_BODY_JSON_IMPORT_FORMAT
@@ -1973,6 +1991,20 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingBefore: string
   textInset: string
   verticalAlign: string
+}
+type PPTTextFontFamilyImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  fontFamily: string
+  format: typeof PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_FONT_FAMILY_IMPORT_MODEL
+  objectIds: string
+  slideId: string
 }
 type PPTTextBodyImportEffect = {
   commandTargets: string
@@ -3253,6 +3285,8 @@ function App() {
   const [lastStrokeLineStyleEffect, setLastStrokeLineStyleEffect] = useState<SlideEditObjectStrokeLineStyleHostCommandEffect<string, string> | null>(null)
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
+  const [lastTextFontFamilyImportEffect, setLastTextFontFamilyImportEffect] =
+    useState<PPTTextFontFamilyImportEffect | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetImportEffect, setLastTextFrameInsetImportEffect] =
     useState<PPTTextFrameInsetImportEffect | null>(null)
@@ -4325,6 +4359,17 @@ function App() {
       if (
         textFrameInsetSource &&
         pastePPTTextFrameInsetSource(textFrameInsetSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textFontFamilySource =
+        getPPTTextFontFamilySourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textFontFamilySource &&
+        pastePPTTextFontFamilySource(textFontFamilySource)
       ) {
         event.preventDefault()
         return
@@ -6122,6 +6167,56 @@ function App() {
 
           return effect
             ? applyPPTTextVerticalAlignCommandEffectToElement(element, effect)
+            : element
+        }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextFontFamilySource(
+    source: PPTTextFontFamilyImportSource,
+  ) {
+    const effects = selectedElements
+      .filter((element): element is PPTTextElement =>
+        isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .map((element) =>
+        getSlideEditTextFontFamilyCommandEffect(
+          {
+            fieldId: 'fontFamily',
+            id: 'update-text-font-family',
+            objectId: element.id,
+            slideId: activeSlide.id,
+            value: source.fontFamily,
+          },
+          {
+            fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+            options: getPPTTextFontFamilyDescriptorOptions(),
+          },
+        ))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastTextFontFamilyEffect(effects[effects.length - 1])
+    setLastTextFontFamilyImportEffect(
+      createPPTTextFontFamilyImportEffect({
+        effects,
+        source,
+      }),
+    )
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) => {
+          const effect = effects.find((effect) =>
+            effect.payload.objectId === element.id)
+
+          return effect
+            ? applyPPTTextFontFamilyCommandEffectToElement(element, effect)
             : element
         }),
       })))
@@ -12591,6 +12686,18 @@ function App() {
         data-ppt-text-font-family-command-slide={lastTextFontFamilyEffect?.payload.slideId}
         data-ppt-text-font-family-command-type={lastTextFontFamilyEffect?.type}
         data-ppt-text-font-family-command-value={lastTextFontFamilyEffect?.payload.value}
+        data-ppt-text-font-family-import-command-fields={lastTextFontFamilyImportEffect?.commandFields}
+        data-ppt-text-font-family-import-command-targets={lastTextFontFamilyImportEffect?.commandTargets}
+        data-ppt-text-font-family-import-command-types={lastTextFontFamilyImportEffect?.commandTypes}
+        data-ppt-text-font-family-import-command-values={lastTextFontFamilyImportEffect?.commandValues}
+        data-ppt-text-font-family-import-commands={lastTextFontFamilyImportEffect?.commandIds}
+        data-ppt-text-font-family-import-fields={lastTextFontFamilyImportEffect?.fields}
+        data-ppt-text-font-family-import-format={lastTextFontFamilyImportEffect?.format}
+        data-ppt-text-font-family-import-json-length={lastTextFontFamilyImportEffect?.jsonLength}
+        data-ppt-text-font-family-import-model={lastTextFontFamilyImportEffect?.model}
+        data-ppt-text-font-family-import-objects={lastTextFontFamilyImportEffect?.objectIds}
+        data-ppt-text-font-family-import-slide={lastTextFontFamilyImportEffect?.slideId}
+        data-ppt-text-font-family-import-value={lastTextFontFamilyImportEffect?.fontFamily}
         data-ppt-text-font-family-model="slide-edit-text-font-family"
         data-ppt-text-inset-command={lastTextFrameInsetEffect?.payload.id}
         data-ppt-text-inset-command-field={lastTextFrameInsetEffect?.payload.fieldId}
@@ -16107,6 +16214,48 @@ function applyPPTTextVerticalAlignCommandEffectToElement(
     style: {
       ...getPPTTextElementStyle(element),
       verticalAlign: effect.payload.value,
+    },
+  }
+}
+
+function createPPTTextFontFamilyImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditTextFontFamilyHostCommandEffect<string, string>[]
+  source: PPTTextFontFamilyImportSource
+}): PPTTextFontFamilyImportEffect {
+  return {
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    commandValues: effects.map((effect) => effect.payload.value).join(' '),
+    fields: source.fields.join(' '),
+    fontFamily: source.fontFamily,
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_FONT_FAMILY_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    slideId: effects[0]?.payload.slideId ?? '',
+  }
+}
+
+function applyPPTTextFontFamilyCommandEffectToElement(
+  element: PPTElement,
+  effect: SlideEditTextFontFamilyHostCommandEffect<string, string>,
+): PPTElement {
+  if (!isPPTTextElement(element)) {
+    return element
+  }
+
+  return {
+    ...element,
+    style: {
+      ...getPPTTextElementStyle(element),
+      fontFamily: effect.payload.value,
     },
   }
 }
@@ -20619,6 +20768,177 @@ function getPPTTextStyleFontFamilyFromJSONValue(value: unknown) {
   }
 
   return normalizePPTTextFontFamily(value)
+}
+
+function getPPTTextFontFamilySourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextFontFamilySourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFontFamilySourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextFontFamilyImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextFontFamilySourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextFontFamilySourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextFontFamilySourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextFontFamilySourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextFontFamilyImportSource | null {
+  const payload = getPPTTextFontFamilyPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const fontFamily = getPPTTextFontFamilyImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return fontFamily
+    ? {
+        fields: payload.fields,
+        fontFamily,
+        format: PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTTextFontFamilyPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextFontFamilyImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textFontFamily',
+    'fontFamily',
+    'font',
+    'family',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextFontFamilyImportValueFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (isPPTRecord(value)) {
+    return getPPTTextFontFamilyImportValueFromJSONValue(
+      value.value ??
+        value.fontFamily ??
+        value.font ??
+        value.family ??
+        value.textFontFamily,
+    )
+  }
+
+  return getPPTTextStyleFontFamilyFromJSONValue(value)
 }
 
 function getPPTTextStyleFontWeightFromJSONValue(
