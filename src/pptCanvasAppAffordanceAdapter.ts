@@ -172,6 +172,7 @@ import {
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
   getCanvasImageFilesFromDataTransfer,
+  getCanvasImageSourceFromDataTransfer,
   getCanvasSVGImageSourceFromDataTransfer,
   readCanvasImageFileSource,
   readCanvasImageFileSources,
@@ -430,6 +431,8 @@ export const getPPTCanvasImageFileFromDataTransfer =
 export const getPPTCanvasImageFileFromList = getCanvasImageFileFromList
 export const getPPTCanvasImageFilesFromDataTransfer =
   getCanvasImageFilesFromDataTransfer
+export const getPPTCanvasImageSourceFromDataTransfer =
+  getCanvasImageSourceFromDataTransfer
 export const routePPTCanvasImagePasteReplace =
   routeCanvasImagePasteReplace
 export const getPPTCanvasMediaSourceFromDataTransfer =

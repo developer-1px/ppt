@@ -7,6 +7,7 @@ import {
   getPPTCanvasImageFileFromDataTransfer,
   getPPTCanvasImageFileFromList,
   getPPTCanvasImageFilesFromDataTransfer,
+  getPPTCanvasImageSourceFromDataTransfer,
   getPPTCanvasImportedImageSize,
   getPPTCanvasSVGImageSourceFromDataTransfer,
   PPT_CANVAS_IMAGE_IMPORT_MODEL,
@@ -181,8 +182,18 @@ export const getPPTImageFilesFromDataTransfer =
 export const getPPTDataImageSourceFromDataTransfer =
   getPPTCanvasDataImageSourceFromDataTransfer
 
+export const getPPTImageSourceFromDataTransfer =
+  getPPTCanvasImageSourceFromDataTransfer
+
 export const getPPTSVGImageSourceFromDataTransfer =
   getPPTCanvasSVGImageSourceFromDataTransfer
+
+export function shouldResolvePPTImageSourceNaturalSize(
+  source: PPTImageImportSource,
+) {
+  return source.format === 'data-url-html-img' ||
+    source.format === 'data-url-plain'
+}
 
 export const resolvePPTImageSourceNaturalSize =
   resolvePPTCanvasImageSourceNaturalSize

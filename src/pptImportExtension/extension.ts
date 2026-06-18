@@ -5,11 +5,11 @@ import {
   type PPTCanvasDataTransferImportRegistryResolver,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
-  getPPTDataImageSourceFromDataTransfer,
   getPPTImageFileFromDataTransfer,
   getPPTImageFilesFromDataTransfer,
-  getPPTSVGImageSourceFromDataTransfer,
+  getPPTImageSourceFromDataTransfer,
   PPT_IMAGE_IMPORT_MODEL,
+  shouldResolvePPTImageSourceNaturalSize,
   type PPTImageImportFormat,
   type PPTImageImportSource,
 } from './imageImport'
@@ -316,27 +316,19 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
     id: 'image-source',
     mode: 'exclusive',
     resolve: ({ dataTransfer }) => {
-      const source = getPPTSVGImageSourceFromDataTransfer(dataTransfer)
-
-      return source ? { kind: 'image-source', source } : null
-    },
-    scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['image/svg+xml', 'text/html'],
-    title: 'SVG image source',
-  },
-  {
-    id: 'image-source',
-    mode: 'exclusive',
-    resolve: ({ dataTransfer }) => {
-      const source = getPPTDataImageSourceFromDataTransfer(dataTransfer)
+      const source = getPPTImageSourceFromDataTransfer(dataTransfer)
 
       return source
-        ? { kind: 'image-source', resolveNaturalSize: true, source }
+        ? {
+            kind: 'image-source',
+            resolveNaturalSize: shouldResolvePPTImageSourceNaturalSize(source),
+            source,
+          }
         : null
     },
     scope: PPT_CLIPBOARD_IMPORT_SCOPE,
-    supportedFormats: ['text/html'],
-    title: 'Data image source',
+    supportedFormats: ['image/svg+xml', 'text/html', 'text/plain'],
+    title: 'Image source',
   },
   {
     id: 'table-source',
