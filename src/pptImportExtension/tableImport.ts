@@ -12,6 +12,7 @@ import {
   normalizePPTCanvasTableRows,
   PPT_CANVAS_TABLE_IMPORT_MODEL,
   readPPTCanvasTableFileSource,
+  readPPTCanvasTableFileSources,
   type PPTCanvasTableImportFormat,
   type PPTCanvasTableImportSource,
 } from '../pptCanvasAppAffordanceAdapter'
@@ -209,17 +210,9 @@ export async function readPPTTableFileSource(file: Blob & { name?: string }) {
 export async function readPPTTableFileSources(
   files: readonly (Blob & { name?: string })[],
 ) {
-  const sources: PPTTableImportSource[] = []
-
-  for (const file of files) {
-    const source = await readPPTTableFileSource(file)
-
-    if (source) {
-      sources.push(source)
-    }
-  }
-
-  return sources
+  return (await readPPTCanvasTableFileSources(files)).map((source) =>
+    createPPTTableImportSourceFromCanvas(source)
+  )
 }
 
 export function getPPTTableSourceFromText(

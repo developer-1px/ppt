@@ -105,6 +105,7 @@ import {
   measureCanvasTextBlocks,
   readCanvasRichClipboardFromDataTransfer,
   readCanvasTableFileSource,
+  readCanvasTableFileSources,
   resetCanvasViewport,
   routeCanvasTableImportTargetReplace,
   routeCanvasTextPasteReplace,
@@ -483,6 +484,7 @@ export const startPPTCanvasPointerPanInteraction =
 export const readPPTCanvasImageFileSource = readCanvasImageFileSource
 export const readPPTCanvasImageFileSources = readCanvasImageFileSources
 export const readPPTCanvasTableFileSource = readCanvasTableFileSource
+export const readPPTCanvasTableFileSources = readCanvasTableFileSources
 export const resolvePPTCanvasImageSourceNaturalSize =
   resolveCanvasImageSourceNaturalSize
 export const usePPTCanvasAppStageElement = useCanvasAppStageElement
