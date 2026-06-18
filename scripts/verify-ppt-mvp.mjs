@@ -14304,6 +14304,69 @@ async function runTableImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/tab-separated-values', 'Metric\\tActual\\nRevenue\\t13\\nPipeline\\t8')
+    dataTransfer.setData('text/plain', 'Metric\\tActual\\nRevenue\\t13\\nPipeline\\t8')
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterTSVRowsPaste = await getPPTTableState(page)
+
+  record(
+    'pastes TSV table rows into selected PPT table',
+    afterTSVRowsPaste.tableRowsImportModel === 'ppt-table-rows-import' &&
+      afterTSVRowsPaste.tableRowsImportFormat === 'text-tsv' &&
+      afterTSVRowsPaste.tableRowsImportObjects === afterInspectorEdit.selectedId &&
+      afterTSVRowsPaste.tableRowsImportTargets === afterInspectorEdit.selectedId &&
+      afterTSVRowsPaste.tableRowsImportRows === 3 &&
+      afterTSVRowsPaste.tableRowsImportCols === 2 &&
+      afterTSVRowsPaste.tableRowsImportJsonLength > 30 &&
+      afterTSVRowsPaste.tableCount === afterInspectorEdit.tableCount &&
+      afterTSVRowsPaste.selectedId === afterInspectorEdit.selectedId &&
+      afterTSVRowsPaste.selectedRows === 3 &&
+      afterTSVRowsPaste.selectedCols === 2 &&
+      afterTSVRowsPaste.inspectorSize === '3 x 2' &&
+      afterTSVRowsPaste.cellTexts.includes('Pipeline') &&
+      afterTSVRowsPaste.cellTexts.includes('8'),
+    {
+      afterInspectorEdit,
+      afterTSVRowsPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterTSVRowsUndo = await getPPTTableState(page)
+
+  record(
+    'undoes PPT table rows TSV paste as one history step',
+    afterTSVRowsUndo.tableCount === afterInspectorEdit.tableCount &&
+      afterTSVRowsUndo.selectedId === afterInspectorEdit.selectedId &&
+      afterTSVRowsUndo.selectedRows === 3 &&
+      afterTSVRowsUndo.selectedCols === 3 &&
+      afterTSVRowsUndo.cellTexts.includes('Revenue') &&
+      afterTSVRowsUndo.cellTexts.includes('45%') &&
+      !afterTSVRowsUndo.cellTexts.includes('Pipeline'),
+    {
+      afterInspectorEdit,
+      afterTSVRowsPaste,
+      afterTSVRowsUndo,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptTableClipboardItemTypes = []
     window.__pptTableClipboardWriteCount = 0
     window.__pptTableClipboardHTML = ''
@@ -14440,6 +14503,13 @@ async function runTableImportScenario(page) {
     afterInspectorEdit,
     afterPaletteInsert,
   })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()

@@ -621,6 +621,7 @@ import {
   getPPTDeckMarkdownOutlineSourceFromDataTransfer,
   getPPTStageDropImportAction,
   getPPTTableColumnCount,
+  getPPTTableSourceFromDataTransfer,
   getPPTTextPasteSourcesFromDataTransfer,
   getPPTMediaSourceFromText,
   normalizePPTTableRows,
@@ -648,6 +649,7 @@ import {
   type PPTRichTextPasteSource,
   type PPTStageDropImportAction,
   type PPTTableImportEffect,
+  type PPTTableImportFormat,
   type PPTTableImportSource,
   type PPTTextPasteImportResult,
 } from './pptImportExtension'
@@ -2482,15 +2484,18 @@ type PPTTableClipboardEffect = {
   sourceSlideId: string
   writeMode?: PPTRichClipboardWriteMode
 }
+type PPTTableRowsImportFormat =
+  | typeof PPT_TABLE_ROWS_JSON_IMPORT_FORMAT
+  | PPTTableImportFormat
 type PPTTableRowsImportSource = {
-  format: typeof PPT_TABLE_ROWS_JSON_IMPORT_FORMAT
+  format: PPTTableRowsImportFormat
   jsonLength: number
   rows: readonly (readonly string[])[]
 }
 type PPTTableRowsImportEffect = {
   columnCount: number
   commandTargets: string
-  format: typeof PPT_TABLE_ROWS_JSON_IMPORT_FORMAT
+  format: PPTTableRowsImportFormat
   jsonLength: number
   model: typeof PPT_TABLE_ROWS_IMPORT_MODEL
   objectIds: string
@@ -25882,7 +25887,7 @@ function getPPTTableRowsSourceFromDataTransfer(
     }
   }
 
-  return null
+  return getPPTTableRowsSourceFromTableImportDataTransfer(dataTransfer)
 }
 
 function getPPTTableRowsSourceFromText(
@@ -25922,6 +25927,52 @@ function getPPTTableRowsSourceFromJSONValue(
         rows: normalizePPTTableRows(rows),
       }
     : null
+}
+
+function getPPTTableRowsSourceFromTableImportDataTransfer(
+  dataTransfer: DataTransfer,
+): PPTTableRowsImportSource | null {
+  const text = getPPTTableRowsTableImportTextFromDataTransfer(dataTransfer)
+
+  if (!text || getPPTImportJSONText(text)) {
+    return null
+  }
+
+  const source = getPPTTableSourceFromDataTransfer(dataTransfer)
+
+  return source
+    ? {
+        format: source.format ?? 'text-delimited',
+        jsonLength: text.length,
+        rows: source.rows,
+      }
+    : null
+}
+
+function getPPTTableRowsTableImportTextFromDataTransfer(
+  dataTransfer: DataTransfer,
+) {
+  for (const mimeType of [
+    'text/tab-separated-values',
+    'text/csv',
+  ] as const) {
+    const text = dataTransfer.getData(mimeType).trim()
+
+    if (text) {
+      return text
+    }
+  }
+
+  if (
+    dataTransfer.getData('text/html').trim() ||
+    dataTransfer.getData('text/markdown').trim()
+  ) {
+    return ''
+  }
+
+  const plainText = dataTransfer.getData('text/plain').trim()
+
+  return plainText && /[\t,]/.test(plainText) ? plainText : ''
 }
 
 function getPPTTableRowsPayloadValue(
