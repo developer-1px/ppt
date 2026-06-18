@@ -344,6 +344,7 @@ const PPT_DATA_TRANSFER_IMPORT_RESOLVERS = [
       'text/x-markdown',
       'text/plain',
       'text/csv',
+      'text/tab-separated-values',
     ],
     title: 'Table source',
   },
