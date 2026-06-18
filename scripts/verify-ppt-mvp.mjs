@@ -22,6 +22,8 @@ const SLIDE_EDIT_OBJECT_IMAGE_CROP_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-crop+json'
 const SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-image-replace+json'
+const SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.object-layer+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-state+json'
 
@@ -18965,6 +18967,68 @@ async function runSelectionPaneScenario(page) {
     {
       afterObjectLayerBackRedo,
       afterStandaloneObjectLayerFront,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      position: 'back',
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEObjectLayerBack = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'pastes canvas MIME object layer back state through slide-edit layer pane reorder effect',
+    afterCanvasMIMEObjectLayerBack.model === 'ppt-object-layer-import' &&
+      afterCanvasMIMEObjectLayerBack.format === 'application-json-ppt-object-layer' &&
+      afterCanvasMIMEObjectLayerBack.fields === 'position' &&
+      afterCanvasMIMEObjectLayerBack.command === 'reorder-object' &&
+      afterCanvasMIMEObjectLayerBack.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEObjectLayerBack.fromIndex ===
+        afterStandaloneObjectLayerFront.layerOrder.length - 1 &&
+      afterCanvasMIMEObjectLayerBack.toIndex === 0 &&
+      afterCanvasMIMEObjectLayerBack.objectId === layerTargetId &&
+      afterCanvasMIMEObjectLayerBack.position === 'back' &&
+      afterCanvasMIMEObjectLayerBack.layerOrder[0] === layerTargetId &&
+      afterCanvasMIMEObjectLayerBack.stageOrder[0] === layerTargetId &&
+      afterCanvasMIMEObjectLayerBack.rowSelected === 'true' &&
+      afterCanvasMIMEObjectLayerBack.stageSelected === 'true',
+    {
+      afterCanvasMIMEObjectLayerBack,
+      afterStandaloneObjectLayerFront,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterCanvasMIMEObjectLayerUndo = await readPPTObjectLayerImportState(
+    page,
+    layerTargetId,
+  )
+
+  record(
+    'restores PPT object layer after canvas MIME object layer probe',
+    afterCanvasMIMEObjectLayerUndo.layerOrder.at(-1) === layerTargetId &&
+      afterCanvasMIMEObjectLayerUndo.stageOrder.at(-1) === layerTargetId &&
+      afterCanvasMIMEObjectLayerUndo.rowSelected === 'true' &&
+      afterCanvasMIMEObjectLayerUndo.stageSelected === 'true',
+    {
+      afterCanvasMIMEObjectLayerBack,
+      afterCanvasMIMEObjectLayerUndo,
     },
   )
 }

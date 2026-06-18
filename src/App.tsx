@@ -136,6 +136,8 @@ import {
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
+  getSlideEditLayerPaneObjectLayerJSONPasteValue,
+  getSlideEditLayerPaneObjectLayerPasteCommandEffect,
   getSlideEditLayerPaneObjectStateJSONPasteValue,
   getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditInspectorSurface,
@@ -250,6 +252,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_INTENT_MODEL,
   SLIDE_EDIT_LAYER_PANE_KEYBOARD_KEYS,
+  SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
@@ -17266,13 +17269,11 @@ function createPPTObjectLayerImportCommandEffect({
   slide: PPTSlide
   source: PPTObjectLayerImportSource
 }): PPTLayerPaneHostCommandEffect | null {
-  const toIndex = getPPTObjectLayerImportTargetIndex({
-    objectId,
-    slide,
+  const pasteValue = createSlideEditLayerPaneObjectLayerPasteValueFromPPTSource(
     source,
-  })
+  )
 
-  if (toIndex === null) {
+  if (!pasteValue) {
     return null
   }
 
@@ -17283,49 +17284,35 @@ function createPPTObjectLayerImportCommandEffect({
     slide,
   })
 
-  return getSlideEditLayerPaneCommandEffect(descriptor, {
+  return getSlideEditLayerPaneObjectLayerPasteCommandEffect({
+    descriptor,
     objectId,
-    toIndex,
-    type: 'row-drop',
+    pasteValue,
   })
 }
 
-function getPPTObjectLayerImportTargetIndex({
-  objectId,
-  slide,
+function createSlideEditLayerPaneObjectLayerPasteValueFromPPTSource(
   source,
-}: {
-  objectId: string
-  slide: PPTSlide
-  source: PPTObjectLayerImportSource
-}) {
-  const currentIndex = slide.elements.findIndex((element) =>
-    element.id === objectId)
-
-  if (currentIndex < 0) {
-    return null
-  }
-
+): NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectLayerJSONPasteValue>> | null {
   if (source.layer.toIndex !== undefined) {
-    return clampPPTObjectLayerImportIndex(source.layer.toIndex, slide)
+    return {
+      sourceField: 'toIndex',
+      surface: 'object-layer-pane-order',
+      toIndex: source.layer.toIndex,
+      type: 'to-index',
+    }
   }
 
-  switch (source.layer.position) {
-    case 'back':
-      return 0
-    case 'backward':
-      return clampPPTObjectLayerImportIndex(currentIndex - 1, slide)
-    case 'forward':
-      return clampPPTObjectLayerImportIndex(currentIndex + 2, slide)
-    case 'front':
-      return slide.elements.length
-    default:
-      return null
+  if (source.layer.position !== undefined) {
+    return {
+      position: source.layer.position,
+      sourceField: 'position',
+      surface: 'object-layer-pane-order',
+      type: 'position',
+    }
   }
-}
 
-function clampPPTObjectLayerImportIndex(value: number, slide: PPTSlide) {
-  return Math.max(0, Math.min(slide.elements.length, Math.trunc(value)))
+  return null
 }
 
 function createPPTImageCropImportEffect({
@@ -21551,6 +21538,13 @@ function getPPTObjectLayerSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTObjectLayerSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -21594,6 +21588,63 @@ function getPPTObjectLayerSourceFromDataTransfer(
   }
 
   return null
+}
+
+function getPPTObjectLayerSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTObjectLayerImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_OBJECT_LAYER_JSON_MIME_TYPE,
+    SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditLayerPaneObjectLayerJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (!pasteValue) {
+        continue
+      }
+
+      return createPPTObjectLayerSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
+    }
+  }
+
+  return null
+}
+
+function createPPTObjectLayerSourceFromSlideEditJSONPasteValue(
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectLayerJSONPasteValue>>,
+  jsonLength: number,
+): PPTObjectLayerImportSource {
+  return {
+    fields: [pasteValue.type === 'to-index' ? 'toIndex' : 'position'],
+    format: PPT_OBJECT_LAYER_JSON_IMPORT_FORMAT,
+    jsonLength,
+    layer: pasteValue.type === 'to-index'
+      ? { toIndex: pasteValue.toIndex }
+      : { position: pasteValue.position },
+  }
 }
 
 function getPPTObjectLayerSourceFromText(
