@@ -13485,6 +13485,100 @@ async function runImageImportScenario(page) {
   )
 
   await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const svg = '<svg width="140" height="80" viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg"><rect width="140" height="80" fill="#dc2626"/><text x="14" y="47" font-family="Arial" font-size="20" fill="white">DIRECT</text></svg>'
+    const json = JSON.stringify({
+      altText: 'Standalone image source',
+      dataUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+      mimeType: 'image/svg+xml',
+      name: 'standalone-json-replacement.svg',
+      naturalHeight: 80,
+      naturalWidth: 140,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterStandaloneJSONReplace = await getPPTImageImportState(page)
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterStandaloneJSONReplaceUndo = await getPPTImageImportState(page)
+
+  await page.eval(`document.querySelector('button[title="Redo"]')?.click()`)
+  await delay(80)
+
+  const afterStandaloneJSONReplaceRedo = await getPPTImageImportState(page)
+
+  record(
+    'pastes standalone JSON image source into selected PPT image through slide-edit replace command-effect',
+    afterStandaloneJSONReplace.imageReplaceImportModel === 'ppt-image-replace-import' &&
+      afterStandaloneJSONReplace.imageReplaceImportFormat === 'application-json-ppt-image-replace' &&
+      afterStandaloneJSONReplace.imageReplaceImportSlide === 'slide-1' &&
+      afterStandaloneJSONReplace.imageReplaceImportObject === afterReplace.selectedId &&
+      afterStandaloneJSONReplace.imageReplaceImportFields ===
+        'src mimeType name altText naturalWidth naturalHeight' &&
+      afterStandaloneJSONReplace.imageReplaceImportCommand === 'replace-object-image' &&
+      afterStandaloneJSONReplace.imageReplaceImportCommandType === 'slide-command-effect' &&
+      afterStandaloneJSONReplace.imageReplaceImportMime === 'image/svg+xml' &&
+      afterStandaloneJSONReplace.imageReplaceImportName === 'standalone-json-replacement.svg' &&
+      afterStandaloneJSONReplace.imageReplaceImportAltTextLength === 'Standalone image source'.length &&
+      afterStandaloneJSONReplace.imageReplaceImportNaturalWidth === '140' &&
+      afterStandaloneJSONReplace.imageReplaceImportNaturalHeight === '80' &&
+      afterStandaloneJSONReplace.imageReplaceImportSrcPrefix.startsWith('data:image/svg+xml') &&
+      afterStandaloneJSONReplace.imageReplaceCommand === 'replace-object-image' &&
+      afterStandaloneJSONReplace.imageReplaceCommandName === 'standalone-json-replacement.svg' &&
+      afterStandaloneJSONReplace.imageReplaceCommandMime === 'image/svg+xml' &&
+      afterStandaloneJSONReplace.imageReplaceCommandObject === afterReplace.selectedId &&
+      afterStandaloneJSONReplace.imageCount === afterReplace.imageCount &&
+      afterStandaloneJSONReplace.selectedName === 'standalone-json-replacement.svg' &&
+      afterStandaloneJSONReplace.selectedAltText === 'Standalone image source' &&
+      afterStandaloneJSONReplace.selectedImageSrc !== afterReplace.selectedImageSrc &&
+      afterStandaloneJSONReplace.selectedImageDecoded.includes('#dc2626') &&
+      afterStandaloneJSONReplace.selectedImageFit === 'contain' &&
+      afterStandaloneJSONReplace.selectedImagePosition === '25% 70%' &&
+      afterStandaloneJSONReplaceUndo.selectedName === afterReplace.selectedName &&
+      afterStandaloneJSONReplaceUndo.selectedAltText === afterReplace.selectedAltText &&
+      afterStandaloneJSONReplaceUndo.selectedImageSrc === afterReplace.selectedImageSrc &&
+      afterStandaloneJSONReplaceRedo.selectedName === 'standalone-json-replacement.svg' &&
+      afterStandaloneJSONReplaceRedo.selectedAltText === 'Standalone image source' &&
+      afterStandaloneJSONReplaceRedo.selectedImageDecoded.includes('#dc2626'),
+    {
+      afterReplace,
+      afterStandaloneJSONReplace,
+      afterStandaloneJSONReplaceRedo,
+      afterStandaloneJSONReplaceUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterStandaloneJSONReplaceRestore = await getPPTImageImportState(page)
+
+  record(
+    'restores PPT image source after standalone JSON image replacement probe',
+    afterStandaloneJSONReplaceRestore.selectedName === afterReplace.selectedName &&
+      afterStandaloneJSONReplaceRestore.selectedAltText === afterReplace.selectedAltText &&
+      afterStandaloneJSONReplaceRestore.selectedImageSrc === afterReplace.selectedImageSrc &&
+      afterStandaloneJSONReplaceRestore.selectedImageFit === afterReplace.selectedImageFit &&
+      afterStandaloneJSONReplaceRestore.selectedImagePosition === afterReplace.selectedImagePosition,
+    {
+      afterReplace,
+      afterStandaloneJSONReplaceRedo,
+      afterStandaloneJSONReplaceRestore,
+    },
+  )
+
+  await page.eval(`(() => {
     window.__pptRetouchedImageRichClipboardItemTypes = []
     window.__pptRetouchedImageRichClipboardWriteCount = 0
     window.__pptRetouchedImageRichClipboardHTML = ''

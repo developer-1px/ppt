@@ -18528,6 +18528,17 @@ function getPPTSlideMetadataSourceFromJSONValue(
   value: unknown,
   jsonLength: number,
 ): PPTSlideMetadataImportSource | null {
+  const hasExplicitSlideMetadata = isPPTRecord(value) &&
+    isPPTRecord(value.slideMetadata)
+
+  if (
+    !hasExplicitSlideMetadata &&
+    isPPTRecord(value) &&
+    hasPPTImageReplaceStandalonePayloadFields(value)
+  ) {
+    return null
+  }
+
   const payloadValue = isPPTRecord(value) &&
     isPPTRecord(value.slideMetadata)
     ? value.slideMetadata
@@ -19947,7 +19958,7 @@ function getPPTObjectAccessibilityPayloadValue(
 function hasPPTObjectAccessibilityStandalonePayloadFields(
   value: Record<string, unknown>,
 ): boolean {
-  return (
+  return !hasPPTImageReplaceStandalonePayloadFields(value) && (
     value.altText !== undefined ||
     value.decorative !== undefined
   ) && !hasPPTObjectMetadataStandalonePayloadFields(value)
@@ -21127,7 +21138,21 @@ function getPPTImageReplacePayloadValue(
     return value.image
   }
 
+  if (hasPPTImageReplaceStandalonePayloadFields(value)) {
+    return value
+  }
+
   return allowDirect ? value : null
+}
+
+function hasPPTImageReplaceStandalonePayloadFields(
+  value: Record<string, unknown>,
+): boolean {
+  return getPPTImageReplaceDataUrlFromJSONValue(
+    value.src ??
+      value.dataUrl ??
+      value.url,
+  ) !== null
 }
 
 function getPPTImageReplaceDataUrlFromJSONValue(value: unknown) {
