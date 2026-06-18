@@ -220,6 +220,7 @@ import {
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTextVerticalAlignmentJSONPasteValue,
+  getSlideEditTextVerticalAlignmentPasteCommands,
   getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
   mapSlideEditClipboardPasteObjects,
@@ -263,6 +264,7 @@ import {
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
+  SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
   SLIDE_EDIT_LAYER_PANE_DROP_INDICATOR_MODEL,
@@ -7059,19 +7061,21 @@ function App() {
   function pastePPTTextVerticalAlignSource(
     source: PPTTextVerticalAlignImportSource,
   ) {
-    const effects = selectedElements
-      .filter((element): element is PPTTextElement =>
+    const textElements = selectedElements.filter(
+      (element): element is PPTTextElement =>
         isPPTTextElement(element) &&
-          element.locked !== true &&
-          element.visible !== false)
-      .map((element) =>
-        getSlideEditTextVerticalAlignmentCommandEffect({
-          fieldId: 'verticalAlignment',
-          id: 'update-text-vertical-alignment',
-          objectId: element.id,
-          slideId: activeSlide.id,
-          value: source.value,
-        }))
+        element.locked !== true &&
+        element.visible !== false,
+    )
+
+    const effects = getSlideEditTextVerticalAlignmentPasteCommands({
+      objectIds: textElements.map((element) => element.id),
+      pasteValue: {
+        surface: 'text-vertical-alignment',
+        value: source.value,
+      },
+      slideId: activeSlide.id,
+    }).map(getSlideEditTextVerticalAlignmentCommandEffect)
 
     if (effects.length === 0) {
       return false
@@ -26092,29 +26096,47 @@ function getPPTTextVerticalAlignSourceFromDataTransfer(
 function getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextVerticalAlignImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    const payload = getPPTTextVerticalAlignPayloadEntry(
-      getPPTJSONValueFromText(candidate.text),
-      candidate.allowDirect,
-    )
+      if (seen.has(json)) {
+        continue
+      }
 
-    return {
-      fields: payload?.fields ?? ['value'],
-      format: PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
-      value: normalizePPTTextVerticalAlign(pasteValue.value),
+      seen.add(json)
+
+      const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      const payload = getPPTTextVerticalAlignPayloadEntry(
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+        value: normalizePPTTextVerticalAlign(pasteValue.value),
+      }
     }
   }
 

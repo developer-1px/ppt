@@ -42,6 +42,8 @@ const SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-name+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-state+json'
+const SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.text-vertical-alignment+json'
 
 const checks = []
 const browserErrors = []
@@ -7963,6 +7965,75 @@ async function runTextVerticalAlignScenario(page) {
       afterJSONPaste,
       afterJSONRedo,
       afterJSONUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      value: 'top',
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEPaste = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'pastes canvas MIME text vertical alignment through slide-edit command effect',
+    afterCanvasMIMEPaste.command === 'update-text-vertical-alignment' &&
+      afterCanvasMIMEPaste.commandField === 'verticalAlignment' &&
+      afterCanvasMIMEPaste.commandObject === 's1-title' &&
+      afterCanvasMIMEPaste.commandSlide === 'slide-1' &&
+      afterCanvasMIMEPaste.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEPaste.commandValue === 'top' &&
+      afterCanvasMIMEPaste.importAlignItems === 'flex-start' &&
+      afterCanvasMIMEPaste.importCommandFields === 'verticalAlignment' &&
+      afterCanvasMIMEPaste.importCommandTargets === 's1-title' &&
+      afterCanvasMIMEPaste.importCommandTypes === 'slide-command-effect' &&
+      afterCanvasMIMEPaste.importCommands === 'update-text-vertical-alignment' &&
+      afterCanvasMIMEPaste.importFields === 'value' &&
+      afterCanvasMIMEPaste.importFormat === 'application-json-ppt-text-vertical-align' &&
+      afterCanvasMIMEPaste.importJsonLength > 10 &&
+      afterCanvasMIMEPaste.importModel === 'ppt-text-vertical-align-import' &&
+      afterCanvasMIMEPaste.importObjects === 's1-title' &&
+      afterCanvasMIMEPaste.importValue === 'top' &&
+      afterCanvasMIMEPaste.selectedStyleAlignItems === 'flex-start' &&
+      afterCanvasMIMEPaste.selectedVerticalAlign === 'top' &&
+      afterCanvasMIMEPaste.thumbStyleAlignItems === 'flex-start' &&
+      afterCanvasMIMEPaste.thumbVerticalAlign === 'top' &&
+      afterCanvasMIMEPaste.verticalAlign === 'top',
+    {
+      afterCanvasMIMEPaste,
+      afterJSONRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEUndo = await getPPTTextVerticalAlignState(page)
+
+  record(
+    'undoes canvas MIME text vertical alignment as one history step',
+    afterCanvasMIMEUndo.selectedVerticalAlign === 'bottom' &&
+      afterCanvasMIMEUndo.selectedStyleAlignItems === 'flex-end' &&
+      afterCanvasMIMEUndo.thumbVerticalAlign === 'bottom' &&
+      afterCanvasMIMEUndo.verticalAlign === 'bottom',
+    {
+      afterCanvasMIMEPaste,
+      afterCanvasMIMEUndo,
     },
   )
 
