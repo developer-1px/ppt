@@ -178,7 +178,8 @@ import {
   getSlideEditObjectOpacityPasteCommand,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
-  getSlideEditObjectShadowJSONPasteValue,
+  getSlideEditObjectShadowJSONPasteValueFromText,
+  getSlideEditObjectShadowJSONPasteValueFromValue,
   getSlideEditObjectShadowPasteCommands,
   normalizeSlideEditObjectAltTextStorageValue,
   normalizeSlideEditObjectHyperlinkStorageUrl,
@@ -20761,13 +20762,10 @@ function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectShadowJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectShadowJSONPasteValueFromText(
+        json,
+        { mode: candidate.allowDirect ? 'direct' : 'wrapped' },
+      )
 
       if (pasteValue === null) {
         continue
@@ -20784,7 +20782,7 @@ function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditObjectShadowJSONPasteValue>>,
+  pasteValue: SlideEditObjectShadowJSONPasteValue,
   jsonLength: number,
 ): PPTObjectShadowImportSource {
   const hasDisabledShadow = pasteValue.fields.some((field) =>
@@ -20874,6 +20872,18 @@ function getPPTObjectShadowSourceFromJSONValue(
   jsonLength: number,
   allowDirect: boolean,
 ): PPTObjectShadowImportSource | null {
+  const slideEditPasteValue = getSlideEditObjectShadowJSONPasteValueFromValue(
+    value,
+    { mode: allowDirect ? 'direct' : 'wrapped' },
+  )
+
+  if (slideEditPasteValue) {
+    return createPPTObjectShadowSourceFromSlideEditJSONPasteValue(
+      slideEditPasteValue,
+      jsonLength,
+    )
+  }
+
   const source = getPPTObjectShadowFromJSONValue(
     getPPTObjectShadowPayloadValue(value, allowDirect),
   )
