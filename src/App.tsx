@@ -1144,6 +1144,17 @@ type PPTClipboardSourcePasteAction = {
   kind: string
   run: () => boolean
 }
+type PPTDataTransferTextReader = {
+  getData?: (format: string) => string
+}
+
+function readPPTDataTransferText(
+  dataTransfer: PPTDataTransferTextReader | null,
+  mimeType: string,
+) {
+  return getPPTCanvasDataTransferText({ dataTransfer, mimeType })
+}
+
 const PPT_RICH_CLIPBOARD_MODEL = 'canvas-board-io-ppt-rich-clipboard' as const
 const PPT_RICH_CLIPBOARD_KIND = 'interactive-os.ppt.selection' as const
 const PPT_RICH_CLIPBOARD_VERSION = 1
@@ -19233,7 +19244,7 @@ function getPPTSlideFallbackHTMLSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
   return getPPTSlideFallbackHTMLSourceFromHTML(
-    dataTransfer?.getData('text/html') ?? '',
+    readPPTDataTransferText(dataTransfer, 'text/html'),
   )
 }
 
@@ -19272,8 +19283,8 @@ function getPPTSlideFallbackHTMLSourceFromHTML(
 function getPPTDeckHTMLSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  const html = dataTransfer?.getData('text/html') ?? ''
-  const plainText = dataTransfer?.getData('text/plain') ?? ''
+  const html = readPPTDataTransferText(dataTransfer, 'text/html')
+  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain')
 
   return getPPTDeckHTMLSourceFromHTML(html) ??
     getPPTDeckHTMLSourceFromHTML(plainText)
@@ -19325,23 +19336,23 @@ function getPPTDeckJSONSourceFromDataTransfer(
   }> = [
     {
       format: PPT_DECK_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData(PPT_DECK_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_DECK_JSON_MIME_TYPE),
     },
     {
       format: PPT_DECK_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       format: PPT_DECK_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       format: PPT_DECK_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/markdown'),
+      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
     },
     {
       format: PPT_DECK_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -19403,23 +19414,23 @@ function getPPTSlideJSONSourceFromDataTransfer(
   }> = [
     {
       format: PPT_SLIDE_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData(PPT_SLIDE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_SLIDE_JSON_MIME_TYPE),
     },
     {
       format: PPT_SLIDE_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       format: PPT_SLIDE_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       format: PPT_SLIDE_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/markdown'),
+      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
     },
     {
       format: PPT_SLIDE_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -19476,10 +19487,10 @@ function getPPTSlideMetadataSourceFromDataTransfer(
   }
 
   const candidates = [
-    dataTransfer.getData(PPT_SLIDE_METADATA_JSON_MIME_TYPE),
-    dataTransfer.getData('application/json'),
-    dataTransfer.getData('text/json'),
-    dataTransfer.getData('text/plain'),
+    readPPTDataTransferText(dataTransfer, PPT_SLIDE_METADATA_JSON_MIME_TYPE),
+    readPPTDataTransferText(dataTransfer, 'application/json'),
+    readPPTDataTransferText(dataTransfer, 'text/json'),
+    readPPTDataTransferText(dataTransfer, 'text/plain'),
   ]
   const seen = new Set<string>()
 
@@ -19621,10 +19632,10 @@ function getPPTSlideLayoutSourceFromDataTransfer(
   }
 
   const candidates = [
-    dataTransfer.getData(PPT_SLIDE_LAYOUT_JSON_MIME_TYPE),
-    dataTransfer.getData('application/json'),
-    dataTransfer.getData('text/json'),
-    dataTransfer.getData('text/plain'),
+    readPPTDataTransferText(dataTransfer, PPT_SLIDE_LAYOUT_JSON_MIME_TYPE),
+    readPPTDataTransferText(dataTransfer, 'application/json'),
+    readPPTDataTransferText(dataTransfer, 'text/json'),
+    readPPTDataTransferText(dataTransfer, 'text/plain'),
   ]
   const seen = new Set<string>()
 
@@ -19671,7 +19682,7 @@ function getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditLayoutJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -20069,10 +20080,10 @@ function getPPTSlideTransitionSourceFromDataTransfer(
   }
 
   const candidates = [
-    dataTransfer.getData(PPT_SLIDE_TRANSITION_JSON_MIME_TYPE),
-    dataTransfer.getData('application/json'),
-    dataTransfer.getData('text/json'),
-    dataTransfer.getData('text/plain'),
+    readPPTDataTransferText(dataTransfer, PPT_SLIDE_TRANSITION_JSON_MIME_TYPE),
+    readPPTDataTransferText(dataTransfer, 'application/json'),
+    readPPTDataTransferText(dataTransfer, 'text/json'),
+    readPPTDataTransferText(dataTransfer, 'text/plain'),
   ]
   const seen = new Set<string>()
 
@@ -20226,19 +20237,19 @@ function getPPTObjectAnimationSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_ANIMATION_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_ANIMATION_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -20429,19 +20440,19 @@ function getPPTObjectStyleSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_STYLE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_STYLE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -20605,19 +20616,19 @@ function getPPTObjectShadowSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_SHADOW_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_SHADOW_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -20668,7 +20679,7 @@ function getPPTObjectShadowSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectShadowJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -20987,19 +20998,19 @@ function getPPTObjectOpacitySourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_OPACITY_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_OPACITY_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -21050,7 +21061,7 @@ function getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -21190,19 +21201,19 @@ function getPPTObjectAccessibilitySourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -21253,7 +21264,7 @@ function getPPTObjectAccessibilitySourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
         storagePolicy: {
@@ -21447,19 +21458,19 @@ function getPPTObjectMetadataSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_METADATA_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_METADATA_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -21511,7 +21522,7 @@ function getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
       const pasteValue = getSlideEditLayerPaneRenameJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeTypes: candidate.customMimeType
           ? [candidate.customMimeType]
@@ -21755,19 +21766,19 @@ function getPPTObjectHyperlinkSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -21818,7 +21829,7 @@ function getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
         storagePolicy: {
@@ -21992,19 +22003,19 @@ function getPPTObjectStateSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_STATE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_STATE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -22055,7 +22066,7 @@ function getPPTObjectStateSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditLayerPaneObjectStateJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -22229,19 +22240,19 @@ function getPPTObjectLayerSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_LAYER_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_LAYER_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -22292,7 +22303,7 @@ function getPPTObjectLayerSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditLayerPaneObjectLayerJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -22472,19 +22483,19 @@ function getPPTObjectTransformSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -22535,7 +22546,7 @@ function getPPTObjectTransformSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectTransformJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -22741,19 +22752,19 @@ function getPPTImageReplaceSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_IMAGE_REPLACE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_IMAGE_REPLACE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -22804,7 +22815,7 @@ function getPPTImageReplaceSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectImageReplaceJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -23105,19 +23116,19 @@ function getPPTImageCropSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_IMAGE_CROP_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_IMAGE_CROP_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -23168,7 +23179,7 @@ function getPPTImageCropSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectImageCropJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -23371,19 +23382,19 @@ function getPPTObjectFillOpacitySourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -23444,7 +23455,7 @@ function getPPTObjectFillOpacitySourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectFillOpacityJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -23587,19 +23598,19 @@ function getPPTObjectCornerRadiusSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -23660,7 +23671,7 @@ function getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -23796,19 +23807,19 @@ function getPPTShapeStyleSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_SHAPE_STYLE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_SHAPE_STYLE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -24065,19 +24076,19 @@ function getPPTLineStyleSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_LINE_STYLE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_LINE_STYLE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -24247,19 +24258,19 @@ function getPPTObjectStrokeLineStyleSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -24320,7 +24331,7 @@ function getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(
       const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -24439,19 +24450,19 @@ function getPPTTextStyleSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_STYLE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_STYLE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -24757,19 +24768,19 @@ function getPPTTextFontSizeSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FONT_SIZE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -25001,7 +25012,7 @@ function getPPTSlideEditJSONPasteCandidates({
       type: 'text/plain',
     },
   ].flatMap((candidate) => {
-    const text = dataTransfer.getData(candidate.type).trim()
+    const text = readPPTDataTransferText(dataTransfer, candidate.type).trim()
 
     if (!text || seen.has(text)) {
       return []
@@ -25050,19 +25061,19 @@ function getPPTTextFontWeightSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FONT_WEIGHT_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -25274,19 +25285,19 @@ function getPPTTextRunSizeSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_RUN_SIZE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_SIZE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -25341,7 +25352,7 @@ function getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(
       const size = getSlideEditTextRunFormattingJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         fieldId: 'size',
         jsonMimeType: candidate.customMimeType,
@@ -25541,19 +25552,19 @@ function getPPTTextRunColorSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -25608,7 +25619,7 @@ function getPPTTextRunColorSourceFromSlideEditJSONPasteValue(
       const color = getSlideEditTextRunFormattingJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         fieldId: 'color',
         jsonMimeType: candidate.customMimeType,
@@ -25798,19 +25809,19 @@ function getPPTTextRunBoldSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_RUN_BOLD_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_BOLD_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -26034,19 +26045,19 @@ function getPPTTextRunItalicSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_ITALIC_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -26272,19 +26283,19 @@ function getPPTTextRunUnderlineSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -26373,7 +26384,7 @@ function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
       const value = getSlideEditTextRunFormattingJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         fieldId,
         jsonMimeType: candidate.customMimeType,
@@ -26613,19 +26624,19 @@ function getPPTTextFontFamilySourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -26864,19 +26875,19 @@ function getPPTTextVerticalAlignSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -26927,7 +26938,7 @@ function getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -27125,19 +27136,19 @@ function getPPTTextParagraphAlignSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_ALIGN_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -27348,19 +27359,19 @@ function getPPTTextParagraphBulletSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_BULLET_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -27609,19 +27620,19 @@ function getPPTTextParagraphSpacingSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -27672,7 +27683,7 @@ function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -27894,19 +27905,19 @@ function getPPTTextBodySourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_BODY_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_BODY_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -28071,19 +28082,19 @@ function getPPTColorSwatchSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_COLOR_SWATCH_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_COLOR_SWATCH_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -28458,19 +28469,19 @@ function getPPTTextAutoFitSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_AUTOFIT_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_AUTOFIT_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -28695,19 +28706,19 @@ function getPPTTextFrameInsetSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -28758,7 +28769,7 @@ function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
       const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
         dataTransfer: {
           getData: (type: string) =>
-            candidate.dataTransfer.getData(type) ? json : '',
+            readPPTDataTransferText(candidate.dataTransfer, type) ? json : '',
         },
         jsonMimeType: candidate.customMimeType,
       })
@@ -29010,23 +29021,23 @@ function getPPTTableRowsSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TABLE_ROWS_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TABLE_ROWS_JSON_MIME_TYPE),
     },
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -29145,26 +29156,26 @@ function getPPTTableRowsTableImportTextFromDataTransfer(
     'text/tab-separated-values',
     'text/csv',
   ] as const) {
-    const text = dataTransfer.getData(mimeType).trim()
+    const text = readPPTDataTransferText(dataTransfer, mimeType).trim()
 
     if (text) {
       return text
     }
   }
 
-  const markdownText = dataTransfer.getData('text/markdown').trim()
+  const markdownText = readPPTDataTransferText(dataTransfer, 'text/markdown').trim()
 
   if (markdownText) {
     return markdownText
   }
 
-  const htmlText = dataTransfer.getData('text/html').trim()
+  const htmlText = readPPTDataTransferText(dataTransfer, 'text/html').trim()
 
   if (htmlText) {
     return isPPTTableRowsExternalHTMLTableClipboard(htmlText) ? htmlText : ''
   }
 
-  const plainText = dataTransfer.getData('text/plain').trim()
+  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain').trim()
 
   return plainText &&
       (/[\t,]/.test(plainText) || isPPTTableRowsMarkdownTableText(plainText))
@@ -29319,19 +29330,19 @@ function getPPTMediaJSONSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_MEDIA_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_MEDIA_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -29514,19 +29525,19 @@ function getPPTCommentSourceFromDataTransfer(
   }> = [
     {
       allowDirect: true,
-      text: dataTransfer.getData(PPT_COMMENT_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_COMMENT_JSON_MIME_TYPE),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       allowDirect: false,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -29581,7 +29592,7 @@ function getPPTCommentSourceFromSlideEditJSONPasteValue(
   const seen = new Set<string>()
 
   for (const candidate of candidates) {
-    const text = dataTransfer.getData(candidate.type).trim()
+    const text = readPPTDataTransferText(dataTransfer, candidate.type).trim()
 
     if (!text || seen.has(text)) {
       continue
@@ -29880,23 +29891,23 @@ function getPPTSlideNotesSourceFromDataTransfer(
   }> = [
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData(PPT_SLIDE_NOTES_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_SLIDE_NOTES_JSON_MIME_TYPE),
     },
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       format: PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/markdown'),
+      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
     },
     {
       format: PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -30047,23 +30058,23 @@ function getPPTElementsJSONSourceFromDataTransfer(
   }> = [
     {
       format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData(PPT_ELEMENTS_JSON_MIME_TYPE),
+      text: readPPTDataTransferText(dataTransfer, PPT_ELEMENTS_JSON_MIME_TYPE),
     },
     {
       format: PPT_ELEMENTS_JSON_IMPORT_FORMAT,
-      text: dataTransfer.getData('application/json'),
+      text: readPPTDataTransferText(dataTransfer, 'application/json'),
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/json'),
+      text: readPPTDataTransferText(dataTransfer, 'text/json'),
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/markdown'),
+      text: readPPTDataTransferText(dataTransfer, 'text/markdown'),
     },
     {
       format: PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT,
-      text: dataTransfer.getData('text/plain'),
+      text: readPPTDataTransferText(dataTransfer, 'text/plain'),
     },
   ]
   const seen = new Set<string>()
@@ -30238,8 +30249,8 @@ function getPPTDeckFromJSONValue(value: unknown) {
 function getPPTDeckFallbackHTMLSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  const html = dataTransfer?.getData('text/html') ?? ''
-  const plainText = dataTransfer?.getData('text/plain') ?? ''
+  const html = readPPTDataTransferText(dataTransfer, 'text/html')
+  const plainText = readPPTDataTransferText(dataTransfer, 'text/plain')
 
   return getPPTDeckFallbackHTMLSourceFromHTML(html) ??
     getPPTDeckFallbackHTMLSourceFromHTML(plainText)
