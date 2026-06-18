@@ -190,6 +190,8 @@ import {
   getSlideEditTextFrameInsetJSONPasteValue,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
+  getSlideEditTableRowsJSONPasteValue,
+  getSlideEditTableRowsPasteCommandEffect,
   getSlideEditTextParagraphAlignJSONPasteValue,
   getSlideEditTextParagraphBulletJSONPasteValue,
   getSlideEditTextParagraphSpacingCommandEffect,
@@ -7510,9 +7512,30 @@ function App() {
       return false
     }
 
-    return pastePPTTableRowsSourceToObjectIds({
-      objectIds: route.intent.target.selection,
+    const pasteValue = createPPTTableRowsPasteValue({
       rows: route.intent.rows,
+      source,
+    })
+    const effects = route.intent.target.selection.flatMap((objectId) => {
+      const effect = getSlideEditTableRowsPasteCommandEffect({
+        pasteValue,
+        slideId: activeSlide.id,
+        target: {
+          isTable: true,
+          objectId,
+        },
+      })
+
+      return effect ? [effect] : []
+    })
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    return pastePPTTableRowsSourceToObjectIds({
+      objectIds: effects.map((effect) => effect.payload.objectId),
+      rows: effects[0].payload.rows,
       source,
     })
   }
@@ -18610,6 +18633,26 @@ function createPPTCanvasTableImportSourceFromTableRowsSource(
   }
 }
 
+function createPPTTableRowsPasteValue({
+  rows,
+  source,
+}: {
+  rows: readonly (readonly string[])[]
+  source: PPTTableRowsImportSource
+}) {
+  const normalizedRows = normalizePPTTableRows(rows)
+
+  return {
+    columnCount: getPPTTableColumnCount(normalizedRows),
+    format: 'json',
+    payloadLength: source.jsonLength,
+    rowCount: normalizedRows.length,
+    rows: normalizedRows,
+    sourceType: source.format,
+    surface: 'table-rows',
+  } as const
+}
+
 function createPPTCanvasTableImportSourceFromTableImportSource(
   source: PPTTableImportSource,
 ): PPTCanvasTableImportSource {
@@ -27374,6 +27417,13 @@ function getPPTTableRowsSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTableRowsSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -27421,6 +27471,32 @@ function getPPTTableRowsSourceFromDataTransfer(
   }
 
   return getPPTTableRowsSourceFromTableImportDataTransfer(dataTransfer)
+}
+
+function getPPTTableRowsSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTableRowsImportSource | null {
+  for (const candidate of getPPTSlideEditJSONPasteCandidates({
+    customMimeType: PPT_TABLE_ROWS_JSON_MIME_TYPE,
+    dataTransfer,
+  })) {
+    const pasteValue = getSlideEditTableRowsJSONPasteValue({
+      dataTransfer: candidate.dataTransfer,
+      jsonMimeType: candidate.customMimeType,
+    })
+
+    if (pasteValue === null) {
+      continue
+    }
+
+    return {
+      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+      jsonLength: candidate.text.length,
+      rows: normalizePPTTableRows(pasteValue.rows),
+    }
+  }
+
+  return null
 }
 
 function getPPTTableRowsSourceFromText(
