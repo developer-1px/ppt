@@ -123,8 +123,11 @@ import {
   isCanvasImageBlob,
   readCanvasImageFileSource,
   resolveCanvasImageSourceNaturalSize,
+  routeCanvasImagePasteReplace,
   type CanvasImageImportFormat,
   type CanvasImageImportSource,
+  type CanvasImagePasteReplaceRoute,
+  type CanvasImagePasteReplaceTarget,
 } from 'canvas/app/image-import'
 import {
   CANVAS_MEDIA_IMPORT_MODEL,
@@ -447,6 +450,8 @@ export function getPPTCanvasImageFilesFromDataTransfer(
 ) {
   return getPPTCanvasDataTransferFiles(dataTransfer).filter(isCanvasImageBlob)
 }
+export const routePPTCanvasImagePasteReplace =
+  routeCanvasImagePasteReplace
 export const getPPTCanvasMediaSourceFromDataTransfer =
   getCanvasMediaSourceFromDataTransfer
 export const getPPTCanvasMediaSourceFromText =
@@ -503,6 +508,10 @@ export const usePPTCanvasAppStageElement = useCanvasAppStageElement
 export type PPTCommandPaletteItemBase = CanvasCommandPaletteItem
 export type PPTCanvasImageImportFormat = CanvasImageImportFormat
 export type PPTCanvasImageImportSource = CanvasImageImportSource
+export type PPTCanvasImagePasteReplaceRoute =
+  CanvasImagePasteReplaceRoute
+export type PPTCanvasImagePasteReplaceTarget =
+  CanvasImagePasteReplaceTarget
 export type PPTCanvasMediaObjectHyperlinkRoute =
   CanvasMediaObjectHyperlinkRoute
 export type PPTCanvasMediaObjectHyperlinkTarget =

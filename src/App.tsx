@@ -538,6 +538,7 @@ import {
   PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER,
   readPPTCanvasRichClipboardFromDataTransfer,
   resetPPTCanvasViewport,
+  routePPTCanvasImagePasteReplace,
   routePPTCanvasMediaSourceObjectHyperlink,
   runPPTCanvasKeyboardCommandIntent,
   runPPTCanvasKeyboardToolIntent,
@@ -555,6 +556,8 @@ import {
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
   type PPTCanvasFloatingAnchor,
+  type PPTCanvasImagePasteReplaceRoute,
+  type PPTCanvasImagePasteReplaceTarget,
   type PPTCanvasKeyboardToolIntent,
   type PPTCanvasMediaObjectHyperlinkRoute,
   type PPTCanvasMediaObjectHyperlinkTarget,
@@ -7485,12 +7488,7 @@ function App() {
   }
 
   function pastePPTImageReplaceSource(source: PPTImageReplaceImportSource) {
-    const imageElements = activeSlide.elements
-      .filter((element): element is PPTImage =>
-        selection.includes(element.id) &&
-          element.kind === 'image' &&
-          element.locked !== true &&
-          element.visible !== false)
+    const imageElements = getPPTImagePasteReplaceTargetElements(selection)
 
     if (imageElements.length !== 1) {
       return false
@@ -7530,10 +7528,83 @@ function App() {
     return true
   }
 
+  function pastePPTImageImportSource(
+    source: PPTImageImportSource,
+    options: {
+      center?: Point
+      resolveNaturalSize?: boolean
+    } = {},
+  ) {
+    const route = routePPTCanvasImagePasteReplace({
+      getTarget: ({ selection: targetSelection }) =>
+        getPPTImagePasteReplaceRouteTarget(targetSelection),
+      selection,
+      sources: [source],
+    })
+
+    if (route.kind === 'image-replace') {
+      return pastePPTImageImportSourceAsReplace(route.intent.source)
+    }
+
+    return insertPPTImagePasteReplaceFallback(route, options)
+  }
+
+  function getPPTImagePasteReplaceTargetElements(
+    targetSelection: readonly string[],
+  ) {
+    const targetIds = new Set(targetSelection)
+
+    return selectedElements.filter((element): element is PPTImage =>
+      targetIds.has(element.id) &&
+        element.kind === 'image' &&
+        element.locked !== true &&
+        element.visible !== false)
+  }
+
+  function getPPTImagePasteReplaceRouteTarget(
+    targetSelection: readonly string[],
+  ): PPTCanvasImagePasteReplaceTarget | null {
+    const imageElements = getPPTImagePasteReplaceTargetElements(targetSelection)
+
+    return imageElements.length === 1
+      ? {
+          id: imageElements[0].id,
+          selection: [imageElements[0].id],
+        }
+      : null
+  }
+
   function pastePPTImageImportSourceAsReplace(source: PPTImageImportSource) {
     return pastePPTImageReplaceSource(
       createPPTImageReplaceSourceFromImageImportSource(source),
     )
+  }
+
+  function insertPPTImagePasteReplaceFallback(
+    route: Extract<
+      PPTCanvasImagePasteReplaceRoute,
+      { kind: 'image-insert' }
+    >,
+    {
+      center = getPPTViewportCenter(),
+      resolveNaturalSize = false,
+    }: {
+      center?: Point
+      resolveNaturalSize?: boolean
+    } = {},
+  ) {
+    if (route.sources.length === 0) {
+      return false
+    }
+
+    if (route.sources.length === 1 && resolveNaturalSize) {
+      void resolvePPTImageSourceNaturalSize(route.sources[0]).then((source) => {
+        insertPPTImageSource(source, center)
+      })
+      return true
+    }
+
+    return insertPPTImageSources(route.sources, center)
   }
 
   function pastePPTImageCropSource(source: PPTImageCropImportSource) {
@@ -8323,18 +8394,9 @@ function App() {
         void insertPPTTableFile(action.file)
         return true
       case 'image-source':
-        if (pastePPTImageImportSourceAsReplace(action.source)) {
-          return true
-        }
-
-        if (action.resolveNaturalSize) {
-          void resolvePPTImageSourceNaturalSize(action.source).then((source) => {
-            insertPPTImageSource(source)
-          })
-        } else {
-          insertPPTImageSource(action.source)
-        }
-        return true
+        return pastePPTImageImportSource(action.source, {
+          resolveNaturalSize: action.resolveNaturalSize,
+        })
       case 'fallback-html-selection-source':
         insertPPTFallbackHTMLSelectionSource(action.source)
         return true
@@ -8477,12 +8539,7 @@ function App() {
       return false
     }
 
-    if (pastePPTImageImportSourceAsReplace(source)) {
-      return true
-    }
-
-    insertPPTImageSource(source, center)
-    return true
+    return pastePPTImageImportSource(source, { center })
   }
 
   async function insertPPTImageFiles(
