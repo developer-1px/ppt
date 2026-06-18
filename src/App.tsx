@@ -636,6 +636,7 @@ import {
   type PPTImageImportFormat,
   type PPTImageImportSource,
   stringifyPPTTableRows,
+  stringifyPPTTableRowsCSV,
   PPT_MEDIA_IMPORT_MODEL,
   PPT_TABLE_IMPORT_MODEL,
   PPT_TEXT_PASTE_IMPORT_MODEL,
@@ -10827,6 +10828,7 @@ function App() {
 
     const html = createPPTTableClipboardHTML(selectedTableElement)
     const plainText = stringifyPPTTableRows(selectedTableElement.rows)
+    const csvText = stringifyPPTTableRowsCSV(selectedTableElement.rows)
     const effect = createPPTTableClipboardEffect({
       html,
       objectId: selectedTableElement.id,
@@ -10839,6 +10841,7 @@ function App() {
     setLastTableClipboardEffect(effect)
 
     void writePPTTableClipboard({
+      csvText,
       html,
       objectId: selectedTableElement.id,
       plainText,
@@ -27732,12 +27735,14 @@ async function writePPTSelectionSVGClipboard({
 }
 
 async function writePPTTableClipboard({
+  csvText,
   html,
   objectId,
   plainText,
   rows,
   sourceSlideId,
 }: {
+  csvText: string
   html: string
   objectId: string
   plainText: string
@@ -27757,6 +27762,10 @@ async function writePPTTableClipboard({
   })
 
   return writePPTCanvasRichClipboardPayload({
+    extraItems: {
+      'text/csv': csvText,
+      'text/tab-separated-values': plainText,
+    },
     html,
     json,
     jsonMimeType: PPT_TABLE_CLIPBOARD_JSON_MIME_TYPE,

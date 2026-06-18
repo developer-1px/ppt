@@ -258,6 +258,14 @@ export function stringifyPPTTableRows(rows: readonly (readonly string[])[]) {
     .join('\n')
 }
 
+export function stringifyPPTTableRowsCSV(
+  rows: readonly (readonly string[])[],
+) {
+  return normalizePPTTableRows(rows)
+    .map((row) => row.map(formatPPTTableCSVCell).join(','))
+    .join('\n')
+}
+
 export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
   return normalizePPTCanvasTableRows(rows, {
     fallbackRows: PPT_DEFAULT_TABLE_ROWS,
@@ -269,6 +277,12 @@ export function normalizePPTTableRows(rows: readonly (readonly string[])[]) {
 
 export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
   return getPPTCanvasTableColumnCount(rows)
+}
+
+function formatPPTTableCSVCell(value: string) {
+  return /[",\r\n]/.test(value)
+    ? `"${value.replace(/"/g, '""')}"`
+    : value
 }
 
 function getPPTTableImportSourceSize(source: PPTTableImportSource) {
@@ -428,6 +442,7 @@ function getPPTCanvasTableImportFormat(
   if (
     format === 'text-delimited' ||
     format === 'text-html' ||
+    format === 'text-markdown' ||
     format === 'text-tsv'
   ) {
     return format
@@ -446,6 +461,7 @@ function getPPTTableImportFormat(
   if (
     format === 'text-delimited' ||
     format === 'text-html' ||
+    format === 'text-markdown' ||
     format === 'text-tsv'
   ) {
     return format

@@ -14699,6 +14699,8 @@ async function runTableImportScenario(page) {
     window.__pptTableClipboardHTML = ''
     window.__pptTableClipboardJSON = ''
     window.__pptTableClipboardPlainText = ''
+    window.__pptTableClipboardCSV = ''
+    window.__pptTableClipboardTSV = ''
 
     window.ClipboardItem = class PPTTableClipboardItem {
       constructor(items) {
@@ -14718,6 +14720,12 @@ async function runTableImportScenario(page) {
 
           window.__pptTableClipboardHTML = await item.items['text/html'].text()
           window.__pptTableClipboardPlainText = await item.items['text/plain'].text()
+          window.__pptTableClipboardCSV = item.items['text/csv']
+            ? await item.items['text/csv'].text()
+            : ''
+          window.__pptTableClipboardTSV = item.items['text/tab-separated-values']
+            ? await item.items['text/tab-separated-values'].text()
+            : ''
           window.__pptTableClipboardJSON = mimeType
             ? await item.items[mimeType].text()
             : ''
@@ -14734,6 +14742,8 @@ async function runTableImportScenario(page) {
     itemTypes: window.__pptTableClipboardItemTypes?.at(-1) ?? [],
     json: window.__pptTableClipboardJSON ?? '',
     plainText: window.__pptTableClipboardPlainText ?? '',
+    csv: window.__pptTableClipboardCSV ?? '',
+    tsv: window.__pptTableClipboardTSV ?? '',
     writeCount: window.__pptTableClipboardWriteCount ?? 0,
   }))()`)
 
@@ -14748,6 +14758,8 @@ async function runTableImportScenario(page) {
       tableClipboardWrite.itemTypes.includes(afterCopyTable.tableClipboardJsonMimeType) &&
       tableClipboardWrite.itemTypes.includes('text/html') &&
       tableClipboardWrite.itemTypes.includes('text/plain') &&
+      tableClipboardWrite.itemTypes.includes('text/csv') &&
+      tableClipboardWrite.itemTypes.includes('text/tab-separated-values') &&
       tableClipboardWrite.html.includes('<table') &&
       tableClipboardWrite.html.includes('data-ppt-selection-table="true"') &&
       tableClipboardWrite.html.includes('data-ppt-selection-x="') &&
@@ -14756,6 +14768,9 @@ async function runTableImportScenario(page) {
       tableClipboardWrite.html.includes('<td>45%</td>') &&
       tableClipboardWrite.plainText.includes('Revenue\t10\t12') &&
       tableClipboardWrite.plainText.includes('Margin\t42%\t45%') &&
+      tableClipboardWrite.tsv === tableClipboardWrite.plainText &&
+      tableClipboardWrite.csv.includes('Revenue,10,12') &&
+      tableClipboardWrite.csv.includes('Margin,42%,45%') &&
       tableClipboardWrite.json.includes('"kind": "interactive-os.ppt.table-export"'),
     {
       afterCopyTable,
