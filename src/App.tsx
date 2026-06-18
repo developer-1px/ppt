@@ -24922,6 +24922,13 @@ function getPPTTextRunSizeSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -24961,6 +24968,67 @@ function getPPTTextRunSizeSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunSizeImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_TEXT_RUN_SIZE_JSON_MIME_TYPE,
+    getPPTTextRunFormattingJSONMimeType('size'),
+  ]) {
+    if (!customMimeType) {
+      continue
+    }
+
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const size = getSlideEditTextRunFormattingJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        fieldId: 'size',
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (size === null) {
+        continue
+      }
+
+      const normalizedSize = getPPTTextRunSizeImportValueFromJSONValue(size)
+
+      if (normalizedSize === undefined) {
+        continue
+      }
+
+      const payload = getPPTTextRunSizePayloadEntry(
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_RUN_SIZE_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+        size: normalizedSize,
+      }
     }
   }
 
@@ -25121,6 +25189,13 @@ function getPPTTextRunColorSourceFromDataTransfer(
     return null
   }
 
+  const slideEditSource =
+    getPPTTextRunColorSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
   const candidates: Array<{
     allowDirect: boolean
     text: string
@@ -25160,6 +25235,67 @@ function getPPTTextRunColorSourceFromDataTransfer(
 
     if (source) {
       return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunColorSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunColorImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE,
+    getPPTTextRunFormattingJSONMimeType('color'),
+  ]) {
+    if (!customMimeType) {
+      continue
+    }
+
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const color = getSlideEditTextRunFormattingJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        fieldId: 'color',
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (color === null) {
+        continue
+      }
+
+      const normalizedColor = getPPTTextRunColorImportValueFromJSONValue(color)
+
+      if (normalizedColor === undefined) {
+        continue
+      }
+
+      const payload = getPPTTextRunColorPayloadEntry(
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        color: normalizedColor,
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+      }
     }
   }
 

@@ -6800,10 +6800,10 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
-    const json = JSON.stringify('28px')
+    const json = JSON.stringify(28)
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-run-size+json',
+      'application/vnd.interactive-os.slide-edit.text-run-size+json',
       json,
     )
     window.dispatchEvent(new ClipboardEvent('paste', {
@@ -6817,7 +6817,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunSizePaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run size JSON through run style command effect',
+    'pastes canvas text run size JSON through run style command effect',
     summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletRestore.runSizeCount === 0 &&
       summaryAfterTextRunSizePaste.selected === 'true' &&
@@ -6833,7 +6833,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextRunSizePaste.textRunSizeImportCommandTypes === 'slide-command-effect' &&
       summaryAfterTextRunSizePaste.textRunSizeImportCommandValues === '28' &&
       summaryAfterTextRunSizePaste.textRunSizeImportFields === 'value' &&
-      summaryAfterTextRunSizePaste.textRunSizeImportJsonLength >= 6 &&
+      summaryAfterTextRunSizePaste.textRunSizeImportJsonLength >= 2 &&
       summaryAfterTextRunSizePaste.textRunSizeImportObjects === 's1-summary' &&
       summaryAfterTextRunSizePaste.textRunSizeImportRuns > 0 &&
       summaryAfterTextRunSizePaste.textRunSizeImportSlide === 'slide-1' &&
@@ -6890,7 +6890,7 @@ async function runTextQuickFormatScenario(page) {
     const json = JSON.stringify('#0f766e')
 
     dataTransfer.setData(
-      'application/vnd.interactive-os.ppt.text-run-color+json',
+      'application/vnd.interactive-os.slide-edit.text-run-color+json',
       json,
     )
     window.dispatchEvent(new ClipboardEvent('paste', {
@@ -6904,7 +6904,7 @@ async function runTextQuickFormatScenario(page) {
   const summaryAfterTextRunColorPaste = await getPPTTextFormatPainterState(page, 's1-summary')
 
   record(
-    'pastes PPT text run color JSON through run style command effect',
+    'pastes canvas text run color JSON through run style command effect',
     summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
       summaryAfterTextParagraphBulletRestore.runColorCount === 0 &&
       summaryAfterTextRunColorPaste.selected === 'true' &&
