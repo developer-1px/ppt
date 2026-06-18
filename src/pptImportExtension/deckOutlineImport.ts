@@ -7,6 +7,7 @@ import {
 } from '../pptModel'
 import {
   getPPTCanvasDataTransferText,
+  PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
   getSlideEditMarkdownDeckSource,
@@ -68,7 +69,10 @@ export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
         dataTransfer,
         mimeType: 'text/x-markdown',
       }) ||
-      getPPTCanvasDataTransferText({ dataTransfer, mimeType: 'text/plain' }),
+      getPPTCanvasDataTransferText({
+        dataTransfer,
+        mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+      }),
   )
 }
 
