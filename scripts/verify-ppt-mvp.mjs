@@ -6576,6 +6576,91 @@ async function runTextFrameInsetScenario(page) {
     },
   )
 
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      textFrameInset: {
+        bottom: 16,
+        left: 20,
+        right: 12,
+        top: 8,
+      },
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterJSONPaste = await getPPTTextFrameInsetState(page)
+
+  record(
+    'pastes PPT text frame inset JSON through slide-edit command effects',
+    afterJSONPaste.importBottom === '16' &&
+      afterJSONPaste.importCommandFields === 'top right bottom left' &&
+      afterJSONPaste.importCommands === 'update-text-frame-inset update-text-frame-inset update-text-frame-inset update-text-frame-inset' &&
+      afterJSONPaste.importCommandTargets === 's1-title s1-title s1-title s1-title' &&
+      afterJSONPaste.importCommandTypes === 'slide-command-effect slide-command-effect slide-command-effect slide-command-effect' &&
+      afterJSONPaste.importFields === 'top right bottom left' &&
+      afterJSONPaste.importFormat === 'application-json-ppt-text-frame-inset' &&
+      afterJSONPaste.importJsonLength > 50 &&
+      afterJSONPaste.importLeft === '20' &&
+      afterJSONPaste.importModel === 'ppt-text-frame-inset-import' &&
+      afterJSONPaste.importObjects === 's1-title' &&
+      afterJSONPaste.importRight === '12' &&
+      afterJSONPaste.importTop === '8' &&
+      afterJSONPaste.inspectorTextInset === '8,12,16,20' &&
+      afterJSONPaste.selectedStylePadding === '8px 12px 16px 20px' &&
+      afterJSONPaste.selectedTextInset === '8,12,16,20' &&
+      afterJSONPaste.thumbTextInset === '8,12,16,20' &&
+      afterJSONPaste.top === '8' &&
+      afterJSONPaste.right === '12' &&
+      afterJSONPaste.bottom === '16' &&
+      afterJSONPaste.left === '20',
+    {
+      afterJSONPaste,
+      afterRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterJSONUndo = await getPPTTextFrameInsetState(page)
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const afterJSONRedo = await getPPTTextFrameInsetState(page)
+
+  record(
+    'undoes and redoes PPT text frame inset JSON as one history step',
+    afterJSONUndo.selectedTextInset === '10,14,18,22' &&
+      afterJSONUndo.selectedStylePadding === '10px 14px 18px 22px' &&
+      afterJSONRedo.selectedTextInset === '8,12,16,20' &&
+      afterJSONRedo.selectedStylePadding === '8px 12px 16px 20px',
+    {
+      afterJSONPaste,
+      afterJSONRedo,
+      afterJSONUndo,
+    },
+  )
+
   await page.eval(`document.querySelector('[data-ppt-present-start]')?.click()`)
   await delay(120)
 
@@ -6593,8 +6678,8 @@ async function runTextFrameInsetScenario(page) {
   record(
     'keeps PPT text frame inset metadata in presentation preview',
     preview.open &&
-      preview.textInset === '10,14,18,22' &&
-      preview.padding === '10px 14px 18px 22px',
+      preview.textInset === '8,12,16,20' &&
+      preview.padding === '8px 12px 16px 20px',
     preview,
   )
 
@@ -6641,8 +6726,8 @@ async function runExportScenario(page) {
       hasFontFamilyModel: code.includes('"fontFamily": "Georgia"'),
       hasParagraphSpacingMarkup: code.includes('data-ppt-line-height="1.4"') && code.includes('data-ppt-spacing-before="6"') && code.includes('data-ppt-spacing-after="12"') && code.includes('line-height:1.4') && code.includes('margin-top:6px') && code.includes('margin-bottom:12px'),
       hasParagraphSpacingModel: code.includes('"lineHeight": 1.4') && code.includes('"spacingBefore": 6') && code.includes('"spacingAfter": 12'),
-      hasTextFrameInsetMarkup: code.includes('data-ppt-text-inset="10,14,18,22"') && code.includes('padding:10px 14px 18px 22px'),
-      hasTextFrameInsetModel: code.includes('"textInset"') && code.includes('"top": 10') && code.includes('"right": 14') && code.includes('"bottom": 18') && code.includes('"left": 22'),
+      hasTextFrameInsetMarkup: code.includes('data-ppt-text-inset="8,12,16,20"') && code.includes('padding:8px 12px 16px 20px'),
+      hasTextFrameInsetModel: code.includes('"textInset"') && code.includes('"top": 8') && code.includes('"right": 12') && code.includes('"bottom": 16') && code.includes('"left": 20'),
       hasTextVerticalAlignMarkup: code.includes('data-ppt-vertical-align="middle"') && code.includes('align-items:center'),
       hasTextVerticalAlignModel: code.includes('"verticalAlign": "middle"'),
       hasImageMarkup: code.includes('class="ppt-element ppt-image"') && code.includes('data:image/svg+xml'),
@@ -7584,7 +7669,7 @@ async function runExportScenario(page) {
       hasStrokeDash: text.includes('data-ppt-stroke-dash="dash"') && text.includes('data-ppt-stroke-dash="dot"') && text.includes('stroke-dasharray='),
       hasFontFamily: text.includes('data-ppt-font-family="Georgia"') && text.includes('font-family="Georgia, serif"'),
       hasParagraphSpacing: text.includes('data-ppt-line-height="1.4"') && text.includes('data-ppt-spacing-before="6"') && text.includes('data-ppt-spacing-after="12"'),
-      hasTextFrameInset: text.includes('data-ppt-text-inset="10,14,18,22"'),
+      hasTextFrameInset: text.includes('data-ppt-text-inset="8,12,16,20"'),
       hasTextVerticalAlign: text.includes('data-ppt-vertical-align="middle"'),
       hasComment: text.includes('data-ppt-kind="comment"') && text.includes('data-ppt-comment-body="true"'),
       hasFreeform: text.includes('data-ppt-kind="freeform"') && text.includes('data-ppt-freeform-path'),
@@ -17703,6 +17788,19 @@ function getPPTTextFrameInsetState(page) {
         inspector?.getAttribute('data-ppt-text-inset-bottom') ?? '',
         inspector?.getAttribute('data-ppt-text-inset-left') ?? '',
       ].join(','),
+      importBottom: stage?.getAttribute('data-ppt-text-inset-import-bottom') ?? '',
+      importCommandFields: stage?.getAttribute('data-ppt-text-inset-import-command-fields') ?? '',
+      importCommandTargets: stage?.getAttribute('data-ppt-text-inset-import-command-targets') ?? '',
+      importCommandTypes: stage?.getAttribute('data-ppt-text-inset-import-command-types') ?? '',
+      importCommands: stage?.getAttribute('data-ppt-text-inset-import-commands') ?? '',
+      importFields: stage?.getAttribute('data-ppt-text-inset-import-fields') ?? '',
+      importFormat: stage?.getAttribute('data-ppt-text-inset-import-format') ?? '',
+      importJsonLength: Number(stage?.getAttribute('data-ppt-text-inset-import-json-length') ?? '0'),
+      importLeft: stage?.getAttribute('data-ppt-text-inset-import-left') ?? '',
+      importModel: stage?.getAttribute('data-ppt-text-inset-import-model') ?? '',
+      importObjects: stage?.getAttribute('data-ppt-text-inset-import-objects') ?? '',
+      importRight: stage?.getAttribute('data-ppt-text-inset-import-right') ?? '',
+      importTop: stage?.getAttribute('data-ppt-text-inset-import-top') ?? '',
       left: left?.value ?? '',
       leftCommand: left?.getAttribute('data-ppt-text-inset-command') ?? '',
       leftControl: left?.getAttribute('data-ppt-text-inset-control') ?? '',

@@ -1085,6 +1085,11 @@ const PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-autofit' as const
 const PPT_TEXT_AUTOFIT_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-autofit+json'
+const PPT_TEXT_FRAME_INSET_IMPORT_MODEL = 'ppt-text-frame-inset-import' as const
+const PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-frame-inset' as const
+const PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-frame-inset+json'
 const PPT_COLOR_SWATCH_IMPORT_MODEL = 'ppt-color-swatch-import' as const
 const PPT_COLOR_SWATCH_JSON_IMPORT_FORMAT =
   'application-json-ppt-color-swatch' as const
@@ -1427,6 +1432,13 @@ type PPTTextAutoFitImportSource = {
   handle: ResizeHandle
   jsonLength: number
   mode: 'resize-to-fit'
+}
+type PPTTextFrameInsetImportField = PPTTextInsetField
+type PPTTextFrameInsetImportSource = {
+  fields: readonly PPTTextFrameInsetImportField[]
+  format: typeof PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT
+  inset: Partial<PPTTextInset>
+  jsonLength: number
 }
 type PPTColorSwatchImportField =
   | 'channel'
@@ -1774,6 +1786,21 @@ type PPTTextAutoFitImportEffect = {
   mode: string
   model: typeof PPT_TEXT_AUTOFIT_IMPORT_MODEL
   objectIds: string
+}
+type PPTTextFrameInsetImportEffect = {
+  bottom: string
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  fields: string
+  format: typeof PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT
+  jsonLength: number
+  left: string
+  model: typeof PPT_TEXT_FRAME_INSET_IMPORT_MODEL
+  objectIds: string
+  right: string
+  top: string
 }
 type PPTColorSwatchImportEffect = {
   commandChannels: string
@@ -2952,6 +2979,8 @@ function App() {
   const [lastTextAutoFitEffect, setLastTextAutoFitEffect] = useState<SlideEditTextAutoFitHostCommandEffect<string, string> | null>(null)
   const [lastTextFontFamilyEffect, setLastTextFontFamilyEffect] = useState<SlideEditTextFontFamilyHostCommandEffect<string, string> | null>(null)
   const [lastTextFrameInsetEffect, setLastTextFrameInsetEffect] = useState<SlideEditTextFrameInsetHostCommandEffect<string, string> | null>(null)
+  const [lastTextFrameInsetImportEffect, setLastTextFrameInsetImportEffect] =
+    useState<PPTTextFrameInsetImportEffect | null>(null)
   const [lastColorSwatchImportEffect, setLastColorSwatchImportEffect] =
     useState<PPTColorSwatchImportEffect | null>(null)
   const [lastInlineEditEffect, setLastInlineEditEffect] = useState<PPTInlineEditEffect | null>(null)
@@ -3911,6 +3940,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textFrameInsetSource =
+        getPPTTextFrameInsetSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textFrameInsetSource &&
+        pastePPTTextFrameInsetSource(textFrameInsetSource)
       ) {
         event.preventDefault()
         return
@@ -5286,6 +5326,44 @@ function App() {
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
             : element
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextFrameInsetSource(source: PPTTextFrameInsetImportSource) {
+    const effects = selectedElements
+      .filter((element): element is PPTTextElement =>
+        isPPTTextElement(element) &&
+          element.locked !== true &&
+          element.visible !== false)
+      .flatMap((element) =>
+        createPPTTextFrameInsetImportCommandEffects({
+          element,
+          slideId: activeSlide.id,
+          source,
+        }))
+
+    if (effects.length === 0) {
+      return false
+    }
+
+    setLastTextFrameInsetEffect(effects[effects.length - 1])
+    setLastTextFrameInsetImportEffect(createPPTTextFrameInsetImportEffect({
+      effects,
+      source,
+    }))
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: slide.elements.map((element) =>
+          isPPTTextElement(element)
+            ? applyPPTTextFrameInsetCommandEffectsToElement(
+                element,
+                effects.filter((effect) =>
+                  effect.payload.objectId === element.id),
+              )
+            : element),
       })))
 
     return true
@@ -11632,6 +11710,19 @@ function App() {
         data-ppt-text-inset-command-slide={lastTextFrameInsetEffect?.payload.slideId}
         data-ppt-text-inset-command-type={lastTextFrameInsetEffect?.type}
         data-ppt-text-inset-command-value={lastTextFrameInsetEffect?.payload.value}
+        data-ppt-text-inset-import-bottom={lastTextFrameInsetImportEffect?.bottom}
+        data-ppt-text-inset-import-command-fields={lastTextFrameInsetImportEffect?.commandFields}
+        data-ppt-text-inset-import-command-targets={lastTextFrameInsetImportEffect?.commandTargets}
+        data-ppt-text-inset-import-command-types={lastTextFrameInsetImportEffect?.commandTypes}
+        data-ppt-text-inset-import-commands={lastTextFrameInsetImportEffect?.commandIds}
+        data-ppt-text-inset-import-fields={lastTextFrameInsetImportEffect?.fields}
+        data-ppt-text-inset-import-format={lastTextFrameInsetImportEffect?.format}
+        data-ppt-text-inset-import-json-length={lastTextFrameInsetImportEffect?.jsonLength}
+        data-ppt-text-inset-import-left={lastTextFrameInsetImportEffect?.left}
+        data-ppt-text-inset-import-model={lastTextFrameInsetImportEffect?.model}
+        data-ppt-text-inset-import-objects={lastTextFrameInsetImportEffect?.objectIds}
+        data-ppt-text-inset-import-right={lastTextFrameInsetImportEffect?.right}
+        data-ppt-text-inset-import-top={lastTextFrameInsetImportEffect?.top}
         data-ppt-text-inset-model="slide-edit-text-frame-inset"
         data-ppt-text-paragraph-spacing-command={lastTextParagraphSpacingEffect?.payload.id}
         data-ppt-text-paragraph-spacing-command-field={lastTextParagraphSpacingEffect?.payload.fieldId}
@@ -14718,6 +14809,74 @@ function applyPPTTextAutoFitCommandEffectToElement(
     ...element,
     geometry: updatePPTElementBounds(element, effect.payload.bounds).geometry,
     textAutoFit: PPT_TEXT_AUTOFIT,
+  }
+}
+
+function createPPTTextFrameInsetImportEffect({
+  effects,
+  source,
+}: {
+  effects: readonly SlideEditTextFrameInsetHostCommandEffect<string, string>[]
+  source: PPTTextFrameInsetImportSource
+}): PPTTextFrameInsetImportEffect {
+  return {
+    bottom: source.inset.bottom === undefined ? '' : String(source.inset.bottom),
+    commandFields: effects.map((effect) => effect.payload.fieldId).join(' '),
+    commandIds: effects.map((effect) => effect.payload.id).join(' '),
+    commandTargets: effects.map((effect) => effect.payload.objectId).join(' '),
+    commandTypes: effects.map((effect) => effect.type).join(' '),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    left: source.inset.left === undefined ? '' : String(source.inset.left),
+    model: PPT_TEXT_FRAME_INSET_IMPORT_MODEL,
+    objectIds: uniquePPTCanvasValues(
+      effects.map((effect) => effect.payload.objectId),
+    ).join(' '),
+    right: source.inset.right === undefined ? '' : String(source.inset.right),
+    top: source.inset.top === undefined ? '' : String(source.inset.top),
+  }
+}
+
+function createPPTTextFrameInsetImportCommandEffects({
+  element,
+  slideId,
+  source,
+}: {
+  element: PPTTextElement
+  slideId: string
+  source: PPTTextFrameInsetImportSource
+}): SlideEditTextFrameInsetHostCommandEffect<string, string>[] {
+  return source.fields.map((field) =>
+    getSlideEditTextFrameInsetCommandEffect({
+      fieldId: field,
+      id: 'update-text-frame-inset',
+      objectId: element.id,
+      slideId,
+      value: source.inset[field] ?? 0,
+    }))
+}
+
+function applyPPTTextFrameInsetCommandEffectsToElement(
+  element: PPTTextElement,
+  effects: readonly SlideEditTextFrameInsetHostCommandEffect<string, string>[],
+): PPTTextElement {
+  if (effects.length === 0) {
+    return element
+  }
+
+  const inset = { ...getPPTTextElementInset(element) }
+
+  effects.forEach((effect) => {
+    inset[effect.payload.fieldId] = normalizePPTTextInset(effect.payload.value)
+  })
+
+  return {
+    ...element,
+    style: {
+      ...getPPTTextElementStyle(element),
+      textInset: inset,
+    },
   }
 }
 
@@ -18636,6 +18795,224 @@ function getPPTTextAutoFitHandleFromJSONValue(
 
   return PPT_RESIZE_HANDLES.includes(handle as ResizeHandle)
     ? handle as ResizeHandle
+    : undefined
+}
+
+function getPPTTextFrameInsetSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextFrameInsetSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextFrameInsetSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextFrameInsetImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    return null
+  }
+
+  try {
+    return getPPTTextFrameInsetSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextFrameInsetSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextFrameInsetImportSource | null {
+  const payloadValue = getPPTTextFrameInsetPayloadValue(value, allowDirect)
+  const fields = ['top', 'right', 'bottom', 'left'] as const
+  const inset: Partial<PPTTextInset> = {}
+
+  if (typeof payloadValue === 'number') {
+    const insetValue = getPPTTextFrameInsetFieldValueFromJSONValue(payloadValue)
+
+    if (insetValue === undefined) {
+      return null
+    }
+
+    fields.forEach((field) => {
+      inset[field] = insetValue
+    })
+
+    return {
+      fields,
+      format: PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT,
+      inset,
+      jsonLength,
+    }
+  }
+
+  if (Array.isArray(payloadValue)) {
+    fields.forEach((field, index) => {
+      const fieldValue = getPPTTextFrameInsetFieldValueFromJSONValue(
+        payloadValue[index],
+      )
+
+      if (fieldValue !== undefined) {
+        inset[field] = fieldValue
+      }
+    })
+
+    const sourceFields = fields.filter((field) => inset[field] !== undefined)
+
+    return sourceFields.length > 0
+      ? {
+          fields: sourceFields,
+          format: PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT,
+          inset,
+          jsonLength,
+        }
+      : null
+  }
+
+  if (!isPPTRecord(payloadValue)) {
+    return null
+  }
+
+  fields.forEach((field) => {
+    const fieldValue = getPPTTextFrameInsetFieldValueFromJSONValue(
+      payloadValue[field],
+    )
+
+    if (fieldValue !== undefined) {
+      inset[field] = fieldValue
+    }
+  })
+
+  const sourceFields = fields.filter((field) => inset[field] !== undefined)
+
+  return sourceFields.length > 0
+    ? {
+        fields: sourceFields,
+        format: PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT,
+        inset,
+        jsonLength,
+      }
+    : null
+}
+
+function getPPTTextFrameInsetPayloadValue(
+  value: unknown,
+  allowDirect: boolean,
+): unknown {
+  if (!isPPTRecord(value)) {
+    return allowDirect ? value : null
+  }
+
+  if (
+    isPPTRecord(value.textFrameInset) ||
+    Array.isArray(value.textFrameInset) ||
+    typeof value.textFrameInset === 'number'
+  ) {
+    return value.textFrameInset
+  }
+
+  if (
+    isPPTRecord(value.textInset) ||
+    Array.isArray(value.textInset) ||
+    typeof value.textInset === 'number'
+  ) {
+    return value.textInset
+  }
+
+  if (
+    isPPTRecord(value.textPadding) ||
+    Array.isArray(value.textPadding) ||
+    typeof value.textPadding === 'number'
+  ) {
+    return value.textPadding
+  }
+
+  if (
+    isPPTRecord(value.inset) ||
+    Array.isArray(value.inset) ||
+    typeof value.inset === 'number'
+  ) {
+    return value.inset
+  }
+
+  if (
+    isPPTRecord(value.padding) ||
+    Array.isArray(value.padding) ||
+    typeof value.padding === 'number'
+  ) {
+    return value.padding
+  }
+
+  if (allowDirect && (
+    typeof value.top === 'number' ||
+    typeof value.right === 'number' ||
+    typeof value.bottom === 'number' ||
+    typeof value.left === 'number'
+  )) {
+    return value
+  }
+
+  return allowDirect ? value : null
+}
+
+function getPPTTextFrameInsetFieldValueFromJSONValue(
+  value: unknown,
+): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? normalizePPTTextInset(value)
     : undefined
 }
 
