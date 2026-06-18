@@ -29364,34 +29364,6 @@ function getPPTMediaJSONPayloadValue(
     return null
   }
 
-  if (typeof value.media === 'string') {
-    return { url: value.media }
-  }
-
-  if (isPPTRecord(value.media)) {
-    return value.media
-  }
-
-  if (typeof value.mediaSource === 'string') {
-    return { url: value.mediaSource }
-  }
-
-  if (isPPTRecord(value.mediaSource)) {
-    return value.mediaSource
-  }
-
-  if (isPPTRecord(value.linkCard)) {
-    return value.linkCard
-  }
-
-  if (isPPTRecord(value.linkPreview)) {
-    return value.linkPreview
-  }
-
-  if (isPPTRecord(value.embed)) {
-    return value.embed
-  }
-
   if (hasPPTMediaJSONStandalonePayloadFields(value)) {
     return value
   }

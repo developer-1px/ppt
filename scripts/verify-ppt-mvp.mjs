@@ -16950,6 +16950,52 @@ async function runMediaImportScenario(page) {
     },
   )
 
+  const stringJSONUrl = 'https://example.com/string-json-media-card'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      mediaSource: url,
+    })
+
+    dataTransfer.setData('application/json', json)
+    dataTransfer.setData('text/plain', json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(stringJSONUrl)})`)
+  await delay(120)
+
+  const afterStringJSONPaste = await getPPTMediaImportState(page)
+
+  record(
+    'pastes string wrapper JSON media source through canvas media import',
+    afterStringJSONPaste.mediaImportModel === 'canvas-media-import' &&
+      afterStringJSONPaste.mediaImportImporter === 'ppt-link-card' &&
+      afterStringJSONPaste.mediaImportUrl === stringJSONUrl &&
+      afterStringJSONPaste.mediaImportSelection === afterStringJSONPaste.selectedId &&
+      afterStringJSONPaste.mediaJSONImportModel === 'ppt-media-json-import' &&
+      afterStringJSONPaste.mediaJSONImportFormat === 'application-json-ppt-media' &&
+      afterStringJSONPaste.mediaJSONImportFields === 'url' &&
+      afterStringJSONPaste.mediaJSONImportImporter === 'ppt-link-card' &&
+      afterStringJSONPaste.mediaJSONImportObject === afterStringJSONPaste.selectedId &&
+      afterStringJSONPaste.mediaJSONImportTitle === '' &&
+      afterStringJSONPaste.mediaJSONImportUrl === stringJSONUrl &&
+      afterStringJSONPaste.mediaJSONImportJsonLength > 40 &&
+      afterStringJSONPaste.shapeCount === afterJSONPaste.shapeCount + 1 &&
+      afterStringJSONPaste.selectedKind === 'shape' &&
+      afterStringJSONPaste.selectedName === 'Link card' &&
+      afterStringJSONPaste.selectedHyperlink === stringJSONUrl &&
+      afterStringJSONPaste.selectedText.includes(stringJSONUrl) &&
+      afterStringJSONPaste.exportCode.includes(`data-ppt-hyperlink-url="${stringJSONUrl}"`),
+    {
+      afterJSONPaste,
+      afterStringJSONPaste,
+    },
+  )
+
   const standaloneJSONUrl = 'https://example.com/standalone-json-media-card'
   const standaloneJSONTitle = 'Standalone media brief'
 
@@ -16986,7 +17032,7 @@ async function runMediaImportScenario(page) {
       afterStandaloneJSONPaste.mediaJSONImportTitle === standaloneJSONTitle &&
       afterStandaloneJSONPaste.mediaJSONImportUrl === standaloneJSONUrl &&
       afterStandaloneJSONPaste.mediaJSONImportJsonLength > 60 &&
-      afterStandaloneJSONPaste.shapeCount === afterJSONPaste.shapeCount + 1 &&
+      afterStandaloneJSONPaste.shapeCount === afterStringJSONPaste.shapeCount + 1 &&
       afterStandaloneJSONPaste.selectedKind === 'shape' &&
       afterStandaloneJSONPaste.selectedName === 'Link card' &&
       afterStandaloneJSONPaste.selectedHyperlink === standaloneJSONUrl &&
@@ -16994,7 +17040,7 @@ async function runMediaImportScenario(page) {
       afterStandaloneJSONPaste.selectedText.includes(standaloneJSONUrl) &&
       afterStandaloneJSONPaste.exportCode.includes(`data-ppt-hyperlink-url="${standaloneJSONUrl}"`),
     {
-      afterJSONPaste,
+      afterStringJSONPaste,
       afterStandaloneJSONPaste,
     },
   )
