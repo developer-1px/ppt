@@ -42,6 +42,8 @@ const SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-name+json'
 const SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-state+json'
+const SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.slide-edit.text-frame-inset+json'
 const SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.text-vertical-alignment+json'
 
@@ -8267,6 +8269,83 @@ async function runTextFrameInsetScenario(page) {
       afterJSONPaste,
       afterJSONRedo,
       afterJSONUndo,
+    },
+  )
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify({
+      bottom: 14,
+      left: 18,
+      right: 10,
+      top: 6,
+    })
+
+    dataTransfer.setData(${JSON.stringify(SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE)}, json)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const afterCanvasMIMEPaste = await getPPTTextFrameInsetState(page)
+
+  record(
+    'pastes canvas MIME text frame inset through slide-edit command effects',
+    afterCanvasMIMEPaste.command === 'update-text-frame-inset' &&
+      afterCanvasMIMEPaste.commandField === 'left' &&
+      afterCanvasMIMEPaste.commandObject === 's1-title' &&
+      afterCanvasMIMEPaste.commandSlide === 'slide-1' &&
+      afterCanvasMIMEPaste.commandType === 'slide-command-effect' &&
+      afterCanvasMIMEPaste.commandValue === '18' &&
+      afterCanvasMIMEPaste.importBottom === '14' &&
+      afterCanvasMIMEPaste.importCommandFields === 'top right bottom left' &&
+      afterCanvasMIMEPaste.importCommands === 'update-text-frame-inset update-text-frame-inset update-text-frame-inset update-text-frame-inset' &&
+      afterCanvasMIMEPaste.importCommandTargets === 's1-title s1-title s1-title s1-title' &&
+      afterCanvasMIMEPaste.importCommandTypes === 'slide-command-effect slide-command-effect slide-command-effect slide-command-effect' &&
+      afterCanvasMIMEPaste.importFields === 'top right bottom left' &&
+      afterCanvasMIMEPaste.importFormat === 'application-json-ppt-text-frame-inset' &&
+      afterCanvasMIMEPaste.importJsonLength > 40 &&
+      afterCanvasMIMEPaste.importLeft === '18' &&
+      afterCanvasMIMEPaste.importModel === 'ppt-text-frame-inset-import' &&
+      afterCanvasMIMEPaste.importObjects === 's1-title' &&
+      afterCanvasMIMEPaste.importRight === '10' &&
+      afterCanvasMIMEPaste.importTop === '6' &&
+      afterCanvasMIMEPaste.inspectorTextInset === '6,10,14,18' &&
+      afterCanvasMIMEPaste.selectedStylePadding === '6px 10px 14px 18px' &&
+      afterCanvasMIMEPaste.selectedTextInset === '6,10,14,18' &&
+      afterCanvasMIMEPaste.thumbTextInset === '6,10,14,18' &&
+      afterCanvasMIMEPaste.top === '6' &&
+      afterCanvasMIMEPaste.right === '10' &&
+      afterCanvasMIMEPaste.bottom === '14' &&
+      afterCanvasMIMEPaste.left === '18',
+    {
+      afterCanvasMIMEPaste,
+      afterJSONRedo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterCanvasMIMEUndo = await getPPTTextFrameInsetState(page)
+
+  record(
+    'undoes canvas MIME text frame inset as one history step',
+    afterCanvasMIMEUndo.selectedTextInset === '8,12,16,20' &&
+      afterCanvasMIMEUndo.selectedStylePadding === '8px 12px 16px 20px' &&
+      afterCanvasMIMEUndo.thumbTextInset === '8,12,16,20' &&
+      afterCanvasMIMEUndo.inspectorTextInset === '8,12,16,20',
+    {
+      afterCanvasMIMEPaste,
+      afterCanvasMIMEUndo,
     },
   )
 

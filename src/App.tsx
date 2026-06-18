@@ -210,6 +210,7 @@ import {
   getSlideEditTextFrameInsetJSONPasteValue,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
+  getSlideEditTextFrameInsetPasteCommands,
   getSlideEditTableRowsJSONPasteValue,
   getSlideEditTableRowsPasteCommandEffect,
   getSlideEditTextParagraphAlignJSONPasteValue,
@@ -264,6 +265,7 @@ import {
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
+  SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_COMMANDS,
@@ -7309,17 +7311,31 @@ function App() {
   }
 
   function pastePPTTextFrameInsetSource(source: PPTTextFrameInsetImportSource) {
-    const effects = selectedElements
-      .filter((element): element is PPTTextElement =>
+    const textElements = selectedElements.filter(
+      (element): element is PPTTextElement =>
         isPPTTextElement(element) &&
-          element.locked !== true &&
-          element.visible !== false)
-      .flatMap((element) =>
-        createPPTTextFrameInsetImportCommandEffects({
-          element,
-          slideId: activeSlide.id,
-          source,
-        }))
+        element.locked !== true &&
+        element.visible !== false,
+    )
+
+    const effects = getSlideEditTextFrameInsetPasteCommands({
+      objectIds: textElements.map((element) => element.id),
+      pasteValue: {
+        fields: source.fields.flatMap((field) => {
+          const value = source.inset[field]
+
+          return value === undefined
+            ? []
+            : [{
+                fieldId: field,
+                value,
+              }]
+        }),
+        inset: source.inset,
+        surface: 'text-frame-inset',
+      },
+      slideId: activeSlide.id,
+    }).map(getSlideEditTextFrameInsetCommandEffect)
 
     if (effects.length === 0) {
       return false
@@ -18260,25 +18276,6 @@ function createPPTTextFrameInsetImportEffect({
   }
 }
 
-function createPPTTextFrameInsetImportCommandEffects({
-  element,
-  slideId,
-  source,
-}: {
-  element: PPTTextElement
-  slideId: string
-  source: PPTTextFrameInsetImportSource
-}): SlideEditTextFrameInsetHostCommandEffect<string, string>[] {
-  return source.fields.map((field) =>
-    getSlideEditTextFrameInsetCommandEffect({
-      fieldId: field,
-      id: 'update-text-frame-inset',
-      objectId: element.id,
-      slideId,
-      value: source.inset[field] ?? 0,
-    }))
-}
-
 function applyPPTTextFrameInsetCommandEffectsToElement(
   element: PPTTextElement,
   effects: readonly SlideEditTextFrameInsetHostCommandEffect<string, string>[],
@@ -27883,23 +27880,41 @@ function getPPTTextFrameInsetSourceFromDataTransfer(
 function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextFrameInsetImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
+  for (const customMimeType of [
+    PPT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
+        dataTransfer: {
+          getData: (type: string) =>
+            candidate.dataTransfer.getData(type) ? json : '',
+        },
+        jsonMimeType: candidate.customMimeType,
+      })
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return createPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
+        pasteValue,
+        json.length,
+      )
     }
-
-    return createPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
-      pasteValue,
-      candidate.text.length,
-    )
   }
 
   return null
