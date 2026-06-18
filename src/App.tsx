@@ -1131,6 +1131,12 @@ const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
 const PPT_TEXT_BODY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-body+json'
+const PPT_TEXT_RUN_COLOR_IMPORT_MODEL =
+  'ppt-text-run-color-import' as const
+const PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-run-color' as const
+const PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-run-color+json'
 const PPT_TEXT_RUN_BOLD_IMPORT_MODEL =
   'ppt-text-run-bold-import' as const
 const PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT =
@@ -1598,6 +1604,17 @@ type PPTTextBodyImportSource = {
   jsonLength: number
   mode: 'plain-text' | 'text-body'
   textBody: PPTTextBody
+}
+type PPTTextRunColorImportField =
+  | 'color'
+  | 'runColor'
+  | 'textRunColor'
+  | 'value'
+type PPTTextRunColorImportSource = {
+  color: string
+  fields: readonly PPTTextRunColorImportField[]
+  format: typeof PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT
+  jsonLength: number
 }
 type PPTTextRunBoldImportField =
   | 'runBold'
@@ -2161,6 +2178,21 @@ type PPTTextBodyImportEffect = {
   paragraphCount: number
   runCount: number
   textLength: number
+}
+type PPTTextRunColorImportEffect = {
+  color: string
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_RUN_COLOR_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
 }
 type PPTTextRunBoldImportEffect = {
   bold: string
@@ -3444,6 +3476,8 @@ function App() {
     useState<PPTTextStyleImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
+  const [lastTextRunColorImportEffect, setLastTextRunColorImportEffect] =
+    useState<PPTTextRunColorImportEffect | null>(null)
   const [lastTextRunBoldImportEffect, setLastTextRunBoldImportEffect] =
     useState<PPTTextRunBoldImportEffect | null>(null)
   const [lastTextRunItalicImportEffect, setLastTextRunItalicImportEffect] =
@@ -4554,6 +4588,17 @@ function App() {
       if (
         colorSwatchSource &&
         pastePPTColorSwatchSource(colorSwatchSource)
+      ) {
+        event.preventDefault()
+        return
+      }
+
+      const textRunColorSource =
+        getPPTTextRunColorSourceFromDataTransfer(event.clipboardData)
+
+      if (
+        textRunColorSource &&
+        pastePPTTextRunColorSource(textRunColorSource)
       ) {
         event.preventDefault()
         return
@@ -6388,6 +6433,54 @@ function App() {
             ? applyPPTColorSwatchCommandEffectToElement(element, effect)
             : element
         }),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    setLastTextRunColorImportEffect(createPPTTextRunColorImportEffect({
+      objectIds: textElements.map((element) => element.id),
+      runCount: textElements.reduce((count, element) =>
+        count + element.textBody.paragraphs.reduce(
+          (paragraphCount, paragraph) => paragraphCount + paragraph.runs.length,
+          0,
+        ), 0),
+      slideId: activeSlide.id,
+      source,
+    }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          textElements.map((element) => element.id),
+          (element) =>
+            isPPTTextElement(element)
+              ? {
+                  ...element,
+                  textBody: {
+                    paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+                      ...paragraph,
+                      runs: paragraph.runs.map((run) => ({
+                        ...run,
+                        color: source.color,
+                      })),
+                    })),
+                  },
+                }
+              : element,
+        ),
       })))
 
     return true
@@ -12985,6 +13078,19 @@ function App() {
         data-ppt-text-body-import-paragraphs={lastTextBodyImportEffect?.paragraphCount}
         data-ppt-text-body-import-runs={lastTextBodyImportEffect?.runCount}
         data-ppt-text-body-import-text-length={lastTextBodyImportEffect?.textLength}
+        data-ppt-text-run-color-import-command-fields={lastTextRunColorImportEffect?.commandFields}
+        data-ppt-text-run-color-import-command-ids={lastTextRunColorImportEffect?.commandIds}
+        data-ppt-text-run-color-import-command-targets={lastTextRunColorImportEffect?.commandTargets}
+        data-ppt-text-run-color-import-command-types={lastTextRunColorImportEffect?.commandTypes}
+        data-ppt-text-run-color-import-command-values={lastTextRunColorImportEffect?.commandValues}
+        data-ppt-text-run-color-import-fields={lastTextRunColorImportEffect?.fields}
+        data-ppt-text-run-color-import-format={lastTextRunColorImportEffect?.format}
+        data-ppt-text-run-color-import-json-length={lastTextRunColorImportEffect?.jsonLength}
+        data-ppt-text-run-color-import-model={lastTextRunColorImportEffect?.model}
+        data-ppt-text-run-color-import-objects={lastTextRunColorImportEffect?.objectIds}
+        data-ppt-text-run-color-import-runs={lastTextRunColorImportEffect?.runCount}
+        data-ppt-text-run-color-import-slide={lastTextRunColorImportEffect?.slideId}
+        data-ppt-text-run-color-import-value={lastTextRunColorImportEffect?.color}
         data-ppt-text-run-bold-import-command-fields={lastTextRunBoldImportEffect?.commandFields}
         data-ppt-text-run-bold-import-command-ids={lastTextRunBoldImportEffect?.commandIds}
         data-ppt-text-run-bold-import-command-targets={lastTextRunBoldImportEffect?.commandTargets}
@@ -17007,6 +17113,34 @@ function createPPTTextBodyImportEffect({
       0,
     ),
     textLength: readPPTText(source.textBody).length,
+  }
+}
+
+function createPPTTextRunColorImportEffect({
+  objectIds,
+  runCount,
+  slideId,
+  source,
+}: {
+  objectIds: readonly string[]
+  runCount: number
+  slideId: string
+  source: PPTTextRunColorImportSource
+}): PPTTextRunColorImportEffect {
+  return {
+    color: source.color,
+    commandFields: 'color',
+    commandIds: 'update-text-run-style',
+    commandTargets: objectIds.join(' '),
+    commandTypes: 'slide-command-effect',
+    commandValues: source.color,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_RUN_COLOR_IMPORT_MODEL,
+    objectIds: objectIds.join(' '),
+    runCount,
+    slideId,
   }
 }
 
@@ -22179,6 +22313,195 @@ function getPPTTextFontWeightImportValueFromJSONValue(
 
   return getPPTTextStyleFontWeightFromJSONValue(value) ??
     getPPTTextStyleBoldFromJSONValue(value)
+}
+
+function getPPTTextRunColorSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const candidates: Array<{
+    allowDirect: boolean
+    text: string
+  }> = [
+    {
+      allowDirect: true,
+      text: dataTransfer.getData(PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('application/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/json'),
+    },
+    {
+      allowDirect: false,
+      text: dataTransfer.getData('text/plain'),
+    },
+  ]
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const text = candidate.text.trim()
+
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+
+    const source = getPPTTextRunColorSourceFromText(
+      text,
+      candidate.allowDirect,
+    )
+
+    if (source) {
+      return source
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunColorSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextRunColorImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextRunColorSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextRunColorSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextRunColorSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextRunColorSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextRunColorImportSource | null {
+  const payload = getPPTTextRunColorPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const color = getPPTTextRunColorImportValueFromJSONValue(payload.value)
+
+  return color === undefined
+    ? null
+    : {
+        color,
+        fields: payload.fields,
+        format: PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT,
+        jsonLength,
+      }
+}
+
+function getPPTTextRunColorPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunColorImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textRunColor',
+    'runColor',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  if (allowDirect) {
+    for (const field of [
+      'color',
+      'value',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return {
+          fields: [field],
+          value: value[field],
+        }
+      }
+    }
+
+    return {
+      fields: ['value'],
+      value,
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunColorImportValueFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'color',
+      'runColor',
+      'textRunColor',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextRunColorImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  return normalizePPTSwatchColor(value) || undefined
 }
 
 function getPPTTextRunBoldSourceFromDataTransfer(
@@ -28491,6 +28814,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
           {paragraph.runs.map((run, runIndex) => (
             <span
               data-ppt-run-bold={run.bold === true ? 'true' : undefined}
+              data-ppt-run-color={run.color}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
               data-ppt-run-underline={run.underline === true ? 'true' : undefined}
               key={runIndex}

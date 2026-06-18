@@ -5400,6 +5400,22 @@ function getPPTTextFormatPainterState(page, elementId) {
       textFontWeightImportModel: stage?.getAttribute('data-ppt-text-font-weight-import-model') ?? '',
       textFontWeightImportObjects: stage?.getAttribute('data-ppt-text-font-weight-import-objects') ?? '',
       textFontWeightImportValue: stage?.getAttribute('data-ppt-text-font-weight-import-value') ?? '',
+      runColor: element?.querySelector('[data-ppt-run-color]')?.style.color ?? '',
+      runColorCount: element?.querySelectorAll('[data-ppt-run-color]').length ?? 0,
+      runColorValue: element?.querySelector('[data-ppt-run-color]')?.getAttribute('data-ppt-run-color') ?? '',
+      textRunColorImportCommandFields: stage?.getAttribute('data-ppt-text-run-color-import-command-fields') ?? '',
+      textRunColorImportCommandIds: stage?.getAttribute('data-ppt-text-run-color-import-command-ids') ?? '',
+      textRunColorImportCommandTargets: stage?.getAttribute('data-ppt-text-run-color-import-command-targets') ?? '',
+      textRunColorImportCommandTypes: stage?.getAttribute('data-ppt-text-run-color-import-command-types') ?? '',
+      textRunColorImportCommandValues: stage?.getAttribute('data-ppt-text-run-color-import-command-values') ?? '',
+      textRunColorImportFields: stage?.getAttribute('data-ppt-text-run-color-import-fields') ?? '',
+      textRunColorImportFormat: stage?.getAttribute('data-ppt-text-run-color-import-format') ?? '',
+      textRunColorImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-color-import-json-length') ?? 0),
+      textRunColorImportModel: stage?.getAttribute('data-ppt-text-run-color-import-model') ?? '',
+      textRunColorImportObjects: stage?.getAttribute('data-ppt-text-run-color-import-objects') ?? '',
+      textRunColorImportRuns: Number(stage?.getAttribute('data-ppt-text-run-color-import-runs') ?? 0),
+      textRunColorImportSlide: stage?.getAttribute('data-ppt-text-run-color-import-slide') ?? '',
+      textRunColorImportValue: stage?.getAttribute('data-ppt-text-run-color-import-value') ?? '',
       textRunBoldImportCommandFields: stage?.getAttribute('data-ppt-text-run-bold-import-command-fields') ?? '',
       textRunBoldImportCommandIds: stage?.getAttribute('data-ppt-text-run-bold-import-command-ids') ?? '',
       textRunBoldImportCommandTargets: stage?.getAttribute('data-ppt-text-run-bold-import-command-targets') ?? '',
@@ -6410,6 +6426,93 @@ async function runTextQuickFormatScenario(page) {
   await delay(80)
 
   const summaryAfterTextParagraphBulletRestore = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('#0f766e')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.ppt.text-run-color+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunColorPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes PPT text run color JSON through run style command effect',
+    summaryAfterTextParagraphBulletRestore.paragraphList === 'numbered' &&
+      summaryAfterTextParagraphBulletRestore.runColorCount === 0 &&
+      summaryAfterTextRunColorPaste.selected === 'true' &&
+      summaryAfterTextRunColorPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextRunColorPaste.runColor === 'rgb(15, 118, 110)' &&
+      summaryAfterTextRunColorPaste.runColorCount > 0 &&
+      summaryAfterTextRunColorPaste.runColorValue === '#0f766e' &&
+      summaryAfterTextRunColorPaste.textRunColorImportModel === 'ppt-text-run-color-import' &&
+      summaryAfterTextRunColorPaste.textRunColorImportFormat === 'application-json-ppt-text-run-color' &&
+      summaryAfterTextRunColorPaste.textRunColorImportCommandIds === 'update-text-run-style' &&
+      summaryAfterTextRunColorPaste.textRunColorImportCommandFields === 'color' &&
+      summaryAfterTextRunColorPaste.textRunColorImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunColorPaste.textRunColorImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunColorPaste.textRunColorImportCommandValues === '#0f766e' &&
+      summaryAfterTextRunColorPaste.textRunColorImportFields === 'value' &&
+      summaryAfterTextRunColorPaste.textRunColorImportJsonLength >= 9 &&
+      summaryAfterTextRunColorPaste.textRunColorImportObjects === 's1-summary' &&
+      summaryAfterTextRunColorPaste.textRunColorImportRuns > 0 &&
+      summaryAfterTextRunColorPaste.textRunColorImportSlide === 'slide-1' &&
+      summaryAfterTextRunColorPaste.textRunColorImportValue === '#0f766e',
+    {
+      summaryAfterTextParagraphBulletRestore,
+      summaryAfterTextRunColorPaste,
+      summaryAfterTextStylePaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunColorUndo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await pressKey(page, {
+    code: 'KeyY',
+    key: 'y',
+    modifiers: 2,
+    windowsVirtualKeyCode: 89,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunColorRedo = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes and redoes PPT text run color JSON as one history step',
+    summaryAfterTextRunColorUndo.runColorCount === 0 &&
+      summaryAfterTextRunColorRedo.runColor === 'rgb(15, 118, 110)' &&
+      summaryAfterTextRunColorRedo.runColorCount > 0,
+    {
+      summaryAfterTextRunColorPaste,
+      summaryAfterTextRunColorRedo,
+      summaryAfterTextRunColorUndo,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
