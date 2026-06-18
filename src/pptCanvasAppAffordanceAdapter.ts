@@ -116,6 +116,7 @@ import {
   isCanvasWheelPassthroughTarget,
   measureCanvasElementOverflow,
   measureCanvasTextBlocks,
+  readCanvasDataTransferJSONCandidate,
   readCanvasRichClipboardFromDataTransfer,
   readCanvasTableFileSource,
   readCanvasTableFileSources,
@@ -451,6 +452,8 @@ export const isPPTCanvasWheelPassthroughTarget =
 export const measurePPTCanvasElementOverflow =
   measureCanvasElementOverflow
 export const measurePPTCanvasTextBlocks = measureCanvasTextBlocks
+export const readPPTCanvasDataTransferJSONCandidate =
+  readCanvasDataTransferJSONCandidate
 export const readPPTCanvasRichClipboardFromDataTransfer =
   readCanvasRichClipboardFromDataTransfer
 export const resetPPTCanvasViewport = resetCanvasViewport
