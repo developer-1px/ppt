@@ -1440,6 +1440,17 @@ async function runAffordanceScenario(page) {
 
   const afterCenterResize = await page.eval(`(() => {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    if (!element) {
+      return {
+        centerX: 0,
+        centerY: 0,
+        height: 0,
+        left: 0,
+        top: 0,
+        width: 0,
+      }
+    }
+
     const left = parseFloat(element.style.left)
     const top = parseFloat(element.style.top)
     const width = parseFloat(element.style.width)
@@ -5161,9 +5172,15 @@ async function readPPTCommandPaletteComboboxState(page) {
 async function readCommandPaletteIds(page, query) {
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-command-palette-query]')
-    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!input) return
 
-    valueSetter.call(input, ${JSON.stringify(query)})
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+    if (valueSetter) {
+      valueSetter.call(input, ${JSON.stringify(query)})
+    } else {
+      input.value = ${JSON.stringify(query)}
+    }
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
@@ -12462,14 +12479,22 @@ async function runObjectHyperlinkScenario(page) {
     initial,
   )
 
-  await page.eval(`((url) => {
+  await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!input) return
 
-    setter.call(input, url)
+    input.focus()
+    input.select()
+  })()`)
+  await page.send('Input.insertText', { text: url })
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
+    if (!input) return
+
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
-  })(${JSON.stringify(url)})`)
+    input.blur()
+  })()`)
   await delay(120)
 
   const afterUrl = await getPPTObjectHyperlinkState(page, targetId)
@@ -12533,11 +12558,23 @@ async function runObjectHyperlinkScenario(page) {
 
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!input) return
 
-    setter.call(input, '')
+    input.focus()
+    input.select()
+  })()`)
+  await pressKey(page, {
+    code: 'Backspace',
+    key: 'Backspace',
+    windowsVirtualKeyCode: 8,
+  })
+  await page.eval(`(() => {
+    const input = document.querySelector('[data-ppt-style-field="hyperlink"]')
+    if (!input) return
+
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
+    input.blur()
   })()`)
   await delay(120)
 
@@ -15725,6 +15762,13 @@ async function runMediaImportScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   const before = await getPPTMediaImportState(page)
   const pasteUrl = 'https://example.com/ppt-link-card'
 
@@ -15761,6 +15805,75 @@ async function runMediaImportScenario(page) {
     {
       afterPaste,
       before,
+    },
+  )
+
+  const selectedHyperlinkUrl = 'https://example.com/selected-object-link'
+
+  await page.eval(`((url) => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData('text/uri-list', url)
+    dataTransfer.setData('text/plain', url)
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })(${JSON.stringify(selectedHyperlinkUrl)})`)
+  await delay(120)
+
+  const afterSelectedURLPaste = await getPPTMediaImportState(page)
+  const afterSelectedURLHyperlink =
+    await getPPTObjectHyperlinkState(page, afterPaste.selectedId)
+
+  record(
+    'pastes URL media source into selected PPT object hyperlink via slide-edit command effect',
+    afterSelectedURLPaste.importExtensionLastClipboardActions === 'media-source' &&
+      afterSelectedURLPaste.shapeCount === afterPaste.shapeCount &&
+      afterSelectedURLPaste.selectedId === afterPaste.selectedId &&
+      afterSelectedURLPaste.selectedKind === afterPaste.selectedKind &&
+      afterSelectedURLPaste.selectedName === afterPaste.selectedName &&
+      afterSelectedURLPaste.selectedHyperlink === selectedHyperlinkUrl &&
+      afterSelectedURLPaste.selectedText === afterPaste.selectedText &&
+      afterSelectedURLPaste.mediaImportUrl === pasteUrl &&
+      afterSelectedURLHyperlink.hyperlinkImportModel === 'ppt-object-hyperlink-import' &&
+      afterSelectedURLHyperlink.hyperlinkImportFormat === 'canvas-media-url' &&
+      afterSelectedURLHyperlink.hyperlinkImportSlide === 'slide-1' &&
+      afterSelectedURLHyperlink.hyperlinkImportObjects === afterPaste.selectedId &&
+      afterSelectedURLHyperlink.hyperlinkImportFields === 'url' &&
+      afterSelectedURLHyperlink.hyperlinkImportCommands === 'update-object-hyperlink' &&
+      afterSelectedURLHyperlink.hyperlinkImportCommandFields === 'url' &&
+      afterSelectedURLHyperlink.hyperlinkImportCommandTargets === afterPaste.selectedId &&
+      afterSelectedURLHyperlink.hyperlinkImportCommandTypes === 'slide-command-effect' &&
+      afterSelectedURLHyperlink.hyperlinkImportEnabled === 'true' &&
+      afterSelectedURLHyperlink.hyperlinkImportUrl === selectedHyperlinkUrl &&
+      afterSelectedURLHyperlink.hyperlinkImportJsonLength === selectedHyperlinkUrl.length &&
+      afterSelectedURLHyperlink.command === 'update-object-hyperlink' &&
+      afterSelectedURLHyperlink.commandObject === afterPaste.selectedId &&
+      afterSelectedURLHyperlink.commandValue === selectedHyperlinkUrl,
+    {
+      afterPaste,
+      afterSelectedURLHyperlink,
+      afterSelectedURLPaste,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(80)
+
+  const afterSelectedURLUndo = await getPPTMediaImportState(page)
+
+  record(
+    'undoes selected PPT object URL media-source hyperlink paste as one history step',
+    afterSelectedURLUndo.shapeCount === afterPaste.shapeCount &&
+      afterSelectedURLUndo.selectedId === afterPaste.selectedId &&
+      afterSelectedURLUndo.selectedHyperlink === pasteUrl &&
+      afterSelectedURLUndo.selectedText === afterPaste.selectedText,
+    {
+      afterPaste,
+      afterSelectedURLPaste,
+      afterSelectedURLUndo,
     },
   )
 
@@ -19475,18 +19588,32 @@ async function runTextOverflowScenario(page) {
     const text = document.querySelector('[data-ppt-style-field="text"]')
     const width = document.querySelector('[data-ppt-geometry-field="w"]')
     const height = document.querySelector('[data-ppt-geometry-field="h"]')
-    const textSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!text || !width || !height) return
 
-    textSetter.call(text, 'Overflowing AI generated takeaway that needs quick auto fit before PPTX compatible export.')
+    const textSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+    const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+    if (textSetter) {
+      textSetter.call(text, 'Overflowing AI generated takeaway that needs quick auto fit before PPTX compatible export.')
+    } else {
+      text.value = 'Overflowing AI generated takeaway that needs quick auto fit before PPTX compatible export.'
+    }
     text.dispatchEvent(new Event('input', { bubbles: true }))
     text.dispatchEvent(new Event('change', { bubbles: true }))
 
-    inputSetter.call(width, '132')
+    if (inputSetter) {
+      inputSetter.call(width, '132')
+    } else {
+      width.value = '132'
+    }
     width.dispatchEvent(new Event('input', { bubbles: true }))
     width.dispatchEvent(new Event('change', { bubbles: true }))
 
-    inputSetter.call(height, '34')
+    if (inputSetter) {
+      inputSetter.call(height, '34')
+    } else {
+      height.value = '34'
+    }
     height.dispatchEvent(new Event('input', { bubbles: true }))
     height.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)

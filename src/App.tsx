@@ -1068,6 +1068,8 @@ const PPT_OBJECT_METADATA_JSON_MIME_TYPE =
 const PPT_OBJECT_HYPERLINK_IMPORT_MODEL = 'ppt-object-hyperlink-import' as const
 const PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-hyperlink' as const
+const PPT_OBJECT_HYPERLINK_MEDIA_IMPORT_FORMAT =
+  'canvas-media-url' as const
 const PPT_OBJECT_HYPERLINK_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-hyperlink+json'
 const PPT_OBJECT_STATE_IMPORT_MODEL = 'ppt-object-state-import' as const
@@ -1452,9 +1454,12 @@ type PPTObjectMetadataImportSource = {
   }
 }
 type PPTObjectHyperlinkImportField = 'url'
+type PPTObjectHyperlinkImportFormat =
+  | typeof PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT
+  | typeof PPT_OBJECT_HYPERLINK_MEDIA_IMPORT_FORMAT
 type PPTObjectHyperlinkImportSource = {
   fields: readonly PPTObjectHyperlinkImportField[]
-  format: typeof PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT
+  format: PPTObjectHyperlinkImportFormat
   hyperlinkUrl: string | null
   jsonLength: number
 }
@@ -2033,7 +2038,7 @@ type PPTObjectHyperlinkImportEffect = {
   commandTypes: string
   enabled: string
   fields: string
-  format: typeof PPT_OBJECT_HYPERLINK_JSON_IMPORT_FORMAT
+  format: PPTObjectHyperlinkImportFormat
   jsonLength: number
   model: typeof PPT_OBJECT_HYPERLINK_IMPORT_MODEL
   objectIds: string
@@ -7423,6 +7428,12 @@ function App() {
     return true
   }
 
+  function pastePPTMediaSourceAsObjectHyperlink(source: PPTMediaImportSource) {
+    return pastePPTObjectHyperlinkSource(
+      createPPTObjectHyperlinkSourceFromMediaSource(source),
+    )
+  }
+
   function pastePPTImageReplaceSource(source: PPTImageReplaceImportSource) {
     const imageElements = activeSlide.elements
       .filter((element): element is PPTImage =>
@@ -8293,7 +8304,8 @@ function App() {
         insertPPTTableSource(action.source)
         return true
       case 'media-source':
-        return insertPPTMediaSource(action.source)
+        return pastePPTMediaSourceAsObjectHyperlink(action.source) ||
+          insertPPTMediaSource(action.source)
       case 'rich-text-source':
         return pastePPTTextBodySource(
             createPPTTextBodySourceFromRichTextPasteSource(action.source),
@@ -16399,6 +16411,17 @@ function createPPTObjectHyperlinkImportEffect({
     ).join(' '),
     slideId: effects[0]?.payload.slideId ?? '',
     url: source.hyperlinkUrl ?? '',
+  }
+}
+
+function createPPTObjectHyperlinkSourceFromMediaSource(
+  source: PPTMediaImportSource,
+): PPTObjectHyperlinkImportSource {
+  return {
+    fields: ['url'],
+    format: PPT_OBJECT_HYPERLINK_MEDIA_IMPORT_FORMAT,
+    hyperlinkUrl: source.url,
+    jsonLength: source.url.length,
   }
 }
 

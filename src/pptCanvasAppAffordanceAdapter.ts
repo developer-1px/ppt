@@ -97,6 +97,8 @@ import {
   writeCanvasRichClipboardPayload,
   zoomCanvasViewport,
   type CanvasFloatingAnchor,
+  type CanvasDeferredSelectorFocusInput,
+  type CanvasFocusableElement,
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
   type CanvasPointerClickMemory,
@@ -286,8 +288,11 @@ export const createPPTCanvasTabsDescriptor = createCanvasTabsDescriptor
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
 export const fitPPTCanvasViewportToBounds = fitCanvasViewportToBounds
 export const focusPPTCanvasElement = focusCanvasElement
-export const focusPPTCanvasElementBySelectorOnNextFrame =
-  focusCanvasElementBySelectorOnNextFrame
+export function focusPPTCanvasElementBySelectorOnNextFrame<
+  TElement extends Element & CanvasFocusableElement = HTMLElement,
+>(input: CanvasDeferredSelectorFocusInput<TElement>) {
+  return focusCanvasElementBySelectorOnNextFrame<TElement>(input)
+}
 export const focusPPTCanvasElementOnNextFrame =
   focusCanvasElementOnNextFrame
 export const getPPTCanvasClientViewportSize =
