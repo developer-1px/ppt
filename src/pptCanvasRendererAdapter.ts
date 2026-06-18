@@ -1,11 +1,13 @@
 import {
   createCanvasCssBoundsTransform,
   createCanvasSvgBoundsTransform,
-  createCanvasSvgFreehandPathData,
-  createCanvasSvgPathData,
   escapeCanvasXmlAttribute,
   formatCanvasSvgNumber,
 } from 'canvas/renderer'
+import {
+  createCanvasSvgFreehandPathData,
+  createCanvasSvgPathData,
+} from 'canvas/renderer/svg-drawing-primitives'
 
 export const createPPTCanvasCssBoundsTransform =
   createCanvasCssBoundsTransform

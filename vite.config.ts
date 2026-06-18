@@ -19,7 +19,7 @@ const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canv
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
 const canvasEngineEntry = fileURLToPath(new URL('../canvas/src/canvas/engine/index.ts', import.meta.url))
-const canvasSvgDrawingPrimitivesEntry = fileURLToPath(new URL('../canvas/src/canvas/renderer/svg/CanvasSvgDrawingPrimitives.ts', import.meta.url))
+const canvasSvgDrawingPrimitivesEntry = fileURLToPath(new URL('../canvas/src/canvas/renderer/svg-drawing-primitives.ts', import.meta.url))
 const domEditAffordanceMetadataEntry = fileURLToPath(new URL('../canvas/packages/dom-edit-affordance/src/metadata.ts', import.meta.url))
 const slideEditAffordanceEntry = fileURLToPath(new URL('../canvas/packages/slide-edit-affordance/src/index.ts', import.meta.url))
 
