@@ -295,6 +295,7 @@ import {
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
+  SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
@@ -3712,6 +3713,8 @@ const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL =
   'slide-edit-text-paragraph-bullet-keyboard-shortcuts'
 const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT =
   'slide-edit-text-paragraph-bullet-keyboard-intent'
+const PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT =
+  'slide-edit-text-paragraph-numbered-keyboard-intent'
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -4820,6 +4823,7 @@ function App() {
       const textParagraphBulletKeyboardIntent =
         getSlideEditTextParagraphBulletKeyboardIntent({
           altKey: event.altKey,
+          code: event.code,
           key: event.key,
           mod,
           shiftKey: event.shiftKey,
@@ -4829,7 +4833,11 @@ function App() {
         if (textParagraphBulletKeyboardIntent.preventDefault) {
           event.preventDefault()
         }
-        toggleSelectedParagraphBullet()
+        if (textParagraphBulletKeyboardIntent.kind === 'toggle-bullet') {
+          toggleSelectedParagraphBullet()
+        } else {
+          toggleSelectedParagraphNumbered()
+        }
         return
       }
 
@@ -14408,6 +14416,7 @@ function App() {
     id: 'format:numbered',
     onSelect: toggleSelectedParagraphNumbered,
     section: 'Format',
+    shortcut: SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
     title: 'Toggle numbered list',
   }, {
     disabled: !selectedElement || !isPPTTextElement(selectedElement) || !selectedTextOverflow,
@@ -15443,6 +15452,9 @@ function App() {
         data-ppt-text-paragraph-bullet-shortcut-intent={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT}
         data-ppt-text-paragraph-bullet-shortcut-keys={SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT}
         data-ppt-text-paragraph-bullet-shortcut-model={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL}
+        data-ppt-text-paragraph-numbered-shortcut-intent={PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT}
+        data-ppt-text-paragraph-numbered-shortcut-keys={SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT}
+        data-ppt-text-paragraph-numbered-shortcut-model={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL}
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}

@@ -5285,6 +5285,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.itemIds.includes('format:italic') &&
       afterShortcutOpen.itemIds.includes('format:underline') &&
       afterShortcutOpen.itemIds.includes('format:bullet') &&
+      afterShortcutOpen.itemIds.includes('format:numbered') &&
       afterShortcutOpen.itemIds.includes('command:edit-selection') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-next') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-previous') &&
@@ -5303,6 +5304,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+I') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+U') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+Shift+L') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+Shift+7') &&
       afterShortcutOpen.shortcuts.includes('Tab') &&
       afterShortcutOpen.shortcuts.includes('Shift+Tab') &&
       afterShortcutOpen.shortcuts.includes('H') &&
@@ -6779,12 +6781,19 @@ function getPPTTextParagraphBulletShortcutState(page, elementId) {
       bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
       bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
       inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
       numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
       numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
       paragraphBullet: paragraph?.getAttribute('data-ppt-bullet') === 'true'
         ? paragraph.textContent ?? ''
         : '',
       paragraphList: paragraph?.getAttribute('data-ppt-list') ?? '',
+      paragraphNumbered: paragraph?.getAttribute('data-ppt-numbered') === 'true'
+        ? paragraph.textContent ?? ''
+        : '',
+      numberedShortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-intent') ?? '',
+      numberedShortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-keys') ?? '',
+      numberedShortcutModel: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-model') ?? '',
       selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
       shortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-bullet-shortcut-intent') ?? '',
       shortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-bullet-shortcut-keys') ?? '',
@@ -7413,12 +7422,16 @@ async function runTextQuickFormatScenario(page) {
       afterBulletShortcut.shortcutModel === 'slide-edit-text-paragraph-bullet-keyboard-shortcuts' &&
       afterBulletShortcut.shortcutIntent === 'slide-edit-text-paragraph-bullet-keyboard-intent' &&
       afterBulletShortcut.shortcutKeys === 'Cmd/Ctrl+Shift+L' &&
+      afterBulletShortcut.numberedShortcutModel === 'slide-edit-text-paragraph-bullet-keyboard-shortcuts' &&
+      afterBulletShortcut.numberedShortcutIntent === 'slide-edit-text-paragraph-numbered-keyboard-intent' &&
+      afterBulletShortcut.numberedShortcutKeys === 'Cmd/Ctrl+Shift+7' &&
       afterBulletShortcut.bulletList === 'true' &&
       afterBulletShortcut.numberedList === '' &&
       afterBulletShortcut.paragraphList === 'bullet' &&
       afterBulletShortcut.bulletPressed === 'true' &&
       afterBulletShortcut.numberedPressed === 'false' &&
       afterBulletShortcut.inspectorBulletPressed === 'true' &&
+      afterBulletShortcut.inspectorNumberedPressed === 'false' &&
       afterBulletShortcut.paragraphBullet.length > 0 &&
       afterBulletShortcutRestore.selectedId === 's1-title' &&
       afterBulletShortcutRestore.bulletList === '' &&
@@ -7430,6 +7443,55 @@ async function runTextQuickFormatScenario(page) {
     {
       afterBulletShortcut,
       afterBulletShortcutRestore,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Digit7',
+    key: '7',
+    modifiers: 10,
+    windowsVirtualKeyCode: 55,
+  })
+  await delay(80)
+
+  const afterNumberedShortcut =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await pressKey(page, {
+    code: 'Digit7',
+    key: '7',
+    modifiers: 10,
+    windowsVirtualKeyCode: 55,
+  })
+  await delay(80)
+
+  const afterNumberedShortcutRestore =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  record(
+    'toggles PPT numbered list with canvas paragraph bullet keyboard shortcut',
+    afterNumberedShortcut.selectedId === 's1-title' &&
+      afterNumberedShortcut.numberedShortcutModel === 'slide-edit-text-paragraph-bullet-keyboard-shortcuts' &&
+      afterNumberedShortcut.numberedShortcutIntent === 'slide-edit-text-paragraph-numbered-keyboard-intent' &&
+      afterNumberedShortcut.numberedShortcutKeys === 'Cmd/Ctrl+Shift+7' &&
+      afterNumberedShortcut.bulletList === '' &&
+      afterNumberedShortcut.numberedList === 'true' &&
+      afterNumberedShortcut.paragraphList === 'numbered' &&
+      afterNumberedShortcut.bulletPressed === 'false' &&
+      afterNumberedShortcut.numberedPressed === 'true' &&
+      afterNumberedShortcut.inspectorBulletPressed === 'false' &&
+      afterNumberedShortcut.inspectorNumberedPressed === 'true' &&
+      afterNumberedShortcut.paragraphNumbered.length > 0 &&
+      afterNumberedShortcutRestore.selectedId === 's1-title' &&
+      afterNumberedShortcutRestore.bulletList === '' &&
+      afterNumberedShortcutRestore.numberedList === '' &&
+      afterNumberedShortcutRestore.paragraphList === '' &&
+      afterNumberedShortcutRestore.bulletPressed === 'false' &&
+      afterNumberedShortcutRestore.numberedPressed === 'false' &&
+      afterNumberedShortcutRestore.inspectorNumberedPressed === 'false',
+    {
+      afterNumberedShortcut,
+      afterNumberedShortcutRestore,
     },
   )
 
