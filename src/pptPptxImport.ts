@@ -52,6 +52,19 @@ type PPTXImportedAnimation = {
   objectName?: string
   objectId: string
 }
+type PPTXGroupTransform = {
+  childOffsetX: number
+  childOffsetY: number
+  offsetX: number
+  offsetY: number
+  scaleX: number
+  scaleY: number
+}
+type PPTXSlideObjectNode = {
+  element: Element
+  groupId?: string
+  transform: PPTXGroupTransform
+}
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -60,6 +73,14 @@ const PPTX_DEFAULT_TEXT_COLOR = '#111827'
 const PPTX_DEFAULT_TEXT_SIZE = 24
 const PPTX_DEFAULT_FILL_COLOR = '#ffffff'
 const PPTX_DEFAULT_STROKE_COLOR = '#111827'
+const PPTX_IDENTITY_GROUP_TRANSFORM: PPTXGroupTransform = {
+  childOffsetX: 0,
+  childOffsetY: 0,
+  offsetX: 0,
+  offsetY: 0,
+  scaleX: 1,
+  scaleY: 1,
+}
 const PPTX_LOCK_ATTRIBUTE_NAMES = [
   'noAdjustHandles',
   'noEditPoints',
@@ -300,7 +321,8 @@ async function readPPTXOpenXmlSlide({
   const elementIdByPptxObjectId = new Map<string, string>()
   let objectIndex = 1
 
-  for (const child of getPPTXSlideObjectNodes(spTree, xml)) {
+  for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
+    const child = objectNode.element
     let element: PPTElement | null = null
 
     if (child.localName === 'sp') {
@@ -323,9 +345,11 @@ async function readPPTXOpenXmlSlide({
     }
 
     if (element) {
-      elements.push(element)
+      const transformedElement = applyPPTXGroupObjectNode(element, objectNode)
+
+      elements.push(transformedElement)
       for (const pptxObjectId of readPPTXObjectIds(child)) {
-        elementIdByPptxObjectId.set(pptxObjectId, element.id)
+        elementIdByPptxObjectId.set(pptxObjectId, transformedElement.id)
       }
       objectIndex += 1
     }
@@ -392,14 +416,31 @@ function readPPTXObjectIds(element: Element) {
     .filter((id) => id.length > 0)
 }
 
-function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
+function applyPPTXGroupObjectNode(
+  element: PPTElement,
+  objectNode: PPTXSlideObjectNode,
+): PPTElement {
+  const withGroup = objectNode.groupId
+    ? { ...element, groupId: objectNode.groupId }
+    : element
+
+  return isPPTXIdentityGroupTransform(objectNode.transform)
+    ? withGroup
+    : transformPPTXElement(withGroup, objectNode.transform)
+}
+
+function getPPTXSlideObjectNodes(
+  spTree: Element | null,
+  xml: string,
+  slideIndex: number,
+) {
   const treeNodes = spTree
-    ? Array.from(spTree.children)
-      .filter((child) =>
-        child.localName === 'sp' ||
-        child.localName === 'cxnSp' ||
-        child.localName === 'pic' ||
-        child.localName === 'graphicFrame')
+    ? getPPTXSlideObjectNodesFromContainer({
+        container: spTree,
+        groupId: undefined,
+        slideIndex,
+        transform: PPTX_IDENTITY_GROUP_TRANSFORM,
+      })
     : []
 
   if (treeNodes.length > 0) {
@@ -409,6 +450,68 @@ function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
   return [...xml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame)\b[\s\S]*?<\/p:\1>/g)]
     .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
     .filter((element): element is Element => element !== null)
+    .map((element) => ({
+      element,
+      transform: PPTX_IDENTITY_GROUP_TRANSFORM,
+    }))
+}
+
+function getPPTXSlideObjectNodesFromContainer({
+  container,
+  groupId,
+  slideIndex,
+  transform,
+}: {
+  container: Element
+  groupId: string | undefined
+  slideIndex: number
+  transform: PPTXGroupTransform
+}): PPTXSlideObjectNode[] {
+  return Array.from(container.children).flatMap((child) => {
+    if (isPPTXSlideObjectNode(child)) {
+      return [{
+        element: child,
+        ...(groupId ? { groupId } : {}),
+        transform,
+      }]
+    }
+
+    if (child.localName !== 'grpSp') {
+      return []
+    }
+
+    const nextTransform = composePPTXGroupTransforms(
+      transform,
+      readPPTXGroupTransform(child),
+    )
+    const nextGroupId = groupId ??
+      readPPTXGroupId(child, slideIndex)
+
+    return getPPTXSlideObjectNodesFromContainer({
+      container: child,
+      groupId: nextGroupId,
+      slideIndex,
+      transform: nextTransform,
+    })
+  })
+}
+
+function isPPTXSlideObjectNode(element: Element) {
+  return element.localName === 'sp' ||
+    element.localName === 'cxnSp' ||
+    element.localName === 'pic' ||
+    element.localName === 'graphicFrame'
+}
+
+function readPPTXGroupId(group: Element, slideIndex: number) {
+  const id = getFirstPPTXDescendantByLocalName(group, 'cNvPr')
+    ?.getAttribute('id')
+    ?.trim()
+  const name = readPPTXObjectName(group, 'group')
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return `pptx-slide-${slideIndex + 1}-group-${id || name || 'object'}`
 }
 
 function readPPTXSlideName(
@@ -1200,6 +1303,128 @@ function resolvePPTXRelationshipTarget(basePath: string, target: string) {
   }
 
   return normalized.join('/')
+}
+
+function readPPTXGroupTransform(group: Element): PPTXGroupTransform {
+  const grpSpPr = getDirectPPTXChildByLocalName(group, 'grpSpPr')
+  const xfrm = getDirectPPTXChildByLocalName(grpSpPr, 'xfrm')
+  const off = getDirectPPTXChildByLocalName(xfrm, 'off')
+  const ext = getDirectPPTXChildByLocalName(xfrm, 'ext')
+  const childOff = getDirectPPTXChildByLocalName(xfrm, 'chOff')
+  const childExt = getDirectPPTXChildByLocalName(xfrm, 'chExt')
+  const rawWidth = toPPTXPositiveNumber(ext?.getAttribute('cx'))
+  const rawHeight = toPPTXPositiveNumber(ext?.getAttribute('cy'))
+  const rawChildWidth = toPPTXPositiveNumber(childExt?.getAttribute('cx'))
+  const rawChildHeight = toPPTXPositiveNumber(childExt?.getAttribute('cy'))
+
+  return {
+    childOffsetX: emuToPx(toPPTXNumber(childOff?.getAttribute('x')) ?? 0),
+    childOffsetY: emuToPx(toPPTXNumber(childOff?.getAttribute('y')) ?? 0),
+    offsetX: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
+    offsetY: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
+    scaleX: rawWidth !== null && rawChildWidth !== null && rawChildWidth > 0
+      ? rawWidth / rawChildWidth
+      : 1,
+    scaleY: rawHeight !== null && rawChildHeight !== null && rawChildHeight > 0
+      ? rawHeight / rawChildHeight
+      : 1,
+  }
+}
+
+function composePPTXGroupTransforms(
+  parent: PPTXGroupTransform,
+  child: PPTXGroupTransform,
+): PPTXGroupTransform {
+  return {
+    childOffsetX: child.childOffsetX,
+    childOffsetY: child.childOffsetY,
+    offsetX: transformPPTXGroupCoordinate(
+      child.offsetX,
+      parent.offsetX,
+      parent.childOffsetX,
+      parent.scaleX,
+    ),
+    offsetY: transformPPTXGroupCoordinate(
+      child.offsetY,
+      parent.offsetY,
+      parent.childOffsetY,
+      parent.scaleY,
+    ),
+    scaleX: parent.scaleX * child.scaleX,
+    scaleY: parent.scaleY * child.scaleY,
+  }
+}
+
+function transformPPTXElement(
+  element: PPTElement,
+  transform: PPTXGroupTransform,
+): PPTElement {
+  const geometry = transformPPTXGeometry(element.geometry, transform)
+
+  if (element.kind === 'line') {
+    return {
+      ...element,
+      end: transformPPTXLinePoint(element.end, transform),
+      geometry,
+      start: transformPPTXLinePoint(element.start, transform),
+    }
+  }
+
+  return {
+    ...element,
+    geometry,
+  }
+}
+
+function transformPPTXGeometry(
+  geometry: PPTGeometry,
+  transform: PPTXGroupTransform,
+): PPTGeometry {
+  return {
+    ...geometry,
+    h: Math.max(1, Math.round(geometry.h * transform.scaleY)),
+    w: Math.max(1, Math.round(geometry.w * transform.scaleX)),
+    x: transformPPTXGroupCoordinate(
+      geometry.x,
+      transform.offsetX,
+      transform.childOffsetX,
+      transform.scaleX,
+    ),
+    y: transformPPTXGroupCoordinate(
+      geometry.y,
+      transform.offsetY,
+      transform.childOffsetY,
+      transform.scaleY,
+    ),
+  }
+}
+
+function transformPPTXLinePoint(
+  point: PPTLine['start'],
+  transform: PPTXGroupTransform,
+) {
+  return {
+    x: Math.round(point.x * transform.scaleX),
+    y: Math.round(point.y * transform.scaleY),
+  }
+}
+
+function transformPPTXGroupCoordinate(
+  value: number,
+  offset: number,
+  childOffset: number,
+  scale: number,
+) {
+  return Math.round(offset + (value - childOffset) * scale)
+}
+
+function isPPTXIdentityGroupTransform(transform: PPTXGroupTransform) {
+  return transform.offsetX === 0 &&
+    transform.offsetY === 0 &&
+    transform.childOffsetX === 0 &&
+    transform.childOffsetY === 0 &&
+    transform.scaleX === 1 &&
+    transform.scaleY === 1
 }
 
 function readPPTXElementGeometry(spPr: Element | null): PPTGeometry | null {

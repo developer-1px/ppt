@@ -11001,8 +11001,10 @@ async function runExportScenario(page) {
   const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
     await addPPTXImageOpacityProbe(
       await addPPTXNoFillShapeProbe(
-        await reversePPTXPresentationSlideOrder(
-          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        await addPPTXGroupedObjectProbe(
+          await reversePPTXPresentationSlideOrder(
+            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          ),
         ),
       ),
     ),
@@ -11041,6 +11043,9 @@ async function runExportScenario(page) {
         element.kind === 'image' &&
         typeof element.src === 'string' &&
         element.src.startsWith('data:image/svg+xml')).length,
+      groupedProbeModelCount: elements.filter((element) =>
+        element.name === 'Grouped Text Probe' ||
+        element.name === 'Grouped Shape Probe').length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
@@ -11130,6 +11135,25 @@ async function runExportScenario(page) {
       element.kind === 'image' &&
       typeof element.src === 'string' &&
       element.src.startsWith('data:image/svg+xml'))
+    const exportGroupedProbeObjects = exportElements.filter((element) =>
+      (element.name === 'Grouped Text Probe' ||
+        element.name === 'Grouped Shape Probe') &&
+      element.groupId)
+    const exportGroupedProbeIds = [...new Set(exportGroupedProbeObjects
+      .map((element) => element.groupId)
+      .filter(Boolean))]
+    const exportHasGroupedProbe = exportGroupedProbeIds.some((groupId) => {
+      const groupObjects = exportGroupedProbeObjects.filter((element) =>
+        element.groupId === groupId)
+      const groupedTextProbe = groupObjects.find((element) =>
+        element.name === 'Grouped Text Probe')
+      const groupedShapeProbe = groupObjects.find((element) =>
+        element.name === 'Grouped Shape Probe')
+
+      return groupedTextProbe?.geometry?.x > 700 &&
+        groupedTextProbe?.geometry?.y > 500 &&
+        groupedShapeProbe?.geometry?.x > groupedTextProbe.geometry.x
+    })
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
     const exportNoFillShapeObjects = exportElements.filter((element) =>
@@ -11188,6 +11212,10 @@ async function runExportScenario(page) {
       exportImageOpacityObjectNames: exportImageOpacityObjects.map((element) => element.name).join(' | '),
       exportHasSVGImage: exportSvgImages.length > 0,
       exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
+      exportHasGroupedProbe,
+      exportGroupedProbeNames: exportGroupedProbeObjects.map((element) => element.name).join(' | '),
+      exportGroupedProbePositions: exportGroupedProbeObjects.map((element) =>
+        [element.name, element.geometry?.x, element.geometry?.y].join(':')).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
@@ -11213,6 +11241,8 @@ async function runExportScenario(page) {
       exportImageFlipModelCount: exportFlippedImages.length,
       exportImageOpacityModelCount: exportImageOpacityObjects.length,
       exportImageSvgModelCount: exportSvgImages.length,
+      exportGroupedProbeGroupIds: exportGroupedProbeIds.join(' | '),
+      exportGroupedProbeModelCount: exportGroupedProbeObjects.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectAltTextModelCount: exportAltTextObjects.length,
       exportObjectLockingModelCount: exportLockedObjects.length,
@@ -11277,6 +11307,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
       openXmlPPTXImportState.exportHasSVGImage &&
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
+      openXmlPPTXImportState.exportHasGroupedProbe &&
+      openXmlPPTXImportState.exportGroupedProbeModelCount > beforeOpenXmlPPTXDrop.groupedProbeModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectAltText &&
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&
@@ -27193,6 +27225,97 @@ async function addPPTXImageOpacityProbe(base64) {
     if (updated) {
       zip.file(slidePath, nextXml)
       break
+    }
+  }
+
+  return updated
+    ? await zip.generateAsync({
+        compression: 'DEFLATE',
+        type: 'base64',
+      })
+    : base64
+}
+
+async function addPPTXGroupedObjectProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  let updated = false
+
+  if (slidePaths.length === 0) {
+    return base64
+  }
+
+  for (const [slideIndex, slidePath] of slidePaths.entries()) {
+    const xml = await readPPTXZipText(zip, slidePath)
+
+    if (xml.includes('Grouped Text Probe')) {
+      continue
+    }
+
+    const objectIdBase = 9903 + slideIndex * 10
+    const groupXml = [
+      '<p:grpSp>',
+      '<p:nvGrpSpPr>',
+      `<p:cNvPr id="${objectIdBase}" name="Grouped Probe"/>`,
+      '<p:cNvGrpSpPr/>',
+      '<p:nvPr/>',
+      '</p:nvGrpSpPr>',
+      '<p:grpSpPr>',
+      '<a:xfrm>',
+      '<a:off x="7315200" y="5029200"/>',
+      '<a:ext cx="2743200" cy="914400"/>',
+      '<a:chOff x="0" y="0"/>',
+      '<a:chExt cx="2743200" cy="914400"/>',
+      '</a:xfrm>',
+      '</p:grpSpPr>',
+      '<p:sp>',
+      '<p:nvSpPr>',
+      `<p:cNvPr id="${objectIdBase + 1}" name="Grouped Text Probe"/>`,
+      '<p:cNvSpPr txBox="1"/>',
+      '<p:nvPr/>',
+      '</p:nvSpPr>',
+      '<p:spPr>',
+      '<a:xfrm>',
+      '<a:off x="0" y="0"/>',
+      '<a:ext cx="1371600" cy="457200"/>',
+      '</a:xfrm>',
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+      '</p:spPr>',
+      '<p:txBody>',
+      '<a:bodyPr/>',
+      '<a:lstStyle/>',
+      '<a:p><a:r><a:rPr sz="1400"/><a:t>Grouped PPTX text</a:t></a:r></a:p>',
+      '</p:txBody>',
+      '</p:sp>',
+      '<p:sp>',
+      '<p:nvSpPr>',
+      `<p:cNvPr id="${objectIdBase + 2}" name="Grouped Shape Probe"/>`,
+      '<p:cNvSpPr/>',
+      '<p:nvPr/>',
+      '</p:nvSpPr>',
+      '<p:spPr>',
+      '<a:xfrm>',
+      '<a:off x="1600200" y="0"/>',
+      '<a:ext cx="914400" cy="457200"/>',
+      '</a:xfrm>',
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+      '<a:solidFill><a:srgbClr val="DCFCE7"/></a:solidFill>',
+      '<a:ln w="19050"><a:solidFill><a:srgbClr val="16A34A"/></a:solidFill></a:ln>',
+      '</p:spPr>',
+      '</p:sp>',
+      '</p:grpSp>',
+    ].join('')
+    const nextXml = xml.replace('</p:spTree>', `${groupXml}</p:spTree>`)
+
+    if (nextXml !== xml) {
+      zip.file(slidePath, nextXml)
+      updated = true
     }
   }
 
