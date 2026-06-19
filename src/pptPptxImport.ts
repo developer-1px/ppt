@@ -2152,7 +2152,9 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
     return 'dot'
   }
 
-  return value === 'dash' || value === 'lgDash' ? 'dash' : undefined
+  return value === 'dash' || value === 'lgDash' || value === 'sysDash'
+    ? 'dash'
+    : undefined
 }
 
 function readPPTXColor(solidFill: Element) {

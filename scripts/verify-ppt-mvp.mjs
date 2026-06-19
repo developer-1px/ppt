@@ -11064,6 +11064,13 @@ async function runExportScenario(page) {
         element.name === 'No Fill Shape Probe').length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       objectShadowModelCount: elements.filter((element) => element.shadow).length,
+      openXmlDashProbeModelCount: elements.filter((element) =>
+        element.name === 'No Fill Shape Probe' &&
+        element.stroke?.dash === 'dash').length,
+      openXmlDotLineProbeModelCount: elements.filter((element) =>
+        element.name === 'Dot Line Probe' &&
+        element.kind === 'line' &&
+        element.stroke?.dash === 'dot').length,
       paragraphDefaultRunStyleModelCount: elements.filter((element) =>
         element.name === 'Default Run Style Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
@@ -11221,7 +11228,12 @@ async function runExportScenario(page) {
       element.name === 'No Fill Shape Probe' &&
       element.kind === 'shape' &&
       element.fill?.opacity === 0 &&
-      element.stroke?.color === '#2563eb')
+      element.stroke?.color === '#2563eb' &&
+      element.stroke?.dash === 'dash')
+    const exportDotLineProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Dot Line Probe' &&
+      element.kind === 'line' &&
+      element.stroke?.dash === 'dot')
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
     const exportRuns = exportElements.flatMap((element) =>
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
@@ -11339,6 +11351,11 @@ async function runExportScenario(page) {
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
       exportHasNoFillShape: exportNoFillShapeObjects.length > 0,
+      exportHasOpenXmlDotLineProbe: exportDotLineProbeObjects.length > 0,
+      exportOpenXmlDashProbeModelCount: exportNoFillShapeObjects.length,
+      exportOpenXmlDashProbeStrokeDash: exportNoFillShapeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
+      exportOpenXmlDotLineProbeModelCount: exportDotLineProbeObjects.length,
+      exportOpenXmlDotLineProbeStrokeDash: exportDotLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasObjectShadow: exportShadowedObjects.length > 0,
       exportObjectAltTextNames: exportAltTextObjects.map((element) => element.name).join(' | '),
@@ -11438,6 +11455,9 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectLockingModelCount > beforeOpenXmlPPTXDrop.objectLockingModelCount &&
       openXmlPPTXImportState.exportHasNoFillShape &&
       openXmlPPTXImportState.exportNoFillShapeModelCount > beforeOpenXmlPPTXDrop.noFillShapeModelCount &&
+      openXmlPPTXImportState.exportOpenXmlDashProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashProbeModelCount &&
+      openXmlPPTXImportState.exportHasOpenXmlDotLineProbe &&
+      openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&
@@ -27813,11 +27833,35 @@ async function addPPTXNoFillShapeProbe(base64) {
     '<a:noFill/>',
     '<a:ln w="28575">',
     '<a:solidFill><a:srgbClr val="2563EB"/></a:solidFill>',
+    '<a:prstDash val="sysDash"/>',
     '</a:ln>',
     '</p:spPr>',
     '</p:sp>',
   ].join('')
-  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+  const probeLineXml = [
+    '<p:cxnSp>',
+    '<p:nvCxnSpPr>',
+    '<p:cNvPr id="9964" name="Dot Line Probe"/>',
+    '<p:cNvCxnSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvCxnSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7315200" y="5486400"/>',
+    '<a:ext cx="1371600" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="line"><a:avLst/></a:prstGeom>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="7C3AED"/></a:solidFill>',
+    '<a:prstDash val="sysDot"/>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:cxnSp>',
+  ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${probeShapeXml}${probeLineXml}</p:spTree>`,
+  )
 
   if (nextXml === xml) {
     return base64
