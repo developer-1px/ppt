@@ -10975,8 +10975,8 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(
-    pptxDownloadBase64,
+  const openXmlPPTXBase64 = await reversePPTXPresentationSlideOrder(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
@@ -11012,12 +11012,16 @@ async function runExportScenario(page) {
     const imageDataUriCount = [...document.querySelectorAll('.ppt-slide .ppt-element img')]
       .filter((image) => image.getAttribute('src')?.startsWith('data:image/') === true)
       .length
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeSlide,
       dropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
       elementCount: elements.length,
+      exportHasHyperlink: exportCode.includes('https://example.com/ppt') && exportCode.includes('data-ppt-hyperlink-url='),
+      exportHasImage: exportCode.includes('"kind": "image"') && exportCode.includes('data:image/'),
+      exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
       firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
@@ -11055,9 +11059,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.elementCount >= 4 &&
       openXmlPPTXImportState.textBoxCount >= 1 &&
       openXmlPPTXImportState.shapeCount >= 1 &&
-      openXmlPPTXImportState.imageCount >= 1 &&
-      openXmlPPTXImportState.imageDataUriCount >= 1 &&
-      openXmlPPTXImportState.text.length > 0,
+      openXmlPPTXImportState.exportHasImage &&
+      openXmlPPTXImportState.text.includes('Minimal subset now') &&
+      openXmlPPTXImportState.exportHasHyperlink &&
+      openXmlPPTXImportState.exportHasNotes,
     {
       beforeOpenXmlPPTXDrop,
       openXmlPPTXImportState,
@@ -26859,6 +26864,40 @@ async function removePPTXEmbeddedPPTModel(base64) {
       ),
     )
   }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function reversePPTXPresentationSlideOrder(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const presentationXml = await readPPTXZipText(zip, 'ppt/presentation.xml')
+  const listMatch = presentationXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/)
+
+  if (!listMatch) {
+    return base64
+  }
+
+  const slideIdTags = [...listMatch[1].matchAll(/<p:sldId\b[^>]*\/>/g)]
+    .map((match) => match[0])
+
+  if (slideIdTags.length < 2) {
+    return base64
+  }
+
+  zip.file(
+    'ppt/presentation.xml',
+    presentationXml.replace(
+      listMatch[1],
+      slideIdTags.reverse().join(''),
+    ),
+  )
 
   return await zip.generateAsync({
     compression: 'DEFLATE',

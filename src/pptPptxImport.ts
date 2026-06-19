@@ -37,7 +37,12 @@ export type PPTDeckPPTXImportResult = {
   jsonLength: number
 }
 
-type PPTXRelationshipMap = Map<string, string>
+type PPTXRelationship = {
+  target: string
+  targetMode: string
+  type: string
+}
+type PPTXRelationshipMap = Map<string, PPTXRelationship>
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -115,7 +120,7 @@ async function importPPTDeckFromCustomXmlZip(
 async function importPPTDeckFromOpenXmlZip(
   zip: JSZip,
 ): Promise<PPTDeckPPTXImportResult | null> {
-  const slidePaths = getPPTXOpenXmlSlidePaths(zip)
+  const slidePaths = await getPPTXOpenXmlSlidePaths(zip)
 
   if (slidePaths.length === 0) {
     return null
@@ -178,10 +183,45 @@ function isPPTDeckPPTXFile(file: File) {
     file.name.toLowerCase().endsWith('.pptx')
 }
 
-function getPPTXOpenXmlSlidePaths(zip: JSZip) {
+async function getPPTXOpenXmlSlidePaths(zip: JSZip) {
+  const pathsByFileName = getPPTXOpenXmlSlidePathsByFileName(zip)
+  const orderedPaths = await readPPTXPresentationSlideOrder(zip)
+
+  return orderedPaths.length > 0
+    ? [
+        ...orderedPaths,
+        ...pathsByFileName.filter((path) => !orderedPaths.includes(path)),
+      ]
+    : pathsByFileName
+}
+
+function getPPTXOpenXmlSlidePathsByFileName(zip: JSZip) {
   return Object.keys(zip.files)
     .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
     .sort(comparePPTXNumberedPaths)
+}
+
+async function readPPTXPresentationSlideOrder(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const xml = await zip.file(presentationPath)?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+
+  if (!doc || relationships.size === 0) {
+    return []
+  }
+
+  return getPPTXDescendantsByLocalName(doc, 'sldId')
+    .map((slideId) =>
+      slideId.getAttribute('r:id') ?? slideId.getAttribute('id'))
+    .map((relationshipId) =>
+      relationshipId ? relationships.get(relationshipId) : undefined)
+    .filter((relationship): relationship is PPTXRelationship =>
+      relationship !== undefined &&
+      relationship.type.endsWith('/slide'))
+    .map((relationship) =>
+      resolvePPTXRelationshipTarget(presentationPath, relationship.target))
+    .filter((path) => zip.file(path) !== null)
 }
 
 async function readPPTXOpenXmlDeckSize(zip: JSZip) {
@@ -225,12 +265,17 @@ async function readPPTXOpenXmlSlide({
     ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
     : null
   const relationships = await readPPTXSlideRelationships(zip, path)
+  const notes = await readPPTXSlideNotes({
+    relationships,
+    slidePath: path,
+    zip,
+  })
   const elements: PPTElement[] = []
   let objectIndex = 1
 
   for (const child of getPPTXSlideObjectNodes(spTree, xml)) {
     const element = child.localName === 'sp'
-      ? readPPTXShapeElement(child, index, objectIndex)
+      ? readPPTXShapeElement(child, index, objectIndex, relationships)
       : child.localName === 'pic'
         ? await readPPTXPictureElement({
             index,
@@ -256,6 +301,7 @@ async function readPPTXOpenXmlSlide({
     elements,
     id: `pptx-slide-${index + 1}`,
     name: readPPTXSlideName(cSld, index, xml),
+    ...(notes ? { notes } : {}),
     themeId: PPT_DEFAULT_THEME_ID,
   }
 }
@@ -305,10 +351,51 @@ function readPPTXSlideBackgroundFromXml(xml: string) {
   return fill ? { background: fill } : null
 }
 
+async function readPPTXSlideNotes({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const notesRelationship = Array.from(relationships.values())
+    .find((relationship) => relationship.type.endsWith('/notesSlide'))
+  const notesPath = notesRelationship
+    ? resolvePPTXRelationshipTarget(slidePath, notesRelationship.target)
+    : null
+  const xml = notesPath ? await zip.file(notesPath)?.async('string') : ''
+
+  if (!xml) {
+    return undefined
+  }
+
+  const doc = parsePPTXXmlDocument(xml)
+
+  if (!doc) {
+    return undefined
+  }
+
+  const bodyPlaceholder = getPPTXDescendantsByLocalName(doc, 'sp')
+    .find((shape) =>
+      getFirstPPTXDescendantByLocalName(shape, 'ph')
+        ?.getAttribute('type') === 'body')
+  const textBody = bodyPlaceholder
+    ? getFirstPPTXDescendantByLocalName(bodyPlaceholder, 'txBody')
+    : null
+  const text = textBody
+    ? readPPTXPlainTextBody(textBody)
+    : readPPTXPlainTextBody(doc)
+
+  return text.trim() || undefined
+}
+
 function readPPTXShapeElement(
   sp: Element,
   slideIndex: number,
   objectIndex: number,
+  relationships: PPTXRelationshipMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
@@ -329,6 +416,7 @@ function readPPTXShapeElement(
   if (isTextBox) {
     return {
       geometry,
+      ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
       id,
       kind: 'textBox',
       name,
@@ -340,6 +428,7 @@ function readPPTXShapeElement(
 
   return {
     ...(readPPTXShapeCornerRadius(spPr) ?? {}),
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
       style: readPPTXTextStyle(textBody, txBody),
@@ -375,9 +464,9 @@ async function readPPTXPictureElement({
   const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
   const relationshipId = blip?.getAttribute('r:embed') ??
     blip?.getAttribute('embed')
-  const target = relationshipId ? relationships.get(relationshipId) : undefined
-  const mediaPath = target
-    ? resolvePPTXRelationshipTarget(slidePath, target)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const mediaPath = relationship
+    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
     : null
   const media = mediaPath ? zip.file(mediaPath) : null
 
@@ -395,6 +484,7 @@ async function readPPTXPictureElement({
     alt: altText || name,
     fit: 'contain',
     geometry,
+    ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
     id: createPPTXImportedElementId(index, objectIndex),
     kind: 'image',
     name,
@@ -403,8 +493,12 @@ async function readPPTXPictureElement({
 }
 
 async function readPPTXSlideRelationships(zip: JSZip, slidePath: string) {
-  const relationships = new Map<string, string>()
-  const relsPath = getPPTXSlideRelationshipsPath(slidePath)
+  return await readPPTXRelationships(zip, slidePath)
+}
+
+async function readPPTXRelationships(zip: JSZip, sourcePath: string) {
+  const relationships = new Map<string, PPTXRelationship>()
+  const relsPath = getPPTXRelationshipsPath(sourcePath)
   const xml = await zip.file(relsPath)?.async('string')
   const doc = xml ? parsePPTXXmlDocument(xml) : null
 
@@ -415,19 +509,25 @@ async function readPPTXSlideRelationships(zip: JSZip, slidePath: string) {
   for (const relationship of getPPTXDescendantsByLocalName(doc, 'Relationship')) {
     const id = relationship.getAttribute('Id')
     const target = relationship.getAttribute('Target')
+    const targetMode = relationship.getAttribute('TargetMode') ?? ''
+    const type = relationship.getAttribute('Type') ?? ''
 
     if (id && target) {
-      relationships.set(id, target)
+      relationships.set(id, {
+        target,
+        targetMode,
+        type,
+      })
     }
   }
 
   return relationships
 }
 
-function getPPTXSlideRelationshipsPath(slidePath: string) {
-  const slashIndex = slidePath.lastIndexOf('/')
-  const directory = slashIndex >= 0 ? slidePath.slice(0, slashIndex) : ''
-  const fileName = slashIndex >= 0 ? slidePath.slice(slashIndex + 1) : slidePath
+function getPPTXRelationshipsPath(sourcePath: string) {
+  const slashIndex = sourcePath.lastIndexOf('/')
+  const directory = slashIndex >= 0 ? sourcePath.slice(0, slashIndex) : ''
+  const fileName = slashIndex >= 0 ? sourcePath.slice(slashIndex + 1) : sourcePath
 
   return `${directory}/_rels/${fileName}.rels`
 }
@@ -490,6 +590,16 @@ function readPPTXTextBody(txBody: Element | null): PPTTextBody | null {
     paragraph.runs.some((run) => run.text.length > 0))
 
   return hasText || paragraphs.length > 0 ? { paragraphs } : null
+}
+
+function readPPTXPlainTextBody(root: Document | Element) {
+  return getPPTXDescendantsByLocalName(root, 'p')
+    .map((paragraph) =>
+      getPPTXDescendantsByLocalName(paragraph, 't')
+        .map((text) => text.textContent ?? '')
+        .join(''))
+    .filter((text) => text.length > 0)
+    .join('\n')
 }
 
 function readPPTXParagraph(paragraph: Element): PPTParagraph {
@@ -724,6 +834,22 @@ function readPPTXObjectDescription(element: Element) {
   return getFirstPPTXDescendantByLocalName(element, 'cNvPr')
     ?.getAttribute('descr')
     ?.trim() ?? ''
+}
+
+function readPPTXElementHyperlink(
+  element: Element,
+  relationships: PPTXRelationshipMap,
+) {
+  const relationshipId = getFirstPPTXDescendantByLocalName(element, 'hlinkClick')
+    ?.getAttribute('r:id')
+  const relationship = relationshipId
+    ? relationships.get(relationshipId)
+    : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target
+    : undefined
+
+  return url ? { hyperlink: { url } } : null
 }
 
 function createPPTXImportedElementId(slideIndex: number, objectIndex: number) {
