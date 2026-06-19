@@ -15308,6 +15308,9 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-transform-constrain-angle-modifier="Shift"
+        data-ppt-transform-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-transform-rotation-snap-step="15"
         data-ppt-alignment-popover-preview={alignmentPreviewCommand ?? undefined}
         data-ppt-alignment-popover-preview-model={CANVAS_DOM_ALIGNMENT_PREVIEW_GUIDE_MODEL}
         data-ppt-comment-thread-command={lastCommentThreadEffect?.payload.id}

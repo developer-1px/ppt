@@ -2014,6 +2014,72 @@ async function runAffordanceScenario(page) {
 
   record('rotates selected object from PPT rotation handle', Math.abs(afterRotateHandle.rotation) > 0 && afterRotateHandle.transform.includes('rotate(') && afterRotateHandle.undoEnabled, afterRotateHandle)
 
+  const shiftRotateHandle = await page.eval(`(() => {
+    const rect = document.querySelector('[data-ppt-rotate-handle]').getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+  const beforeShiftRotate = afterRotateHandle.rotation
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mousePressed',
+    x: shiftRotateHandle.x,
+    y: shiftRotateHandle.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 8,
+    type: 'mouseMoved',
+    x: shiftRotateHandle.x + 84,
+    y: shiftRotateHandle.y - 34,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mouseReleased',
+    x: shiftRotateHandle.x + 84,
+    y: shiftRotateHandle.y - 34,
+  })
+  await delay(50)
+
+  const afterShiftRotate = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      constrainAngleModifier: stage?.getAttribute('data-ppt-transform-constrain-angle-modifier') ?? '',
+      modifierModel: stage?.getAttribute('data-ppt-transform-modifier-model') ?? '',
+      rotation: Number(element.getAttribute('data-rotation')),
+      snapStep: Number(stage?.getAttribute('data-ppt-transform-rotation-snap-step') ?? 0),
+      transform: element.style.transform,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+  const expectedShiftRotation = Math.round(afterShiftRotate.rotation / 15) * 15
+
+  record(
+    'snaps PPT rotation handle to 15 degrees with Shift drag',
+    afterShiftRotate.modifierModel === 'canvas-resize-pointer-modifiers' &&
+      afterShiftRotate.constrainAngleModifier === 'Shift' &&
+      afterShiftRotate.snapStep === 15 &&
+      afterShiftRotate.rotation !== beforeShiftRotate &&
+      nearlyEqual(afterShiftRotate.rotation, expectedShiftRotation, 0.001) &&
+      afterShiftRotate.transform.includes('rotate(') &&
+      afterShiftRotate.undoEnabled,
+    {
+      afterShiftRotate,
+      beforeShiftRotate,
+      expectedShiftRotation,
+    },
+  )
+
   await page.eval(`(() => {
     const rotation = document.querySelector('[data-ppt-geometry-field="rotation"]')
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
