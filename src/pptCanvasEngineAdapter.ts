@@ -1,4 +1,5 @@
 import {
+  CANVAS_CREATED_RECT_BOUNDS_MODEL,
   CANVAS_COMMAND_AFFORDANCES,
   CANVAS_TOOL_AFFORDANCES,
   alignCanvasCommand,
@@ -8,6 +9,7 @@ import {
   deleteCanvasCommand,
   distributeCanvasCommand,
   duplicateCanvasCommand,
+  getCanvasAspectLockedCreationPoint,
   getCanvasCreatedRectBounds,
   getCanvasWheelViewport,
   groupCanvasCommand,
@@ -28,6 +30,8 @@ import {
 } from 'canvas/engine'
 
 export const PPT_COMMAND_AFFORDANCES = CANVAS_COMMAND_AFFORDANCES
+export const PPT_CREATED_RECT_BOUNDS_MODEL =
+  CANVAS_CREATED_RECT_BOUNDS_MODEL
 export const PPT_TOOL_AFFORDANCES = CANVAS_TOOL_AFFORDANCES
 
 export const alignPPTCanvasCommand = alignCanvasCommand
@@ -37,6 +41,8 @@ export const createPPTCanvasText = createCanvasText
 export const deletePPTCanvasCommand = deleteCanvasCommand
 export const distributePPTCanvasCommand = distributeCanvasCommand
 export const duplicatePPTCanvasCommand = duplicateCanvasCommand
+export const getPPTCanvasAspectLockedCreationPoint =
+  getCanvasAspectLockedCreationPoint
 export const getPPTCanvasCreatedRectBounds = getCanvasCreatedRectBounds
 export const getPPTCanvasWheelViewport = getCanvasWheelViewport
 export const groupPPTCanvasCommand = groupCanvasCommand

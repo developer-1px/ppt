@@ -12137,8 +12137,10 @@ async function runViewAndShapeScenario(page) {
 
   const afterShiftEllipseDrag = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
+    const stage = document.querySelector('.ppt-stage-shell')
 
     return {
+      creationBoundsModel: stage?.getAttribute('data-ppt-creation-bounds-model') ?? '',
       height: parseFloat(selected?.style.height ?? '0'),
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       shape: selected?.getAttribute('data-shape') ?? null,
@@ -12152,6 +12154,7 @@ async function runViewAndShapeScenario(page) {
     shiftEllipseDrag.pressed === 'true' &&
       afterShiftEllipseDrag.selectedKind === 'shape' &&
       afterShiftEllipseDrag.shape === 'ellipse' &&
+      afterShiftEllipseDrag.creationBoundsModel === 'canvas-created-rect-bounds' &&
       afterShiftEllipseDrag.width > 120 &&
       nearlyEqual(afterShiftEllipseDrag.width, afterShiftEllipseDrag.height, 0.001) &&
       afterShiftEllipseDrag.undoEnabled,
@@ -12203,6 +12206,7 @@ async function runViewAndShapeScenario(page) {
       centerX: rect ? rect.left + rect.width / 2 : 0,
       centerY: rect ? rect.top + rect.height / 2 : 0,
       creationAspectModifier: stage?.getAttribute('data-ppt-creation-aspect-ratio-modifier') ?? '',
+      creationBoundsModel: stage?.getAttribute('data-ppt-creation-bounds-model') ?? '',
       creationCenterModifier: stage?.getAttribute('data-ppt-creation-from-center-modifier') ?? '',
       creationModifierModel: stage?.getAttribute('data-ppt-creation-modifier-model') ?? '',
       height: parseFloat(selected?.style.height ?? '0'),
@@ -12219,6 +12223,7 @@ async function runViewAndShapeScenario(page) {
     'creates PPT shape from center with Alt drag',
     centerEllipseDrag.pressed === 'true' &&
       afterCenterEllipseDrag.creationModifierModel === 'canvas-resize-pointer-modifiers' &&
+      afterCenterEllipseDrag.creationBoundsModel === 'canvas-created-rect-bounds' &&
       afterCenterEllipseDrag.creationCenterModifier === 'Alt' &&
       afterCenterEllipseDrag.creationAspectModifier === 'Shift' &&
       afterCenterEllipseDrag.selectedKind === 'shape' &&

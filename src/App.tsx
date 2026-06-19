@@ -571,8 +571,10 @@ import {
   createPPTCanvasAffordanceConfig,
   createPPTCanvasShape,
   createPPTCanvasText,
+  getPPTCanvasAspectLockedCreationPoint,
   deletePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
+  PPT_CREATED_RECT_BOUNDS_MODEL,
   PPT_COMMAND_AFFORDANCES,
   PPT_TOOL_AFFORDANCES,
   type PPTCanvasAlignMode,
@@ -13832,7 +13834,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
       const constrainedCurrent = interaction.tool.kind === 'shape' &&
         transformModifierState.preserveAspectRatio
-        ? getPPTAspectLockedCreationPoint(interaction.startPoint, point)
+        ? getPPTCanvasAspectLockedCreationPoint({
+          currentWorld: point,
+          startWorld: interaction.startPoint,
+        })
         : point
       const creationPoints = transformModifierState.resizeFromCenter
         ? getPPTCenterOutCreationPoints(interaction.startPoint, constrainedCurrent)
@@ -16171,6 +16176,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-creation-aspect-ratio-modifier="Shift"
+        data-ppt-creation-bounds-model={PPT_CREATED_RECT_BOUNDS_MODEL}
         data-ppt-creation-from-center-modifier="Alt"
         data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-move-axis-lock-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.axisLockModifier}
@@ -39341,17 +39347,6 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 
 function noopPPTKeyboardCommandHandler() {}
 
-function getPPTAspectLockedCreationPoint(start: Point, current: Point): Point {
-  const dx = current.x - start.x
-  const dy = current.y - start.y
-  const size = Math.max(Math.abs(dx), Math.abs(dy))
-
-  return {
-    x: start.x + getPPTCreationDirectionSign(dx) * size,
-    y: start.y + getPPTCreationDirectionSign(dy) * size,
-  }
-}
-
 function getPPTCenterOutCreationPoints(center: Point, current: Point) {
   const dx = current.x - center.x
   const dy = current.y - center.y
@@ -39363,10 +39358,6 @@ function getPPTCenterOutCreationPoints(center: Point, current: Point) {
       y: center.y - dy,
     },
   }
-}
-
-function getPPTCreationDirectionSign(value: number) {
-  return value < 0 ? -1 : 1
 }
 
 function getPPTAngleConstrainedLineEndPoint(start: Point, current: Point): Point {
