@@ -206,17 +206,17 @@ import {
   parseSlideEditSlideClipboardPayload,
   resolveSlideEditSlideClipboardPastePlacement,
   getSlideEditTextAutoFitGestureCommandEffect,
-  getSlideEditTextAutoFitJSONPasteValue,
+  getSlideEditTextAutoFitJSONPasteValueFromText,
   getSlideEditTextAutoFitPasteCommandEffects,
   getSlideEditTextBodyPasteCommandEffect,
   getSlideEditTextOverflowIndicatorState,
   getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
-  getSlideEditTextFontFamilyJSONPasteValue,
+  getSlideEditTextFontFamilyJSONPasteValueFromText,
   getSlideEditTextFontSizeCommandEffect,
-  getSlideEditTextFontSizeJSONPasteValue,
+  getSlideEditTextFontSizeJSONPasteValueFromText,
   getSlideEditTextFontWeightCommandEffect,
-  getSlideEditTextFontWeightJSONPasteValue,
+  getSlideEditTextFontWeightJSONPasteValueFromText,
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextRunFormattingCommandEffect,
   getSlideEditTextRunFormattingJSONPasteValueFromText,
@@ -227,9 +227,9 @@ import {
   getSlideEditTableRowsJSONPasteValue,
   getSlideEditTableRowsPasteCommandEffect,
   getSlideEditTextParagraphAlignCommandEffect,
-  getSlideEditTextParagraphAlignJSONPasteValue,
+  getSlideEditTextParagraphAlignJSONPasteValueFromText,
   getSlideEditTextParagraphBulletCommandEffect,
-  getSlideEditTextParagraphBulletJSONPasteValue,
+  getSlideEditTextParagraphBulletJSONPasteValueFromText,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextParagraphSpacingJSONPasteValueFromText,
@@ -24806,10 +24806,12 @@ function getPPTTextFontSizeSourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const fontSize = getSlideEditTextFontSizeJSONPasteValue({
-        dataTransfer: candidate.dataTransfer,
-        jsonMimeType: candidate.customMimeType,
-      })
+      const fontSize = getSlideEditTextFontSizeJSONPasteValueFromText(
+        candidate.text,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (fontSize === null) {
         continue
@@ -25095,10 +25097,12 @@ function getPPTTextFontWeightSourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const fontWeight = getSlideEditTextFontWeightJSONPasteValue({
-        dataTransfer: candidate.dataTransfer,
-        jsonMimeType: candidate.customMimeType,
-      })
+      const fontWeight = getSlideEditTextFontWeightJSONPasteValueFromText(
+        candidate.text,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (fontWeight === null) {
         continue
@@ -26619,12 +26623,14 @@ function getPPTTextFontFamilySourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const fontFamily = getSlideEditTextFontFamilyJSONPasteValue({
-        dataTransfer: candidate.dataTransfer,
-        fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-        jsonMimeType: candidate.customMimeType,
-        options: getPPTTextFontFamilyDescriptorOptions(),
-      })
+      const fontFamily = getSlideEditTextFontFamilyJSONPasteValueFromText(
+        candidate.text,
+        {
+          fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
+          mode: candidate.allowDirect ? 'any' : 'wrapped',
+          options: getPPTTextFontFamilyDescriptorOptions(),
+        },
+      )
 
       if (fontFamily === null) {
         continue
@@ -27118,10 +27124,12 @@ function getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const align = getSlideEditTextParagraphAlignJSONPasteValue({
-        dataTransfer: candidate.dataTransfer,
-        jsonMimeType: candidate.customMimeType,
-      })
+      const align = getSlideEditTextParagraphAlignJSONPasteValueFromText(
+        candidate.text,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (align === null) {
         continue
@@ -27335,10 +27343,12 @@ function getPPTTextParagraphBulletSourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const bullet = getSlideEditTextParagraphBulletJSONPasteValue({
-        dataTransfer: candidate.dataTransfer,
-        jsonMimeType: candidate.customMimeType,
-      })
+      const bullet = getSlideEditTextParagraphBulletJSONPasteValueFromText(
+        candidate.text,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (bullet === null) {
         continue
@@ -28408,10 +28418,12 @@ function getPPTTextAutoFitSourceFromSlideEditJSONPasteValue(
     customMimeType: PPT_TEXT_AUTOFIT_JSON_MIME_TYPE,
     dataTransfer,
   })) {
-    const pasteValue = getSlideEditTextAutoFitJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+    const pasteValue = getSlideEditTextAutoFitJSONPasteValueFromText(
+      candidate.text,
+      {
+        mode: candidate.allowDirect ? 'direct' : 'wrapped',
+      },
+    )
 
     if (pasteValue === null) {
       continue
