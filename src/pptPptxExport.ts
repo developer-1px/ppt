@@ -177,6 +177,7 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
 
 function shouldPatchPPTXPackage(deck: PPTDeck) {
   return deck.slides.some((slide) =>
+    hasPPTXSlideName(slide) ||
     slide.transition !== undefined ||
     hasPPTXSlideAnimations(slide) ||
     hasPPTXLockedElements(slide) ||
@@ -205,7 +206,7 @@ async function applyPPTXPackagePatches({
       setPPTXElementAccessibilityXml(
         setPPTXSlideTimingXml(
           setPPTXSlideTransitionXml(
-            xml,
+            setPPTXSlideNameXml(xml, slide),
             createPPTXSlideTransitionXml(slide.transition),
           ),
           slide,
@@ -219,6 +220,10 @@ async function applyPPTXPackagePatches({
       zip.file(path, nextXml)
     }
   }))
+}
+
+function hasPPTXSlideName(slide: PPTSlide) {
+  return slide.name.trim().length > 0
 }
 
 function hasPPTXSlideAnimations(slide: PPTSlide) {
@@ -406,6 +411,17 @@ function setPPTXXmlTagAttribute(tag: string, name: string, value: string) {
   return tag.endsWith('/>')
     ? tag.replace(/\/>$/, ` ${name}="${escapedValue}"/>`)
     : tag.replace(/>$/, ` ${name}="${escapedValue}">`)
+}
+
+function setPPTXSlideNameXml(xml: string, slide: PPTSlide) {
+  const name = slide.name.trim()
+
+  if (!name) {
+    return xml
+  }
+
+  return xml.replace(/<p:cSld\b[^>]*>/, (tag) =>
+    setPPTXXmlTagAttribute(tag, 'name', name))
 }
 
 function setPPTXSlideTimingXml(xml: string, slide: PPTSlide) {

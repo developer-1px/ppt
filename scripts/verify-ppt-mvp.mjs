@@ -10816,6 +10816,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX slide names',
+    pptxPackageState.hasSlideNames,
+    pptxPackageState,
+  )
+  record(
     'exports editable PPTX slide XML content',
     pptxPackageState.hasEditableShapeTree &&
       pptxPackageState.hasEditableTextRuns &&
@@ -26634,6 +26639,7 @@ async function inspectPPTXPackage(base64) {
     hasNonImageAltTextDescription: false,
     hasSlide1Xml: false,
     hasSlide2Xml: false,
+    hasSlideNames: false,
     hasSpeakerNotes: false,
     hasTableText: false,
     hasTableXml: false,
@@ -26714,6 +26720,9 @@ async function inspectPPTXPackage(base64) {
       ),
       hasSlide1Xml: entries.includes('ppt/slides/slide1.xml'),
       hasSlide2Xml: entries.includes('ppt/slides/slide2.xml'),
+      hasSlideNames:
+        slideXml.includes('<p:cSld name="Overview"') &&
+        slideXml.includes('<p:cSld name="Model"'),
       hasSlideTransition:
         slide1Xml.includes('<p:transition') &&
         slide1Xml.includes('<p:push dir="l"/>'),
