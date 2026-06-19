@@ -3874,6 +3874,7 @@ type Interaction =
         started: boolean
       }
       historyDeck?: PPTDeck
+      historySelection?: string[]
       kind: 'move'
       selection: string[]
       slideId: string
@@ -4921,6 +4922,10 @@ function App() {
 
       if (systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
+        if (cancelActivePPTInteraction()) {
+          return
+        }
+
         setEditingId(null)
         setInlineEditInitialText(null)
         setInteraction(null)
@@ -12706,6 +12711,7 @@ function App() {
 
     let interactionBounds = bounds
     let interactionHistoryDeck: PPTDeck | undefined
+    let interactionHistorySelection: string[] | undefined
     let interactionSelection = pointerDownSelection
     let interactionStartDeck = deckRef.current
 
@@ -12732,6 +12738,7 @@ function App() {
         setDeck(liveDeck)
         interactionBounds = liveScene.getBounds(cloneIds) ?? bounds
         interactionHistoryDeck = sourceDeck
+        interactionHistorySelection = nextSelection
         interactionSelection = cloneIds
         interactionStartDeck = liveDeck
       }
@@ -12743,6 +12750,7 @@ function App() {
       bounds: interactionBounds,
       duplicateOnDrag,
       historyDeck: interactionHistoryDeck,
+      historySelection: interactionHistorySelection,
       kind: 'move',
       selection: interactionSelection,
       slideId: activeSlide.id,
@@ -13243,6 +13251,7 @@ function App() {
               duplicated: true,
             },
             historyDeck: sourceDeck,
+            historySelection: moveInteraction.duplicateOnDrag.sourceSelection,
             selection: cloneIds,
             startDeck: liveDeck,
           }
@@ -13576,6 +13585,80 @@ function App() {
     }
 
     setInteraction(null)
+  }
+
+  function cancelActivePPTInteraction() {
+    if (!interaction) {
+      return false
+    }
+
+    const cancelDeck = getPPTInteractionCancelDeck(interaction)
+    const cancelSelection = getPPTInteractionCancelSelection(interaction)
+
+    if (cancelDeck) {
+      deckRef.current = cancelDeck
+      setDeck(cancelDeck)
+    }
+
+    if (cancelSelection) {
+      setSelection(cancelSelection)
+    }
+
+    resizeHandleClickMemoryRef.current = null
+    setEditingId(null)
+    setInlineEditInitialText(null)
+    setInteraction(null)
+    setIsTemporaryPanActive(false)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    setContextMenu(null)
+    setSlideContextMenu(null)
+
+    return true
+  }
+
+  function getPPTInteractionCancelDeck(current: Interaction) {
+    if (current.kind === 'marquee' || current.kind === 'pan' || current.kind === 'laser') {
+      return null
+    }
+
+    if (current.kind === 'move') {
+      return current.historyDeck ?? current.startDeck
+    }
+
+    return current.startDeck
+  }
+
+  function getPPTInteractionCancelSelection(current: Interaction) {
+    switch (current.kind) {
+      case 'move':
+        if (current.historyDeck) {
+          return current.historySelection ??
+            current.duplicateOnDrag?.sourceSelection ??
+            []
+        }
+
+        return current.selection
+      case 'resize':
+      case 'rotate':
+        return current.selection
+      case 'line-endpoint':
+      case 'line-route':
+        return [current.lineId]
+      case 'element-create':
+      case 'freeform-create':
+      case 'line-create':
+      case 'erase':
+        return []
+      case 'marquee':
+        return current.baseSelection
+      case 'pan':
+      case 'laser':
+        return null
+    }
   }
 
   function getPPTInteractionHistoryDeck(current: Interaction) {

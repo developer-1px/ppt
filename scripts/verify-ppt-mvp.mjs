@@ -1674,6 +1674,73 @@ async function runAffordanceScenario(page) {
   record('renders PPT selection size capsule', initial.hasSizeCapsule, initial)
   record('renders PPT rotation handle', initial.hasRotateHandle, initial)
 
+  const cancelResizeBefore = await page.eval(`(() => {
+    const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+      width: parseFloat(element.style.width),
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: cancelResizeBefore.x,
+    y: cancelResizeBefore.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: cancelResizeBefore.x + 42,
+    y: cancelResizeBefore.y,
+  })
+  await delay(50)
+
+  const cancelResizePreview = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: cancelResizeBefore.x + 42,
+    y: cancelResizeBefore.y,
+  })
+  await delay(50)
+
+  const cancelResizeAfter = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+      width: parseFloat(element.style.width),
+    }
+  })()`)
+
+  record('cancels active PPT resize with Escape', cancelResizePreview.width > cancelResizeBefore.width && nearlyEqual(cancelResizeAfter.width, cancelResizeBefore.width, 0.001) && cancelResizeAfter.selectedId === cancelResizeBefore.selectedId && cancelResizeAfter.undoEnabled === cancelResizeBefore.undoEnabled, {
+    cancelResizeAfter,
+    cancelResizeBefore,
+    cancelResizePreview,
+  })
+
   const firstResizeHandle = await page.eval(`(() => {
     const rect = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
 
