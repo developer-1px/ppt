@@ -217,12 +217,16 @@ function addPPTXTextBox({
   element: Extract<PPTElement, { kind: 'textBox' }>
   pptxSlide: PPTXSlide
 }) {
+  const hyperlink = createPPTXHyperlink(element.hyperlink)
+
   pptxSlide.addText(createPPTXTextRuns({
     body: element.textBody,
+    hyperlink,
     style: element.style,
   }), {
     ...createPPTXElementTextOptions({
       element,
+      hyperlink,
       inset: getPPTXTextInset(element.style, PPTX_DEFAULT_TEXT_BOX_INSET),
     }),
     isTextBox: true,
@@ -250,13 +254,17 @@ function addPPTXShape({
   }
 
   if (element.textBody) {
+    const hyperlink = createPPTXHyperlink(element.hyperlink)
+
     pptxSlide.addText(createPPTXTextRuns({
       body: element.textBody,
+      hyperlink,
       style: element.style,
     }), {
       ...shapeOptions,
       ...createPPTXTextStyleOptions(element.style),
       fit: getPPTXTextFit(element.textAutoFit),
+      hyperlink,
       margin: createPPTXMargin(getPPTXTextInset(
         element.style,
         PPTX_DEFAULT_SHAPE_TEXT_INSET,
@@ -465,16 +473,18 @@ function addPPTXComment({
 
 function createPPTXElementTextOptions({
   element,
+  hyperlink,
   inset,
 }: {
   element: Extract<PPTElement, { kind: 'textBox' }>
+  hyperlink: PptxGenJS.HyperlinkProps | undefined
   inset: PPTXTextInset
 }) {
   return {
     ...createPPTXElementPosition(element.geometry),
     ...createPPTXTextStyleOptions(element.style),
     fit: getPPTXTextFit(element.textAutoFit),
-    hyperlink: createPPTXHyperlink(element.hyperlink),
+    hyperlink,
     margin: createPPTXMargin(inset),
     objectName: element.name,
     shadow: createPPTXShadow(element.shadow),
@@ -484,9 +494,11 @@ function createPPTXElementTextOptions({
 
 function createPPTXTextRuns({
   body,
+  hyperlink,
   style,
 }: {
   body: PPTTextBody
+  hyperlink?: PptxGenJS.HyperlinkProps
   style?: PPTTextStyle
 }): PptxGenJS.TextProps[] {
   const runs: PptxGenJS.TextProps[] = []
@@ -503,6 +515,7 @@ function createPPTXTextRuns({
           ...createPPTXParagraphOptions(paragraph),
           ...createPPTXTextRunOptions(run),
           breakLine: paragraphIndex > 0 && runIndex === 0,
+          hyperlink,
         },
         text: run.text,
       })
@@ -619,7 +632,7 @@ function createPPTXLineProps(
 
 function createPPTXHyperlink(
   hyperlink: PPTElement['hyperlink'] | undefined,
-) {
+): PptxGenJS.HyperlinkProps | undefined {
   return hyperlink?.url
     ? { url: hyperlink.url }
     : undefined

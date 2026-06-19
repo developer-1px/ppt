@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process'
+import { Buffer } from 'node:buffer'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import net from 'node:net'
+import JSZip from 'jszip'
 
 const DEFAULT_APP_URL = 'http://127.0.0.1:5173/'
 const EXTERNAL_APP_URL = process.env.APP_URL ?? null
@@ -10766,12 +10768,14 @@ async function runExportScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
   await delay(700)
 
-  const pptxDownloadState = await page.eval(`(() => {
+  const pptxDownloadBlobState = await page.eval(`(() => {
     const download = (window.__pptDownloads ?? [])
       .find((entry) => entry.download === 'ai-retouch-demo.pptx') ?? {}
     const text = download.text ?? ''
 
     return {
+      base64: download.base64 ?? '',
+      base64Length: (download.base64 ?? '').length,
       byteLength: download.byteLength ?? 0,
       download: download.download ?? '',
       hasContentTypes: text.includes('[Content_Types].xml'),
@@ -10783,6 +10787,9 @@ async function runExportScenario(page) {
       type: download.type ?? '',
     }
   })()`)
+  const { base64: pptxDownloadBase64, ...pptxDownloadState } =
+    pptxDownloadBlobState
+  const pptxPackageState = await inspectPPTXPackage(pptxDownloadBase64)
 
   record(
     'downloads editable PPT deck as PPTX',
@@ -10795,11 +10802,28 @@ async function runExportScenario(page) {
   )
   record(
     'exports PPTX OpenXML package structure',
-    pptxDownloadState.hasContentTypes &&
-      pptxDownloadState.hasPresentationXml &&
-      pptxDownloadState.hasSlide1Xml &&
-      pptxDownloadState.hasSlide2Xml,
-    pptxDownloadState,
+    pptxPackageState.hasContentTypes &&
+      pptxPackageState.hasPresentationXml &&
+      pptxPackageState.hasSlide1Xml &&
+      pptxPackageState.hasSlide2Xml &&
+      pptxPackageState.slideCount >= 2,
+    pptxPackageState,
+  )
+  record(
+    'exports editable PPTX slide XML content',
+    pptxPackageState.hasEditableShapeTree &&
+      pptxPackageState.hasEditableTextRuns &&
+      pptxPackageState.hasPresetGeometry &&
+      pptxPackageState.hasTableXml &&
+      pptxPackageState.hasTableText,
+    pptxPackageState,
+  )
+  record(
+    'exports PPTX notes media and hyperlink relationships',
+    pptxPackageState.hasSpeakerNotes &&
+      pptxPackageState.hasMediaPart &&
+      pptxPackageState.hasHyperlinkRelationship,
+    pptxPackageState,
   )
 
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
@@ -26498,10 +26522,21 @@ async function installPPTDownloadCapture(page) {
   await page.eval(`(() => {
     window.__pptDownloads = []
     let downloadIndex = 0
+    const encodeBytesAsBase64 = (bytes) => {
+      let binary = ''
+      const chunkSize = 0x8000
+
+      for (let index = 0; index < bytes.length; index += chunkSize) {
+        binary += String.fromCharCode(...bytes.slice(index, index + chunkSize))
+      }
+
+      return btoa(binary)
+    }
 
     URL.createObjectURL = (blob) => {
       const url = \`blob:ppt-download-\${downloadIndex++}\`
       const entry = {
+        base64: '',
         byteLength: 0,
         download: '',
         signature: '',
@@ -26514,6 +26549,7 @@ async function installPPTDownloadCapture(page) {
       window.__pptDownloads.push(entry)
       void blob.arrayBuffer().then((buffer) => {
         const bytes = new Uint8Array(buffer)
+        entry.base64 = encodeBytesAsBase64(bytes)
         entry.byteLength = bytes.byteLength
         entry.signature = String.fromCharCode(...bytes.slice(0, 2))
       })
@@ -26533,6 +26569,103 @@ async function installPPTDownloadCapture(page) {
       }
     }
   })()`)
+}
+
+async function inspectPPTXPackage(base64) {
+  const empty = {
+    entryCount: 0,
+    error: '',
+    hasContentTypes: false,
+    hasEditableShapeTree: false,
+    hasEditableTextRuns: false,
+    hasHyperlinkRelationship: false,
+    hasMediaPart: false,
+    hasPresentationXml: false,
+    hasPresetGeometry: false,
+    hasSlide1Xml: false,
+    hasSlide2Xml: false,
+    hasSpeakerNotes: false,
+    hasTableText: false,
+    hasTableXml: false,
+    notesCount: 0,
+    relationshipCount: 0,
+    slideCount: 0,
+    textRunCount: 0,
+  }
+
+  if (!base64) {
+    return empty
+  }
+
+  try {
+    const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+    const entries = Object.keys(zip.files)
+      .filter((path) => !zip.files[path]?.dir)
+    const slidePaths = entries
+      .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+      .sort(comparePPTXNumberedPaths)
+    const notesPaths = entries
+      .filter((path) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(path))
+      .sort(comparePPTXNumberedPaths)
+    const relationshipPaths = entries
+      .filter((path) => path.endsWith('.rels'))
+      .sort()
+    const slideXml = (await Promise.all(slidePaths.map((path) =>
+      readPPTXZipText(zip, path),
+    ))).join('\n')
+    const notesXml = (await Promise.all(notesPaths.map((path) =>
+      readPPTXZipText(zip, path),
+    ))).join('\n')
+    const relationshipXml = (await Promise.all(relationshipPaths.map((path) =>
+      readPPTXZipText(zip, path),
+    ))).join('\n')
+    const textRunCount = countOccurrences(slideXml, '<a:t>')
+
+    return {
+      entryCount: entries.length,
+      error: '',
+      hasContentTypes: entries.includes('[Content_Types].xml'),
+      hasEditableShapeTree: slideXml.includes('<p:spTree>') ||
+        slideXml.includes('<p:spTree '),
+      hasEditableTextRuns: textRunCount >= 10,
+      hasHyperlinkRelationship:
+        relationshipXml.includes('hyperlink') &&
+        relationshipXml.includes('https://example.com/ppt'),
+      hasMediaPart: entries.some((path) => path.startsWith('ppt/media/')),
+      hasPresentationXml: entries.includes('ppt/presentation.xml'),
+      hasPresetGeometry: slideXml.includes('<a:prstGeom'),
+      hasSlide1Xml: entries.includes('ppt/slides/slide1.xml'),
+      hasSlide2Xml: entries.includes('ppt/slides/slide2.xml'),
+      hasSpeakerNotes: notesXml.includes('Presenter cue: review image crop and final CTA.'),
+      hasTableText: slideXml.includes('Region'),
+      hasTableXml: slideXml.includes('<a:tbl>') || slideXml.includes('<a:tbl '),
+      notesCount: notesPaths.length,
+      relationshipCount: relationshipPaths.length,
+      slideCount: slidePaths.length,
+      textRunCount,
+    }
+  } catch (error) {
+    return {
+      ...empty,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+function readPPTXZipText(zip, path) {
+  return zip.file(path)?.async('string') ?? ''
+}
+
+function comparePPTXNumberedPaths(left, right) {
+  return getPPTXPathNumber(left) - getPPTXPathNumber(right)
+}
+
+function getPPTXPathNumber(path) {
+  return Number(path.match(/(\d+)\.xml$/)?.[1] ?? 0)
+}
+
+function countOccurrences(value, pattern) {
+  return value.split(pattern).length - 1
 }
 
 async function rightClickMouse(page, x, y) {
