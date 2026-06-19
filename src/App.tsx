@@ -13354,19 +13354,31 @@ function App() {
     }
 
     if (interaction.kind === 'line-endpoint') {
+      const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
       const elements = mapPPTElementsByIds(
         startSlide.elements,
         [interaction.lineId],
-        (element) =>
-          element.kind === 'line'
-            ? updatePPTLineEndpoint(
+        (element) => {
+          if (element.kind !== 'line') {
+            return element
+          }
+
+          const endpointPoint = transformModifierState.constrainAngle
+            ? getPPTAngleConstrainedLineEndpointPoint(
                 element,
                 interaction.endpoint,
                 point,
-                startSlide,
-                interaction.lineId,
               )
-            : element,
+            : point
+
+          return updatePPTLineEndpoint(
+            element,
+            interaction.endpoint,
+            endpointPoint,
+            startSlide,
+            interaction.lineId,
+          )
+        },
       )
 
       const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
@@ -37321,6 +37333,19 @@ function getPPTAngleConstrainedLineEndPoint(start: Point, current: Point): Point
     x: start.x + Math.cos(constrainedAngle) * distance,
     y: start.y + Math.sin(constrainedAngle) * distance,
   }
+}
+
+function getPPTAngleConstrainedLineEndpointPoint(
+  line: PPTLine,
+  endpoint: 'end' | 'start',
+  current: Point,
+): Point {
+  const anchorEndpoint = endpoint === 'end' ? 'start' : 'end'
+
+  return getPPTAngleConstrainedLineEndPoint(
+    getPPTLineEndpointPoint(line, anchorEndpoint),
+    current,
+  )
 }
 
 function getPPTSlideKeyboardShortcutIntent({

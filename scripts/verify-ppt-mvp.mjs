@@ -18920,6 +18920,61 @@ async function runLineAffordanceScenario(page) {
     beforeEndpoint,
   })
 
+  const beforeShiftEndpoint = await getPPTLineState(page)
+  const shiftEndpoint = await page.eval(`(() => {
+    const handle = document.querySelector('[data-ppt-line-endpoint="end"]').getBoundingClientRect()
+
+    return {
+      handleX: handle.left + handle.width / 2,
+      handleY: handle.top + handle.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mousePressed',
+    x: shiftEndpoint.handleX,
+    y: shiftEndpoint.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 8,
+    type: 'mouseMoved',
+    x: shiftEndpoint.handleX + 76,
+    y: shiftEndpoint.handleY + 31,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mouseReleased',
+    x: shiftEndpoint.handleX + 76,
+    y: shiftEndpoint.handleY + 31,
+  })
+  await delay(50)
+
+  const afterShiftEndpoint = await getPPTLineState(page)
+  const shiftEndpointAngle = getPPTLineAngleDegrees(afterShiftEndpoint)
+  const shiftEndpointAngleSnap = Math.round(shiftEndpointAngle / 45) * 45
+
+  record(
+    'constrains PPT line endpoint angle with Shift drag',
+    afterShiftEndpoint.endpointHandleCount === 2 &&
+      afterShiftEndpoint.worldX2 !== beforeShiftEndpoint.worldX2 &&
+      afterShiftEndpoint.worldY2 !== beforeShiftEndpoint.worldY2 &&
+      afterShiftEndpoint.endConnection === '' &&
+      nearlyEqual(shiftEndpointAngle, shiftEndpointAngleSnap, 0.001),
+    {
+      afterShiftEndpoint,
+      beforeShiftEndpoint,
+      shiftEndpoint,
+      shiftEndpointAngle,
+      shiftEndpointAngleSnap,
+    },
+  )
+
   await pressKey(page, {
     code: 'KeyL',
     key: 'l',
@@ -23483,6 +23538,13 @@ function getPPTLineState(page, elementId = null) {
       worldY2: top + y2,
     }
   })()`)
+}
+
+function getPPTLineAngleDegrees(line) {
+  return Math.atan2(
+    line.worldY2 - line.worldY1,
+    line.worldX2 - line.worldX1,
+  ) * 180 / Math.PI
 }
 
 function getPPTShapeStrokeDashState(page) {
