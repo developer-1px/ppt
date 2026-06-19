@@ -636,6 +636,7 @@ function readPPTXShapeElement(
 
   if (isTextBox) {
     return {
+      ...readPPTXElementFlip(spPr),
       geometry,
       ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
       id,
@@ -649,6 +650,7 @@ function readPPTXShapeElement(
 
   return {
     ...(readPPTXShapeCornerRadius(spPr) ?? {}),
+    ...readPPTXElementFlip(spPr),
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
@@ -706,6 +708,7 @@ async function readPPTXPictureElement({
     alt: altText || name,
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
+    ...readPPTXElementFlip(spPr),
     geometry,
     ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
     id: createPPTXImportedElementId(index, objectIndex),
@@ -753,6 +756,7 @@ function readPPTXTableElement(
   }
 
   return {
+    ...readPPTXElementFlip(graphicFrame),
     geometry,
     ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
     id: createPPTXImportedElementId(slideIndex, objectIndex),
@@ -844,6 +848,15 @@ function readPPTXElementGeometry(spPr: Element | null): PPTGeometry | null {
     w: emuToPx(width),
     x: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
     y: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
+  }
+}
+
+function readPPTXElementFlip(container: Element | null) {
+  const xfrm = container ? getDirectPPTXChildByLocalName(container, 'xfrm') : null
+
+  return {
+    ...(isPPTXTrue(xfrm?.getAttribute('flipH')) ? { flipH: true } : {}),
+    ...(isPPTXTrue(xfrm?.getAttribute('flipV')) ? { flipV: true } : {}),
   }
 }
 

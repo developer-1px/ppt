@@ -215,6 +215,7 @@ function shouldPatchPPTXPackage(deck: PPTDeck) {
       hasPPTXSlideName(slide) ||
       slide.transition !== undefined ||
       hasPPTXSlideAnimations(slide) ||
+      hasPPTXFlippedElements(slide) ||
       hasPPTXLockedElements(slide) ||
       slide.elements.some((element) =>
         element.visible !== false &&
@@ -242,10 +243,13 @@ async function applyPPTXPackagePatches({
     const xml = await file.async('string')
     const nextXml = setPPTXElementLocksXml(
       setPPTXElementAccessibilityXml(
-        setPPTXSlideTimingXml(
-          setPPTXSlideTransitionXml(
-            setPPTXSlideNameXml(xml, slide),
-            createPPTXSlideTransitionXml(slide.transition),
+        setPPTXElementFlipXml(
+          setPPTXSlideTimingXml(
+            setPPTXSlideTransitionXml(
+              setPPTXSlideNameXml(xml, slide),
+              createPPTXSlideTransitionXml(slide.transition),
+            ),
+            slide,
           ),
           slide,
         ),
@@ -503,6 +507,64 @@ function hasPPTXLockedElements(slide: PPTSlide) {
   return slide.elements.some((element) =>
     element.visible !== false &&
     element.locked === true)
+}
+
+function hasPPTXFlippedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    (element.flipH === true || element.flipV === true))
+}
+
+function setPPTXElementFlipXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false ||
+      (element.flipH !== true && element.flipV !== true)) {
+      return nextXml
+    }
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectFlipXml(patchedXml, objectName, element),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectFlipXml(
+  xml: string,
+  objectName: string,
+  element: PPTElement,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+
+  return xml.replace(
+    /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g,
+    (segment) =>
+      hasPPTXObjectNameXml(segment, name)
+        ? setPPTXObjectTransformFlipXml(segment, element)
+        : segment,
+  )
+}
+
+function hasPPTXObjectNameXml(segment: string, name: string) {
+  return new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[^>]*>`,
+  ).test(segment)
+}
+
+function setPPTXObjectTransformFlipXml(
+  segment: string,
+  element: PPTElement,
+) {
+  return segment.replace(/<a:xfrm\b[^>]*>/, (tag) => {
+    const withFlipH = element.flipH === true
+      ? setPPTXXmlTagAttribute(tag, 'flipH', '1')
+      : tag
+
+    return element.flipV === true
+      ? setPPTXXmlTagAttribute(withFlipH, 'flipV', '1')
+      : withFlipH
+  })
 }
 
 function setPPTXElementAccessibilityXml(xml: string, slide: PPTSlide) {

@@ -10848,6 +10848,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX image flip transform',
+    pptxPackageState.hasImageFlipXfrm,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX object opacity',
     pptxPackageState.hasObjectOpacityAlpha,
     pptxPackageState,
@@ -10980,9 +10985,22 @@ async function runExportScenario(page) {
   )
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
 
     return {
       imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
+      imageFlipModelCount: elements.filter((element) =>
+        element.kind === 'image' && element.flipH === true).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
@@ -11022,6 +11040,19 @@ async function runExportScenario(page) {
       .filter((image) => image.getAttribute('src')?.startsWith('data:image/') === true)
       .length
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportElements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+    const exportFlippedImages = exportElements.filter((element) =>
+      element.kind === 'image' && element.flipH === true)
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -11033,6 +11064,8 @@ async function runExportScenario(page) {
       exportHasImageCrop: exportCode.includes('"crop": {') &&
         exportCode.includes('"x": 25') &&
         exportCode.includes('"y": 70'),
+      exportHasImageFlip: exportFlippedImages.length > 0,
+      exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
@@ -11042,6 +11075,7 @@ async function runExportScenario(page) {
         exportCode.includes('"advanceOnClick": false') &&
         exportCode.includes('"advanceAfterMs": 3000'),
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
+      exportImageFlipModelCount: exportFlippedImages.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
@@ -11086,6 +11120,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportHasImage &&
       openXmlPPTXImportState.exportHasImageCrop &&
       openXmlPPTXImportState.exportImageCropModelCount > beforeOpenXmlPPTXDrop.imageCropModelCount &&
+      openXmlPPTXImportState.exportHasImageFlip &&
+      openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
@@ -26951,6 +26987,7 @@ async function inspectPPTXPackage(base64) {
     hasEditableTextRuns: false,
     hasHyperlinkRelationship: false,
     hasImageCropSrcRect: false,
+    hasImageFlipXfrm: false,
     hasMediaPart: false,
     hasObjectAnimationMotion: false,
     hasObjectAnimationTarget: false,
@@ -26971,6 +27008,7 @@ async function inspectPPTXPackage(base64) {
     hasSlideTransitionNamespace: false,
     hasSlideTransitionTiming: false,
     notesCount: 0,
+    imageFlipXfrmCount: 0,
     relationshipCount: 0,
     slideCount: 0,
     transitionCount: 0,
@@ -27017,6 +27055,9 @@ async function inspectPPTXPackage(base64) {
     const themeXml = await readPPTXZipText(zip, 'ppt/theme/theme1.xml')
     const textRunCount = countOccurrences(slideXml, '<a:t>')
     const transitionCount = countOccurrences(slideXml, '<p:transition')
+    const imageFlipXfrmCount = [
+      ...slideXml.matchAll(/<p:pic\b[\s\S]*?<a:xfrm\b[^>]*\bflipH="(?:1|true)"[\s\S]*?<\/p:pic>/g),
+    ].length
 
     return {
       entryCount: entries.length,
@@ -27051,6 +27092,7 @@ async function inspectPPTXPackage(base64) {
       hasImageCropSrcRect: slideXml.includes(
         '<a:srcRect l="-25000" r="25000" t="20000" b="-20000"/>',
       ),
+      hasImageFlipXfrm: imageFlipXfrmCount > 0,
       hasMediaPart: entries.some((path) => path.startsWith('ppt/media/')),
       hasObjectAnimationMotion:
         slideXml.includes('<p:timing>') &&
@@ -27098,6 +27140,7 @@ async function inspectPPTXPackage(base64) {
         themeXml.includes('<a:accent1><a:srgbClr val="2563EB"/></a:accent1>') &&
         themeXml.includes('<a:hlink><a:srgbClr val="2563EB"/></a:hlink>'),
       notesCount: notesPaths.length,
+      imageFlipXfrmCount,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
       transitionCount,
