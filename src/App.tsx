@@ -3718,6 +3718,7 @@ const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
+const PPT_DRAG_DUPLICATE_THRESHOLD = 4
 const PPT_FILL_OPACITY_MIN = 0
 const PPT_FILL_OPACITY_MAX = 1
 const PPT_FILL_OPACITY_STEP = 0.05
@@ -3857,6 +3858,12 @@ type PPTTextToken = {
 type Interaction =
   | {
       bounds: Bounds
+      duplicateOnDrag?: {
+        duplicated: boolean
+        pendingSelection: string[]
+        sourceDeck: PPTDeck
+        sourceSelection: string[]
+      }
       historyDeck?: PPTDeck
       kind: 'move'
       selection: string[]
@@ -12557,6 +12564,8 @@ function App() {
     event.stopPropagation()
     capturePPTCanvasPointerFromEvent(event)
 
+    const duplicateWithPrimaryPointerModifier =
+      (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
@@ -12571,11 +12580,40 @@ function App() {
       selection,
       slide: activeSlide,
     })
-    const bounds = scene.getBounds(nextSelection)
+    const duplicateSourcePointerSelection = duplicateWithPrimaryPointerModifier
+      ? getPPTElementPointerSelection({
+          additive: false,
+          elementId,
+          scene,
+          selection,
+        })
+      : null
+    const duplicateSourceSelection = duplicateSourcePointerSelection
+      ? getPPTGroupPointerSelection({
+          additive: false,
+          fallbackSelection: duplicateSourcePointerSelection.nextSelection,
+          itemId: elementId,
+          selection,
+          slide: activeSlide,
+        })
+      : null
+    const duplicateOnDrag = duplicateSourceSelection &&
+      duplicateSourceSelection.some((id) => selection.includes(id))
+      ? {
+          duplicated: false,
+          pendingSelection: nextSelection,
+          sourceDeck: deckRef.current,
+          sourceSelection: duplicateSourceSelection,
+        }
+      : undefined
+    const pointerDownSelection = duplicateOnDrag
+      ? duplicateOnDrag.sourceSelection
+      : nextSelection
+    const bounds = scene.getBounds(pointerDownSelection)
     const hasLockedTarget = activeSlide.elements.some((element) =>
-      nextSelection.includes(element.id) && element.locked === true)
+      pointerDownSelection.includes(element.id) && element.locked === true)
     const hasHiddenTarget = activeSlide.elements.some((element) =>
-      nextSelection.includes(element.id) && element.visible === false)
+      pointerDownSelection.includes(element.id) && element.visible === false)
 
     if (!bounds || hasLockedTarget || hasHiddenTarget) {
       setSelection(nextSelection)
@@ -12584,7 +12622,7 @@ function App() {
 
     let interactionBounds = bounds
     let interactionHistoryDeck: PPTDeck | undefined
-    let interactionSelection = nextSelection
+    let interactionSelection = pointerDownSelection
     let interactionStartDeck = deckRef.current
 
     if (event.altKey) {
@@ -12618,6 +12656,7 @@ function App() {
     setSelection(interactionSelection)
     setInteraction({
       bounds: interactionBounds,
+      duplicateOnDrag,
       historyDeck: interactionHistoryDeck,
       kind: 'move',
       selection: interactionSelection,
@@ -13065,14 +13104,71 @@ function App() {
       return
     }
 
-    const startSlide = findPPTSlide(interaction.startDeck, interaction.slideId)
+    let startSlide = findPPTSlide(interaction.startDeck, interaction.slideId)
 
     if (interaction.kind === 'move') {
+      let moveInteraction = interaction
+
+      if (
+        moveInteraction.duplicateOnDrag &&
+        !moveInteraction.duplicateOnDrag.duplicated
+      ) {
+        if (
+          getPPTCanvasPointDistance(moveInteraction.startPoint, point) <=
+          PPT_DRAG_DUPLICATE_THRESHOLD
+        ) {
+          return
+        }
+
+        const sourceDeck = moveInteraction.duplicateOnDrag.sourceDeck
+        const sourceSlide = findPPTSlide(sourceDeck, moveInteraction.slideId)
+        const clones = commandAdapter.cloneSelection({
+          createId: createPPTElementIdFactory(sourceSlide),
+          ids: moveInteraction.duplicateOnDrag.sourceSelection,
+          items: sourceSlide.elements,
+          offset: { x: 0, y: 0 },
+        })
+
+        if (clones.length > 0) {
+          const cloneIds = clones.map((clone) => clone.id)
+          const liveDeck = updatePPTDeckSlide(sourceDeck, moveInteraction.slideId, (slide) => ({
+            ...slide,
+            elements: [...slide.elements, ...clones],
+          }))
+          const liveSlide = findPPTSlide(liveDeck, moveInteraction.slideId)
+          const liveScene = createPPTCanvasScene(liveSlide)
+
+          deckRef.current = liveDeck
+          setDeck(liveDeck)
+          setSelection(cloneIds)
+          moveInteraction = {
+            ...moveInteraction,
+            bounds: liveScene.getBounds(cloneIds) ?? moveInteraction.bounds,
+            duplicateOnDrag: {
+              ...moveInteraction.duplicateOnDrag,
+              duplicated: true,
+            },
+            historyDeck: sourceDeck,
+            selection: cloneIds,
+            startDeck: liveDeck,
+          }
+          startSlide = liveSlide
+        } else {
+          moveInteraction = {
+            ...moveInteraction,
+            duplicateOnDrag: {
+              ...moveInteraction.duplicateOnDrag,
+              duplicated: true,
+            },
+          }
+        }
+      }
+
       const startScene = createPPTCanvasScene(startSlide)
-      const dx = point.x - interaction.startPoint.x
-      const dy = point.y - interaction.startPoint.y
+      const dx = point.x - moveInteraction.startPoint.x
+      const dy = point.y - moveInteraction.startPoint.y
       const snap = getPPTCanvasMoveSnap({
-        bounds: interaction.bounds,
+        bounds: moveInteraction.bounds,
         config: {
           gestures: {
             snapToAlignment: true,
@@ -13083,7 +13179,7 @@ function App() {
         dx,
         dy,
         scene: startScene,
-        selection: interaction.selection,
+        selection: moveInteraction.selection,
         viewport,
       })
       const elements = movePPTCanvasSelection({
@@ -13091,21 +13187,21 @@ function App() {
         dx: snap.dx,
         dy: snap.dy,
         items: startSlide.elements,
-        selection: interaction.selection,
+        selection: moveInteraction.selection,
       })
       const syncedElements = syncPPTLineConnections(
         elements,
-        getPPTSelectedLineIds(elements, interaction.selection),
+        getPPTSelectedLineIds(elements, moveInteraction.selection),
       )
 
-      const nextDeck = updatePPTDeckSlide(interaction.startDeck, interaction.slideId, (slide) => ({
+      const nextDeck = updatePPTDeckSlide(moveInteraction.startDeck, moveInteraction.slideId, (slide) => ({
         ...slide,
         elements: syncedElements,
       }))
       deckRef.current = nextDeck
       setDeck(nextDeck)
       setInteraction({
-        ...interaction,
+        ...moveInteraction,
         snapGuides: {
           alignmentGuides: snap.alignmentGuides,
           spacingGuides: snap.spacingGuides,
@@ -13206,6 +13302,22 @@ function App() {
   function handlePointerUp() {
     if (!interaction) {
       return
+    }
+
+    if (
+      interaction.kind === 'move' &&
+      interaction.duplicateOnDrag &&
+      !interaction.duplicateOnDrag.duplicated
+    ) {
+      const duplicateStarted =
+        JSON.stringify(deckRef.current) !==
+        JSON.stringify(interaction.duplicateOnDrag.sourceDeck)
+
+      if (!duplicateStarted) {
+        setSelection(interaction.duplicateOnDrag.pendingSelection)
+        setInteraction(null)
+        return
+      }
     }
 
     if (interaction.kind === 'erase' && interaction.erasedIds.length > 0) {

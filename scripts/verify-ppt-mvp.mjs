@@ -12,6 +12,7 @@ const CHROME_BIN =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const CDP_COMMAND_TIMEOUT_MS = 10000
 const PAGE_LOAD_TIMEOUT_MS = 60000
+const PPT_PRIMARY_POINTER_MODIFIER = process.platform === 'darwin' ? 4 : 2
 const PPT_SLIDE_WIDTH = 1280
 const PPT_SLIDE_HEIGHT = 720
 const PPT_TEST_IMAGE_WIDTH = 640
@@ -726,6 +727,148 @@ async function runAltDragDuplicateScenario(page) {
     afterUndo,
     before,
   })
+
+  const ctrlPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, ctrlPoint.x, ctrlPoint.y, 1)
+  await delay(50)
+
+  const beforeCtrlDrag = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      left: parseFloat(element.style.left),
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      top: parseFloat(element.style.top),
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: PPT_PRIMARY_POINTER_MODIFIER,
+    type: 'mousePressed',
+    x: ctrlPoint.x,
+    y: ctrlPoint.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: PPT_PRIMARY_POINTER_MODIFIER,
+    type: 'mouseMoved',
+    x: ctrlPoint.x + 84,
+    y: ctrlPoint.y + 32,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: PPT_PRIMARY_POINTER_MODIFIER,
+    type: 'mouseReleased',
+    x: ctrlPoint.x + 84,
+    y: ctrlPoint.y + 32,
+  })
+  await delay(100)
+
+  const afterCtrlDrag = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-style-field="name"]')?.value ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'duplicates selected PPT object with Cmd/Ctrl drag',
+    afterCtrlDrag.count === beforeCtrlDrag.count + 1 &&
+      afterCtrlDrag.selectedId !== beforeCtrlDrag.selectedId &&
+      afterCtrlDrag.selectedName.includes('Copy') &&
+      afterCtrlDrag.originalLeft === beforeCtrlDrag.left &&
+      afterCtrlDrag.originalTop === beforeCtrlDrag.top &&
+      afterCtrlDrag.selectedLeft !== beforeCtrlDrag.left &&
+      afterCtrlDrag.undoEnabled,
+    {
+      afterCtrlDrag,
+      beforeCtrlDrag,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterCtrlDragUndo = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+    }
+  })()`)
+
+  record('undoes PPT Cmd/Ctrl drag duplicate as one history step', afterCtrlDragUndo.count === beforeCtrlDrag.count && afterCtrlDragUndo.originalLeft === beforeCtrlDrag.left && afterCtrlDragUndo.originalTop === beforeCtrlDrag.top && afterCtrlDragUndo.redoEnabled, {
+    afterCtrlDragUndo,
+    beforeCtrlDrag,
+  })
+
+  const additivePoint = await getElementCenter(page, 's1-card-2')
+  await clickMouse(page, ctrlPoint.x, ctrlPoint.y, 1)
+  await delay(50)
+  const beforeCtrlClick = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: PPT_PRIMARY_POINTER_MODIFIER,
+    type: 'mousePressed',
+    x: additivePoint.x,
+    y: additivePoint.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: PPT_PRIMARY_POINTER_MODIFIER,
+    type: 'mouseReleased',
+    x: additivePoint.x,
+    y: additivePoint.y,
+  })
+  await delay(80)
+
+  const afterCtrlClick = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record(
+    'keeps Cmd/Ctrl click as additive PPT selection without duplicating',
+    afterCtrlClick.count === beforeCtrlClick.count &&
+      beforeCtrlClick.selectedIds.length === 1 &&
+      afterCtrlClick.selectedIds.includes('s1-card-1') &&
+      afterCtrlClick.selectedIds.includes('s1-card-2'),
+    {
+      afterCtrlClick,
+      beforeCtrlClick,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
 
   const lockedPoint = await getElementCenter(page, 's1-card-1')
   await clickMouse(page, lockedPoint.x, lockedPoint.y, 1)
