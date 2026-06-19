@@ -5,13 +5,16 @@ import {
 import {
   createPPTCanvasExternalClipboardImagePasteActionResolver,
   createPPTCanvasExternalClipboardPasteActionPlan,
+  getPPTCanvasDataImageSourceFromHTML,
   getPPTCanvasDataImageSourceFromDataTransfer,
+  getPPTCanvasHTMLDataImageSourcesFromHTML,
   getPPTCanvasHTMLDataImageSourcesFromDataTransfer,
   getPPTCanvasImageFileFromDataTransfer,
   getPPTCanvasImageFileFromList,
   getPPTCanvasImageFilesFromDataTransfer,
   getPPTCanvasImageSourceFromDataTransfer,
   getPPTCanvasImportedImageSize,
+  getPPTCanvasSVGImageSourceFromHTML,
   getPPTCanvasSVGImageSourceFromDataTransfer,
   PPT_CANVAS_IMAGE_IMPORT_MODEL,
   readPPTCanvasClipboardImageSource,
@@ -198,20 +201,23 @@ export const getPPTImageFilesFromDataTransfer =
 export const getPPTDataImageSourceFromDataTransfer =
   getPPTCanvasDataImageSourceFromDataTransfer
 
+export const getPPTDataImageSourceFromHTML =
+  getPPTCanvasDataImageSourceFromHTML
+
 export const getPPTHTMLDataImageSourcesFromDataTransfer =
   getPPTCanvasHTMLDataImageSourcesFromDataTransfer
 
-export function getPPTHTMLDataImageSourcesFromHTML(html: string) {
-  return getPPTHTMLDataImageSourcesFromDataTransfer({
-    getData: (type: string) => type === 'text/html' ? html : '',
-  } as DataTransfer)
-}
+export const getPPTHTMLDataImageSourcesFromHTML =
+  getPPTCanvasHTMLDataImageSourcesFromHTML
 
 export const getPPTImageSourceFromDataTransfer =
   getPPTCanvasImageSourceFromDataTransfer
 
 export const getPPTSVGImageSourceFromDataTransfer =
   getPPTCanvasSVGImageSourceFromDataTransfer
+
+export const getPPTSVGImageSourceFromHTML =
+  getPPTCanvasSVGImageSourceFromHTML
 
 export function shouldResolvePPTImageSourceNaturalSize(
   source: PPTImageImportSource,

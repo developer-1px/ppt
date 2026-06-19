@@ -216,12 +216,15 @@ import {
 } from 'canvas/app/image-clipboard'
 import {
   CANVAS_IMAGE_IMPORT_MODEL,
+  getCanvasDataImageSourceFromHTML,
   getCanvasDataImageSourceFromDataTransfer,
+  getCanvasHTMLDataImageSourcesFromHTML,
   getCanvasHTMLDataImageSourcesFromDataTransfer,
   getCanvasImageFileFromDataTransfer,
   getCanvasImageFileFromList,
   getCanvasImageFilesFromDataTransfer,
   getCanvasImageSourceFromDataTransfer,
+  getCanvasSVGImageSourceFromHTML,
   getCanvasSVGImageSourceFromDataTransfer,
   readCanvasImageFileSource,
   readCanvasImageFileSources,
@@ -526,10 +529,16 @@ export const zoomPPTCanvasViewport = zoomCanvasViewport
 export const filterPPTCommandPaletteItems =
   filterCanvasCommandPaletteItems
 export const createPPTCanvasTextPasteItems = createCanvasTextPasteItems
+export const getPPTCanvasDataImageSourceFromHTML =
+  getCanvasDataImageSourceFromHTML
 export const getPPTCanvasDataImageSourceFromDataTransfer =
   getCanvasDataImageSourceFromDataTransfer
+export const getPPTCanvasHTMLDataImageSourcesFromHTML =
+  getCanvasHTMLDataImageSourcesFromHTML
 export const getPPTCanvasHTMLDataImageSourcesFromDataTransfer =
   getCanvasHTMLDataImageSourcesFromDataTransfer
+export const getPPTCanvasSVGImageSourceFromHTML =
+  getCanvasSVGImageSourceFromHTML
 export const readPPTCanvasClipboardImageSource =
   readCanvasClipboardImageSource
 export const getPPTCanvasImageFileFromDataTransfer =

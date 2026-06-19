@@ -25,8 +25,10 @@ import {
   type PPTTextStyle,
 } from '../pptModel'
 import {
+  getPPTDataImageSourceFromHTML,
   getPPTHTMLDataImageSourcesFromHTML,
   getPPTImageSourceFromDataTransfer,
+  getPPTSVGImageSourceFromHTML,
   type PPTImageImportSource,
 } from './imageImport'
 import {
@@ -848,15 +850,9 @@ function getPPTFallbackHTMLImageImportSourceFromHTML(
 ): PPTImageImportSource | null {
   const [source = null] = getPPTHTMLDataImageSourcesFromHTML(html)
 
-  if (source) {
-    return source
-  }
-
-  const dataTransfer = {
-    getData: (type: string) => type === 'text/html' ? html : '',
-  } as DataTransfer
-
-  return getPPTImageSourceFromDataTransfer(dataTransfer)
+  return source ??
+    getPPTSVGImageSourceFromHTML(html) ??
+    getPPTDataImageSourceFromHTML(html)
 }
 
 function parsePPTFallbackHTMLImageFit(value: string | null): PPTImageFit {
