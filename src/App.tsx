@@ -3693,6 +3693,10 @@ const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
+const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
+const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
+  'ppt-slide-keyboard-shortcut-intent'
+const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -4621,6 +4625,20 @@ function App() {
           event.preventDefault()
           pasteFormatting()
         }
+        return
+      }
+
+      const slideKeyboardIntent = getPPTSlideKeyboardShortcutIntent({
+        event,
+        key: event.key,
+        mod,
+      })
+
+      if (slideKeyboardIntent?.kind === 'add-slide') {
+        if (slideKeyboardIntent.preventDefault) {
+          event.preventDefault()
+        }
+        addSlide()
         return
       }
 
@@ -13262,6 +13280,7 @@ function App() {
     id: 'slide:add',
     onSelect: addSlide,
     section: 'Slides',
+    shortcut: PPT_SLIDE_ADD_SHORTCUT,
     title: 'Add slide',
   }, {
     id: 'slide:duplicate',
@@ -14893,6 +14912,9 @@ function App() {
         data-ppt-keyboard-tool-dispatch={PPT_KEYBOARD_TOOL_DISPATCH_MODEL}
         data-ppt-keyboard-viewport-intent={PPT_KEYBOARD_VIEWPORT_INTENT_MODEL}
         data-ppt-keyboard-viewport-model={PPT_KEYBOARD_VIEWPORT_MODEL}
+        data-ppt-slide-add-shortcut={PPT_SLIDE_ADD_SHORTCUT}
+        data-ppt-slide-keyboard-intent={PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL}
+        data-ppt-slide-keyboard-model={PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL}
         data-ppt-sticky-tool-model={PPT_TOOL_AFFORDANCES.sticky.model}
         data-ppt-sticky-tool-shortcut={PPT_TOOL_AFFORDANCES.sticky.shortcut}
         data-ppt-temporary-pan-active={isTemporaryPanActive ? 'true' : 'false'}
@@ -36362,6 +36384,24 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 }
 
 function noopPPTKeyboardCommandHandler() {}
+
+function getPPTSlideKeyboardShortcutIntent({
+  event,
+  key,
+  mod,
+}: {
+  event: KeyboardEvent
+  key: string
+  mod: boolean
+}): { kind: 'add-slide'; preventDefault: boolean } | null {
+  if (!mod || event.altKey || event.shiftKey) {
+    return null
+  }
+
+  return key.toLowerCase() === 'm'
+    ? { kind: 'add-slide', preventDefault: true }
+    : null
+}
 
 function selectSameTypePPTSelection(
   elements: readonly PPTElement[],
