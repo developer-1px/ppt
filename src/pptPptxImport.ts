@@ -285,7 +285,9 @@ async function readPPTXOpenXmlSlide({
             slidePath: path,
             zip,
           })
-        : null
+        : child.localName === 'graphicFrame'
+          ? readPPTXTableElement(child, index, objectIndex, relationships)
+          : null
 
     if (element) {
       elements.push(element)
@@ -309,14 +311,17 @@ async function readPPTXOpenXmlSlide({
 function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
   const treeNodes = spTree
     ? Array.from(spTree.children)
-      .filter((child) => child.localName === 'sp' || child.localName === 'pic')
+      .filter((child) =>
+        child.localName === 'sp' ||
+        child.localName === 'pic' ||
+        child.localName === 'graphicFrame')
     : []
 
   if (treeNodes.length > 0) {
     return treeNodes
   }
 
-  return [...xml.matchAll(/<p:(sp|pic)\b[\s\S]*?<\/p:\1>/g)]
+  return [...xml.matchAll(/<p:(sp|pic|graphicFrame)\b[\s\S]*?<\/p:\1>/g)]
     .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
     .filter((element): element is Element => element !== null)
 }
@@ -489,6 +494,36 @@ async function readPPTXPictureElement({
     kind: 'image',
     name,
     src: `data:${mimeType};base64,${base64}`,
+  }
+}
+
+function readPPTXTableElement(
+  graphicFrame: Element,
+  slideIndex: number,
+  objectIndex: number,
+  relationships: PPTXRelationshipMap,
+): PPTElement | null {
+  const table = getFirstPPTXDescendantByLocalName(graphicFrame, 'tbl')
+  const geometry = readPPTXElementGeometry(graphicFrame)
+  const rows = table
+    ? getDirectPPTXChildrenByLocalName(table, 'tr')
+      .map((row) =>
+        getDirectPPTXChildrenByLocalName(row, 'tc')
+          .map((cell) => readPPTXPlainTextBody(cell).trim()))
+      .filter((row) => row.length > 0)
+    : []
+
+  if (!geometry || rows.length === 0) {
+    return null
+  }
+
+  return {
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'table',
+    name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
+    rows,
   }
 }
 

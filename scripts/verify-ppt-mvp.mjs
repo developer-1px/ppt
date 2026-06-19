@@ -10978,9 +10978,14 @@ async function runExportScenario(page) {
   const openXmlPPTXBase64 = await reversePPTXPresentationSlideOrder(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
-  const beforeOpenXmlPPTXDrop = await page.eval(`(() => ({
-    slideCount: document.querySelectorAll('.ppt-thumb').length,
-  }))()`)
+  const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+    return {
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+    }
+  })()`)
 
   await page.eval(`((base64, type) => {
     const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
@@ -11022,6 +11027,8 @@ async function runExportScenario(page) {
       exportHasHyperlink: exportCode.includes('https://example.com/ppt') && exportCode.includes('data-ppt-hyperlink-url='),
       exportHasImage: exportCode.includes('"kind": "image"') && exportCode.includes('data:image/'),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
+      exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
+      exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
       firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
@@ -11060,6 +11067,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.textBoxCount >= 1 &&
       openXmlPPTXImportState.shapeCount >= 1 &&
       openXmlPPTXImportState.exportHasImage &&
+      openXmlPPTXImportState.exportHasTableText &&
+      openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
       openXmlPPTXImportState.text.includes('Minimal subset now') &&
       openXmlPPTXImportState.exportHasHyperlink &&
       openXmlPPTXImportState.exportHasNotes,
