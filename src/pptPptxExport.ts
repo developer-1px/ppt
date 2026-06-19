@@ -23,6 +23,10 @@ import {
   type PPTTextAutoFit,
   type PPTTextStyle,
 } from './pptModel'
+import {
+  getPPTTableResolvedColumnWidths,
+  getPPTTableResolvedRowHeights,
+} from './pptTableLayout'
 
 export const PPTX_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -1421,12 +1425,9 @@ function addPPTXTable({
   )
   const opacity = getPPTXElementOpacity(element)
   const position = createPPTXElementPosition(element.geometry)
-  const colW = Array.from(
-    { length: columnCount },
-    () => position.w / columnCount,
-  )
+  const colW = getPPTTableResolvedColumnWidths(element).map(pxToIn)
   const rowH = element.rows.length > 0
-    ? Array.from({ length: element.rows.length }, () => position.h / element.rows.length)
+    ? getPPTTableResolvedRowHeights(element).map(pxToIn)
     : undefined
 
   pptxSlide.addTable(element.rows.map((row, rowIndex) =>

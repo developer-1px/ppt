@@ -44,6 +44,10 @@ import {
   type PPTTextStyle,
 } from './pptModel'
 import {
+  getPPTTableResolvedColumnWidths,
+  getPPTTableResolvedRowHeights,
+} from './pptTableLayout'
+import {
   createPPTCanvasCssBoundsTransform,
   createPPTCanvasSvgBoundsTransform,
   createPPTCanvasSvgFreehandPathData,
@@ -794,12 +798,19 @@ function renderPPTTableHTML(
 ) {
   const columnCount = getPPTTableColumnCount(element.rows)
   const rowCount = element.rows.length
+  const columnWidths = getPPTTableResolvedColumnWidths(element)
+  const rowHeights = getPPTTableResolvedRowHeights(element)
+  const colGroup = columnWidths.length > 0
+    ? `<colgroup>${columnWidths.map((width) =>
+        `<col style="width:${formatNumber(width)}px">`).join('')}</colgroup>`
+    : ''
   const head = element.rows[0]
-    ? `<thead><tr>${renderPPTTableHTMLRow(element.rows[0], columnCount, 'th')}</tr></thead>`
+    ? `<thead>${renderPPTTableHTMLRow(element.rows[0], columnCount, 'th', rowHeights[0])}</thead>`
     : ''
   const bodyRows = element.rows
     .slice(1)
-    .map((row) => `<tr>${renderPPTTableHTMLRow(row, columnCount, 'td')}</tr>`)
+    .map((row, index) =>
+      renderPPTTableHTMLRow(row, columnCount, 'td', rowHeights[index + 1]))
     .join('')
   const body = `<tbody>${bodyRows}</tbody>`
   const attrs = [
@@ -812,51 +823,73 @@ function renderPPTTableHTML(
     getPPTElementShadowHTMLAttrs(element).trim(),
     `data-ppt-table-rows="${rowCount}"`,
     `data-ppt-table-cols="${columnCount}"`,
+    `data-ppt-table-column-widths="${escapeHtml(formatPPTTableTrackSizesAttribute(columnWidths))}"`,
+    `data-ppt-table-row-heights="${escapeHtml(formatPPTTableTrackSizesAttribute(rowHeights))}"`,
     `style="${style.filter(Boolean).join(';')}"`,
   ].filter(Boolean).join(' ')
 
-  return `    <table ${attrs}>${head}${body}</table>`
+  return `    <table ${attrs}>${colGroup}${head}${body}</table>`
 }
 
 function renderPPTTableHTMLRow(
   row: readonly string[],
   columnCount: number,
   tagName: 'td' | 'th',
+  rowHeight: number | undefined,
 ) {
-  return Array.from({ length: columnCount }, (_, index) =>
+  const rowStyle = rowHeight === undefined
+    ? ''
+    : ` style="height:${formatNumber(rowHeight)}px"`
+  const cells = Array.from({ length: columnCount }, (_, index) =>
     `<${tagName} data-ppt-table-cell="${index}">${escapeHtml(row[index] ?? '')}</${tagName}>`,
   ).join('')
+
+  return `<tr${rowStyle}>${cells}</tr>`
 }
 
 function renderPPTTableSVG(element: PPTTable) {
   const columnCount = getPPTTableColumnCount(element.rows)
   const rowCount = element.rows.length
-  const cellWidth = columnCount > 0 ? element.geometry.w / columnCount : element.geometry.w
-  const cellHeight = rowCount > 0 ? element.geometry.h / rowCount : element.geometry.h
-  const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
-  const cells = element.rows.flatMap((row, rowIndex) =>
-    Array.from({ length: columnCount }, (_, columnIndex) => {
-      const x = element.geometry.x + cellWidth * columnIndex
-      const y = element.geometry.y + cellHeight * rowIndex
+  const columnWidths = getPPTTableResolvedColumnWidths(element)
+  const rowHeights = getPPTTableResolvedRowHeights(element)
+  let rowY = element.geometry.y
+  const cells = element.rows.flatMap((row, rowIndex) => {
+    const cellHeight = rowHeights[rowIndex] ?? (rowCount > 0 ? element.geometry.h / rowCount : element.geometry.h)
+    const y = rowY
+    let columnX = element.geometry.x
+    rowY += cellHeight
+
+    return Array.from({ length: columnCount }, (_, columnIndex) => {
+      const cellWidth = columnWidths[columnIndex] ?? (columnCount > 0 ? element.geometry.w / columnCount : element.geometry.w)
+      const x = columnX
+      const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
       const textX = x + Math.min(10, cellWidth * 0.12)
       const textY = y + cellHeight / 2
       const headerAttrs = rowIndex === 0
         ? ' data-ppt-table-header="true" font-weight="700"'
         : ''
 
+      columnX += cellWidth
+
       return [
         `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}" stroke="#dbe3ef" stroke-width="1"></rect>`,
         `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(fontSize)}" dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
-    }),
-  ).join('')
+    })
+  }).join('')
   const attrs = [
     getPPTElementSVGAttrs(element),
     `data-ppt-table-rows="${rowCount}"`,
     `data-ppt-table-cols="${columnCount}"`,
+    `data-ppt-table-column-widths="${escapeHtml(formatPPTTableTrackSizesAttribute(columnWidths))}"`,
+    `data-ppt-table-row-heights="${escapeHtml(formatPPTTableTrackSizesAttribute(rowHeights))}"`,
   ].join(' ')
 
   return `<g ${attrs}><rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" fill="#ffffff" stroke="#94a3b8" stroke-width="1"></rect>${cells}</g>`
+}
+
+function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
+  return trackSizes.map((size) => Math.round(size)).join(' ')
 }
 
 function getPPTElementTransform(element: PPTElement) {

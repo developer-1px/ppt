@@ -11001,9 +11001,11 @@ async function runExportScenario(page) {
   const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
     await addPPTXImageOpacityProbe(
       await addPPTXNoFillShapeProbe(
-        await addPPTXGroupedObjectProbe(
-          await reversePPTXPresentationSlideOrder(
-            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        await addPPTXUnevenTableProbe(
+          await addPPTXGroupedObjectProbe(
+            await reversePPTXPresentationSlideOrder(
+              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+            ),
           ),
         ),
       ),
@@ -11046,6 +11048,8 @@ async function runExportScenario(page) {
       groupedProbeModelCount: elements.filter((element) =>
         element.name === 'Grouped Text Probe' ||
         element.name === 'Grouped Shape Probe').length,
+      unevenTableProbeModelCount: elements.filter((element) =>
+        element.name === 'Uneven Table Probe').length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
@@ -11154,6 +11158,19 @@ async function runExportScenario(page) {
         groupedTextProbe?.geometry?.y > 500 &&
         groupedShapeProbe?.geometry?.x > groupedTextProbe.geometry.x
     })
+    const exportUnevenTableProbeObjects = exportElements.filter((element) =>
+      element.name === 'Uneven Table Probe' &&
+      element.kind === 'table')
+    const exportUnevenTableProbe = exportUnevenTableProbeObjects.find((element) => {
+      const columnWidths = element.columnWidths ?? []
+      const rowHeights = element.rowHeights ?? []
+
+      return element.rows?.[0]?.[1] === 'Wide column' &&
+        columnWidths.length === 3 &&
+        rowHeights.length === 2 &&
+        columnWidths[1] > columnWidths[0] * 1.5 &&
+        rowHeights[1] > rowHeights[0] * 1.5
+    })
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
     const exportNoFillShapeObjects = exportElements.filter((element) =>
@@ -11216,6 +11233,10 @@ async function runExportScenario(page) {
       exportGroupedProbeNames: exportGroupedProbeObjects.map((element) => element.name).join(' | '),
       exportGroupedProbePositions: exportGroupedProbeObjects.map((element) =>
         [element.name, element.geometry?.x, element.geometry?.y].join(':')).join(' | '),
+      exportHasUnevenTableProbe: Boolean(exportUnevenTableProbe),
+      exportUnevenTableProbeNames: exportUnevenTableProbeObjects.map((element) => element.name).join(' | '),
+      exportUnevenTableProbeColumnWidths: (exportUnevenTableProbe?.columnWidths ?? []).join(' '),
+      exportUnevenTableProbeRowHeights: (exportUnevenTableProbe?.rowHeights ?? []).join(' '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
@@ -11243,6 +11264,7 @@ async function runExportScenario(page) {
       exportImageSvgModelCount: exportSvgImages.length,
       exportGroupedProbeGroupIds: exportGroupedProbeIds.join(' | '),
       exportGroupedProbeModelCount: exportGroupedProbeObjects.length,
+      exportUnevenTableProbeModelCount: exportUnevenTableProbeObjects.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectAltTextModelCount: exportAltTextObjects.length,
       exportObjectLockingModelCount: exportLockedObjects.length,
@@ -11309,6 +11331,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportHasGroupedProbe &&
       openXmlPPTXImportState.exportGroupedProbeModelCount > beforeOpenXmlPPTXDrop.groupedProbeModelCount &&
+      openXmlPPTXImportState.exportHasUnevenTableProbe &&
+      openXmlPPTXImportState.exportUnevenTableProbeModelCount > beforeOpenXmlPPTXDrop.unevenTableProbeModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectAltText &&
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&
@@ -27325,6 +27349,100 @@ async function addPPTXGroupedObjectProbe(base64) {
         type: 'base64',
       })
     : base64
+}
+
+async function addPPTXUnevenTableProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  let updated = false
+
+  for (const [slideIndex, slidePath] of slidePaths.entries()) {
+    const xml = await readPPTXZipText(zip, slidePath)
+
+    if (xml.includes('Uneven Table Probe')) {
+      continue
+    }
+
+    const objectIdBase = 9933 + slideIndex * 10
+    const tableXml = [
+      '<p:graphicFrame>',
+      '<p:nvGraphicFramePr>',
+      `<p:cNvPr id="${objectIdBase}" name="Uneven Table Probe"/>`,
+      '<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>',
+      '<p:nvPr/>',
+      '</p:nvGraphicFramePr>',
+      '<p:xfrm>',
+      '<a:off x="914400" y="4343400"/>',
+      '<a:ext cx="3657600" cy="1097280"/>',
+      '</p:xfrm>',
+      '<a:graphic>',
+      '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">',
+      '<a:tbl>',
+      '<a:tblPr firstRow="1" bandRow="1">',
+      '<a:tableStyleId>{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}</a:tableStyleId>',
+      '</a:tblPr>',
+      '<a:tblGrid>',
+      '<a:gridCol w="914400"/>',
+      '<a:gridCol w="1828800"/>',
+      '<a:gridCol w="914400"/>',
+      '</a:tblGrid>',
+      '<a:tr h="365760">',
+      createPPTXTableCellXml('Narrow'),
+      createPPTXTableCellXml('Wide column'),
+      createPPTXTableCellXml('Narrow'),
+      '</a:tr>',
+      '<a:tr h="731520">',
+      createPPTXTableCellXml('Q1'),
+      createPPTXTableCellXml('Imported sizing'),
+      createPPTXTableCellXml('OK'),
+      '</a:tr>',
+      '</a:tbl>',
+      '</a:graphicData>',
+      '</a:graphic>',
+      '</p:graphicFrame>',
+    ].join('')
+    const nextXml = xml.replace('</p:spTree>', `${tableXml}</p:spTree>`)
+
+    if (nextXml !== xml) {
+      zip.file(slidePath, nextXml)
+      updated = true
+    }
+  }
+
+  return updated
+    ? await zip.generateAsync({
+        compression: 'DEFLATE',
+        type: 'base64',
+      })
+    : base64
+}
+
+function createPPTXTableCellXml(text) {
+  return [
+    '<a:tc>',
+    '<a:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>',
+    escapePPTXXmlText(text),
+    '</a:t></a:r></a:p>',
+    '</a:txBody>',
+    '<a:tcPr/>',
+    '</a:tc>',
+  ].join('')
+}
+
+function escapePPTXXmlText(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 async function addPPTXNoFillShapeProbe(base64) {

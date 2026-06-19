@@ -852,6 +852,10 @@ import {
   exportPPTSlideSVG,
 } from './pptExport'
 import {
+  getPPTTableResolvedColumnWidths,
+  getPPTTableResolvedRowHeights,
+} from './pptTableLayout'
+import {
   exportPPTDeckPPTXBlob,
   getPPTDeckPPTXFilename,
 } from './pptPptxExport'
@@ -36166,14 +36170,19 @@ function getPPTInlineEditInputType(event: ReactFormEvent<HTMLElement>) {
 
 function PPTTableView({ element }: { element: PPTTable }) {
   const columnCount = getPPTTableColumnCount(element.rows)
+  const columnWidths = getPPTTableResolvedColumnWidths(element)
+  const rowHeights = getPPTTableResolvedRowHeights(element)
 
   return (
     <div
       className="ppt-table-grid"
       data-ppt-table-cols={columnCount}
+      data-ppt-table-column-widths={formatPPTTableTrackSizesAttribute(columnWidths)}
       data-ppt-table-rows={element.rows.length}
+      data-ppt-table-row-heights={formatPPTTableTrackSizesAttribute(rowHeights)}
       style={{
-        gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+        gridTemplateColumns: formatPPTTableGridTemplate(columnWidths),
+        gridTemplateRows: formatPPTTableGridTemplate(rowHeights),
       }}
     >
       {element.rows.flatMap((row, rowIndex) =>
@@ -36190,6 +36199,16 @@ function PPTTableView({ element }: { element: PPTTable }) {
       )}
     </div>
   )
+}
+
+function formatPPTTableGridTemplate(trackSizes: readonly number[]) {
+  return trackSizes.length > 0
+    ? trackSizes.map((size) => `${size}px`).join(' ')
+    : undefined
+}
+
+function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
+  return trackSizes.map((size) => Math.round(size)).join(' ')
 }
 
 function createPPTTableClipboardHTML(element: PPTTable) {

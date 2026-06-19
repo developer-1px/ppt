@@ -18,9 +18,11 @@ import {
   type PPTSlide,
   type PPTSlideTransition,
   type PPTStroke,
+  type PPTTable,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
+import { getPPTTableColumnCount } from './pptTableLayout'
 import {
   PPTX_MIME_TYPE,
   PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE,
@@ -1226,8 +1228,16 @@ function readPPTXTableElement(
     return null
   }
 
+  const columnWidths = table
+    ? readPPTXTableColumnWidths(table, getPPTTableColumnCount(rows))
+    : undefined
+  const rowHeights = table
+    ? readPPTXTableRowHeights(table, rows.length)
+    : undefined
+
   return {
     ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    ...(columnWidths ? { columnWidths } : {}),
     ...readPPTXElementFlip(graphicFrame),
     geometry,
     ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
@@ -1235,9 +1245,41 @@ function readPPTXTableElement(
     kind: 'table',
     ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
     name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
+    ...(rowHeights ? { rowHeights } : {}),
     ...(shadow ? { shadow } : {}),
     rows,
   }
+}
+
+function readPPTXTableColumnWidths(
+  table: Element,
+  columnCount: number,
+): PPTTable['columnWidths'] {
+  const grid = getDirectPPTXChildByLocalName(table, 'tblGrid')
+  const widths = grid
+    ? getDirectPPTXChildrenByLocalName(grid, 'gridCol')
+      .map((column) => toPPTXPositiveNumber(column.getAttribute('w')))
+    : []
+  const visibleWidths = widths.slice(0, columnCount)
+
+  return visibleWidths.length === columnCount &&
+    visibleWidths.every((width) => width !== null && width > 0)
+    ? visibleWidths.map((width) => emuToPx(width ?? 0))
+    : undefined
+}
+
+function readPPTXTableRowHeights(
+  table: Element,
+  rowCount: number,
+): PPTTable['rowHeights'] {
+  const heights = getDirectPPTXChildrenByLocalName(table, 'tr')
+    .map((row) => toPPTXPositiveNumber(row.getAttribute('h')))
+  const visibleHeights = heights.slice(0, rowCount)
+
+  return visibleHeights.length === rowCount &&
+    visibleHeights.every((height) => height !== null && height > 0)
+    ? visibleHeights.map((height) => emuToPx(height ?? 0))
+    : undefined
 }
 
 async function readPPTXSlideRelationships(zip: JSZip, slidePath: string) {
@@ -1370,10 +1412,30 @@ function transformPPTXElement(
     }
   }
 
+  if (element.kind === 'table') {
+    return {
+      ...element,
+      ...(element.columnWidths
+        ? { columnWidths: transformPPTXTableTrackSizes(element.columnWidths, transform.scaleX) }
+        : {}),
+      geometry,
+      ...(element.rowHeights
+        ? { rowHeights: transformPPTXTableTrackSizes(element.rowHeights, transform.scaleY) }
+        : {}),
+    }
+  }
+
   return {
     ...element,
     geometry,
   }
+}
+
+function transformPPTXTableTrackSizes(
+  trackSizes: readonly number[],
+  scale: number,
+) {
+  return trackSizes.map((size) => Math.max(1, Math.round(size * scale)))
 }
 
 function transformPPTXGeometry(

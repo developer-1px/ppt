@@ -178,7 +178,9 @@ const PPTFreeformSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTTableSchema = PPTElementBaseSchema.extend({
+  columnWidths: z.array(z.number()).optional(),
   kind: z.literal('table'),
+  rowHeights: z.array(z.number()).optional(),
   rows: z.array(z.array(z.string())),
 })
 
@@ -338,7 +340,7 @@ export function updatePPTElementGeometry(
   element: PPTElement,
   geometry: PPTGeometry,
 ): PPTElement {
-  if (element.kind === 'line' || element.kind === 'freeform') {
+  if (element.kind === 'line' || element.kind === 'freeform' || element.kind === 'table') {
     const scaleX = element.geometry.w === 0 ? 1 : geometry.w / element.geometry.w
     const scaleY = element.geometry.h === 0 ? 1 : geometry.h / element.geometry.h
 
@@ -350,6 +352,19 @@ export function updatePPTElementGeometry(
           x: point.x * scaleX,
           y: point.y * scaleY,
         })),
+      }
+    }
+
+    if (element.kind === 'table') {
+      return {
+        ...element,
+        ...(element.columnWidths
+          ? { columnWidths: scalePPTTableTrackSizes(element.columnWidths, scaleX) }
+          : {}),
+        geometry,
+        ...(element.rowHeights
+          ? { rowHeights: scalePPTTableTrackSizes(element.rowHeights, scaleY) }
+          : {}),
       }
     }
 
@@ -371,6 +386,10 @@ export function updatePPTElementGeometry(
     ...element,
     geometry,
   }
+}
+
+function scalePPTTableTrackSizes(trackSizes: readonly number[], scale: number) {
+  return trackSizes.map((size) => size * scale)
 }
 
 export function updatePPTDeckSlide(

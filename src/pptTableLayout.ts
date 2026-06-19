@@ -1,0 +1,57 @@
+import type { PPTTable } from './pptModel'
+
+export function getPPTTableResolvedColumnWidths(element: PPTTable) {
+  return resolvePPTTableTrackSizes({
+    totalSize: element.geometry.w,
+    trackCount: getPPTTableColumnCount(element.rows),
+    trackSizes: element.columnWidths,
+  })
+}
+
+export function getPPTTableResolvedRowHeights(element: PPTTable) {
+  return resolvePPTTableTrackSizes({
+    totalSize: element.geometry.h,
+    trackCount: element.rows.length,
+    trackSizes: element.rowHeights,
+  })
+}
+
+export function getPPTTableColumnCount(rows: readonly (readonly string[])[]) {
+  return Math.max(0, ...rows.map((row) => row.length))
+}
+
+function resolvePPTTableTrackSizes({
+  totalSize,
+  trackCount,
+  trackSizes,
+}: {
+  totalSize: number
+  trackCount: number
+  trackSizes: readonly number[] | undefined
+}) {
+  if (trackCount <= 0) {
+    return []
+  }
+
+  const fallbackSize = totalSize / trackCount
+
+  if (!trackSizes || trackSizes.length < trackCount) {
+    return Array.from({ length: trackCount }, () => fallbackSize)
+  }
+
+  const sizes = trackSizes.slice(0, trackCount)
+
+  if (sizes.some((size) => !Number.isFinite(size) || size <= 0)) {
+    return Array.from({ length: trackCount }, () => fallbackSize)
+  }
+
+  const sizeTotal = sizes.reduce((sum, size) => sum + size, 0)
+
+  if (sizeTotal <= 0) {
+    return Array.from({ length: trackCount }, () => fallbackSize)
+  }
+
+  const scale = totalSize / sizeTotal
+
+  return sizes.map((size) => size * scale)
+}
