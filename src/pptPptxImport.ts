@@ -14,6 +14,7 @@ import {
   type PPTRun,
   type PPTShapeKind,
   type PPTSlide,
+  type PPTSlideTransition,
   type PPTStroke,
   type PPTTextBody,
   type PPTTextStyle,
@@ -271,6 +272,7 @@ async function readPPTXOpenXmlSlide({
     slidePath: path,
     zip,
   })
+  const transition = readPPTXSlideTransition(doc, xml)
   const elements: PPTElement[] = []
   let objectIndex = 1
 
@@ -312,6 +314,7 @@ async function readPPTXOpenXmlSlide({
     name: readPPTXSlideName(cSld, index, xml),
     ...(notes ? { notes } : {}),
     themeId: PPT_DEFAULT_THEME_ID,
+    ...(transition ? { transition } : {}),
   }
 }
 
@@ -362,6 +365,92 @@ function readPPTXSlideBackgroundFromXml(xml: string) {
   const fill = readPPTXSolidFill(bgPr)
 
   return fill ? { background: fill } : null
+}
+
+function readPPTXSlideTransition(
+  doc: Document | null,
+  xml: string,
+): PPTSlideTransition | null {
+  const transition = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'transition')
+    : null
+
+  if (!transition) {
+    return readPPTXSlideTransitionFromXml(xml)
+  }
+
+  return readPPTXSlideTransitionElement(transition)
+}
+
+function readPPTXSlideTransitionElement(
+  transition: Element,
+): PPTSlideTransition {
+  return {
+    advanceAfterMs: toPPTXPositiveNumber(transition.getAttribute('advTm')),
+    advanceOnClick: transition.getAttribute('advClick') !== '0',
+    durationMs: readPPTXSlideTransitionDuration(transition),
+    type: readPPTXSlideTransitionType(transition),
+  }
+}
+
+function readPPTXSlideTransitionFromXml(xml: string): PPTSlideTransition | null {
+  const match = xml.match(/<p:transition\b([^>]*)>([\s\S]*?)<\/p:transition>|<p:transition\b([^>]*)\/>/)
+
+  if (!match) {
+    return null
+  }
+
+  const attributes = match[1] ?? match[3] ?? ''
+  const body = match[2] ?? ''
+
+  return {
+    advanceAfterMs: toPPTXPositiveNumber(readPPTXXmlAttribute(attributes, 'advTm')),
+    advanceOnClick: readPPTXXmlAttribute(attributes, 'advClick') !== '0',
+    durationMs: toPPTXPositiveNumber(
+      readPPTXXmlAttribute(attributes, 'dur') ??
+        readPPTXXmlAttribute(attributes, 'p14:dur'),
+    ) ?? readPPTXSlideTransitionSpeedDurationFromValue(
+      readPPTXXmlAttribute(attributes, 'spd'),
+    ),
+    type: body.includes('<p:push')
+      ? 'push'
+      : body.includes('<p:fade')
+        ? 'fade'
+        : 'none',
+  }
+}
+
+function readPPTXSlideTransitionDuration(transition: Element) {
+  return toPPTXPositiveNumber(
+    transition.getAttribute('p14:dur') ??
+      getPPTXAttributeByLocalName(transition, 'dur'),
+  ) ?? readPPTXSlideTransitionSpeedDurationFromValue(
+    transition.getAttribute('spd'),
+  )
+}
+
+function readPPTXSlideTransitionSpeedDurationFromValue(
+  speed: string | null,
+) {
+  if (speed === 'fast') {
+    return 500
+  }
+
+  if (speed === 'slow') {
+    return 1500
+  }
+
+  return 650
+}
+
+function readPPTXSlideTransitionType(
+  transition: Element,
+): PPTSlideTransition['type'] {
+  if (getDirectPPTXChildByLocalName(transition, 'push')) {
+    return 'push'
+  }
+
+  return getDirectPPTXChildByLocalName(transition, 'fade') ? 'fade' : 'none'
 }
 
 async function readPPTXSlideNotes({
@@ -1080,6 +1169,18 @@ function parsePPTXXmlElementFragment(xml: string, localName: string) {
   return doc ? getFirstPPTXDescendantByLocalName(doc, localName) : null
 }
 
+function readPPTXXmlAttribute(attributes: string, name: string) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const localName = name.includes(':') ? name.split(':').at(-1) : name
+  const escapedLocalName = localName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const exact = attributes.match(new RegExp(`\\s${escapedName}="([^"]*)"`))
+  const byLocalName = escapedLocalName
+    ? attributes.match(new RegExp(`\\s(?:[\\w.-]+:)?${escapedLocalName}="([^"]*)"`))
+    : null
+
+  return exact?.[1] ?? byLocalName?.[1] ?? null
+}
+
 function getFirstPPTXDescendantByLocalName(
   root: Document | Element | null,
   localName: string,
@@ -1110,6 +1211,15 @@ function getDirectPPTXChildrenByLocalName(
     ? Array.from(element.children)
       .filter((child) => child.localName === localName)
     : []
+}
+
+function getPPTXAttributeByLocalName(
+  element: Element,
+  localName: string,
+) {
+  return Array.from(element.attributes)
+    .find((attribute) => attribute.localName === localName)
+    ?.value ?? null
 }
 
 function comparePPTXNumberedPaths(left: string, right: string) {

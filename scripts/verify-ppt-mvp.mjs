@@ -10986,6 +10986,7 @@ async function runExportScenario(page) {
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      transitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
     }
   })()`)
 
@@ -11033,9 +11034,15 @@ async function runExportScenario(page) {
         exportCode.includes('"y": 70'),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
+      exportHasTransition: exportCode.includes('"transition": {') &&
+        exportCode.includes('"type": "push"') &&
+        exportCode.includes('"durationMs": 650') &&
+        exportCode.includes('"advanceOnClick": false') &&
+        exportCode.includes('"advanceAfterMs": 3000'),
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      exportTransitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
       firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
@@ -11079,6 +11086,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
+      openXmlPPTXImportState.exportHasTransition &&
+      openXmlPPTXImportState.exportTransitionModelCount > beforeOpenXmlPPTXDrop.transitionModelCount &&
       openXmlPPTXImportState.text.includes('Minimal subset now') &&
       openXmlPPTXImportState.exportHasHyperlink &&
       openXmlPPTXImportState.exportHasNotes,
