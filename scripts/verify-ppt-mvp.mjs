@@ -5693,8 +5693,8 @@ async function runSlideMetadataScenario(page) {
 
   record(
     'pastes JSON speaker notes into active PPT slide metadata',
-    afterJSONNotesPaste.slideNotesImportModel === 'ppt-slide-notes-import' &&
-      afterJSONNotesPaste.slideNotesImportFormat === 'application-json-ppt-notes' &&
+    afterJSONNotesPaste.slideNotesImportModel === 'slide-edit-slide-notes-import' &&
+      afterJSONNotesPaste.slideNotesImportFormat === 'application-json-slide-edit-slide-notes' &&
       afterJSONNotesPaste.slideNotesImportSlide === 'slide-1' &&
       afterJSONNotesPaste.notes.includes('AI notes from JSON clipboard.') &&
       afterJSONNotesPaste.notes.includes('Confirm the ask before presenting.') &&
@@ -5728,8 +5728,8 @@ async function runSlideMetadataScenario(page) {
 
   record(
     'pastes Markdown speaker notes into active PPT slide metadata',
-    afterMarkdownNotesPaste.slideNotesImportModel === 'ppt-slide-notes-import' &&
-      afterMarkdownNotesPaste.slideNotesImportFormat === 'text-markdown-ppt-notes' &&
+    afterMarkdownNotesPaste.slideNotesImportModel === 'slide-edit-slide-notes-import' &&
+      afterMarkdownNotesPaste.slideNotesImportFormat === 'text-markdown-slide-edit-slide-notes' &&
       afterMarkdownNotesPaste.slideNotesImportSlide === 'slide-1' &&
       afterMarkdownNotesPaste.notes.includes('Rehearse the imported AI draft.') &&
       afterMarkdownNotesPaste.notes.includes('Leave the final wording editable.') &&

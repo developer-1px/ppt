@@ -208,6 +208,7 @@ import {
   getSlideEditRailPointerCommandEffect,
   getSlideEditRailReorderKeyboardShortcutIntent,
   getSlideEditResolvedLayoutPlaceholder,
+  getSlideEditSlideNotesPasteValue,
   getSlideEditStyleClipboardCategoryDescriptors,
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardKeyboardIntent,
@@ -301,6 +302,7 @@ import {
   SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
   SLIDE_EDIT_SLIDE_CLIPBOARD_HTML_SCRIPT_ATTRIBUTE,
   SLIDE_EDIT_SLIDE_CLIPBOARD_MIME_TYPE,
+  SLIDE_EDIT_SLIDE_NOTES_IMPORT_MODEL as PPT_SLIDE_NOTES_IMPORT_MODEL,
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
@@ -368,6 +370,7 @@ import {
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
+  toSlideEditSlideNotesPasteCommandEffect,
   toSlideEditSlideMetadataHostCommandEffect,
   type SlideEditCommentThreadJSONPasteValue,
   type SlideEditCommentThreadPatchHostCommandEffect,
@@ -448,6 +451,7 @@ import {
   type SlideEditSlideMetadataInspectorDescriptor,
   type SlideEditSlideMetadataReadModel,
   type SlideEditSlideMetadataUpdateCommand,
+  type SlideEditSlideNotesPasteValue,
   type SlideEditSlideClipboardOperation,
   type SlideEditSlideClipboardPasteHostCommandEffect,
   type SlideEditSlideOrientation,
@@ -1527,13 +1531,6 @@ const PPT_SLIDE_JSON_IMPORT_FORMAT = 'application-json-ppt-slide' as const
 const PPT_SLIDE_JSON_TEXT_IMPORT_FORMAT = 'text-json-ppt-slide' as const
 const PPT_SLIDE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.slide.raw+json'
-const PPT_SLIDE_NOTES_IMPORT_MODEL = 'ppt-slide-notes-import' as const
-const PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT = 'application-json-ppt-notes' as const
-const PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT =
-  'text-markdown-ppt-notes' as const
-const PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT = 'text-plain-ppt-notes' as const
-const PPT_SLIDE_NOTES_JSON_MIME_TYPE =
-  'application/vnd.interactive-os.ppt.notes+json'
 const PPT_SLIDE_METADATA_IMPORT_MODEL = 'ppt-slide-metadata-import' as const
 const PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT =
   'application-json-ppt-slide-metadata' as const
@@ -1908,14 +1905,7 @@ type PPTSlideJSONImportSource = {
   jsonLength: number
   slides: readonly PPTSlide[]
 }
-type PPTSlideNotesImportSource = {
-  format:
-    | typeof PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT
-    | typeof PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT
-    | typeof PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT
-  notes: string
-  textLength: number
-}
+type PPTSlideNotesImportSource = SlideEditSlideNotesPasteValue
 type PPTSlideMetadataImportSource = {
   background?: PPTSlideMetadataBackgroundDescriptor
   format: typeof PPT_SLIDE_METADATA_JSON_IMPORT_FORMAT
@@ -2502,10 +2492,7 @@ type PPTSlideJSONImportEffect = {
   sourceSlideNames: string
 }
 type PPTSlideNotesImportEffect = {
-  format:
-    | typeof PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT
-    | typeof PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT
-    | typeof PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT
+  format: PPTSlideNotesImportSource['format']
   model: typeof PPT_SLIDE_NOTES_IMPORT_MODEL
   notesLength: number
   slideId: string
@@ -6850,11 +6837,9 @@ function App() {
   }
 
   function pastePPTSlideNotesSource(source: PPTSlideNotesImportSource) {
-    const effect = toPPTSlideMetadataHostCommandEffect({
-      fieldId: 'notes',
-      id: 'update-slide-notes',
+    const effect = toSlideEditSlideNotesPasteCommandEffect({
+      pasteValue: source,
       slideId: activeSlide.id,
-      value: source.notes,
     })
 
     setLastSlideNotesImportEffect(createPPTSlideNotesImportEffect({
@@ -32628,137 +32613,7 @@ function getPPTCommentThreadMessageFromJSONValue(
 function getPPTSlideNotesSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  const candidates: readonly PPTJSONDataTransferCandidate<
-    PPTSlideNotesImportSource['format']
-  >[] = [
-    {
-      format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      mimeType: PPT_SLIDE_NOTES_JSON_MIME_TYPE,
-    },
-    {
-      format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      mimeType: 'application/json',
-    },
-    {
-      format: PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT,
-      mimeType: 'text/json',
-    },
-    {
-      format: PPT_SLIDE_NOTES_MARKDOWN_IMPORT_FORMAT,
-      mimeType: 'text/markdown',
-    },
-    {
-      format: PPT_SLIDE_NOTES_TEXT_IMPORT_FORMAT,
-      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
-    },
-  ]
-
-  return readPPTJSONDataTransferSource({
-    candidates,
-    dataTransfer,
-    parseJSONValue: ({ candidate, json, jsonLength }) => {
-      if (candidate.format !== PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT) {
-        return null
-      }
-
-      const notes = getPPTSlideNotesFromJSONValue(json)
-
-      return notes
-        ? {
-            format: candidate.format,
-            notes,
-            textLength: jsonLength,
-          }
-        : null
-    },
-    parseText: (text, candidate) =>
-      getPPTSlideNotesSourceFromText(text, candidate.format),
-  })
-}
-
-function getPPTSlideNotesSourceFromText(
-  text: string,
-  format: PPTSlideNotesImportSource['format'],
-): PPTSlideNotesImportSource | null {
-  const normalized = text.replace(/\r\n?/g, '\n').trim()
-
-  if (!normalized) {
-    return null
-  }
-
-  const notes = format === PPT_SLIDE_NOTES_JSON_IMPORT_FORMAT
-    ? getPPTSlideNotesFromJSONText(normalized)
-    : getPPTSlideNotesFromMarkedText(normalized)
-
-  return notes
-    ? {
-        format,
-        notes,
-        textLength: normalized.length,
-      }
-    : null
-}
-
-function getPPTSlideNotesFromJSONText(text: string) {
-  const json = getPPTImportJSONText(text)
-
-  if (!json) {
-    return null
-  }
-
-  try {
-    return getPPTSlideNotesFromJSONValue(JSON.parse(json))
-  } catch {
-    return null
-  }
-}
-
-function getPPTSlideNotesFromJSONValue(value: unknown): string | null {
-  if (typeof value === 'string') {
-    return normalizePPTSlideNotesText(value)
-  }
-
-  if (!isPPTRecord(value)) {
-    return null
-  }
-
-  const notesValue =
-    value.notes ??
-      value.speakerNotes ??
-      value.speaker_notes ??
-      (isPPTRecord(value.slide) ? value.slide.notes : undefined)
-
-  return typeof notesValue === 'string'
-    ? normalizePPTSlideNotesText(notesValue)
-    : null
-}
-
-function getPPTSlideNotesFromMarkedText(text: string) {
-  const lines = text.split('\n')
-  const firstContentIndex = lines.findIndex((line) => line.trim())
-
-  if (firstContentIndex < 0) {
-    return null
-  }
-
-  const firstLine = lines[firstContentIndex].trim()
-  const headingMatch = firstLine.match(
-    /^#{1,6}\s*(?:speaker\s+notes?|presenter\s+notes?|notes?)\s*#*$/i,
-  )
-  const prefixMatch = firstLine.match(
-    /^(?:speaker\s+notes?|presenter\s+notes?|notes?)\s*:\s*(.*)$/i,
-  )
-
-  if (!headingMatch && !prefixMatch) {
-    return null
-  }
-
-  const noteLines = [
-    ...(prefixMatch?.[1]?.trim() ? [prefixMatch[1].trim()] : []),
-    ...lines.slice(firstContentIndex + 1),
-  ]
-
-  return normalizePPTSlideNotesText(noteLines.join('\n'))
+  return getSlideEditSlideNotesPasteValue({ dataTransfer })
 }
 
 function normalizePPTSlideNotesText(text: string) {
