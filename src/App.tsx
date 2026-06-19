@@ -156,11 +156,11 @@ import {
   getSlideEditObjectAnimationCSSStyle,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectCornerRadiusCSS,
-  getSlideEditObjectCornerRadiusJSONPasteValue,
+  getSlideEditObjectCornerRadiusJSONPasteValueFromText,
   getSlideEditObjectCornerRadiusPasteCommand,
   getSlideEditObjectCornerRadiusPreviewCSS,
   getSlideEditObjectFillOpacityCommandEffect,
-  getSlideEditObjectFillOpacityJSONPasteValue,
+  getSlideEditObjectFillOpacityJSONPasteValueFromText,
   getSlideEditObjectFillOpacityPasteCommand,
   getSlideEditObjectHyperlinkCommandEffect,
   getSlideEditObjectHyperlinkJSONPasteValueFromText,
@@ -187,9 +187,9 @@ import {
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
   getSlideEditObjectStrokeLineStyleDashArray,
-  getSlideEditObjectStrokeLineStyleJSONPasteValue,
+  getSlideEditObjectStrokeLineStyleJSONPasteValueFromText,
   getSlideEditObjectStrokeLineStylePasteCommand,
-  getSlideEditObjectTransformJSONPasteValue,
+  getSlideEditObjectTransformJSONPasteValueFromText,
   getSlideEditObjectTransformPasteCommandEffects,
   getSlideEditObjectAccessibilityJSONPasteValueFromText,
   getSlideEditObjectAccessibilityPasteCommand,
@@ -22583,13 +22583,14 @@ function getPPTObjectTransformSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectTransformJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectTransformJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'any' : 'wrapped',
+          payloadLength: json.length,
+          sourceType: candidate.type,
+        },
+      )
 
       if (!pasteValue) {
         continue
@@ -23472,13 +23473,12 @@ function getPPTObjectFillOpacitySourceFromSlideEditJSONPasteValue(
         continue
       }
 
-      const pasteValue = getSlideEditObjectFillOpacityJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectFillOpacityJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (pasteValue === null) {
         continue
@@ -23682,13 +23682,12 @@ function getPPTObjectCornerRadiusSourceFromSlideEditJSONPasteValue(
         continue
       }
 
-      const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectCornerRadiusJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (pasteValue === null) {
         continue
@@ -24324,13 +24323,13 @@ function getPPTObjectStrokeLineStyleSourceFromSlideEditJSONPasteValue(
         continue
       }
 
-      const strokeLineStyle = getSlideEditObjectStrokeLineStyleJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
+      const strokeLineStyle =
+        getSlideEditObjectStrokeLineStyleJSONPasteValueFromText(
           json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+          {
+            mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          },
+        )
 
       if (strokeLineStyle === null) {
         continue
