@@ -138,11 +138,11 @@ import {
   getSlideEditLayerPaneCommandEffect,
   getSlideEditLayerPaneDropIndicator,
   getSlideEditLayerPaneKeyboardIntent,
-  getSlideEditLayerPaneObjectLayerJSONPasteValue,
+  getSlideEditLayerPaneObjectLayerJSONPasteValueFromText,
   getSlideEditLayerPaneObjectLayerPasteCommandEffect,
   getSlideEditLayerPaneObjectStatePasteCommandEffects,
-  getSlideEditLayerPaneObjectStateJSONPasteValue,
-  getSlideEditLayerPaneRenameJSONPasteValue,
+  getSlideEditLayerPaneObjectStateJSONPasteValueFromText,
+  getSlideEditLayerPaneRenameJSONPasteValueFromText,
   getSlideEditLayerPaneRenamePasteCommandEffect,
   getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditLayoutJSONPasteCommandEffects,
@@ -320,6 +320,8 @@ import {
   type SlideEditLayerPaneIntent,
   type SlideEditLayerPaneKeyboardIntent,
   type SlideEditLayerPaneObjectLayerJSONPasteValue,
+  type SlideEditLayerPaneObjectStateJSONPasteValue,
+  type SlideEditLayerPaneRenameJSONPasteValue,
   type SlideEditLayerPaneRowDescriptor,
   type SlideEditLayoutApplyHostCommandEffect,
   type SlideEditLayoutDescriptor,
@@ -17510,7 +17512,7 @@ function createPPTObjectMetadataRenameEffects({
 
 function createSlideEditLayerPaneRenamePasteValueFromPPTSource(
   source: PPTObjectMetadataImportSource,
-): NonNullable<ReturnType<typeof getSlideEditLayerPaneRenameJSONPasteValue>> {
+): SlideEditLayerPaneRenameJSONPasteValue {
   return {
     name: source.metadata.name ?? '',
     nameField: 'name',
@@ -17635,7 +17637,7 @@ function createPPTObjectStateImportCommandEffects({
 
 function createSlideEditLayerPaneObjectStatePasteValueFromPPTSource(
   source: PPTObjectStateImportSource,
-): NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectStateJSONPasteValue>> | null {
+): SlideEditLayerPaneObjectStateJSONPasteValue | null {
   const lock = source.state.locked === undefined
     ? undefined
     : {
@@ -21593,15 +21595,10 @@ function getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditLayerPaneRenameJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeTypes: candidate.customMimeType
-          ? [candidate.customMimeType]
-          : [],
-      })
+      const pasteValue = getSlideEditLayerPaneRenameJSONPasteValueFromText(
+        json,
+        { mode: candidate.allowDirect ? 'any' : 'wrapped' },
+      )
 
       if (!pasteValue) {
         continue
@@ -21630,7 +21627,7 @@ function getPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
 }
 
 function createPPTObjectMetadataSourceFromSlideEditRenameJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneRenameJSONPasteValue>>,
+  pasteValue: SlideEditLayerPaneRenameJSONPasteValue,
   jsonLength: number,
 ): PPTObjectMetadataImportSource {
   return {
@@ -22125,13 +22122,10 @@ function getPPTObjectStateSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditLayerPaneObjectStateJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditLayerPaneObjectStateJSONPasteValueFromText(
+        json,
+        { mode: 'any' },
+      )
 
       if (!pasteValue) {
         continue
@@ -22148,7 +22142,7 @@ function getPPTObjectStateSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTObjectStateSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectStateJSONPasteValue>>,
+  pasteValue: SlideEditLayerPaneObjectStateJSONPasteValue,
   jsonLength: number,
 ): PPTObjectStateImportSource | null {
   const state: PPTObjectStateImportSource['state'] = {}
@@ -22356,13 +22350,10 @@ function getPPTObjectLayerSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditLayerPaneObjectLayerJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditLayerPaneObjectLayerJSONPasteValueFromText(
+        json,
+        { mode: 'any' },
+      )
 
       if (!pasteValue) {
         continue
@@ -22379,7 +22370,7 @@ function getPPTObjectLayerSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTObjectLayerSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditLayerPaneObjectLayerJSONPasteValue>>,
+  pasteValue: SlideEditLayerPaneObjectLayerJSONPasteValue,
   jsonLength: number,
 ): PPTObjectLayerImportSource {
   return {
