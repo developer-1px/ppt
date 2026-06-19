@@ -4,6 +4,7 @@ import {
   type PPTComment,
   type PPTDeck,
   type PPTElement,
+  type PPTElementAnimation,
   type PPTElementShadow,
   type PPTFill,
   type PPTFreeform,
@@ -47,6 +48,7 @@ const PPTX_MARKUP_COMPATIBILITY_NS =
   'http://schemas.openxmlformats.org/markup-compatibility/2006'
 const PPTX_POWERPOINT_2010_NS =
   'http://schemas.microsoft.com/office/powerpoint/2010/main'
+const PPTX_FLY_IN_MOTION_PATH = 'M 0 0.25 L 0 0 E'
 
 type PPTXPptx = InstanceType<typeof PptxGenJS>
 type PPTXSlide = ReturnType<PPTXPptx['addSlide']>
@@ -62,6 +64,10 @@ type PPTXTextInset = {
   left: number
   right: number
   top: number
+}
+type PPTXAnimationTarget = {
+  animation: PPTElementAnimation
+  objectId: string
 }
 
 export function createPPTDeckPPTX(deck: PPTDeck) {
@@ -167,6 +173,7 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
 function shouldPatchPPTXPackage(deck: PPTDeck) {
   return deck.slides.some((slide) =>
     slide.transition !== undefined ||
+    hasPPTXSlideAnimations(slide) ||
     slide.elements.some((element) =>
       element.visible !== false &&
       Boolean(element.accessibility?.altText.trim())))
@@ -189,9 +196,12 @@ async function applyPPTXPackagePatches({
 
     const xml = await file.async('string')
     const nextXml = setPPTXElementAccessibilityXml(
-      setPPTXSlideTransitionXml(
-        xml,
-        createPPTXSlideTransitionXml(slide.transition),
+      setPPTXSlideTimingXml(
+        setPPTXSlideTransitionXml(
+          xml,
+          createPPTXSlideTransitionXml(slide.transition),
+        ),
+        slide,
       ),
       slide,
     )
@@ -200,6 +210,13 @@ async function applyPPTXPackagePatches({
       zip.file(path, nextXml)
     }
   }))
+}
+
+function hasPPTXSlideAnimations(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.animation !== undefined &&
+    element.animation.type !== 'none')
 }
 
 function setPPTXElementAccessibilityXml(xml: string, slide: PPTSlide) {
@@ -257,6 +274,229 @@ function getPPTXElementObjectNames(element: PPTElement) {
   }
 
   return [element.name]
+}
+
+function setPPTXSlideTimingXml(xml: string, slide: PPTSlide) {
+  if (!hasPPTXSlideAnimations(slide)) {
+    return xml
+  }
+
+  const xmlWithoutTiming = xml.replace(
+    /<p:timing\b[\s\S]*?<\/p:timing>/,
+    '',
+  )
+  const timingXml = createPPTXSlideTimingXml(xmlWithoutTiming, slide)
+
+  if (!timingXml) {
+    return xml
+  }
+
+  if (xmlWithoutTiming.includes('</p:transition>')) {
+    return xmlWithoutTiming.replace(
+      '</p:transition>',
+      `</p:transition>${timingXml}`,
+    )
+  }
+
+  if (/<p:transition\b[^/]*\/>/.test(xmlWithoutTiming)) {
+    return xmlWithoutTiming.replace(
+      /<p:transition\b[^/]*\/>/,
+      (tag) => `${tag}${timingXml}`,
+    )
+  }
+
+  const anchor = xmlWithoutTiming.includes('</p:clrMapOvr>')
+    ? '</p:clrMapOvr>'
+    : '</p:cSld>'
+
+  return xmlWithoutTiming.replace(anchor, `${anchor}${timingXml}`)
+}
+
+function createPPTXSlideTimingXml(xml: string, slide: PPTSlide) {
+  const targets = getPPTXSlideAnimationTargets(xml, slide)
+
+  if (targets.length === 0) {
+    return null
+  }
+
+  let nextTimeNodeId = 3
+  const effectXml = targets.map((target) => {
+    const startId = nextTimeNodeId
+    nextTimeNodeId += 3
+
+    return createPPTXAnimationEffectXml(target, startId)
+  }).join('')
+  const buildXml = targets.map(({ objectId }) =>
+    `<p:bldP spid="${objectId}" grpId="0" build="allAtOnce"/>`).join('')
+
+  return [
+    '<p:timing>',
+    '<p:tnLst>',
+    '<p:par>',
+    '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">',
+    '<p:childTnLst>',
+    '<p:seq concurrent="1" nextAc="seek">',
+    '<p:cTn id="2" dur="indefinite" nodeType="mainSeq">',
+    `<p:childTnLst>${effectXml}</p:childTnLst>`,
+    '</p:cTn>',
+    '</p:seq>',
+    '</p:childTnLst>',
+    '</p:cTn>',
+    '</p:par>',
+    '</p:tnLst>',
+    `<p:bldLst>${buildXml}</p:bldLst>`,
+    '</p:timing>',
+  ].join('')
+}
+
+function getPPTXSlideAnimationTargets(xml: string, slide: PPTSlide) {
+  const targets: PPTXAnimationTarget[] = []
+  const animatedElements = slide.elements
+    .filter((element) =>
+      element.visible !== false &&
+      element.animation !== undefined &&
+      element.animation.type !== 'none')
+    .sort((a, b) => (a.animation?.order ?? 0) - (b.animation?.order ?? 0))
+
+  for (const element of animatedElements) {
+    const objectIds = new Set(
+      getPPTXElementObjectNames(element)
+        .flatMap((objectName) => getPPTXObjectIdsByName(xml, objectName)),
+    )
+
+    for (const objectId of objectIds) {
+      if (element.animation) {
+        targets.push({
+          animation: element.animation,
+          objectId,
+        })
+      }
+    }
+  }
+
+  return targets
+}
+
+function getPPTXObjectIdsByName(xml: string, objectName: string) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const objectIds: string[] = []
+
+  for (const match of xml.matchAll(/<p:cNvPr\b[^>]*>/g)) {
+    const tag = match[0]
+
+    if (getPPTXXmlTagAttribute(tag, 'name') === name) {
+      const objectId = getPPTXXmlTagAttribute(tag, 'id')
+
+      if (objectId) {
+        objectIds.push(objectId)
+      }
+    }
+  }
+
+  return objectIds
+}
+
+function getPPTXXmlTagAttribute(tag: string, name: string) {
+  const pattern = new RegExp(`\\b${escapePPTXRegExp(name)}="([^"]*)"`)
+
+  return tag.match(pattern)?.[1] ?? null
+}
+
+function createPPTXAnimationEffectXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+) {
+  const presetId = target.animation.type === 'flyIn' ? '2' : '10'
+  const presetSubtype = target.animation.type === 'flyIn' ? '8' : '0'
+  const nodeType = target.animation.trigger === 'withPrevious'
+    ? 'withEffect'
+    : 'clickEffect'
+  const startDelay = target.animation.trigger === 'withPrevious'
+    ? clampPPTXAnimationMs(target.animation.delayMs)
+    : 'indefinite'
+  const effectDelay = target.animation.trigger === 'withPrevious'
+    ? 0
+    : clampPPTXAnimationMs(target.animation.delayMs)
+  const effectXml = target.animation.type === 'flyIn'
+    ? createPPTXAnimationMotionXml(target, timeNodeId + 2, effectDelay)
+    : createPPTXAnimationFadeXml(target, timeNodeId + 2, effectDelay)
+
+  return [
+    '<p:par>',
+    `<p:cTn id="${timeNodeId}" presetID="${presetId}" presetClass="entr" `,
+    `presetSubtype="${presetSubtype}" fill="hold" nodeType="${nodeType}">`,
+    '<p:stCondLst>',
+    `<p:cond delay="${startDelay}"/>`,
+    '</p:stCondLst>',
+    '<p:childTnLst>',
+    createPPTXAnimationVisibilityXml(target, timeNodeId + 1),
+    effectXml,
+    '</p:childTnLst>',
+    '</p:cTn>',
+    '</p:par>',
+  ].join('')
+}
+
+function createPPTXAnimationVisibilityXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+) {
+  return [
+    '<p:set>',
+    '<p:cBhvr>',
+    `<p:cTn id="${timeNodeId}" dur="1" fill="hold"/>`,
+    createPPTXAnimationTargetXml(target.objectId),
+    '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>',
+    '</p:cBhvr>',
+    '<p:to><p:strVal val="visible"/></p:to>',
+    '</p:set>',
+  ].join('')
+}
+
+function createPPTXAnimationFadeXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    '<p:animEffect transition="in" filter="fade">',
+    createPPTXAnimationBehaviorXml(target, timeNodeId, delayMs),
+    '</p:animEffect>',
+  ].join('')
+}
+
+function createPPTXAnimationMotionXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    `<p:animMotion origin="layout" path="${PPTX_FLY_IN_MOTION_PATH}" `,
+    'pathEditMode="relative">',
+    createPPTXAnimationBehaviorXml(target, timeNodeId, delayMs),
+    '</p:animMotion>',
+  ].join('')
+}
+
+function createPPTXAnimationBehaviorXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    '<p:cBhvr>',
+    `<p:cTn id="${timeNodeId}" dur="${clampPPTXAnimationMs(target.animation.durationMs)}" fill="hold">`,
+    '<p:stCondLst>',
+    `<p:cond delay="${delayMs}"/>`,
+    '</p:stCondLst>',
+    '</p:cTn>',
+    createPPTXAnimationTargetXml(target.objectId),
+    '</p:cBhvr>',
+  ].join('')
+}
+
+function createPPTXAnimationTargetXml(objectId: string) {
+  return `<p:tgtEl><p:spTgt spid="${escapePPTXXmlAttribute(objectId)}"/></p:tgtEl>`
 }
 
 function setPPTXSlideTransitionXml(
@@ -374,6 +614,10 @@ function getPPTXSlideTransitionSpeed(durationMs: number) {
 }
 
 function clampPPTXTransitionMs(value: number) {
+  return Math.round(clamp(value, 0, 2_147_483_647))
+}
+
+function clampPPTXAnimationMs(value: number) {
   return Math.round(clamp(value, 0, 2_147_483_647))
 }
 

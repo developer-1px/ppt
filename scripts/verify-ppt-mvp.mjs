@@ -10834,6 +10834,13 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX object animation timing',
+    pptxPackageState.hasObjectAnimationTiming &&
+      pptxPackageState.hasObjectAnimationMotion &&
+      pptxPackageState.hasObjectAnimationTarget,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -26603,6 +26610,9 @@ async function inspectPPTXPackage(base64) {
     hasHyperlinkRelationship: false,
     hasImageCropSrcRect: false,
     hasMediaPart: false,
+    hasObjectAnimationMotion: false,
+    hasObjectAnimationTarget: false,
+    hasObjectAnimationTiming: false,
     hasObjectOpacityAlpha: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
@@ -26668,6 +26678,17 @@ async function inspectPPTXPackage(base64) {
         '<a:srcRect l="-25000" r="25000" t="20000" b="-20000"/>',
       ),
       hasMediaPart: entries.some((path) => path.startsWith('ppt/media/')),
+      hasObjectAnimationMotion:
+        slideXml.includes('<p:timing>') &&
+        slideXml.includes('<p:animMotion origin="layout" path="M 0 0.25 L 0 0 E" pathEditMode="relative">') &&
+        slideXml.includes('presetClass="entr"') &&
+        slideXml.includes('nodeType="withEffect"'),
+      hasObjectAnimationTarget:
+        slideXml.includes('<p:tgtEl><p:spTgt spid="') &&
+        slideXml.includes('<p:bldLst><p:bldP spid="'),
+      hasObjectAnimationTiming:
+        slideXml.includes('dur="800"') &&
+        slideXml.includes('<p:cond delay="200"/>'),
       hasObjectOpacityAlpha: slideXml.includes('<a:alpha val="42000"/>'),
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
