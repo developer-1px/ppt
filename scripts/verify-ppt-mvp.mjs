@@ -616,7 +616,7 @@ async function runSpacingGuideScenario(page) {
   })()`)
 
   if (afterRelease.left !== before.left) {
-    await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+    await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
     await delay(50)
   }
 
@@ -11465,6 +11465,13 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await page.eval(`document.querySelector('[data-ppt-inspector-tab="slide"]')?.click()`)
+  await delay(50)
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('[data-ppt-slide-field="notes"]')`),
+    'PPT slide notes field',
+  )
+
   await page.eval(`(() => {
     const notes = document.querySelector('[data-ppt-slide-field="notes"]')
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
@@ -16095,7 +16102,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterRichUndo = await getPPTTextPasteState(page)
@@ -16150,7 +16157,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const markdownLinkUrl = 'https://example.com/review-brief'
@@ -16192,7 +16199,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   await page.eval(`(() => {
@@ -16232,7 +16239,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   await page.eval(`(() => {
@@ -16279,7 +16286,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterMarkdownUndo = await getPPTTextPasteState(page)
@@ -16332,7 +16339,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterUndo = await getPPTTextPasteState(page)
@@ -16409,7 +16416,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterSelectedHTMLTextUndo = await getPPTTextPasteState(page)
@@ -16470,7 +16477,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterSelectedMarkdownTextUndo = await getPPTTextPasteState(page)
@@ -16524,7 +16531,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterSelectedPlainTextUndo = await getPPTTextPasteState(page)
@@ -16652,7 +16659,7 @@ async function runTextPasteScenario(page) {
     },
   )
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterTextBodyJSONUndo = await getPPTTextPasteState(page)
@@ -21063,7 +21070,60 @@ async function getPPTPresentationState(page) {
 }
 
 async function runSlideManagementScenario(page) {
-  const before = await getSlideRailState(page)
+  let before = await getSlideRailState(page)
+  const beforeAddLayout = await getActivePPTSlideLayoutState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="add"]').click()`)
+  await delay(60)
+
+  const afterAdd = await getSlideRailState(page)
+  const afterAddLayout = await getActivePPTSlideLayoutState(page)
+
+  record(
+    'adds PPT slide from active layout placeholders',
+    afterAdd.count === before.count + 1 &&
+      afterAdd.activeId !== before.activeId &&
+      afterAdd.activeName.includes(`Slide ${before.count + 1}`) &&
+      afterAdd.selectedIds === afterAddLayout.elementIds[0] &&
+      afterAddLayout.layout === beforeAddLayout.layout &&
+      afterAddLayout.theme === beforeAddLayout.theme &&
+      afterAddLayout.elementCount === afterAddLayout.visiblePlaceholderCount &&
+      afterAddLayout.elementCount >= 2 &&
+      afterAddLayout.elementIds.every((id) => id.startsWith(`${afterAdd.activeId}-`)) &&
+      afterAddLayout.texts[0]?.includes('Untitled slide') &&
+      afterAddLayout.placeholderCount === afterAddLayout.visiblePlaceholderCount,
+    {
+      afterAdd,
+      afterAddLayout,
+      before,
+      beforeAddLayout,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(60)
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((item) => item.getAttribute('data-ppt-slide-id') === slideId)
+
+    thumb?.click()
+  })(${JSON.stringify(before.activeId)})`)
+  await delay(60)
+
+  const afterAddCleanup = await getSlideRailState(page)
+
+  record(
+    'removes temporary PPT layout slide before slide management probes',
+    afterAddCleanup.count === before.count &&
+      afterAddCleanup.activeId === before.activeId,
+    {
+      afterAdd,
+      afterAddCleanup,
+      before,
+    },
+  )
+
+  before = afterAddCleanup
 
   await page.eval(`document.querySelector('[data-ppt-slide-action="duplicate"]').click()`)
   await delay(50)
@@ -21386,7 +21446,7 @@ async function runSlideManagementScenario(page) {
     dragDetails,
   })
 
-  await page.eval(`document.querySelector('button[title="Undo"]').click()`)
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(80)
 
   const afterDragUndo = await getSlideRailState(page)
@@ -23437,6 +23497,38 @@ function getSlideRailState(page) {
         .filter((thumb) => thumb.tabIndex === 0)
         .map((thumb) => thumb.getAttribute('data-ppt-slide-id') ?? ''),
       thumbnailCount: rail?.getAttribute('data-ppt-slide-rail-thumbnail-count') ?? '',
+    }
+  })()`)
+}
+
+function getActivePPTSlideLayoutState(page) {
+  return page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide')
+    const elements = [...(slide?.querySelectorAll('[data-ppt-element]') ?? [])]
+    const placeholders = [...document.querySelectorAll('[data-ppt-layout-placeholder]')]
+    const visiblePlaceholders = placeholders
+      .filter((placeholder) => placeholder.getAttribute('data-ppt-placeholder-visible') === 'true')
+
+    return {
+      elementCount: elements.length,
+      elementIds: elements
+        .map((element) => element.getAttribute('data-ppt-element') ?? ''),
+      geometry: elements.map((element) => [
+        element.getAttribute('data-ppt-selection-x') ?? '',
+        element.getAttribute('data-ppt-selection-y') ?? '',
+        element.getAttribute('data-ppt-selection-w') ?? '',
+        element.getAttribute('data-ppt-selection-h') ?? '',
+      ].join(',')),
+      kinds: elements.map((element) => element.getAttribute('data-kind') ?? ''),
+      layout: slide?.getAttribute('data-ppt-layout-id') ?? '',
+      placeholderCount: placeholders.length,
+      placeholderIds: placeholders
+        .map((placeholder) => placeholder.getAttribute('data-ppt-layout-placeholder') ?? ''),
+      texts: elements.map((element) => element.textContent?.trim() ?? ''),
+      theme: slide?.getAttribute('data-ppt-theme-id') ?? '',
+      visiblePlaceholderCount: visiblePlaceholders.length,
+      visiblePlaceholderIds: visiblePlaceholders
+        .map((placeholder) => placeholder.getAttribute('data-ppt-layout-placeholder') ?? ''),
     }
   })()`)
 }

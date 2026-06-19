@@ -1102,6 +1102,145 @@ function getPPTHiddenPlaceholderIdSet(slide: PPTSlide) {
   return new Set(slide.hiddenPlaceholderIds ?? [])
 }
 
+function createPPTSlideFromLayout({
+  id,
+  layout,
+  name,
+  themeId,
+}: {
+  id: string
+  layout: SlideEditLayoutDescriptor
+  name: string
+  themeId: string
+}): PPTSlide {
+  const slide: PPTSlide = {
+    background: {
+      color: getPPTThemeColorTokenValue(
+        layout.defaultStyle?.colorTokenIds?.background ??
+          PPT_THEME_DESCRIPTOR.defaultStyle?.colorTokenIds?.background,
+        '#ffffff',
+      ),
+    },
+    elements: [],
+    id,
+    layoutId: layout.layoutId,
+    name,
+    notes: '',
+    themeId,
+  }
+
+  return {
+    ...slide,
+    elements: getPPTLayoutPlaceholders(layout, slide)
+      .filter((placeholder) => placeholder.isVisible)
+      .map((placeholder) => createPPTElementFromLayoutPlaceholder(id, placeholder)),
+  }
+}
+
+function createPPTElementFromLayoutPlaceholder(
+  slideId: string,
+  placeholder: SlideEditResolvedLayoutPlaceholder,
+): PPTElement {
+  const base = {
+    geometry: { ...placeholder.bounds },
+    id: `${slideId}-${placeholder.placeholderId}`,
+    name: placeholder.title,
+  }
+
+  if (placeholder.role === 'media') {
+    return {
+      ...base,
+      fill: {
+        color: getPPTThemeColorTokenValue(
+          placeholder.inheritedStyle.colorTokenIds?.fill ??
+            placeholder.inheritedStyle.colorTokenIds?.background,
+          '#ffffff',
+        ),
+      },
+      kind: 'shape',
+      shape: 'rect',
+      stroke: {
+        color: getPPTThemeColorTokenValue('ppt-color-accent', '#2563eb'),
+        dash: 'dash',
+        width: 2,
+      },
+      style: getPPTLayoutPlaceholderTextStyle(placeholder),
+      textBody: createPPTTextBody(placeholder.title),
+    }
+  }
+
+  return {
+    ...base,
+    kind: 'textBox',
+    style: getPPTLayoutPlaceholderTextStyle(placeholder),
+    textBody: createPPTTextBody(getPPTLayoutPlaceholderDefaultText(placeholder)),
+  }
+}
+
+function getPPTLayoutPlaceholderDefaultText(
+  placeholder: SlideEditResolvedLayoutPlaceholder,
+) {
+  if (placeholder.role === 'title') {
+    return 'Untitled slide'
+  }
+
+  return placeholder.title
+}
+
+function getPPTLayoutPlaceholderTextStyle(
+  placeholder: SlideEditResolvedLayoutPlaceholder,
+): PPTTextStyle {
+  const fontTokenId = placeholder.role === 'title'
+    ? placeholder.inheritedStyle.fontTokenIds?.heading
+    : placeholder.inheritedStyle.fontTokenIds?.body
+  const fontToken = PPT_THEME_DESCRIPTOR.fontTokens.find((token) =>
+    token.tokenId === fontTokenId)
+
+  return {
+    color: getPPTThemeColorTokenValue(
+      placeholder.inheritedStyle.colorTokenIds?.text,
+      '#111827',
+    ),
+    ...(fontToken?.family ? { fontFamily: fontToken.family } : {}),
+    fontSize: typeof fontToken?.size === 'number'
+      ? fontToken.size
+      : placeholder.role === 'title'
+        ? 56
+        : 24,
+    fontWeight: getPPTFontWeightFromThemeToken(fontToken?.weight),
+  }
+}
+
+function getPPTThemeColorTokenValue(
+  tokenId: string | undefined,
+  fallback: string,
+) {
+  return PPT_THEME_DESCRIPTOR.colorTokens.find((token) =>
+    token.tokenId === tokenId)?.value ?? fallback
+}
+
+function getPPTFontWeightFromThemeToken(
+  weight: number | string | undefined,
+): PPTTextStyle['fontWeight'] {
+  if (typeof weight === 'number') {
+    return weight >= 700 ? 'bold' : weight >= 600 ? 'semibold' : 'regular'
+  }
+
+  if (typeof weight === 'string') {
+    const normalized = weight.toLowerCase()
+
+    if (normalized.includes('bold') || normalized === '700') {
+      return 'bold'
+    }
+
+    if (normalized.includes('semi') || normalized === '600') {
+      return 'semibold'
+    }
+  }
+
+  return 'regular'
+}
+
 const canvasAlignModeAvailabilityKey = {
   alignBottom: 'alignBottom',
   alignCenter: 'alignCenter',
@@ -5552,27 +5691,27 @@ function App() {
     commitDeck((current) => {
       const nextIndex = current.slides.length + 1
       const id = createPPTSlideId(current)
-      const slide: PPTSlide = {
-        background: { color: '#ffffff' },
-        elements: [{
-          geometry: { h: 72, w: 720, x: 84, y: 82 },
-          id: `${id}-title`,
-          kind: 'textBox',
-          name: 'Title',
-          style: { color: '#111827', fontSize: 44, fontWeight: 'bold' },
-          textBody: createPPTTextBody('Untitled slide'),
-        }],
+      const sourceSlide = current.slides.find((slide) => slide.id === activeSlide.id)
+      const layout = getPPTLayoutDescriptor(sourceSlide?.layoutId ?? activeSlide.layoutId)
+      const slide = createPPTSlideFromLayout({
         id,
+        layout,
         name: `Slide ${nextIndex}`,
-        notes: '',
-      }
+        themeId: sourceSlide?.themeId ?? activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId,
+      })
+      const result = insertPPTSlideAtTargetPlacement({
+        placement: 'after',
+        slide,
+        slides: current.slides,
+        targetSlideId: sourceSlide?.id ?? activeSlide.id,
+      })
 
       setActiveSlideId(slide.id)
-      setSelection([slide.elements[0].id])
+      setSelection(slide.elements[0] ? [slide.elements[0].id] : [])
 
       return {
         ...current,
-        slides: [...current.slides, slide],
+        slides: result?.items ?? [...current.slides, slide],
       }
     })
   }
