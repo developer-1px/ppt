@@ -10998,8 +10998,10 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await reversePPTXPresentationSlideOrder(
-    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXImageOpacityProbe(
+    await reversePPTXPresentationSlideOrder(
+      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    ),
   )
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
@@ -11027,6 +11029,10 @@ async function runExportScenario(page) {
       imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       imageFlipModelCount: elements.filter((element) =>
         element.kind === 'image' && element.flipH === true).length,
+      imageOpacityModelCount: elements.filter((element) =>
+        element.kind === 'image' &&
+        element.opacity !== undefined &&
+        element.opacity !== 1).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
@@ -11104,6 +11110,10 @@ async function runExportScenario(page) {
       element.accessibility?.altText)
     const exportFlippedImages = exportElements.filter((element) =>
       element.kind === 'image' && element.flipH === true)
+    const exportImageOpacityObjects = exportElements.filter((element) =>
+      element.kind === 'image' &&
+      element.opacity !== undefined &&
+      element.opacity !== 1)
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
@@ -11140,6 +11150,8 @@ async function runExportScenario(page) {
         exportCode.includes('"y": 70'),
       exportHasImageFlip: exportFlippedImages.length > 0,
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
+      exportHasImageOpacity: exportImageOpacityObjects.length > 0,
+      exportImageOpacityObjectNames: exportImageOpacityObjects.map((element) => element.name).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
@@ -11161,6 +11173,7 @@ async function runExportScenario(page) {
         exportCode.includes('"advanceAfterMs": 3000'),
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportImageFlipModelCount: exportFlippedImages.length,
+      exportImageOpacityModelCount: exportImageOpacityObjects.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectAltTextModelCount: exportAltTextObjects.length,
       exportObjectLockingModelCount: exportLockedObjects.length,
@@ -11217,6 +11230,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageCropModelCount > beforeOpenXmlPPTXDrop.imageCropModelCount &&
       openXmlPPTXImportState.exportHasImageFlip &&
       openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
+      openXmlPPTXImportState.exportHasImageOpacity &&
+      openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectAltText &&
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&
@@ -27083,6 +27098,61 @@ async function reversePPTXPresentationSlideOrder(base64) {
     compression: 'DEFLATE',
     type: 'base64',
   })
+}
+
+async function addPPTXImageOpacityProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  let updated = false
+
+  for (const slidePath of slidePaths) {
+    const xml = await readPPTXZipText(zip, slidePath)
+    const nextXml = xml.replace(/<p:pic\b[\s\S]*?<\/p:pic>/, (picXml) => {
+      if (/<a:alpha(?:Mod|ModFix)?\b/.test(picXml)) {
+        return picXml
+      }
+
+      const expandedBlip = picXml.replace(
+        /<a:blip\b([^>]*)\/>/,
+        '<a:blip$1><a:alphaModFix amt="42000"/></a:blip>',
+      )
+
+      if (expandedBlip !== picXml) {
+        updated = true
+
+        return expandedBlip
+      }
+
+      const blipWithOpacity = picXml.replace(
+        /(<a:blip\b[^>]*>)/,
+        '$1<a:alphaModFix amt="42000"/>',
+      )
+
+      if (blipWithOpacity !== picXml) {
+        updated = true
+      }
+
+      return blipWithOpacity
+    })
+
+    if (updated) {
+      zip.file(slidePath, nextXml)
+      break
+    }
+  }
+
+  return updated
+    ? await zip.generateAsync({
+        compression: 'DEFLATE',
+        type: 'base64',
+      })
+    : base64
 }
 
 async function inspectPPTXPackage(base64) {

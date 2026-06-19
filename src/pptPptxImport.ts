@@ -1020,6 +1020,7 @@ async function readPPTXPictureElement({
   const altText = readPPTXObjectDescription(pic)
   const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
+  const opacity = readPPTXImageOpacity(blip)
   const shadow = readPPTXElementShadow(spPr)
 
   return {
@@ -1034,6 +1035,7 @@ async function readPPTXPictureElement({
     kind: 'image',
     ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
     name,
+    ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
     src: `data:${mimeType};base64,${base64}`,
   }
@@ -1587,6 +1589,25 @@ function readPPTXAlphaOpacity(solidFill: Element) {
   const value = toPPTXPositiveNumber(alpha?.getAttribute('val'))
 
   return value === null ? null : Math.max(0, Math.min(1, value / 100_000))
+}
+
+function readPPTXImageOpacity(blip: Element | null) {
+  const alphaModFix = getFirstPPTXDescendantByLocalName(blip, 'alphaModFix')
+  const alphaMod = getFirstPPTXDescendantByLocalName(blip, 'alphaMod')
+  const alpha = getFirstPPTXDescendantByLocalName(blip, 'alpha')
+  const value = toPPTXPositiveNumber(
+    alphaModFix?.getAttribute('amt') ??
+      alphaMod?.getAttribute('amt') ??
+      alpha?.getAttribute('val'),
+  )
+
+  if (value === null) {
+    return null
+  }
+
+  const opacity = Math.max(0, Math.min(1, value / 100_000))
+
+  return opacity === 1 ? null : opacity
 }
 
 function readPPTXObjectName(element: Element, fallback: string) {
