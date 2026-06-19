@@ -1388,6 +1388,7 @@ async function runTextEditingScenario(page) {
   const afterTypeToEditStart = await page.eval(`(() => {
     const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
     const selected = document.querySelector('[data-selected="true"]')
+    const shell = document.querySelector('.ppt-stage-shell')
 
     return {
       active: document.activeElement === editor,
@@ -1395,16 +1396,26 @@ async function runTextEditingScenario(page) {
       inlineEditActive: editor?.getAttribute('data-ppt-inline-edit-active') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       text: editor?.textContent ?? '',
+      textEditStartInitialText: shell?.getAttribute('data-ppt-text-edit-start-initial-text') ?? '',
+      textEditStartIntent: shell?.getAttribute('data-ppt-text-edit-start-intent') ?? '',
+      textEditStartKeys: shell?.getAttribute('data-ppt-text-edit-start-keys') ?? '',
+      textEditStartModel: shell?.getAttribute('data-ppt-text-edit-start-model') ?? '',
+      textEditStartTarget: shell?.getAttribute('data-ppt-text-edit-start-target') ?? '',
     }
   })()`)
 
   record(
-    'starts PPT inline text edit by typing a printable key',
+    'starts PPT inline text edit with canvas printable key intent',
     afterTypeToEditStart.active &&
       afterTypeToEditStart.editable &&
       afterTypeToEditStart.inlineEditActive === 'true' &&
       afterTypeToEditStart.selectedId === 's1-title' &&
-      afterTypeToEditStart.text === 'x',
+      afterTypeToEditStart.text === 'x' &&
+      afterTypeToEditStart.textEditStartInitialText === 'x' &&
+      afterTypeToEditStart.textEditStartIntent === 'canvas-keyboard-text-edit-start-intent' &&
+      afterTypeToEditStart.textEditStartKeys === 'printable' &&
+      afterTypeToEditStart.textEditStartModel === 'canvas-keyboard-text-edit-start' &&
+      afterTypeToEditStart.textEditStartTarget === 's1-title',
     afterTypeToEditStart,
   )
 

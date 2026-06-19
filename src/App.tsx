@@ -600,6 +600,9 @@ import {
   PPT_KEYBOARD_SELECTION_CYCLE_INTENT_MODEL,
   PPT_KEYBOARD_SELECTION_CYCLE_KEYS,
   PPT_KEYBOARD_SELECTION_CYCLE_MODEL,
+  PPT_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL,
+  PPT_KEYBOARD_TEXT_EDIT_START_KEYS,
+  PPT_KEYBOARD_TEXT_EDIT_START_MODEL,
   PPT_KEYBOARD_TOOL_DISPATCH_MODEL,
   PPT_KEYBOARD_VIEWPORT_INTENT_MODEL,
   PPT_KEYBOARD_VIEWPORT_MODEL,
@@ -655,6 +658,7 @@ import {
   getPPTCanvasKeyboardNudgeShortcutIntent,
   getPPTCanvasKeyboardSelectionCycleIntent,
   getPPTCanvasKeyboardSystemShortcutIntent,
+  getPPTCanvasKeyboardTextEditStartIntent,
   getPPTCanvasKeyboardToolShortcutIntent,
   getPPTCanvasKeyboardViewportShortcutIntent,
   getPPTCanvasMediaInsertPosition,
@@ -738,6 +742,7 @@ import {
   type PPTCanvasImagePasteReplaceTarget,
   type PPTCanvasKeyboardSelectionCycleDirection,
   type PPTCanvasKeyboardSelectionCycleIntent,
+  type PPTCanvasKeyboardTextEditStartIntent,
   type PPTCanvasKeyboardToolIntent,
   type PPTCanvasMediaObjectHyperlinkRoute,
   type PPTCanvasMediaObjectHyperlinkTarget,
@@ -3592,6 +3597,12 @@ type PPTSelectionCycleEffect = {
   objectIds: readonly string[]
   targetObjectId: string
 }
+type PPTTextEditStartEffect = {
+  initialText: string
+  keyboardIntent: typeof PPT_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL
+  keyboardModel: typeof PPT_KEYBOARD_TEXT_EDIT_START_MODEL
+  targetObjectId: string
+}
 type PPTInlineEditInitialText = {
   elementId: string
   text: string
@@ -4330,6 +4341,8 @@ function App() {
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastSelectionCycleEffect, setLastSelectionCycleEffect] =
     useState<PPTSelectionCycleEffect | null>(null)
+  const [lastTextEditStartEffect, setLastTextEditStartEffect] =
+    useState<PPTTextEditStartEffect | null>(null)
   const [lastSlideTransitionEffect, setLastSlideTransitionEffect] = useState<PPTSlideTransitionHostCommandEffect | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
   const [lastColorSwatchEffect, setLastColorSwatchEffect] = useState<PPTColorSwatchHostCommandEffect | null>(null)
@@ -5082,18 +5095,25 @@ function App() {
         return
       }
 
-      if (
-        !editingId &&
-        isPPTKeyboardTextEditStartKey(event) &&
-        !getPPTToolShortcutIntent(event) &&
-        !isPPTCanvasControlTarget({
-          extraSelectors: ['[data-ppt-layer-pane]'],
-          target: event.target,
-        }) &&
-        editSelectedElementFromTypedKey(event.key)
-      ) {
-        event.preventDefault()
-        return
+      if (!editingId) {
+        const textEditStartIntent = getPPTCanvasKeyboardTextEditStartIntent({
+          blockedTargetSelectors: '[data-ppt-layer-pane]',
+          event,
+          isEditableTextSelection: selectedElement?.kind === 'textBox' &&
+            isPPTTextElement(selectedElement) &&
+            selectedElement.locked !== true &&
+            selectedElement.visible !== false,
+          isReservedShortcut: () => getPPTToolShortcutIntent(event) !== null,
+          selection,
+        })
+
+        if (textEditStartIntent.kind === 'start-text-edit') {
+          if (textEditStartIntent.preventDefault) {
+            event.preventDefault()
+          }
+          editSelectedElementFromTextEditStartIntent(textEditStartIntent)
+          return
+        }
       }
 
       const textFormattingKeyboardIntent = getSlideEditTextFormattingKeyboardIntent({
@@ -11043,19 +11063,30 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     setSlideContextMenu(null)
   }
 
-  function editSelectedElementFromTypedKey(key: string) {
+  function editSelectedElementFromTextEditStartIntent(
+    intent: Extract<
+      PPTCanvasKeyboardTextEditStartIntent,
+      { kind: 'start-text-edit' }
+    >,
+  ) {
     if (
       !selectedElement ||
       selectedElement.kind !== 'textBox' ||
       !isPPTTextElement(selectedElement) ||
+      selectedElement.id !== intent.targetId ||
       selectedElement.locked === true ||
       selectedElement.visible === false
     ) {
-      return false
+      return
     }
 
-    editSelectedElement({ initialText: key })
-    return true
+    editSelectedElement({ initialText: intent.initialText })
+    setLastTextEditStartEffect({
+      initialText: intent.initialText,
+      keyboardIntent: PPT_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL,
+      keyboardModel: PPT_KEYBOARD_TEXT_EDIT_START_MODEL,
+      targetObjectId: intent.targetId,
+    })
   }
 
   function getSelectablePPTObjectIds(slide: PPTSlide) {
@@ -16094,6 +16125,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-paragraph-numbered-shortcut-intent={PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT}
         data-ppt-text-paragraph-numbered-shortcut-keys={SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT}
         data-ppt-text-paragraph-numbered-shortcut-model={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL}
+        data-ppt-text-edit-start-initial-text={lastTextEditStartEffect?.initialText}
+        data-ppt-text-edit-start-intent={lastTextEditStartEffect?.keyboardIntent}
+        data-ppt-text-edit-start-keys={PPT_KEYBOARD_TEXT_EDIT_START_KEYS}
+        data-ppt-text-edit-start-model={lastTextEditStartEffect?.keyboardModel ??
+          PPT_KEYBOARD_TEXT_EDIT_START_MODEL}
+        data-ppt-text-edit-start-target={lastTextEditStartEffect?.targetObjectId}
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}
@@ -41097,14 +41134,6 @@ function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
   }
 
   return tool.kind
-}
-
-function isPPTKeyboardTextEditStartKey(event: KeyboardEvent) {
-  return event.key.length === 1 &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    event.isComposing !== true
 }
 
 function getPPTTextFontSizeKeyboardShortcutIntent(event: KeyboardEvent) {

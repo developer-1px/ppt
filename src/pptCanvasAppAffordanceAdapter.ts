@@ -10,6 +10,9 @@ import {
   CANVAS_KEYBOARD_SELECTION_CYCLE_INTENT_MODEL,
   CANVAS_KEYBOARD_SELECTION_CYCLE_KEYS,
   CANVAS_KEYBOARD_SELECTION_CYCLE_MODEL,
+  CANVAS_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL,
+  CANVAS_KEYBOARD_TEXT_EDIT_START_KEYS,
+  CANVAS_KEYBOARD_TEXT_EDIT_START_MODEL,
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_MODEL,
@@ -84,6 +87,7 @@ import {
   getCanvasKeyboardNudgeShortcutIntent,
   getCanvasKeyboardSelectionCycleIntent,
   getCanvasKeyboardSystemShortcutIntent,
+  getCanvasKeyboardTextEditStartIntent,
   getCanvasKeyboardToolShortcutIntent,
   getCanvasKeyboardViewportShortcutIntent,
   getCanvasMergedEraserHitIds,
@@ -187,6 +191,7 @@ import {
   type CanvasFocusableElement,
   type CanvasKeyboardSelectionCycleDirection,
   type CanvasKeyboardSelectionCycleIntent,
+  type CanvasKeyboardTextEditStartIntent,
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
   type CanvasPointerClickMemory,
@@ -335,6 +340,12 @@ export const PPT_KEYBOARD_SELECTION_CYCLE_KEYS =
   CANVAS_KEYBOARD_SELECTION_CYCLE_KEYS
 export const PPT_KEYBOARD_SELECTION_CYCLE_MODEL =
   CANVAS_KEYBOARD_SELECTION_CYCLE_MODEL
+export const PPT_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL =
+  CANVAS_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL
+export const PPT_KEYBOARD_TEXT_EDIT_START_KEYS =
+  CANVAS_KEYBOARD_TEXT_EDIT_START_KEYS
+export const PPT_KEYBOARD_TEXT_EDIT_START_MODEL =
+  CANVAS_KEYBOARD_TEXT_EDIT_START_MODEL
 export const PPT_KEYBOARD_TOOL_DISPATCH_MODEL =
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL
 export const PPT_KEYBOARD_VIEWPORT_INTENT_MODEL =
@@ -455,6 +466,8 @@ export const getPPTCanvasKeyboardSelectionCycleIntent =
   getCanvasKeyboardSelectionCycleIntent
 export const getPPTCanvasKeyboardSystemShortcutIntent =
   getCanvasKeyboardSystemShortcutIntent
+export const getPPTCanvasKeyboardTextEditStartIntent =
+  getCanvasKeyboardTextEditStartIntent
 export const getPPTCanvasKeyboardToolShortcutIntent =
   getCanvasKeyboardToolShortcutIntent
 export const getPPTCanvasKeyboardViewportShortcutIntent =
@@ -735,6 +748,9 @@ export type PPTCanvasKeyboardSelectionCycleDirection =
 export type PPTCanvasKeyboardSelectionCycleIntent<
   TId extends string = string,
 > = CanvasKeyboardSelectionCycleIntent<TId>
+export type PPTCanvasKeyboardTextEditStartIntent<
+  TId extends string = string,
+> = CanvasKeyboardTextEditStartIntent<TId>
 export type PPTCanvasKeyboardToolIntent = CanvasKeyboardToolIntent
 export type PPTCanvasPastePositionMemory = CanvasPastePositionMemory
 export type PPTCanvasPointerClickMemory = CanvasPointerClickMemory
