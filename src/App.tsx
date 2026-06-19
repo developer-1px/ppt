@@ -571,9 +571,11 @@ import {
   createPPTCanvasAffordanceConfig,
   createPPTCanvasShape,
   createPPTCanvasText,
+  getPPTCanvasAngleConstrainedLineEndPoint,
   getPPTCanvasCenterOutCreationPoints,
   deletePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
+  PPT_ANGLE_CONSTRAINED_LINE_ENDPOINT_MODEL,
   PPT_CENTER_OUT_CREATION_POINTS_MODEL,
   PPT_CREATED_RECT_BOUNDS_MODEL,
   PPT_COMMAND_AFFORDANCES,
@@ -13782,7 +13784,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
       const endPoint = transformModifierState.constrainAngle
-        ? getPPTAngleConstrainedLineEndPoint(interaction.startPoint, point)
+        ? getPPTCanvasAngleConstrainedLineEndPoint({
+            currentWorld: point,
+            startWorld: interaction.startPoint,
+          })
         : point
       const elements = mapPPTElementsByIds(
         currentSlide.elements,
@@ -16178,6 +16183,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-creation-center-out-model={PPT_CENTER_OUT_CREATION_POINTS_MODEL}
         data-ppt-creation-from-center-modifier="Alt"
         data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-line-angle-constrain-model={PPT_ANGLE_CONSTRAINED_LINE_ENDPOINT_MODEL}
         data-ppt-move-axis-lock-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.axisLockModifier}
         data-ppt-move-duplicate-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.duplicateModifier}
         data-ppt-move-drag-modifier-model={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.model}
@@ -39346,23 +39352,6 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 
 function noopPPTKeyboardCommandHandler() {}
 
-function getPPTAngleConstrainedLineEndPoint(start: Point, current: Point): Point {
-  const distance = getPPTCanvasPointDistance(start, current)
-
-  if (distance === 0) {
-    return current
-  }
-
-  const angleStep = Math.PI / 4
-  const angle = Math.atan2(current.y - start.y, current.x - start.x)
-  const constrainedAngle = Math.round(angle / angleStep) * angleStep
-
-  return {
-    x: start.x + Math.cos(constrainedAngle) * distance,
-    y: start.y + Math.sin(constrainedAngle) * distance,
-  }
-}
-
 function getPPTAngleConstrainedLineEndpointPoint(
   line: PPTLine,
   endpoint: 'end' | 'start',
@@ -39370,10 +39359,10 @@ function getPPTAngleConstrainedLineEndpointPoint(
 ): Point {
   const anchorEndpoint = endpoint === 'end' ? 'start' : 'end'
 
-  return getPPTAngleConstrainedLineEndPoint(
-    getPPTLineEndpointPoint(line, anchorEndpoint),
-    current,
-  )
+  return getPPTCanvasAngleConstrainedLineEndPoint({
+    currentWorld: current,
+    startWorld: getPPTLineEndpointPoint(line, anchorEndpoint),
+  })
 }
 
 function getPPTSlideIndexReorderResult({

@@ -20569,6 +20569,7 @@ async function runLineAffordanceScenario(page) {
   record(
     'constrains PPT line endpoint angle with Shift drag',
     afterShiftEndpoint.endpointHandleCount === 2 &&
+      afterShiftEndpoint.lineAngleConstrainModel === 'canvas-angle-constrained-line-endpoint' &&
       afterShiftEndpoint.worldX2 !== beforeShiftEndpoint.worldX2 &&
       afterShiftEndpoint.worldY2 !== beforeShiftEndpoint.worldY2 &&
       afterShiftEndpoint.endConnection === '' &&
@@ -20665,6 +20666,7 @@ async function runLineAffordanceScenario(page) {
     'constrains PPT line creation angle with Shift drag',
     shiftLine.pressed === 'true' &&
       afterShiftLine.lineCount === afterArrow.lineCount + 1 &&
+      afterShiftLine.lineAngleConstrainModel === 'canvas-angle-constrained-line-endpoint' &&
       afterShiftLine.selectedKind === 'line' &&
       afterShiftLine.selectedName === 'Line' &&
       afterShiftLine.endConnection === '' &&
@@ -25198,6 +25200,7 @@ function getPPTLineState(page, elementId = null) {
       lineStyleImportStrokeDash: stage?.getAttribute('data-ppt-line-style-import-stroke-dash') ?? '',
       lineStyleImportStrokeWidth: stage?.getAttribute('data-ppt-line-style-import-stroke-width') ?? '',
       lineCount: document.querySelectorAll('[data-kind="line"]').length,
+      lineAngleConstrainModel: stage?.getAttribute('data-ppt-line-angle-constrain-model') ?? '',
       lineTool: stage?.getAttribute('data-line-tool') ?? '',
       endConnection: selected?.getAttribute('data-line-end-connection') ?? '',
       hasPath: !!selectedPath,

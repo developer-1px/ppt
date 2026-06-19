@@ -1,4 +1,5 @@
 import {
+  CANVAS_ANGLE_CONSTRAINED_LINE_ENDPOINT_MODEL,
   CANVAS_CENTER_OUT_CREATION_POINTS_MODEL,
   CANVAS_CREATED_RECT_BOUNDS_MODEL,
   CANVAS_COMMAND_AFFORDANCES,
@@ -15,6 +16,7 @@ import {
   getCanvasCreatedRectBounds,
   getCanvasWheelViewport,
   groupCanvasCommand,
+  getCanvasAngleConstrainedLineEndPoint,
   lockCanvasCommand,
   nudgeCanvasCommand,
   reorderCanvasCommand,
@@ -34,6 +36,8 @@ import {
 export const PPT_COMMAND_AFFORDANCES = CANVAS_COMMAND_AFFORDANCES
 export const PPT_CENTER_OUT_CREATION_POINTS_MODEL =
   CANVAS_CENTER_OUT_CREATION_POINTS_MODEL
+export const PPT_ANGLE_CONSTRAINED_LINE_ENDPOINT_MODEL =
+  CANVAS_ANGLE_CONSTRAINED_LINE_ENDPOINT_MODEL
 export const PPT_CREATED_RECT_BOUNDS_MODEL =
   CANVAS_CREATED_RECT_BOUNDS_MODEL
 export const PPT_TOOL_AFFORDANCES = CANVAS_TOOL_AFFORDANCES
@@ -52,6 +56,8 @@ export const getPPTCanvasCenterOutCreationPoints =
 export const getPPTCanvasCreatedRectBounds = getCanvasCreatedRectBounds
 export const getPPTCanvasWheelViewport = getCanvasWheelViewport
 export const groupPPTCanvasCommand = groupCanvasCommand
+export const getPPTCanvasAngleConstrainedLineEndPoint =
+  getCanvasAngleConstrainedLineEndPoint
 export const lockPPTCanvasCommand = lockCanvasCommand
 export const nudgePPTCanvasCommand = nudgeCanvasCommand
 export const reorderPPTCanvasCommand = reorderCanvasCommand
