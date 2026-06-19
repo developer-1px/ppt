@@ -10887,6 +10887,94 @@ async function runExportScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]')?.click()`)
   await delay(80)
 
+  const beforeDeckPPTXDrop = await page.eval(`(() => ({
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'ai-retouch-demo.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(pptxDownloadBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(500)
+
+  const deckPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const title = document.querySelector('.ppt-slide [data-ppt-element-name="Title"]')
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      dropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      jsonLength: Number(stage?.getAttribute('data-ppt-deck-pptx-import-json-length') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-pptx-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-pptx-import-source-title') ?? '',
+      titleText: title?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'drops exported PPTX back as editable PPT model slides',
+    deckPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      deckPPTXImportState.format === 'pptx-custom-xml-ppt-deck' &&
+      deckPPTXImportState.sourceDeck === 'deck-ai-retouch' &&
+      deckPPTXImportState.sourceTitle === 'AI Retouch Demo' &&
+      deckPPTXImportState.sourceSlideCount === beforeDeckPPTXDrop.slideCount &&
+      deckPPTXImportState.importedCount === beforeDeckPPTXDrop.slideCount &&
+      deckPPTXImportState.slideCount === beforeDeckPPTXDrop.slideCount * 2 &&
+      deckPPTXImportState.activeSlide === deckPPTXImportState.firstImportedSlideId &&
+      deckPPTXImportState.activeName.includes('Copy') &&
+      deckPPTXImportState.titleText.length > 0 &&
+      deckPPTXImportState.fileName === 'ai-retouch-demo.pptx' &&
+      deckPPTXImportState.fileSize > 5000 &&
+      deckPPTXImportState.jsonLength > 1000 &&
+      deckPPTXImportState.dropAction === 'pptx-deck-file',
+    {
+      beforeDeckPPTXDrop,
+      deckPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDeckPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes PPTX deck drop probes before export scenario continues',
+    afterDeckPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterDeckPPTXDropCleanup.slideCount === beforeDeckPPTXDrop.slideCount,
+    {
+      afterDeckPPTXDropCleanup,
+      beforeDeckPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)

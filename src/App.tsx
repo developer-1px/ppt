@@ -856,6 +856,13 @@ import {
   getPPTDeckPPTXFilename,
 } from './pptPptxExport'
 import {
+  PPTX_DECK_MODEL_IMPORT_FORMAT,
+  canImportPPTDeckPPTXFromDataTransfer,
+  getPPTDeckPPTXFileFromDataTransfer,
+  importPPTDeckFromPPTXBlob,
+  type PPTDeckPPTXImportResult,
+} from './pptPptxImport'
+import {
   PPT_DEFAULT_TABLE_ROWS,
   PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT,
   PPT_DECK_MARKDOWN_OUTLINE_IMPORT_MODEL,
@@ -1778,6 +1785,7 @@ const PPT_DECK_JSON_IMPORT_FORMAT = 'application-json-ppt-deck' as const
 const PPT_DECK_JSON_TEXT_IMPORT_FORMAT = 'text-json-ppt-deck' as const
 const PPT_DECK_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.deck+json'
+const PPT_DECK_PPTX_IMPORT_MODEL = 'ppt-deck-pptx-import' as const
 const PPT_ELEMENTS_JSON_IMPORT_MODEL = 'ppt-elements-json-import' as const
 const PPT_ELEMENTS_JSON_IMPORT_FORMAT = 'application-json-ppt-elements' as const
 const PPT_ELEMENTS_JSON_TEXT_IMPORT_FORMAT = 'text-json-ppt-elements' as const
@@ -1900,6 +1908,10 @@ type PPTDeckJSONImportSource = {
     | typeof PPT_DECK_JSON_IMPORT_FORMAT
     | typeof PPT_DECK_JSON_TEXT_IMPORT_FORMAT
   jsonLength: number
+}
+type PPTDeckPPTXImportSource = PPTDeckPPTXImportResult & {
+  fileName: string
+  fileSize: number
 }
 type PPTSlideJSONImportSource = {
   format:
@@ -2478,6 +2490,18 @@ type PPTDeckJSONImportEffect = {
   importedSlideCount: number
   jsonLength: number
   model: typeof PPT_DECK_JSON_IMPORT_MODEL
+  sourceDeckId: string
+  sourceSlideCount: number
+  sourceTitle: string
+}
+type PPTDeckPPTXImportEffect = {
+  fileName: string
+  fileSize: number
+  firstImportedSlideId: string
+  format: typeof PPTX_DECK_MODEL_IMPORT_FORMAT
+  importedSlideCount: number
+  jsonLength: number
+  model: typeof PPT_DECK_PPTX_IMPORT_MODEL
   sourceDeckId: string
   sourceSlideCount: number
   sourceTitle: string
@@ -4230,6 +4254,8 @@ function App() {
   ] = useState<PPTDeckMarkdownOutlineImportEffect | null>(null)
   const [lastDeckJSONImportEffect, setLastDeckJSONImportEffect] =
     useState<PPTDeckJSONImportEffect | null>(null)
+  const [lastDeckPPTXImportEffect, setLastDeckPPTXImportEffect] =
+    useState<PPTDeckPPTXImportEffect | null>(null)
   const [lastSlideJSONImportEffect, setLastSlideJSONImportEffect] =
     useState<PPTSlideJSONImportEffect | null>(null)
   const [lastSlideNotesImportEffect, setLastSlideNotesImportEffect] =
@@ -5584,6 +5610,15 @@ function App() {
         return
       }
 
+      const deckPPTXFile =
+        getPPTDeckPPTXFileFromDataTransfer(event.clipboardData)
+
+      if (deckPPTXFile) {
+        event.preventDefault()
+        void importPPTDeckPPTXFile(deckPPTXFile)
+        return
+      }
+
       const slideClipboardImport =
         getPPTSlideClipboardFromDataTransfer(event.clipboardData)
 
@@ -6747,6 +6782,78 @@ function App() {
       }
 
       setLastDeckJSONImportEffect(createPPTDeckJSONImportEffect({
+        importedSlides,
+        source,
+      }))
+      selectSlide(importedSlides[0].id)
+
+      return {
+        ...current,
+        slides,
+      }
+    })
+
+    return true
+  }
+
+  async function importPPTDeckPPTXFile(file: File) {
+    const result = await importPPTDeckFromPPTXBlob(file)
+
+    if (!result) {
+      return false
+    }
+
+    return pastePPTDeckPPTXSource({
+      ...result,
+      fileName: file.name,
+      fileSize: file.size,
+    })
+  }
+
+  function pastePPTDeckPPTXSource(source: PPTDeckPPTXImportSource) {
+    if (source.deck.slides.length === 0) {
+      return false
+    }
+
+    commitDeck((current) => {
+      const targetSlideId = current.slides.some((slide) =>
+        slide.id === activeSlide.id)
+        ? activeSlide.id
+        : current.slides.at(-1)?.id
+
+      if (!targetSlideId) {
+        return current
+      }
+
+      const importedSlides = clonePPTDeckSlidesForImport(
+        current,
+        source.deck.slides,
+      )
+
+      if (importedSlides.length === 0) {
+        return current
+      }
+
+      let slides = current.slides
+      let anchorSlideId = targetSlideId
+
+      for (const slide of importedSlides) {
+        const result = insertPPTSlideAtTargetPlacement({
+          placement: 'after',
+          slide,
+          slides,
+          targetSlideId: anchorSlideId,
+        })
+
+        if (!result) {
+          return current
+        }
+
+        slides = result.items
+        anchorSlideId = slide.id
+      }
+
+      setLastDeckPPTXImportEffect(createPPTDeckPPTXImportEffect({
         importedSlides,
         source,
       }))
@@ -12994,7 +13101,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
   }
 
   function handleStageDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    if (canHandlePPTStageDropImport(event.dataTransfer)) {
+    if (
+      canImportPPTDeckPPTXFromDataTransfer(event.dataTransfer) ||
+      canHandlePPTStageDropImport(event.dataTransfer)
+    ) {
       event.preventDefault()
       setPPTCanvasDataTransferDropEffect({
         dataTransfer: event.dataTransfer,
@@ -13004,6 +13114,15 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
   }
 
   function handleStageDrop(event: ReactDragEvent<HTMLDivElement>) {
+    const deckPPTXFile = getPPTDeckPPTXFileFromDataTransfer(event.dataTransfer)
+
+    if (deckPPTXFile) {
+      event.preventDefault()
+      setLastStageDropImportActionKind('pptx-deck-file')
+      void importPPTDeckPPTXFile(deckPPTXFile)
+      return
+    }
+
     const action = getPPTStageDropImportAction(event.dataTransfer)
     setLastStageDropImportActionKind(action?.kind ?? '')
 
@@ -15639,6 +15758,16 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-deck-json-import-source-deck={lastDeckJSONImportEffect?.sourceDeckId}
         data-ppt-deck-json-import-source-slide-count={lastDeckJSONImportEffect?.sourceSlideCount}
         data-ppt-deck-json-import-source-title={lastDeckJSONImportEffect?.sourceTitle}
+        data-ppt-deck-pptx-import-file-name={lastDeckPPTXImportEffect?.fileName}
+        data-ppt-deck-pptx-import-file-size={lastDeckPPTXImportEffect?.fileSize}
+        data-ppt-deck-pptx-import-first-slide={lastDeckPPTXImportEffect?.firstImportedSlideId}
+        data-ppt-deck-pptx-import-format={lastDeckPPTXImportEffect?.format}
+        data-ppt-deck-pptx-import-imported-count={lastDeckPPTXImportEffect?.importedSlideCount}
+        data-ppt-deck-pptx-import-json-length={lastDeckPPTXImportEffect?.jsonLength}
+        data-ppt-deck-pptx-import-model={lastDeckPPTXImportEffect?.model}
+        data-ppt-deck-pptx-import-source-deck={lastDeckPPTXImportEffect?.sourceDeckId}
+        data-ppt-deck-pptx-import-source-slide-count={lastDeckPPTXImportEffect?.sourceSlideCount}
+        data-ppt-deck-pptx-import-source-title={lastDeckPPTXImportEffect?.sourceTitle}
         data-ppt-slide-json-import-first-slide={lastSlideJSONImportEffect?.firstImportedSlideId}
         data-ppt-slide-json-import-format={lastSlideJSONImportEffect?.format}
         data-ppt-slide-json-import-imported-count={lastSlideJSONImportEffect?.importedSlideCount}
@@ -18591,6 +18720,27 @@ function createPPTDeckJSONImportEffect({
     importedSlideCount: importedSlides.length,
     jsonLength: source.jsonLength,
     model: PPT_DECK_JSON_IMPORT_MODEL,
+    sourceDeckId: source.deck.id,
+    sourceSlideCount: source.deck.slides.length,
+    sourceTitle: source.deck.title,
+  }
+}
+
+function createPPTDeckPPTXImportEffect({
+  importedSlides,
+  source,
+}: {
+  importedSlides: readonly PPTSlide[]
+  source: PPTDeckPPTXImportSource
+}): PPTDeckPPTXImportEffect {
+  return {
+    fileName: source.fileName,
+    fileSize: source.fileSize,
+    firstImportedSlideId: importedSlides[0]?.id ?? '',
+    format: source.format,
+    importedSlideCount: importedSlides.length,
+    jsonLength: source.jsonLength,
+    model: PPT_DECK_PPTX_IMPORT_MODEL,
     sourceDeckId: source.deck.id,
     sourceSlideCount: source.deck.slides.length,
     sourceTitle: source.deck.title,

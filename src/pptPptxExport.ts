@@ -57,11 +57,11 @@ const PPTX_CUSTOM_XML_PROPS_RELATIONSHIP_TYPE =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps'
 const PPTX_CUSTOM_XML_PROPS_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.customXmlProperties+xml'
-const PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE =
+export const PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE =
   'application/vnd.interactive-os.ppt.deck+json'
-const PPTX_MODEL_CUSTOM_XML_NAMESPACE =
+export const PPTX_MODEL_CUSTOM_XML_NAMESPACE =
   'https://interactive-os.dev/ppt/model/v1'
-const PPTX_MODEL_CUSTOM_XML_PATH = 'customXml/item1.xml'
+export const PPTX_MODEL_CUSTOM_XML_PATH = 'customXml/item1.xml'
 const PPTX_MODEL_CUSTOM_XML_PROPS_PATH = 'customXml/itemProps1.xml'
 const PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH = 'customXml/_rels/item1.xml.rels'
 const PPTX_MODEL_CUSTOM_XML_ITEM_ID =
