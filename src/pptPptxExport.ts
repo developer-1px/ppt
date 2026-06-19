@@ -69,6 +69,11 @@ type PPTXAnimationTarget = {
   animation: PPTElementAnimation
   objectId: string
 }
+type PPTXLockDescriptor = {
+  lockTagName: string
+  lockXml: string
+  propertyTagName: string
+}
 
 export function createPPTDeckPPTX(deck: PPTDeck) {
   const pptx = new PptxGenJS()
@@ -174,6 +179,7 @@ function shouldPatchPPTXPackage(deck: PPTDeck) {
   return deck.slides.some((slide) =>
     slide.transition !== undefined ||
     hasPPTXSlideAnimations(slide) ||
+    hasPPTXLockedElements(slide) ||
     slide.elements.some((element) =>
       element.visible !== false &&
       Boolean(element.accessibility?.altText.trim())))
@@ -195,11 +201,14 @@ async function applyPPTXPackagePatches({
     }
 
     const xml = await file.async('string')
-    const nextXml = setPPTXElementAccessibilityXml(
-      setPPTXSlideTimingXml(
-        setPPTXSlideTransitionXml(
-          xml,
-          createPPTXSlideTransitionXml(slide.transition),
+    const nextXml = setPPTXElementLocksXml(
+      setPPTXElementAccessibilityXml(
+        setPPTXSlideTimingXml(
+          setPPTXSlideTransitionXml(
+            xml,
+            createPPTXSlideTransitionXml(slide.transition),
+          ),
+          slide,
         ),
         slide,
       ),
@@ -217,6 +226,12 @@ function hasPPTXSlideAnimations(slide: PPTSlide) {
     element.visible !== false &&
     element.animation !== undefined &&
     element.animation.type !== 'none')
+}
+
+function hasPPTXLockedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.locked === true)
 }
 
 function setPPTXElementAccessibilityXml(xml: string, slide: PPTSlide) {
@@ -274,6 +289,123 @@ function getPPTXElementObjectNames(element: PPTElement) {
   }
 
   return [element.name]
+}
+
+function setPPTXElementLocksXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false || element.locked !== true) {
+      return nextXml
+    }
+
+    const descriptor = getPPTXLockDescriptor(element)
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectLocksXml(patchedXml, objectName, descriptor),
+      nextXml,
+    )
+  }, xml)
+}
+
+function getPPTXLockDescriptor(element: PPTElement): PPTXLockDescriptor {
+  if (element.kind === 'image') {
+    return {
+      lockTagName: 'picLocks',
+      lockXml: '<a:picLocks noMove="1" noResize="1" noRot="1"/>',
+      propertyTagName: 'cNvPicPr',
+    }
+  }
+
+  if (element.kind === 'line' || element.kind === 'freeform') {
+    return {
+      lockTagName: 'cxnSpLocks',
+      lockXml: '<a:cxnSpLocks noMove="1" noResize="1" noRot="1" noEditPoints="1"/>',
+      propertyTagName: 'cNvCxnSpPr',
+    }
+  }
+
+  if (element.kind === 'table') {
+    return {
+      lockTagName: 'graphicFrameLocks',
+      lockXml: '<a:graphicFrameLocks noMove="1" noResize="1"/>',
+      propertyTagName: 'cNvGraphicFramePr',
+    }
+  }
+
+  return {
+    lockTagName: 'spLocks',
+    lockXml: '<a:spLocks noMove="1" noResize="1" noRot="1" noTextEdit="1"/>',
+    propertyTagName: 'cNvSpPr',
+  }
+}
+
+function setPPTXObjectLocksXml(
+  xml: string,
+  objectName: string,
+  descriptor: PPTXLockDescriptor,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const segmentPattern = new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[\\s\\S]*?</p:nv(?:Sp|Pic|CxnSp|GraphicFrame)Pr>`,
+    'g',
+  )
+
+  return xml.replace(segmentPattern, (segment) =>
+    setPPTXNonVisualPropertyLocksXml(segment, descriptor))
+}
+
+function setPPTXNonVisualPropertyLocksXml(
+  segment: string,
+  descriptor: PPTXLockDescriptor,
+) {
+  const lockPattern = new RegExp(`<a:${descriptor.lockTagName}\\b[^>]*/>`)
+
+  if (lockPattern.test(segment)) {
+    return segment.replace(lockPattern, (tag) =>
+      mergePPTXLockXmlAttributes(tag, descriptor.lockXml))
+  }
+
+  const propertyPattern = new RegExp(
+    `<p:${descriptor.propertyTagName}\\b([^>]*)/>`,
+  )
+
+  if (propertyPattern.test(segment)) {
+    return segment.replace(
+      propertyPattern,
+      `<p:${descriptor.propertyTagName}$1>${descriptor.lockXml}</p:${descriptor.propertyTagName}>`,
+    )
+  }
+
+  return segment.replace(
+    new RegExp(`</p:${descriptor.propertyTagName}>`),
+    `${descriptor.lockXml}</p:${descriptor.propertyTagName}>`,
+  )
+}
+
+function mergePPTXLockXmlAttributes(tag: string, lockXml: string) {
+  return getPPTXXmlAttributeEntries(lockXml).reduce(
+    (nextTag, [name, value]) => setPPTXXmlTagAttribute(nextTag, name, value),
+    tag,
+  )
+}
+
+function getPPTXXmlAttributeEntries(tag: string) {
+  return [...tag.matchAll(/\s([A-Za-z_:][A-Za-z0-9_.:-]*)="([^"]*)"/g)]
+    .map((match) => [match[1], match[2]] as const)
+}
+
+function setPPTXXmlTagAttribute(tag: string, name: string, value: string) {
+  const escapedName = escapePPTXRegExp(name)
+  const escapedValue = escapePPTXXmlAttribute(value)
+  const attributePattern = new RegExp(`\\s${escapedName}="[^"]*"`)
+
+  if (attributePattern.test(tag)) {
+    return tag.replace(attributePattern, ` ${name}="${escapedValue}"`)
+  }
+
+  return tag.endsWith('/>')
+    ? tag.replace(/\/>$/, ` ${name}="${escapedValue}"/>`)
+    : tag.replace(/>$/, ` ${name}="${escapedValue}">`)
 }
 
 function setPPTXSlideTimingXml(xml: string, slide: PPTSlide) {

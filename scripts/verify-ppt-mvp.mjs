@@ -10765,6 +10765,12 @@ async function runExportScenario(page) {
     htmlClipboardState,
   )
 
+  const lockedExportPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, lockedExportPoint.x, lockedExportPoint.y, 1)
+  await delay(80)
+  await page.eval(`document.querySelector('[data-ppt-command="lock-selection"]')?.click()`)
+  await delay(80)
+
   await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
   await delay(700)
 
@@ -10841,6 +10847,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX locked object protections',
+    pptxPackageState.hasObjectLocking,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -10854,6 +10865,9 @@ async function runExportScenario(page) {
       pptxPackageState.hasSlideTransitionNamespace,
     pptxPackageState,
   )
+
+  await page.eval(`document.querySelector('[data-ppt-command="unlock-all"]')?.click()`)
+  await delay(80)
 
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
@@ -26613,6 +26627,7 @@ async function inspectPPTXPackage(base64) {
     hasObjectAnimationMotion: false,
     hasObjectAnimationTarget: false,
     hasObjectAnimationTiming: false,
+    hasObjectLocking: false,
     hasObjectOpacityAlpha: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
@@ -26689,6 +26704,8 @@ async function inspectPPTXPackage(base64) {
       hasObjectAnimationTiming:
         slideXml.includes('dur="800"') &&
         slideXml.includes('<p:cond delay="200"/>'),
+      hasObjectLocking:
+        slideXml.includes('<a:spLocks noMove="1" noResize="1" noRot="1" noTextEdit="1"/>'),
       hasObjectOpacityAlpha: slideXml.includes('<a:alpha val="42000"/>'),
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
