@@ -19,6 +19,7 @@ import {
   type PPTSlideTransition,
   type PPTStroke,
   type PPTTable,
+  type PPTTableCellBorders,
   type PPTTableCellStyle,
   type PPTTableCellTextStyle,
   type PPTTextBody,
@@ -1260,18 +1261,42 @@ function readPPTXTableCellStyles(
 ): PPTTable['cellStyles'] {
   const styles = cellRows.map((row) =>
     row.map((cell): PPTTableCellStyle => {
+      const borders = readPPTXTableCellBorders(cell)
       const fill = readPPTXTableCellFill(cell)
       const textStyle = readPPTXTableCellTextStyle(cell)
 
       return {
+        ...(borders ? { borders } : {}),
         ...(fill ? { fill } : {}),
         ...(textStyle ? { textStyle } : {}),
       }
     }))
 
-  return styles.some((row) => row.some((style) => style.fill || style.textStyle))
+  return styles.some((row) =>
+    row.some((style) => style.borders || style.fill || style.textStyle))
     ? styles
     : undefined
+}
+
+function readPPTXTableCellBorders(cell: Element): PPTTableCellBorders | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
+  const borders = {
+    bottom: readPPTXTableCellBorderSide(tcPr, 'lnB'),
+    left: readPPTXTableCellBorderSide(tcPr, 'lnL'),
+    right: readPPTXTableCellBorderSide(tcPr, 'lnR'),
+    top: readPPTXTableCellBorderSide(tcPr, 'lnT'),
+  }
+
+  return borders.bottom || borders.left || borders.right || borders.top
+    ? borders
+    : undefined
+}
+
+function readPPTXTableCellBorderSide(
+  tcPr: Element | null,
+  tagName: 'lnB' | 'lnL' | 'lnR' | 'lnT',
+) {
+  return readPPTXStrokeLine(getDirectPPTXChildByLocalName(tcPr, tagName))
 }
 
 function readPPTXTableCellFill(cell: Element): PPTFill | undefined {
@@ -2041,6 +2066,10 @@ function readPPTXSolidFill(container: Element | null): PPTFill | null {
 function readPPTXStroke(spPr: Element | null): PPTStroke | undefined {
   const line = spPr ? getDirectPPTXChildByLocalName(spPr, 'ln') : null
 
+  return readPPTXStrokeLine(line)
+}
+
+function readPPTXStrokeLine(line: Element | null): PPTStroke | undefined {
   if (!line || hasPPTXNoFill(line)) {
     return undefined
   }

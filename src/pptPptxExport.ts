@@ -19,11 +19,13 @@ import {
   type PPTSlideTransition,
   type PPTStroke,
   type PPTTable,
+  type PPTTableCellBorders,
   type PPTTextBody,
   type PPTTextAutoFit,
   type PPTTextStyle,
 } from './pptModel'
 import {
+  getPPTTableCellBorders,
   getPPTTableCellFill,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
@@ -1434,6 +1436,7 @@ function addPPTXTable({
 
   pptxSlide.addTable(element.rows.map((row, rowIndex) =>
     Array.from({ length: columnCount }, (_, columnIndex) => {
+      const cellBorders = getPPTTableCellBorders(element, rowIndex, columnIndex)
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
       const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
       const fallbackFillColor = rowIndex === 0 ? 'EFF6FF' : 'FFFFFF'
@@ -1444,7 +1447,9 @@ function addPPTXTable({
           bold: cellTextStyle?.fontWeight === undefined
             ? rowIndex === 0
             : cellTextStyle.fontWeight !== 'regular',
-          border: { color: 'DBE3EF', pt: 0.75 },
+          border: cellBorders
+            ? createPPTXTableCellBorders(cellBorders)
+            : { color: 'DBE3EF', pt: 0.75 },
           color: toPPTXColor(cellTextStyle?.color ?? '#111827', '111827'),
           fill: {
             color: cellFill
@@ -1746,6 +1751,34 @@ function createPPTXTableCellMargin(
     pxToIn(inset.bottom),
     pxToIn(inset.left),
   ]
+}
+
+function createPPTXTableCellBorders(
+  borders: PPTTableCellBorders,
+): [PptxGenJS.BorderProps, PptxGenJS.BorderProps, PptxGenJS.BorderProps, PptxGenJS.BorderProps] {
+  const fallback = { color: 'DBE3EF', pt: 0.75 }
+
+  return [
+    createPPTXTableCellBorder(borders.top, fallback),
+    createPPTXTableCellBorder(borders.right, fallback),
+    createPPTXTableCellBorder(borders.bottom, fallback),
+    createPPTXTableCellBorder(borders.left, fallback),
+  ]
+}
+
+function createPPTXTableCellBorder(
+  stroke: PPTStroke | undefined,
+  fallback: PptxGenJS.BorderProps,
+): PptxGenJS.BorderProps {
+  if (!stroke) {
+    return fallback
+  }
+
+  return {
+    color: toPPTXColor(stroke.color, 'DBE3EF'),
+    pt: Math.max(0.25, pxToPt(stroke.width)),
+    type: stroke.dash === 'dash' || stroke.dash === 'dot' ? 'dash' : 'solid',
+  }
 }
 
 function getPPTXTextInset(

@@ -11,11 +11,22 @@ const PPTFillSchema = z.object({
   color: z.string(),
   opacity: z.number().optional(),
 })
+const PPTStrokeSchema = z.object({
+  color: z.string(),
+  dash: z.enum(['solid', 'dash', 'dot']).optional(),
+  width: z.number(),
+})
 const PPTTextInsetSchema = z.object({
   bottom: z.number(),
   left: z.number(),
   right: z.number(),
   top: z.number(),
+})
+const PPTTableCellBordersSchema = z.object({
+  bottom: PPTStrokeSchema.optional(),
+  left: PPTStrokeSchema.optional(),
+  right: PPTStrokeSchema.optional(),
+  top: PPTStrokeSchema.optional(),
 })
 const PPTTableCellTextStyleSchema = z.object({
   align: z.enum(['left', 'center', 'right', 'justify']).optional(),
@@ -26,14 +37,9 @@ const PPTTableCellTextStyleSchema = z.object({
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
 })
 const PPTTableCellStyleSchema = z.object({
+  borders: PPTTableCellBordersSchema.optional(),
   fill: PPTFillSchema.optional(),
   textStyle: PPTTableCellTextStyleSchema.optional(),
-})
-
-const PPTStrokeSchema = z.object({
-  color: z.string(),
-  dash: z.enum(['solid', 'dash', 'dot']).optional(),
-  width: z.number(),
 })
 
 const PPTGeometrySchema = z.object({
@@ -271,6 +277,7 @@ export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTFreeform = z.infer<typeof PPTFreeformSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
+export type PPTTableCellBorders = z.infer<typeof PPTTableCellBordersSchema>
 export type PPTTableCellStyle = z.infer<typeof PPTTableCellStyleSchema>
 export type PPTTableCellTextStyle = z.infer<typeof PPTTableCellTextStyleSchema>
 export type PPTComment = z.infer<typeof PPTCommentSchema>

@@ -40,11 +40,13 @@ import {
   type PPTStroke,
   type PPTStrokeDash,
   type PPTTable,
+  type PPTTableCellBorders,
   type PPTTableCellTextStyle,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
 import {
+  getPPTTableCellBorders,
   getPPTTableCellFill,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
@@ -867,10 +869,23 @@ function renderPPTTableHTMLRow({
     ? ''
     : ` style="height:${formatNumber(rowHeight)}px"`
   const cells = Array.from({ length: columnCount }, (_, index) => {
+    const borders = getPPTTableCellBorders(element, rowIndex, index)
     const fill = getPPTTableCellFill(element, rowIndex, index)
     const textStyle = getPPTTableCellTextStyle(element, rowIndex, index)
-    const cellAttrs = fill || textStyle
+    const cellAttrs = fill || textStyle || borders
       ? [
+          borders?.bottom
+            ? ` data-ppt-table-cell-border-bottom="${escapeHtml(formatPPTTableCellBorderData(borders.bottom))}"`
+            : '',
+          borders?.left
+            ? ` data-ppt-table-cell-border-left="${escapeHtml(formatPPTTableCellBorderData(borders.left))}"`
+            : '',
+          borders?.right
+            ? ` data-ppt-table-cell-border-right="${escapeHtml(formatPPTTableCellBorderData(borders.right))}"`
+            : '',
+          borders?.top
+            ? ` data-ppt-table-cell-border-top="${escapeHtml(formatPPTTableCellBorderData(borders.top))}"`
+            : '',
           fill
             ? ` data-ppt-table-cell-fill="${escapeHtml(fill.color)}"`
             : '',
@@ -895,7 +910,7 @@ function renderPPTTableHTMLRow({
           textStyle?.verticalAlign
             ? ` data-ppt-table-cell-vertical-align="${escapeHtml(textStyle.verticalAlign)}"`
             : '',
-          formatPPTTableCellHTMLStyle(fill, textStyle),
+          formatPPTTableCellHTMLStyle(fill, textStyle, borders),
         ].join('')
       : ''
 
@@ -928,6 +943,7 @@ function renderPPTTableSVG(element: PPTTable) {
       columnX += cellWidth
 
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const cellBorders = getPPTTableCellBorders(element, rowIndex, columnIndex)
       const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
       const fillAttrs = cellFill
         ? `fill="${escapeHtml(cellFill.color)}"${getPPTFillOpacitySvgAttr(cellFill)}`
@@ -962,9 +978,17 @@ function renderPPTTableSVG(element: PPTTable) {
       const textFontWeight = cellTextStyle?.fontWeight
         ? getPPTTableCellFontWeightSvgAttr(cellTextStyle.fontWeight)
         : rowIndex === 0 ? ' font-weight="700"' : ''
+      const borderLines = renderPPTTableCellBorderSVG({
+        borders: cellBorders,
+        cellHeight,
+        cellWidth,
+        x,
+        y,
+      })
 
       return [
         `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
+        borderLines,
         `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs}${textInsetAttr}${textVerticalAlignAttr} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="${textBaseline}">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
     })
@@ -987,8 +1011,13 @@ function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
 function formatPPTTableCellHTMLStyle(
   fill: PPTFill | undefined,
   textStyle: PPTTableCellTextStyle | undefined,
+  borders: PPTTableCellBorders | undefined,
 ) {
   const styles = [
+    borders?.bottom ? `border-bottom:${getPPTTableCellBorderCSS(borders.bottom)}` : '',
+    borders?.left ? `border-left:${getPPTTableCellBorderCSS(borders.left)}` : '',
+    borders?.right ? `border-right:${getPPTTableCellBorderCSS(borders.right)}` : '',
+    borders?.top ? `border-top:${getPPTTableCellBorderCSS(borders.top)}` : '',
     fill ? `background:${getPPTFillColorCSS(fill)}` : '',
     textStyle?.align ? `text-align:${textStyle.align}` : '',
     textStyle?.color ? `color:${textStyle.color}` : '',
@@ -1003,6 +1032,93 @@ function formatPPTTableCellHTMLStyle(
   return styles.length > 0
     ? ` style="${escapeHtml(styles.join(';'))}"`
     : ''
+}
+
+function getPPTTableCellBorderCSS(stroke: PPTStroke) {
+  return `${formatNumber(stroke.width)}px ${getPPTStrokeDashBorderStyle(stroke)} ${stroke.color}`
+}
+
+function formatPPTTableCellBorderData(stroke: PPTStroke) {
+  return `${stroke.color} ${formatNumber(stroke.width)} ${getPPTStrokeDash(stroke)}`
+}
+
+function renderPPTTableCellBorderSVG({
+  borders,
+  cellHeight,
+  cellWidth,
+  x,
+  y,
+}: {
+  borders: PPTTableCellBorders | undefined
+  cellHeight: number
+  cellWidth: number
+  x: number
+  y: number
+}) {
+  if (!borders) {
+    return ''
+  }
+
+  return [
+    borders.top
+      ? renderPPTTableCellBorderLineSVG({
+          side: 'top',
+          stroke: borders.top,
+          x1: x,
+          x2: x + cellWidth,
+          y1: y,
+          y2: y,
+        })
+      : '',
+    borders.right
+      ? renderPPTTableCellBorderLineSVG({
+          side: 'right',
+          stroke: borders.right,
+          x1: x + cellWidth,
+          x2: x + cellWidth,
+          y1: y,
+          y2: y + cellHeight,
+        })
+      : '',
+    borders.bottom
+      ? renderPPTTableCellBorderLineSVG({
+          side: 'bottom',
+          stroke: borders.bottom,
+          x1: x,
+          x2: x + cellWidth,
+          y1: y + cellHeight,
+          y2: y + cellHeight,
+        })
+      : '',
+    borders.left
+      ? renderPPTTableCellBorderLineSVG({
+          side: 'left',
+          stroke: borders.left,
+          x1: x,
+          x2: x,
+          y1: y,
+          y2: y + cellHeight,
+        })
+      : '',
+  ].join('')
+}
+
+function renderPPTTableCellBorderLineSVG({
+  side,
+  stroke,
+  x1,
+  x2,
+  y1,
+  y2,
+}: {
+  side: keyof PPTTableCellBorders
+  stroke: PPTStroke
+  x1: number
+  x2: number
+  y1: number
+  y2: number
+}) {
+  return `<line data-ppt-table-cell-border="${side}" x1="${formatNumber(x1)}" x2="${formatNumber(x2)}" y1="${formatNumber(y1)}" y2="${formatNumber(y2)}" stroke="${escapeHtml(stroke.color)}" stroke-width="${formatNumber(stroke.width)}"${getPPTStrokeDashArraySvgAttr(stroke)} stroke-linecap="square"></line>`
 }
 
 function getPPTTableCellFontWeightCSS(

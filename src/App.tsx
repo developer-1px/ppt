@@ -592,6 +592,7 @@ import {
   type PPTStroke,
   type PPTStrokeDash,
   type PPTTable,
+  type PPTTableCellBorders,
   type PPTTableCellTextStyle,
   type PPTTextBody,
   type PPTTextAutoFit,
@@ -853,6 +854,7 @@ import {
   exportPPTSlideSVG,
 } from './pptExport'
 import {
+  getPPTTableCellBorders,
   getPPTTableCellFill,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
@@ -36190,6 +36192,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
     >
       {element.rows.flatMap((row, rowIndex) =>
         row.map((cell, columnIndex) => {
+          const borders = getPPTTableCellBorders(element, rowIndex, columnIndex)
           const fill = getPPTTableCellFill(element, rowIndex, columnIndex)
           const textStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
 
@@ -36197,6 +36200,10 @@ function PPTTableView({ element }: { element: PPTTable }) {
             <div
               className="ppt-table-cell"
               data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
+              data-ppt-table-cell-border-bottom={formatPPTTableCellBorderData(borders?.bottom)}
+              data-ppt-table-cell-border-left={formatPPTTableCellBorderData(borders?.left)}
+              data-ppt-table-cell-border-right={formatPPTTableCellBorderData(borders?.right)}
+              data-ppt-table-cell-border-top={formatPPTTableCellBorderData(borders?.top)}
               data-ppt-table-cell-fill={fill?.color}
               data-ppt-table-cell-fill-opacity={fill?.opacity}
               data-ppt-table-cell-align={textStyle?.align}
@@ -36209,7 +36216,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell-vertical-align={textStyle?.verticalAlign}
               data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
               key={`${rowIndex}:${columnIndex}`}
-              style={getPPTTableCellStyleCSS(fill, textStyle)}
+              style={getPPTTableCellStyleCSS(fill, textStyle, borders)}
             >
               {cell}
             </div>
@@ -36233,12 +36240,17 @@ function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
 function getPPTTableCellStyleCSS(
   fill: PPTFill | undefined,
   textStyle: PPTTableCellTextStyle | undefined,
+  borders: PPTTableCellBorders | undefined,
 ): CSSProperties | undefined {
-  if (!fill && !textStyle) {
+  if (!fill && !textStyle && !borders) {
     return undefined
   }
 
   return {
+    ...(borders?.bottom ? { borderBottom: getPPTTableCellBorderCSS(borders.bottom) } : {}),
+    ...(borders?.left ? { borderLeft: getPPTTableCellBorderCSS(borders.left) } : {}),
+    ...(borders?.right ? { borderRight: getPPTTableCellBorderCSS(borders.right) } : {}),
+    ...(borders?.top ? { borderTop: getPPTTableCellBorderCSS(borders.top) } : {}),
     ...(fill ? { background: getPPTFillColorCSS(fill) } : {}),
     ...(textStyle?.align ? { textAlign: textStyle.align } : {}),
     ...(textStyle?.color ? { color: textStyle.color } : {}),
@@ -36253,6 +36265,16 @@ function getPPTTableCellStyleCSS(
       ? { alignItems: getPPTTableCellVerticalAlignCSS(textStyle.verticalAlign) }
       : {}),
   }
+}
+
+function getPPTTableCellBorderCSS(stroke: PPTStroke) {
+  return `${stroke.width}px ${getPPTStrokeDashBorderStyle(stroke)} ${stroke.color}`
+}
+
+function formatPPTTableCellBorderData(stroke: PPTStroke | undefined) {
+  return stroke
+    ? `${stroke.color} ${stroke.width} ${getPPTStrokeDash(stroke)}`
+    : undefined
 }
 
 function getPPTTableCellVerticalAlignCSS(

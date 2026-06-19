@@ -11164,6 +11164,7 @@ async function runExportScenario(page) {
     const exportUnevenTableProbe = exportUnevenTableProbeObjects.find((element) => {
       const columnWidths = element.columnWidths ?? []
       const rowHeights = element.rowHeights ?? []
+      const wideColumnBorders = element.cellStyles?.[0]?.[1]?.borders
       const wideColumnFill = element.cellStyles?.[0]?.[1]?.fill
       const wideColumnTextStyle = element.cellStyles?.[0]?.[1]?.textStyle
       const wideColumnTextInset = wideColumnTextStyle?.textInset
@@ -11173,6 +11174,16 @@ async function runExportScenario(page) {
         rowHeights.length === 2 &&
         columnWidths[1] > columnWidths[0] * 1.5 &&
         rowHeights[1] > rowHeights[0] * 1.5 &&
+        wideColumnBorders?.top?.color === '#2563eb' &&
+        wideColumnBorders?.top?.width === 2 &&
+        wideColumnBorders?.right?.color === '#f97316' &&
+        wideColumnBorders?.right?.dash === 'dash' &&
+        wideColumnBorders?.right?.width === 4 &&
+        wideColumnBorders?.bottom?.color === '#16a34a' &&
+        wideColumnBorders?.bottom?.width === 3 &&
+        wideColumnBorders?.left?.color === '#7c3aed' &&
+        wideColumnBorders?.left?.dash === 'dot' &&
+        wideColumnBorders?.left?.width === 2 &&
         wideColumnFill?.color === '#fee2e2' &&
         wideColumnFill?.opacity === 0.5 &&
         wideColumnTextStyle?.align === 'center' &&
@@ -11250,6 +11261,34 @@ async function runExportScenario(page) {
       exportHasUnevenTableProbe: Boolean(exportUnevenTableProbe),
       exportUnevenTableProbeNames: exportUnevenTableProbeObjects.map((element) => element.name).join(' | '),
       exportUnevenTableProbeColumnWidths: (exportUnevenTableProbe?.columnWidths ?? []).join(' '),
+      exportUnevenTableProbeCellBorderBottom: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.borders?.bottom
+        ? [
+            exportUnevenTableProbe.cellStyles[0][1].borders.bottom.color,
+            exportUnevenTableProbe.cellStyles[0][1].borders.bottom.width,
+            exportUnevenTableProbe.cellStyles[0][1].borders.bottom.dash ?? 'solid',
+          ].join(' ')
+        : '',
+      exportUnevenTableProbeCellBorderLeft: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.borders?.left
+        ? [
+            exportUnevenTableProbe.cellStyles[0][1].borders.left.color,
+            exportUnevenTableProbe.cellStyles[0][1].borders.left.width,
+            exportUnevenTableProbe.cellStyles[0][1].borders.left.dash ?? 'solid',
+          ].join(' ')
+        : '',
+      exportUnevenTableProbeCellBorderRight: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.borders?.right
+        ? [
+            exportUnevenTableProbe.cellStyles[0][1].borders.right.color,
+            exportUnevenTableProbe.cellStyles[0][1].borders.right.width,
+            exportUnevenTableProbe.cellStyles[0][1].borders.right.dash ?? 'solid',
+          ].join(' ')
+        : '',
+      exportUnevenTableProbeCellBorderTop: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.borders?.top
+        ? [
+            exportUnevenTableProbe.cellStyles[0][1].borders.top.color,
+            exportUnevenTableProbe.cellStyles[0][1].borders.top.width,
+            exportUnevenTableProbe.cellStyles[0][1].borders.top.dash ?? 'solid',
+          ].join(' ')
+        : '',
       exportUnevenTableProbeCellFill: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.color ?? '',
       exportUnevenTableProbeCellFillOpacity: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.opacity ?? '',
       exportUnevenTableProbeCellTextAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.align ?? '',
@@ -27424,6 +27463,12 @@ async function addPPTXUnevenTableProbe(base64) {
       '<a:tr h="365760">',
       createPPTXTableCellXml('Narrow'),
       createPPTXTableCellXml('Wide column', {
+        borders: {
+          bottom: { color: '16A34A', width: 28575 },
+          left: { color: '7C3AED', dash: 'dot', width: 19050 },
+          right: { color: 'F97316', dash: 'dash', width: 38100 },
+          top: { color: '2563EB', width: 19050 },
+        },
         fill: { color: 'FEE2E2', opacity: 0.5 },
         textStyle: {
           align: 'ctr',
@@ -27470,6 +27515,7 @@ async function addPPTXUnevenTableProbe(base64) {
 }
 
 function createPPTXTableCellXml(text, options = {}) {
+  const borders = options.borders ?? null
   const fill = options.fill ?? null
   const textStyle = options.textStyle ?? null
   const runPropertiesXml = textStyle
@@ -27495,9 +27541,16 @@ function createPPTXTableCellXml(text, options = {}) {
         ].join('')
       : '',
   ].join('')
+  const borderXml = [
+    createPPTXTableCellBorderXml('lnL', borders?.left),
+    createPPTXTableCellBorderXml('lnR', borders?.right),
+    createPPTXTableCellBorderXml('lnT', borders?.top),
+    createPPTXTableCellBorderXml('lnB', borders?.bottom),
+  ].join('')
   const tcPrXml = fill
     ? [
         `<a:tcPr${tcPrAttrs}>`,
+        borderXml,
         `<a:solidFill><a:srgbClr val="${fill.color}">`,
         fill.opacity === undefined
           ? ''
@@ -27505,7 +27558,9 @@ function createPPTXTableCellXml(text, options = {}) {
         '</a:srgbClr></a:solidFill>',
         '</a:tcPr>',
       ].join('')
-    : `<a:tcPr${tcPrAttrs}/>`
+    : borderXml
+      ? `<a:tcPr${tcPrAttrs}>${borderXml}</a:tcPr>`
+      : `<a:tcPr${tcPrAttrs}/>`
 
   return [
     '<a:tc>',
@@ -27522,6 +27577,19 @@ function createPPTXTableCellXml(text, options = {}) {
     '</a:txBody>',
     tcPrXml,
     '</a:tc>',
+  ].join('')
+}
+
+function createPPTXTableCellBorderXml(tagName, border) {
+  if (!border) {
+    return ''
+  }
+
+  return [
+    `<a:${tagName} w="${border.width}" cap="flat" cmpd="sng" algn="ctr">`,
+    `<a:solidFill><a:srgbClr val="${border.color}"/></a:solidFill>`,
+    border.dash ? `<a:prstDash val="${border.dash}"/>` : '',
+    `</a:${tagName}>`,
   ].join('')
 }
 

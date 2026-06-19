@@ -8,6 +8,14 @@ export function getPPTTableCellFill(
   return getPPTTableCellStyle(element, rowIndex, columnIndex)?.fill
 }
 
+export function getPPTTableCellBorders(
+  element: PPTTable,
+  rowIndex: number,
+  columnIndex: number,
+) {
+  return getPPTTableCellStyle(element, rowIndex, columnIndex)?.borders
+}
+
 export function getPPTTableCellStyle(
   element: PPTTable,
   rowIndex: number,
