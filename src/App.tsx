@@ -1172,7 +1172,6 @@ type PPTDirectJSONDataTransferCandidate<TFormat extends string> =
 type PPTSlideEditJSONPasteCandidate = {
   allowDirect: boolean
   customMimeType: string
-  dataTransfer: PPTDataTransferTextSource
   text: string
   type: string
 }
@@ -25007,10 +25006,6 @@ function getPPTSlideEditJSONPasteCandidates({
     return [{
       allowDirect: candidate.allowDirect,
       customMimeType: candidate.customMimeType,
-      dataTransfer: createPPTTextDataTransferReader({
-        mimeType: candidate.type,
-        text,
-      }),
       text,
       type: candidate.type,
     }]
