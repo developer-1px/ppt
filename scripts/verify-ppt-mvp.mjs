@@ -7143,6 +7143,71 @@ async function runTextQuickFormatScenario(page) {
     },
   )
 
+  await pressKey(page, {
+    code: 'Period',
+    key: '>',
+    modifiers: 10,
+    windowsVirtualKeyCode: 190,
+  })
+  await delay(80)
+
+  const afterFontSizeIncreaseShortcut = await page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
+      quickSize: document.querySelector('[data-ppt-text-quick-size]')?.textContent ?? '',
+      selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      shortcutIntent: stage?.getAttribute('data-ppt-text-font-size-shortcut-intent') ?? '',
+      shortcutKeys: stage?.getAttribute('data-ppt-text-font-size-shortcut-keys') ?? '',
+      shortcutModel: stage?.getAttribute('data-ppt-text-font-size-shortcut-model') ?? '',
+      shortcutStep: stage?.getAttribute('data-ppt-text-font-size-shortcut-step') ?? '',
+    }
+  })()`)
+
+  await pressKey(page, {
+    code: 'Comma',
+    key: '<',
+    modifiers: 10,
+    windowsVirtualKeyCode: 188,
+  })
+  await delay(80)
+
+  const afterFontSizeDecreaseShortcut = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
+      quickSize: document.querySelector('[data-ppt-text-quick-size]')?.textContent ?? '',
+      selectedFontSize: selected ? getComputedStyle(selected).fontSize : '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record(
+    'changes PPT text font size with Cmd/Ctrl Shift angle-bracket shortcuts',
+    afterFontSizeIncreaseShortcut.selectedId === 's1-title' &&
+      afterFontSizeIncreaseShortcut.shortcutModel === 'ppt-text-font-size-keyboard-shortcuts' &&
+      afterFontSizeIncreaseShortcut.shortcutIntent === 'ppt-text-font-size-keyboard-intent' &&
+      afterFontSizeIncreaseShortcut.shortcutKeys.includes('Cmd/Ctrl+Shift+>') &&
+      afterFontSizeIncreaseShortcut.shortcutKeys.includes('Cmd/Ctrl+Shift+<') &&
+      afterFontSizeIncreaseShortcut.shortcutStep === '2' &&
+      afterFontSizeIncreaseShortcut.fontSize === initial.fontSize + 2 &&
+      afterFontSizeIncreaseShortcut.selectedFontSize === `${initial.fontSize + 2}px` &&
+      afterFontSizeIncreaseShortcut.quickSize.includes(String(initial.fontSize + 2)) &&
+      afterFontSizeDecreaseShortcut.selectedId === 's1-title' &&
+      afterFontSizeDecreaseShortcut.fontSize === initial.fontSize &&
+      afterFontSizeDecreaseShortcut.selectedFontSize === `${initial.fontSize}px` &&
+      afterFontSizeDecreaseShortcut.quickSize.includes(String(initial.fontSize)),
+    {
+      afterFontSizeDecreaseShortcut,
+      afterFontSizeIncreaseShortcut,
+      initial,
+    },
+  )
+
   const initialAlignRadio = await readPPTParagraphAlignRadioGroupState(page)
 
   record(

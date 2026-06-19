@@ -3679,6 +3679,12 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_FONT_SIZE_STEP = 2
+const PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL =
+  'ppt-text-font-size-keyboard-shortcuts'
+const PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT =
+  'ppt-text-font-size-keyboard-intent'
+const PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS =
+  'Cmd/Ctrl+Shift+< Cmd/Ctrl+Shift+>'
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -4868,6 +4874,17 @@ function App() {
               toggleSelectedTextUnderline()
               break
           }
+        }
+        return
+      }
+
+      const textFontSizeKeyboardIntent =
+        getPPTTextFontSizeKeyboardShortcutIntent(event)
+
+      if (textFontSizeKeyboardIntent) {
+        if (canFormatSelectedText) {
+          event.preventDefault()
+          stepSelectedTextFontSize(textFontSizeKeyboardIntent.delta)
         }
         return
       }
@@ -14209,6 +14226,20 @@ function App() {
     title: 'Underline text',
   }, {
     disabled: !canFormatSelectedText,
+    id: 'format:decrease-font-size',
+    onSelect: () => stepSelectedTextFontSize(-PPT_TEXT_FONT_SIZE_STEP),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+Shift+<',
+    title: 'Decrease font size',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:increase-font-size',
+    onSelect: () => stepSelectedTextFontSize(PPT_TEXT_FONT_SIZE_STEP),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+Shift+>',
+    title: 'Increase font size',
+  }, {
+    disabled: !canFormatSelectedText,
     id: 'format:bullet',
     onSelect: toggleSelectedParagraphBullet,
     section: 'Format',
@@ -15243,6 +15274,10 @@ function App() {
         data-ppt-keyboard-nudge-large-step={String(PPT_KEYBOARD_NUDGE_LARGE_STEP)}
         data-ppt-keyboard-nudge-model={PPT_KEYBOARD_NUDGE_MODEL}
         data-ppt-keyboard-nudge-step={String(PPT_KEYBOARD_NUDGE_STEP)}
+        data-ppt-text-font-size-shortcut-intent={PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT}
+        data-ppt-text-font-size-shortcut-keys={PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS}
+        data-ppt-text-font-size-shortcut-model={PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL}
+        data-ppt-text-font-size-shortcut-step={String(PPT_TEXT_FONT_SIZE_STEP)}
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}
@@ -39092,6 +39127,30 @@ function isPPTKeyboardTextEditStartKey(event: KeyboardEvent) {
     !event.ctrlKey &&
     !event.metaKey &&
     event.isComposing !== true
+}
+
+function getPPTTextFontSizeKeyboardShortcutIntent(event: KeyboardEvent) {
+  const mod = event.metaKey || event.ctrlKey
+
+  if (!mod || !event.shiftKey || event.altKey) {
+    return null
+  }
+
+  if (event.key === '>' || event.code === 'Period') {
+    return {
+      delta: PPT_TEXT_FONT_SIZE_STEP,
+      intent: PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT,
+    }
+  }
+
+  if (event.key === '<' || event.code === 'Comma') {
+    return {
+      delta: -PPT_TEXT_FONT_SIZE_STEP,
+      intent: PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT,
+    }
+  }
+
+  return null
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {
