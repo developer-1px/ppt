@@ -7309,6 +7309,17 @@ async function runTextQuickFormatScenario(page) {
     await getPPTTextParagraphAlignShortcutState(page, 's1-title')
 
   await pressKey(page, {
+    code: 'KeyJ',
+    key: 'j',
+    modifiers: 2,
+    windowsVirtualKeyCode: 74,
+  })
+  await delay(80)
+
+  const afterTextAlignJustifyShortcut =
+    await getPPTTextParagraphAlignShortcutState(page, 's1-title')
+
+  await pressKey(page, {
     code: 'KeyL',
     key: 'l',
     modifiers: 2,
@@ -7320,24 +7331,29 @@ async function runTextQuickFormatScenario(page) {
     await getPPTTextParagraphAlignShortcutState(page, 's1-title')
 
   record(
-    'aligns PPT text paragraphs with PPTX Cmd/Ctrl L E R shortcuts',
+    'aligns PPT text paragraphs with PPTX Cmd/Ctrl L E R J shortcuts',
     afterTextAlignCenterShortcut.selectedId === 's1-title' &&
       afterTextAlignCenterShortcut.shortcutModel === 'ppt-text-paragraph-align-keyboard-shortcuts' &&
       afterTextAlignCenterShortcut.shortcutIntent === 'ppt-text-paragraph-align-keyboard-intent' &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+L') &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+E') &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+R') &&
+      afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+J') &&
       afterTextAlignCenterShortcut.textAlign === 'center' &&
       afterTextAlignCenterShortcut.quickChecked === 'center' &&
       afterTextAlignRightShortcut.selectedId === 's1-title' &&
       afterTextAlignRightShortcut.textAlign === 'right' &&
       afterTextAlignRightShortcut.quickChecked === 'right' &&
+      afterTextAlignJustifyShortcut.selectedId === 's1-title' &&
+      afterTextAlignJustifyShortcut.textAlign === 'justify' &&
+      afterTextAlignJustifyShortcut.quickChecked === 'justify' &&
       afterTextAlignLeftShortcut.selectedId === 's1-title' &&
       afterTextAlignLeftShortcut.textAlign === 'left' &&
       afterTextAlignLeftShortcut.quickChecked === 'left' &&
       afterTextAlignLeftShortcut.locked === 'false',
     {
       afterTextAlignCenterShortcut,
+      afterTextAlignJustifyShortcut,
       afterTextAlignLeftShortcut,
       afterTextAlignRightShortcut,
     },
@@ -7351,14 +7367,14 @@ async function runTextQuickFormatScenario(page) {
       initialAlignRadio.quick.focusModel === 'roving-tabindex' &&
       initialAlignRadio.quick.keyboardModel === 'arrow-home-end' &&
       initialAlignRadio.quick.model === 'canvas-radio-group' &&
-      initialAlignRadio.quick.radioCount === 3 &&
+      initialAlignRadio.quick.radioCount === 4 &&
       initialAlignRadio.quick.checkedValues.includes('left') &&
       initialAlignRadio.quick.tabStopValues.includes('left') &&
       initialAlignRadio.inspector.role === 'radiogroup' &&
       initialAlignRadio.inspector.focusModel === 'roving-tabindex' &&
       initialAlignRadio.inspector.keyboardModel === 'arrow-home-end' &&
       initialAlignRadio.inspector.model === 'canvas-radio-group' &&
-      initialAlignRadio.inspector.radioCount === 3 &&
+      initialAlignRadio.inspector.radioCount === 4 &&
       initialAlignRadio.inspector.checkedValues.includes('left') &&
       initialAlignRadio.inspector.tabStopValues.includes('left'),
     initialAlignRadio,
@@ -8080,7 +8096,7 @@ async function runTextQuickFormatScenario(page) {
 
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
-    const json = JSON.stringify('right')
+    const json = JSON.stringify('justify')
 
     dataTransfer.setData(
       'application/vnd.interactive-os.slide-edit.text-paragraph-align+json',
@@ -8102,18 +8118,18 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextFontWeightRestore.textAlign === 'center' &&
       summaryAfterTextParagraphAlignPaste.selected === 'true' &&
       summaryAfterTextParagraphAlignPaste.text === summaryAfterTextStylePaste.text &&
-      summaryAfterTextParagraphAlignPaste.textAlign === 'right' &&
+      summaryAfterTextParagraphAlignPaste.textAlign === 'justify' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportModel === 'ppt-text-paragraph-align-import' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFormat === 'application-json-ppt-text-paragraph-align' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommand === 'update-text-paragraph-align' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandFields === 'paragraphAlign' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandTargets === 's1-summary' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandType === 'slide-command-effect' &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandValues === 'right' &&
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportCommandValues === 'justify' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportObjects === 's1-summary' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportFields === 'value' &&
       summaryAfterTextParagraphAlignPaste.textParagraphAlignImportJsonLength > 6 &&
-      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportValue === 'right',
+      summaryAfterTextParagraphAlignPaste.textParagraphAlignImportValue === 'justify',
     {
       summaryAfterTextFontWeightRestore,
       summaryAfterTextParagraphAlignPaste,
@@ -8144,7 +8160,7 @@ async function runTextQuickFormatScenario(page) {
   record(
     'undoes and redoes PPT text paragraph align JSON as one history step',
     summaryAfterTextParagraphAlignUndo.textAlign === 'center' &&
-      summaryAfterTextParagraphAlignRedo.textAlign === 'right',
+      summaryAfterTextParagraphAlignRedo.textAlign === 'justify',
     {
       summaryAfterTextParagraphAlignPaste,
       summaryAfterTextParagraphAlignRedo,

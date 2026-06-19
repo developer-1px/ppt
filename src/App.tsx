@@ -6,6 +6,7 @@ import {
   AlignEndHorizontal,
   AlignEndVertical,
   AlignHorizontalDistributeCenter,
+  AlignJustify,
   AlignLeft,
   AlignRight,
   AlignStartHorizontal,
@@ -843,7 +844,7 @@ const PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS = new Set([
   'unlock-all',
 ])
 const PPT_RECENT_COLOR_LIMIT = 8
-const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right'] as const
+const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right', 'justify'] as const
 const PPT_SLIDE_RAIL_HIT_TARGET_PADDING = 6
 const PPT_SLIDE_RAIL_THUMB_GAP = 8
 const PPT_SLIDE_RAIL_THUMB_HEIGHT = 86
@@ -2150,6 +2151,18 @@ type PPTTextParagraphAlignImportSource = {
   format: typeof PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT
   jsonLength: number
 }
+type PPTTextParagraphAlignSlideEditCommandValue = Parameters<
+  typeof getSlideEditTextParagraphAlignCommandEffect
+>[0]['value']
+type PPTTextParagraphAlignHostCommandEffect =
+  Omit<SlideEditTextParagraphAlignHostCommandEffect<string, string>, 'payload'> & {
+    payload: Omit<
+      SlideEditTextParagraphAlignHostCommandEffect<string, string>['payload'],
+      'value'
+    > & {
+      value: NonNullable<PPTParagraph['align']>
+    }
+  }
 type PPTTextParagraphBulletImportField =
   | 'bullet'
   | 'list'
@@ -3690,7 +3703,7 @@ const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL =
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT =
   'ppt-text-paragraph-align-keyboard-intent'
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
-  'Cmd/Ctrl+L Cmd/Ctrl+E Cmd/Ctrl+R'
+  'Cmd/Ctrl+L Cmd/Ctrl+E Cmd/Ctrl+R Cmd/Ctrl+J'
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -7764,14 +7777,23 @@ function App() {
       return false
     }
 
-    const effects = textElements.map((element) =>
-      getSlideEditTextParagraphAlignCommandEffect({
+    const effects: PPTTextParagraphAlignHostCommandEffect[] = textElements.map((element) => {
+      const effect = getSlideEditTextParagraphAlignCommandEffect({
         fieldId: 'paragraphAlign',
         id: 'update-text-paragraph-align',
         objectId: element.id,
         slideId: activeSlide.id,
-        value: source.align,
-      }))
+        value: source.align as PPTTextParagraphAlignSlideEditCommandValue,
+      })
+
+      return {
+        ...effect,
+        payload: {
+          ...effect.payload,
+          value: source.align,
+        },
+      }
+    })
 
     setLastTextParagraphAlignImportEffect(createPPTTextParagraphAlignImportEffect({
       effects,
@@ -13696,7 +13718,7 @@ function App() {
   const snapGuides = interaction?.kind === 'move'
     ? interaction.snapGuides
     : EMPTY_PPT_CANVAS_SNAP_GUIDES
-  const selectionCommandBarWidth = textQuickFormatState ? 516 : 332
+  const selectionCommandBarWidth = textQuickFormatState ? 552 : 332
   const selectionCommandAnchor = selectedBounds &&
     !editingId &&
     !interaction &&
@@ -14274,6 +14296,13 @@ function App() {
     section: 'Format',
     shortcut: 'Cmd/Ctrl+R',
     title: 'Align text right',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:align-text-justify',
+    onSelect: () => updateSelectedParagraphAlign('justify'),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+J',
+    title: 'Justify text',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:bullet',
@@ -19453,7 +19482,7 @@ function createPPTTextParagraphAlignImportEffect({
   effects,
   source,
 }: {
-  effects: readonly SlideEditTextParagraphAlignHostCommandEffect<string, string>[]
+  effects: readonly PPTTextParagraphAlignHostCommandEffect[]
   source: PPTTextParagraphAlignImportSource
 }): PPTTextParagraphAlignImportEffect {
   return {
@@ -19501,7 +19530,7 @@ function createPPTTextParagraphBulletImportEffect({
 
 function applyPPTTextParagraphAlignCommandEffectToElement(
   element: PPTElement,
-  effect: SlideEditTextParagraphAlignHostCommandEffect<string, string>,
+  effect: PPTTextParagraphAlignHostCommandEffect,
 ): PPTElement {
   if (!isPPTTextElement(element)) {
     return element
@@ -28109,7 +28138,10 @@ function getPPTTextStyleInsetFromJSONValue(
 function getPPTTextStyleParagraphAlignFromJSONValue(
   value: unknown,
 ): PPTParagraph['align'] | undefined {
-  return value === 'left' || value === 'center' || value === 'right'
+  return value === 'left' ||
+    value === 'center' ||
+    value === 'right' ||
+    value === 'justify'
     ? value
     : undefined
 }
@@ -28186,21 +28218,24 @@ function getPPTTextParagraphAlignSourceFromSlideEditJSONPasteValue(
 
       seen.add(candidate.text)
 
-      const align = getSlideEditTextParagraphAlignJSONPasteValueFromText(
+      const payload = getPPTTextParagraphAlignPayloadEntry(
+        getPPTJSONValueFromText(candidate.text),
+        candidate.allowDirect,
+      )
+      const slideEditAlign = getSlideEditTextParagraphAlignJSONPasteValueFromText(
         candidate.text,
         {
           mode: candidate.allowDirect ? 'direct' : 'wrapped',
         },
       )
+      const align = slideEditAlign ??
+        (payload
+          ? getPPTTextParagraphAlignImportValueFromJSONValue(payload.value)
+          : undefined)
 
-      if (align === null) {
+      if (!align) {
         continue
       }
-
-      const payload = getPPTTextParagraphAlignPayloadEntry(
-        getPPTJSONValueFromText(candidate.text),
-        candidate.allowDirect,
-      )
 
       return {
         align,
@@ -33328,6 +33363,8 @@ function PPTTextAlignIcon({
   switch (align) {
     case 'center':
       return <AlignCenter size={size} />
+    case 'justify':
+      return <AlignJustify size={size} />
     case 'right':
       return <AlignRight size={size} />
     case 'left':
@@ -39213,6 +39250,11 @@ function getPPTTextParagraphAlignKeyboardShortcutIntent(event: KeyboardEvent) {
     case 'r':
       return {
         align: 'right' as const,
+        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+      }
+    case 'j':
+      return {
+        align: 'justify' as const,
         intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
       }
     default:

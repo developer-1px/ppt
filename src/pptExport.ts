@@ -1586,7 +1586,7 @@ function getPPTSvgTextX({
   geometry,
   inset,
 }: {
-  align: 'center' | 'left' | 'right' | undefined
+  align: PPTParagraph['align']
   geometry: PPTElement['geometry']
   inset: PPTTextInset
 }) {
@@ -1601,7 +1601,7 @@ function getPPTSvgTextX({
   return geometry.x + inset.left
 }
 
-function getPPTSvgTextAnchor(align: 'center' | 'left' | 'right' | undefined) {
+function getPPTSvgTextAnchor(align: PPTParagraph['align']) {
   if (align === 'center') {
     return 'middle'
   }

@@ -361,7 +361,10 @@ function getPPTRichTextSingleHyperlinkUrl(
 function normalizePPTRichTextParagraphAlign(
   align: PPTCanvasRichTextPasteSource['paragraphs'][number]['align'],
 ) {
-  return align === 'left' || align === 'center' || align === 'right'
+  return align === 'left' ||
+    align === 'center' ||
+    align === 'right' ||
+    align === 'justify'
     ? align
     : undefined
 }
