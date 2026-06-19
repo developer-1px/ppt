@@ -19,6 +19,9 @@ export const SAMPLE_PPT_DECK: PPTDeck = PPTDeckSchema.parse({
       background: { color: '#f8fafc' },
       elements: [
         {
+          accessibility: {
+            altText: 'Main AI pitch deck title text box.',
+          },
           geometry: { h: 108, w: 760, x: 84, y: 78 },
           id: 's1-title',
           kind: 'textBox',

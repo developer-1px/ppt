@@ -100,12 +100,12 @@ export async function exportPPTDeckPPTXBlob(deck: PPTDeck) {
   })
   const arrayBuffer = await toPPTXArrayBuffer(output)
 
-  if (!deck.slides.some((slide) => slide.transition !== undefined)) {
+  if (!shouldPatchPPTXPackage(deck)) {
     return createPPTXBlob(arrayBuffer)
   }
 
   const zip = await JSZip.loadAsync(arrayBuffer)
-  await applyPPTXSlideTransitions({ deck, zip })
+  await applyPPTXPackagePatches({ deck, zip })
   const patchedOutput = await zip.generateAsync({
     compression: 'DEFLATE',
     mimeType: PPTX_MIME_TYPE,
@@ -164,7 +164,15 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
   return `${slug || 'ppt-deck'}.pptx`
 }
 
-async function applyPPTXSlideTransitions({
+function shouldPatchPPTXPackage(deck: PPTDeck) {
+  return deck.slides.some((slide) =>
+    slide.transition !== undefined ||
+    slide.elements.some((element) =>
+      element.visible !== false &&
+      Boolean(element.accessibility?.altText.trim())))
+}
+
+async function applyPPTXPackagePatches({
   deck,
   zip,
 }: {
@@ -180,15 +188,75 @@ async function applyPPTXSlideTransitions({
     }
 
     const xml = await file.async('string')
-    const nextXml = setPPTXSlideTransitionXml(
-      xml,
-      createPPTXSlideTransitionXml(slide.transition),
+    const nextXml = setPPTXElementAccessibilityXml(
+      setPPTXSlideTransitionXml(
+        xml,
+        createPPTXSlideTransitionXml(slide.transition),
+      ),
+      slide,
     )
 
     if (nextXml !== xml) {
       zip.file(path, nextXml)
     }
   }))
+}
+
+function setPPTXElementAccessibilityXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    const altText = element.visible === false
+      ? ''
+      : element.accessibility?.altText.trim() ?? ''
+
+    if (!altText) {
+      return nextXml
+    }
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectDescriptionXml(patchedXml, objectName, altText),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectDescriptionXml(
+  xml: string,
+  objectName: string,
+  description: string,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const descr = escapePPTXXmlAttribute(description)
+  const pattern = new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[^>]*>`,
+    'g',
+  )
+
+  return xml.replace(pattern, (tag) => {
+    if (tag.includes(' descr=')) {
+      return tag.replace(/\sdescr="[^"]*"/, ` descr="${descr}"`)
+    }
+
+    return tag.endsWith('/>')
+      ? tag.replace(/\/>$/, ` descr="${descr}"/>`)
+      : tag.replace(/>$/, ` descr="${descr}">`)
+  })
+}
+
+function getPPTXElementObjectNames(element: PPTElement) {
+  if (element.kind === 'freeform') {
+    return element.points.length > 1
+      ? element.points
+        .slice(1)
+        .map((_, index) => `${element.name} segment ${index + 1}`)
+      : []
+  }
+
+  if (element.kind === 'line' && element.route === 'elbow') {
+    return [`${element.name} route`]
+  }
+
+  return [element.name]
 }
 
 function setPPTXSlideTransitionXml(
@@ -307,6 +375,19 @@ function getPPTXSlideTransitionSpeed(durationMs: number) {
 
 function clampPPTXTransitionMs(value: number) {
   return Math.round(clamp(value, 0, 2_147_483_647))
+}
+
+function escapePPTXXmlAttribute(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+}
+
+function escapePPTXRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function addPPTXSlide({

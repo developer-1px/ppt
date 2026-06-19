@@ -10829,6 +10829,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX non-image alt text',
+    pptxPackageState.hasNonImageAltTextDescription,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -26601,6 +26606,7 @@ async function inspectPPTXPackage(base64) {
     hasObjectOpacityAlpha: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
+    hasNonImageAltTextDescription: false,
     hasSlide1Xml: false,
     hasSlide2Xml: false,
     hasSpeakerNotes: false,
@@ -26665,6 +26671,9 @@ async function inspectPPTXPackage(base64) {
       hasObjectOpacityAlpha: slideXml.includes('<a:alpha val="42000"/>'),
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
+      hasNonImageAltTextDescription: slideXml.includes(
+        'name="Title" descr="Main AI pitch deck title text box."',
+      ),
       hasSlide1Xml: entries.includes('ppt/slides/slide1.xml'),
       hasSlide2Xml: entries.includes('ppt/slides/slide2.xml'),
       hasSlideTransition:
