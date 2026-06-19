@@ -1137,6 +1137,68 @@ async function runTextEditingScenario(page) {
   })
   await delay(50)
 
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyX',
+    key: 'x',
+    windowsVirtualKeyCode: 88,
+  })
+  await delay(80)
+
+  const afterTypeToEditStart = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      active: document.activeElement === editor,
+      editable: editor?.isContentEditable === true,
+      inlineEditActive: editor?.getAttribute('data-ppt-inline-edit-active') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      text: editor?.textContent ?? '',
+    }
+  })()`)
+
+  record(
+    'starts PPT inline text edit by typing a printable key',
+    afterTypeToEditStart.active &&
+      afterTypeToEditStart.editable &&
+      afterTypeToEditStart.inlineEditActive === 'true' &&
+      afterTypeToEditStart.selectedId === 's1-title' &&
+      afterTypeToEditStart.text === 'x',
+    afterTypeToEditStart,
+  )
+
+  await page.send('Input.insertText', { text: 'typed title' })
+  await page.eval(`document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor').blur()`)
+  await delay(50)
+
+  const afterTypeToEditCommit = await page.eval(`(() => ({
+    text: document.querySelector('[data-ppt-element="s1-title"]')?.textContent ?? '',
+    undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+  }))()`)
+
+  record(
+    'commits PPT type-to-edit replacement on blur',
+    afterTypeToEditCommit.text.includes('xtyped title') &&
+      afterTypeToEditCommit.undoEnabled,
+    afterTypeToEditCommit,
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterTypeToEditUndo = await page.eval(`document.querySelector('[data-ppt-element="s1-title"]')?.textContent ?? ''`)
+
+  record('undo restores PPT text before type-to-edit replacement', afterTypeToEditUndo.includes('Edited title'), {
+    afterTypeToEditUndo,
+  })
+
   const summaryPoint = await getElementCenter(page, 's1-summary')
   const beforeCancel = await page.eval(`document.querySelector('[data-ppt-element="s1-summary"]')?.textContent ?? ''`)
 
@@ -11329,13 +11391,25 @@ async function runViewAndShapeScenario(page) {
     },
   )
 
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('[data-ppt-style-field="shape-corner-radius"]')`),
+    'Timed out waiting for PPT shape corner radius input',
+  )
+
   await page.eval(`(() => {
     const input = document.querySelector('[data-ppt-style-field="shape-corner-radius"]')
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    if (!input) return
 
-    setter.call(input, '36')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+
+    if (setter) {
+      setter.call(input, '36')
+    } else {
+      input.value = '36'
+    }
     input.dispatchEvent(new Event('input', { bubbles: true }))
     input.dispatchEvent(new Event('change', { bubbles: true }))
+    input.blur()
   })()`)
   await delay(80)
 

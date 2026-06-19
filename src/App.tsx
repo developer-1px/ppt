@@ -3409,6 +3409,10 @@ type PPTSelectionCycleEffect = {
   objectIds: readonly string[]
   targetObjectId: string
 }
+type PPTInlineEditInitialText = {
+  elementId: string
+  text: string
+}
 
 const PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL =
   'ppt-selection-cycle-keyboard-intent'
@@ -3964,6 +3968,8 @@ function App() {
   const [selection, setSelection] = useState<string[]>(['s1-title'])
   const [viewport, setViewport] = useState<Viewport>({ scale: 1, x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [inlineEditInitialText, setInlineEditInitialText] =
+    useState<PPTInlineEditInitialText | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [alignmentPreviewCommand, setAlignmentPreviewCommand] =
     useState<PPTAlignmentPopoverCommand | null>(null)
@@ -4823,6 +4829,20 @@ function App() {
         return
       }
 
+      if (
+        !editingId &&
+        isPPTKeyboardTextEditStartKey(event) &&
+        !getPPTToolShortcutIntent(event) &&
+        !isPPTCanvasControlTarget({
+          extraSelectors: ['[data-ppt-layer-pane]'],
+          target: event.target,
+        }) &&
+        editSelectedElementFromTypedKey(event.key)
+      ) {
+        event.preventDefault()
+        return
+      }
+
       const textFormattingKeyboardIntent = getSlideEditTextFormattingKeyboardIntent({
         altKey: event.altKey,
         key: event.key,
@@ -4902,6 +4922,7 @@ function App() {
       if (systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
         setEditingId(null)
+        setInlineEditInitialText(null)
         setInteraction(null)
         setIsTemporaryPanActive(false)
         setLineCreationMode(null)
@@ -5649,6 +5670,7 @@ function App() {
     setActiveSlideId(slideId)
     setSelection([])
     setEditingId(null)
+    setInlineEditInitialText(null)
     setInteraction(null)
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
@@ -10503,7 +10525,7 @@ function App() {
     executePPTCanvasStandardSelectionCommand({ kind: 'select-all' })
   }
 
-  function editSelectedElement() {
+  function editSelectedElement(options: { initialText?: string } = {}) {
     if (
       !selectedElement ||
       !isPPTTextElement(selectedElement) ||
@@ -10513,6 +10535,14 @@ function App() {
       return
     }
 
+    setInlineEditInitialText(
+      options.initialText === undefined
+        ? null
+        : {
+            elementId: selectedElement.id,
+            text: options.initialText,
+          },
+    )
     setEditingId(selectedElement.id)
     setSelection([selectedElement.id])
     setInteraction(null)
@@ -10523,6 +10553,21 @@ function App() {
     setIsEraserToolActive(false)
     setContextMenu(null)
     setSlideContextMenu(null)
+  }
+
+  function editSelectedElementFromTypedKey(key: string) {
+    if (
+      !selectedElement ||
+      selectedElement.kind !== 'textBox' ||
+      !isPPTTextElement(selectedElement) ||
+      selectedElement.locked === true ||
+      selectedElement.visible === false
+    ) {
+      return false
+    }
+
+    editSelectedElement({ initialText: key })
+    return true
   }
 
   function cycleObjectSelection(direction: PPTSelectionCycleDirection) {
@@ -10551,6 +10596,7 @@ function App() {
 
     setSelection([targetObjectId])
     setEditingId(null)
+    setInlineEditInitialText(null)
     setInteraction(null)
     setLineCreationMode(null)
     setCreationTool(null)
@@ -10578,6 +10624,7 @@ function App() {
 
     setSelection(selectSameTypePPTSelection(activeSlide.elements, selection))
     setEditingId(null)
+    setInlineEditInitialText(null)
     setContextMenu(null)
   }
 
@@ -10595,6 +10642,7 @@ function App() {
       ),
     })))
     setEditingId(null)
+    setInlineEditInitialText(null)
     setContextMenu(null)
   }
 
@@ -10616,6 +10664,7 @@ function App() {
       }
     }))
     setEditingId(null)
+    setInlineEditInitialText(null)
     setContextMenu(null)
   }
 
@@ -10627,6 +10676,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setEditingId(null)
+    setInlineEditInitialText(null)
     setContextMenu(null)
   }
 
@@ -15654,6 +15704,9 @@ function App() {
                 eraserHit={eraserHitIds?.has(element.id) === true}
                 hovered={hoveredId === element.id}
                 findActive={findOpen && activeFindMatch?.elementId === element.id}
+                initialEditText={inlineEditInitialText?.elementId === element.id
+                  ? inlineEditInitialText.text
+                  : null}
                 key={element.id}
                 selected={selection.includes(element.id)}
                 slideId={activeSlide.id}
@@ -15664,6 +15717,7 @@ function App() {
                 onCommitText={commitText}
                 onEdit={() => {
                   if (isPPTTextElement(element)) {
+                    setInlineEditInitialText(null)
                     setEditingId(element.id)
                     setSelection([element.id])
                     setContextMenu(null)
@@ -15674,7 +15728,11 @@ function App() {
                 onPointerEnter={() => setHoveredId(element.id)}
                 onPointerLeave={() => setHoveredId((current) => current === element.id ? null : current)}
                 onInlineEditEffect={setLastInlineEditEffect}
-                onStopEdit={() => setEditingId(null)}
+                onStopEdit={() => {
+                  setEditingId(null)
+                  setInlineEditInitialText((current) =>
+                    current?.elementId === element.id ? null : current)
+                }}
                 onTextOverflowChange={updateTextOverflowState}
               />
             ))}
@@ -16176,6 +16234,7 @@ function PPTPresentationOverlay({
                 eraserHit={false}
                 findActive={false}
                 hovered={false}
+                initialEditText={null}
                 key={element.id}
                 selected={false}
                 slideId={slide.id}
@@ -33599,6 +33658,7 @@ function PPTElementView({
   eraserHit,
   findActive,
   hovered,
+  initialEditText,
   onCommitText,
   onContextMenu,
   onEdit,
@@ -33618,6 +33678,7 @@ function PPTElementView({
   eraserHit: boolean
   findActive: boolean
   hovered: boolean
+  initialEditText: string | null
   onCommitText: (elementId: string, text: string) => void
   onContextMenu: (event: ReactMouseEvent<HTMLDivElement>, elementId: string) => void
   onEdit: () => void
@@ -33640,6 +33701,7 @@ function PPTElementView({
   const textBody = isPPTTextElement(element) ? element.textBody : null
   const textStyle = isPPTTextElement(element) ? element.style : undefined
   const text = isPPTTextElement(element) ? readPPTText(element.textBody) : ''
+  const editorText = initialEditText ?? text
   const editorRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -33651,7 +33713,11 @@ function PPTElementView({
       element: editorRef.current,
       preventScroll: false,
     })
-  }, [editing])
+
+    if (initialEditText !== null) {
+      collapsePPTInlineEditorSelectionToEnd(editorRef.current)
+    }
+  }, [editing, initialEditText])
 
   useLayoutEffect(() => {
     if (!textBody) {
@@ -33689,7 +33755,7 @@ function PPTElementView({
     element.id,
     textStyle,
     onTextOverflowChange,
-    text,
+    editorText,
     textBody,
   ])
 
@@ -33945,11 +34011,28 @@ function PPTElementView({
           onKeyDown={handleInlineEditKeyDown}
           onPaste={handleInlineEditPaste}
         >
-          {editing || !textBody ? text : <PPTTextBodyView body={textBody} />}
+          {editing || !textBody ? editorText : <PPTTextBodyView body={textBody} />}
         </div>
       )}
     </div>
   )
+}
+
+function collapsePPTInlineEditorSelectionToEnd(element: HTMLElement | null) {
+  if (!element) {
+    return
+  }
+
+  const selection = window.getSelection()
+  if (!selection) {
+    return
+  }
+
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  range.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(range)
 }
 
 function PPTCommentView({ element }: { element: PPTComment }) {
@@ -38900,6 +38983,14 @@ function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
   }
 
   return tool.kind
+}
+
+function isPPTKeyboardTextEditStartKey(event: KeyboardEvent) {
+  return event.key.length === 1 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    event.isComposing !== true
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {
