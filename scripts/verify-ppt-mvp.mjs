@@ -11174,6 +11174,7 @@ async function runExportScenario(page) {
         rowHeights[1] > rowHeights[0] * 1.5 &&
         wideColumnFill?.color === '#fee2e2' &&
         wideColumnFill?.opacity === 0.5 &&
+        wideColumnTextStyle?.align === 'center' &&
         wideColumnTextStyle?.color === '#7f1d1d' &&
         wideColumnTextStyle?.fontWeight === 'bold' &&
         wideColumnTextStyle?.fontSize >= 20
@@ -11245,6 +11246,7 @@ async function runExportScenario(page) {
       exportUnevenTableProbeColumnWidths: (exportUnevenTableProbe?.columnWidths ?? []).join(' '),
       exportUnevenTableProbeCellFill: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.color ?? '',
       exportUnevenTableProbeCellFillOpacity: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.opacity ?? '',
+      exportUnevenTableProbeCellTextAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.align ?? '',
       exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
       exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
       exportUnevenTableProbeCellTextFontWeight: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontWeight ?? '',
@@ -27408,7 +27410,7 @@ async function addPPTXUnevenTableProbe(base64) {
       createPPTXTableCellXml('Narrow'),
       createPPTXTableCellXml('Wide column', {
         fill: { color: 'FEE2E2', opacity: 0.5 },
-        textStyle: { bold: true, color: '7F1D1D', size: 1600 },
+        textStyle: { align: 'ctr', bold: true, color: '7F1D1D', size: 1600 },
       }),
       createPPTXTableCellXml('Narrow'),
       '</a:tr>',
@@ -27472,7 +27474,9 @@ function createPPTXTableCellXml(text, options = {}) {
     '<a:txBody>',
     '<a:bodyPr/>',
     '<a:lstStyle/>',
-    '<a:p><a:r>',
+    '<a:p>',
+    textStyle?.align ? `<a:pPr algn="${textStyle.align}"/>` : '',
+    '<a:r>',
     runPropertiesXml,
     '<a:t>',
     escapePPTXXmlText(text),

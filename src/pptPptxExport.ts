@@ -1440,6 +1440,7 @@ function addPPTXTable({
 
       return {
         options: {
+          align: cellTextStyle?.align,
           bold: cellTextStyle?.fontWeight === undefined
             ? rowIndex === 0
             : cellTextStyle.fontWeight !== 'regular',

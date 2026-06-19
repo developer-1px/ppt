@@ -12,6 +12,7 @@ const PPTFillSchema = z.object({
   opacity: z.number().optional(),
 })
 const PPTTableCellTextStyleSchema = z.object({
+  align: z.enum(['left', 'center', 'right', 'justify']).optional(),
   color: z.string().optional(),
   fontSize: z.number().optional(),
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),

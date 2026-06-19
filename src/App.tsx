@@ -36199,6 +36199,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
               data-ppt-table-cell-fill={fill?.color}
               data-ppt-table-cell-fill-opacity={fill?.opacity}
+              data-ppt-table-cell-align={textStyle?.align}
               data-ppt-table-cell-font-size={textStyle?.fontSize}
               data-ppt-table-cell-font-weight={textStyle?.fontWeight}
               data-ppt-table-cell-text-color={textStyle?.color}
@@ -36235,6 +36236,7 @@ function getPPTTableCellStyleCSS(
 
   return {
     ...(fill ? { background: getPPTFillColorCSS(fill) } : {}),
+    ...(textStyle?.align ? { textAlign: textStyle.align } : {}),
     ...(textStyle?.color ? { color: textStyle.color } : {}),
     ...(textStyle?.fontSize ? { fontSize: `${textStyle.fontSize}px` } : {}),
     ...(textStyle?.fontWeight
