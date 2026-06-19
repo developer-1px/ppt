@@ -7389,8 +7389,8 @@ async function runTextQuickFormatScenario(page) {
   record(
     'changes PPT text font size with Cmd/Ctrl Shift angle-bracket shortcuts',
     afterFontSizeIncreaseShortcut.selectedId === 's1-title' &&
-      afterFontSizeIncreaseShortcut.shortcutModel === 'ppt-text-font-size-keyboard-shortcuts' &&
-      afterFontSizeIncreaseShortcut.shortcutIntent === 'ppt-text-font-size-keyboard-intent' &&
+      afterFontSizeIncreaseShortcut.shortcutModel === 'canvas-keyboard-text-font-size-shortcuts' &&
+      afterFontSizeIncreaseShortcut.shortcutIntent === 'canvas-keyboard-text-font-size-intent' &&
       afterFontSizeIncreaseShortcut.shortcutKeys.includes('Cmd/Ctrl+Shift+>') &&
       afterFontSizeIncreaseShortcut.shortcutKeys.includes('Cmd/Ctrl+Shift+<') &&
       afterFontSizeIncreaseShortcut.shortcutStep === '2' &&

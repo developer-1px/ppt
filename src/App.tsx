@@ -608,6 +608,10 @@ import {
   PPT_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL,
   PPT_KEYBOARD_TEXT_EDIT_START_KEYS,
   PPT_KEYBOARD_TEXT_EDIT_START_MODEL,
+  PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT,
+  PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS,
+  PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL,
+  PPT_TEXT_FONT_SIZE_STEP,
   PPT_KEYBOARD_TOOL_DISPATCH_MODEL,
   PPT_KEYBOARD_VIEWPORT_INTENT_MODEL,
   PPT_KEYBOARD_VIEWPORT_MODEL,
@@ -664,6 +668,7 @@ import {
   getPPTCanvasKeyboardSelectionCycleIntent,
   getPPTCanvasKeyboardSystemShortcutIntent,
   getPPTCanvasKeyboardTextEditStartIntent,
+  getPPTTextFontSizeKeyboardShortcutIntent,
   getPPTCanvasKeyboardToolShortcutIntent,
   getPPTCanvasKeyboardViewportShortcutIntent,
   getPPTCanvasMediaInsertPosition,
@@ -3878,13 +3883,6 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 }
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
-const PPT_TEXT_FONT_SIZE_STEP = 2
-const PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL =
-  'ppt-text-font-size-keyboard-shortcuts'
-const PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT =
-  'ppt-text-font-size-keyboard-intent'
-const PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS =
-  'Cmd/Ctrl+Shift+< Cmd/Ctrl+Shift+>'
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL =
   'ppt-text-paragraph-align-keyboard-shortcuts'
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT =
@@ -41125,30 +41123,6 @@ function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
   }
 
   return tool.kind
-}
-
-function getPPTTextFontSizeKeyboardShortcutIntent(event: KeyboardEvent) {
-  const mod = event.metaKey || event.ctrlKey
-
-  if (!mod || !event.shiftKey || event.altKey) {
-    return null
-  }
-
-  if (event.key === '>' || event.code === 'Period') {
-    return {
-      delta: PPT_TEXT_FONT_SIZE_STEP,
-      intent: PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT,
-    }
-  }
-
-  if (event.key === '<' || event.code === 'Comma') {
-    return {
-      delta: -PPT_TEXT_FONT_SIZE_STEP,
-      intent: PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT,
-    }
-  }
-
-  return null
 }
 
 function getPPTTextParagraphAlignKeyboardShortcutIntent(event: KeyboardEvent) {

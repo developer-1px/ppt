@@ -13,6 +13,10 @@ import {
   CANVAS_KEYBOARD_TEXT_EDIT_START_INTENT_MODEL,
   CANVAS_KEYBOARD_TEXT_EDIT_START_KEYS,
   CANVAS_KEYBOARD_TEXT_EDIT_START_MODEL,
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_INTENT_MODEL,
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_KEYS,
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_MODEL,
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_STEP,
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_INTENT_MODEL,
   CANVAS_KEYBOARD_VIEWPORT_MODEL,
@@ -88,6 +92,7 @@ import {
   getCanvasKeyboardSelectionCycleIntent,
   getCanvasKeyboardSystemShortcutIntent,
   getCanvasKeyboardTextEditStartIntent,
+  getCanvasKeyboardTextFontSizeShortcutIntent,
   getCanvasKeyboardToolShortcutIntent,
   getCanvasKeyboardViewportShortcutIntent,
   getCanvasMergedEraserHitIds,
@@ -192,6 +197,8 @@ import {
   type CanvasKeyboardSelectionCycleDirection,
   type CanvasKeyboardSelectionCycleIntent,
   type CanvasKeyboardTextEditStartIntent,
+  type CanvasKeyboardTextFontSizeIntent,
+  type CanvasKeyboardTextFontSizeKeyboardEvent,
   type CanvasKeyboardToolIntent,
   type CanvasPastePositionMemory,
   type CanvasPointerClickMemory,
@@ -346,6 +353,14 @@ export const PPT_KEYBOARD_TEXT_EDIT_START_KEYS =
   CANVAS_KEYBOARD_TEXT_EDIT_START_KEYS
 export const PPT_KEYBOARD_TEXT_EDIT_START_MODEL =
   CANVAS_KEYBOARD_TEXT_EDIT_START_MODEL
+export const PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL =
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_MODEL
+export const PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT =
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_INTENT_MODEL
+export const PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS =
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_KEYS
+export const PPT_TEXT_FONT_SIZE_STEP =
+  CANVAS_KEYBOARD_TEXT_FONT_SIZE_STEP
 export const PPT_KEYBOARD_TOOL_DISPATCH_MODEL =
   CANVAS_KEYBOARD_TOOL_DISPATCH_MODEL
 export const PPT_KEYBOARD_VIEWPORT_INTENT_MODEL =
@@ -468,6 +483,13 @@ export const getPPTCanvasKeyboardSystemShortcutIntent =
   getCanvasKeyboardSystemShortcutIntent
 export const getPPTCanvasKeyboardTextEditStartIntent =
   getCanvasKeyboardTextEditStartIntent
+export function getPPTTextFontSizeKeyboardShortcutIntent(
+  event: CanvasKeyboardTextFontSizeKeyboardEvent,
+) {
+  const intent = getCanvasKeyboardTextFontSizeShortcutIntent({ event })
+
+  return intent.kind === 'none' ? null : intent
+}
 export const getPPTCanvasKeyboardToolShortcutIntent =
   getCanvasKeyboardToolShortcutIntent
 export const getPPTCanvasKeyboardViewportShortcutIntent =
@@ -751,6 +773,8 @@ export type PPTCanvasKeyboardSelectionCycleIntent<
 export type PPTCanvasKeyboardTextEditStartIntent<
   TId extends string = string,
 > = CanvasKeyboardTextEditStartIntent<TId>
+export type PPTCanvasKeyboardTextFontSizeIntent =
+  CanvasKeyboardTextFontSizeIntent
 export type PPTCanvasKeyboardToolIntent = CanvasKeyboardToolIntent
 export type PPTCanvasPastePositionMemory = CanvasPastePositionMemory
 export type PPTCanvasPointerClickMemory = CanvasPointerClickMemory
