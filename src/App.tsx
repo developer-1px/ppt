@@ -125,12 +125,12 @@ import {
   createSlideEditTextVerticalAlignmentDescriptor,
   createSlideEditTransitionDescriptor,
   createSlideEditSlideMetadataInspectorDescriptor,
-  getSlideEditCommentThreadJSONPasteValue,
+  getSlideEditCommentThreadJSONPasteValueFromText,
   getSlideEditCommentThreadPasteCommandEffect,
   getSlideEditFrameGuideGeometry,
   getSlideEditColorSwatchCommandEffect,
   getSlideEditColorSwatchId,
-  getSlideEditColorSwatchJSONPasteValue,
+  getSlideEditColorSwatchJSONPasteValueFromText,
   getSlideEditColorSwatchPasteCommandEffects,
   getSlideEditColorWithAlphaCSS,
   getSlideEditDeckNavigationKeyboardIntent,
@@ -224,7 +224,7 @@ import {
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextFrameInsetPasteCommands,
-  getSlideEditTableRowsJSONPasteValue,
+  getSlideEditTableRowsJSONPasteValueFromText,
   getSlideEditTableRowsPasteCommandEffect,
   getSlideEditTextParagraphAlignCommandEffect,
   getSlideEditTextParagraphAlignJSONPasteValueFromText,
@@ -263,6 +263,7 @@ import {
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
+  SLIDE_EDIT_COLOR_SWATCH_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_FILL_OPACITY_JSON_MIME_TYPE,
@@ -303,6 +304,7 @@ import {
   SLIDE_EDIT_LAYER_PANE_OBJECT_STATE_JSON_MIME_TYPE,
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYOUT_JSON_MIME_TYPE,
+  SLIDE_EDIT_TABLE_ROWS_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
@@ -28033,28 +28035,50 @@ function getPPTColorSwatchSourceFromDataTransfer(
 function getPPTColorSwatchSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTColorSwatchImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_COLOR_SWATCH_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditColorSwatchJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_COLOR_SWATCH_JSON_MIME_TYPE,
+    SLIDE_EDIT_COLOR_SWATCH_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      if (seen.has(candidate.text)) {
+        continue
+      }
 
-    const source = createPPTColorSwatchSourceFromSlideEditJSONPasteValue({
-      allowDirect: candidate.allowDirect,
-      jsonLength: candidate.text.length,
-      pasteValue,
-      value: getPPTJSONValueFromText(candidate.text),
-    })
+      seen.add(candidate.text)
 
-    if (source) {
-      return source
+      const pasteValue = candidate.allowDirect
+        ? getSlideEditColorSwatchJSONPasteValueFromText(
+            candidate.text,
+            { mode: 'direct' },
+          )
+        : getSlideEditColorSwatchJSONPasteValueFromText(
+            candidate.text,
+            { mode: 'wrapped' },
+          ) ??
+          getSlideEditColorSwatchJSONPasteValueFromText(
+            candidate.text,
+            { mode: 'direct-with-channel' },
+          )
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      const source = createPPTColorSwatchSourceFromSlideEditJSONPasteValue({
+        allowDirect: candidate.allowDirect,
+        jsonLength: candidate.text.length,
+        pasteValue,
+        value: getPPTJSONValueFromText(candidate.text),
+      })
+
+      if (source) {
+        return source
+      }
     }
   }
 
@@ -28069,7 +28093,7 @@ function createPPTColorSwatchSourceFromSlideEditJSONPasteValue({
 }: {
   allowDirect: boolean
   jsonLength: number
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValue>>
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValueFromText>>
   value: unknown
 }): PPTColorSwatchImportSource | null {
   const color = normalizePPTSwatchColor(pasteValue.value)
@@ -28107,7 +28131,7 @@ function getPPTColorSwatchImportFieldsFromSlideEditJSONPasteValue({
   value,
 }: {
   allowDirect: boolean
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValue>>
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditColorSwatchJSONPasteValueFromText>>
   value: unknown
 }): readonly PPTColorSwatchImportField[] {
   const payloadValue = getPPTColorSwatchPayloadValue(value, allowDirect)
@@ -28962,23 +28986,39 @@ function getPPTTableRowsSourceFromDataTransfer(
 function getPPTTableRowsSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTableRowsImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TABLE_ROWS_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditTableRowsJSONPasteValue({
-      dataTransfer: candidate.dataTransfer,
-      jsonMimeType: candidate.customMimeType,
-    })
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_TABLE_ROWS_JSON_MIME_TYPE,
+    SLIDE_EDIT_TABLE_ROWS_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      if (seen.has(candidate.text)) {
+        continue
+      }
 
-    return {
-      format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
-      jsonLength: candidate.text.length,
-      rows: normalizePPTTableRows(pasteValue.rows),
+      seen.add(candidate.text)
+
+      const pasteValue = getSlideEditTableRowsJSONPasteValueFromText(
+        candidate.text,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          sourceType: candidate.type,
+        },
+      )
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      return {
+        format: PPT_TABLE_ROWS_JSON_IMPORT_FORMAT,
+        jsonLength: candidate.text.length,
+        rows: normalizePPTTableRows(pasteValue.rows),
+      }
     }
   }
 
@@ -29471,12 +29511,9 @@ function getPPTCommentSourceFromSlideEditJSONPasteValue(
     seen.add(text)
 
     const json = getPPTImportJSONText(text) ?? text
-    const pasteValue = getSlideEditCommentThreadJSONPasteValue({
-      dataTransfer: createPPTTextDataTransferReader({
-        mimeType: candidate.type,
-        text: json,
-      }),
-      jsonMimeType: candidate.jsonMimeType,
+    const pasteValue = getSlideEditCommentThreadJSONPasteValueFromText(json, {
+      mode: candidate.jsonMimeType ? 'direct' : 'wrapped',
+      sourceType: candidate.type,
       storagePolicy: {
         maxBodyLength: PPT_COMMENT_BODY_MAX_LENGTH,
         maxMessageBodyLength: PPT_COMMENT_REPLY_MAX_LENGTH,
