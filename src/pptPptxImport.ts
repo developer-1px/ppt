@@ -528,6 +528,7 @@ function readPPTXLineElement(
   }
 
   return {
+    ...(readPPTXElementAccessibility(element) ?? {}),
     end: lineGeometry.end,
     endMarker: readPPTXLineMarker(line, 'tailEnd'),
     geometry: lineGeometry.geometry,
@@ -657,6 +658,7 @@ function readPPTXShapeElement(
 
   if (isTextBox) {
     return {
+      ...(readPPTXElementAccessibility(sp) ?? {}),
       ...readPPTXElementFlip(spPr),
       geometry,
       ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
@@ -672,6 +674,7 @@ function readPPTXShapeElement(
   }
 
   return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
     ...(readPPTXShapeCornerRadius(spPr) ?? {}),
     ...readPPTXElementFlip(spPr),
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
@@ -726,11 +729,12 @@ async function readPPTXPictureElement({
   const mimeType = getPPTXMediaMimeType(mediaPath)
   const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(pic)
+  const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
   const shadow = readPPTXElementShadow(spPr)
 
   return {
-    ...(altText ? { accessibility: { altText } } : {}),
+    ...(accessibility ?? {}),
     alt: altText || name,
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
@@ -785,6 +789,7 @@ function readPPTXTableElement(
   }
 
   return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
     ...readPPTXElementFlip(graphicFrame),
     geometry,
     ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
@@ -907,6 +912,12 @@ function readPPTXElementShadow(container: Element | null): PPTElementShadow | nu
     distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
     opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
   }
+}
+
+function readPPTXElementAccessibility(element: Element) {
+  const altText = readPPTXObjectDescription(element)
+
+  return altText ? { accessibility: { altText } } : null
 }
 
 function readPPTXElementLocked(element: Element) {
