@@ -305,6 +305,9 @@ import {
   SLIDE_EDIT_SLIDE_CLIPBOARD_HTML_SCRIPT_ATTRIBUTE,
   SLIDE_EDIT_SLIDE_CLIPBOARD_MIME_TYPE,
   SLIDE_EDIT_SLIDE_NOTES_IMPORT_MODEL as PPT_SLIDE_NOTES_IMPORT_MODEL,
+  SLIDE_EDIT_TEXT_AUTO_FIT_IMPORT_MODEL as PPT_TEXT_AUTOFIT_IMPORT_MODEL,
+  SLIDE_EDIT_TEXT_AUTO_FIT_JSON_IMPORT_FORMAT as PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
+  SLIDE_EDIT_TEXT_AUTO_FIT_JSON_MIME_TYPE,
   SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
@@ -1723,10 +1726,7 @@ const PPT_TEXT_VERTICAL_ALIGN_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-vertical-align' as const
 const PPT_TEXT_VERTICAL_ALIGN_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-vertical-align+json'
-const PPT_TEXT_AUTOFIT_IMPORT_MODEL = 'ppt-text-autofit-import' as const
-const PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT =
-  'application-json-ppt-text-autofit' as const
-const PPT_TEXT_AUTOFIT_JSON_MIME_TYPE =
+const PPT_LEGACY_TEXT_AUTOFIT_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-autofit+json'
 const PPT_TEXT_FRAME_INSET_IMPORT_MODEL = 'ppt-text-frame-inset-import' as const
 const PPT_TEXT_FRAME_INSET_JSON_IMPORT_FORMAT =
@@ -31216,7 +31216,7 @@ function getPPTTextAutoFitSourceFromDataTransfer(
     {
       allowDirect: true,
       format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
-      mimeType: PPT_TEXT_AUTOFIT_JSON_MIME_TYPE,
+      mimeType: PPT_LEGACY_TEXT_AUTOFIT_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
@@ -31252,35 +31252,50 @@ function getPPTTextAutoFitSourceFromDataTransfer(
 function getPPTTextAutoFitSourceFromSlideEditJSONPasteValue(
   dataTransfer: DataTransfer,
 ): PPTTextAutoFitImportSource | null {
-  for (const candidate of getPPTSlideEditJSONPasteCandidates({
-    customMimeType: PPT_TEXT_AUTOFIT_JSON_MIME_TYPE,
-    dataTransfer,
-  })) {
-    const pasteValue = getSlideEditTextAutoFitJSONPasteValueFromText(
-      candidate.text,
-      {
-        mode: candidate.allowDirect ? 'direct' : 'wrapped',
-      },
-    )
+  const seen = new Set<string>()
 
-    if (pasteValue === null) {
-      continue
-    }
+  for (const customMimeType of [
+    PPT_LEGACY_TEXT_AUTOFIT_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_AUTO_FIT_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
 
-    const handle = getPPTTextAutoFitHandleFromJSONValue(pasteValue.handle)
+      if (seen.has(json)) {
+        continue
+      }
 
-    if (handle === undefined) {
-      continue
-    }
+      seen.add(json)
 
-    return {
-      fields: pasteValue.sourceFields.handle
-        ? ['mode', 'handle']
-        : ['mode'],
-      format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
-      handle,
-      jsonLength: candidate.text.length,
-      mode: pasteValue.mode,
+      const pasteValue = getSlideEditTextAutoFitJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
+
+      if (pasteValue === null) {
+        continue
+      }
+
+      const handle = getPPTTextAutoFitHandleFromJSONValue(pasteValue.handle)
+
+      if (handle === undefined) {
+        continue
+      }
+
+      return {
+        fields: pasteValue.sourceFields.handle
+          ? ['mode', 'handle']
+          : ['mode'],
+        format: PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
+        handle,
+        jsonLength: json.length,
+        mode: pasteValue.mode,
+      }
     }
   }
 
