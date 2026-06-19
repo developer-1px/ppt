@@ -11037,6 +11037,10 @@ async function runExportScenario(page) {
         element.kind === 'image' &&
         element.opacity !== undefined &&
         element.opacity !== 1).length,
+      imageSvgModelCount: elements.filter((element) =>
+        element.kind === 'image' &&
+        typeof element.src === 'string' &&
+        element.src.startsWith('data:image/svg+xml')).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
@@ -11122,6 +11126,10 @@ async function runExportScenario(page) {
       element.kind === 'image' &&
       element.opacity !== undefined &&
       element.opacity !== 1)
+    const exportSvgImages = exportElements.filter((element) =>
+      element.kind === 'image' &&
+      typeof element.src === 'string' &&
+      element.src.startsWith('data:image/svg+xml'))
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
     const exportNoFillShapeObjects = exportElements.filter((element) =>
@@ -11178,6 +11186,8 @@ async function runExportScenario(page) {
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasImageOpacity: exportImageOpacityObjects.length > 0,
       exportImageOpacityObjectNames: exportImageOpacityObjects.map((element) => element.name).join(' | '),
+      exportHasSVGImage: exportSvgImages.length > 0,
+      exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
@@ -11202,6 +11212,7 @@ async function runExportScenario(page) {
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportImageFlipModelCount: exportFlippedImages.length,
       exportImageOpacityModelCount: exportImageOpacityObjects.length,
+      exportImageSvgModelCount: exportSvgImages.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectAltTextModelCount: exportAltTextObjects.length,
       exportObjectLockingModelCount: exportLockedObjects.length,
@@ -11264,6 +11275,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
       openXmlPPTXImportState.exportHasImageOpacity &&
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
+      openXmlPPTXImportState.exportHasSVGImage &&
+      openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectAltText &&
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&

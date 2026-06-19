@@ -1002,12 +1002,12 @@ async function readPPTXPictureElement({
   const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
   const geometry = readPPTXElementGeometry(spPr)
   const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
-  const relationshipId = blip?.getAttribute('r:embed') ??
-    blip?.getAttribute('embed')
-  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
-  const mediaPath = relationship
-    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
-    : null
+  const mediaPath = readPPTXPictureMediaPath({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
   const media = mediaPath ? zip.file(mediaPath) : null
 
   if (!geometry || !mediaPath || !media) {
@@ -1039,6 +1039,50 @@ async function readPPTXPictureElement({
     ...(shadow ? { shadow } : {}),
     src: `data:${mimeType};base64,${base64}`,
   }
+}
+
+function readPPTXPictureMediaPath({
+  blip,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const svgBlip = getFirstPPTXDescendantByLocalName(blip, 'svgBlip')
+  const relationshipIds = [
+    readPPTXEmbedRelationshipId(svgBlip),
+    readPPTXEmbedRelationshipId(blip),
+  ].filter((id): id is string => id !== null)
+  const seen = new Set<string>()
+
+  for (const relationshipId of relationshipIds) {
+    if (seen.has(relationshipId)) {
+      continue
+    }
+
+    seen.add(relationshipId)
+
+    const relationship = relationships.get(relationshipId)
+    const mediaPath = relationship
+      ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+      : null
+
+    if (mediaPath && zip.file(mediaPath)) {
+      return mediaPath
+    }
+  }
+
+  return null
+}
+
+function readPPTXEmbedRelationshipId(element: Element | null) {
+  return element?.getAttribute('r:embed') ??
+    element?.getAttribute('embed') ??
+    null
 }
 
 function readPPTXImageCrop(pic: Element): PPTImage['crop'] | null {
