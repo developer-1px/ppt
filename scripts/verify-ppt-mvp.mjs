@@ -18520,7 +18520,7 @@ async function runTextPasteScenario(page) {
   await page.eval(`(() => {
     const dataTransfer = new DataTransfer()
 
-    dataTransfer.setData('text/html', '<article><p style="text-align:center;line-height:140%;margin-top:12px;margin-bottom:8px"><strong style="font-size:20px">Bold plan</strong> and <span style="font-size:18px"><em>italic note</em></span> with <u>underline</u> and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul><ol><li>First step</li><li><strong>Second step</strong></li></ol></article>')
+    dataTransfer.setData('text/html', '<article><p style="text-align:center;line-height:140%;margin-top:12px;margin-bottom:8px"><strong style="font-size:20px">Bold plan</strong> and <span style="font-size:18px"><em>italic note</em></span> with <u>underline</u>, <s>canceled</s>, <span style="text-decoration: line-through">line-through</span>, and <a href="https://example.com">link</a></p><ul><li>First bullet</li><li><strong>Second bullet</strong></li></ul><ol><li>First step</li><li><strong>Second step</strong></li></ol></article>')
     window.dispatchEvent(new ClipboardEvent('paste', {
       bubbles: true,
       cancelable: true,
@@ -18538,6 +18538,7 @@ async function runTextPasteScenario(page) {
       afterRichPaste.textPasteFormat === 'text-html-rich' &&
       afterRichPaste.textPasteRichFallback === '' &&
       afterRichPaste.textPasteBoldRuns >= 2 &&
+      afterRichPaste.textPasteStrikethroughRuns >= 2 &&
       afterRichPaste.textPasteUnderlineRuns >= 2 &&
       afterRichPaste.textPasteBulletParagraphs === 2 &&
       afterRichPaste.textPasteNumberedParagraphs === 2 &&
@@ -18547,6 +18548,7 @@ async function runTextPasteScenario(page) {
       afterRichPaste.selectedName === 'Rich Text' &&
       afterRichPaste.selectedBoldRunCount >= 2 &&
       afterRichPaste.selectedItalicRunCount >= 1 &&
+      afterRichPaste.selectedStrikethroughRunCount >= 2 &&
       afterRichPaste.selectedUnderlineRunCount >= 2 &&
       afterRichPaste.selectedBulletParagraphCount === 2 &&
       afterRichPaste.selectedNumberedParagraphCount === 2 &&
@@ -18557,6 +18559,8 @@ async function runTextPasteScenario(page) {
       afterRichPaste.selectedRunFontSizes.includes('20px') &&
       afterRichPaste.selectedRunFontSizes.includes('18px') &&
       afterRichPaste.selectedText.includes('Bold plan') &&
+      afterRichPaste.selectedText.includes('canceled') &&
+      afterRichPaste.selectedText.includes('line-through') &&
       afterRichPaste.selectedText.includes('Second bullet') &&
       afterRichPaste.selectedText.includes('Second step'),
     {
@@ -25003,6 +25007,7 @@ function getPPTTextPasteState(page) {
       selectedText: selected?.textContent ?? '',
       selectedTextAlign: selected ? getComputedStyle(selected).textAlign : '',
       selectedTop: parseFloat(selected?.style.top ?? '0'),
+      selectedStrikethroughRunCount: selected?.querySelectorAll('[data-ppt-run-strikethrough="true"]').length ?? 0,
       selectedUnderlineRunCount: selected?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
       selectedWidth: parseFloat(selected?.style.width ?? '0'),
       richClipboardHTMLLength: Number(stage?.getAttribute('data-ppt-rich-clipboard-html-length') ?? 0),
@@ -25031,6 +25036,7 @@ function getPPTTextPasteState(page) {
       textPasteNumberedParagraphs: Number(stage?.getAttribute('data-ppt-text-paste-numbered-paragraphs') ?? 0),
       textPasteRichFallback: stage?.getAttribute('data-ppt-text-paste-rich-fallback') ?? '',
       textPasteSelection: stage?.getAttribute('data-ppt-text-paste-selection') ?? '',
+      textPasteStrikethroughRuns: Number(stage?.getAttribute('data-ppt-text-paste-strikethrough-runs') ?? 0),
       textPasteUnderlineRuns: Number(stage?.getAttribute('data-ppt-text-paste-underline-runs') ?? 0),
       thumbTextCount: document.querySelectorAll('.ppt-thumb-text').length,
       undoEnabled: !document.querySelector('button[title="Undo"]')?.disabled,

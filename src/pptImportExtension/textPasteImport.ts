@@ -47,6 +47,7 @@ export type PPTTextPasteImportResult = {
   item: PPTTextBox
   linkRunCount?: number
   numberedParagraphCount?: number
+  strikethroughRunCount?: number
   underlineRunCount?: number
 }
 export type PPTRichTextPasteSource = {
@@ -58,6 +59,7 @@ export type PPTRichTextPasteSource = {
   linkRunCount: number
   name?: string
   numberedParagraphCount: number
+  strikethroughRunCount: number
   text: string
   textBody: PPTTextBody
   underlineRunCount: number
@@ -229,6 +231,7 @@ export function createPPTRichTextPasteElement({
     ...(source.hyperlinkUrl ? { hyperlinkUrl: source.hyperlinkUrl } : {}),
     linkRunCount: source.linkRunCount,
     numberedParagraphCount: source.numberedParagraphCount,
+    strikethroughRunCount: source.strikethroughRunCount,
     underlineRunCount: source.underlineRunCount,
   }
 }
@@ -303,6 +306,9 @@ function createPPTRichTextPasteSource(
           ...(run.color || run.link ? { color: run.color ?? '#2563eb' } : {}),
           ...(run.fontSize === undefined ? {} : { size: run.fontSize }),
           ...(run.italic === undefined ? {} : { italic: run.italic }),
+          ...(run.strikethrough === undefined
+            ? {}
+            : { strikethrough: run.strikethrough }),
           ...(run.underline === undefined ? {} : { underline: run.underline }),
           text: run.text,
         })),
@@ -327,6 +333,10 @@ function createPPTRichTextPasteSource(
       : 'Rich Text',
     numberedParagraphCount: textBody.paragraphs.filter((paragraph) =>
       paragraph.bullet === 'numbered').length,
+    strikethroughRunCount: getPPTTextBodyRunCount(
+      textBody,
+      'strikethrough',
+    ),
     text: source.text,
     textBody,
     underlineRunCount: getPPTTextBodyRunCount(textBody, 'underline'),
@@ -399,7 +409,10 @@ function hasPPTRichTextHyperlinkControlCharacter(value: string) {
 
 function getPPTTextBodyRunCount(
   body: PPTTextBody,
-  field: keyof Pick<PPTRun, 'bold' | 'color' | 'italic' | 'underline'>,
+  field: keyof Pick<
+    PPTRun,
+    'bold' | 'color' | 'italic' | 'strikethrough' | 'underline'
+  >,
 ) {
   return body.paragraphs.reduce((count, paragraph) =>
     count + paragraph.runs.filter((run) => Boolean(run[field])).length, 0)

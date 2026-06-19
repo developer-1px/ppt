@@ -16086,6 +16086,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-paste-model={PPT_TEXT_PASTE_IMPORT_MODEL}
         data-ppt-text-paste-numbered-paragraphs={lastTextPasteImport?.numberedParagraphCount}
         data-ppt-text-paste-selection={lastTextPasteImport?.item.id}
+        data-ppt-text-paste-strikethrough-runs={lastTextPasteImport?.strikethroughRunCount}
         data-ppt-text-paste-underline-runs={lastTextPasteImport?.underlineRunCount}
         data-ppt-marquee-active={interaction?.kind === 'marquee' ? 'true' : 'false'}
         data-ppt-marquee-additive={interaction?.kind === 'marquee'
