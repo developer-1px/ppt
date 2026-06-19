@@ -932,8 +932,8 @@ function readPPTXShapeElement(
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const geometry = readPPTXElementGeometry(spPr)
   const textBody = readPPTXTextBody(txBody)
-  const fill = readPPTXSolidFill(spPr)
   const stroke = readPPTXStroke(spPr)
+  const fill = readPPTXShapeFill(spPr, stroke)
   const shadow = readPPTXElementShadow(spPr)
   const hasPaint = fill !== null || stroke !== undefined
 
@@ -1595,8 +1595,24 @@ function readPPTXShapeCornerRadius(spPr: Element | null) {
   return preset === 'roundRect' ? { cornerRadius: 24 } : null
 }
 
+function readPPTXShapeFill(
+  spPr: Element | null,
+  stroke: PPTStroke | undefined,
+): PPTFill | null {
+  const fill = readPPTXSolidFill(spPr)
+
+  if (fill || !hasPPTXNoFill(spPr) || !stroke) {
+    return fill
+  }
+
+  return {
+    color: PPTX_DEFAULT_FILL_COLOR,
+    opacity: 0,
+  }
+}
+
 function readPPTXSolidFill(container: Element | null): PPTFill | null {
-  if (!container || getDirectPPTXChildByLocalName(container, 'noFill')) {
+  if (!container || hasPPTXNoFill(container)) {
     return null
   }
 
@@ -1623,7 +1639,7 @@ function readPPTXSolidFill(container: Element | null): PPTFill | null {
 function readPPTXStroke(spPr: Element | null): PPTStroke | undefined {
   const line = spPr ? getDirectPPTXChildByLocalName(spPr, 'ln') : null
 
-  if (!line || getDirectPPTXChildByLocalName(line, 'noFill')) {
+  if (!line || hasPPTXNoFill(line)) {
     return undefined
   }
 
@@ -1658,6 +1674,10 @@ function readPPTXColor(solidFill: Element) {
   }
 
   return scheme ? PPTX_SCHEME_COLORS[scheme] : undefined
+}
+
+function hasPPTXNoFill(container: Element | null) {
+  return getDirectPPTXChildByLocalName(container, 'noFill') !== null
 }
 
 function readPPTXAlphaOpacity(solidFill: Element) {

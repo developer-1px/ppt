@@ -11000,8 +11000,10 @@ async function runExportScenario(page) {
 
   const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
     await addPPTXImageOpacityProbe(
-      await reversePPTXPresentationSlideOrder(
-        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+      await addPPTXNoFillShapeProbe(
+        await reversePPTXPresentationSlideOrder(
+          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        ),
       ),
     ),
   )
@@ -11040,6 +11042,8 @@ async function runExportScenario(page) {
         element.accessibility?.altText).length,
       objectLockingModelCount: elements.filter((element) =>
         element.locked === true).length,
+      noFillShapeModelCount: elements.filter((element) =>
+        element.name === 'No Fill Shape Probe').length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       objectShadowModelCount: elements.filter((element) => element.shadow).length,
       paragraphDefaultRunStyleModelCount: elements.filter((element) =>
@@ -11120,6 +11124,11 @@ async function runExportScenario(page) {
       element.opacity !== 1)
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
+    const exportNoFillShapeObjects = exportElements.filter((element) =>
+      element.name === 'No Fill Shape Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.opacity === 0 &&
+      element.stroke?.color === '#2563eb')
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
     const exportRuns = exportElements.flatMap((element) =>
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
@@ -11172,6 +11181,7 @@ async function runExportScenario(page) {
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
+      exportHasNoFillShape: exportNoFillShapeObjects.length > 0,
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasObjectShadow: exportShadowedObjects.length > 0,
       exportObjectAltTextNames: exportAltTextObjects.map((element) => element.name).join(' | '),
@@ -11195,6 +11205,8 @@ async function runExportScenario(page) {
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectAltTextModelCount: exportAltTextObjects.length,
       exportObjectLockingModelCount: exportLockedObjects.length,
+      exportNoFillShapeNames: exportNoFillShapeObjects.map((element) => element.name).join(' | '),
+      exportNoFillShapeModelCount: exportNoFillShapeObjects.length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportObjectShadowModelCount: exportShadowedObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
@@ -11257,6 +11269,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&
       openXmlPPTXImportState.exportHasObjectLocking &&
       openXmlPPTXImportState.exportObjectLockingModelCount > beforeOpenXmlPPTXDrop.objectLockingModelCount &&
+      openXmlPPTXImportState.exportHasNoFillShape &&
+      openXmlPPTXImportState.exportNoFillShapeModelCount > beforeOpenXmlPPTXDrop.noFillShapeModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&
@@ -27175,6 +27189,60 @@ async function addPPTXImageOpacityProbe(base64) {
         type: 'base64',
       })
     : base64
+}
+
+async function addPPTXNoFillShapeProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('No Fill Shape Probe')) {
+    return base64
+  }
+
+  const probeShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9902" name="No Fill Shape Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5029200" y="5486400"/>',
+    '<a:ext cx="1828800" cy="685800"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:noFill/>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="2563EB"/></a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function addPPTXParagraphDefaultRunStyleProbe(base64) {
