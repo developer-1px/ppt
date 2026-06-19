@@ -163,7 +163,7 @@ import {
   getSlideEditObjectFillOpacityJSONPasteValue,
   getSlideEditObjectFillOpacityPasteCommand,
   getSlideEditObjectHyperlinkCommandEffect,
-  getSlideEditObjectHyperlinkJSONPasteValue,
+  getSlideEditObjectHyperlinkJSONPasteValueFromText,
   getSlideEditObjectHyperlinkPasteCommands,
   getSlideEditObjectImageCropCommandEffect,
   getSlideEditObjectImageCropJSONPasteValueFromText,
@@ -21891,17 +21891,16 @@ function getPPTObjectHyperlinkSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectHyperlinkJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-        storagePolicy: {
-          blockedSchemes: ['javascript', 'data', 'vbscript'],
-          maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
+      const pasteValue = getSlideEditObjectHyperlinkJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          storagePolicy: {
+            blockedSchemes: ['javascript', 'data', 'vbscript'],
+            maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
+          },
         },
-      })
+      )
 
       if (pasteValue === null) {
         continue
