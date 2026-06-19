@@ -10975,6 +10975,114 @@ async function runExportScenario(page) {
     },
   )
 
+  const openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(
+    pptxDownloadBase64,
+  )
+  const beforeOpenXmlPPTXDrop = await page.eval(`(() => ({
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-basic.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(openXmlPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const openXmlPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const elements = [...document.querySelectorAll('.ppt-slide .ppt-element')]
+    const kinds = elements.map((element) => element.getAttribute('data-kind') ?? '')
+    const text = [...document.querySelectorAll('.ppt-slide .ppt-element-editor')]
+      .map((element) => element.textContent ?? '')
+      .join('\\n')
+    const imageDataUriCount = [...document.querySelectorAll('.ppt-slide .ppt-element img')]
+      .filter((image) => image.getAttribute('src')?.startsWith('data:image/') === true)
+      .length
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      dropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
+      elementCount: elements.length,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      imageCount: kinds.filter((kind) => kind === 'image').length,
+      imageDataUriCount,
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      jsonLength: Number(stage?.getAttribute('data-ppt-deck-pptx-import-json-length') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      shapeCount: kinds.filter((kind) => kind === 'shape').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-pptx-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-pptx-import-source-title') ?? '',
+      text,
+      textBoxCount: kinds.filter((kind) => kind === 'textBox').length,
+    }
+  })()`)
+
+  record(
+    'drops PPTX without embedded PPT model through OpenXML fallback import',
+    openXmlPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      openXmlPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      openXmlPPTXImportState.sourceDeck === 'pptx-openxml-import' &&
+      openXmlPPTXImportState.sourceTitle.length > 0 &&
+      openXmlPPTXImportState.sourceSlideCount === beforeOpenXmlPPTXDrop.slideCount &&
+      openXmlPPTXImportState.importedCount === beforeOpenXmlPPTXDrop.slideCount &&
+      openXmlPPTXImportState.slideCount === beforeOpenXmlPPTXDrop.slideCount * 2 &&
+      openXmlPPTXImportState.activeSlide === openXmlPPTXImportState.firstImportedSlideId &&
+      openXmlPPTXImportState.activeName.includes('Copy') &&
+      openXmlPPTXImportState.fileName === 'external-openxml-basic.pptx' &&
+      openXmlPPTXImportState.fileSize > 5000 &&
+      openXmlPPTXImportState.jsonLength === 0 &&
+      openXmlPPTXImportState.dropAction === 'pptx-deck-file' &&
+      openXmlPPTXImportState.elementCount >= 4 &&
+      openXmlPPTXImportState.textBoxCount >= 1 &&
+      openXmlPPTXImportState.shapeCount >= 1 &&
+      openXmlPPTXImportState.imageCount >= 1 &&
+      openXmlPPTXImportState.imageDataUriCount >= 1 &&
+      openXmlPPTXImportState.text.length > 0,
+    {
+      beforeOpenXmlPPTXDrop,
+      openXmlPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterOpenXmlPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes OpenXML PPTX drop probes before export scenario continues',
+    afterOpenXmlPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterOpenXmlPPTXDropCleanup.slideCount === beforeOpenXmlPPTXDrop.slideCount,
+    {
+      afterOpenXmlPPTXDropCleanup,
+      beforeOpenXmlPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -26718,6 +26826,44 @@ async function installPPTDownloadCapture(page) {
       }
     }
   })()`)
+}
+
+async function removePPTXEmbeddedPPTModel(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const contentTypesXml = await readPPTXZipText(zip, '[Content_Types].xml')
+  const packageRelationshipsXml = await readPPTXZipText(zip, '_rels/.rels')
+
+  zip.remove('customXml/item1.xml')
+  zip.remove('customXml/itemProps1.xml')
+  zip.remove('customXml/_rels/item1.xml.rels')
+
+  if (contentTypesXml) {
+    zip.file(
+      '[Content_Types].xml',
+      contentTypesXml
+        .replace(/<Override PartName="\/customXml\/item1\.xml"[^>]*\/>/g, '')
+        .replace(/<Override PartName="\/customXml\/itemProps1\.xml"[^>]*\/>/g, ''),
+    )
+  }
+
+  if (packageRelationshipsXml) {
+    zip.file(
+      '_rels/.rels',
+      packageRelationshipsXml.replace(
+        /<Relationship\b(?=[^>]*Target="customXml\/item1\.xml")[^>]*\/>/g,
+        '',
+      ),
+    )
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function inspectPPTXPackage(base64) {

@@ -856,7 +856,6 @@ import {
   getPPTDeckPPTXFilename,
 } from './pptPptxExport'
 import {
-  PPTX_DECK_MODEL_IMPORT_FORMAT,
   canImportPPTDeckPPTXFromDataTransfer,
   getPPTDeckPPTXFileFromDataTransfer,
   importPPTDeckFromPPTXBlob,
@@ -2498,7 +2497,7 @@ type PPTDeckPPTXImportEffect = {
   fileName: string
   fileSize: number
   firstImportedSlideId: string
-  format: typeof PPTX_DECK_MODEL_IMPORT_FORMAT
+  format: PPTDeckPPTXImportResult['format']
   importedSlideCount: number
   jsonLength: number
   model: typeof PPT_DECK_PPTX_IMPORT_MODEL
