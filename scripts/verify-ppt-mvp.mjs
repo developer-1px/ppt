@@ -10870,6 +10870,12 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX text frame inset and vertical alignment',
+    pptxPackageState.hasTextBodyPrInset &&
+      pptxPackageState.hasTextBodyPrVerticalAnchor,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX non-image alt text',
     pptxPackageState.hasNonImageAltTextDescription,
     pptxPackageState,
@@ -11012,6 +11018,10 @@ async function runExportScenario(page) {
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
     const paragraphs = elements.flatMap((element) =>
       element.textBody?.paragraphs ?? [])
+    const textFrameInsetElements = elements.filter((element) =>
+      element.style?.textInset)
+    const textVerticalAlignElements = elements.filter((element) =>
+      element.style?.verticalAlign !== undefined)
 
     return {
       imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
@@ -11026,9 +11036,11 @@ async function runExportScenario(page) {
         paragraph.spacingBefore !== undefined).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      textFrameInsetModelCount: textFrameInsetElements.length,
       textRunHighlightModelCount: runs.filter((run) => run.highlight).length,
       textRunStrikethroughModelCount: runs.filter((run) =>
         run.strikethrough === true).length,
+      textVerticalAlignModelCount: textVerticalAlignElements.length,
       transitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
     }
   })()`)
@@ -11089,6 +11101,10 @@ async function runExportScenario(page) {
       paragraph.lineHeight !== undefined ||
       paragraph.spacingAfter !== undefined ||
       paragraph.spacingBefore !== undefined)
+    const exportTextFrameInsetElements = exportElements.filter((element) =>
+      element.style?.textInset)
+    const exportTextVerticalAlignElements = exportElements.filter((element) =>
+      element.style?.verticalAlign !== undefined)
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -11108,8 +11124,10 @@ async function runExportScenario(page) {
       exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
       exportHasParagraphSpacing: exportSpacedParagraphs.length > 0,
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
+      exportHasTextFrameInset: exportTextFrameInsetElements.length > 0,
       exportHasTextRunHighlight: exportHighlightedRuns.length > 0,
       exportHasTextRunStrikethrough: exportStrikethroughRuns.length > 0,
+      exportHasTextVerticalAlign: exportTextVerticalAlignElements.length > 0,
       exportHasTransition: exportCode.includes('"transition": {') &&
         exportCode.includes('"type": "push"') &&
         exportCode.includes('"durationMs": 650') &&
@@ -11122,8 +11140,10 @@ async function runExportScenario(page) {
       exportObjectShadowModelCount: exportShadowedObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      exportTextFrameInsetModelCount: exportTextFrameInsetElements.length,
       exportTextRunHighlightModelCount: exportHighlightedRuns.length,
       exportTextRunStrikethroughModelCount: exportStrikethroughRuns.length,
+      exportTextVerticalAlignModelCount: exportTextVerticalAlignElements.length,
       exportTransitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
@@ -11176,10 +11196,14 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
+      openXmlPPTXImportState.exportHasTextFrameInset &&
+      openXmlPPTXImportState.exportTextFrameInsetModelCount > beforeOpenXmlPPTXDrop.textFrameInsetModelCount &&
       openXmlPPTXImportState.exportHasTextRunHighlight &&
       openXmlPPTXImportState.exportTextRunHighlightModelCount > beforeOpenXmlPPTXDrop.textRunHighlightModelCount &&
       openXmlPPTXImportState.exportHasTextRunStrikethrough &&
       openXmlPPTXImportState.exportTextRunStrikethroughModelCount > beforeOpenXmlPPTXDrop.textRunStrikethroughModelCount &&
+      openXmlPPTXImportState.exportHasTextVerticalAlign &&
+      openXmlPPTXImportState.exportTextVerticalAlignModelCount > beforeOpenXmlPPTXDrop.textVerticalAlignModelCount &&
       openXmlPPTXImportState.exportHasTransition &&
       openXmlPPTXImportState.exportTransitionModelCount > beforeOpenXmlPPTXDrop.transitionModelCount &&
       openXmlPPTXImportState.text.includes('Minimal subset now') &&
@@ -27057,6 +27081,8 @@ async function inspectPPTXPackage(base64) {
     hasSpeakerNotes: false,
     hasTableText: false,
     hasTableXml: false,
+    hasTextBodyPrInset: false,
+    hasTextBodyPrVerticalAnchor: false,
     hasTextParagraphSpacing: false,
     hasTextRunHighlight: false,
     hasTextRunStrikethrough: false,
@@ -27069,6 +27095,8 @@ async function inspectPPTXPackage(base64) {
     objectShadowOuterCount: 0,
     relationshipCount: 0,
     slideCount: 0,
+    textBodyPrInsetCount: 0,
+    textBodyPrVerticalAnchorCount: 0,
     textParagraphSpacingCount: 0,
     textRunHighlightCount: 0,
     textRunStrikethroughCount: 0,
@@ -27120,6 +27148,12 @@ async function inspectPPTXPackage(base64) {
       ...slideXml.matchAll(/<p:pic\b[\s\S]*?<a:xfrm\b[^>]*\bflipH="(?:1|true)"[\s\S]*?<\/p:pic>/g),
     ].length
     const objectShadowOuterCount = countOccurrences(slideXml, '<a:outerShdw')
+    const textBodyPrInsetCount = [
+      ...slideXml.matchAll(/<a:bodyPr\b[^>]*\b(?:bIns|lIns|rIns|tIns|marB|marL|marR|marT)="[^"]*"/g),
+    ].length
+    const textBodyPrVerticalAnchorCount = [
+      ...slideXml.matchAll(/<a:bodyPr\b[^>]*\banchor="(?:b|ctr|t)"/g),
+    ].length
     const textParagraphSpacingCount = countOccurrences(slideXml, '<a:lnSpc>') +
       countOccurrences(slideXml, '<a:spcBef>') +
       countOccurrences(slideXml, '<a:spcAft>')
@@ -27201,6 +27235,8 @@ async function inspectPPTXPackage(base64) {
       hasSpeakerNotes: notesXml.includes('Presenter cue: review image crop and final CTA.'),
       hasTableText: slideXml.includes('Region'),
       hasTableXml: slideXml.includes('<a:tbl>') || slideXml.includes('<a:tbl '),
+      hasTextBodyPrInset: textBodyPrInsetCount > 0,
+      hasTextBodyPrVerticalAnchor: textBodyPrVerticalAnchorCount > 0,
       hasTextParagraphSpacing: textParagraphSpacingCount > 0,
       hasTextRunHighlight: textRunHighlightCount > 0,
       hasTextRunStrikethrough: textRunStrikethroughCount > 0,
@@ -27215,6 +27251,8 @@ async function inspectPPTXPackage(base64) {
       objectShadowOuterCount,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
+      textBodyPrInsetCount,
+      textBodyPrVerticalAnchorCount,
       textParagraphSpacingCount,
       transitionCount,
       textRunHighlightCount,

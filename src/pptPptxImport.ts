@@ -973,7 +973,75 @@ function readPPTXTextStyle(
     ...(fontFamily ? { fontFamily } : {}),
     fontSize: firstRun?.size ?? PPTX_DEFAULT_TEXT_SIZE,
     ...(firstRun?.bold === true ? { fontWeight: 'bold' } : {}),
+    ...readPPTXTextFrameStyle(txBody),
   }
+}
+
+function readPPTXTextFrameStyle(
+  txBody: Element | null,
+): Pick<PPTTextStyle, 'textInset' | 'verticalAlign'> {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const verticalAlign = readPPTXTextVerticalAlign(bodyPr)
+  const textInset = readPPTXTextInset(bodyPr)
+
+  return {
+    ...(textInset ? { textInset } : {}),
+    ...(verticalAlign ? { verticalAlign } : {}),
+  }
+}
+
+function readPPTXTextVerticalAlign(
+  bodyPr: Element | null,
+): PPTTextStyle['verticalAlign'] | undefined {
+  const anchor = bodyPr?.getAttribute('anchor')
+
+  if (anchor === 'ctr') {
+    return 'middle'
+  }
+
+  if (anchor === 'b') {
+    return 'bottom'
+  }
+
+  return anchor === 't' ? 'top' : undefined
+}
+
+function readPPTXTextInset(
+  bodyPr: Element | null,
+): PPTTextStyle['textInset'] | undefined {
+  if (!bodyPr) {
+    return undefined
+  }
+
+  const top = readPPTXTextInsetSide(bodyPr, 'tIns', 'marT')
+  const right = readPPTXTextInsetSide(bodyPr, 'rIns', 'marR')
+  const bottom = readPPTXTextInsetSide(bodyPr, 'bIns', 'marB')
+  const left = readPPTXTextInsetSide(bodyPr, 'lIns', 'marL')
+
+  return top === undefined &&
+    right === undefined &&
+    bottom === undefined &&
+    left === undefined
+    ? undefined
+    : {
+        bottom: bottom ?? 0,
+        left: left ?? 0,
+        right: right ?? 0,
+        top: top ?? 0,
+      }
+}
+
+function readPPTXTextInsetSide(
+  bodyPr: Element,
+  insetAttribute: 'bIns' | 'lIns' | 'rIns' | 'tIns',
+  legacyMarginAttribute: 'marB' | 'marL' | 'marR' | 'marT',
+) {
+  const value = toPPTXPositiveNumber(
+    bodyPr.getAttribute(insetAttribute) ??
+      bodyPr.getAttribute(legacyMarginAttribute),
+  )
+
+  return value === null ? undefined : emuToPx(value)
 }
 
 function readPPTXParagraphAlign(
