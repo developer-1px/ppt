@@ -199,6 +199,7 @@ import {
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailListboxKeyboardIntent,
   getSlideEditRailPointerCommandEffect,
+  getSlideEditRailReorderKeyboardShortcutIntent,
   getSlideEditResolvedLayoutPlaceholder,
   getSlideEditStyleClipboardCategoryDescriptors,
   getSlideEditStyleClipboardCopyCommandEffect,
@@ -308,6 +309,7 @@ import {
   SLIDE_EDIT_LAYOUT_JSON_MIME_TYPE,
   SLIDE_EDIT_TABLE_ROWS_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
+  SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
@@ -3819,7 +3821,7 @@ const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
-  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} ${PPT_SLIDE_MOVE_UP_SHORTCUT} ${PPT_SLIDE_MOVE_DOWN_SHORTCUT} ${PPT_SLIDE_MOVE_TO_START_SHORTCUT} ${PPT_SLIDE_MOVE_TO_END_SHORTCUT} Delete Backspace`
+  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} ${SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS} Delete Backspace`
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
   'ppt-slide-rail-command-shortcut-intent'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
@@ -3852,10 +3854,6 @@ type PPTSlideRailCommandShortcutIntent =
   | { kind: 'cut-slide' }
   | { kind: 'delete-slide' }
   | { kind: 'duplicate-slide' }
-  | { kind: 'move-slide-down' }
-  | { kind: 'move-slide-to-end' }
-  | { kind: 'move-slide-to-start' }
-  | { kind: 'move-slide-up' }
   | { kind: 'paste-slide' }
 type PPTCreationTool =
   | {
@@ -5833,6 +5831,28 @@ function App() {
       return
     }
 
+    const slideOrder = deck.slides.map((slide) => slide.id)
+    const reorderShortcutIntent = getSlideEditRailReorderKeyboardShortcutIntent({
+      activeSlideId: slideId,
+      altKey: event.altKey,
+      key: event.key,
+      mod: event.metaKey || event.ctrlKey,
+      shiftKey: event.shiftKey,
+      slideOrder,
+    })
+    const reorderShortcutEffect = reorderShortcutIntent
+      ? getSlideEditRailKeyboardCommandEffect(reorderShortcutIntent)
+      : null
+
+    if (reorderShortcutIntent) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (reorderShortcutEffect?.payload.id === 'reorder-slide') {
+        moveSlideToIndex(slideId, reorderShortcutEffect.payload.toIndex, { focusRail: true })
+      }
+      return
+    }
+
     const commandIntent = getPPTSlideRailCommandShortcutIntent({
       canDelete: canDeleteSlide,
       canPaste: canPasteSlide,
@@ -5866,26 +5886,6 @@ function App() {
         return
       }
 
-      if (commandIntent.kind === 'move-slide-up') {
-        moveSlideToIndex(slideId, deck.slides.findIndex((slide) => slide.id === slideId) - 1, { focusRail: true })
-        return
-      }
-
-      if (commandIntent.kind === 'move-slide-down') {
-        moveSlideToIndex(slideId, deck.slides.findIndex((slide) => slide.id === slideId) + 1, { focusRail: true })
-        return
-      }
-
-      if (commandIntent.kind === 'move-slide-to-start') {
-        moveSlideToIndex(slideId, 0, { focusRail: true })
-        return
-      }
-
-      if (commandIntent.kind === 'move-slide-to-end') {
-        moveSlideToIndex(slideId, deck.slides.length - 1, { focusRail: true })
-        return
-      }
-
       deleteSlide(slideId)
       return
     }
@@ -5894,7 +5894,6 @@ function App() {
       return
     }
 
-    const slideOrder = deck.slides.map((slide) => slide.id)
     const railKey = event.key === 'ArrowRight'
       ? 'ArrowDown'
       : event.key === 'ArrowLeft'
@@ -37681,18 +37680,6 @@ function getPPTSlideRailCommandShortcutIntent({
   shiftKey: boolean
 }): PPTSlideRailCommandShortcutIntent | null {
   const normalizedKey = key.toLowerCase()
-
-  if (mod && !altKey && key === 'ArrowUp') {
-    return shiftKey
-      ? { kind: 'move-slide-to-start' }
-      : { kind: 'move-slide-up' }
-  }
-
-  if (mod && !altKey && key === 'ArrowDown') {
-    return shiftKey
-      ? { kind: 'move-slide-to-end' }
-      : { kind: 'move-slide-down' }
-  }
 
   if (mod && !altKey && !shiftKey && normalizedKey === 'c') {
     return { kind: 'copy-slide' }
