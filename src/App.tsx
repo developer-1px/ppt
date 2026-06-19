@@ -3864,6 +3864,11 @@ type Interaction =
         sourceDeck: PPTDeck
         sourceSelection: string[]
       }
+      axisLockOnDrag?: {
+        pendingSelection: string[]
+        sourceSelection: string[]
+        started: boolean
+      }
       historyDeck?: PPTDeck
       kind: 'move'
       selection: string[]
@@ -12566,6 +12571,8 @@ function App() {
 
     const duplicateWithPrimaryPointerModifier =
       (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+    const lockAxisWithShiftPointerModifier =
+      event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
@@ -12597,6 +12604,23 @@ function App() {
           slide: activeSlide,
         })
       : null
+    const axisLockSourcePointerSelection = lockAxisWithShiftPointerModifier
+      ? getPPTElementPointerSelection({
+          additive: false,
+          elementId,
+          scene,
+          selection,
+        })
+      : null
+    const axisLockSourceSelection = axisLockSourcePointerSelection
+      ? getPPTGroupPointerSelection({
+          additive: false,
+          fallbackSelection: axisLockSourcePointerSelection.nextSelection,
+          itemId: elementId,
+          selection,
+          slide: activeSlide,
+        })
+      : null
     const duplicateOnDrag = duplicateSourceSelection &&
       duplicateSourceSelection.some((id) => selection.includes(id))
       ? {
@@ -12606,8 +12630,18 @@ function App() {
           sourceSelection: duplicateSourceSelection,
         }
       : undefined
+    const axisLockOnDrag = axisLockSourceSelection &&
+      axisLockSourceSelection.some((id) => selection.includes(id))
+      ? {
+          pendingSelection: nextSelection,
+          sourceSelection: axisLockSourceSelection,
+          started: false,
+        }
+      : undefined
     const pointerDownSelection = duplicateOnDrag
       ? duplicateOnDrag.sourceSelection
+      : axisLockOnDrag
+        ? axisLockOnDrag.sourceSelection
       : nextSelection
     const bounds = scene.getBounds(pointerDownSelection)
     const hasLockedTarget = activeSlide.elements.some((element) =>
@@ -12655,6 +12689,7 @@ function App() {
 
     setSelection(interactionSelection)
     setInteraction({
+      axisLockOnDrag,
       bounds: interactionBounds,
       duplicateOnDrag,
       historyDeck: interactionHistoryDeck,
@@ -13164,9 +13199,33 @@ function App() {
         }
       }
 
+      if (
+        moveInteraction.axisLockOnDrag &&
+        !moveInteraction.axisLockOnDrag.started
+      ) {
+        if (
+          getPPTCanvasPointDistance(moveInteraction.startPoint, point) <=
+          PPT_DRAG_DUPLICATE_THRESHOLD
+        ) {
+          return
+        }
+
+        moveInteraction = {
+          ...moveInteraction,
+          axisLockOnDrag: {
+            ...moveInteraction.axisLockOnDrag,
+            started: true,
+          },
+          selection: moveInteraction.axisLockOnDrag.sourceSelection,
+        }
+      }
+
       const startScene = createPPTCanvasScene(startSlide)
-      const dx = point.x - moveInteraction.startPoint.x
-      const dy = point.y - moveInteraction.startPoint.y
+      const rawDx = point.x - moveInteraction.startPoint.x
+      const rawDy = point.y - moveInteraction.startPoint.y
+      const moveDelta = moveInteraction.axisLockOnDrag?.started
+        ? getPPTAxisLockedMoveDelta(rawDx, rawDy)
+        : { dx: rawDx, dy: rawDy }
       const snap = getPPTCanvasMoveSnap({
         bounds: moveInteraction.bounds,
         config: {
@@ -13176,8 +13235,8 @@ function App() {
             snapToSpacing: true,
           },
         },
-        dx,
-        dy,
+        dx: moveDelta.dx,
+        dy: moveDelta.dy,
         scene: startScene,
         selection: moveInteraction.selection,
         viewport,
@@ -13315,6 +13374,21 @@ function App() {
 
       if (!duplicateStarted) {
         setSelection(interaction.duplicateOnDrag.pendingSelection)
+        setInteraction(null)
+        return
+      }
+    }
+
+    if (
+      interaction.kind === 'move' &&
+      interaction.axisLockOnDrag &&
+      !interaction.axisLockOnDrag.started
+    ) {
+      const axisLockedMoveStarted =
+        JSON.stringify(deckRef.current) !== JSON.stringify(interaction.startDeck)
+
+      if (!axisLockedMoveStarted) {
+        setSelection(interaction.axisLockOnDrag.pendingSelection)
         setInteraction(null)
         return
       }
@@ -37118,6 +37192,12 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 }
 
 function noopPPTKeyboardCommandHandler() {}
+
+function getPPTAxisLockedMoveDelta(dx: number, dy: number) {
+  return Math.abs(dx) >= Math.abs(dy)
+    ? { dx, dy: 0 }
+    : { dx: 0, dy }
+}
 
 function getPPTSlideKeyboardShortcutIntent({
   event,

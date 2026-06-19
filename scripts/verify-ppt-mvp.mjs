@@ -303,6 +303,7 @@ async function runSelectionAndDragScenario(page) {
     const rect = element.getBoundingClientRect()
     return {
       left: element.style.left,
+      top: element.style.top,
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     }
@@ -344,6 +345,7 @@ async function runSelectionAndDragScenario(page) {
     return {
       left: element.style.left,
       selected: element.getAttribute('data-selected'),
+      top: element.style.top,
       undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
     }
   })()`)
@@ -359,6 +361,122 @@ async function runSelectionAndDragScenario(page) {
     before,
   })
   record('records drag in undo history', after.undoEnabled, after)
+
+  const beforeAxisLock = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const rect = element.getBoundingClientRect()
+
+    return {
+      left: parseFloat(element.style.left),
+      selected: element.getAttribute('data-selected'),
+      top: parseFloat(element.style.top),
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mousePressed',
+    x: beforeAxisLock.x,
+    y: beforeAxisLock.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 8,
+    type: 'mouseMoved',
+    x: beforeAxisLock.x + 96,
+    y: beforeAxisLock.y + 34,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 8,
+    type: 'mouseReleased',
+    x: beforeAxisLock.x + 96,
+    y: beforeAxisLock.y + 34,
+  })
+  await delay(100)
+
+  const afterAxisLock = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      left: parseFloat(element.style.left),
+      selected: element.getAttribute('data-selected'),
+      top: parseFloat(element.style.top),
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'axis-locks selected PPT object with Shift drag',
+    beforeAxisLock.selected === 'true' &&
+      afterAxisLock.selected === 'true' &&
+      afterAxisLock.left > beforeAxisLock.left + 40 &&
+      nearlyEqual(afterAxisLock.top, beforeAxisLock.top, 0.001) &&
+      afterAxisLock.undoEnabled,
+    {
+      afterAxisLock,
+      beforeAxisLock,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterAxisLockUndo = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      left: parseFloat(element.style.left),
+      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+      top: parseFloat(element.style.top),
+    }
+  })()`)
+
+  record(
+    'undoes PPT Shift drag axis lock as one history step',
+    nearlyEqual(afterAxisLockUndo.left, beforeAxisLock.left, 0.001) &&
+      nearlyEqual(afterAxisLockUndo.top, beforeAxisLock.top, 0.001) &&
+      afterAxisLockUndo.redoEnabled,
+    {
+      afterAxisLockUndo,
+      beforeAxisLock,
+    },
+  )
+
+  const restoredPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, restoredPoint.x, restoredPoint.y, 1)
+  await delay(50)
+
+  const beforeShiftClick = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  await clickMouse(page, restoredPoint.x, restoredPoint.y, 1, 8)
+  await delay(50)
+
+  const afterShiftClick = await page.eval(`(() => ({
+    count: document.querySelectorAll('[data-ppt-element]').length,
+    selectedIds: [...document.querySelectorAll('[data-selected="true"]')]
+      .map((element) => element.getAttribute('data-ppt-element')),
+  }))()`)
+
+  record(
+    'keeps Shift click as PPT additive selection without axis-lock moving',
+    afterShiftClick.count === beforeShiftClick.count &&
+      beforeShiftClick.selectedIds.includes('s1-card-1') &&
+      !afterShiftClick.selectedIds.includes('s1-card-1'),
+    {
+      afterShiftClick,
+      beforeShiftClick,
+    },
+  )
 }
 
 async function runMarqueeSelectionScenario(page) {
