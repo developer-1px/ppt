@@ -24586,6 +24586,9 @@ async function runSlideManagementScenario(page) {
       afterRailMoveToEndShortcut.commandFromIndex === '0' &&
       afterRailMoveToEndShortcut.commandToIndex === String(beforeRailReorderShortcut.count - 1) &&
       afterRailMoveToEndShortcut.focusedId === railReorderShortcutTargetId &&
+      afterRailMoveToEndShortcut.reorderShortcutIntent === 'slide-edit-rail-reorder-keyboard-intent' &&
+      afterRailMoveToEndShortcut.reorderShortcutKeys === 'Cmd/Ctrl+Up Cmd/Ctrl+Down Cmd/Ctrl+Shift+Up Cmd/Ctrl+Shift+Down' &&
+      afterRailMoveToEndShortcut.reorderShortcutModel === 'slide-edit-rail-reorder-keyboard-shortcuts' &&
       afterRailMoveUpShortcut.activeId === railReorderShortcutTargetId &&
       afterRailMoveUpShortcut.activeIndex === beforeRailReorderShortcut.count - 2 &&
       afterRailMoveUpShortcut.command === 'reorder-slide' &&
@@ -26611,6 +26614,9 @@ function getSlideRailState(page) {
       optionIds: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-rail-option-id') ?? ''),
       optionIndexes: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-rail-option-index') ?? ''),
       rovingTabIndexes: thumbs.map((thumb) => thumb.getAttribute('data-ppt-slide-roving-tab-index') ?? ''),
+      reorderShortcutIntent: rail?.getAttribute('data-ppt-slide-rail-reorder-shortcut-intent') ?? '',
+      reorderShortcutKeys: rail?.getAttribute('data-ppt-slide-rail-reorder-shortcut-keys') ?? '',
+      reorderShortcutModel: rail?.getAttribute('data-ppt-slide-rail-reorder-shortcut-model') ?? '',
       selectionMode: rail?.getAttribute('data-ppt-slide-rail-selection-mode') ?? '',
       selectedOptionIds: thumbs
         .filter((thumb) => thumb.getAttribute('aria-selected') === 'true')

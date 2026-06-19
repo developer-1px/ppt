@@ -335,6 +335,12 @@ import {
   SLIDE_EDIT_TABLE_ROWS_JSON_MIME_TYPE,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
   SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS,
+  SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_INTENT as PPT_SLIDE_RAIL_REORDER_SHORTCUT_INTENT,
+  SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_MODEL as PPT_SLIDE_RAIL_REORDER_SHORTCUT_MODEL,
+  SLIDE_EDIT_RAIL_REORDER_MOVE_DOWN_SHORTCUT as PPT_SLIDE_MOVE_DOWN_SHORTCUT,
+  SLIDE_EDIT_RAIL_REORDER_MOVE_TO_END_SHORTCUT as PPT_SLIDE_MOVE_TO_END_SHORTCUT,
+  SLIDE_EDIT_RAIL_REORDER_MOVE_TO_START_SHORTCUT as PPT_SLIDE_MOVE_TO_START_SHORTCUT,
+  SLIDE_EDIT_RAIL_REORDER_MOVE_UP_SHORTCUT as PPT_SLIDE_MOVE_UP_SHORTCUT,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
@@ -4007,10 +4013,6 @@ const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
 const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
 const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
 const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
-const PPT_SLIDE_MOVE_DOWN_SHORTCUT = 'Cmd/Ctrl+Down'
-const PPT_SLIDE_MOVE_TO_END_SHORTCUT = 'Cmd/Ctrl+Shift+Down'
-const PPT_SLIDE_MOVE_TO_START_SHORTCUT = 'Cmd/Ctrl+Shift+Up'
-const PPT_SLIDE_MOVE_UP_SHORTCUT = 'Cmd/Ctrl+Up'
 const PPT_SLIDE_PASTE_SHORTCUT = 'Cmd/Ctrl+V'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
@@ -15501,6 +15503,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           data-ppt-slide-rail-keyboard-model={slideRailDescriptor.listbox.keyboardModel}
           data-ppt-slide-rail-model="slide-edit-rail-interactions"
           data-ppt-slide-rail-option-count={slideRailDescriptor.listbox.options.length}
+          data-ppt-slide-rail-reorder-shortcut-intent={PPT_SLIDE_RAIL_REORDER_SHORTCUT_INTENT}
+          data-ppt-slide-rail-reorder-shortcut-keys={SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS}
+          data-ppt-slide-rail-reorder-shortcut-model={PPT_SLIDE_RAIL_REORDER_SHORTCUT_MODEL}
           data-ppt-slide-rail-selection-mode={slideRailDescriptor.listbox.selectionMode}
           data-ppt-slide-rail-slide-order={slideRailDescriptor.slideOrder.join(' ')}
           data-ppt-slide-rail-thumbnail-count={slideRailDescriptor.thumbnails.length}
