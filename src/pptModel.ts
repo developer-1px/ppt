@@ -38,6 +38,7 @@ const PPTRunSchema = z.object({
 const PPTParagraphSchema = z.object({
   align: z.enum(['left', 'center', 'right', 'justify']).optional(),
   bullet: z.enum(['bullet', 'numbered']).optional(),
+  level: z.number().int().nonnegative().optional(),
   lineHeight: z.number().optional(),
   runs: z.array(PPTRunSchema),
   spacingAfter: z.number().optional(),
@@ -322,6 +323,7 @@ function copyPPTParagraphAttributes({
         ...paragraph,
         ...(sourceParagraph.align ? { align: sourceParagraph.align } : {}),
         ...(sourceParagraph.bullet ? { bullet: sourceParagraph.bullet } : {}),
+        ...(sourceParagraph.level === undefined ? {} : { level: sourceParagraph.level }),
         ...(sourceParagraph.lineHeight === undefined ? {} : { lineHeight: sourceParagraph.lineHeight }),
         ...(sourceParagraph.spacingAfter === undefined ? {} : { spacingAfter: sourceParagraph.spacingAfter }),
         ...(sourceParagraph.spacingBefore === undefined ? {} : { spacingBefore: sourceParagraph.spacingBefore }),

@@ -1251,18 +1251,20 @@
 }
 
 .ppt-text-paragraph {
+  --ppt-paragraph-list-level-indent: 0em;
   display: block;
   min-height: 1em;
+  padding-left: var(--ppt-paragraph-list-level-indent);
 }
 
 .ppt-text-paragraph[data-ppt-bullet='true'] {
   position: relative;
-  padding-left: 1.1em;
+  padding-left: calc(var(--ppt-paragraph-list-level-indent) + 1.1em);
 }
 
 .ppt-text-paragraph[data-ppt-bullet='true']::before {
   position: absolute;
-  left: 0;
+  left: var(--ppt-paragraph-list-level-indent);
   content: '\2022';
 }
 
@@ -1272,13 +1274,13 @@
 
 .ppt-text-paragraph[data-ppt-numbered='true'] {
   position: relative;
-  padding-left: 1.45em;
+  padding-left: calc(var(--ppt-paragraph-list-level-indent) + 1.45em);
   counter-increment: ppt-numbered-list;
 }
 
 .ppt-text-paragraph[data-ppt-numbered='true']::before {
   position: absolute;
-  left: 0;
+  left: var(--ppt-paragraph-list-level-indent);
   content: counter(ppt-numbered-list) '.';
 }
 
@@ -1875,11 +1877,13 @@
 
 .ppt-paragraph-control-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(62px, 0.5fr)) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(62px, 0.5fr)) repeat(2, 32px) minmax(0, 1fr);
   gap: 8px;
 }
 
 .ppt-paragraph-bullet-button {
+  display: inline-grid;
+  place-items: center;
   height: 32px;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
@@ -1887,6 +1891,11 @@
   color: var(--text-secondary);
   font: inherit;
   font-size: 12px;
+}
+
+.ppt-paragraph-bullet-button:disabled {
+  color: var(--text-muted);
+  opacity: 0.55;
 }
 
 .ppt-paragraph-bullet-button[aria-pressed='true'] {

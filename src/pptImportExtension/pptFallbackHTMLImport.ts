@@ -1173,16 +1173,35 @@ function getPPTFallbackHTMLTextBody(element: HTMLElement): PPTTextBody | null {
 
 function getPPTFallbackHTMLParagraphListAttribute(
   element: HTMLElement,
-): Pick<PPTParagraph, 'bullet'> {
+): Pick<PPTParagraph, 'bullet' | 'level'> {
   if (element.tagName.toLowerCase() !== 'li') {
     return {}
   }
+  const level = parsePPTFallbackHTMLListLevel(
+    element.getAttribute('data-ppt-selection-list-level') ??
+      element.getAttribute('data-ppt-list-level'),
+  )
 
   return {
     bullet: element.parentElement?.tagName.toLowerCase() === 'ol'
       ? 'numbered'
       : 'bullet',
+    ...(level === undefined ? {} : { level }),
   }
+}
+
+function parsePPTFallbackHTMLListLevel(value: string | null) {
+  if (!value) {
+    return undefined
+  }
+
+  const level = Number(value)
+
+  if (!Number.isFinite(level)) {
+    return undefined
+  }
+
+  return Math.round(Math.min(5, Math.max(0, level)))
 }
 
 function getPPTFallbackHTMLRuns(root: HTMLElement): PPTRun[] {
@@ -1211,9 +1230,14 @@ function getPPTFallbackHTMLParagraphAttributes(
     style,
     'margin-top',
   )
+  const level = parsePPTFallbackHTMLListLevel(
+    element.getAttribute('data-ppt-selection-list-level') ??
+      element.getAttribute('data-ppt-list-level'),
+  )
 
   return {
     ...(align ? { align } : {}),
+    ...(level === undefined ? {} : { level }),
     ...(lineHeight === undefined ? {} : { lineHeight }),
     ...(spacingAfter === undefined ? {} : { spacingAfter }),
     ...(spacingBefore === undefined ? {} : { spacingBefore }),

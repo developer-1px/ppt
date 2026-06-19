@@ -55,6 +55,9 @@ const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
+const PPT_PARAGRAPH_LIST_LEVEL_MIN = 0
+const PPT_PARAGRAPH_LIST_LEVEL_MAX = 5
+const PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM = 1.35
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', value: 'Inter' },
@@ -491,6 +494,7 @@ function renderPPTTextBodySVG({
   return body.paragraphs.map((paragraph) => {
     const bullet = paragraph.bullet === 'bullet'
     const numbered = paragraph.bullet === 'numbered'
+    const listLevel = getPPTParagraphListLevel(paragraph)
     const runs = paragraph.runs.map(renderPPTTextRunSVG).join('')
     const listPrefix = bullet
       ? '<tspan data-ppt-bullet="true">&#8226; </tspan>'
@@ -505,7 +509,7 @@ function renderPPTTextBodySVG({
       align: paragraph.align,
       geometry,
       inset,
-    })
+    }) + fontSize * listLevel * PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM
     y += spacingBefore + fontSize
     if (numbered) {
       numberedIndex += 1
@@ -515,6 +519,7 @@ function renderPPTTextBodySVG({
       bullet ? 'data-ppt-bullet="true"' : '',
       numbered ? 'data-ppt-numbered="true"' : '',
       paragraph.bullet ? `data-ppt-list="${escapeHtml(paragraph.bullet)}"` : '',
+      `data-ppt-list-level="${formatNumber(listLevel)}"`,
       `data-ppt-line-height="${formatNumber(lineHeight)}"`,
       `data-ppt-spacing-after="${formatNumber(spacingAfter)}"`,
       `data-ppt-spacing-before="${formatNumber(spacingBefore)}"`,
@@ -581,12 +586,12 @@ function exportCSS() {
     '.ppt-table th,.ppt-table td{height:1px;padding:8px 10px;overflow:hidden;border:1px solid #dbe3ef;text-align:left;text-overflow:ellipsis;white-space:nowrap;}',
     '.ppt-table th{background:#eff6ff;font-weight:700;}',
     '.ppt-text{align-items:flex-start;padding:0;}',
-    '.ppt-text-paragraph{display:block;min-height:1em;}',
-    '.ppt-text-paragraph[data-ppt-bullet="true"]{position:relative;padding-left:1.1em;}',
-    '.ppt-text-paragraph[data-ppt-bullet="true"]::before{content:"\\2022";position:absolute;left:0;}',
+    '.ppt-text-paragraph{--ppt-paragraph-list-level-indent:0em;display:block;min-height:1em;padding-left:var(--ppt-paragraph-list-level-indent);}',
+    '.ppt-text-paragraph[data-ppt-bullet="true"]{position:relative;padding-left:calc(var(--ppt-paragraph-list-level-indent) + 1.1em);}',
+    '.ppt-text-paragraph[data-ppt-bullet="true"]::before{content:"\\2022";position:absolute;left:var(--ppt-paragraph-list-level-indent);}',
     '.ppt-element{counter-reset:ppt-numbered-list;}',
-    '.ppt-text-paragraph[data-ppt-numbered="true"]{position:relative;padding-left:1.45em;counter-increment:ppt-numbered-list;}',
-    '.ppt-text-paragraph[data-ppt-numbered="true"]::before{content:counter(ppt-numbered-list) ".";position:absolute;left:0;}',
+    '.ppt-text-paragraph[data-ppt-numbered="true"]{position:relative;padding-left:calc(var(--ppt-paragraph-list-level-indent) + 1.45em);counter-increment:ppt-numbered-list;}',
+    '.ppt-text-paragraph[data-ppt-numbered="true"]::before{content:counter(ppt-numbered-list) ".";position:absolute;left:var(--ppt-paragraph-list-level-indent);}',
     '.ppt-shape{border-radius:24px;}',
     '.ppt-shape-ellipse{border-radius:999px;}',
     '.ppt-shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}',
@@ -1484,17 +1489,26 @@ function getPPTTextBodySVGHeight(body: PPTTextBody, fontSize: number) {
 function getPPTParagraphHTMLAttrs(paragraph: PPTParagraph) {
   return [
     ` data-ppt-line-height="${formatNumber(getPPTParagraphLineHeight(paragraph))}"`,
+    ` data-ppt-list-level="${formatNumber(getPPTParagraphListLevel(paragraph))}"`,
     ` data-ppt-spacing-after="${formatNumber(getPPTParagraphSpacingAfter(paragraph))}"`,
     ` data-ppt-spacing-before="${formatNumber(getPPTParagraphSpacingBefore(paragraph))}"`,
   ].join('')
 }
 
 function getPPTParagraphStyleAttr(paragraph: PPTParagraph) {
+  const listLevelIndent = getPPTParagraphListLevel(paragraph) *
+    PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM
+
   return ` style="${[
     `line-height:${formatNumber(getPPTParagraphLineHeight(paragraph))}`,
     `margin-bottom:${formatNumber(getPPTParagraphSpacingAfter(paragraph))}px`,
     `margin-top:${formatNumber(getPPTParagraphSpacingBefore(paragraph))}px`,
+    `--ppt-paragraph-list-level-indent:${formatNumber(listLevelIndent)}em`,
   ].join(';')}"`
+}
+
+function getPPTParagraphListLevel(paragraph: PPTParagraph) {
+  return normalizePPTParagraphListLevel(paragraph.level)
 }
 
 function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
@@ -1509,6 +1523,18 @@ function getPPTParagraphSpacingAfter(paragraph: PPTParagraph) {
 
 function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
   return normalizePPTParagraphSpacing(paragraph.spacingBefore ?? 0)
+}
+
+function normalizePPTParagraphListLevel(value: number | null | undefined) {
+  const next = Math.round(Math.min(
+    PPT_PARAGRAPH_LIST_LEVEL_MAX,
+    Math.max(
+      PPT_PARAGRAPH_LIST_LEVEL_MIN,
+      Number.isFinite(value) ? Number(value) : PPT_PARAGRAPH_LIST_LEVEL_MIN,
+    ),
+  ))
+
+  return next
 }
 
 function normalizePPTParagraphLineHeight(value: number) {

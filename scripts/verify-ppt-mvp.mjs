@@ -6774,13 +6774,19 @@ function getPPTTextParagraphAlignShortcutState(page, elementId) {
 function getPPTTextParagraphBulletShortcutState(page, elementId) {
   return page.eval(`((id) => {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const paragraph = element?.querySelector('.ppt-text-paragraph')
     const stage = document.querySelector('.ppt-stage-shell')
 
     return {
       bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
       bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
+      exportHasListLevelHTML: exportCode.includes('data-ppt-list-level="2"'),
+      exportHasListLevelModel: exportCode.includes('"level": 2'),
       inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      inspectorListLevel: document.querySelector('[data-ppt-paragraph-list-level-up]')?.getAttribute('data-ppt-paragraph-list-level') ?? '',
+      inspectorListLevelDownDisabled: document.querySelector('[data-ppt-paragraph-list-level-down]')?.hasAttribute('disabled') === true ? 'true' : 'false',
+      inspectorListLevelUpDisabled: document.querySelector('[data-ppt-paragraph-list-level-up]')?.hasAttribute('disabled') === true ? 'true' : 'false',
       inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
       numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
       numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
@@ -6788,9 +6794,15 @@ function getPPTTextParagraphBulletShortcutState(page, elementId) {
         ? paragraph.textContent ?? ''
         : '',
       paragraphList: paragraph?.getAttribute('data-ppt-list') ?? '',
+      paragraphListIndent: paragraph ? getComputedStyle(paragraph).getPropertyValue('--ppt-paragraph-list-level-indent').trim() : '',
+      paragraphListLevel: paragraph?.getAttribute('data-ppt-list-level') ?? '',
       paragraphNumbered: paragraph?.getAttribute('data-ppt-numbered') === 'true'
         ? paragraph.textContent ?? ''
         : '',
+      quickListLevelDownDisabled: document.querySelector('[data-ppt-text-quick="list-level-down"]')?.hasAttribute('disabled') === true ? 'true' : 'false',
+      quickListLevelDownState: document.querySelector('[data-ppt-text-quick="list-level-down"]')?.getAttribute('data-ppt-text-quick-list-level') ?? '',
+      quickListLevelUpDisabled: document.querySelector('[data-ppt-text-quick="list-level-up"]')?.hasAttribute('disabled') === true ? 'true' : 'false',
+      quickListLevelUpState: document.querySelector('[data-ppt-text-quick="list-level-up"]')?.getAttribute('data-ppt-text-quick-list-level') ?? '',
       numberedShortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-intent') ?? '',
       numberedShortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-keys') ?? '',
       numberedShortcutModel: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-model') ?? '',
@@ -7492,6 +7504,63 @@ async function runTextQuickFormatScenario(page) {
     {
       afterNumberedShortcut,
       afterNumberedShortcutRestore,
+    },
+  )
+
+  const beforeListLevel =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-paragraph-list-level-up]')?.click()`)
+  await delay(80)
+
+  const afterInspectorListLevelUp =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="list-level-up"]')?.click()`)
+  await delay(80)
+
+  const afterQuickListLevelUp =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="list-level-down"]')?.click()`)
+  await delay(80)
+
+  const afterQuickListLevelDown =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-paragraph-list-level-down]')?.click()`)
+  await delay(80)
+
+  const afterListLevelRestore =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  record(
+    'changes PPT paragraph list level from inspector and quick controls',
+    beforeListLevel.paragraphListLevel === '0' &&
+      beforeListLevel.inspectorListLevelDownDisabled === 'true' &&
+      beforeListLevel.quickListLevelDownDisabled === 'true' &&
+      afterInspectorListLevelUp.paragraphListLevel === '1' &&
+      afterInspectorListLevelUp.inspectorListLevel === '1' &&
+      afterInspectorListLevelUp.paragraphListIndent === '1.35em' &&
+      afterInspectorListLevelUp.quickListLevelUpState === '1' &&
+      afterQuickListLevelUp.paragraphListLevel === '2' &&
+      afterQuickListLevelUp.inspectorListLevel === '2' &&
+      afterQuickListLevelUp.paragraphListIndent === '2.7em' &&
+      afterQuickListLevelUp.exportHasListLevelHTML &&
+      afterQuickListLevelUp.exportHasListLevelModel &&
+      afterQuickListLevelUp.quickListLevelDownDisabled === 'false' &&
+      afterQuickListLevelUp.quickListLevelUpState === '2' &&
+      afterQuickListLevelDown.paragraphListLevel === '1' &&
+      afterListLevelRestore.paragraphListLevel === '0' &&
+      afterListLevelRestore.paragraphListIndent === '0em' &&
+      afterListLevelRestore.inspectorListLevelDownDisabled === 'true' &&
+      afterListLevelRestore.quickListLevelDownDisabled === 'true',
+    {
+      afterInspectorListLevelUp,
+      afterListLevelRestore,
+      afterQuickListLevelDown,
+      afterQuickListLevelUp,
+      beforeListLevel,
     },
   )
 
@@ -10873,6 +10942,7 @@ async function runExportScenario(page) {
       '',
       '## Market context',
       '- Current demand is fragmented',
+      '  - Segment second layer',
       '- **Risk** needs tighter framing',
       'Notes: Mention the source assumptions.',
       '',
@@ -10905,7 +10975,9 @@ async function runExportScenario(page) {
       activeSlide,
       bodyText: selectedBody?.textContent ?? '',
       bulletCount: selectedBody?.querySelectorAll('[data-ppt-bullet="true"]').length ?? 0,
+      bodyListLevelOneCount: selectedBody?.querySelectorAll('[data-ppt-list-level="1"]').length ?? 0,
       exportHasLayout: exportCode.includes('"layoutId": "ppt-layout-title-body"'),
+      exportHasListLevel: exportCode.includes('"level": 1') && exportCode.includes('Segment second layer'),
       exportHasNotes: exportCode.includes('Mention the source assumptions.'),
       exportHasNumbered: exportCode.includes('"bullet": "numbered"') && exportCode.includes('Draft compact slides'),
       firstImportedSlideId: stage?.getAttribute('data-ppt-deck-outline-import-first-slide') ?? '',
@@ -10932,9 +11004,12 @@ async function runExportScenario(page) {
       deckOutlineImportState.activeName.includes('Market context') &&
       deckOutlineImportState.titleText.includes('Market context') &&
       deckOutlineImportState.bodyText.includes('Current demand is fragmented') &&
+      deckOutlineImportState.bodyText.includes('Segment second layer') &&
       deckOutlineImportState.bodyText.includes('Risk needs tighter framing') &&
-      deckOutlineImportState.bulletCount === 2 &&
+      deckOutlineImportState.bulletCount === 3 &&
+      deckOutlineImportState.bodyListLevelOneCount === 1 &&
       deckOutlineImportState.textLength > 0 &&
+      deckOutlineImportState.exportHasListLevel &&
       deckOutlineImportState.exportHasNotes &&
       deckOutlineImportState.exportHasNumbered &&
       deckOutlineImportState.exportHasLayout,

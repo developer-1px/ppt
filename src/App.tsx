@@ -43,6 +43,8 @@ import {
   Keyboard,
   Layers,
   List,
+  ListIndentDecrease,
+  ListIndentIncrease,
   ListOrdered,
   Lock,
   Map as MapIcon,
@@ -2016,6 +2018,7 @@ type PPTTextStyleImportField =
   | 'fontWeight'
   | 'paragraphAlign'
   | 'paragraphBullet'
+  | 'paragraphListLevel'
   | 'paragraphLineHeight'
   | 'paragraphSpacingAfter'
   | 'paragraphSpacingBefore'
@@ -2032,6 +2035,7 @@ type PPTTextStyleImportText = Partial<Omit<PPTTextStyle, 'textInset'>> & {
 type PPTTextStyleImportParagraph = {
   align?: PPTParagraph['align']
   bullet?: PPTParagraph['bullet'] | null
+  level?: PPTParagraph['level']
   lineHeight?: PPTParagraph['lineHeight']
   spacingAfter?: PPTParagraph['spacingAfter']
   spacingBefore?: PPTParagraph['spacingBefore']
@@ -2637,6 +2641,7 @@ type PPTTextStyleImportEffect = {
   objectIds: string
   paragraphAlign: string
   paragraphBullet: string
+  paragraphLevel: string
   paragraphLineHeight: string
   paragraphSpacingAfter: string
   paragraphSpacingBefore: string
@@ -3014,7 +3019,7 @@ type PPTStyleClipboardCategory =
   | 'text-run'
 type PPTStyleClipboardParagraph = Pick<
   PPTParagraph,
-  'align' | 'bullet' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
+  'align' | 'bullet' | 'level' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
 >
 type PPTStyleClipboardRunStyle = PPTTextRunStyle
 type PPTStyleClipboard = {
@@ -3289,9 +3294,10 @@ type PPTParagraphTextAlign =
   | 'start'
   | 'end'
   | 'match-parent'
-type PPTParagraphCSSStyle = ReturnType<
+type PPTParagraphCSSStyle = CSSProperties & ReturnType<
   typeof getSlideEditTextParagraphSpacingCSSStyle
 > & {
+  '--ppt-paragraph-list-level-indent'?: string
   textAlign?: PPTParagraphTextAlign
 }
 type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
@@ -3407,11 +3413,14 @@ type PPTSelectionCommandAnchor = PPTCanvasFloatingAnchor
 type PPTTextQuickFormatState = {
   align: NonNullable<PPTParagraph['align']>
   bullet: boolean
+  canDecreaseListLevel: boolean
+  canIncreaseListLevel: boolean
   color: string
   fontSize: number
   isBold: boolean
   isItalic: boolean
   isUnderline: boolean
+  listLevel: number
   numbered: boolean
 }
 type PPTShapeQuickMenuState = {
@@ -3817,6 +3826,9 @@ const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
+const PPT_PARAGRAPH_LIST_LEVEL_MIN = 0
+const PPT_PARAGRAPH_LIST_LEVEL_MAX = 5
+const PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM = 1.35
 const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
 const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
 const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
@@ -3899,6 +3911,7 @@ type PPTTextToken = {
   align?: PPTParagraph['align']
   bullet?: PPTParagraph['bullet']
   char: string
+  level?: PPTParagraph['level']
   lineHeight?: PPTParagraph['lineHeight']
   runStyle: PPTTextRunStyle
   spacingAfter?: PPTParagraph['spacingAfter']
@@ -11343,6 +11356,33 @@ function App() {
     )
   }
 
+  function stepSelectedParagraphListLevel(delta: number) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => {
+              const level = normalizePPTParagraphListLevel(
+                getPPTParagraphListLevel(paragraph) + delta,
+              )
+
+              return {
+                ...paragraph,
+                level: getPPTParagraphListLevelModelValue(level),
+              }
+            }),
+          },
+        })),
+      })),
+    )
+  }
+
   function updateSelectedParagraphBullet(enabled: boolean) {
     updateSelectedParagraphList(enabled ? 'bullet' : undefined)
   }
@@ -11977,6 +12017,32 @@ function App() {
               ...paragraph,
               bullet: list,
             })),
+          },
+        }
+      }),
+    )
+  }
+
+  function stepParagraphListLevel(elementId: string, delta: number) {
+    commitDeck((current) =>
+      updatePPTDeckElement(current, activeSlide.id, elementId, (element) => {
+        if (!isPPTTextElement(element) || element.locked === true) {
+          return element
+        }
+
+        return {
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => {
+              const level = normalizePPTParagraphListLevel(
+                getPPTParagraphListLevel(paragraph) + delta,
+              )
+
+              return {
+                ...paragraph,
+                level: getPPTParagraphListLevelModelValue(level),
+              }
+            }),
           },
         }
       }),
@@ -14419,6 +14485,18 @@ function App() {
     shortcut: SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
     title: 'Toggle numbered list',
   }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:decrease-list-level',
+    onSelect: () => stepSelectedParagraphListLevel(-1),
+    section: 'Format',
+    title: 'Decrease list level',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:increase-list-level',
+    onSelect: () => stepSelectedParagraphListLevel(1),
+    section: 'Format',
+    title: 'Increase list level',
+  }, {
     disabled: !selectedElement || !isPPTTextElement(selectedElement) || !selectedTextOverflow,
     id: 'format:auto-fit-text',
     onSelect: () => {
@@ -15170,6 +15248,7 @@ function App() {
         data-ppt-text-style-import-objects={lastTextStyleImportEffect?.objectIds}
         data-ppt-text-style-import-paragraph-align={lastTextStyleImportEffect?.paragraphAlign}
         data-ppt-text-style-import-paragraph-bullet={lastTextStyleImportEffect?.paragraphBullet}
+        data-ppt-text-style-import-paragraph-level={lastTextStyleImportEffect?.paragraphLevel}
         data-ppt-text-style-import-paragraph-line-height={lastTextStyleImportEffect?.paragraphLineHeight}
         data-ppt-text-style-import-paragraph-spacing-after={lastTextStyleImportEffect?.paragraphSpacingAfter}
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
@@ -16049,6 +16128,7 @@ function App() {
               onAlignmentPreviewChange={setAlignmentPreviewCommand}
               onFontSizeStep={stepSelectedTextFontSize}
               onParagraphBulletToggle={toggleSelectedParagraphBullet}
+              onParagraphListLevelStep={stepSelectedParagraphListLevel}
               onParagraphNumberedToggle={toggleSelectedParagraphNumbered}
               onParagraphAlign={updateSelectedParagraphAlign}
               onShapeKindChange={updateShapeKind}
@@ -16135,6 +16215,7 @@ function App() {
         onLineMarkerChange={updateLineMarker}
         onLineRouteChange={updateLineRoute}
         onParagraphBulletChange={updateParagraphBullet}
+        onParagraphListLevelStep={stepParagraphListLevel}
         onParagraphNumberedChange={updateParagraphNumbered}
         onParagraphSpacingChange={updateParagraphSpacing}
         onElementTextStyleChange={updateElementTextStyle}
@@ -17372,6 +17453,28 @@ function parsePPTParagraphSpacing(value: string) {
   return normalizePPTParagraphSpacing(Number(value))
 }
 
+function normalizePPTParagraphListLevel(value: number | null | undefined) {
+  const finiteValue = Number.isFinite(value)
+    ? Number(value)
+    : PPT_PARAGRAPH_LIST_LEVEL_MIN
+
+  return Math.round(clampPPTCanvasValue(
+    finiteValue,
+    PPT_PARAGRAPH_LIST_LEVEL_MIN,
+    PPT_PARAGRAPH_LIST_LEVEL_MAX,
+  ))
+}
+
+function getPPTParagraphListLevel(paragraph: PPTParagraph) {
+  return normalizePPTParagraphListLevel(paragraph.level)
+}
+
+function getPPTParagraphListLevelModelValue(value: number) {
+  const level = normalizePPTParagraphListLevel(value)
+
+  return level === PPT_PARAGRAPH_LIST_LEVEL_MIN ? undefined : level
+}
+
 function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
   return normalizePPTParagraphLineHeight(
     paragraph.lineHeight ?? PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
@@ -17387,6 +17490,8 @@ function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
 }
 
 function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
+  const listLevel = getPPTParagraphListLevel(paragraph)
+
   return {
     ...getSlideEditTextParagraphSpacingCSSStyle({
       lineHeightRatio: getPPTParagraphLineHeight(paragraph),
@@ -17399,6 +17504,9 @@ function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
         value: getPPTParagraphSpacingBefore(paragraph),
       },
     }),
+    '--ppt-paragraph-list-level-indent': `${
+      Math.round(listLevel * PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM * 100) / 100
+    }em`,
     textAlign: paragraph.align,
   }
 }
@@ -19259,6 +19367,9 @@ function createPPTTextStyleImportEffect({
       .join(' ') ?? '',
     paragraphAlign: paragraph?.align ?? '',
     paragraphBullet: paragraph?.bullet ?? '',
+    paragraphLevel: paragraph?.level === undefined
+      ? ''
+      : String(paragraph.level),
     paragraphLineHeight: paragraph?.lineHeight === undefined
       ? ''
       : String(paragraph.lineHeight),
@@ -20240,10 +20351,16 @@ function getPPTTextStyleImportParagraph(
   const bullet = source.fields.includes('paragraphBullet')
     ? importedParagraph.bullet ?? undefined
     : paragraph?.bullet
+  const level = source.fields.includes('paragraphListLevel')
+    ? importedParagraph.level
+    : paragraph
+      ? getPPTParagraphListLevelModelValue(getPPTParagraphListLevel(paragraph))
+      : undefined
 
   return {
     align: importedParagraph.align ?? paragraph?.align ?? 'left',
     ...(bullet ? { bullet } : {}),
+    ...(level === undefined ? {} : { level }),
     lineHeight: importedParagraph.lineHeight ??
       (paragraph
         ? getPPTParagraphLineHeight(paragraph)
@@ -25748,6 +25865,12 @@ function getPPTTextStyleSourceFromJSONValue(
   const bullet = getPPTTextStyleParagraphBulletFromJSONValue(
     'bullet' in paragraphValue ? paragraphValue.bullet : paragraphValue.list,
   )
+  const level = getPPTTextStyleParagraphListLevelFromJSONValue(
+    paragraphValue.level ??
+      paragraphValue.listLevel ??
+      paragraphValue.paragraphLevel ??
+      paragraphValue.indentLevel,
+  )
   const lineHeight = getPPTTextStyleParagraphLineHeightFromJSONValue(
     paragraphValue.lineHeight,
   )
@@ -25799,6 +25922,11 @@ function getPPTTextStyleSourceFromJSONValue(
   if (bullet !== undefined) {
     paragraph.bullet = bullet
     fields.push('paragraphBullet')
+  }
+
+  if (level !== undefined) {
+    paragraph.level = level
+    fields.push('paragraphListLevel')
   }
 
   if (lineHeight !== undefined) {
@@ -28718,6 +28846,14 @@ function getPPTTextStyleParagraphBulletFromJSONValue(
     : undefined
 }
 
+function getPPTTextStyleParagraphListLevelFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return normalizePPTParagraphListLevel(value)
+}
+
 function getPPTTextStyleParagraphLineHeightFromJSONValue(value: unknown) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return undefined
@@ -30118,12 +30254,21 @@ function normalizePPTImportedTextBody(body: PPTTextBody): PPTTextBody {
     : [{ runs: [{ text: '' }] }]
 
   return {
-    paragraphs: paragraphs.map((paragraph) => ({
-      ...paragraph,
-      runs: paragraph.runs.length > 0
-        ? paragraph.runs.map((run) => ({ ...run }))
-        : [{ text: '' }],
-    })),
+    paragraphs: paragraphs.map((paragraph) => {
+      const paragraphWithoutLevel = { ...paragraph }
+      delete paragraphWithoutLevel.level
+      const level = getPPTParagraphListLevelModelValue(
+        getPPTParagraphListLevel(paragraph),
+      )
+
+      return {
+        ...paragraphWithoutLevel,
+        ...(level === undefined ? {} : { level }),
+        runs: paragraph.runs.length > 0
+          ? paragraph.runs.map((run) => ({ ...run }))
+          : [{ text: '' }],
+      }
+    }),
   }
 }
 
@@ -31632,6 +31777,7 @@ function readPPTTextForClipboard(body: PPTTextBody | undefined) {
 
   return body.paragraphs
     .map((paragraph) => {
+      const levelPrefix = '\t'.repeat(getPPTParagraphListLevel(paragraph))
       const listPrefix = paragraph.bullet === 'bullet'
         ? '\u2022 '
         : paragraph.bullet === 'numbered'
@@ -31642,7 +31788,7 @@ function readPPTTextForClipboard(body: PPTTextBody | undefined) {
         numberedIndex += 1
       }
 
-      return `${listPrefix}${paragraph.runs.map((run) => run.text).join('')}`
+      return `${levelPrefix}${listPrefix}${paragraph.runs.map((run) => run.text).join('')}`
     })
     .join('\n')
 }
@@ -31815,14 +31961,14 @@ function createPPTTextBodyClipboardHTML(body: PPTTextBody) {
       }
 
       listItems.push(
-        `<li data-ppt-selection-paragraph="true"${createPPTParagraphClipboardStyleAttribute(paragraph)}>${runsHTML || '<br>'}</li>`,
+        `<li data-ppt-selection-paragraph="true"${createPPTParagraphClipboardAttributes(paragraph)}>${runsHTML || '<br>'}</li>`,
       )
       return
     }
 
     flushList()
     parts.push(
-      `<p data-ppt-selection-paragraph="true"${createPPTParagraphClipboardStyleAttribute(paragraph)}>${runsHTML || '<br>'}</p>`,
+      `<p data-ppt-selection-paragraph="true"${createPPTParagraphClipboardAttributes(paragraph)}>${runsHTML || '<br>'}</p>`,
     )
   })
 
@@ -31868,9 +32014,25 @@ function createPPTParagraphClipboardStyleAttribute(paragraph: PPTParagraph) {
   return createPPTClipboardStyleAttribute([
     ['text-align', paragraph.align],
     ['line-height', paragraph.lineHeight === undefined ? undefined : String(paragraph.lineHeight)],
+    ['margin-left', getPPTParagraphListLevel(paragraph) > 0
+      ? `${Math.round(
+        getPPTParagraphListLevel(paragraph) *
+          PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM * 16,
+      )}px`
+      : undefined],
     ['margin-bottom', paragraph.spacingAfter === undefined ? undefined : `${paragraph.spacingAfter}px`],
     ['margin-top', paragraph.spacingBefore === undefined ? undefined : `${paragraph.spacingBefore}px`],
   ])
+}
+
+function createPPTParagraphClipboardAttributes(paragraph: PPTParagraph) {
+  const listLevel = getPPTParagraphListLevel(paragraph)
+
+  return `${createPPTParagraphClipboardStyleAttribute(paragraph)}${
+    listLevel > 0
+      ? ` data-ppt-selection-list-level="${listLevel}"`
+      : ''
+  }`
 }
 
 function createPPTClipboardStyleAttribute(
@@ -32821,6 +32983,7 @@ function PPTSelectionFloatingBar({
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
+  onParagraphListLevelStep,
   onParagraphNumberedToggle,
   onShapeKindChange,
   onTextBoldToggle,
@@ -32839,6 +33002,7 @@ function PPTSelectionFloatingBar({
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
+  onParagraphListLevelStep: (delta: number) => void
   onParagraphNumberedToggle: () => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onTextBoldToggle: () => void
@@ -32873,6 +33037,7 @@ function PPTSelectionFloatingBar({
           onFontSizeStep={onFontSizeStep}
           onParagraphAlign={onParagraphAlign}
           onParagraphBulletToggle={onParagraphBulletToggle}
+          onParagraphListLevelStep={onParagraphListLevelStep}
           onParagraphNumberedToggle={onParagraphNumberedToggle}
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
@@ -33245,6 +33410,7 @@ function PPTTextQuickFormatControls({
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
+  onParagraphListLevelStep,
   onParagraphNumberedToggle,
   onTextBoldToggle,
   onTextColorChange,
@@ -33255,6 +33421,7 @@ function PPTTextQuickFormatControls({
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
+  onParagraphListLevelStep: (delta: number) => void
   onParagraphNumberedToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
@@ -33381,6 +33548,38 @@ function PPTTextQuickFormatControls({
         }}
       >
         <ListOrdered size={16} />
+      </button>
+      <button
+        aria-label="Decrease list level"
+        className="ppt-floating-command"
+        data-ppt-text-quick="list-level-down"
+        data-ppt-text-quick-list-level={state.listLevel}
+        disabled={!state.canDecreaseListLevel}
+        title="Decrease list level"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onParagraphListLevelStep(-1)
+        }}
+      >
+        <ListIndentDecrease size={16} />
+      </button>
+      <button
+        aria-label="Increase list level"
+        className="ppt-floating-command"
+        data-ppt-text-quick="list-level-up"
+        data-ppt-text-quick-list-level={state.listLevel}
+        disabled={!state.canIncreaseListLevel}
+        title="Increase list level"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onParagraphListLevelStep(1)
+        }}
+      >
+        <ListIndentIncrease size={16} />
       </button>
       <PPTParagraphAlignRadioGroup
         align={state.align}
@@ -34415,6 +34614,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
           data-ppt-list={paragraph.bullet}
           data-ppt-numbered={paragraph.bullet === 'numbered' ? 'true' : undefined}
           data-ppt-line-height={getPPTParagraphLineHeight(paragraph)}
+          data-ppt-list-level={getPPTParagraphListLevel(paragraph)}
           data-ppt-spacing-after={getPPTParagraphSpacingAfter(paragraph)}
           data-ppt-spacing-before={getPPTParagraphSpacingBefore(paragraph)}
           key={index}
@@ -34963,6 +35163,7 @@ function Inspector({
   onLineMarkerChange,
   onLineRouteChange,
   onParagraphBulletChange,
+  onParagraphListLevelStep,
   onParagraphNumberedChange,
   onParagraphAlignChange,
   onParagraphSpacingChange,
@@ -35078,6 +35279,10 @@ function Inspector({
     elementId: string,
     enabled: boolean,
   ) => void
+  onParagraphListLevelStep: (
+    elementId: string,
+    delta: number,
+  ) => void
   onParagraphNumberedChange: (
     elementId: string,
     enabled: boolean,
@@ -35136,6 +35341,9 @@ function Inspector({
   const paragraphNumbered = selectedElement && isPPTTextElement(selectedElement)
     ? hasPPTTextBodyNumbered(selectedElement.textBody)
     : false
+  const paragraphListLevel = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTParagraphListLevel(selectedElement.textBody.paragraphs[0] ?? { runs: [] })
+    : 0
   const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementParagraphSpacing(selectedElement)
     : getDefaultPPTParagraphSpacing()
@@ -36590,6 +36798,30 @@ function Inspector({
                     >
                       numbered
                     </button>
+                    <button
+                      aria-label="Decrease list level"
+                      className="ppt-paragraph-bullet-button"
+                      data-ppt-paragraph-list-level-down
+                      data-ppt-paragraph-list-level={paragraphListLevel}
+                      disabled={paragraphListLevel <= PPT_PARAGRAPH_LIST_LEVEL_MIN}
+                      title="Decrease list level"
+                      type="button"
+                      onClick={() => onParagraphListLevelStep(selectedElement.id, -1)}
+                    >
+                      <ListIndentDecrease size={15} />
+                    </button>
+                    <button
+                      aria-label="Increase list level"
+                      className="ppt-paragraph-bullet-button"
+                      data-ppt-paragraph-list-level-up
+                      data-ppt-paragraph-list-level={paragraphListLevel}
+                      disabled={paragraphListLevel >= PPT_PARAGRAPH_LIST_LEVEL_MAX}
+                      title="Increase list level"
+                      type="button"
+                      onClick={() => onParagraphListLevelStep(selectedElement.id, 1)}
+                    >
+                      <ListIndentIncrease size={15} />
+                    </button>
                     <PPTParagraphAlignRadioGroup
                       align={paragraphAlign}
                       surface="inspector"
@@ -37939,10 +38171,15 @@ function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null 
     )
 
     if (paragraph) {
+      const level = getPPTParagraphListLevelModelValue(
+        getPPTParagraphListLevel(paragraph),
+      )
+
       categories.push('paragraph')
       clipboard.paragraph = {
         align: paragraph.align ?? 'left',
         bullet: paragraph.bullet,
+        ...(level === undefined ? {} : { level }),
         lineHeight: getPPTParagraphLineHeight(paragraph),
         spacingAfter: getPPTParagraphSpacingAfter(paragraph),
         spacingBefore: getPPTParagraphSpacingBefore(paragraph),
@@ -38188,6 +38425,7 @@ function applyPPTStyleClipboardToElement(
             ...paragraph,
             align: clipboard.paragraph?.align,
             bullet: clipboard.paragraph?.bullet,
+            level: clipboard.paragraph?.level,
             lineHeight: clipboard.paragraph?.lineHeight,
             spacingAfter: clipboard.paragraph?.spacingAfter,
             spacingBefore: clipboard.paragraph?.spacingBefore,
@@ -38267,6 +38505,9 @@ function getPPTTextQuickFormatState(
   const styles = elements.map(getPPTTextElementStyle)
   const firstStyle = styles[0] ?? getDefaultPPTTextStyle()
   const firstAlign = elements[0]?.textBody.paragraphs[0]?.align ?? 'left'
+  const listLevels = elements.flatMap((element) =>
+    element.textBody.paragraphs.map(getPPTParagraphListLevel))
+  const firstListLevel = listLevels[0] ?? PPT_PARAGRAPH_LIST_LEVEL_MIN
 
   return {
     align: elements.every((element) =>
@@ -38274,6 +38515,10 @@ function getPPTTextQuickFormatState(
       ? firstAlign
       : 'left',
     bullet: areAllPPTTextElementsBulleted(elements),
+    canDecreaseListLevel: listLevels.some((level) =>
+      level > PPT_PARAGRAPH_LIST_LEVEL_MIN),
+    canIncreaseListLevel: listLevels.some((level) =>
+      level < PPT_PARAGRAPH_LIST_LEVEL_MAX),
     color: styles.every((style) => style.color === firstStyle.color)
       ? firstStyle.color
       : '#111827',
@@ -38284,6 +38529,9 @@ function getPPTTextQuickFormatState(
       styles.every((style) => style.fontWeight === 'bold'),
     isItalic: areAllPPTTextRunsStyled(elements, 'italic'),
     isUnderline: areAllPPTTextRunsStyled(elements, 'underline'),
+    listLevel: listLevels.every((level) => level === firstListLevel)
+      ? firstListLevel
+      : PPT_PARAGRAPH_LIST_LEVEL_MIN,
     numbered: areAllPPTTextElementsNumbered(elements),
   }
 }
@@ -39512,6 +39760,7 @@ function replacePPTTextBodyRange(
     anchor?.runStyle ?? {},
     anchor?.align ?? body.paragraphs[0]?.align,
     anchor?.bullet ?? body.paragraphs[0]?.bullet,
+    anchor?.level ?? body.paragraphs[0]?.level,
     anchor?.lineHeight ?? body.paragraphs[0]?.lineHeight,
     anchor?.spacingBefore ?? body.paragraphs[0]?.spacingBefore,
     anchor?.spacingAfter ?? body.paragraphs[0]?.spacingAfter,
@@ -39524,6 +39773,7 @@ function replacePPTTextBodyRange(
   ], {
     align: body.paragraphs[0]?.align,
     bullet: body.paragraphs[0]?.bullet,
+    level: body.paragraphs[0]?.level,
     lineHeight: body.paragraphs[0]?.lineHeight,
     spacingAfter: body.paragraphs[0]?.spacingAfter,
     spacingBefore: body.paragraphs[0]?.spacingBefore,
@@ -39542,6 +39792,7 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
           align: paragraph.align,
           bullet: paragraph.bullet,
           char: text[index],
+          level: paragraph.level,
           lineHeight: paragraph.lineHeight,
           runStyle,
           spacingAfter: paragraph.spacingAfter,
@@ -39555,6 +39806,7 @@ function tokenizePPTTextBody(body: PPTTextBody): PPTTextToken[] {
         align: paragraph.align,
         bullet: paragraph.bullet,
         char: '\n',
+        level: paragraph.level,
         lineHeight: paragraph.lineHeight,
         runStyle: getPPTParagraphFallbackRunStyle(paragraph),
         spacingAfter: paragraph.spacingAfter,
@@ -39571,6 +39823,7 @@ function createPPTTextTokens(
   runStyle: PPTTextRunStyle,
   align: PPTParagraph['align'] | undefined,
   bullet: PPTParagraph['bullet'] | undefined,
+  level: PPTParagraph['level'] | undefined,
   lineHeight: PPTParagraph['lineHeight'] | undefined,
   spacingBefore: PPTParagraph['spacingBefore'] | undefined,
   spacingAfter: PPTParagraph['spacingAfter'] | undefined,
@@ -39582,6 +39835,7 @@ function createPPTTextTokens(
       align,
       bullet,
       char: text[index],
+      level,
       lineHeight,
       runStyle,
       spacingAfter,
@@ -39596,12 +39850,13 @@ function buildPPTTextBodyFromTokens(
   tokens: PPTTextToken[],
   fallback: Pick<
     PPTParagraph,
-    'align' | 'bullet' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
+    'align' | 'bullet' | 'level' | 'lineHeight' | 'spacingAfter' | 'spacingBefore'
   >,
 ): PPTTextBody {
   const paragraphs: PPTParagraph[] = []
   let currentAlign = fallback.align
   let currentBullet = fallback.bullet
+  let currentLevel = fallback.level
   let currentLineHeight = fallback.lineHeight
   let currentSpacingAfter = fallback.spacingAfter
   let currentSpacingBefore = fallback.spacingBefore
@@ -39624,7 +39879,7 @@ function buildPPTTextBodyFromTokens(
 
   function flushParagraph() {
     flushRun()
-    paragraphs.push(createPPTParagraph(currentRuns, currentAlign, currentBullet, {
+    paragraphs.push(createPPTParagraph(currentRuns, currentAlign, currentBullet, currentLevel, {
       lineHeight: currentLineHeight,
       spacingAfter: currentSpacingAfter,
       spacingBefore: currentSpacingBefore,
@@ -39634,6 +39889,7 @@ function buildPPTTextBodyFromTokens(
     currentText = ''
     currentAlign = fallback.align
     currentBullet = fallback.bullet
+    currentLevel = fallback.level
     currentLineHeight = fallback.lineHeight
     currentSpacingAfter = fallback.spacingAfter
     currentSpacingBefore = fallback.spacingBefore
@@ -39644,6 +39900,7 @@ function buildPPTTextBodyFromTokens(
       flushParagraph()
       currentAlign = token.align ?? fallback.align
       currentBullet = token.bullet ?? fallback.bullet
+      currentLevel = token.level ?? fallback.level
       currentLineHeight = token.lineHeight ?? fallback.lineHeight
       currentSpacingAfter = token.spacingAfter ?? fallback.spacingAfter
       currentSpacingBefore = token.spacingBefore ?? fallback.spacingBefore
@@ -39653,6 +39910,7 @@ function buildPPTTextBodyFromTokens(
     if (!currentRunStyle && currentText.length === 0 && currentRuns.length === 0) {
       currentAlign = token.align ?? fallback.align
       currentBullet = token.bullet ?? fallback.bullet
+      currentLevel = token.level ?? fallback.level
       currentLineHeight = token.lineHeight ?? fallback.lineHeight
       currentSpacingAfter = token.spacingAfter ?? fallback.spacingAfter
       currentSpacingBefore = token.spacingBefore ?? fallback.spacingBefore
@@ -39677,11 +39935,15 @@ function createPPTParagraph(
   runs: PPTRun[],
   align: PPTParagraph['align'] | undefined,
   bullet: PPTParagraph['bullet'] | undefined,
+  level: PPTParagraph['level'] | undefined,
   spacing: Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> = {},
 ): PPTParagraph {
+  const listLevel = getPPTParagraphListLevelModelValue(level ?? 0)
+
   return {
     ...(align ? { align } : {}),
     ...(bullet ? { bullet } : {}),
+    ...(listLevel === undefined ? {} : { level: listLevel }),
     ...(spacing.lineHeight === undefined ? {} : { lineHeight: spacing.lineHeight }),
     ...(spacing.spacingAfter === undefined ? {} : { spacingAfter: spacing.spacingAfter }),
     ...(spacing.spacingBefore === undefined ? {} : { spacingBefore: spacing.spacingBefore }),
@@ -40323,6 +40585,7 @@ function measurePPTTextContentSize(
   const size = measurePPTCanvasTextBlocks({
     blocks: element.textBody.paragraphs.map((paragraph) => {
       const paragraphStyle = getPPTParagraphStyle(paragraph)
+      const levelPrefix = '  '.repeat(getPPTParagraphListLevel(paragraph))
       const listPrefix = paragraph.bullet === 'bullet'
         ? '\u2022 '
         : paragraph.bullet === 'numbered'
@@ -40337,7 +40600,7 @@ function measurePPTTextContentSize(
         lineHeight: paragraphStyle.lineHeight,
         marginBottom: paragraphStyle.marginBottom,
         marginTop: paragraphStyle.marginTop,
-        text: `${listPrefix}${
+        text: `${levelPrefix}${listPrefix}${
           paragraph.runs.map((run) => run.text).join('') || ' '
         }`,
       }

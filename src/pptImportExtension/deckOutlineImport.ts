@@ -45,6 +45,7 @@ type PPTMarkdownOutlineHeading = {
 const PPT_MARKDOWN_OUTLINE_TITLE_MAX_LENGTH = 80
 const PPT_MARKDOWN_OUTLINE_BODY_MAX_PARAGRAPHS = 8
 const PPT_MARKDOWN_OUTLINE_BODY_MAX_LENGTH = 140
+const PPT_MARKDOWN_OUTLINE_LIST_LEVEL_MAX = 5
 
 export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
@@ -253,6 +254,7 @@ function createPPTMarkdownOutlineParagraphsFromSlideEditBlocks(
             bullet: block.kind === 'ordered-list'
               ? 'numbered' as const
               : 'bullet' as const,
+            ...getPPTMarkdownOutlineListLevelModel(item.level),
             lineHeight: 1.2,
             runs: [{ text }],
             spacingAfter: 10,
@@ -260,6 +262,15 @@ function createPPTMarkdownOutlineParagraphsFromSlideEditBlocks(
         : []
     })
   })
+}
+
+function getPPTMarkdownOutlineListLevelModel(level: number | undefined) {
+  const normalized = Math.round(Math.min(
+    PPT_MARKDOWN_OUTLINE_LIST_LEVEL_MAX,
+    Math.max(0, Number.isFinite(level) ? Number(level) : 0),
+  ))
+
+  return normalized > 0 ? { level: normalized } : {}
 }
 
 function readPPTMarkdownOutlineTextFromSlideEditBlocks(
