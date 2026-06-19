@@ -1836,6 +1836,79 @@ async function runAffordanceScenario(page) {
     afterNudge,
   })
 
+  await pressKey(page, {
+    code: 'Tab',
+    key: 'Tab',
+    windowsVirtualKeyCode: 9,
+  })
+  await delay(50)
+
+  const afterTabCycle = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      cycleDirection: shell?.getAttribute('data-ppt-selection-cycle-direction') ?? '',
+      cycleFrom: shell?.getAttribute('data-ppt-selection-cycle-from') ?? '',
+      cycleIntent: shell?.getAttribute('data-ppt-selection-cycle-intent') ?? '',
+      cycleKeys: shell?.getAttribute('data-ppt-selection-cycle-keys') ?? '',
+      cycleModel: shell?.getAttribute('data-ppt-selection-cycle-model') ?? '',
+      cycleOrder: shell?.getAttribute('data-ppt-selection-cycle-order') ?? '',
+      cycleTarget: shell?.getAttribute('data-ppt-selection-cycle-target') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+
+  await pressKey(page, {
+    code: 'Tab',
+    key: 'Tab',
+    modifiers: 8,
+    windowsVirtualKeyCode: 9,
+  })
+  await delay(50)
+
+  const afterShiftTabCycle = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      cycleDirection: shell?.getAttribute('data-ppt-selection-cycle-direction') ?? '',
+      cycleFrom: shell?.getAttribute('data-ppt-selection-cycle-from') ?? '',
+      cycleIntent: shell?.getAttribute('data-ppt-selection-cycle-intent') ?? '',
+      cycleKeys: shell?.getAttribute('data-ppt-selection-cycle-keys') ?? '',
+      cycleModel: shell?.getAttribute('data-ppt-selection-cycle-model') ?? '',
+      cycleOrder: shell?.getAttribute('data-ppt-selection-cycle-order') ?? '',
+      cycleTarget: shell?.getAttribute('data-ppt-selection-cycle-target') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+    }
+  })()`)
+
+  record(
+    'cycles PPT object selection with Tab and Shift Tab',
+    afterTabCycle.cycleDirection === 'next' &&
+      afterTabCycle.cycleFrom === 's1-card-1' &&
+      afterTabCycle.cycleTarget === 's1-card-2' &&
+      afterTabCycle.selectedId === 's1-card-2' &&
+      afterTabCycle.selectedCount === 1 &&
+      afterTabCycle.cycleIntent === 'ppt-selection-cycle-keyboard-intent' &&
+      afterTabCycle.cycleModel === 'ppt-selection-cycle-keyboard-shortcuts' &&
+      afterTabCycle.cycleKeys === 'Tab Shift+Tab' &&
+      afterTabCycle.cycleOrder.includes('s1-card-1') &&
+      afterTabCycle.cycleOrder.includes('s1-card-2') &&
+      afterShiftTabCycle.cycleDirection === 'previous' &&
+      afterShiftTabCycle.cycleFrom === 's1-card-2' &&
+      afterShiftTabCycle.cycleTarget === 's1-card-1' &&
+      afterShiftTabCycle.selectedId === 's1-card-1' &&
+      afterShiftTabCycle.selectedCount === 1,
+    {
+      afterLargeNudge,
+      afterShiftTabCycle,
+      afterTabCycle,
+    },
+  )
+
   const multiSelectTargets = await page.eval(`(() => {
     const ids = ['s1-card-2', 's1-side-panel']
 
@@ -4086,7 +4159,58 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:cut') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.itemIds.includes('format:italic') && afterShortcutOpen.itemIds.includes('format:underline') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+I') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+U') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record(
+    'derives PPT keyboard shortcut help from command palette shortcuts',
+    afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') &&
+      afterShortcutOpen.itemIds.includes('command:duplicate') &&
+      afterShortcutOpen.itemIds.includes('command:bring-forward') &&
+      afterShortcutOpen.itemIds.includes('command:lock-selection') &&
+      afterShortcutOpen.itemIds.includes('slide:add') &&
+      afterShortcutOpen.itemIds.includes('slide:copy') &&
+      afterShortcutOpen.itemIds.includes('slide:cut') &&
+      afterShortcutOpen.itemIds.includes('slide:duplicate') &&
+      afterShortcutOpen.itemIds.includes('slide:paste') &&
+      afterShortcutOpen.itemIds.includes('view:fit-slide') &&
+      afterShortcutOpen.itemIds.includes('view:reset-zoom') &&
+      afterShortcutOpen.itemIds.includes('view:zoom-in') &&
+      afterShortcutOpen.itemIds.includes('tool:pan') &&
+      afterShortcutOpen.itemIds.includes('tool:laser') &&
+      afterShortcutOpen.itemIds.includes('tool:text') &&
+      afterShortcutOpen.itemIds.includes('tool:sticky') &&
+      afterShortcutOpen.itemIds.includes('tool:section') &&
+      afterShortcutOpen.itemIds.includes('tool:arrow') &&
+      afterShortcutOpen.itemIds.includes('tool:marker') &&
+      afterShortcutOpen.itemIds.includes('tool:highlight') &&
+      afterShortcutOpen.itemIds.includes('tool:eraser') &&
+      afterShortcutOpen.itemIds.includes('format:bold') &&
+      afterShortcutOpen.itemIds.includes('format:italic') &&
+      afterShortcutOpen.itemIds.includes('format:underline') &&
+      afterShortcutOpen.itemIds.includes('selection:cycle-next') &&
+      afterShortcutOpen.itemIds.includes('selection:cycle-previous') &&
+      afterShortcutOpen.shortcuts.includes('Shift+/') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') &&
+      afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') &&
+      afterShortcutOpen.shortcuts.includes('0') &&
+      afterShortcutOpen.shortcuts.includes('1') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+I') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+U') &&
+      afterShortcutOpen.shortcuts.includes('Tab') &&
+      afterShortcutOpen.shortcuts.includes('Shift+Tab') &&
+      afterShortcutOpen.shortcuts.includes('H') &&
+      afterShortcutOpen.shortcuts.includes('P') &&
+      afterShortcutOpen.shortcuts.includes('S') &&
+      afterShortcutOpen.shortcuts.includes('Shift+S') &&
+      afterShortcutOpen.shortcuts.includes('L') &&
+      afterShortcutOpen.shortcuts.includes('M') &&
+      afterShortcutOpen.shortcuts.includes('Shift+M') &&
+      afterShortcutOpen.shortcuts.includes('E'),
+    afterShortcutOpen,
+  )
 
   await pressKey(page, {
     code: 'Escape',

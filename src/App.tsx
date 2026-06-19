@@ -3399,6 +3399,21 @@ type PPTShapeQuickMenuState = {
   elementId: string
   shape: PPTShapeKind
 }
+type PPTSelectionCycleDirection = 'next' | 'previous'
+type PPTSelectionCycleEffect = {
+  direction: PPTSelectionCycleDirection
+  fromObjectId: string
+  keyboardIntent: typeof PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL
+  keyboardModel: typeof PPT_SELECTION_CYCLE_KEYBOARD_MODEL
+  objectIds: readonly string[]
+  targetObjectId: string
+}
+
+const PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL =
+  'ppt-selection-cycle-keyboard-intent'
+const PPT_SELECTION_CYCLE_KEYBOARD_MODEL =
+  'ppt-selection-cycle-keyboard-shortcuts'
+const PPT_SELECTION_CYCLE_KEYBOARD_KEYS = 'Tab Shift+Tab'
 
 const PPT_SLIDE_CONTEXT_MENU_GROUPS: readonly PPTSlideContextCommandGroup[] = [{
   commands: [{
@@ -4053,6 +4068,8 @@ function App() {
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
+  const [lastSelectionCycleEffect, setLastSelectionCycleEffect] =
+    useState<PPTSelectionCycleEffect | null>(null)
   const [lastSlideTransitionEffect, setLastSlideTransitionEffect] = useState<PPTSlideTransitionHostCommandEffect | null>(null)
   const [lastAccessibilityEffect, setLastAccessibilityEffect] = useState<SlideEditObjectAccessibilityHostCommandEffect<string, string> | null>(null)
   const [lastColorSwatchEffect, setLastColorSwatchEffect] = useState<PPTColorSwatchHostCommandEffect | null>(null)
@@ -4597,6 +4614,10 @@ function App() {
         return
       }
 
+      if (commandPaletteOpen) {
+        return
+      }
+
       const mod = event.metaKey || event.ctrlKey
       const beforeTypingSystemShortcutIntent = getPPTCanvasKeyboardSystemShortcutIntent({
         config: PPT_CANVAS_COMMAND_CONFIG,
@@ -4793,6 +4814,23 @@ function App() {
               toggleSelectedTextUnderline()
               break
           }
+        }
+        return
+      }
+
+      if (
+        event.key === 'Tab' &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !editingId &&
+        isPPTCanvasTargetWithinSelector({
+          selectors: '.ppt-stage-shell, [data-ppt-element]',
+          target: event.target,
+        })
+      ) {
+        if (cycleObjectSelection(event.shiftKey ? 'previous' : 'next')) {
+          event.preventDefault()
         }
         return
       }
@@ -10429,6 +10467,52 @@ function App() {
     executePPTCanvasStandardSelectionCommand({ kind: 'select-all' })
   }
 
+  function cycleObjectSelection(direction: PPTSelectionCycleDirection) {
+    const selectableObjectIds = activeSlide.elements
+      .filter((element) => element.visible !== false && element.locked !== true)
+      .map((element) => element.id)
+
+    if (selectableObjectIds.length === 0) {
+      return false
+    }
+
+    const fromObjectId = [...selection]
+      .reverse()
+      .find((objectId) => selectableObjectIds.includes(objectId)) ?? ''
+    const currentIndex = fromObjectId
+      ? selectableObjectIds.indexOf(fromObjectId)
+      : -1
+    const targetIndex = fromObjectId
+      ? direction === 'next'
+        ? (currentIndex + 1) % selectableObjectIds.length
+        : (currentIndex - 1 + selectableObjectIds.length) % selectableObjectIds.length
+      : direction === 'next'
+        ? 0
+        : selectableObjectIds.length - 1
+    const targetObjectId = selectableObjectIds[targetIndex]
+
+    setSelection([targetObjectId])
+    setEditingId(null)
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    setContextMenu(null)
+    setSlideContextMenu(null)
+    setLastSelectionCycleEffect({
+      direction,
+      fromObjectId,
+      keyboardIntent: PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL,
+      keyboardModel: PPT_SELECTION_CYCLE_KEYBOARD_MODEL,
+      objectIds: selectableObjectIds,
+      targetObjectId,
+    })
+
+    return true
+  }
+
   function selectSameTypeElements() {
     if (!commandAvailability.selectSameType) {
       return
@@ -13332,6 +13416,22 @@ function App() {
     shortcut: 'Cmd/Ctrl+A',
     title: PPT_COMMAND_AFFORDANCES.selectAll.title,
   }, {
+    disabled: activeSlide.elements.every((element) =>
+      element.locked === true || element.visible === false),
+    id: 'selection:cycle-next',
+    onSelect: () => cycleObjectSelection('next'),
+    section: 'Edit',
+    shortcut: 'Tab',
+    title: 'Select next object',
+  }, {
+    disabled: activeSlide.elements.every((element) =>
+      element.locked === true || element.visible === false),
+    id: 'selection:cycle-previous',
+    onSelect: () => cycleObjectSelection('previous'),
+    section: 'Edit',
+    shortcut: 'Shift+Tab',
+    title: 'Select previous object',
+  }, {
     disabled: !commandAvailability.selectSameType,
     id: 'command:select-same-type',
     onSelect: selectSameTypeElements,
@@ -14774,6 +14874,14 @@ function App() {
         data-ppt-keyboard-nudge-large-step={String(PPT_KEYBOARD_NUDGE_LARGE_STEP)}
         data-ppt-keyboard-nudge-model={PPT_KEYBOARD_NUDGE_MODEL}
         data-ppt-keyboard-nudge-step={String(PPT_KEYBOARD_NUDGE_STEP)}
+        data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
+        data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
+        data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}
+        data-ppt-selection-cycle-keys={PPT_SELECTION_CYCLE_KEYBOARD_KEYS}
+        data-ppt-selection-cycle-model={lastSelectionCycleEffect?.keyboardModel ??
+          PPT_SELECTION_CYCLE_KEYBOARD_MODEL}
+        data-ppt-selection-cycle-order={lastSelectionCycleEffect?.objectIds.join(' ')}
+        data-ppt-selection-cycle-target={lastSelectionCycleEffect?.targetObjectId}
         data-ppt-arrow-tool-model={PPT_TOOL_AFFORDANCES.arrow.model}
         data-ppt-arrow-tool-shortcut={PPT_TOOL_AFFORDANCES.arrow.shortcut}
         data-ppt-drawing-tool={creationTool?.kind === 'freeform'
