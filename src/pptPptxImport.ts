@@ -35,6 +35,8 @@ import {
 
 export const PPTX_DECK_MODEL_IMPORT_FORMAT = 'pptx-custom-xml-ppt-deck' as const
 export const PPTX_OPEN_XML_IMPORT_FORMAT = 'pptx-open-xml-ppt-deck' as const
+const PPTX_RELATIONSHIP_ATTRIBUTE_NS =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 
 type PPTDeckPPTXImportFormat =
   | typeof PPTX_DECK_MODEL_IMPORT_FORMAT
@@ -2212,8 +2214,9 @@ function readPPTXElementHyperlink(
   element: Element,
   relationships: PPTXRelationshipMap,
 ) {
-  const relationshipId = getFirstPPTXDescendantByLocalName(element, 'hlinkClick')
-    ?.getAttribute('r:id')
+  const relationshipId = readPPTXRelationshipAttributeId(
+    getFirstPPTXDescendantByLocalName(element, 'hlinkClick'),
+  )
   const relationship = relationshipId
     ? relationships.get(relationshipId)
     : undefined
@@ -2222,6 +2225,13 @@ function readPPTXElementHyperlink(
     : undefined
 
   return url ? { hyperlink: { url } } : null
+}
+
+function readPPTXRelationshipAttributeId(element: Element | null) {
+  return element?.getAttribute('r:id') ??
+    element?.getAttributeNS(PPTX_RELATIONSHIP_ATTRIBUTE_NS, 'id') ??
+    element?.getAttribute('id') ??
+    null
 }
 
 function createPPTXImportedElementId(slideIndex: number, objectIndex: number) {

@@ -10999,12 +10999,14 @@ async function runExportScenario(page) {
   )
 
   const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
-    await addPPTXImageOpacityProbe(
-      await addPPTXNoFillShapeProbe(
-        await addPPTXUnevenTableProbe(
-          await addPPTXGroupedObjectProbe(
-            await reversePPTXPresentationSlideOrder(
-              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    await addPPTXHyperlinkProbe(
+      await addPPTXImageOpacityProbe(
+        await addPPTXNoFillShapeProbe(
+          await addPPTXUnevenTableProbe(
+            await addPPTXGroupedObjectProbe(
+              await reversePPTXPresentationSlideOrder(
+                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+              ),
             ),
           ),
         ),
@@ -11048,6 +11050,9 @@ async function runExportScenario(page) {
       groupedProbeModelCount: elements.filter((element) =>
         element.name === 'Grouped Text Probe' ||
         element.name === 'Grouped Shape Probe').length,
+      hyperlinkProbeModelCount: elements.filter((element) =>
+        element.name === 'Hyperlink Probe' &&
+        element.hyperlink?.url === 'https://example.com/openxml-hyperlink-probe').length,
       unevenTableProbeModelCount: elements.filter((element) =>
         element.name === 'Uneven Table Probe').length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
@@ -11161,6 +11166,10 @@ async function runExportScenario(page) {
     const exportUnevenTableProbeObjects = exportElements.filter((element) =>
       element.name === 'Uneven Table Probe' &&
       element.kind === 'table')
+    const exportHyperlinkProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Hyperlink Probe' &&
+      element.kind === 'shape' &&
+      element.hyperlink?.url === 'https://example.com/openxml-hyperlink-probe')
     const exportUnevenTableProbe = exportUnevenTableProbeObjects.find((element) => {
       const columnWidths = element.columnWidths ?? []
       const rowHeights = element.rowHeights ?? []
@@ -11251,6 +11260,10 @@ async function runExportScenario(page) {
       exportAnimatedObjectNames: exportAnimatedObjects.map((element) => element.name).join(' | '),
       exportAnimationModelCount: exportAnimatedObjects.length,
       exportHasHyperlink: exportCode.includes('https://example.com/ppt') && exportCode.includes('data-ppt-hyperlink-url='),
+      exportHasHyperlinkProbe: exportHyperlinkProbeObjects.length > 0,
+      exportHyperlinkProbeModelCount: exportHyperlinkProbeObjects.length,
+      exportHyperlinkProbeNames: exportHyperlinkProbeObjects.map((element) => element.name).join(' | '),
+      exportHyperlinkProbeUrls: exportHyperlinkProbeObjects.map((element) => element.hyperlink?.url ?? '').join(' | '),
       exportHasAnimation: exportAnimatedObjects.length > 0,
       exportImportedAnimationModelCount: exportImportedAnimatedObjects.length,
       exportImportedAnimatedObjectNames: exportImportedAnimatedObjects.map((element) => element.name).join(' | '),
@@ -11447,6 +11460,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportTransitionModelCount > beforeOpenXmlPPTXDrop.transitionModelCount &&
       openXmlPPTXImportState.text.includes('Minimal subset now') &&
       openXmlPPTXImportState.exportHasHyperlink &&
+      openXmlPPTXImportState.exportHasHyperlinkProbe &&
+      openXmlPPTXImportState.exportHyperlinkProbeModelCount > beforeOpenXmlPPTXDrop.hyperlinkProbeModelCount &&
       openXmlPPTXImportState.exportHasNotes,
     {
       beforeOpenXmlPPTXDrop,
@@ -27345,6 +27360,71 @@ async function addPPTXImageOpacityProbe(base64) {
     : base64
 }
 
+async function addPPTXHyperlinkProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Hyperlink Probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXExternalRelationship({
+    target: 'https://example.com/openxml-hyperlink-probe',
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+    zip,
+    sourcePath: slidePath,
+  })
+  const probeShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9963" name="Hyperlink Probe">',
+    `<a:hlinkClick r:id="${relationshipId}"/>`,
+    '</p:cNvPr>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5029200" y="4343400"/>',
+    '<a:ext cx="2286000" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="DBEAFE"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="2563EB"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>Hyperlink Probe</a:t></a:r></a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXGroupedObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -27624,6 +27704,70 @@ function createPPTXTableCellBorderXml(tagName, border) {
     border.dash ? `<a:prstDash val="${border.dash}"/>` : '',
     `</a:${tagName}>`,
   ].join('')
+}
+
+async function addPPTXExternalRelationship({
+  sourcePath,
+  target,
+  type,
+  zip,
+}) {
+  const relsPath = getPPTXRelationshipsPath(sourcePath)
+  const existingXml = await readPPTXZipText(zip, relsPath)
+  const xml = existingXml || [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    '</Relationships>',
+  ].join('')
+  const existingRelationship = [...xml.matchAll(/<Relationship\b[^>]*\/>/g)]
+    .map((match) => match[0])
+    .find((relationshipXml) =>
+      relationshipXml.includes(`Target="${escapePPTXXmlAttribute(target)}"`) &&
+      relationshipXml.includes(`Type="${escapePPTXXmlAttribute(type)}"`))
+  const existingId = existingRelationship?.match(/\bId="([^"]+)"/)?.[1]
+
+  if (existingId) {
+    return existingId
+  }
+
+  const relationshipId = getNextPPTXRelationshipId(xml)
+  const relationshipXml = [
+    `<Relationship Id="${relationshipId}"`,
+    ` Type="${escapePPTXXmlAttribute(type)}"`,
+    ` Target="${escapePPTXXmlAttribute(target)}"`,
+    ' TargetMode="External"/>',
+  ].join('')
+
+  zip.file(
+    relsPath,
+    xml.replace('</Relationships>', `${relationshipXml}</Relationships>`),
+  )
+
+  return relationshipId
+}
+
+function getPPTXRelationshipsPath(sourcePath) {
+  const parts = sourcePath.split('/')
+  const fileName = parts.pop()
+  const directory = parts.join('/')
+
+  return `${directory}/_rels/${fileName}.rels`
+}
+
+function getNextPPTXRelationshipId(xml) {
+  const ids = [...xml.matchAll(/\bId="rId(\d+)"/g)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite)
+  const nextId = ids.length > 0
+    ? Math.max(...ids) + 1
+    : 1
+
+  return `rId${nextId}`
+}
+
+function escapePPTXXmlAttribute(value) {
+  return escapePPTXXmlText(value)
+    .replace(/"/g, '&quot;')
 }
 
 function escapePPTXXmlText(value) {
