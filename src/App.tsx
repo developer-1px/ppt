@@ -12624,8 +12624,8 @@ function App() {
     event.stopPropagation()
     capturePPTCanvasPointerFromEvent(event)
 
-    const duplicateWithPrimaryPointerModifier =
-      (event.ctrlKey || event.metaKey) && !event.altKey
+    const duplicateWithPointerModifier =
+      event.altKey || event.ctrlKey || event.metaKey
     const lockAxisWithShiftPointerModifier =
       event.shiftKey
     const additive = isAdditivePPTPointerInput(event)
@@ -12642,7 +12642,7 @@ function App() {
       selection,
       slide: activeSlide,
     })
-    const duplicateSourcePointerSelection = duplicateWithPrimaryPointerModifier
+    const duplicateSourcePointerSelection = duplicateWithPointerModifier
       ? getPPTElementPointerSelection({
           additive: false,
           elementId,
@@ -12684,7 +12684,7 @@ function App() {
           sourceSelection: duplicateSourceSelection,
         }
       : undefined
-    let axisLockOnDrag = axisLockSourceSelection &&
+    const axisLockOnDrag = axisLockSourceSelection &&
       (axisLockSourceSelection.some((id) => selection.includes(id)) || !!duplicateOnDrag)
       ? {
           pendingSelection: nextSelection,
@@ -12708,59 +12708,16 @@ function App() {
       return
     }
 
-    let interactionBounds = bounds
-    let interactionHistoryDeck: PPTDeck | undefined
-    let interactionHistorySelection: string[] | undefined
-    let interactionSelection = pointerDownSelection
-    let interactionStartDeck = deckRef.current
-
-    if (event.altKey) {
-      const sourceDeck = deckRef.current
-      const sourceSlide = findPPTSlide(sourceDeck, activeSlide.id)
-      const clones = commandAdapter.cloneSelection({
-        createId: createPPTElementIdFactory(sourceSlide),
-        ids: nextSelection,
-        items: sourceSlide.elements,
-        offset: { x: 0, y: 0 },
-      })
-
-      if (clones.length > 0) {
-        const cloneIds = clones.map((clone) => clone.id)
-        const liveDeck = updatePPTDeckSlide(sourceDeck, activeSlide.id, (slide) => ({
-          ...slide,
-          elements: [...slide.elements, ...clones],
-        }))
-        const liveSlide = findPPTSlide(liveDeck, activeSlide.id)
-        const liveScene = createPPTCanvasScene(liveSlide)
-
-        deckRef.current = liveDeck
-        setDeck(liveDeck)
-        interactionBounds = liveScene.getBounds(cloneIds) ?? bounds
-        interactionHistoryDeck = sourceDeck
-        interactionHistorySelection = nextSelection
-        interactionSelection = cloneIds
-        interactionStartDeck = liveDeck
-        if (axisLockOnDrag) {
-          axisLockOnDrag = {
-            ...axisLockOnDrag,
-            sourceSelection: cloneIds,
-          }
-        }
-      }
-    }
-
-    setSelection(interactionSelection)
+    setSelection(pointerDownSelection)
     setInteraction({
       axisLockOnDrag,
-      bounds: interactionBounds,
+      bounds,
       duplicateOnDrag,
-      historyDeck: interactionHistoryDeck,
-      historySelection: interactionHistorySelection,
       kind: 'move',
-      selection: interactionSelection,
+      selection: pointerDownSelection,
       slideId: activeSlide.id,
       snapGuides: EMPTY_PPT_CANVAS_SNAP_GUIDES,
-      startDeck: interactionStartDeck,
+      startDeck: deckRef.current,
       startPoint: screenToWorld(event.nativeEvent),
     })
   }

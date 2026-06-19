@@ -791,6 +791,40 @@ async function runAltDragDuplicateScenario(page) {
   })
   await page.send('Input.dispatchMouseEvent', {
     button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mouseReleased',
+    x: point.x,
+    y: point.y,
+  })
+  await delay(50)
+
+  const afterAltClick = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      left: parseFloat(element.style.left),
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      top: parseFloat(element.style.top),
+    }
+  })()`)
+
+  record('keeps PPT Alt click from duplicating object', afterAltClick.count === before.count && afterAltClick.selectedId === before.selectedId && afterAltClick.left === before.left && afterAltClick.top === before.top, {
+    afterAltClick,
+    before,
+  })
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 1,
+    type: 'mousePressed',
+    x: point.x,
+    y: point.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
     modifiers: 1,
     type: 'mouseMoved',
     x: point.x + 96,
