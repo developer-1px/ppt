@@ -2205,6 +2205,71 @@ async function runAffordanceScenario(page) {
     centerResizeBefore,
   })
 
+  const centerAspectResizeBefore = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const left = parseFloat(element.style.left)
+    const top = parseFloat(element.style.top)
+    const width = parseFloat(element.style.width)
+    const height = parseFloat(element.style.height)
+    const rect = document.querySelector('button[aria-label="Resize se"]').getBoundingClientRect()
+
+    return {
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+      handleX: rect.left + rect.width / 2,
+      handleY: rect.top + rect.height / 2,
+      height,
+      ratio: width / height,
+      width,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 9,
+    type: 'mousePressed',
+    x: centerAspectResizeBefore.handleX,
+    y: centerAspectResizeBefore.handleY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: 9,
+    type: 'mouseMoved',
+    x: centerAspectResizeBefore.handleX + 42,
+    y: centerAspectResizeBefore.handleY + 18,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: 9,
+    type: 'mouseReleased',
+    x: centerAspectResizeBefore.handleX + 42,
+    y: centerAspectResizeBefore.handleY + 18,
+  })
+  await delay(50)
+
+  const afterCenterAspectResize = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const left = parseFloat(element.style.left)
+    const top = parseFloat(element.style.top)
+    const width = parseFloat(element.style.width)
+    const height = parseFloat(element.style.height)
+
+    return {
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+      height,
+      ratio: width / height,
+      width,
+    }
+  })()`)
+
+  record('combines PPT Shift and Alt resize modifiers through canvas resize engine', afterCenterAspectResize.width > centerAspectResizeBefore.width && afterCenterAspectResize.height > centerAspectResizeBefore.height && nearlyEqual(afterCenterAspectResize.centerX, centerAspectResizeBefore.centerX, 0.75) && nearlyEqual(afterCenterAspectResize.centerY, centerAspectResizeBefore.centerY, 0.75) && Math.abs(afterCenterAspectResize.ratio - centerAspectResizeBefore.ratio) < 0.02, {
+    afterCenterAspectResize,
+    centerAspectResizeBefore,
+  })
+
   const rotateHandle = await page.eval(`(() => {
     const rect = document.querySelector('[data-ppt-rotate-handle]').getBoundingClientRect()
 
