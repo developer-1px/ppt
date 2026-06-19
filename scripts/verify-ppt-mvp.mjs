@@ -2469,8 +2469,8 @@ async function runAffordanceScenario(page) {
 
   record(
     'pastes JSON object transform into selected PPT object',
-    afterTransformPaste.importModel === 'ppt-object-transform-import' &&
-      afterTransformPaste.importFormat === 'application-json-ppt-object-transform' &&
+    afterTransformPaste.importModel === 'slide-edit-object-transform-import' &&
+      afterTransformPaste.importFormat === 'application-json-slide-edit-object-transform' &&
       afterTransformPaste.importTargets === 's1-card-1' &&
       afterTransformPaste.importObjects === 's1-card-1' &&
       afterTransformPaste.importFields === 'x y w h rotation' &&
@@ -2549,8 +2549,8 @@ async function runAffordanceScenario(page) {
 
   record(
     'pastes standalone JSON object transform into selected PPT object',
-    afterStandaloneTransformPaste.importModel === 'ppt-object-transform-import' &&
-      afterStandaloneTransformPaste.importFormat === 'application-json-ppt-object-transform' &&
+    afterStandaloneTransformPaste.importModel === 'slide-edit-object-transform-import' &&
+      afterStandaloneTransformPaste.importFormat === 'application-json-slide-edit-object-transform' &&
       afterStandaloneTransformPaste.importTargets === 's1-card-1' &&
       afterStandaloneTransformPaste.importObjects === 's1-card-1' &&
       afterStandaloneTransformPaste.importFields === 'x y w h rotation' &&

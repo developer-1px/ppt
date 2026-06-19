@@ -292,6 +292,8 @@ import {
   SLIDE_EDIT_OBJECT_IMAGE_REPLACE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE,
+  SLIDE_EDIT_OBJECT_TRANSFORM_IMPORT_MODEL as PPT_OBJECT_TRANSFORM_IMPORT_MODEL,
+  SLIDE_EDIT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT as PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
@@ -1747,10 +1749,7 @@ const PPT_OBJECT_STROKE_LINE_STYLE_JSON_IMPORT_FORMAT =
   'application-json-ppt-object-stroke-line-style' as const
 const PPT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-stroke-line-style+json'
-const PPT_OBJECT_TRANSFORM_IMPORT_MODEL = 'ppt-object-transform-import' as const
-const PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT =
-  'application-json-ppt-object-transform' as const
-const PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE =
+const PPT_LEGACY_OBJECT_TRANSFORM_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.object-transform+json'
 const PPT_MEDIA_JSON_IMPORT_MODEL = 'ppt-media-json-import' as const
 const PPT_MEDIA_JSON_IMPORT_FORMAT = 'application-json-ppt-media' as const
@@ -24599,7 +24598,7 @@ function getPPTObjectTransformSourceFromDataTransfer(
     {
       allowDirect: true,
       format: PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
-      mimeType: PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
+      mimeType: PPT_LEGACY_OBJECT_TRANSFORM_JSON_MIME_TYPE,
     },
     {
       allowDirect: false,
@@ -24638,7 +24637,7 @@ function getPPTObjectTransformSourceFromSlideEditJSONPasteValue(
   const seen = new Set<string>()
 
   for (const customMimeType of [
-    PPT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
+    PPT_LEGACY_OBJECT_TRANSFORM_JSON_MIME_TYPE,
     SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   ]) {
     for (const candidate of getPPTSlideEditJSONPasteCandidates({
