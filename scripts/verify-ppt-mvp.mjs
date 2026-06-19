@@ -23324,7 +23324,7 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.focusableOption === expectedActiveOptionId &&
       initialKeyboard.slideOrder === expectedSlideOrder &&
       initialKeyboard.commandShortcuts ===
-        'Cmd/Ctrl+X Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Delete Backspace' &&
+        'Cmd/Ctrl+X Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Cmd/Ctrl+Up Cmd/Ctrl+Down Cmd/Ctrl+Shift+Up Cmd/Ctrl+Shift+Down Delete Backspace' &&
       initialKeyboard.commandShortcutIntent === 'ppt-slide-rail-command-shortcut-intent' &&
       initialKeyboard.commandShortcutModel === 'ppt-slide-rail-command-shortcuts' &&
       initialKeyboard.optionCount === initialKeyboard.count &&
@@ -23633,6 +23633,94 @@ async function runSlideManagementScenario(page) {
       afterRailDeleteShortcut,
       afterRailDuplicateShortcut,
       initialKeyboard,
+    },
+  )
+
+  const railReorderShortcutTargetId = afterRailDeleteShortcut.ids[0] ?? afterRailDeleteShortcut.activeId
+  await focusPPTSlideThumb(page, railReorderShortcutTargetId)
+  await delay(50)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
+
+  const beforeRailReorderShortcut = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    modifiers: 10,
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(80)
+
+  const afterRailMoveToEndShortcut = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowUp',
+    key: 'ArrowUp',
+    modifiers: 2,
+    windowsVirtualKeyCode: 38,
+  })
+  await delay(80)
+
+  const afterRailMoveUpShortcut = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowDown',
+    key: 'ArrowDown',
+    modifiers: 2,
+    windowsVirtualKeyCode: 40,
+  })
+  await delay(80)
+
+  const afterRailMoveDownShortcut = await getSlideRailState(page)
+
+  await pressKey(page, {
+    code: 'ArrowUp',
+    key: 'ArrowUp',
+    modifiers: 10,
+    windowsVirtualKeyCode: 38,
+  })
+  await delay(80)
+
+  const afterRailMoveToStartShortcut = await getSlideRailState(page)
+
+  record(
+    'reorders focused PPT slide thumbnail with Cmd/Ctrl+Arrow shortcuts',
+    beforeRailReorderShortcut.count >= 2 &&
+      beforeRailReorderShortcut.activeId === railReorderShortcutTargetId &&
+      beforeRailReorderShortcut.activeIndex === 0 &&
+      afterRailMoveToEndShortcut.activeId === railReorderShortcutTargetId &&
+      afterRailMoveToEndShortcut.activeIndex === beforeRailReorderShortcut.count - 1 &&
+      afterRailMoveToEndShortcut.command === 'reorder-slide' &&
+      afterRailMoveToEndShortcut.commandSlide === railReorderShortcutTargetId &&
+      afterRailMoveToEndShortcut.commandFromIndex === '0' &&
+      afterRailMoveToEndShortcut.commandToIndex === String(beforeRailReorderShortcut.count - 1) &&
+      afterRailMoveToEndShortcut.focusedId === railReorderShortcutTargetId &&
+      afterRailMoveUpShortcut.activeId === railReorderShortcutTargetId &&
+      afterRailMoveUpShortcut.activeIndex === beforeRailReorderShortcut.count - 2 &&
+      afterRailMoveUpShortcut.command === 'reorder-slide' &&
+      afterRailMoveUpShortcut.commandSlide === railReorderShortcutTargetId &&
+      afterRailMoveDownShortcut.activeId === railReorderShortcutTargetId &&
+      afterRailMoveDownShortcut.activeIndex === beforeRailReorderShortcut.count - 1 &&
+      afterRailMoveDownShortcut.command === 'reorder-slide' &&
+      afterRailMoveDownShortcut.commandSlide === railReorderShortcutTargetId &&
+      afterRailMoveToStartShortcut.activeId === railReorderShortcutTargetId &&
+      afterRailMoveToStartShortcut.activeIndex === 0 &&
+      afterRailMoveToStartShortcut.command === 'reorder-slide' &&
+      afterRailMoveToStartShortcut.commandSlide === railReorderShortcutTargetId &&
+      afterRailMoveToStartShortcut.commandToIndex === '0' &&
+      afterRailMoveToStartShortcut.focusedId === railReorderShortcutTargetId,
+    {
+      afterRailMoveDownShortcut,
+      afterRailMoveToEndShortcut,
+      afterRailMoveToStartShortcut,
+      afterRailMoveUpShortcut,
+      beforeRailReorderShortcut,
+      railReorderShortcutTargetId,
     },
   )
 

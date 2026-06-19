@@ -3810,12 +3810,16 @@ const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
 const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
 const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
 const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
+const PPT_SLIDE_MOVE_DOWN_SHORTCUT = 'Cmd/Ctrl+Down'
+const PPT_SLIDE_MOVE_TO_END_SHORTCUT = 'Cmd/Ctrl+Shift+Down'
+const PPT_SLIDE_MOVE_TO_START_SHORTCUT = 'Cmd/Ctrl+Shift+Up'
+const PPT_SLIDE_MOVE_UP_SHORTCUT = 'Cmd/Ctrl+Up'
 const PPT_SLIDE_PASTE_SHORTCUT = 'Cmd/Ctrl+V'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
-  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
+  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} ${PPT_SLIDE_MOVE_UP_SHORTCUT} ${PPT_SLIDE_MOVE_DOWN_SHORTCUT} ${PPT_SLIDE_MOVE_TO_START_SHORTCUT} ${PPT_SLIDE_MOVE_TO_END_SHORTCUT} Delete Backspace`
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
   'ppt-slide-rail-command-shortcut-intent'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
@@ -3843,6 +3847,16 @@ const PPT_LAYER_PANE_GROUP_ROW_PREFIX = 'ppt-layer-group:'
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
 type PPTFreeformTool = 'highlight' | 'marker' | 'pen'
+type PPTSlideRailCommandShortcutIntent =
+  | { kind: 'copy-slide' }
+  | { kind: 'cut-slide' }
+  | { kind: 'delete-slide' }
+  | { kind: 'duplicate-slide' }
+  | { kind: 'move-slide-down' }
+  | { kind: 'move-slide-to-end' }
+  | { kind: 'move-slide-to-start' }
+  | { kind: 'move-slide-up' }
+  | { kind: 'paste-slide' }
 type PPTCreationTool =
   | {
       kind: 'shape'
@@ -5849,6 +5863,26 @@ function App() {
 
       if (commandIntent.kind === 'paste-slide') {
         pasteCopiedSlideAfterSlide(slideId)
+        return
+      }
+
+      if (commandIntent.kind === 'move-slide-up') {
+        moveSlideToIndex(slideId, deck.slides.findIndex((slide) => slide.id === slideId) - 1, { focusRail: true })
+        return
+      }
+
+      if (commandIntent.kind === 'move-slide-down') {
+        moveSlideToIndex(slideId, deck.slides.findIndex((slide) => slide.id === slideId) + 1, { focusRail: true })
+        return
+      }
+
+      if (commandIntent.kind === 'move-slide-to-start') {
+        moveSlideToIndex(slideId, 0, { focusRail: true })
+        return
+      }
+
+      if (commandIntent.kind === 'move-slide-to-end') {
+        moveSlideToIndex(slideId, deck.slides.length - 1, { focusRail: true })
         return
       }
 
@@ -9174,33 +9208,55 @@ function App() {
   }
 
   function moveActiveSlide(delta: -1 | 1) {
+    const index = deckRef.current.slides.findIndex((slide) => slide.id === activeSlide.id)
+
+    moveSlideToIndex(activeSlide.id, index + delta)
+  }
+
+  function moveSlideToIndex(
+    slideId: string,
+    toIndex: number,
+    options: { focusRail?: boolean } = {},
+  ) {
+    const result = getPPTSlideIndexReorderResult({
+      slideId,
+      slides: deckRef.current.slides,
+      toIndex,
+    })
+
+    if (!result) {
+      return false
+    }
+
+    setLastSlideRailCommandEffect(toSlideEditRailHostCommandEffect({
+      fromIndex: result.fromIndex,
+      id: 'reorder-slide',
+      slideId,
+      toIndex: result.toIndex,
+    }))
+
     commitDeck((current) => {
-      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
-      const targetIndex = index + delta
+      const currentResult = getPPTSlideIndexReorderResult({
+        slideId,
+        slides: current.slides,
+        toIndex: result.toIndex,
+      })
 
-      if (index < 0 || targetIndex < 0 || targetIndex >= current.slides.length) {
-        return current
-      }
-
-      const targetSlide = current.slides[targetIndex]
-      const result = targetSlide
-        ? movePPTSlideToTargetPlacement({
-            placement: delta > 0 ? 'after' : 'before',
-            slideId: activeSlide.id,
-            slides: current.slides,
-            targetSlideId: targetSlide.id,
-          })
-        : null
-
-      if (!result) {
+      if (!currentResult) {
         return current
       }
 
       return {
         ...current,
-        slides: result.items,
+        slides: currentResult.items,
       }
     })
+
+    if (options.focusRail) {
+      focusPPTSlideThumb(slideId)
+    }
+
+    return true
   }
 
   function getSlideThumbDropPlacement(
@@ -14143,13 +14199,29 @@ function App() {
     id: 'slide:move-up',
     onSelect: () => moveActiveSlide(-1),
     section: 'Slides',
+    shortcut: PPT_SLIDE_MOVE_UP_SHORTCUT,
     title: 'Move slide up',
   }, {
     disabled: !canMoveActiveSlideDown,
     id: 'slide:move-down',
     onSelect: () => moveActiveSlide(1),
     section: 'Slides',
+    shortcut: PPT_SLIDE_MOVE_DOWN_SHORTCUT,
     title: 'Move slide down',
+  }, {
+    disabled: !canMoveActiveSlideUp,
+    id: 'slide:move-to-start',
+    onSelect: () => moveSlideToIndex(activeSlide.id, 0),
+    section: 'Slides',
+    shortcut: PPT_SLIDE_MOVE_TO_START_SHORTCUT,
+    title: 'Move slide to start',
+  }, {
+    disabled: !canMoveActiveSlideDown,
+    id: 'slide:move-to-end',
+    onSelect: () => moveSlideToIndex(activeSlide.id, deck.slides.length - 1),
+    section: 'Slides',
+    shortcut: PPT_SLIDE_MOVE_TO_END_SHORTCUT,
+    title: 'Move slide to end',
   }, ...PPT_LAYOUT_DESCRIPTORS.map((layout) => ({
     disabled: activeLayout.layoutId === layout.layoutId,
     id: `slide:layout:${layout.layoutId}`,
@@ -37535,6 +37607,46 @@ function getPPTAngleConstrainedLineEndpointPoint(
   )
 }
 
+function getPPTSlideIndexReorderResult({
+  slideId,
+  slides,
+  toIndex,
+}: {
+  slideId: string
+  slides: readonly PPTSlide[]
+  toIndex: number
+}): { fromIndex: number; items: PPTSlide[]; toIndex: number } | null {
+  const fromIndex = slides.findIndex((slide) => slide.id === slideId)
+
+  if (fromIndex < 0 || slides.length <= 1 || !Number.isFinite(toIndex)) {
+    return null
+  }
+
+  const normalizedToIndex = Math.max(
+    0,
+    Math.min(slides.length - 1, Math.round(toIndex)),
+  )
+
+  if (fromIndex === normalizedToIndex) {
+    return null
+  }
+
+  const items = [...slides]
+  const [slide] = items.splice(fromIndex, 1)
+
+  if (!slide) {
+    return null
+  }
+
+  items.splice(normalizedToIndex, 0, slide)
+
+  return {
+    fromIndex,
+    items,
+    toIndex: normalizedToIndex,
+  }
+}
+
 function getPPTSlideKeyboardShortcutIntent({
   event,
   key,
@@ -37567,10 +37679,20 @@ function getPPTSlideRailCommandShortcutIntent({
   key: string
   mod: boolean
   shiftKey: boolean
-}): {
-  kind: 'copy-slide' | 'cut-slide' | 'delete-slide' | 'duplicate-slide' | 'paste-slide'
-} | null {
+}): PPTSlideRailCommandShortcutIntent | null {
   const normalizedKey = key.toLowerCase()
+
+  if (mod && !altKey && key === 'ArrowUp') {
+    return shiftKey
+      ? { kind: 'move-slide-to-start' }
+      : { kind: 'move-slide-up' }
+  }
+
+  if (mod && !altKey && key === 'ArrowDown') {
+    return shiftKey
+      ? { kind: 'move-slide-to-end' }
+      : { kind: 'move-slide-down' }
+  }
 
   if (mod && !altKey && !shiftKey && normalizedKey === 'c') {
     return { kind: 'copy-slide' }
