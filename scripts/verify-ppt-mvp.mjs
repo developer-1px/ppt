@@ -10998,9 +10998,11 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await addPPTXImageOpacityProbe(
-    await reversePPTXPresentationSlideOrder(
-      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
+    await addPPTXImageOpacityProbe(
+      await reversePPTXPresentationSlideOrder(
+        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+      ),
     ),
   )
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
@@ -11040,6 +11042,8 @@ async function runExportScenario(page) {
         element.locked === true).length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       objectShadowModelCount: elements.filter((element) => element.shadow).length,
+      paragraphDefaultRunStyleModelCount: elements.filter((element) =>
+        element.name === 'Default Run Style Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
         paragraph.lineHeight !== undefined ||
         paragraph.spacingAfter !== undefined ||
@@ -11121,6 +11125,19 @@ async function runExportScenario(page) {
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
     const exportParagraphs = exportElements.flatMap((element) =>
       element.textBody?.paragraphs ?? [])
+    const exportParagraphDefaultRunStyleObjects = exportElements.filter((element) =>
+      element.name === 'Default Run Style Probe' &&
+      element.kind === 'textBox' &&
+      element.style?.color === '#7f1d1d' &&
+      element.style?.fontFamily === 'Courier New' &&
+      element.style?.fontSize === 32 &&
+      element.style?.fontWeight === 'bold' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'Default run style probe' &&
+          run.color === '#7f1d1d' &&
+          run.size === 32 &&
+          run.bold === true)) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11160,6 +11177,7 @@ async function runExportScenario(page) {
       exportObjectAltTextNames: exportAltTextObjects.map((element) => element.name).join(' | '),
       exportObjectLockingNames: exportLockedObjects.map((element) => element.name).join(' | '),
       exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
+      exportHasParagraphDefaultRunStyle: exportParagraphDefaultRunStyleObjects.length > 0,
       exportHasParagraphSpacing: exportSpacedParagraphs.length > 0,
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
       exportHasTextFrameInset: exportTextFrameInsetElements.length > 0,
@@ -11179,6 +11197,8 @@ async function runExportScenario(page) {
       exportObjectLockingModelCount: exportLockedObjects.length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportObjectShadowModelCount: exportShadowedObjects.length,
+      exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
+      exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       exportTextFrameInsetModelCount: exportTextFrameInsetElements.length,
@@ -11241,6 +11261,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&
       openXmlPPTXImportState.exportObjectShadowModelCount > beforeOpenXmlPPTXDrop.objectShadowModelCount &&
+      openXmlPPTXImportState.exportHasParagraphDefaultRunStyle &&
+      openXmlPPTXImportState.exportParagraphDefaultRunStyleModelCount > beforeOpenXmlPPTXDrop.paragraphDefaultRunStyleModelCount &&
       openXmlPPTXImportState.exportHasParagraphSpacing &&
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
@@ -27153,6 +27175,69 @@ async function addPPTXImageOpacityProbe(base64) {
         type: 'base64',
       })
     : base64
+}
+
+async function addPPTXParagraphDefaultRunStyleProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Default Run Style Probe')) {
+    return base64
+  }
+
+  const probeShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9901" name="Default Run Style Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="914400" y="5486400"/>',
+    '<a:ext cx="3657600" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr>',
+    '<a:defRPr sz="2400" b="1">',
+    '<a:solidFill><a:srgbClr val="7F1D1D"/></a:solidFill>',
+    '<a:latin typeface="Courier New"/>',
+    '</a:defRPr>',
+    '</a:pPr>',
+    '<a:r><a:t>Default run style probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function inspectPPTXPackage(base64) {

@@ -1250,12 +1250,16 @@ function readPPTXPlainTextBody(root: Document | Element) {
 
 function readPPTXParagraph(paragraph: Element): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
+  const defaultRunProperties = readPPTXParagraphDefaultRunProperties(
+    paragraph,
+    pPr,
+  )
   const align = readPPTXParagraphAlign(pPr)
   const bullet = readPPTXParagraphBullet(pPr)
   const level = readPPTXParagraphLevel(pPr)
   const spacing = readPPTXParagraphSpacing(pPr)
   const runs = Array.from(paragraph.children)
-    .flatMap((child) => readPPTXTextRun(child))
+    .flatMap((child) => readPPTXTextRun(child, defaultRunProperties))
 
   return {
     ...(align ? { align } : {}),
@@ -1266,27 +1270,93 @@ function readPPTXParagraph(paragraph: Element): PPTParagraph {
   }
 }
 
-function readPPTXTextRun(node: Element): PPTRun[] {
+function readPPTXParagraphDefaultRunProperties(
+  paragraph: Element,
+  pPr: Element | null,
+) {
+  return getDirectPPTXChildByLocalName(pPr, 'defRPr') ??
+    getDirectPPTXChildByLocalName(paragraph, 'endParaRPr')
+}
+
+function readPPTXTextRun(
+  node: Element,
+  defaultRunProperties: Element | null,
+): PPTRun[] {
   if (node.localName !== 'r' && node.localName !== 'fld') {
     return []
   }
 
   const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
   const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
-  const color = readPPTXSolidFill(rPr)?.color
-  const highlight = readPPTXRunHighlight(rPr)
-  const size = toPPTXPositiveNumber(rPr?.getAttribute('sz'))
+  const color = readPPTXRunColor(rPr, defaultRunProperties)
+  const highlight = readPPTXRunHighlight(rPr) ??
+    readPPTXRunHighlight(defaultRunProperties)
+  const size = readPPTXRunSize(rPr, defaultRunProperties)
 
   return [{
-    ...(rPr?.getAttribute('b') === '1' ? { bold: true } : {}),
+    ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'b')
+      ? { bold: true }
+      : {}),
     ...(color ? { color } : {}),
     ...(highlight ? { highlight } : {}),
-    ...(rPr?.getAttribute('i') === '1' ? { italic: true } : {}),
+    ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'i')
+      ? { italic: true }
+      : {}),
     ...(size === null ? {} : { size: textSizeToPx(size) }),
-    ...(readPPTXStrikethrough(rPr) ? { strikethrough: true } : {}),
-    ...(readPPTXUnderline(rPr) ? { underline: true } : {}),
+    ...(readPPTXRunStrikethrough(rPr, defaultRunProperties)
+      ? { strikethrough: true }
+      : {}),
+    ...(readPPTXRunUnderline(rPr, defaultRunProperties)
+      ? { underline: true }
+      : {}),
     text,
   }]
+}
+
+function readPPTXRunColor(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return readPPTXSolidFill(rPr)?.color ??
+    readPPTXSolidFill(defaultRunProperties)?.color
+}
+
+function readPPTXRunSize(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return toPPTXPositiveNumber(rPr?.getAttribute('sz')) ??
+    toPPTXPositiveNumber(defaultRunProperties?.getAttribute('sz'))
+}
+
+function readPPTXRunBooleanAttribute(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+  attribute: 'b' | 'i',
+) {
+  const own = rPr?.getAttribute(attribute)
+
+  return own === null || own === undefined
+    ? isPPTXTrue(defaultRunProperties?.getAttribute(attribute))
+    : isPPTXTrue(own)
+}
+
+function readPPTXRunUnderline(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return hasPPTXAttribute(rPr, 'u')
+    ? readPPTXUnderline(rPr)
+    : readPPTXUnderline(defaultRunProperties)
+}
+
+function readPPTXRunStrikethrough(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return hasPPTXAttribute(rPr, 'strike')
+    ? readPPTXStrikethrough(rPr)
+    : readPPTXStrikethrough(defaultRunProperties)
 }
 
 function readPPTXTextStyle(
@@ -1481,8 +1551,14 @@ function readPPTXFirstTypeface(txBody: Element | null) {
     return undefined
   }
 
-  for (const runProperties of getPPTXDescendantsByLocalName(txBody, 'rPr')) {
-    const typeface = readPPTXTypeface(runProperties)
+  for (const properties of Array.from(txBody.getElementsByTagName('*'))) {
+    if (properties.localName !== 'rPr' &&
+      properties.localName !== 'defRPr' &&
+      properties.localName !== 'endParaRPr') {
+      continue
+    }
+
+    const typeface = readPPTXTypeface(properties)
 
     if (typeface) {
       return typeface
@@ -1740,6 +1816,16 @@ function getPPTXAttributeByLocalName(
   return Array.from(element.attributes)
     .find((attribute) => attribute.localName === localName)
     ?.value ?? null
+}
+
+function hasPPTXAttribute(
+  element: Element | null,
+  localName: string,
+) {
+  return element
+    ? Array.from(element.attributes)
+      .some((attribute) => attribute.localName === localName)
+    : false
 }
 
 function comparePPTXNumberedPaths(left: string, right: string) {
