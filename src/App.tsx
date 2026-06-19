@@ -219,7 +219,7 @@ import {
   getSlideEditTextFontWeightJSONPasteValue,
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextRunFormattingCommandEffect,
-  getSlideEditTextRunFormattingJSONPasteValue,
+  getSlideEditTextRunFormattingJSONPasteValueFromText,
   getSlideEditTextFrameInsetJSONPasteValueFromText,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
@@ -25013,16 +25013,6 @@ function getPPTSlideEditJSONPasteCandidates({
   })
 }
 
-function createPPTSlideEditJSONPasteCandidateDataTransfer(
-  candidate: PPTSlideEditJSONPasteCandidate,
-  json: string,
-) {
-  return createPPTTextDataTransferReader({
-    mimeType: candidate.type,
-    text: json,
-  })
-}
-
 function getPPTJSONValueFromText(text: string): unknown {
   const json = getPPTImportJSONText(text) ?? text.trim()
 
@@ -25329,14 +25319,13 @@ function getPPTTextRunSizeSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const size = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        fieldId: 'size',
-        jsonMimeType: candidate.customMimeType,
-      })
+      const size = getSlideEditTextRunFormattingJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          fieldId: 'size',
+        },
+      )
 
       if (size === null) {
         continue
@@ -25590,14 +25579,13 @@ function getPPTTextRunColorSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const color = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        fieldId: 'color',
-        jsonMimeType: candidate.customMimeType,
-      })
+      const color = getSlideEditTextRunFormattingJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          fieldId: 'color',
+        },
+      )
 
       if (color === null) {
         continue
@@ -26337,14 +26325,13 @@ function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
 
       seen.add(json)
 
-      const value = getSlideEditTextRunFormattingJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        fieldId,
-        jsonMimeType: candidate.customMimeType,
-      })
+      const value = getSlideEditTextRunFormattingJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          fieldId,
+        },
+      )
 
       if (value === null) {
         continue
