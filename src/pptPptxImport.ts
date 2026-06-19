@@ -2030,10 +2030,17 @@ function readPPTXRunHighlight(rPr: Element | null) {
 }
 
 function readPPTXTypeface(rPr: Element | null) {
-  const latin = rPr ? getDirectPPTXChildByLocalName(rPr, 'latin') : null
-  const typeface = latin?.getAttribute('typeface')?.trim()
+  for (const localName of ['latin', 'ea', 'cs']) {
+    const typeface = getDirectPPTXChildByLocalName(rPr, localName)
+      ?.getAttribute('typeface')
+      ?.trim()
 
-  return typeface || undefined
+    if (typeface && !typeface.startsWith('+')) {
+      return typeface
+    }
+  }
+
+  return undefined
 }
 
 function readPPTXFirstTypeface(txBody: Element | null) {

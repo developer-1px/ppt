@@ -11082,6 +11082,8 @@ async function runExportScenario(page) {
         element.cornerRadius === 32).length,
       paragraphDefaultRunStyleModelCount: elements.filter((element) =>
         element.name === 'Default Run Style Probe').length,
+      eastAsianTypefaceProbeModelCount: elements.filter((element) =>
+        element.name === 'East Asian Typeface Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
         paragraph.lineHeight !== undefined ||
         paragraph.spacingAfter !== undefined ||
@@ -11271,6 +11273,13 @@ async function runExportScenario(page) {
           run.color === '#7f1d1d' &&
           run.size === 32 &&
           run.bold === true)) === true)
+    const exportEastAsianTypefaceProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'East Asian Typeface Probe' &&
+      element.kind === 'textBox' &&
+      element.style?.fontFamily === 'Malgun Gothic' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'East Asian typeface probe')) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11413,6 +11422,9 @@ async function runExportScenario(page) {
       exportNoFillShapeModelCount: exportNoFillShapeObjects.length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportObjectShadowModelCount: exportShadowedObjects.length,
+      exportHasEastAsianTypefaceProbe: exportEastAsianTypefaceProbeObjects.length > 0,
+      exportEastAsianTypefaceProbeFontFamily: exportEastAsianTypefaceProbeObjects.map((element) => element.style?.fontFamily ?? '').join(' | '),
+      exportEastAsianTypefaceProbeModelCount: exportEastAsianTypefaceProbeObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
       exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
@@ -11494,6 +11506,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectShadowModelCount > beforeOpenXmlPPTXDrop.objectShadowModelCount &&
       openXmlPPTXImportState.exportHasParagraphDefaultRunStyle &&
       openXmlPPTXImportState.exportParagraphDefaultRunStyleModelCount > beforeOpenXmlPPTXDrop.paragraphDefaultRunStyleModelCount &&
+      openXmlPPTXImportState.exportHasEastAsianTypefaceProbe &&
+      openXmlPPTXImportState.exportEastAsianTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.eastAsianTypefaceProbeModelCount &&
       openXmlPPTXImportState.exportHasParagraphSpacing &&
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
@@ -27965,40 +27979,78 @@ async function addPPTXParagraphDefaultRunStyleProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
 
-  if (xml.includes('Default Run Style Probe')) {
+  if (
+    xml.includes('Default Run Style Probe') &&
+    xml.includes('East Asian Typeface Probe')
+  ) {
     return base64
   }
 
-  const probeShapeXml = [
-    '<p:sp>',
-    '<p:nvSpPr>',
-    '<p:cNvPr id="9901" name="Default Run Style Probe"/>',
-    '<p:cNvSpPr txBox="1"/>',
-    '<p:nvPr/>',
-    '</p:nvSpPr>',
-    '<p:spPr>',
-    '<a:xfrm>',
-    '<a:off x="914400" y="5486400"/>',
-    '<a:ext cx="3657600" cy="457200"/>',
-    '</a:xfrm>',
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
-    '</p:spPr>',
-    '<p:txBody>',
-    '<a:bodyPr/>',
-    '<a:lstStyle/>',
-    '<a:p>',
-    '<a:pPr>',
-    '<a:defRPr sz="2400" b="1">',
-    '<a:solidFill><a:srgbClr val="7F1D1D"/></a:solidFill>',
-    '<a:latin typeface="Courier New"/>',
-    '</a:defRPr>',
-    '</a:pPr>',
-    '<a:r><a:t>Default run style probe</a:t></a:r>',
-    '</a:p>',
-    '</p:txBody>',
-    '</p:sp>',
-  ].join('')
-  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+  const probeShapeXml = xml.includes('Default Run Style Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9901" name="Default Run Style Probe"/>',
+        '<p:cNvSpPr txBox="1"/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="914400" y="5486400"/>',
+        '<a:ext cx="3657600" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '</p:spPr>',
+        '<p:txBody>',
+        '<a:bodyPr/>',
+        '<a:lstStyle/>',
+        '<a:p>',
+        '<a:pPr>',
+        '<a:defRPr sz="2400" b="1">',
+        '<a:solidFill><a:srgbClr val="7F1D1D"/></a:solidFill>',
+        '<a:latin typeface="Courier New"/>',
+        '</a:defRPr>',
+        '</a:pPr>',
+        '<a:r><a:t>Default run style probe</a:t></a:r>',
+        '</a:p>',
+        '</p:txBody>',
+        '</p:sp>',
+      ].join('')
+  const eastAsianTypefaceProbeXml = xml.includes('East Asian Typeface Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9967" name="East Asian Typeface Probe"/>',
+        '<p:cNvSpPr txBox="1"/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="5029200" y="5943600"/>',
+        '<a:ext cx="2743200" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '</p:spPr>',
+        '<p:txBody>',
+        '<a:bodyPr/>',
+        '<a:lstStyle/>',
+        '<a:p>',
+        '<a:pPr>',
+        '<a:defRPr sz="2000">',
+        '<a:ea typeface="Malgun Gothic"/>',
+        '</a:defRPr>',
+        '</a:pPr>',
+        '<a:r><a:t>East Asian typeface probe</a:t></a:r>',
+        '</a:p>',
+        '</p:txBody>',
+        '</p:sp>',
+      ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${probeShapeXml}${eastAsianTypefaceProbeXml}</p:spTree>`,
+  )
 
   if (nextXml === xml) {
     return base64
