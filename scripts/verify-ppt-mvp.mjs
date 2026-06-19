@@ -14688,8 +14688,8 @@ async function runObjectOpacityScenario(page) {
 
   record(
     'pastes JSON object opacity through slide-edit command effect',
-    afterOpacityJSONPaste.opacityImportModel === 'ppt-object-opacity-import' &&
-      afterOpacityJSONPaste.opacityImportFormat === 'application-json-ppt-object-opacity' &&
+    afterOpacityJSONPaste.opacityImportModel === 'slide-edit-object-opacity-import' &&
+      afterOpacityJSONPaste.opacityImportFormat === 'application-json-slide-edit-object-opacity' &&
       afterOpacityJSONPaste.opacityImportSlide === 'slide-1' &&
       afterOpacityJSONPaste.opacityImportObjects === targetId &&
       afterOpacityJSONPaste.opacityImportFields === 'opacity' &&
@@ -14773,8 +14773,8 @@ async function runObjectOpacityScenario(page) {
 
   record(
     'pastes standalone JSON object opacity through slide-edit command effect',
-    afterStandaloneOpacityJSONPaste.opacityImportModel === 'ppt-object-opacity-import' &&
-      afterStandaloneOpacityJSONPaste.opacityImportFormat === 'application-json-ppt-object-opacity' &&
+    afterStandaloneOpacityJSONPaste.opacityImportModel === 'slide-edit-object-opacity-import' &&
+      afterStandaloneOpacityJSONPaste.opacityImportFormat === 'application-json-slide-edit-object-opacity' &&
       afterStandaloneOpacityJSONPaste.opacityImportSlide === 'slide-1' &&
       afterStandaloneOpacityJSONPaste.opacityImportObjects === targetId &&
       afterStandaloneOpacityJSONPaste.opacityImportFields === 'opacity' &&
@@ -14838,8 +14838,8 @@ async function runObjectOpacityScenario(page) {
 
   record(
     'pastes canvas MIME object opacity through slide-edit command effect',
-    afterCanvasMIMEOpacityJSONPaste.opacityImportModel === 'ppt-object-opacity-import' &&
-      afterCanvasMIMEOpacityJSONPaste.opacityImportFormat === 'application-json-ppt-object-opacity' &&
+    afterCanvasMIMEOpacityJSONPaste.opacityImportModel === 'slide-edit-object-opacity-import' &&
+      afterCanvasMIMEOpacityJSONPaste.opacityImportFormat === 'application-json-slide-edit-object-opacity' &&
       afterCanvasMIMEOpacityJSONPaste.opacityImportSlide === 'slide-1' &&
       afterCanvasMIMEOpacityJSONPaste.opacityImportObjects === targetId &&
       afterCanvasMIMEOpacityJSONPaste.opacityImportFields === 'opacity' &&
