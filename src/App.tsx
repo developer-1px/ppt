@@ -3685,6 +3685,12 @@ const PPT_TEXT_FONT_SIZE_SHORTCUT_INTENT =
   'ppt-text-font-size-keyboard-intent'
 const PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS =
   'Cmd/Ctrl+Shift+< Cmd/Ctrl+Shift+>'
+const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL =
+  'ppt-text-paragraph-align-keyboard-shortcuts'
+const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT =
+  'ppt-text-paragraph-align-keyboard-intent'
+const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
+  'Cmd/Ctrl+L Cmd/Ctrl+E Cmd/Ctrl+R'
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -4768,6 +4774,15 @@ function App() {
           event.preventDefault()
         }
         addSlide()
+        return
+      }
+
+      const textParagraphAlignKeyboardIntent =
+        getPPTTextParagraphAlignKeyboardShortcutIntent(event)
+
+      if (textParagraphAlignKeyboardIntent && canFormatSelectedText) {
+        event.preventDefault()
+        updateSelectedParagraphAlign(textParagraphAlignKeyboardIntent.align)
         return
       }
 
@@ -14240,6 +14255,27 @@ function App() {
     title: 'Increase font size',
   }, {
     disabled: !canFormatSelectedText,
+    id: 'format:align-text-left',
+    onSelect: () => updateSelectedParagraphAlign('left'),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+L',
+    title: 'Align text left',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:align-text-center',
+    onSelect: () => updateSelectedParagraphAlign('center'),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+E',
+    title: 'Align text center',
+  }, {
+    disabled: !canFormatSelectedText,
+    id: 'format:align-text-right',
+    onSelect: () => updateSelectedParagraphAlign('right'),
+    section: 'Format',
+    shortcut: 'Cmd/Ctrl+R',
+    title: 'Align text right',
+  }, {
+    disabled: !canFormatSelectedText,
     id: 'format:bullet',
     onSelect: toggleSelectedParagraphBullet,
     section: 'Format',
@@ -15278,6 +15314,9 @@ function App() {
         data-ppt-text-font-size-shortcut-keys={PPT_TEXT_FONT_SIZE_SHORTCUT_KEYS}
         data-ppt-text-font-size-shortcut-model={PPT_TEXT_FONT_SIZE_SHORTCUT_MODEL}
         data-ppt-text-font-size-shortcut-step={String(PPT_TEXT_FONT_SIZE_STEP)}
+        data-ppt-text-paragraph-align-shortcut-intent={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT}
+        data-ppt-text-paragraph-align-shortcut-keys={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS}
+        data-ppt-text-paragraph-align-shortcut-model={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL}
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}
@@ -39151,6 +39190,34 @@ function getPPTTextFontSizeKeyboardShortcutIntent(event: KeyboardEvent) {
   }
 
   return null
+}
+
+function getPPTTextParagraphAlignKeyboardShortcutIntent(event: KeyboardEvent) {
+  const mod = event.metaKey || event.ctrlKey
+
+  if (!mod || event.shiftKey || event.altKey) {
+    return null
+  }
+
+  switch (event.key.toLowerCase()) {
+    case 'l':
+      return {
+        align: 'left' as const,
+        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+      }
+    case 'e':
+      return {
+        align: 'center' as const,
+        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+      }
+    case 'r':
+      return {
+        align: 'right' as const,
+        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+      }
+    default:
+      return null
+  }
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {

@@ -3145,6 +3145,51 @@ async function runAffordanceScenario(page) {
     afterSendToBackShortcut,
   })
 
+  await page.eval(`document.querySelector('[data-ppt-insert-line="line"]')?.click()`)
+  await delay(20)
+  const lockShortcutProbeDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.9,
+      endY: slide.top + slide.height * 0.22,
+      startX: slide.left + slide.width * 0.78,
+      startY: slide.top + slide.height * 0.18,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: lockShortcutProbeDrag.startX,
+    y: lockShortcutProbeDrag.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: lockShortcutProbeDrag.endX,
+    y: lockShortcutProbeDrag.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: lockShortcutProbeDrag.endX,
+    y: lockShortcutProbeDrag.endY,
+  })
+  await delay(80)
+
+  const lockShortcutProbe = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      text: selected?.textContent?.trim() ?? '',
+    }
+  })()`)
+
   await pressKey(page, {
     code: 'KeyL',
     key: 'l',
@@ -3152,7 +3197,8 @@ async function runAffordanceScenario(page) {
     windowsVirtualKeyCode: 76,
   })
   await delay(50)
-  const afterLockShortcut = await readPPTElementLayerState(page, 's1-card-1')
+  const afterLockShortcut =
+    await readPPTElementLayerState(page, lockShortcutProbe.selectedId)
 
   await pressKey(page, {
     code: 'KeyL',
@@ -3161,12 +3207,24 @@ async function runAffordanceScenario(page) {
     windowsVirtualKeyCode: 76,
   })
   await delay(50)
-  const afterUnlockShortcut = await readPPTElementLayerState(page, 's1-card-1')
+  const afterUnlockShortcut =
+    await readPPTElementLayerState(page, lockShortcutProbe.selectedId)
 
-  record('runs PPT lock and unlock keyboard shortcuts from canvas command bindings', afterLockShortcut.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterLockShortcut.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterLockShortcut.locked === 'true' && afterUnlockShortcut.locked === 'false' && afterUnlockShortcut.selected, {
+  record('runs PPT lock and unlock keyboard shortcuts from canvas command bindings on non-text objects', lockShortcutProbe.selectedKind === 'line' && afterLockShortcut.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' && afterLockShortcut.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' && afterLockShortcut.locked === 'true' && afterUnlockShortcut.locked === 'false' && afterUnlockShortcut.selected, {
     afterLockShortcut,
     afterUnlockShortcut,
+    lockShortcutProbeDrag,
+    lockShortcutProbe,
   })
+
+  await pressKey(page, {
+    code: 'Delete',
+    key: 'Delete',
+    windowsVirtualKeyCode: 46,
+  })
+  await delay(50)
+  await clickMouse(page, afterDistribute.x, afterDistribute.y, 1)
+  await delay(50)
 
   await pressKey(page, {
     code: 'KeyD',
@@ -6689,6 +6747,26 @@ function getPPTTextShortcutFormatState(page, elementId) {
   })(${JSON.stringify(elementId)})`)
 }
 
+function getPPTTextParagraphAlignShortcutState(page, elementId) {
+  return page.eval(`((id) => {
+    const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const paragraph = element?.querySelector('.ppt-text-paragraph')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      locked: element?.getAttribute('data-locked') ?? '',
+      quickChecked: [...document.querySelectorAll('[data-ppt-paragraph-align-radiogroup="quick"] [aria-checked="true"]')]
+        .map((radio) => radio.getAttribute('data-ppt-paragraph-align'))
+        .join(' '),
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      shortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-align-shortcut-intent') ?? '',
+      shortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-align-shortcut-keys') ?? '',
+      shortcutModel: stage?.getAttribute('data-ppt-text-paragraph-align-shortcut-model') ?? '',
+      textAlign: paragraph ? getComputedStyle(paragraph).textAlign : '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
 function getPPTTextFormatPainterState(page, elementId) {
   return page.eval(`((id) => {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
@@ -7205,6 +7283,63 @@ async function runTextQuickFormatScenario(page) {
       afterFontSizeDecreaseShortcut,
       afterFontSizeIncreaseShortcut,
       initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyE',
+    key: 'e',
+    modifiers: 2,
+    windowsVirtualKeyCode: 69,
+  })
+  await delay(80)
+
+  const afterTextAlignCenterShortcut =
+    await getPPTTextParagraphAlignShortcutState(page, 's1-title')
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    modifiers: 2,
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(80)
+
+  const afterTextAlignRightShortcut =
+    await getPPTTextParagraphAlignShortcutState(page, 's1-title')
+
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    modifiers: 2,
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(80)
+
+  const afterTextAlignLeftShortcut =
+    await getPPTTextParagraphAlignShortcutState(page, 's1-title')
+
+  record(
+    'aligns PPT text paragraphs with PPTX Cmd/Ctrl L E R shortcuts',
+    afterTextAlignCenterShortcut.selectedId === 's1-title' &&
+      afterTextAlignCenterShortcut.shortcutModel === 'ppt-text-paragraph-align-keyboard-shortcuts' &&
+      afterTextAlignCenterShortcut.shortcutIntent === 'ppt-text-paragraph-align-keyboard-intent' &&
+      afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+L') &&
+      afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+E') &&
+      afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+R') &&
+      afterTextAlignCenterShortcut.textAlign === 'center' &&
+      afterTextAlignCenterShortcut.quickChecked === 'center' &&
+      afterTextAlignRightShortcut.selectedId === 's1-title' &&
+      afterTextAlignRightShortcut.textAlign === 'right' &&
+      afterTextAlignRightShortcut.quickChecked === 'right' &&
+      afterTextAlignLeftShortcut.selectedId === 's1-title' &&
+      afterTextAlignLeftShortcut.textAlign === 'left' &&
+      afterTextAlignLeftShortcut.quickChecked === 'left' &&
+      afterTextAlignLeftShortcut.locked === 'false',
+    {
+      afterTextAlignCenterShortcut,
+      afterTextAlignLeftShortcut,
+      afterTextAlignRightShortcut,
     },
   )
 
