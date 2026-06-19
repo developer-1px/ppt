@@ -5084,26 +5084,6 @@ function App() {
       }
 
       if (
-        event.key === 'F2' &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.shiftKey &&
-        !isPPTCanvasControlTarget({
-          extraSelectors: ['[data-ppt-layer-pane]'],
-          target: event.target,
-        }) &&
-        selectedElement &&
-        isPPTTextElement(selectedElement) &&
-        selectedElement.locked !== true &&
-        selectedElement.visible !== false
-      ) {
-        event.preventDefault()
-        editSelectedElement()
-        return
-      }
-
-      if (
         !editingId &&
         isPPTKeyboardTextEditStartKey(event) &&
         !getPPTToolShortcutIntent(event) &&

@@ -1346,20 +1346,25 @@ async function runTextEditingScenario(page) {
   const afterF2KeyboardEdit = await page.eval(`(() => {
     const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
     const selected = document.querySelector('[data-selected="true"]')
+    const shell = document.querySelector('.ppt-stage-shell')
 
     return {
       active: document.activeElement === editor,
       editable: editor?.isContentEditable === true,
       inlineEditActive: editor?.getAttribute('data-ppt-inline-edit-active') ?? '',
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
     }
   })()`)
 
   record(
-    'enters PPT inline text edit with F2 fallback shortcut',
+    'enters PPT inline text edit with F2 canvas edit-selection keyboard intent',
     afterF2KeyboardEdit.active &&
       afterF2KeyboardEdit.editable &&
       afterF2KeyboardEdit.inlineEditActive === 'true' &&
+      afterF2KeyboardEdit.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterF2KeyboardEdit.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
       afterF2KeyboardEdit.selectedId === 's1-title',
     afterF2KeyboardEdit,
   )
