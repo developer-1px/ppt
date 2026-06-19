@@ -5056,6 +5056,7 @@ async function runCommandPaletteScenario(page) {
   const markerToolIds = await readCommandPaletteIds(page, 'marker')
   const highlighterToolIds = await readCommandPaletteIds(page, 'highlighter')
   const eraserToolIds = await readCommandPaletteIds(page, 'eraser')
+  const clearFormattingIds = await readCommandPaletteIds(page, 'clear formatting')
   const findIds = await readCommandPaletteIds(page, 'find')
   const groupIds = await readCommandPaletteIds(page, 'group')
   const lockIds = await readCommandPaletteIds(page, 'lock')
@@ -5093,6 +5094,7 @@ async function runCommandPaletteScenario(page) {
     hasFind: findIds.includes('view:find'),
     hasFlip: flipIds.includes('command:flip-horizontal') &&
       flipIds.includes('command:flip-vertical'),
+    hasFormat: clearFormattingIds.includes('format:clear-formatting'),
     hasGroup: groupIds.includes('command:group') && groupIds.includes('command:ungroup'),
     hasLock: lockIds.includes('command:lock-selection') && lockIds.includes('command:unlock-all'),
     hasLockShortcuts: lockShortcutIds.includes('command:lock-selection') &&
@@ -5132,6 +5134,7 @@ async function runCommandPaletteScenario(page) {
     visibleCounts: {
       align: alignIds.length,
       back: backIds.length,
+      clearFormatting: clearFormattingIds.length,
       find: findIds.length,
       fit: fitIds.length,
       flip: flipIds.length,
@@ -5155,7 +5158,7 @@ async function runCommandPaletteScenario(page) {
     },
   }
 
-  record('exposes PPT create view and arrange commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasGroup && exposed.hasLock && exposed.hasLockShortcuts && exposed.hasReorder && exposed.hasReorderShortcuts && exposed.hasTidy && exposed.hasView && exposed.hasViewportShortcuts, exposed)
+  record('exposes PPT create view arrange and format commands in command palette', exposed.hasAlign && exposed.hasCreate && exposed.hasFind && exposed.hasFlip && exposed.hasFormat && exposed.hasGroup && exposed.hasLock && exposed.hasLockShortcuts && exposed.hasReorder && exposed.hasReorderShortcuts && exposed.hasTidy && exposed.hasView && exposed.hasViewportShortcuts, exposed)
 
   const guideToggleIds = await readCommandPaletteIds(page, 'frame guides')
   await pressKey(page, {
@@ -6861,6 +6864,21 @@ function getPPTTextFormatPainterState(page, elementId) {
       stylePadding: element?.style.padding ?? '',
       text: element?.textContent ?? '',
       textAlign: element?.style.textAlign ?? '',
+      textClearFormattingCommand: stage?.getAttribute('data-ppt-text-clear-formatting-command') ?? '',
+      textClearFormattingCommandTargets: stage?.getAttribute('data-ppt-text-clear-formatting-command-targets') ?? '',
+      textClearFormattingCommandType: stage?.getAttribute('data-ppt-text-clear-formatting-command-type') ?? '',
+      textClearFormattingImportCommand: stage?.getAttribute('data-ppt-text-clear-formatting-import-command') ?? '',
+      textClearFormattingImportCommandTargets: stage?.getAttribute('data-ppt-text-clear-formatting-import-command-targets') ?? '',
+      textClearFormattingImportCommandType: stage?.getAttribute('data-ppt-text-clear-formatting-import-command-type') ?? '',
+      textClearFormattingImportFields: stage?.getAttribute('data-ppt-text-clear-formatting-import-fields') ?? '',
+      textClearFormattingImportFormat: stage?.getAttribute('data-ppt-text-clear-formatting-import-format') ?? '',
+      textClearFormattingImportJsonLength: Number(stage?.getAttribute('data-ppt-text-clear-formatting-import-json-length') ?? 0),
+      textClearFormattingImportModel: stage?.getAttribute('data-ppt-text-clear-formatting-import-model') ?? '',
+      textClearFormattingImportObjects: stage?.getAttribute('data-ppt-text-clear-formatting-import-objects') ?? '',
+      textClearFormattingImportRuns: Number(stage?.getAttribute('data-ppt-text-clear-formatting-import-runs') ?? 0),
+      textClearFormattingImportSlide: stage?.getAttribute('data-ppt-text-clear-formatting-import-slide') ?? '',
+      textClearFormattingModel: stage?.getAttribute('data-ppt-text-clear-formatting-model') ?? '',
+      textClearFormattingSlide: stage?.getAttribute('data-ppt-text-clear-formatting-slide') ?? '',
       textInset: element?.getAttribute('data-ppt-text-inset') ?? '',
       textFontSizeImportCategories: stage?.getAttribute('data-ppt-text-font-size-import-categories') ?? '',
       textFontSizeImportCommand: stage?.getAttribute('data-ppt-text-font-size-import-command') ?? '',
@@ -7234,9 +7252,10 @@ async function runTextQuickFormatScenario(page) {
     selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
     strikethroughPressed: document.querySelector('[data-ppt-text-quick="strikethrough"]')?.getAttribute('aria-pressed') ?? '',
     underlinePressed: document.querySelector('[data-ppt-text-quick="underline"]')?.getAttribute('aria-pressed') ?? '',
+    clearFormattingPresent: !!document.querySelector('[data-ppt-text-quick="clear-formatting"]'),
   }))()`)
 
-  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.strikethroughPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0 && initial.highlightValue === '#fde047', initial)
+  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.strikethroughPressed === 'false' && initial.underlinePressed === 'false' && initial.clearFormattingPresent && initial.fontSize > 0 && initial.highlightValue === '#fde047', initial)
 
   await pressKey(page, {
     code: 'KeyI',
@@ -7852,6 +7871,92 @@ async function runTextQuickFormatScenario(page) {
     afterSingleFormat,
     initial,
   })
+
+  const titleBeforeClearFormatting =
+    await getPPTTextFormatPainterState(page, 's1-title')
+
+  await page.eval(`document.querySelector('[data-ppt-text-quick="clear-formatting"]')?.click()`)
+  await delay(100)
+
+  const titleAfterClearFormatting =
+    await getPPTTextFormatPainterState(page, 's1-title')
+
+  record(
+    'clears PPT text formatting with PPTX-style quick command',
+    titleBeforeClearFormatting.text === titleAfterClearFormatting.text &&
+      titleBeforeClearFormatting.name === titleAfterClearFormatting.name &&
+      titleBeforeClearFormatting.left === titleAfterClearFormatting.left &&
+      titleBeforeClearFormatting.top === titleAfterClearFormatting.top &&
+      titleBeforeClearFormatting.width === titleAfterClearFormatting.width &&
+      titleBeforeClearFormatting.height === titleAfterClearFormatting.height &&
+      titleBeforeClearFormatting.textInset === titleAfterClearFormatting.textInset &&
+      titleBeforeClearFormatting.verticalAlign === titleAfterClearFormatting.verticalAlign &&
+      titleAfterClearFormatting.selected === 'true' &&
+      titleAfterClearFormatting.textClearFormattingCommand === 'clear-text-formatting' &&
+      titleAfterClearFormatting.textClearFormattingCommandTargets === 's1-title' &&
+      titleAfterClearFormatting.textClearFormattingCommandType === 'slide-command-effect' &&
+      titleAfterClearFormatting.textClearFormattingModel === 'text-clear-formatting' &&
+      titleAfterClearFormatting.textClearFormattingSlide === 'slide-1' &&
+      titleAfterClearFormatting.textClearFormattingImportModel === '' &&
+      titleAfterClearFormatting.color === 'rgb(17, 24, 39)' &&
+      titleAfterClearFormatting.fontFamily === 'Inter' &&
+      titleAfterClearFormatting.styleFontFamily.includes('Inter') &&
+      titleAfterClearFormatting.fontSize === '24px' &&
+      ['400', 'normal'].includes(titleAfterClearFormatting.fontWeight) &&
+      titleAfterClearFormatting.textAlign === 'left' &&
+      titleAfterClearFormatting.bulletList === '' &&
+      titleAfterClearFormatting.numberedList === '' &&
+      titleAfterClearFormatting.paragraphList === '' &&
+      titleAfterClearFormatting.boldRunCount === 0 &&
+      titleAfterClearFormatting.italicRunCount === 0 &&
+      titleAfterClearFormatting.runColorCount === 0 &&
+      titleAfterClearFormatting.runHighlightCount === 0 &&
+      titleAfterClearFormatting.runSizeCount === 0 &&
+      titleAfterClearFormatting.strikethroughRunCount === 0 &&
+      titleAfterClearFormatting.underlineRunCount === 0,
+    {
+      titleAfterClearFormatting,
+      titleBeforeClearFormatting,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const titleAfterClearFormattingUndo =
+    await getPPTTextFormatPainterState(page, 's1-title')
+
+  record(
+    'undoes PPT text clear formatting as one history step',
+    titleAfterClearFormattingUndo.selected === 'true' &&
+      titleAfterClearFormattingUndo.text === titleBeforeClearFormatting.text &&
+      titleAfterClearFormattingUndo.name === titleBeforeClearFormatting.name &&
+      titleAfterClearFormattingUndo.left === titleBeforeClearFormatting.left &&
+      titleAfterClearFormattingUndo.top === titleBeforeClearFormatting.top &&
+      titleAfterClearFormattingUndo.width === titleBeforeClearFormatting.width &&
+      titleAfterClearFormattingUndo.height === titleBeforeClearFormatting.height &&
+      titleAfterClearFormattingUndo.color === titleBeforeClearFormatting.color &&
+      titleAfterClearFormattingUndo.fontSize === titleBeforeClearFormatting.fontSize &&
+      titleAfterClearFormattingUndo.fontWeight === titleBeforeClearFormatting.fontWeight &&
+      titleAfterClearFormattingUndo.textAlign === titleBeforeClearFormatting.textAlign &&
+      titleAfterClearFormattingUndo.bulletList === titleBeforeClearFormatting.bulletList &&
+      titleAfterClearFormattingUndo.numberedList === titleBeforeClearFormatting.numberedList &&
+      titleAfterClearFormattingUndo.paragraphList === titleBeforeClearFormatting.paragraphList &&
+      titleAfterClearFormattingUndo.italicRunCount === titleBeforeClearFormatting.italicRunCount &&
+      titleAfterClearFormattingUndo.runHighlightValue === titleBeforeClearFormatting.runHighlightValue &&
+      titleAfterClearFormattingUndo.strikethroughRunCount === titleBeforeClearFormatting.strikethroughRunCount &&
+      titleAfterClearFormattingUndo.underlineRunCount === titleBeforeClearFormatting.underlineRunCount,
+    {
+      titleAfterClearFormatting,
+      titleAfterClearFormattingUndo,
+      titleBeforeClearFormatting,
+    },
+  )
 
   await page.eval(`document.querySelector('[data-ppt-command="copy-formatting"]')?.click()`)
   await delay(80)
@@ -9074,6 +9179,107 @@ async function runTextQuickFormatScenario(page) {
     windowsVirtualKeyCode: 90,
   })
   await delay(80)
+
+  const summaryBeforeTextClearFormattingPaste =
+    await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.slide-edit.text-clear-formatting+json',
+      JSON.stringify(true),
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextClearFormattingPaste =
+    await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes canvas text clear formatting JSON through clear formatting command effect',
+    summaryBeforeTextClearFormattingPaste.text === summaryAfterTextClearFormattingPaste.text &&
+      summaryBeforeTextClearFormattingPaste.name === summaryAfterTextClearFormattingPaste.name &&
+      summaryBeforeTextClearFormattingPaste.left === summaryAfterTextClearFormattingPaste.left &&
+      summaryBeforeTextClearFormattingPaste.top === summaryAfterTextClearFormattingPaste.top &&
+      summaryBeforeTextClearFormattingPaste.width === summaryAfterTextClearFormattingPaste.width &&
+      summaryBeforeTextClearFormattingPaste.height === summaryAfterTextClearFormattingPaste.height &&
+      summaryBeforeTextClearFormattingPaste.textInset === summaryAfterTextClearFormattingPaste.textInset &&
+      summaryBeforeTextClearFormattingPaste.verticalAlign === summaryAfterTextClearFormattingPaste.verticalAlign &&
+      summaryAfterTextClearFormattingPaste.selected === 'true' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingCommand === 'clear-text-formatting' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingCommandTargets === 's1-summary' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingCommandType === 'slide-command-effect' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingModel === 'text-clear-formatting' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingSlide === 'slide-1' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportCommand === 'clear-text-formatting' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportCommandTargets === 's1-summary' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportCommandType === 'slide-command-effect' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportFields === 'value' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportFormat === 'application-json-ppt-text-clear-formatting' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportJsonLength >= 4 &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportModel === 'ppt-text-clear-formatting-import' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportObjects === 's1-summary' &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportRuns > 0 &&
+      summaryAfterTextClearFormattingPaste.textClearFormattingImportSlide === 'slide-1' &&
+      summaryAfterTextClearFormattingPaste.color === 'rgb(17, 24, 39)' &&
+      summaryAfterTextClearFormattingPaste.fontFamily === 'Inter' &&
+      summaryAfterTextClearFormattingPaste.fontSize === '24px' &&
+      ['400', 'normal'].includes(summaryAfterTextClearFormattingPaste.fontWeight) &&
+      summaryAfterTextClearFormattingPaste.textAlign === 'left' &&
+      summaryAfterTextClearFormattingPaste.bulletList === '' &&
+      summaryAfterTextClearFormattingPaste.numberedList === '' &&
+      summaryAfterTextClearFormattingPaste.paragraphList === '' &&
+      summaryAfterTextClearFormattingPaste.boldRunCount === 0 &&
+      summaryAfterTextClearFormattingPaste.italicRunCount === 0 &&
+      summaryAfterTextClearFormattingPaste.runColorCount === 0 &&
+      summaryAfterTextClearFormattingPaste.runHighlightCount === 0 &&
+      summaryAfterTextClearFormattingPaste.runSizeCount === 0 &&
+      summaryAfterTextClearFormattingPaste.strikethroughRunCount === 0 &&
+      summaryAfterTextClearFormattingPaste.underlineRunCount === 0,
+    {
+      summaryAfterTextClearFormattingPaste,
+      summaryBeforeTextClearFormattingPaste,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(100)
+
+  const summaryAfterTextClearFormattingUndo =
+    await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'undoes pasted PPT text clear formatting as one history step',
+    summaryAfterTextClearFormattingUndo.selected === 'true' &&
+      summaryAfterTextClearFormattingUndo.text === summaryBeforeTextClearFormattingPaste.text &&
+      summaryAfterTextClearFormattingUndo.color === summaryBeforeTextClearFormattingPaste.color &&
+      summaryAfterTextClearFormattingUndo.fontSize === summaryBeforeTextClearFormattingPaste.fontSize &&
+      summaryAfterTextClearFormattingUndo.fontWeight === summaryBeforeTextClearFormattingPaste.fontWeight &&
+      summaryAfterTextClearFormattingUndo.textAlign === summaryBeforeTextClearFormattingPaste.textAlign &&
+      summaryAfterTextClearFormattingUndo.bulletList === summaryBeforeTextClearFormattingPaste.bulletList &&
+      summaryAfterTextClearFormattingUndo.numberedList === summaryBeforeTextClearFormattingPaste.numberedList &&
+      summaryAfterTextClearFormattingUndo.paragraphList === summaryBeforeTextClearFormattingPaste.paragraphList &&
+      summaryAfterTextClearFormattingUndo.italicRunCount === summaryBeforeTextClearFormattingPaste.italicRunCount &&
+      summaryAfterTextClearFormattingUndo.runHighlightValue === summaryBeforeTextClearFormattingPaste.runHighlightValue &&
+      summaryAfterTextClearFormattingUndo.strikethroughRunCount === summaryBeforeTextClearFormattingPaste.strikethroughRunCount &&
+      summaryAfterTextClearFormattingUndo.underlineRunCount === summaryBeforeTextClearFormattingPaste.underlineRunCount,
+    {
+      summaryAfterTextClearFormattingPaste,
+      summaryAfterTextClearFormattingUndo,
+      summaryBeforeTextClearFormattingPaste,
+    },
+  )
 
   await pressKey(page, {
     code: 'Escape',

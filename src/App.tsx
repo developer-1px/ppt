@@ -223,6 +223,9 @@ import {
   getSlideEditTextFontSizeJSONPasteValueFromText,
   getSlideEditTextFontWeightCommandEffect,
   getSlideEditTextFontWeightJSONPasteValueFromText,
+  createSlideEditTextClearFormattingDescriptor,
+  getSlideEditTextClearFormattingCommandEffect,
+  getSlideEditTextClearFormattingJSONPasteValueFromText,
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextRunFormattingCommandEffect,
   getSlideEditTextRunFormattingJSONPasteValueFromText,
@@ -294,6 +297,7 @@ import {
   SLIDE_EDIT_TEXT_FONT_FAMILY_FIELD,
   SLIDE_EDIT_TEXT_FONT_SIZE_FIELD,
   SLIDE_EDIT_TEXT_FONT_WEIGHT_FIELD,
+  SLIDE_EDIT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
@@ -414,6 +418,7 @@ import {
   type SlideEditThemeColorToken,
   type SlideEditTextFontFamilyDescriptor,
   type SlideEditTextFontFamilyHostCommandEffect,
+  type SlideEditTextClearFormattingHostCommandEffect,
   type SlideEditTextFontSizeHostCommandEffect,
   type SlideEditTextFontWeightHostCommandEffect,
   type SlideEditTextFrameInsetDescriptor,
@@ -1571,6 +1576,12 @@ const PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-font-family' as const
 const PPT_TEXT_FONT_FAMILY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-font-family+json'
+const PPT_TEXT_CLEAR_FORMATTING_IMPORT_MODEL =
+  'ppt-text-clear-formatting-import' as const
+const PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-clear-formatting' as const
+const PPT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-clear-formatting+json'
 const PPT_TEXT_BODY_IMPORT_MODEL = 'ppt-text-body-import' as const
 const PPT_TEXT_BODY_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-body' as const
@@ -2097,6 +2108,18 @@ type PPTTextFontFamilyImportSource = {
   fields: readonly PPTTextFontFamilyImportField[]
   fontFamily: string
   format: typeof PPT_TEXT_FONT_FAMILY_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
+type PPTTextClearFormattingImportField =
+  | 'clearFormat'
+  | 'clearFormatting'
+  | 'clearTextFormatting'
+  | 'resetFormatting'
+  | 'textClearFormatting'
+  | 'value'
+type PPTTextClearFormattingImportSource = {
+  fields: readonly PPTTextClearFormattingImportField[]
+  format: typeof PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT
   jsonLength: number
 }
 type PPTTextBodyImportFormat =
@@ -2743,6 +2766,18 @@ type PPTTextFontFamilyImportEffect = {
   objectIds: string
   slideId: string
 }
+type PPTTextClearFormattingImportEffect = {
+  commandId: string
+  commandTargets: string
+  commandType: string
+  fields: string
+  format: typeof PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_CLEAR_FORMATTING_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
+}
 type PPTTextBodyImportEffect = {
   commandTargets: string
   format: PPTTextBodyImportFormat
@@ -2756,6 +2791,8 @@ type PPTTextBodyImportEffect = {
 }
 type PPTTextBodyReplaceHostCommandEffect =
   SlideEditTextBodyReplaceHostCommandEffect<string, string, PPTTextBody>
+type PPTTextClearFormattingHostCommandEffect =
+  SlideEditTextClearFormattingHostCommandEffect<string, string>
 type PPTTextRunFormattingHostCommandEffect =
   SlideEditTextRunFormattingHostCommandEffect<string, string>
 type PPTTextRunSizeImportEffect = {
@@ -3226,6 +3263,7 @@ type PPTSurfaceCommand =
   | 'alignTop'
   | 'bringForward'
   | 'bringToFront'
+  | 'clearTextFormatting'
   | 'copyFormatting'
   | 'delete'
   | 'distributeHorizontal'
@@ -3254,6 +3292,7 @@ type PPTAlignmentPopoverCommand = Extract<
   | 'distributeVertical'
 >
 type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
+  clearTextFormatting: boolean
   copyFormatting: boolean
   flipSelection: boolean
   pasteFormatting: boolean
@@ -3590,6 +3629,13 @@ const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
     label: 'Paste formatting',
     surfaces: ['context-menu', 'selection-floating-bar'],
     title: 'Paste formatting',
+  }, {
+    availability: 'clearTextFormatting',
+    command: 'clearTextFormatting',
+    dataCommand: 'clear-text-formatting',
+    label: 'Clear formatting',
+    surfaces: ['context-menu', 'selection-floating-bar'],
+    title: 'Clear formatting',
   }, {
     availability: 'selectSameType',
     command: 'selectSameType',
@@ -4173,6 +4219,12 @@ function App() {
     useState<PPTObjectCornerRadiusImportEffect | null>(null)
   const [lastTextStyleImportEffect, setLastTextStyleImportEffect] =
     useState<PPTTextStyleImportEffect | null>(null)
+  const [lastTextClearFormattingEffect, setLastTextClearFormattingEffect] =
+    useState<PPTTextClearFormattingHostCommandEffect | null>(null)
+  const [
+    lastTextClearFormattingImportEffect,
+    setLastTextClearFormattingImportEffect,
+  ] = useState<PPTTextClearFormattingImportEffect | null>(null)
   const [lastTextBodyImportEffect, setLastTextBodyImportEffect] =
     useState<PPTTextBodyImportEffect | null>(null)
   const [lastTextRunSizeImportEffect, setLastTextRunSizeImportEffect] =
@@ -4549,6 +4601,7 @@ function App() {
       hasLockedSelection,
       selection,
     }),
+    clearTextFormatting: canFormatSelectedText,
     copyFormatting: canCopyFormatting,
     flipSelection: canFlipSelection,
     pasteFormatting: canPasteFormatting,
@@ -4560,6 +4613,7 @@ function App() {
     canPasteFormatting,
     canSelectSameType,
     canTidySelection,
+    canFormatSelectedText,
     future.length,
     hasGroupedSelection,
     hasHiddenSelection,
@@ -5309,6 +5363,12 @@ function App() {
           'text-style-source',
           getPPTTextStyleSourceFromDataTransfer,
           pastePPTTextStyleSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-clear-formatting-source',
+          getPPTTextClearFormattingSourceFromDataTransfer,
+          pastePPTTextClearFormattingSource,
         ),
         createPPTClipboardSourcePasteResolver(
           dataTransfer,
@@ -9282,6 +9342,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     return true
   }
 
+  function pastePPTTextClearFormattingSource(
+    source: PPTTextClearFormattingImportSource,
+  ) {
+    return clearSelectedTextFormatting(source)
+  }
+
   function pastePPTDeckFallbackHTMLSource(source: PPTDeckHTMLFallbackSource) {
     if (source.slides.length === 0) {
       return false
@@ -11053,6 +11119,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       case 'bringToFront':
         reorderSelection('bringToFront')
         break
+      case 'clearTextFormatting':
+        clearSelectedTextFormatting()
+        break
       case 'copyFormatting':
         copyFormatting()
         break
@@ -11498,6 +11567,52 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         isPPTTextElement(element) ? mapTextElement(element, index) : element,
       selection,
     })
+  }
+
+  function clearSelectedTextFormatting(
+    source?: PPTTextClearFormattingImportSource,
+  ) {
+    if (!canFormatSelectedText) {
+      return false
+    }
+
+    const descriptor = createSlideEditTextClearFormattingDescriptor({
+      objectIds: selectedTextElements.map((element) => element.id),
+      slideId: activeSlide.id,
+    })
+    const effect = getSlideEditTextClearFormattingCommandEffect({
+      objectIds: descriptor.objectIds,
+      slideId: descriptor.slideId,
+    })
+    const runCount = getPPTTextElementsRunCount(selectedTextElements)
+
+    setLastTextClearFormattingEffect(effect)
+    setLastTextClearFormattingImportEffect(
+      source
+        ? createPPTTextClearFormattingImportEffect({
+            effect,
+            runCount,
+            source,
+          })
+        : null,
+    )
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.objectIds,
+          (element) =>
+            isPPTTextElement(element)
+              ? applyPPTTextClearFormattingCommandEffectToElement(
+                  element,
+                )
+              : element,
+        ),
+      })))
+
+    return true
   }
 
   function updateSelectedParagraphAlign(
@@ -14664,6 +14779,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     title: 'Strikethrough text',
   }, {
     disabled: !canFormatSelectedText,
+    id: 'format:clear-formatting',
+    onSelect: clearSelectedTextFormatting,
+    section: 'Format',
+    title: 'Clear formatting',
+  }, {
+    disabled: !canFormatSelectedText,
     id: 'format:decrease-font-size',
     onSelect: () => stepSelectedTextFontSize(-PPT_TEXT_FONT_SIZE_STEP),
     section: 'Format',
@@ -15499,6 +15620,21 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-style-import-run-underline={lastTextStyleImportEffect?.runUnderline}
         data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
         data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
+        data-ppt-text-clear-formatting-command={lastTextClearFormattingEffect?.payload.id}
+        data-ppt-text-clear-formatting-command-targets={lastTextClearFormattingEffect?.payload.objectIds.join(' ')}
+        data-ppt-text-clear-formatting-command-type={lastTextClearFormattingEffect?.type}
+        data-ppt-text-clear-formatting-model="text-clear-formatting"
+        data-ppt-text-clear-formatting-slide={lastTextClearFormattingEffect?.payload.slideId}
+        data-ppt-text-clear-formatting-import-command={lastTextClearFormattingImportEffect?.commandId}
+        data-ppt-text-clear-formatting-import-command-targets={lastTextClearFormattingImportEffect?.commandTargets}
+        data-ppt-text-clear-formatting-import-command-type={lastTextClearFormattingImportEffect?.commandType}
+        data-ppt-text-clear-formatting-import-fields={lastTextClearFormattingImportEffect?.fields}
+        data-ppt-text-clear-formatting-import-format={lastTextClearFormattingImportEffect?.format}
+        data-ppt-text-clear-formatting-import-json-length={lastTextClearFormattingImportEffect?.jsonLength}
+        data-ppt-text-clear-formatting-import-model={lastTextClearFormattingImportEffect?.model}
+        data-ppt-text-clear-formatting-import-objects={lastTextClearFormattingImportEffect?.objectIds}
+        data-ppt-text-clear-formatting-import-runs={lastTextClearFormattingImportEffect?.runCount}
+        data-ppt-text-clear-formatting-import-slide={lastTextClearFormattingImportEffect?.slideId}
         data-ppt-text-body-import-command-targets={lastTextBodyImportEffect?.commandTargets}
         data-ppt-text-body-import-format={lastTextBodyImportEffect?.format}
         data-ppt-text-body-import-json-length={lastTextBodyImportEffect?.jsonLength}
@@ -16399,6 +16535,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
               onParagraphAlign={updateSelectedParagraphAlign}
               onShapeKindChange={updateShapeKind}
               onTextBoldToggle={toggleSelectedTextBold}
+              onTextClearFormatting={clearSelectedTextFormatting}
               onTextColorChange={updateSelectedTextColor}
               onTextHighlightChange={updateSelectedTextHighlight}
               onTextItalicToggle={toggleSelectedTextItalic}
@@ -19663,6 +19800,29 @@ function createPPTTextStyleImportEffect({
   }
 }
 
+function createPPTTextClearFormattingImportEffect({
+  effect,
+  runCount,
+  source,
+}: {
+  effect: PPTTextClearFormattingHostCommandEffect
+  runCount: number
+  source: PPTTextClearFormattingImportSource
+}): PPTTextClearFormattingImportEffect {
+  return {
+    commandId: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandType: effect.type,
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_CLEAR_FORMATTING_IMPORT_MODEL,
+    objectIds: effect.payload.objectIds.join(' '),
+    runCount,
+    slideId: effect.payload.slideId,
+  }
+}
+
 function createPPTTextFontSizeImportEffect({
   effects,
   source,
@@ -20012,6 +20172,28 @@ function applyPPTTextRunFormattingCommandEffectToElement(
         runs: paragraph.runs.map((run) => ({
           ...run,
           [field]: value,
+        })),
+      })),
+    },
+  }
+}
+
+function applyPPTTextClearFormattingCommandEffectToElement(
+  element: PPTTextElement,
+): PPTTextElement {
+  const preservedTextStyle = getPPTTextElementStyle(element)
+
+  return {
+    ...element,
+    style: {
+      ...getDefaultPPTTextStyle(),
+      textInset: getPPTTextElementInset(element),
+      verticalAlign: preservedTextStyle.verticalAlign,
+    },
+    textBody: {
+      paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+        runs: paragraph.runs.map((run) => ({
+          text: run.text,
         })),
       })),
     },
@@ -26095,6 +26277,202 @@ function getPPTObjectStrokeLineStyleFromJSONValue(
   return typeof raw === 'string' && isPPTStrokeDash(raw)
     ? normalizePPTStrokeDash(raw)
     : undefined
+}
+
+function getPPTTextClearFormattingSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const slideEditSource =
+    getPPTTextClearFormattingSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextClearFormattingImportSource['format']
+  >[] = [
+    {
+      allowDirect: true,
+      format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE,
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+    },
+  ]
+
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextClearFormattingSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextClearFormattingSourceFromText(text, candidate.allowDirect),
+  })
+}
+
+function getPPTTextClearFormattingSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextClearFormattingImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE,
+    SLIDE_EDIT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE,
+  ]) {
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const shouldClear = getSlideEditTextClearFormattingJSONPasteValueFromText(
+        json,
+        { mode: candidate.allowDirect ? 'direct' : 'wrapped' },
+      )
+
+      if (shouldClear !== true) {
+        continue
+      }
+
+      const payload = getPPTTextClearFormattingPayloadEntry(
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+        jsonLength: json.length,
+      }
+    }
+  }
+
+  return null
+}
+
+function getPPTTextClearFormattingSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextClearFormattingImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextClearFormattingSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextClearFormattingSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextClearFormattingSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextClearFormattingSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextClearFormattingImportSource | null {
+  const payload = getPPTTextClearFormattingPayloadEntry(value, allowDirect)
+
+  if (!payload || payload.value !== true) {
+    return null
+  }
+
+  return {
+    fields: payload.fields,
+    format: PPT_TEXT_CLEAR_FORMATTING_JSON_IMPORT_FORMAT,
+    jsonLength,
+  }
+}
+
+function getPPTTextClearFormattingPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextClearFormattingImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textClearFormatting',
+    'clearTextFormatting',
+    'clearFormatting',
+    'clearFormat',
+    'resetFormatting',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
 }
 
 function getPPTTextStyleSourceFromDataTransfer(
@@ -33869,6 +34247,7 @@ function PPTSelectionFloatingBar({
   onParagraphNumberedToggle,
   onShapeKindChange,
   onTextBoldToggle,
+  onTextClearFormatting,
   onTextColorChange,
   onTextHighlightChange,
   onTextItalicToggle,
@@ -33890,6 +34269,7 @@ function PPTSelectionFloatingBar({
   onParagraphNumberedToggle: () => void
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onTextBoldToggle: () => void
+  onTextClearFormatting: () => void
   onTextColorChange: (color: string) => void
   onTextHighlightChange: (color: string) => void
   onTextItalicToggle: () => void
@@ -33926,6 +34306,7 @@ function PPTSelectionFloatingBar({
           onParagraphListLevelStep={onParagraphListLevelStep}
           onParagraphNumberedToggle={onParagraphNumberedToggle}
           onTextBoldToggle={onTextBoldToggle}
+          onTextClearFormatting={onTextClearFormatting}
           onTextColorChange={onTextColorChange}
           onTextHighlightChange={onTextHighlightChange}
           onTextItalicToggle={onTextItalicToggle}
@@ -34301,6 +34682,7 @@ function PPTTextQuickFormatControls({
   onParagraphListLevelStep,
   onParagraphNumberedToggle,
   onTextBoldToggle,
+  onTextClearFormatting,
   onTextColorChange,
   onTextHighlightChange,
   onTextItalicToggle,
@@ -34314,6 +34696,7 @@ function PPTTextQuickFormatControls({
   onParagraphListLevelStep: (delta: number) => void
   onParagraphNumberedToggle: () => void
   onTextBoldToggle: () => void
+  onTextClearFormatting: () => void
   onTextColorChange: (color: string) => void
   onTextHighlightChange: (color: string) => void
   onTextItalicToggle: () => void
@@ -34382,6 +34765,20 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Strikethrough size={16} />
+      </button>
+      <button
+        aria-label="Clear formatting"
+        className="ppt-floating-command"
+        data-ppt-text-quick="clear-formatting"
+        title="Clear formatting"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onTextClearFormatting()
+        }}
+      >
+        <Eraser size={16} />
       </button>
       <button
         aria-label="Decrease font size"
@@ -34830,6 +35227,8 @@ function PPTSurfaceCommandIcon({
       return <MoveUp size={size} />
     case 'bringToFront':
       return <BringToFront size={size} />
+    case 'clearTextFormatting':
+      return <Eraser size={size} />
     case 'copyFormatting':
       return <Paintbrush size={size} />
     case 'delete':
