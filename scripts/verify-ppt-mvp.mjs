@@ -11090,7 +11090,16 @@ async function runExportScenario(page) {
       }
     }
     const deck = readPPTExportDeckFromHTML(exportCode)
-    const exportElements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportElements = exportSlides.flatMap((slide) => slide.elements ?? [])
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const exportAnimatedObjects = exportElements.filter((element) =>
+      element.animation && element.animation.type !== 'none')
+    const exportImportedAnimatedObjects = exportImportedElements.filter((element) =>
+      element.animation && element.animation.type !== 'none')
     const exportAltTextObjects = exportElements.filter((element) =>
       element.accessibility?.altText)
     const exportFlippedImages = exportElements.filter((element) =>
@@ -11119,7 +11128,12 @@ async function runExportScenario(page) {
       activeSlide,
       dropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
       elementCount: elements.length,
+      exportAnimatedObjectNames: exportAnimatedObjects.map((element) => element.name).join(' | '),
+      exportAnimationModelCount: exportAnimatedObjects.length,
       exportHasHyperlink: exportCode.includes('https://example.com/ppt') && exportCode.includes('data-ppt-hyperlink-url='),
+      exportHasAnimation: exportAnimatedObjects.length > 0,
+      exportImportedAnimationModelCount: exportImportedAnimatedObjects.length,
+      exportImportedAnimatedObjectNames: exportImportedAnimatedObjects.map((element) => element.name).join(' | '),
       exportHasImage: exportCode.includes('"kind": "image"') && exportCode.includes('data:image/'),
       exportHasImageCrop: exportCode.includes('"crop": {') &&
         exportCode.includes('"x": 25') &&
@@ -11196,6 +11210,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.elementCount >= 4 &&
       openXmlPPTXImportState.textBoxCount >= 1 &&
       openXmlPPTXImportState.shapeCount >= 1 &&
+      openXmlPPTXImportState.exportHasAnimation &&
+      openXmlPPTXImportState.exportImportedAnimationModelCount > 0 &&
       openXmlPPTXImportState.exportHasImage &&
       openXmlPPTXImportState.exportHasImageCrop &&
       openXmlPPTXImportState.exportImageCropModelCount > beforeOpenXmlPPTXDrop.imageCropModelCount &&

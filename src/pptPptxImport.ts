@@ -6,6 +6,7 @@ import {
   PPTDeckSchema,
   type PPTDeck,
   type PPTElement,
+  type PPTElementAnimation,
   type PPTElementShadow,
   type PPTFill,
   type PPTGeometry,
@@ -46,6 +47,11 @@ type PPTXRelationship = {
   type: string
 }
 type PPTXRelationshipMap = Map<string, PPTXRelationship>
+type PPTXImportedAnimation = {
+  animation: PPTElementAnimation
+  objectName?: string
+  objectId: string
+}
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -291,6 +297,7 @@ async function readPPTXOpenXmlSlide({
   })
   const transition = readPPTXSlideTransition(doc, xml)
   const elements: PPTElement[] = []
+  const elementIdByPptxObjectId = new Map<string, string>()
   let objectIndex = 1
 
   for (const child of getPPTXSlideObjectNodes(spTree, xml)) {
@@ -317,22 +324,72 @@ async function readPPTXOpenXmlSlide({
 
     if (element) {
       elements.push(element)
+      for (const pptxObjectId of readPPTXObjectIds(child)) {
+        elementIdByPptxObjectId.set(pptxObjectId, element.id)
+      }
       objectIndex += 1
     }
   }
+  const animatedElements = applyPPTXElementAnimations({
+    elementIdByPptxObjectId,
+    elements,
+    importedAnimations: readPPTXSlideAnimations(doc, xml),
+  })
 
   return {
     ...(readPPTXSlideBackground(cSld) ??
       readPPTXSlideBackgroundFromXml(xml) ?? {
         background: { color: PPTX_DEFAULT_FILL_COLOR },
       }),
-    elements,
+    elements: animatedElements,
     id: `pptx-slide-${index + 1}`,
     name: readPPTXSlideName(cSld, index, xml),
     ...(notes ? { notes } : {}),
     themeId: PPT_DEFAULT_THEME_ID,
     ...(transition ? { transition } : {}),
   }
+}
+
+function applyPPTXElementAnimations({
+  elementIdByPptxObjectId,
+  elements,
+  importedAnimations,
+}: {
+  elementIdByPptxObjectId: ReadonlyMap<string, string>
+  elements: readonly PPTElement[]
+  importedAnimations: readonly PPTXImportedAnimation[]
+}) {
+  const animationByElementId = new Map<string, PPTElementAnimation>()
+  const elementIdByObjectName = new Map(
+    elements.map((element) => [element.name, element.id]),
+  )
+
+  importedAnimations.forEach((imported, index) => {
+    const elementId = elementIdByPptxObjectId.get(imported.objectId) ??
+      (imported.objectName
+        ? elementIdByObjectName.get(imported.objectName)
+        : undefined)
+
+    if (elementId && !animationByElementId.has(elementId)) {
+      animationByElementId.set(elementId, {
+        ...imported.animation,
+        order: index + 1,
+      })
+    }
+  })
+
+  return elements.map((element) => {
+    const animation = animationByElementId.get(element.id)
+
+    return animation ? { ...element, animation } : element
+  })
+}
+
+function readPPTXObjectIds(element: Element) {
+  return getPPTXDescendantsByLocalName(element, 'cNvPr')
+    .map((nonVisualProperties) =>
+      nonVisualProperties.getAttribute('id')?.trim() ?? '')
+    .filter((id) => id.length > 0)
 }
 
 function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
@@ -468,6 +525,238 @@ function readPPTXSlideTransitionType(
   }
 
   return getDirectPPTXChildByLocalName(transition, 'fade') ? 'fade' : 'none'
+}
+
+function readPPTXSlideAnimations(
+  doc: Document | null,
+  xml: string,
+): PPTXImportedAnimation[] {
+  const objectNameById = readPPTXObjectNameByIdFromXml(xml)
+  const fromDom = doc
+    ? Array.from(doc.getElementsByTagName('*'))
+      .filter((element) =>
+        element.localName === 'animEffect' ||
+        element.localName === 'animMotion')
+      .map(readPPTXAnimationEffect)
+      .filter((animation): animation is PPTXImportedAnimation => animation !== null)
+    : []
+  const fromXml = readPPTXSlideAnimationsFromXml(xml)
+  const seen = new Set<string>()
+
+  return [...fromDom, ...fromXml]
+    .map((animation) => ({
+      ...animation,
+      ...(objectNameById.get(animation.objectId)
+        ? { objectName: objectNameById.get(animation.objectId) }
+        : {}),
+    }))
+    .filter((animation) => {
+      const key = [
+        animation.objectId,
+        animation.animation.delayMs,
+        animation.animation.durationMs,
+        animation.animation.trigger,
+        animation.animation.type,
+      ].join(':')
+
+      if (seen.has(key)) {
+        return false
+      }
+
+      seen.add(key)
+      return true
+    })
+}
+
+function readPPTXAnimationEffect(effect: Element): PPTXImportedAnimation | null {
+  const objectId = getFirstPPTXDescendantByLocalName(effect, 'spTgt')
+    ?.getAttribute('spid')
+    ?.trim()
+  const behavior = getDirectPPTXChildByLocalName(effect, 'cBhvr') ??
+    getFirstPPTXDescendantByLocalName(effect, 'cBhvr')
+  const behaviorTiming = getDirectPPTXChildByLocalName(behavior, 'cTn')
+  const containerTiming = findPPTXAncestorByLocalName(effect, 'cTn')
+
+  if (!objectId || !behaviorTiming || !containerTiming) {
+    return null
+  }
+
+  const trigger: PPTElementAnimation['trigger'] =
+    containerTiming.getAttribute('nodeType') === 'withEffect'
+      ? 'withPrevious'
+      : 'onClick'
+  const behaviorDelayMs = readPPTXAnimationDelayMs(behaviorTiming) ?? 0
+  const containerDelayMs = readPPTXAnimationDelayMs(containerTiming) ?? 0
+  const type = readPPTXAnimationType(effect)
+
+  if (!type) {
+    return null
+  }
+
+  return {
+    animation: {
+      delayMs: trigger === 'withPrevious' ? containerDelayMs : behaviorDelayMs,
+      durationMs: toPPTXPositiveNumber(behaviorTiming.getAttribute('dur')) ?? 500,
+      order: 1,
+      trigger,
+      type,
+    },
+    objectId,
+  }
+}
+
+function readPPTXAnimationType(
+  effect: Element,
+): PPTElementAnimation['type'] | null {
+  if (effect.localName === 'animMotion') {
+    return 'flyIn'
+  }
+
+  const filter = effect.getAttribute('filter')?.toLowerCase() ?? ''
+  const transition = effect.getAttribute('transition')
+
+  return effect.localName === 'animEffect' &&
+    transition === 'in' &&
+    filter.includes('fade')
+    ? 'fadeIn'
+    : null
+}
+
+function readPPTXAnimationDelayMs(timing: Element) {
+  const stCondLst = getDirectPPTXChildByLocalName(timing, 'stCondLst')
+  const condition = getDirectPPTXChildByLocalName(stCondLst, 'cond')
+
+  return toPPTXPositiveNumber(condition?.getAttribute('delay'))
+}
+
+function readPPTXSlideAnimationsFromXml(xml: string): PPTXImportedAnimation[] {
+  const animations: PPTXImportedAnimation[] = []
+
+  for (const match of xml.matchAll(/<p:par>([\s\S]*?)<\/p:par>/g)) {
+    const block = match[1]
+
+    if (!block.includes('<p:animEffect') && !block.includes('<p:animMotion')) {
+      continue
+    }
+
+    const animation = readPPTXAnimationEffectFromXml(block)
+
+    if (animation) {
+      animations.push(animation)
+    }
+  }
+
+  return animations
+}
+
+function readPPTXAnimationEffectFromXml(
+  block: string,
+): PPTXImportedAnimation | null {
+  const targetAttributes = block.match(/<p:spTgt\b([^>]*)\/>/)?.[1] ?? ''
+  const objectId = readPPTXXmlAttribute(targetAttributes, 'spid')?.trim()
+  const effectMatch = block.match(/<p:(animEffect|animMotion)\b([^>]*)>([\s\S]*?)<\/p:\1>/)
+  const containerAttributes = block.match(/<p:cTn\b([^>]*)>/)?.[1] ?? ''
+  const behaviorMatch = effectMatch?.[3]
+    .match(/<p:cBhvr>[\s\S]*?<p:cTn\b([^>]*)>([\s\S]*?)<\/p:cTn>/)
+  const behaviorAttributes = behaviorMatch?.[1] ?? ''
+  const behaviorBody = behaviorMatch?.[2] ?? ''
+
+  if (!objectId || !effectMatch || !behaviorMatch) {
+    return null
+  }
+
+  const type = readPPTXAnimationTypeFromXml(
+    effectMatch[1],
+    effectMatch[2],
+  )
+
+  if (!type) {
+    return null
+  }
+
+  const trigger: PPTElementAnimation['trigger'] =
+    readPPTXXmlAttribute(containerAttributes, 'nodeType') === 'withEffect'
+      ? 'withPrevious'
+      : 'onClick'
+  const behaviorDelayMs = readPPTXAnimationDelayMsFromXml(behaviorBody) ?? 0
+  const containerDelayMs = readPPTXAnimationDelayMsFromXml(block) ?? 0
+
+  return {
+    animation: {
+      delayMs: trigger === 'withPrevious' ? containerDelayMs : behaviorDelayMs,
+      durationMs: toPPTXPositiveNumber(
+        readPPTXXmlAttribute(behaviorAttributes, 'dur'),
+      ) ?? 500,
+      order: 1,
+      trigger,
+      type,
+    },
+    objectId,
+  }
+}
+
+function readPPTXAnimationTypeFromXml(
+  tagName: string,
+  attributes: string,
+): PPTElementAnimation['type'] | null {
+  if (tagName === 'animMotion') {
+    return 'flyIn'
+  }
+
+  const filter = readPPTXXmlAttribute(attributes, 'filter')?.toLowerCase() ?? ''
+  const transition = readPPTXXmlAttribute(attributes, 'transition')
+
+  return tagName === 'animEffect' &&
+    transition === 'in' &&
+    filter.includes('fade')
+    ? 'fadeIn'
+    : null
+}
+
+function readPPTXAnimationDelayMsFromXml(xml: string) {
+  const conditionAttributes = xml.match(/<p:cond\b([^>]*)\/>/)?.[1] ?? ''
+
+  return toPPTXPositiveNumber(
+    readPPTXXmlAttribute(conditionAttributes, 'delay'),
+  )
+}
+
+function readPPTXObjectNameByIdFromXml(xml: string) {
+  const objectNameById = new Map<string, string>()
+
+  for (const match of xml.matchAll(/<p:cNvPr\b([^>]*)>/g)) {
+    const id = readPPTXXmlAttribute(match[1], 'id')?.trim()
+    const name = readPPTXXmlAttribute(match[1], 'name')?.trim()
+
+    if (id && name) {
+      objectNameById.set(id, unescapePPTXXmlAttribute(name))
+    }
+  }
+
+  return objectNameById
+}
+
+function findPPTXAncestorByLocalName(
+  element: Element,
+  localName: string,
+) {
+  let current = getPPTXParentElement(element)
+
+  while (current) {
+    if (current.localName === localName) {
+      return current
+    }
+
+    current = getPPTXParentElement(current)
+  }
+
+  return null
+}
+
+function getPPTXParentElement(element: Element) {
+  const parent = element.parentElement ?? element.parentNode
+
+  return parent instanceof Element ? parent : null
 }
 
 async function readPPTXSlideNotes({
