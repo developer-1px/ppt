@@ -922,6 +922,7 @@ function readPPTXParagraph(paragraph: Element): PPTParagraph {
   const align = readPPTXParagraphAlign(pPr)
   const bullet = readPPTXParagraphBullet(pPr)
   const level = readPPTXParagraphLevel(pPr)
+  const spacing = readPPTXParagraphSpacing(pPr)
   const runs = Array.from(paragraph.children)
     .flatMap((child) => readPPTXTextRun(child))
 
@@ -929,6 +930,7 @@ function readPPTXParagraph(paragraph: Element): PPTParagraph {
     ...(align ? { align } : {}),
     ...(bullet ? { bullet } : {}),
     ...(level === undefined ? {} : { level }),
+    ...spacing,
     runs: runs.length > 0 ? runs : [{ text: '' }],
   }
 }
@@ -941,13 +943,16 @@ function readPPTXTextRun(node: Element): PPTRun[] {
   const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
   const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
   const color = readPPTXSolidFill(rPr)?.color
+  const highlight = readPPTXRunHighlight(rPr)
   const size = toPPTXPositiveNumber(rPr?.getAttribute('sz'))
 
   return [{
     ...(rPr?.getAttribute('b') === '1' ? { bold: true } : {}),
     ...(color ? { color } : {}),
+    ...(highlight ? { highlight } : {}),
     ...(rPr?.getAttribute('i') === '1' ? { italic: true } : {}),
     ...(size === null ? {} : { size: textSizeToPx(size) }),
+    ...(readPPTXStrikethrough(rPr) ? { strikethrough: true } : {}),
     ...(readPPTXUnderline(rPr) ? { underline: true } : {}),
     text,
   }]
@@ -1011,10 +1016,58 @@ function readPPTXParagraphLevel(pPr: Element | null) {
   return level === null ? undefined : Math.max(0, level)
 }
 
+function readPPTXParagraphSpacing(
+  pPr: Element | null,
+): Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> {
+  const lineHeight = readPPTXParagraphLineHeight(pPr)
+  const spacingBefore = readPPTXParagraphSpacingPixels(pPr, 'spcBef')
+  const spacingAfter = readPPTXParagraphSpacingPixels(pPr, 'spcAft')
+
+  return {
+    ...(lineHeight === undefined ? {} : { lineHeight }),
+    ...(spacingAfter === undefined ? {} : { spacingAfter }),
+    ...(spacingBefore === undefined ? {} : { spacingBefore }),
+  }
+}
+
+function readPPTXParagraphLineHeight(pPr: Element | null) {
+  const spacing = getDirectPPTXChildByLocalName(pPr, 'lnSpc')
+  const percent = getDirectPPTXChildByLocalName(spacing, 'spcPct')
+  const value = toPPTXPositiveNumber(percent?.getAttribute('val'))
+
+  return value === null ? undefined : value / 100_000
+}
+
+function readPPTXParagraphSpacingPixels(
+  pPr: Element | null,
+  localName: 'spcAft' | 'spcBef',
+) {
+  const spacing = getDirectPPTXChildByLocalName(pPr, localName)
+  const points = getDirectPPTXChildByLocalName(spacing, 'spcPts')
+  const value = toPPTXPositiveNumber(points?.getAttribute('val'))
+
+  return value === null ? undefined : pointToPx(value / 100)
+}
+
 function readPPTXUnderline(rPr: Element | null) {
   const underline = rPr?.getAttribute('u')
 
   return underline !== null && underline !== undefined && underline !== 'none'
+}
+
+function readPPTXStrikethrough(rPr: Element | null) {
+  const strike = rPr?.getAttribute('strike')
+
+  return strike !== null &&
+    strike !== undefined &&
+    strike !== 'noStrike' &&
+    strike !== 'none'
+}
+
+function readPPTXRunHighlight(rPr: Element | null) {
+  const highlight = getDirectPPTXChildByLocalName(rPr, 'highlight')
+
+  return highlight ? readPPTXColor(highlight) : undefined
 }
 
 function readPPTXTypeface(rPr: Element | null) {
@@ -1309,6 +1362,10 @@ function normalizePPTXAngle(value: number) {
 
 function emuToPx(value: number) {
   return Math.round(value / PPTX_EMUS_PER_PIXEL)
+}
+
+function pointToPx(value: number) {
+  return Math.round(value / PPTX_POINTS_PER_PIXEL)
 }
 
 function textSizeToPx(value: number) {

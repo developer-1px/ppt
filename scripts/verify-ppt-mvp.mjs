@@ -10863,6 +10863,13 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX text run and paragraph spacing styles',
+    pptxPackageState.hasTextRunHighlight &&
+      pptxPackageState.hasTextRunStrikethrough &&
+      pptxPackageState.hasTextParagraphSpacing,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX non-image alt text',
     pptxPackageState.hasNonImageAltTextDescription,
     pptxPackageState,
@@ -11001,6 +11008,10 @@ async function runExportScenario(page) {
     }
     const deck = readPPTExportDeckFromHTML(exportCode)
     const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+    const runs = elements.flatMap((element) =>
+      element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
+    const paragraphs = elements.flatMap((element) =>
+      element.textBody?.paragraphs ?? [])
 
     return {
       imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
@@ -11009,8 +11020,15 @@ async function runExportScenario(page) {
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       objectShadowModelCount: elements.filter((element) => element.shadow).length,
+      paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
+        paragraph.lineHeight !== undefined ||
+        paragraph.spacingAfter !== undefined ||
+        paragraph.spacingBefore !== undefined).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      textRunHighlightModelCount: runs.filter((run) => run.highlight).length,
+      textRunStrikethroughModelCount: runs.filter((run) =>
+        run.strikethrough === true).length,
       transitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
     }
   })()`)
@@ -11060,6 +11078,17 @@ async function runExportScenario(page) {
     const exportFlippedImages = exportElements.filter((element) =>
       element.kind === 'image' && element.flipH === true)
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
+    const exportRuns = exportElements.flatMap((element) =>
+      element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
+    const exportParagraphs = exportElements.flatMap((element) =>
+      element.textBody?.paragraphs ?? [])
+    const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
+    const exportStrikethroughRuns = exportRuns.filter((run) =>
+      run.strikethrough === true)
+    const exportSpacedParagraphs = exportParagraphs.filter((paragraph) =>
+      paragraph.lineHeight !== undefined ||
+      paragraph.spacingAfter !== undefined ||
+      paragraph.spacingBefore !== undefined)
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -11077,7 +11106,10 @@ async function runExportScenario(page) {
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasObjectShadow: exportShadowedObjects.length > 0,
       exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
+      exportHasParagraphSpacing: exportSpacedParagraphs.length > 0,
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
+      exportHasTextRunHighlight: exportHighlightedRuns.length > 0,
+      exportHasTextRunStrikethrough: exportStrikethroughRuns.length > 0,
       exportHasTransition: exportCode.includes('"transition": {') &&
         exportCode.includes('"type": "push"') &&
         exportCode.includes('"durationMs": 650') &&
@@ -11088,7 +11120,10 @@ async function runExportScenario(page) {
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportObjectShadowModelCount: exportShadowedObjects.length,
+      exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
+      exportTextRunHighlightModelCount: exportHighlightedRuns.length,
+      exportTextRunStrikethroughModelCount: exportStrikethroughRuns.length,
       exportTransitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
@@ -11137,8 +11172,14 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&
       openXmlPPTXImportState.exportObjectShadowModelCount > beforeOpenXmlPPTXDrop.objectShadowModelCount &&
+      openXmlPPTXImportState.exportHasParagraphSpacing &&
+      openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
+      openXmlPPTXImportState.exportHasTextRunHighlight &&
+      openXmlPPTXImportState.exportTextRunHighlightModelCount > beforeOpenXmlPPTXDrop.textRunHighlightModelCount &&
+      openXmlPPTXImportState.exportHasTextRunStrikethrough &&
+      openXmlPPTXImportState.exportTextRunStrikethroughModelCount > beforeOpenXmlPPTXDrop.textRunStrikethroughModelCount &&
       openXmlPPTXImportState.exportHasTransition &&
       openXmlPPTXImportState.exportTransitionModelCount > beforeOpenXmlPPTXDrop.transitionModelCount &&
       openXmlPPTXImportState.text.includes('Minimal subset now') &&
@@ -27016,6 +27057,9 @@ async function inspectPPTXPackage(base64) {
     hasSpeakerNotes: false,
     hasTableText: false,
     hasTableXml: false,
+    hasTextParagraphSpacing: false,
+    hasTextRunHighlight: false,
+    hasTextRunStrikethrough: false,
     hasThemeColorScheme: false,
     hasSlideTransition: false,
     hasSlideTransitionNamespace: false,
@@ -27025,6 +27069,9 @@ async function inspectPPTXPackage(base64) {
     objectShadowOuterCount: 0,
     relationshipCount: 0,
     slideCount: 0,
+    textParagraphSpacingCount: 0,
+    textRunHighlightCount: 0,
+    textRunStrikethroughCount: 0,
     transitionCount: 0,
     textRunCount: 0,
   }
@@ -27073,6 +27120,11 @@ async function inspectPPTXPackage(base64) {
       ...slideXml.matchAll(/<p:pic\b[\s\S]*?<a:xfrm\b[^>]*\bflipH="(?:1|true)"[\s\S]*?<\/p:pic>/g),
     ].length
     const objectShadowOuterCount = countOccurrences(slideXml, '<a:outerShdw')
+    const textParagraphSpacingCount = countOccurrences(slideXml, '<a:lnSpc>') +
+      countOccurrences(slideXml, '<a:spcBef>') +
+      countOccurrences(slideXml, '<a:spcAft>')
+    const textRunHighlightCount = countOccurrences(slideXml, '<a:highlight>')
+    const textRunStrikethroughCount = countOccurrences(slideXml, 'strike="sngStrike"')
 
     return {
       entryCount: entries.length,
@@ -27149,6 +27201,9 @@ async function inspectPPTXPackage(base64) {
       hasSpeakerNotes: notesXml.includes('Presenter cue: review image crop and final CTA.'),
       hasTableText: slideXml.includes('Region'),
       hasTableXml: slideXml.includes('<a:tbl>') || slideXml.includes('<a:tbl '),
+      hasTextParagraphSpacing: textParagraphSpacingCount > 0,
+      hasTextRunHighlight: textRunHighlightCount > 0,
+      hasTextRunStrikethrough: textRunStrikethroughCount > 0,
       hasThemeColorScheme:
         themeXml.includes('<a:dk1><a:srgbClr val="111827"/></a:dk1>') &&
         themeXml.includes('<a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>') &&
@@ -27160,7 +27215,10 @@ async function inspectPPTXPackage(base64) {
       objectShadowOuterCount,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
+      textParagraphSpacingCount,
       transitionCount,
+      textRunHighlightCount,
+      textRunStrikethroughCount,
       textRunCount,
     }
   } catch (error) {
