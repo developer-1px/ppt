@@ -4086,7 +4086,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -19130,12 +19130,11 @@ async function runSelectionPaneScenario(page) {
   await delay(50)
   const afterRenameOpen = await readPPTLayerPaneRenameState(page, layerTargetId)
 
-  await page.eval(`(() => {
-    const input = document.querySelector('[data-ppt-layer-pane-rename-input="${layerTargetId}"]')
-    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    valueSetter.call(input, 'Layer renamed object')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })()`)
+  const renameInputWrite = await setPPTLayerPaneRenameInputValue(
+    page,
+    layerTargetId,
+    'Layer renamed object',
+  )
   await delay(30)
   await pressKey(page, {
     code: 'Enter',
@@ -19153,12 +19152,11 @@ async function runSelectionPaneScenario(page) {
     windowsVirtualKeyCode: 113,
   })
   await delay(50)
-  await page.eval(`(() => {
-    const input = document.querySelector('[data-ppt-layer-pane-rename-input="${layerTargetId}"]')
-    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    valueSetter.call(input, 'Cancelled layer name')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })()`)
+  const renameCancelInputWrite = await setPPTLayerPaneRenameInputValue(
+    page,
+    layerTargetId,
+    'Cancelled layer name',
+  )
   await delay(30)
   await pressKey(page, {
     code: 'Escape',
@@ -19171,17 +19169,21 @@ async function runSelectionPaneScenario(page) {
   record(
     'renames PPT object from layer pane rename command-effect',
     afterRenameOpen.inputOpen &&
+      renameInputWrite.inputFound &&
       afterRenameOpen.inputValue.length > 0 &&
       afterRenameCommit.inputOpen === false &&
       afterRenameCommit.rowName === 'Layer renamed object' &&
       afterRenameCommit.inspectorName === 'Layer renamed object' &&
       afterRenameCommit.stageName === 'Layer renamed object' &&
+      renameCancelInputWrite.inputFound &&
       afterRenameCancel.inputOpen === false &&
       afterRenameCancel.rowName === 'Layer renamed object',
     {
       afterRenameCancel,
       afterRenameCommit,
       afterRenameOpen,
+      renameCancelInputWrite,
+      renameInputWrite,
     },
   )
 
@@ -20150,6 +20152,43 @@ async function readPPTLayerPaneRenameState(page, objectId) {
       stageName: stageElement?.getAttribute('data-ppt-element-name') ?? '',
     }
   })(${JSON.stringify(objectId)})`)
+}
+
+async function setPPTLayerPaneRenameInputValue(page, objectId, value) {
+  return page.eval(`((objectId, value) => {
+    const input = document.querySelector(\`[data-ppt-layer-pane-rename-input="\${objectId}"]\`)
+
+    if (!(input instanceof HTMLInputElement)) {
+      return {
+        activeElement: document.activeElement?.tagName ?? '',
+        activeRowId: document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? '',
+        inputFound: false,
+        objectId,
+      }
+    }
+
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+
+    if (valueSetter) {
+      valueSetter.call(input, value)
+    } else {
+      input.value = value
+    }
+
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+
+    return {
+      activeRowId: document.activeElement?.closest('[data-ppt-layer-pane-row]')?.getAttribute('data-ppt-layer-pane-row') ?? '',
+      focusedRenameInput: document.activeElement === input,
+      inputFound: true,
+      inputValue: input.value,
+      objectId,
+    }
+  })(${JSON.stringify(objectId)}, ${JSON.stringify(value)})`)
 }
 
 async function reorderPPTLayerPaneObjectWithKeyboard(page) {
@@ -21547,7 +21586,8 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.activeOption === expectedActiveOptionId &&
       initialKeyboard.focusableOption === expectedActiveOptionId &&
       initialKeyboard.slideOrder === expectedSlideOrder &&
-      initialKeyboard.commandShortcuts === 'Cmd/Ctrl+D Delete Backspace' &&
+      initialKeyboard.commandShortcuts ===
+        'Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Delete Backspace' &&
       initialKeyboard.commandShortcutIntent === 'ppt-slide-rail-command-shortcut-intent' &&
       initialKeyboard.commandShortcutModel === 'ppt-slide-rail-command-shortcuts' &&
       initialKeyboard.optionCount === initialKeyboard.count &&
@@ -21568,6 +21608,83 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.tabStopIds[0] === initialKeyboard.activeId &&
       initialKeyboard.focusedId === initialKeyboard.activeId,
     {
+      initialKeyboard,
+    },
+  )
+
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyC',
+    key: 'c',
+    modifiers: 2,
+    windowsVirtualKeyCode: 67,
+  })
+  await delay(80)
+
+  const afterRailCopyShortcut = await getSlideRailState(page)
+
+  record(
+    'copies focused PPT slide thumbnail with Cmd/Ctrl+C',
+    afterRailCopyShortcut.count === initialKeyboard.count &&
+      afterRailCopyShortcut.activeId === initialKeyboard.activeId &&
+      afterRailCopyShortcut.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
+      afterRailCopyShortcut.slideClipboardSourceSlide === initialKeyboard.activeId &&
+      afterRailCopyShortcut.slideClipboardElementCount > 0 &&
+      afterRailCopyShortcut.slideClipboardHTMLLength > 0,
+    {
+      afterRailCopyShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    modifiers: 2,
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(80)
+
+  const afterRailPasteShortcut = await getSlideRailState(page)
+
+  record(
+    'pastes copied PPT slide after focused thumbnail with Cmd/Ctrl+V',
+    afterRailPasteShortcut.count === initialKeyboard.count + 1 &&
+      afterRailPasteShortcut.activeId !== initialKeyboard.activeId &&
+      afterRailPasteShortcut.activeName.includes('Copy') &&
+      afterRailPasteShortcut.slideClipboardSourceSlide === initialKeyboard.activeId &&
+      afterRailPasteShortcut.slideClipboardTargetSlide === afterRailPasteShortcut.activeId &&
+      afterRailPasteShortcut.slideClipboardPasteAfterSlide === initialKeyboard.activeId &&
+      afterRailPasteShortcut.slideClipboardPasteCommand === 'paste-slides' &&
+      afterRailPasteShortcut.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterRailPasteShortcut.slideClipboardPasteSelectionSlide === afterRailPasteShortcut.activeId,
+    {
+      afterRailCopyShortcut,
+      afterRailPasteShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-action="delete"]')?.click()`)
+  await delay(60)
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
+
+  const afterRailCopyPasteCleanup = await getSlideRailState(page)
+
+  record(
+    'removes temporary PPT keyboard-pasted slide before rail command probes',
+    afterRailCopyPasteCleanup.count === initialKeyboard.count &&
+      afterRailCopyPasteCleanup.activeId === initialKeyboard.activeId,
+    {
+      afterRailCopyPasteCleanup,
+      afterRailPasteShortcut,
       initialKeyboard,
     },
   )

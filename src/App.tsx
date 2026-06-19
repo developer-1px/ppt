@@ -3694,12 +3694,14 @@ const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
 const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
+const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
 const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
+const PPT_SLIDE_PASTE_SHORTCUT = 'Cmd/Ctrl+V'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
-  `${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
+  `${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
   'ppt-slide-rail-command-shortcut-intent'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
@@ -5531,6 +5533,7 @@ function App() {
   ) {
     const commandIntent = getPPTSlideRailCommandShortcutIntent({
       canDelete: canDeleteSlide,
+      canPaste: canPasteSlide,
       key: event.key,
       mod: event.metaKey || event.ctrlKey,
       shiftKey: event.shiftKey,
@@ -5543,6 +5546,16 @@ function App() {
 
       if (commandIntent.kind === 'duplicate-slide') {
         duplicateSlide(slideId)
+        return
+      }
+
+      if (commandIntent.kind === 'copy-slide') {
+        copySlide(slideId)
+        return
+      }
+
+      if (commandIntent.kind === 'paste-slide') {
+        pasteCopiedSlideAfterSlide(slideId)
         return
       }
 
@@ -5797,7 +5810,17 @@ function App() {
   }
 
   function copyActiveSlide() {
-    const payload = createPPTSlideClipboardPayload(activeSlide)
+    copySlide(activeSlide.id)
+  }
+
+  function copySlide(slideId: string) {
+    const slide = findPPTSlide(deckRef.current, slideId)
+
+    if (!slide) {
+      return false
+    }
+
+    const payload = createPPTSlideClipboardPayload(slide)
     const html = createPPTSlideClipboardHTML(payload)
     const effect = createPPTSlideClipboardEffect({
       html,
@@ -5819,27 +5842,41 @@ function App() {
             }
           : current)
     })
+
+    return true
   }
 
   function pasteCopiedSlide() {
+    return pasteCopiedSlideAfterSlide(activeSlide.id)
+  }
+
+  function pasteCopiedSlideAfterSlide(targetSlideId: string) {
     if (!slideClipboard) {
       return false
     }
 
-    return pasteSlideClipboardPayload(slideClipboard)
+    return pasteSlideClipboardPayload(slideClipboard, { targetSlideId })
   }
 
   function pasteSlideClipboardPayload(
     payload: PPTSlideClipboardPayload,
-    options: { importFormat?: PPTRichClipboardImportFormat } = {},
+    options: {
+      importFormat?: PPTRichClipboardImportFormat
+      targetSlideId?: string
+    } = {},
   ) {
     let pastedSlide: PPTSlide | null = null
 
     commitDeck((current) => {
-      const targetSlideId = current.slides.some((slide) =>
-        slide.id === activeSlide.id)
-        ? activeSlide.id
-        : current.slides.at(-1)?.id ?? null
+      const optionTargetSlide = options.targetSlideId
+        ? findPPTSlide(current, options.targetSlideId)
+        : null
+      const activeTargetSlide = findPPTSlide(current, activeSlide.id)
+      const targetSlideId =
+        optionTargetSlide?.id ??
+        activeTargetSlide?.id ??
+        current.slides.at(-1)?.id ??
+        null
       const slideEditPayload = createPPTSlideEditClipboardPayload(payload)
 
       if (!slideEditPayload) {
@@ -13328,12 +13365,14 @@ function App() {
     id: 'slide:copy',
     onSelect: copyActiveSlide,
     section: 'Slides',
+    shortcut: PPT_SLIDE_COPY_SHORTCUT,
     title: 'Copy slide',
   }, {
     disabled: !canPasteSlide,
     id: 'slide:paste',
     onSelect: pasteCopiedSlide,
     section: 'Slides',
+    shortcut: PPT_SLIDE_PASTE_SHORTCUT,
     title: 'Paste slide',
   }, {
     disabled: !canDeleteSlide,
@@ -36446,17 +36485,29 @@ function getPPTSlideKeyboardShortcutIntent({
 function getPPTSlideRailCommandShortcutIntent({
   altKey,
   canDelete,
+  canPaste,
   key,
   mod,
   shiftKey,
 }: {
   altKey: boolean
   canDelete: boolean
+  canPaste: boolean
   key: string
   mod: boolean
   shiftKey: boolean
-}): { kind: 'delete-slide' | 'duplicate-slide' } | null {
+}): {
+  kind: 'copy-slide' | 'delete-slide' | 'duplicate-slide' | 'paste-slide'
+} | null {
   const normalizedKey = key.toLowerCase()
+
+  if (mod && !altKey && !shiftKey && normalizedKey === 'c') {
+    return { kind: 'copy-slide' }
+  }
+
+  if (mod && !altKey && !shiftKey && normalizedKey === 'v' && canPaste) {
+    return { kind: 'paste-slide' }
+  }
 
   if (mod && !altKey && !shiftKey && normalizedKey === 'd') {
     return { kind: 'duplicate-slide' }
