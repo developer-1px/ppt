@@ -36203,6 +36203,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell-font-size={textStyle?.fontSize}
               data-ppt-table-cell-font-weight={textStyle?.fontWeight}
               data-ppt-table-cell-text-color={textStyle?.color}
+              data-ppt-table-cell-vertical-align={textStyle?.verticalAlign}
               data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
               key={`${rowIndex}:${columnIndex}`}
               style={getPPTTableCellStyleCSS(fill, textStyle)}
@@ -36242,7 +36243,20 @@ function getPPTTableCellStyleCSS(
     ...(textStyle?.fontWeight
       ? { fontWeight: getPPTTableCellFontWeightCSS(textStyle.fontWeight) }
       : {}),
+    ...(textStyle?.verticalAlign
+      ? { alignItems: getPPTTableCellVerticalAlignCSS(textStyle.verticalAlign) }
+      : {}),
   }
+}
+
+function getPPTTableCellVerticalAlignCSS(
+  verticalAlign: PPTTableCellTextStyle['verticalAlign'],
+) {
+  if (verticalAlign === 'top') {
+    return 'flex-start'
+  }
+
+  return verticalAlign === 'bottom' ? 'flex-end' : 'center'
 }
 
 function getPPTTableCellFontWeightCSS(

@@ -889,6 +889,9 @@ function renderPPTTableHTMLRow({
           textStyle?.fontWeight
             ? ` data-ppt-table-cell-font-weight="${escapeHtml(textStyle.fontWeight)}"`
             : '',
+          textStyle?.verticalAlign
+            ? ` data-ppt-table-cell-vertical-align="${escapeHtml(textStyle.verticalAlign)}"`
+            : '',
           formatPPTTableCellHTMLStyle(fill, textStyle),
         ].join('')
       : ''
@@ -916,7 +919,6 @@ function renderPPTTableSVG(element: PPTTable) {
       const x = columnX
       const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
       const textPadding = Math.min(10, cellWidth * 0.12)
-      const textY = y + cellHeight / 2
       const headerAttrs = rowIndex === 0
         ? ' data-ppt-table-header="true"'
         : ''
@@ -931,11 +933,21 @@ function renderPPTTableSVG(element: PPTTable) {
       const textColor = cellTextStyle?.color ?? '#111827'
       const textFontSize = cellTextStyle?.fontSize ?? fontSize
       const textAnchor = getPPTTableCellTextAnchor(cellTextStyle?.align)
+      const textBaseline = getPPTTableCellDominantBaseline(cellTextStyle?.verticalAlign)
+      const textVerticalAlignAttr = cellTextStyle?.verticalAlign
+        ? ` data-ppt-table-cell-vertical-align="${escapeHtml(cellTextStyle.verticalAlign)}"`
+        : ''
       const textX = getPPTTableCellTextX({
         align: cellTextStyle?.align,
         cellWidth,
         padding: textPadding,
         x,
+      })
+      const textY = getPPTTableCellTextY({
+        cellHeight,
+        padding: textPadding,
+        verticalAlign: cellTextStyle?.verticalAlign,
+        y,
       })
       const textFontWeight = cellTextStyle?.fontWeight
         ? getPPTTableCellFontWeightSvgAttr(cellTextStyle.fontWeight)
@@ -943,7 +955,7 @@ function renderPPTTableSVG(element: PPTTable) {
 
       return [
         `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
-        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
+        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs}${textVerticalAlignAttr} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="${textBaseline}">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
     })
   }).join('')
@@ -974,6 +986,7 @@ function formatPPTTableCellHTMLStyle(
     textStyle?.fontWeight
       ? `font-weight:${getPPTTableCellFontWeightCSS(textStyle.fontWeight)}`
       : '',
+    textStyle?.verticalAlign ? `vertical-align:${textStyle.verticalAlign}` : '',
   ].filter(Boolean)
 
   return styles.length > 0
@@ -1025,6 +1038,38 @@ function getPPTTableCellTextX({
   }
 
   return x + padding
+}
+
+function getPPTTableCellTextY({
+  cellHeight,
+  padding,
+  verticalAlign,
+  y,
+}: {
+  cellHeight: number
+  padding: number
+  verticalAlign: PPTTableCellTextStyle['verticalAlign']
+  y: number
+}) {
+  if (verticalAlign === 'top') {
+    return y + padding
+  }
+
+  if (verticalAlign === 'bottom') {
+    return y + cellHeight - padding
+  }
+
+  return y + cellHeight / 2
+}
+
+function getPPTTableCellDominantBaseline(
+  verticalAlign: PPTTableCellTextStyle['verticalAlign'],
+) {
+  if (verticalAlign === 'top') {
+    return 'hanging'
+  }
+
+  return verticalAlign === 'bottom' ? 'text-after-edge' : 'middle'
 }
 
 function getPPTElementTransform(element: PPTElement) {

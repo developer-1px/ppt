@@ -1281,8 +1281,10 @@ function readPPTXTableCellFill(cell: Element): PPTFill | undefined {
 }
 
 function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
   const txBody = getDirectPPTXChildByLocalName(cell, 'txBody')
   const textBody = readPPTXTextBody(txBody)
+  const verticalAlign = readPPTXTableCellVerticalAlign(tcPr)
   const firstParagraph = textBody?.paragraphs
     .find((paragraph) =>
       paragraph.runs.some((run) => run.text.trim().length > 0)) ??
@@ -1296,9 +1298,26 @@ function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | unde
     ...(firstRun?.color ? { color: firstRun.color } : {}),
     ...(firstRun?.size === undefined ? {} : { fontSize: firstRun.size }),
     ...(firstRun?.bold === true ? { fontWeight: 'bold' as const } : {}),
+    ...(verticalAlign ? { verticalAlign } : {}),
   }
 
   return Object.keys(textStyle).length > 0 ? textStyle : undefined
+}
+
+function readPPTXTableCellVerticalAlign(
+  tcPr: Element | null,
+): PPTTableCellTextStyle['verticalAlign'] | undefined {
+  const anchor = tcPr?.getAttribute('anchor')
+
+  if (anchor === 'ctr') {
+    return 'middle'
+  }
+
+  if (anchor === 'b') {
+    return 'bottom'
+  }
+
+  return anchor === 't' ? 'top' : undefined
 }
 
 function readPPTXTableColumnWidths(

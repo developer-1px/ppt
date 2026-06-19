@@ -1458,6 +1458,7 @@ function addPPTXTable({
             : pxToPt(cellTextStyle.fontSize),
           margin: 0.08,
           transparency: toPPTXTransparency(opacity),
+          valign: cellTextStyle?.verticalAlign,
         },
         text: row[columnIndex] ?? '',
       }

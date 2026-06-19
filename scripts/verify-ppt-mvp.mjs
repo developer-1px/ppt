@@ -11177,7 +11177,8 @@ async function runExportScenario(page) {
         wideColumnTextStyle?.align === 'center' &&
         wideColumnTextStyle?.color === '#7f1d1d' &&
         wideColumnTextStyle?.fontWeight === 'bold' &&
-        wideColumnTextStyle?.fontSize >= 20
+        wideColumnTextStyle?.fontSize >= 20 &&
+        wideColumnTextStyle?.verticalAlign === 'bottom'
     })
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
@@ -11250,6 +11251,7 @@ async function runExportScenario(page) {
       exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
       exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
       exportUnevenTableProbeCellTextFontWeight: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontWeight ?? '',
+      exportUnevenTableProbeCellTextVerticalAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.verticalAlign ?? '',
       exportUnevenTableProbeRowHeights: (exportUnevenTableProbe?.rowHeights ?? []).join(' '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
@@ -27410,7 +27412,13 @@ async function addPPTXUnevenTableProbe(base64) {
       createPPTXTableCellXml('Narrow'),
       createPPTXTableCellXml('Wide column', {
         fill: { color: 'FEE2E2', opacity: 0.5 },
-        textStyle: { align: 'ctr', bold: true, color: '7F1D1D', size: 1600 },
+        textStyle: {
+          align: 'ctr',
+          bold: true,
+          color: '7F1D1D',
+          size: 1600,
+          verticalAlign: 'b',
+        },
       }),
       createPPTXTableCellXml('Narrow'),
       '</a:tr>',
@@ -27457,9 +27465,12 @@ function createPPTXTableCellXml(text, options = {}) {
         '</a:rPr>',
       ].join('')
     : ''
+  const tcPrAttrs = textStyle?.verticalAlign
+    ? ` anchor="${textStyle.verticalAlign}"`
+    : ''
   const tcPrXml = fill
     ? [
-        '<a:tcPr>',
+        `<a:tcPr${tcPrAttrs}>`,
         `<a:solidFill><a:srgbClr val="${fill.color}">`,
         fill.opacity === undefined
           ? ''
@@ -27467,7 +27478,7 @@ function createPPTXTableCellXml(text, options = {}) {
         '</a:srgbClr></a:solidFill>',
         '</a:tcPr>',
       ].join('')
-    : '<a:tcPr/>'
+    : `<a:tcPr${tcPrAttrs}/>`
 
   return [
     '<a:tc>',
