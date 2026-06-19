@@ -11043,6 +11043,11 @@ async function runExportScenario(page) {
         element.kind === 'image' &&
         element.opacity !== undefined &&
         element.opacity !== 1).length,
+      colorModifierProbeModelCount: elements.filter((element) =>
+        element.name === 'Color Modifier Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#99b3cc' &&
+        element.stroke?.color === '#496ec0').length,
       imageSvgModelCount: elements.filter((element) =>
         element.kind === 'image' &&
         typeof element.src === 'string' &&
@@ -11151,6 +11156,11 @@ async function runExportScenario(page) {
       element.kind === 'image' &&
       element.opacity !== undefined &&
       element.opacity !== 1)
+    const exportColorModifierProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Color Modifier Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#99b3cc' &&
+      element.stroke?.color === '#496ec0')
     const exportSvgImages = exportElements.filter((element) =>
       element.kind === 'image' &&
       typeof element.src === 'string' &&
@@ -11296,6 +11306,10 @@ async function runExportScenario(page) {
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasImageOpacity: exportImageOpacityObjects.length > 0,
       exportImageOpacityObjectNames: exportImageOpacityObjects.map((element) => element.name).join(' | '),
+      exportHasColorModifierProbe: exportColorModifierProbeObjects.length > 0,
+      exportColorModifierProbeFill: exportColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportColorModifierProbeModelCount: exportColorModifierProbeObjects.length,
+      exportColorModifierProbeStroke: exportColorModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasSVGImage: exportSvgImages.length > 0,
       exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
       exportHasGroupedProbe,
@@ -11454,6 +11468,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
       openXmlPPTXImportState.exportHasImageOpacity &&
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
+      openXmlPPTXImportState.exportHasColorModifierProbe &&
+      openXmlPPTXImportState.exportColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.colorModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasSVGImage &&
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportHasGroupedProbe &&
@@ -27892,9 +27908,33 @@ async function addPPTXNoFillShapeProbe(base64) {
     '</p:spPr>',
     '</p:sp>',
   ].join('')
+  const colorModifierProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9966" name="Color Modifier Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="4343400"/>',
+    '<a:ext cx="1371600" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:srgbClr val="336699"><a:tint val="50000"/></a:srgbClr>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:schemeClr val="accent1"><a:lumMod val="60000"/><a:lumOff val="20000"/></a:schemeClr>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${probeShapeXml}${probeLineXml}${roundRectProbeXml}</p:spTree>`,
+    `${probeShapeXml}${probeLineXml}${roundRectProbeXml}${colorModifierProbeXml}</p:spTree>`,
   )
 
   if (nextXml === xml) {

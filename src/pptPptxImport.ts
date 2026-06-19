@@ -2196,16 +2196,79 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
 }
 
 function readPPTXColor(solidFill: Element) {
-  const srgb = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
-    ?.getAttribute('val')
-  const scheme = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
-    ?.getAttribute('val')
+  const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
+  const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
+  const srgb = srgbColor?.getAttribute('val')
+  const scheme = schemeColor?.getAttribute('val')
+  const base = srgb && /^[\da-f]{6}$/i.test(srgb)
+    ? `#${srgb.toLowerCase()}`
+    : scheme ? PPTX_SCHEME_COLORS[scheme] : undefined
+  const colorElement = srgbColor ?? schemeColor
 
-  if (srgb && /^[\da-f]{6}$/i.test(srgb)) {
-    return `#${srgb.toLowerCase()}`
+  return base && colorElement
+    ? applyPPTXColorModifiers(base, colorElement)
+    : base
+}
+
+function applyPPTXColorModifiers(color: string, colorElement: Element) {
+  let rgb = parsePPTXHexColor(color)
+
+  if (!rgb) {
+    return color
   }
 
-  return scheme ? PPTX_SCHEME_COLORS[scheme] : undefined
+  for (const modifier of Array.from(colorElement.children)) {
+    const ratio = readPPTXColorModifierRatio(modifier)
+
+    if (ratio === null) {
+      continue
+    }
+
+    if (modifier.localName === 'shade') {
+      rgb = rgb.map((channel) => channel * ratio) as [number, number, number]
+    } else if (modifier.localName === 'tint') {
+      rgb = rgb.map((channel) =>
+        channel + (255 - channel) * ratio) as [number, number, number]
+    } else if (modifier.localName === 'lumMod') {
+      rgb = rgb.map((channel) => channel * ratio) as [number, number, number]
+    } else if (modifier.localName === 'lumOff') {
+      rgb = rgb.map((channel) =>
+        channel + 255 * ratio) as [number, number, number]
+    }
+  }
+
+  return formatPPTXHexColor(rgb)
+}
+
+function readPPTXColorModifierRatio(modifier: Element) {
+  const value = toPPTXPositiveNumber(modifier.getAttribute('val'))
+
+  return value === null
+    ? null
+    : Math.max(0, Math.min(1, value / 100_000))
+}
+
+function parsePPTXHexColor(color: string): [number, number, number] | null {
+  const match = color.match(/^#?([\da-f]{6})$/i)
+
+  if (!match) {
+    return null
+  }
+
+  return [
+    Number.parseInt(match[1].slice(0, 2), 16),
+    Number.parseInt(match[1].slice(2, 4), 16),
+    Number.parseInt(match[1].slice(4, 6), 16),
+  ]
+}
+
+function formatPPTXHexColor(rgb: readonly number[]) {
+  return `#${rgb
+    .map((channel) =>
+      Math.max(0, Math.min(255, Math.round(channel)))
+        .toString(16)
+        .padStart(2, '0'))
+    .join('')}`
 }
 
 function hasPPTXNoFill(container: Element | null) {
