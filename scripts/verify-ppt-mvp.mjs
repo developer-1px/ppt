@@ -10858,6 +10858,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX object shadow',
+    pptxPackageState.hasObjectShadowOuter,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX non-image alt text',
     pptxPackageState.hasNonImageAltTextDescription,
     pptxPackageState,
@@ -11003,6 +11008,7 @@ async function runExportScenario(page) {
         element.kind === 'image' && element.flipH === true).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
+      objectShadowModelCount: elements.filter((element) => element.shadow).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       transitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
@@ -11053,6 +11059,7 @@ async function runExportScenario(page) {
     const exportElements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
     const exportFlippedImages = exportElements.filter((element) =>
       element.kind === 'image' && element.flipH === true)
+    const exportShadowedObjects = exportElements.filter((element) => element.shadow)
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -11068,6 +11075,8 @@ async function runExportScenario(page) {
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
+      exportHasObjectShadow: exportShadowedObjects.length > 0,
+      exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
       exportHasTransition: exportCode.includes('"transition": {') &&
         exportCode.includes('"type": "push"') &&
@@ -11078,6 +11087,7 @@ async function runExportScenario(page) {
       exportImageFlipModelCount: exportFlippedImages.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
+      exportObjectShadowModelCount: exportShadowedObjects.length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       exportTransitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
@@ -11125,6 +11135,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
+      openXmlPPTXImportState.exportHasObjectShadow &&
+      openXmlPPTXImportState.exportObjectShadowModelCount > beforeOpenXmlPPTXDrop.objectShadowModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
       openXmlPPTXImportState.exportHasTransition &&
@@ -26994,6 +27006,7 @@ async function inspectPPTXPackage(base64) {
     hasObjectAnimationTiming: false,
     hasObjectLocking: false,
     hasObjectOpacityAlpha: false,
+    hasObjectShadowOuter: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
     hasNonImageAltTextDescription: false,
@@ -27009,6 +27022,7 @@ async function inspectPPTXPackage(base64) {
     hasSlideTransitionTiming: false,
     notesCount: 0,
     imageFlipXfrmCount: 0,
+    objectShadowOuterCount: 0,
     relationshipCount: 0,
     slideCount: 0,
     transitionCount: 0,
@@ -27058,6 +27072,7 @@ async function inspectPPTXPackage(base64) {
     const imageFlipXfrmCount = [
       ...slideXml.matchAll(/<p:pic\b[\s\S]*?<a:xfrm\b[^>]*\bflipH="(?:1|true)"[\s\S]*?<\/p:pic>/g),
     ].length
+    const objectShadowOuterCount = countOccurrences(slideXml, '<a:outerShdw')
 
     return {
       entryCount: entries.length,
@@ -27108,6 +27123,7 @@ async function inspectPPTXPackage(base64) {
       hasObjectLocking:
         slideXml.includes('<a:spLocks noMove="1" noResize="1" noRot="1" noTextEdit="1"/>'),
       hasObjectOpacityAlpha: slideXml.includes('<a:alpha val="42000"/>'),
+      hasObjectShadowOuter: objectShadowOuterCount > 0,
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
       hasNonImageAltTextDescription: slideXml.includes(
@@ -27141,6 +27157,7 @@ async function inspectPPTXPackage(base64) {
         themeXml.includes('<a:hlink><a:srgbClr val="2563EB"/></a:hlink>'),
       notesCount: notesPaths.length,
       imageFlipXfrmCount,
+      objectShadowOuterCount,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
       transitionCount,

@@ -6,6 +6,7 @@ import {
   PPTDeckSchema,
   type PPTDeck,
   type PPTElement,
+  type PPTElementShadow,
   type PPTFill,
   type PPTGeometry,
   type PPTImage,
@@ -503,6 +504,7 @@ function readPPTXLineElement(
   const line = getDirectPPTXChildByLocalName(spPr, 'ln')
   const stroke = readPPTXStroke(spPr)
   const opacity = readPPTXLineOpacity(line)
+  const shadow = readPPTXElementShadow(spPr)
   const lineGeometry = readPPTXLineGeometry(spPr)
 
   if (!stroke || !lineGeometry) {
@@ -519,6 +521,7 @@ function readPPTXLineElement(
     name: readPPTXObjectName(element, `Line ${objectIndex}`),
     ...(opacity === null ? {} : { opacity }),
     route: 'straight',
+    ...(shadow ? { shadow } : {}),
     start: lineGeometry.start,
     startMarker: readPPTXLineMarker(line, 'headEnd'),
     stroke,
@@ -624,6 +627,7 @@ function readPPTXShapeElement(
   const textBody = readPPTXTextBody(txBody)
   const fill = readPPTXSolidFill(spPr)
   const stroke = readPPTXStroke(spPr)
+  const shadow = readPPTXElementShadow(spPr)
   const hasPaint = fill !== null || stroke !== undefined
 
   if (!geometry || (!textBody && !hasPaint)) {
@@ -642,6 +646,7 @@ function readPPTXShapeElement(
       id,
       kind: 'textBox',
       name,
+      ...(shadow ? { shadow } : {}),
       style: readPPTXTextStyle(textBody, txBody),
       textAutoFit: 'resizeShapeToFitText',
       textBody: textBody ?? { paragraphs: [] },
@@ -663,6 +668,7 @@ function readPPTXShapeElement(
     id,
     kind: 'shape',
     name,
+    ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
   }
 }
@@ -702,6 +708,7 @@ async function readPPTXPictureElement({
   const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(pic)
   const crop = readPPTXImageCrop(pic)
+  const shadow = readPPTXElementShadow(spPr)
 
   return {
     ...(altText ? { accessibility: { altText } } : {}),
@@ -714,6 +721,7 @@ async function readPPTXPictureElement({
     id: createPPTXImportedElementId(index, objectIndex),
     kind: 'image',
     name,
+    ...(shadow ? { shadow } : {}),
     src: `data:${mimeType};base64,${base64}`,
   }
 }
@@ -743,6 +751,7 @@ function readPPTXTableElement(
 ): PPTElement | null {
   const table = getFirstPPTXDescendantByLocalName(graphicFrame, 'tbl')
   const geometry = readPPTXElementGeometry(graphicFrame)
+  const shadow = readPPTXElementShadow(graphicFrame)
   const rows = table
     ? getDirectPPTXChildrenByLocalName(table, 'tr')
       .map((row) =>
@@ -762,6 +771,7 @@ function readPPTXTableElement(
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'table',
     name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
+    ...(shadow ? { shadow } : {}),
     rows,
   }
 }
@@ -857,6 +867,24 @@ function readPPTXElementFlip(container: Element | null) {
   return {
     ...(isPPTXTrue(xfrm?.getAttribute('flipH')) ? { flipH: true } : {}),
     ...(isPPTXTrue(xfrm?.getAttribute('flipV')) ? { flipV: true } : {}),
+  }
+}
+
+function readPPTXElementShadow(container: Element | null): PPTElementShadow | null {
+  const outerShadow = getFirstPPTXDescendantByLocalName(container, 'outerShdw')
+
+  if (!outerShadow) {
+    return null
+  }
+
+  const direction = toPPTXNumber(outerShadow.getAttribute('dir'))
+
+  return {
+    angle: direction === null ? 45 : normalizePPTXAngle(direction / 60_000),
+    blur: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('blurRad')) ?? 0),
+    color: readPPTXColor(outerShadow) ?? '#000000',
+    distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
+    opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
   }
 }
 
@@ -1273,6 +1301,10 @@ function isPPTXTrue(value: string | null | undefined) {
 
 function clampPPTXPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function normalizePPTXAngle(value: number) {
+  return ((value % 360) + 360) % 360
 }
 
 function emuToPx(value: number) {
