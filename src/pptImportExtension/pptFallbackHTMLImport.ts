@@ -1279,6 +1279,9 @@ function collectPPTFallbackHTMLRuns(
     ...(tag === 'u'
       ? { underline: true }
       : {}),
+    ...(tag === 's' || tag === 'strike' || tag === 'del'
+      ? { strikethrough: true }
+      : {}),
     ...(getPPTFallbackHTMLStyleValue(style, 'font-weight') === '700' ||
       getPPTFallbackHTMLStyleValue(style, 'font-weight') === 'bold'
       ? { bold: true }
@@ -1288,6 +1291,9 @@ function collectPPTFallbackHTMLRuns(
       : {}),
     ...(getPPTFallbackHTMLStyleValue(style, 'text-decoration').includes('underline')
       ? { underline: true }
+      : {}),
+    ...(getPPTFallbackHTMLStyleValue(style, 'text-decoration').includes('line-through')
+      ? { strikethrough: true }
       : {}),
   }
   const color = parsePPTFallbackHTMLColor(

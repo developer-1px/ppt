@@ -68,6 +68,7 @@ import {
   SendToBack,
   Square,
   StickyNote,
+  Strikethrough,
   Sun,
   Table2,
   Trash2,
@@ -1604,6 +1605,12 @@ const PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-run-underline' as const
 const PPT_TEXT_RUN_UNDERLINE_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-run-underline+json'
+const PPT_TEXT_RUN_STRIKETHROUGH_IMPORT_MODEL =
+  'ppt-text-run-strikethrough-import' as const
+const PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-run-strikethrough' as const
+const PPT_TEXT_RUN_STRIKETHROUGH_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-run-strikethrough+json'
 const PPT_TEXT_PARAGRAPH_ALIGN_IMPORT_MODEL =
   'ppt-text-paragraph-align-import' as const
 const PPT_TEXT_PARAGRAPH_ALIGN_JSON_IMPORT_FORMAT =
@@ -2026,6 +2033,7 @@ type PPTTextStyleImportField =
   | 'runColor'
   | 'runItalic'
   | 'runSize'
+  | 'runStrikethrough'
   | 'runUnderline'
   | 'textInset'
   | 'verticalAlign'
@@ -2147,6 +2155,21 @@ type PPTTextRunUnderlineImportSource = {
   format: typeof PPT_TEXT_RUN_UNDERLINE_JSON_IMPORT_FORMAT
   jsonLength: number
   underline: boolean
+}
+type PPTTextRunStrikethroughImportField =
+  | 'runStrikeThrough'
+  | 'runStrikethrough'
+  | 'strike'
+  | 'strikeThrough'
+  | 'strikethrough'
+  | 'textRunStrikeThrough'
+  | 'textRunStrikethrough'
+  | 'value'
+type PPTTextRunStrikethroughImportSource = {
+  fields: readonly PPTTextRunStrikethroughImportField[]
+  format: typeof PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT
+  jsonLength: number
+  strikethrough: boolean
 }
 type PPTTextParagraphAlignImportField =
   | 'align'
@@ -2649,6 +2672,7 @@ type PPTTextStyleImportEffect = {
   runColor: string
   runItalic: string
   runSize: string
+  runStrikethrough: string
   runUnderline: string
   textInset: string
   verticalAlign: string
@@ -2784,6 +2808,21 @@ type PPTTextRunUnderlineImportEffect = {
   runCount: number
   slideId: string
   underline: string
+}
+type PPTTextRunStrikethroughImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT
+  jsonLength: number
+  model: typeof PPT_TEXT_RUN_STRIKETHROUGH_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
+  strikethrough: string
 }
 type PPTTextParagraphAlignImportEffect = {
   align: string
@@ -3419,6 +3458,7 @@ type PPTTextQuickFormatState = {
   fontSize: number
   isBold: boolean
   isItalic: boolean
+  isStrikethrough: boolean
   isUnderline: boolean
   listLevel: number
   numbered: boolean
@@ -4104,6 +4144,10 @@ function App() {
     useState<PPTTextRunItalicImportEffect | null>(null)
   const [lastTextRunUnderlineImportEffect, setLastTextRunUnderlineImportEffect] =
     useState<PPTTextRunUnderlineImportEffect | null>(null)
+  const [
+    lastTextRunStrikethroughImportEffect,
+    setLastTextRunStrikethroughImportEffect,
+  ] = useState<PPTTextRunStrikethroughImportEffect | null>(null)
   const [lastTextParagraphAlignImportEffect, setLastTextParagraphAlignImportEffect] =
     useState<PPTTextParagraphAlignImportEffect | null>(null)
   const [lastTextParagraphBulletImportEffect, setLastTextParagraphBulletImportEffect] =
@@ -5252,6 +5296,12 @@ function App() {
           'text-run-underline-source',
           getPPTTextRunUnderlineSourceFromDataTransfer,
           pastePPTTextRunUnderlineSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-strikethrough-source',
+          getPPTTextRunStrikethroughSourceFromDataTransfer,
+          pastePPTTextRunStrikethroughSource,
         ),
         createPPTClipboardSourcePasteResolver(
           dataTransfer,
@@ -7821,6 +7871,52 @@ function App() {
       runCount: getPPTTextElementsRunCount(textElements),
       source,
     }))
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.objectIds,
+          (element) =>
+            isPPTTextElement(element)
+              ? applyPPTTextRunFormattingCommandEffectToElement(
+                  element,
+                  effect,
+                )
+              : element,
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextRunStrikethroughSource(
+    source: PPTTextRunStrikethroughImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const effect = getPPTTextRunFormattingCommandEffect({
+      fieldId: 'strikethrough',
+      objectIds: textElements.map((element) => element.id),
+      slideId: activeSlide.id,
+      value: source.strikethrough,
+    })
+
+    setLastTextRunStrikethroughImportEffect(
+      createPPTTextRunStrikethroughImportEffect({
+        effect,
+        runCount: getPPTTextElementsRunCount(textElements),
+        source,
+      }),
+    )
 
     commitDeck((current) =>
       updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
@@ -11400,7 +11496,7 @@ function App() {
   }
 
   function updateSelectedTextRunStyle(
-    field: 'italic' | 'underline',
+    field: 'italic' | 'strikethrough' | 'underline',
     enabled: boolean,
   ) {
     if (!canFormatSelectedText) {
@@ -11437,6 +11533,13 @@ function App() {
     updateSelectedTextRunStyle(
       'underline',
       !areAllPPTTextRunsStyled(selectedTextElements, 'underline'),
+    )
+  }
+
+  function toggleSelectedTextStrikethrough() {
+    updateSelectedTextRunStyle(
+      'strikethrough',
+      !areAllPPTTextRunsStyled(selectedTextElements, 'strikethrough'),
     )
   }
 
@@ -14430,6 +14533,12 @@ function App() {
     title: 'Underline text',
   }, {
     disabled: !canFormatSelectedText,
+    id: 'format:strikethrough',
+    onSelect: toggleSelectedTextStrikethrough,
+    section: 'Format',
+    title: 'Strikethrough text',
+  }, {
+    disabled: !canFormatSelectedText,
     id: 'format:decrease-font-size',
     onSelect: () => stepSelectedTextFontSize(-PPT_TEXT_FONT_SIZE_STEP),
     section: 'Format',
@@ -15191,6 +15300,9 @@ function App() {
           ? undefined
           : String(styleClipboard.runStyle.italic)}
         data-ppt-style-clipboard-run-size={styleClipboard?.runStyle?.size}
+        data-ppt-style-clipboard-run-strikethrough={styleClipboard?.runStyle?.strikethrough === undefined
+          ? undefined
+          : String(styleClipboard.runStyle.strikethrough)}
         data-ppt-style-clipboard-run-underline={styleClipboard?.runStyle?.underline === undefined
           ? undefined
           : String(styleClipboard.runStyle.underline)}
@@ -15256,6 +15368,7 @@ function App() {
         data-ppt-text-style-import-run-color={lastTextStyleImportEffect?.runColor}
         data-ppt-text-style-import-run-italic={lastTextStyleImportEffect?.runItalic}
         data-ppt-text-style-import-run-size={lastTextStyleImportEffect?.runSize}
+        data-ppt-text-style-import-run-strikethrough={lastTextStyleImportEffect?.runStrikethrough}
         data-ppt-text-style-import-run-underline={lastTextStyleImportEffect?.runUnderline}
         data-ppt-text-style-import-text-inset={lastTextStyleImportEffect?.textInset}
         data-ppt-text-style-import-vertical-align={lastTextStyleImportEffect?.verticalAlign}
@@ -15333,6 +15446,19 @@ function App() {
         data-ppt-text-run-underline-import-runs={lastTextRunUnderlineImportEffect?.runCount}
         data-ppt-text-run-underline-import-slide={lastTextRunUnderlineImportEffect?.slideId}
         data-ppt-text-run-underline-import-value={lastTextRunUnderlineImportEffect?.underline}
+        data-ppt-text-run-strikethrough-import-command-fields={lastTextRunStrikethroughImportEffect?.commandFields}
+        data-ppt-text-run-strikethrough-import-command-ids={lastTextRunStrikethroughImportEffect?.commandIds}
+        data-ppt-text-run-strikethrough-import-command-targets={lastTextRunStrikethroughImportEffect?.commandTargets}
+        data-ppt-text-run-strikethrough-import-command-types={lastTextRunStrikethroughImportEffect?.commandTypes}
+        data-ppt-text-run-strikethrough-import-command-values={lastTextRunStrikethroughImportEffect?.commandValues}
+        data-ppt-text-run-strikethrough-import-fields={lastTextRunStrikethroughImportEffect?.fields}
+        data-ppt-text-run-strikethrough-import-format={lastTextRunStrikethroughImportEffect?.format}
+        data-ppt-text-run-strikethrough-import-json-length={lastTextRunStrikethroughImportEffect?.jsonLength}
+        data-ppt-text-run-strikethrough-import-model={lastTextRunStrikethroughImportEffect?.model}
+        data-ppt-text-run-strikethrough-import-objects={lastTextRunStrikethroughImportEffect?.objectIds}
+        data-ppt-text-run-strikethrough-import-runs={lastTextRunStrikethroughImportEffect?.runCount}
+        data-ppt-text-run-strikethrough-import-slide={lastTextRunStrikethroughImportEffect?.slideId}
+        data-ppt-text-run-strikethrough-import-value={lastTextRunStrikethroughImportEffect?.strikethrough}
         data-ppt-text-paragraph-align-import-categories={lastTextParagraphAlignImportEffect?.categories}
         data-ppt-text-paragraph-align-import-command={lastTextParagraphAlignImportEffect?.commandId}
         data-ppt-text-paragraph-align-import-command-fields={lastTextParagraphAlignImportEffect?.commandFields}
@@ -16135,6 +16261,7 @@ function App() {
               onTextBoldToggle={toggleSelectedTextBold}
               onTextColorChange={updateSelectedTextColor}
               onTextItalicToggle={toggleSelectedTextItalic}
+              onTextStrikethroughToggle={toggleSelectedTextStrikethrough}
               onTextUnderlineToggle={toggleSelectedTextUnderline}
             />
             {selectedLineElement && !editingId && canResizeSelection ? (
@@ -19383,6 +19510,9 @@ function createPPTTextStyleImportEffect({
     runColor: runStyle?.color ?? '',
     runItalic: runStyle?.italic === undefined ? '' : String(runStyle.italic),
     runSize: runStyle?.size === undefined ? '' : String(runStyle.size),
+    runStrikethrough: runStyle?.strikethrough === undefined
+      ? ''
+      : String(runStyle.strikethrough),
     runUnderline: runStyle?.underline === undefined ? '' : String(runStyle.underline),
     textInset: text?.textInset
       ? formatPPTTextStyleImportInsetData(text.textInset)
@@ -19666,6 +19796,34 @@ function createPPTTextRunUnderlineImportEffect({
     runCount,
     slideId: effect.payload.slideId,
     underline: value,
+  }
+}
+
+function createPPTTextRunStrikethroughImportEffect({
+  effect,
+  runCount,
+  source,
+}: {
+  effect: PPTTextRunFormattingHostCommandEffect
+  runCount: number
+  source: PPTTextRunStrikethroughImportSource
+}): PPTTextRunStrikethroughImportEffect {
+  const value = String(source.strikethrough)
+
+  return {
+    commandFields: effect.payload.fieldId,
+    commandIds: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandTypes: effect.type,
+    commandValues: String(effect.payload.value),
+    fields: source.fields.join(' '),
+    format: source.format,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_RUN_STRIKETHROUGH_IMPORT_MODEL,
+    objectIds: effect.payload.objectIds.join(' '),
+    runCount,
+    slideId: effect.payload.slideId,
+    strikethrough: value,
   }
 }
 
@@ -25960,6 +26118,10 @@ function getPPTTextStyleSourceFromJSONValue(
     fields.push('runSize')
   }
 
+  if (runStyle?.strikethrough !== undefined) {
+    fields.push('runStrikethrough')
+  }
+
   if (runStyle?.underline !== undefined) {
     fields.push('runUnderline')
   }
@@ -26019,6 +26181,15 @@ function getPPTTextStyleRunStyleFromJSONValue(
   const size = getPPTTextRunSizeImportValueFromJSONValue(
     value.size ?? value.fontSize ?? value.runSize ?? value.textRunSize,
   )
+  const strikethrough = getPPTTextRunStrikethroughImportValueFromJSONValue(
+    value.strikethrough ??
+      value.strikeThrough ??
+      value.strike ??
+      value.runStrikethrough ??
+      value.runStrikeThrough ??
+      value.textRunStrikethrough ??
+      value.textRunStrikeThrough,
+  )
   const underline = getPPTTextRunUnderlineImportValueFromJSONValue(
     value.underline ?? value.runUnderline ?? value.textRunUnderline,
   )
@@ -26037,6 +26208,10 @@ function getPPTTextStyleRunStyleFromJSONValue(
 
   if (size !== undefined) {
     runStyle.size = size
+  }
+
+  if (strikethrough !== undefined) {
+    runStyle.strikethrough = strikethrough
   }
 
   if (underline !== undefined) {
@@ -27617,9 +27792,82 @@ function getPPTTextRunUnderlineSourceFromSlideEditJSONPasteValue(
       }
 }
 
+function getPPTTextRunStrikethroughSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const slideEditSource =
+    getPPTTextRunStrikethroughSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextRunStrikethroughImportSource['format']
+  >[] = [
+    {
+      allowDirect: true,
+      format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_RUN_STRIKETHROUGH_JSON_MIME_TYPE,
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+    },
+  ]
+
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextRunStrikethroughSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextRunStrikethroughSourceFromText(text, candidate.allowDirect),
+  })
+}
+
+function getPPTTextRunStrikethroughSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunStrikethroughImportSource | null {
+  const source = getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
+    dataTransfer,
+    fieldId: 'strikethrough',
+    pptJsonMimeType: PPT_TEXT_RUN_STRIKETHROUGH_JSON_MIME_TYPE,
+  })
+
+  return source === null
+    ? null
+    : {
+        fields: source.fields as readonly PPTTextRunStrikethroughImportField[],
+        format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+        jsonLength: source.jsonLength,
+        strikethrough: source.value,
+      }
+}
+
 type PPTTextRunFormattingImportField =
   | PPTTextRunBoldImportField
   | PPTTextRunItalicImportField
+  | PPTTextRunStrikethroughImportField
   | PPTTextRunUnderlineImportField
 
 function getPPTTextRunFormattingSourceFromSlideEditJSONPasteValue({
@@ -27706,6 +27954,8 @@ function getPPTTextRunFormattingPayloadEntry(
       return getPPTTextRunBoldPayloadEntry(value, allowDirect)
     case 'italic':
       return getPPTTextRunItalicPayloadEntry(value, allowDirect)
+    case 'strikethrough':
+      return getPPTTextRunStrikethroughPayloadEntry(value, allowDirect)
     case 'underline':
       return getPPTTextRunUnderlinePayloadEntry(value, allowDirect)
   }
@@ -27854,6 +28104,178 @@ function getPPTTextRunUnderlineImportValueFromJSONValue(
     case 'true':
     case 'underline':
     case 'underlined':
+    case 'yes':
+      return true
+    case '0':
+    case 'disabled':
+    case 'false':
+    case 'none':
+    case 'no':
+    case 'normal':
+    case 'off':
+    case 'regular':
+    case 'upright':
+      return false
+    default:
+      return undefined
+  }
+}
+
+function getPPTTextRunStrikethroughSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextRunStrikethroughImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextRunStrikethroughSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextRunStrikethroughSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextRunStrikethroughSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextRunStrikethroughSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextRunStrikethroughImportSource | null {
+  const payload = getPPTTextRunStrikethroughPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const strikethrough = getPPTTextRunStrikethroughImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return strikethrough === undefined
+    ? null
+    : {
+        fields: payload.fields,
+        format: PPT_TEXT_RUN_STRIKETHROUGH_JSON_IMPORT_FORMAT,
+        jsonLength,
+        strikethrough,
+      }
+}
+
+function getPPTTextRunStrikethroughPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunStrikethroughImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textRunStrikethrough',
+    'textRunStrikeThrough',
+    'runStrikethrough',
+    'runStrikeThrough',
+    'strikethrough',
+    'strikeThrough',
+    'strike',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextRunStrikethroughImportValueFromJSONValue(
+  value: unknown,
+): boolean | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'strikethrough',
+      'strikeThrough',
+      'strike',
+      'runStrikethrough',
+      'runStrikeThrough',
+      'textRunStrikethrough',
+      'textRunStrikeThrough',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextRunStrikethroughImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return true
+    }
+
+    if (value === 0) {
+      return false
+    }
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  switch (value.trim().replace(/[\s_]/g, '-').toLowerCase()) {
+    case '1':
+    case 'enabled':
+    case 'line-through':
+    case 'on':
+    case 'strike':
+    case 'strikethrough':
+    case 'strike-through':
+    case 'true':
     case 'yes':
       return true
     case '0':
@@ -31994,6 +32416,10 @@ function createPPTRunClipboardHTML(run: PPTRun) {
     content = `<u>${content}</u>`
   }
 
+  if (run.strikethrough === true) {
+    content = `<s>${content}</s>`
+  }
+
   if (run.italic === true) {
     content = `<em>${content}</em>`
   }
@@ -32989,6 +33415,7 @@ function PPTSelectionFloatingBar({
   onTextBoldToggle,
   onTextColorChange,
   onTextItalicToggle,
+  onTextStrikethroughToggle,
   onTextUnderlineToggle,
   scale,
   shapeMenu,
@@ -33008,6 +33435,7 @@ function PPTSelectionFloatingBar({
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   onTextItalicToggle: () => void
+  onTextStrikethroughToggle: () => void
   onTextUnderlineToggle: () => void
   scale: number
   shapeMenu: PPTShapeQuickMenuState | null
@@ -33042,6 +33470,7 @@ function PPTSelectionFloatingBar({
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
           onTextItalicToggle={onTextItalicToggle}
+          onTextStrikethroughToggle={onTextStrikethroughToggle}
           onTextUnderlineToggle={onTextUnderlineToggle}
         />
       ) : null}
@@ -33415,6 +33844,7 @@ function PPTTextQuickFormatControls({
   onTextBoldToggle,
   onTextColorChange,
   onTextItalicToggle,
+  onTextStrikethroughToggle,
   onTextUnderlineToggle,
   state,
 }: {
@@ -33426,6 +33856,7 @@ function PPTTextQuickFormatControls({
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
   onTextItalicToggle: () => void
+  onTextStrikethroughToggle: () => void
   onTextUnderlineToggle: () => void
   state: PPTTextQuickFormatState
 }) {
@@ -33475,6 +33906,21 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Underline size={16} />
+      </button>
+      <button
+        aria-label="Strikethrough text"
+        aria-pressed={state.isStrikethrough}
+        className="ppt-floating-command"
+        data-ppt-text-quick="strikethrough"
+        title="Strikethrough text"
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onTextStrikethroughToggle()
+        }}
+      >
+        <Strikethrough size={16} />
       </button>
       <button
         aria-label="Decrease font size"
@@ -34626,6 +35072,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
               data-ppt-run-color={run.color}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
               data-ppt-run-size={run.size}
+              data-ppt-run-strikethrough={run.strikethrough === true ? 'true' : undefined}
               data-ppt-run-underline={run.underline === true ? 'true' : undefined}
               key={runIndex}
               style={pptTextRunStyle(run)}
@@ -37761,8 +38208,19 @@ function pptTextRunStyle(run: PPTRun): CSSProperties {
     fontSize: run.size,
     fontStyle: run.italic === true ? 'italic' : undefined,
     fontWeight: run.bold === true ? 700 : undefined,
-    textDecoration: run.underline === true ? 'underline' : undefined,
+    textDecoration: getPPTTextRunTextDecoration(run),
   }
+}
+
+function getPPTTextRunTextDecoration(
+  run: Pick<PPTRun, 'strikethrough' | 'underline'>,
+) {
+  const decorations = [
+    run.underline === true ? 'underline' : '',
+    run.strikethrough === true ? 'line-through' : '',
+  ].filter(Boolean)
+
+  return decorations.length > 0 ? decorations.join(' ') : undefined
 }
 
 const PPT_TEMPORARY_PAN_BLOCKED_TARGET_SELECTORS = [
@@ -38481,6 +38939,9 @@ function clonePPTTextRunStyle(style: PPTTextRunStyle): PPTTextRunStyle {
     ...(style.color === undefined ? {} : { color: style.color }),
     ...(style.italic === undefined ? {} : { italic: style.italic }),
     ...(style.size === undefined ? {} : { size: style.size }),
+    ...(style.strikethrough === undefined
+      ? {}
+      : { strikethrough: style.strikethrough }),
     ...(style.underline === undefined ? {} : { underline: style.underline }),
   }
 }
@@ -38495,6 +38956,7 @@ function applyPPTTextRunStyle(
     ...(style.color === undefined ? {} : { color: style.color }),
     ...(style.italic === true ? { italic: true } : {}),
     ...(style.size === undefined ? {} : { size: style.size }),
+    ...(style.strikethrough === true ? { strikethrough: true } : {}),
     ...(style.underline === true ? { underline: true } : {}),
   }
 }
@@ -38528,6 +38990,7 @@ function getPPTTextQuickFormatState(
     isBold: styles.length > 0 &&
       styles.every((style) => style.fontWeight === 'bold'),
     isItalic: areAllPPTTextRunsStyled(elements, 'italic'),
+    isStrikethrough: areAllPPTTextRunsStyled(elements, 'strikethrough'),
     isUnderline: areAllPPTTextRunsStyled(elements, 'underline'),
     listLevel: listLevels.every((level) => level === firstListLevel)
       ? firstListLevel
@@ -38564,7 +39027,7 @@ function hasPPTTextBodyNumbered(body: PPTTextBody) {
 
 function areAllPPTTextRunsStyled(
   elements: readonly PPTTextElement[],
-  field: 'italic' | 'underline',
+  field: 'italic' | 'strikethrough' | 'underline',
 ) {
   return elements.length > 0 &&
     elements.every((element) =>
@@ -39963,6 +40426,9 @@ function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunSty
     ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
     ...(firstRun.italic === undefined ? {} : { italic: firstRun.italic }),
     ...(firstRun.size === undefined ? {} : { size: firstRun.size }),
+    ...(firstRun.strikethrough === undefined
+      ? {}
+      : { strikethrough: firstRun.strikethrough }),
     ...(firstRun.underline === undefined ? {} : { underline: firstRun.underline }),
   }
 }
@@ -39975,6 +40441,7 @@ function arePPTTextRunStylesEqual(
     left.color === right.color &&
     left.italic === right.italic &&
     left.size === right.size &&
+    left.strikethrough === right.strikethrough &&
     left.underline === right.underline
 }
 

@@ -542,9 +542,12 @@ function renderPPTTextBodySVG({
 }
 
 function renderPPTTextRunSVG(run: PPTRun) {
+  const textDecoration = getPPTTextRunTextDecoration(run)
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true" font-style="italic"' : '',
-    run.underline === true ? 'data-ppt-run-underline="true" text-decoration="underline"' : '',
+    run.underline === true ? 'data-ppt-run-underline="true"' : '',
+    run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
+    textDecoration ? `text-decoration="${textDecoration}"` : '',
     run.bold === true ? 'font-weight="700"' : '',
     run.color ? `fill="${escapeHtml(run.color)}"` : '',
     run.size ? `font-size="${formatNumber(run.size)}"` : '',
@@ -620,6 +623,7 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
 function renderPPTTextRunHTML(run: PPTRun) {
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true"' : '',
+    run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
     run.underline === true ? 'data-ppt-run-underline="true"' : '',
     renderPPTTextRunStyleAttr(run),
   ].filter(Boolean).join(' ')
@@ -635,10 +639,23 @@ function renderPPTTextRunStyleAttr(run: PPTRun) {
     run.color ? `color:${escapeHtml(run.color)}` : '',
     run.italic === true ? 'font-style:italic' : '',
     run.size ? `font-size:${run.size}px` : '',
-    run.underline === true ? 'text-decoration:underline' : '',
+    getPPTTextRunTextDecoration(run)
+      ? `text-decoration:${getPPTTextRunTextDecoration(run)}`
+      : '',
   ].filter(Boolean).join(';')
 
   return styles ? `style="${styles}"` : ''
+}
+
+function getPPTTextRunTextDecoration(
+  run: Pick<PPTRun, 'strikethrough' | 'underline'>,
+) {
+  const decorations = [
+    run.underline === true ? 'underline' : '',
+    run.strikethrough === true ? 'line-through' : '',
+  ].filter(Boolean)
+
+  return decorations.length > 0 ? decorations.join(' ') : undefined
 }
 
 function getPPTParagraphListHTMLAttrs(paragraph: PPTParagraph) {

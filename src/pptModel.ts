@@ -31,6 +31,7 @@ const PPTRunSchema = z.object({
   color: z.string().optional(),
   italic: z.boolean().optional(),
   size: z.number().optional(),
+  strikethrough: z.boolean().optional(),
   text: z.string(),
   underline: z.boolean().optional(),
 })
