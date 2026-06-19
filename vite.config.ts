@@ -17,6 +17,8 @@ const canvasAppEntry = fileURLToPath(new URL('../canvas/src/canvas/app/index.ts'
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
 const canvasEngineEntry = fileURLToPath(new URL('../canvas/src/canvas/engine/index.ts', import.meta.url))
+const canvasHostEntry = fileURLToPath(new URL('../canvas/src/canvas/host/index.ts', import.meta.url))
+const canvasRendererEntry = fileURLToPath(new URL('../canvas/src/canvas/renderer/index.ts', import.meta.url))
 const canvasSvgDrawingPrimitivesEntry = fileURLToPath(new URL('../canvas/src/canvas/renderer/svg-drawing-primitives.ts', import.meta.url))
 const domEditAffordanceMetadataEntry = fileURLToPath(new URL('../canvas/packages/dom-edit-affordance/src/metadata.ts', import.meta.url))
 const slideEditAffordanceEntry = fileURLToPath(new URL('../canvas/packages/slide-edit-affordance/src/index.ts', import.meta.url))
@@ -40,7 +42,9 @@ export default defineConfig({
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },
       { find: 'canvas/engine', replacement: canvasEngineEntry },
+      { find: 'canvas/host', replacement: canvasHostEntry },
       { find: 'canvas/renderer/svg-drawing-primitives', replacement: canvasSvgDrawingPrimitivesEntry },
+      { find: 'canvas/renderer', replacement: canvasRendererEntry },
       { find: '@interactive-os/dom-edit-affordance/metadata', replacement: domEditAffordanceMetadataEntry },
       { find: '@interactive-os/slide-edit-affordance', replacement: slideEditAffordanceEntry },
     ],

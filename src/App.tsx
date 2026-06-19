@@ -4919,7 +4919,8 @@ function App() {
 
     function releaseTemporaryPan() {
       setIsTemporaryPanActive(false)
-      setInteraction((current) => current?.kind === 'pan' ? null : current)
+      setInteraction((current: Interaction | null) =>
+        current?.kind === 'pan' ? null : current)
     }
 
     function onKeyUp(event: KeyboardEvent) {
@@ -9302,7 +9303,8 @@ function App() {
 
     setIsLaserToolActive(shouldActivate)
     setLaserTrailPoints([])
-    setInteraction((current) => current?.kind === 'laser' ? null : current)
+    setInteraction((current: Interaction | null) =>
+      current?.kind === 'laser' ? null : current)
     setCreationTool(null)
     setLineCreationMode(null)
     setIsPanToolActive(false)
@@ -9315,7 +9317,8 @@ function App() {
     const shouldActivate = !isEraserToolActive
 
     setIsEraserToolActive(shouldActivate)
-    setInteraction((current) => current?.kind === 'erase' ? null : current)
+    setInteraction((current: Interaction | null) =>
+      current?.kind === 'erase' ? null : current)
     setCreationTool(null)
     setLineCreationMode(null)
     setIsPanToolActive(false)
@@ -13162,7 +13165,7 @@ function App() {
     }
 
     const delta = getPointAngle(interaction.center, point) - interaction.startAngle
-    const rotationById = new Map(interaction.startRotations.map((item) => [
+    const rotationById = new Map<string, number>(interaction.startRotations.map((item) => [
       item.elementId,
       item.rotation,
     ]))
@@ -13416,6 +13419,7 @@ function App() {
     id: 'command:delete',
     onSelect: deleteSelection,
     section: 'Edit',
+    shortcut: 'Delete / Backspace',
     title: PPT_COMMAND_AFFORDANCES.delete.title,
   }, {
     disabled: !commandAvailability.cut,

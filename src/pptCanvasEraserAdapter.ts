@@ -49,18 +49,18 @@ function createPPTEraserItemReadModel(slide: PPTSlide): PPTEraserItemReadModel {
 
   return {
     findEditableTextItem: () => null,
-    findItem: (id) => itemById.get(id),
+    findItem: (id: string) => itemById.get(id),
     getAllIds: () => items.map((item) => item.id),
     getAllItems: () => items,
     getItemBounds: getPPTEraserItemBounds,
-    getSelection: (ids) => ids.filter((id) => itemById.has(id)),
-    getSelectionBounds: (ids) =>
+    getSelection: (ids: string[]) => ids.filter((id) => itemById.has(id)),
+    getSelectionBounds: (ids: Iterable<string>) =>
       unionPPTCanvasRectList(Array.from(ids).flatMap((id) => {
         const item = itemById.get(id)
 
         return item ? [getPPTEraserItemBounds(item)] : []
       })),
-    getSelectedItems: (ids) =>
+    getSelectedItems: (ids: string[]) =>
       ids.flatMap((id) => {
         const item = itemById.get(id)
 

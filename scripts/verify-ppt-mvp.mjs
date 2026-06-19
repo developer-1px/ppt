@@ -2518,6 +2518,142 @@ async function runAffordanceScenario(page) {
   }))()`)
 
   record('selects all PPT objects with keyboard command', afterSelectAll.selectedCount === afterSelectAll.elementCount, afterSelectAll)
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const deletePoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, deletePoint.x, deletePoint.y, 1)
+  await delay(50)
+
+  const beforeKeyboardDelete = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Delete',
+    key: 'Delete',
+    windowsVirtualKeyCode: 46,
+  })
+  await delay(50)
+
+  const afterKeyboardDelete = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'deletes selected PPT object with Delete canvas command binding',
+    beforeKeyboardDelete.selectedId.length > 0 &&
+      afterKeyboardDelete.elementCount === beforeKeyboardDelete.elementCount - 1 &&
+      afterKeyboardDelete.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterKeyboardDelete.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
+      afterKeyboardDelete.selectedCount === 0 &&
+      afterKeyboardDelete.undoEnabled,
+    {
+      afterKeyboardDelete,
+      beforeKeyboardDelete,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterDeleteUndo = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('undoes Delete object removal as one history step', afterDeleteUndo.elementCount === beforeKeyboardDelete.elementCount && afterDeleteUndo.redoEnabled, {
+    afterDeleteUndo,
+    beforeKeyboardDelete,
+  })
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const backspacePoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, backspacePoint.x, backspacePoint.y, 1)
+  await delay(50)
+
+  const beforeKeyboardBackspace = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+  }))()`)
+
+  await pressKey(page, {
+    code: 'Backspace',
+    key: 'Backspace',
+    windowsVirtualKeyCode: 8,
+  })
+  await delay(50)
+
+  const afterKeyboardBackspace = await page.eval(`(() => {
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      elementCount: document.querySelectorAll('[data-ppt-element]').length,
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
+      selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'deletes selected PPT object with Backspace canvas command binding',
+    beforeKeyboardBackspace.selectedId.length > 0 &&
+      afterKeyboardBackspace.elementCount === beforeKeyboardBackspace.elementCount - 1 &&
+      afterKeyboardBackspace.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterKeyboardBackspace.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
+      afterKeyboardBackspace.selectedCount === 0 &&
+      afterKeyboardBackspace.undoEnabled,
+    {
+      afterKeyboardBackspace,
+      beforeKeyboardBackspace,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const afterBackspaceUndo = await page.eval(`(() => ({
+    elementCount: document.querySelectorAll('[data-ppt-element]').length,
+    redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+    selectedCount: document.querySelectorAll('[data-selected="true"]').length,
+  }))()`)
+
+  record('undoes Backspace object removal as one history step', afterBackspaceUndo.elementCount === beforeKeyboardBackspace.elementCount && afterBackspaceUndo.redoEnabled, {
+    afterBackspaceUndo,
+    beforeKeyboardBackspace,
+  })
 }
 
 async function runCommandSurfaceScenario(page) {
@@ -4312,6 +4448,7 @@ async function runShortcutHelpScenario(page) {
     'derives PPT keyboard shortcut help from command palette shortcuts',
     afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') &&
       afterShortcutOpen.itemIds.includes('command:duplicate') &&
+      afterShortcutOpen.itemIds.includes('command:delete') &&
       afterShortcutOpen.itemIds.includes('command:bring-forward') &&
       afterShortcutOpen.itemIds.includes('command:lock-selection') &&
       afterShortcutOpen.itemIds.includes('slide:add') &&
@@ -4339,6 +4476,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.itemIds.includes('selection:cycle-previous') &&
       afterShortcutOpen.shortcuts.includes('Shift+/') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') &&
+      afterShortcutOpen.shortcuts.includes('Delete / Backspace') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') &&
       afterShortcutOpen.shortcuts.includes('Enter / F2') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') &&
