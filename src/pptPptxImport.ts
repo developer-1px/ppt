@@ -37,6 +37,8 @@ export const PPTX_DECK_MODEL_IMPORT_FORMAT = 'pptx-custom-xml-ppt-deck' as const
 export const PPTX_OPEN_XML_IMPORT_FORMAT = 'pptx-open-xml-ppt-deck' as const
 const PPTX_RELATIONSHIP_ATTRIBUTE_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PPTX_ROUND_RECT_DEFAULT_ADJUST = 16_667
+const PPTX_ROUND_RECT_MAX_ADJUST = 50_000
 
 type PPTDeckPPTXImportFormat =
   | typeof PPTX_DECK_MODEL_IMPORT_FORMAT
@@ -1074,7 +1076,7 @@ function readPPTXShapeElement(
 
   return {
     ...(readPPTXElementAccessibility(sp) ?? {}),
-    ...(readPPTXShapeCornerRadius(spPr) ?? {}),
+    ...(readPPTXShapeCornerRadius(spPr, geometry) ?? {}),
     ...readPPTXElementFlip(spPr),
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
@@ -2076,11 +2078,47 @@ function readPPTXShapeKind(spPr: Element | null): PPTShapeKind {
   return 'rect'
 }
 
-function readPPTXShapeCornerRadius(spPr: Element | null) {
-  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+function readPPTXShapeCornerRadius(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+) {
+  const presetGeometry = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+  const preset = presetGeometry
     ?.getAttribute('prst')
 
-  return preset === 'roundRect' ? { cornerRadius: 24 } : null
+  if (preset !== 'roundRect') {
+    return null
+  }
+
+  const adjust = readPPTXPresetGeometryAdjust(
+    presetGeometry,
+    'adj',
+    PPTX_ROUND_RECT_DEFAULT_ADJUST,
+  )
+  const radius = Math.round(
+    Math.min(geometry.w, geometry.h) * adjust / 100_000,
+  )
+
+  return { cornerRadius: Math.max(0, radius) }
+}
+
+function readPPTXPresetGeometryAdjust(
+  presetGeometry: Element | null,
+  name: string,
+  fallback: number,
+) {
+  const formula = presetGeometry
+    ? getPPTXDescendantsByLocalName(presetGeometry, 'gd')
+      .find((guide) => guide.getAttribute('name') === name)
+      ?.getAttribute('fmla') ?? ''
+    : ''
+  const value = toPPTXNumber(formula.match(/^val\s+(-?\d+(?:\.\d+)?)$/)?.[1])
+  const normalized = value === null ? fallback : value
+
+  return Math.min(
+    PPTX_ROUND_RECT_MAX_ADJUST,
+    Math.max(0, normalized),
+  )
 }
 
 function readPPTXShapeFill(

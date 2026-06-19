@@ -11071,6 +11071,10 @@ async function runExportScenario(page) {
         element.name === 'Dot Line Probe' &&
         element.kind === 'line' &&
         element.stroke?.dash === 'dot').length,
+      roundRectProbeModelCount: elements.filter((element) =>
+        element.name === 'Round Rect Probe' &&
+        element.kind === 'shape' &&
+        element.cornerRadius === 32).length,
       paragraphDefaultRunStyleModelCount: elements.filter((element) =>
         element.name === 'Default Run Style Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
@@ -11234,6 +11238,11 @@ async function runExportScenario(page) {
       element.name === 'Dot Line Probe' &&
       element.kind === 'line' &&
       element.stroke?.dash === 'dot')
+    const exportRoundRectProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Round Rect Probe' &&
+      element.kind === 'shape' &&
+      element.shape === 'rect' &&
+      element.cornerRadius === 32)
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
     const exportRuns = exportElements.flatMap((element) =>
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
@@ -11356,6 +11365,9 @@ async function runExportScenario(page) {
       exportOpenXmlDashProbeStrokeDash: exportNoFillShapeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportOpenXmlDotLineProbeModelCount: exportDotLineProbeObjects.length,
       exportOpenXmlDotLineProbeStrokeDash: exportDotLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
+      exportHasRoundRectProbe: exportRoundRectProbeObjects.length > 0,
+      exportRoundRectProbeCornerRadius: exportRoundRectProbeObjects.map((element) => element.cornerRadius ?? '').join(' | '),
+      exportRoundRectProbeModelCount: exportRoundRectProbeObjects.length,
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasObjectShadow: exportShadowedObjects.length > 0,
       exportObjectAltTextNames: exportAltTextObjects.map((element) => element.name).join(' | '),
@@ -11458,6 +11470,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportOpenXmlDashProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashProbeModelCount &&
       openXmlPPTXImportState.exportHasOpenXmlDotLineProbe &&
       openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
+      openXmlPPTXImportState.exportHasRoundRectProbe &&
+      openXmlPPTXImportState.exportRoundRectProbeModelCount > beforeOpenXmlPPTXDrop.roundRectProbeModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&
@@ -27858,9 +27872,29 @@ async function addPPTXNoFillShapeProbe(base64) {
     '</p:spPr>',
     '</p:cxnSp>',
   ].join('')
+  const roundRectProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9965" name="Round Rect Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5486400" y="5486400"/>',
+    '<a:ext cx="1828800" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="roundRect">',
+    '<a:avLst><a:gd name="adj" fmla="val 33333"/></a:avLst>',
+    '</a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="FCE7F3"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="BE185D"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${probeShapeXml}${probeLineXml}</p:spTree>`,
+    `${probeShapeXml}${probeLineXml}${roundRectProbeXml}</p:spTree>`,
   )
 
   if (nextXml === xml) {
