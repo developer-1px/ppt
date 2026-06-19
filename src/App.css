@@ -995,6 +995,10 @@
   cursor: crosshair;
 }
 
+.ppt-stage-shell[data-ppt-style-clipboard-painter-active='true'] {
+  cursor: copy;
+}
+
 .ppt-stage-shell[data-ppt-temporary-pan-gesture='true'] {
   cursor: grabbing;
 }

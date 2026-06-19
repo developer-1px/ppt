@@ -13024,6 +13024,15 @@ async function runViewAndShapeScenario(page) {
       model: shell?.getAttribute('data-ppt-style-clipboard-model') ?? '',
       packageCategories: shell?.getAttribute('data-ppt-style-clipboard-package-categories') ?? '',
       pasteDisabled: document.querySelector('[data-ppt-command="paste-formatting"]')?.disabled ?? true,
+      painterActive: shell?.getAttribute('data-ppt-style-clipboard-painter-active') ?? '',
+      painterCommand: shell?.getAttribute('data-ppt-style-clipboard-painter-command') ?? '',
+      painterCommandMode: shell?.getAttribute('data-ppt-style-clipboard-painter-command-mode') ?? '',
+      painterCommandSourceId: shell?.getAttribute('data-ppt-style-clipboard-painter-command-source-id') ?? '',
+      painterCommandType: shell?.getAttribute('data-ppt-style-clipboard-painter-command-type') ?? '',
+      painterMode: shell?.getAttribute('data-ppt-style-clipboard-painter-mode') ?? '',
+      painterSourceId: shell?.getAttribute('data-ppt-style-clipboard-painter-source-id') ?? '',
+      painterToolbarPressed: document.querySelector('[data-ppt-command="copy-formatting"]')?.getAttribute('aria-pressed') ?? '',
+      painterType: shell?.getAttribute('data-ppt-style-clipboard-painter-type') ?? '',
       sourceId: shell?.getAttribute('data-ppt-style-clipboard-source-id') ?? '',
       sourceKind: shell?.getAttribute('data-ppt-style-clipboard-source-kind') ?? '',
       supportedTargets: shell?.getAttribute('data-ppt-style-clipboard-supported-targets') ?? '',
@@ -13044,6 +13053,15 @@ async function runViewAndShapeScenario(page) {
       afterCopyFormatting.commandSlide === 'slide-1' &&
       afterCopyFormatting.commandSourceId === afterCornerRadius.selectedId &&
       afterCopyFormatting.commandType === 'slide-command-effect' &&
+      afterCopyFormatting.painterActive === 'true' &&
+      afterCopyFormatting.painterCommand === 'start-format-painter' &&
+      afterCopyFormatting.painterCommandMode === 'single-use' &&
+      afterCopyFormatting.painterCommandSourceId === afterCornerRadius.selectedId &&
+      afterCopyFormatting.painterCommandType === 'slide-command-effect' &&
+      afterCopyFormatting.painterMode === 'single-use' &&
+      afterCopyFormatting.painterSourceId === afterCornerRadius.selectedId &&
+      afterCopyFormatting.painterToolbarPressed === 'true' &&
+      afterCopyFormatting.painterType === 'slide-style-clipboard-paint-session' &&
       afterCopyFormatting.categories.includes('shape') &&
       afterCopyFormatting.categories.includes('stroke') &&
       afterCopyFormatting.packageCategories.includes('object-effect') &&
@@ -13092,6 +13110,51 @@ async function runViewAndShapeScenario(page) {
     y: firstFormatTargetDrag.endY,
   })
   await delay(100)
+
+  const beforeSingleUsePainterClick = await getPPTFormatPainterSelectedShapeState(page)
+  const singleUsePainterTargetPoint =
+    await getElementCenter(page, beforeSingleUsePainterClick.selectedId)
+
+  await clickMouse(page, singleUsePainterTargetPoint.x, singleUsePainterTargetPoint.y, 1)
+  await delay(100)
+
+  const afterSingleUsePainterClick = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'applies PPT format painter once from toolbar click target',
+    beforeSingleUsePainterClick.selectedKind === 'shape' &&
+      beforeSingleUsePainterClick.shape === 'rect' &&
+      beforeSingleUsePainterClick.fillOpacity === '1' &&
+      beforeSingleUsePainterClick.objectOpacity === '1' &&
+      beforeSingleUsePainterClick.shadow === '' &&
+      afterSingleUsePainterClick.selectedId === beforeSingleUsePainterClick.selectedId &&
+      afterSingleUsePainterClick.fillOpacity === '0.35' &&
+      afterSingleUsePainterClick.background.includes('0.35') &&
+      afterSingleUsePainterClick.objectOpacity === '0.42' &&
+      afterSingleUsePainterClick.shadow === 'true' &&
+      afterSingleUsePainterClick.strokeDash === 'dash' &&
+      afterSingleUsePainterClick.cornerRadius === '36' &&
+      afterSingleUsePainterClick.styleClipboardCommand === 'paste-object-formatting' &&
+      afterSingleUsePainterClick.styleClipboardCommandApplications.includes(afterSingleUsePainterClick.selectedId) &&
+      afterSingleUsePainterClick.styleClipboardPainterActive === 'false' &&
+      afterSingleUsePainterClick.styleClipboardPainterCommand === 'stop-format-painter' &&
+      afterSingleUsePainterClick.styleClipboardPainterCommandReason === 'single-use-complete' &&
+      afterSingleUsePainterClick.styleClipboardPainterCommandSelection === afterSingleUsePainterClick.selectedId &&
+      afterSingleUsePainterClick.styleClipboardPainterCommandType === 'slide-command-effect' &&
+      afterSingleUsePainterClick.styleClipboardPainterToolbarPressed === '',
+    {
+      afterSingleUsePainterClick,
+      beforeSingleUsePainterClick,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
 
   const beforeShortcutPasteFormatting = await getPPTFormatPainterSelectedShapeState(page)
 
@@ -13252,6 +13315,188 @@ async function runViewAndShapeScenario(page) {
     {
       afterPalettePasteFormatting,
       beforePalettePasteFormatting,
+    },
+  )
+
+  await page.eval(`(() => {
+    const button = document.querySelector('[data-ppt-command="copy-formatting"]')
+
+    button?.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      detail: 2,
+    }))
+  })()`)
+  await delay(100)
+
+  const afterPersistentPainterStart = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'starts PPT persistent format painter from toolbar double-click',
+    afterPersistentPainterStart.styleClipboardPainterActive === 'true' &&
+      afterPersistentPainterStart.styleClipboardPainterCommand === 'start-format-painter' &&
+      afterPersistentPainterStart.styleClipboardPainterCommandMode === 'persistent' &&
+      afterPersistentPainterStart.styleClipboardPainterCommandSourceId === afterPersistentPainterStart.selectedId &&
+      afterPersistentPainterStart.styleClipboardPainterCommandSourceKind === 'shape' &&
+      afterPersistentPainterStart.styleClipboardPainterCommandType === 'slide-command-effect' &&
+      afterPersistentPainterStart.styleClipboardPainterMode === 'persistent' &&
+      afterPersistentPainterStart.styleClipboardPainterSourceId === afterPersistentPainterStart.selectedId &&
+      afterPersistentPainterStart.styleClipboardPainterSourceKind === 'shape' &&
+      afterPersistentPainterStart.styleClipboardPainterToolbarPressed === 'true' &&
+      afterPersistentPainterStart.styleClipboardPainterType === 'slide-style-clipboard-paint-session',
+    afterPersistentPainterStart,
+  )
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(20)
+
+  const persistentTargetDragA = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.42,
+      endY: slide.top + slide.height * 0.86,
+      startX: slide.left + slide.width * 0.28,
+      startY: slide.top + slide.height * 0.74,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: persistentTargetDragA.startX,
+    y: persistentTargetDragA.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: persistentTargetDragA.endX,
+    y: persistentTargetDragA.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: persistentTargetDragA.endX,
+    y: persistentTargetDragA.endY,
+  })
+  await delay(100)
+
+  const beforePersistentPainterTargetA = await getPPTFormatPainterSelectedShapeState(page)
+  const persistentTargetPointA =
+    await getElementCenter(page, beforePersistentPainterTargetA.selectedId)
+
+  await clickMouse(page, persistentTargetPointA.x, persistentTargetPointA.y, 1)
+  await delay(100)
+
+  const afterPersistentPainterTargetA = await getPPTFormatPainterSelectedShapeState(page)
+
+  await pressKey(page, {
+    code: 'KeyR',
+    key: 'r',
+    windowsVirtualKeyCode: 82,
+  })
+  await delay(20)
+
+  const persistentTargetDragB = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.62,
+      endY: slide.top + slide.height * 0.86,
+      startX: slide.left + slide.width * 0.48,
+      startY: slide.top + slide.height * 0.74,
+    }
+  })()`)
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mousePressed',
+    x: persistentTargetDragB.startX,
+    y: persistentTargetDragB.startY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    type: 'mouseMoved',
+    x: persistentTargetDragB.endX,
+    y: persistentTargetDragB.endY,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    type: 'mouseReleased',
+    x: persistentTargetDragB.endX,
+    y: persistentTargetDragB.endY,
+  })
+  await delay(100)
+
+  const beforePersistentPainterTargetB = await getPPTFormatPainterSelectedShapeState(page)
+  const persistentTargetPointB =
+    await getElementCenter(page, beforePersistentPainterTargetB.selectedId)
+
+  await clickMouse(page, persistentTargetPointB.x, persistentTargetPointB.y, 1)
+  await delay(100)
+
+  const afterPersistentPainterTargetB = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'keeps PPT persistent format painter active across multiple targets',
+    beforePersistentPainterTargetA.fillOpacity === '1' &&
+      beforePersistentPainterTargetB.fillOpacity === '1' &&
+      afterPersistentPainterTargetA.selectedId === beforePersistentPainterTargetA.selectedId &&
+      afterPersistentPainterTargetA.fillOpacity === '0.35' &&
+      afterPersistentPainterTargetA.objectOpacity === '0.42' &&
+      afterPersistentPainterTargetA.shadow === 'true' &&
+      afterPersistentPainterTargetA.strokeDash === 'dash' &&
+      afterPersistentPainterTargetA.cornerRadius === '36' &&
+      afterPersistentPainterTargetA.styleClipboardPainterActive === 'true' &&
+      afterPersistentPainterTargetA.styleClipboardPainterMode === 'persistent' &&
+      afterPersistentPainterTargetB.selectedId === beforePersistentPainterTargetB.selectedId &&
+      afterPersistentPainterTargetB.fillOpacity === '0.35' &&
+      afterPersistentPainterTargetB.objectOpacity === '0.42' &&
+      afterPersistentPainterTargetB.shadow === 'true' &&
+      afterPersistentPainterTargetB.strokeDash === 'dash' &&
+      afterPersistentPainterTargetB.cornerRadius === '36' &&
+      afterPersistentPainterTargetB.styleClipboardCommand === 'paste-object-formatting' &&
+      afterPersistentPainterTargetB.styleClipboardCommandApplications.includes(afterPersistentPainterTargetB.selectedId) &&
+      afterPersistentPainterTargetB.styleClipboardPainterActive === 'true' &&
+      afterPersistentPainterTargetB.styleClipboardPainterMode === 'persistent' &&
+      afterPersistentPainterTargetB.styleClipboardPainterToolbarPressed === 'true',
+    {
+      afterPersistentPainterTargetA,
+      afterPersistentPainterTargetB,
+      beforePersistentPainterTargetA,
+      beforePersistentPainterTargetB,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(80)
+
+  const afterPersistentPainterEscape = await getPPTFormatPainterSelectedShapeState(page)
+
+  record(
+    'exits PPT persistent format painter with Escape without clearing selection',
+    afterPersistentPainterEscape.selectedId === afterPersistentPainterTargetB.selectedId &&
+      afterPersistentPainterEscape.styleClipboardPainterActive === 'false' &&
+      afterPersistentPainterEscape.styleClipboardPainterCommand === 'stop-format-painter' &&
+      afterPersistentPainterEscape.styleClipboardPainterCommandReason === 'escape' &&
+      afterPersistentPainterEscape.styleClipboardPainterCommandSelection === afterPersistentPainterTargetB.selectedId &&
+      afterPersistentPainterEscape.styleClipboardPainterCommandType === 'slide-command-effect' &&
+      afterPersistentPainterEscape.styleClipboardPainterToolbarPressed === '',
+    {
+      afterPersistentPainterEscape,
+      afterPersistentPainterTargetB,
     },
   )
 
@@ -25141,6 +25386,19 @@ function getPPTFormatPainterSelectedShapeState(page) {
       styleClipboardCommandSelection: shell?.getAttribute('data-ppt-style-clipboard-command-selection') ?? '',
       styleClipboardCommandTargets: shell?.getAttribute('data-ppt-style-clipboard-command-targets') ?? '',
       styleClipboardCommandType: shell?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
+      styleClipboardPainterActive: shell?.getAttribute('data-ppt-style-clipboard-painter-active') ?? '',
+      styleClipboardPainterCommand: shell?.getAttribute('data-ppt-style-clipboard-painter-command') ?? '',
+      styleClipboardPainterCommandMode: shell?.getAttribute('data-ppt-style-clipboard-painter-command-mode') ?? '',
+      styleClipboardPainterCommandReason: shell?.getAttribute('data-ppt-style-clipboard-painter-command-reason') ?? '',
+      styleClipboardPainterCommandSelection: shell?.getAttribute('data-ppt-style-clipboard-painter-command-selection') ?? '',
+      styleClipboardPainterCommandSourceId: shell?.getAttribute('data-ppt-style-clipboard-painter-command-source-id') ?? '',
+      styleClipboardPainterCommandSourceKind: shell?.getAttribute('data-ppt-style-clipboard-painter-command-source-kind') ?? '',
+      styleClipboardPainterCommandType: shell?.getAttribute('data-ppt-style-clipboard-painter-command-type') ?? '',
+      styleClipboardPainterMode: shell?.getAttribute('data-ppt-style-clipboard-painter-mode') ?? '',
+      styleClipboardPainterSourceId: shell?.getAttribute('data-ppt-style-clipboard-painter-source-id') ?? '',
+      styleClipboardPainterSourceKind: shell?.getAttribute('data-ppt-style-clipboard-painter-source-kind') ?? '',
+      styleClipboardPainterToolbarPressed: document.querySelector('[data-ppt-command="copy-formatting"]')?.getAttribute('aria-pressed') ?? '',
+      styleClipboardPainterType: shell?.getAttribute('data-ppt-style-clipboard-painter-type') ?? '',
       shapeStyleImportCategories: shell?.getAttribute('data-ppt-shape-style-import-categories') ?? '',
       shapeStyleImportCommand: shell?.getAttribute('data-ppt-shape-style-import-command') ?? '',
       shapeStyleImportCommandTargets: shell?.getAttribute('data-ppt-shape-style-import-command-targets') ?? '',

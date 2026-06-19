@@ -207,7 +207,11 @@ import {
   getSlideEditStyleClipboardCategoryDescriptors,
   getSlideEditStyleClipboardCopyCommandEffect,
   getSlideEditStyleClipboardKeyboardIntent,
+  getSlideEditStyleClipboardPaintModeFromPointerActivation,
   getSlideEditStyleClipboardPasteAvailability,
+  createSlideEditStyleClipboardPaintSession,
+  getSlideEditStyleClipboardStartPaintCommandEffect,
+  getSlideEditStyleClipboardStopPaintCommandEffect,
   mapSlideEditSlideClipboardPasteSlides,
   parseSlideEditSlideClipboardPayload,
   resolveSlideEditSlideClipboardPastePlacement,
@@ -413,7 +417,12 @@ import {
   type SlideEditStyleClipboardCopyFormattingCommand,
   type SlideEditStyleClipboardDescriptor,
   type SlideEditStyleClipboardHostCommandEffect,
+  type SlideEditStyleClipboardPaintSession,
   type SlideEditStyleClipboardPasteFormattingCommand,
+  type SlideEditStyleClipboardPointerActivationInput,
+  type SlideEditStyleClipboardStartPaintCommand,
+  type SlideEditStyleClipboardStopPaintCommand,
+  type SlideEditStyleClipboardStopPaintReason,
   type SlideEditStyleClipboardTargetInput,
   type SlideEditThemeColorToken,
   type SlideEditTextFontFamilyDescriptor,
@@ -3212,6 +3221,25 @@ type PPTStyleClipboardHostCommandEffect = SlideEditStyleClipboardHostCommandEffe
     unknown
   >
 >
+type PPTStyleClipboardPaintSession = SlideEditStyleClipboardPaintSession<
+  string,
+  string,
+  PPTElement['kind'],
+  PPTStyleClipboardPackageCategory,
+  unknown
+>
+type PPTStyleClipboardPaintHostCommandEffect = SlideEditStyleClipboardHostCommandEffect<
+  string,
+  string,
+  | SlideEditStyleClipboardStartPaintCommand<
+    string,
+    string,
+    PPTElement['kind'],
+    PPTStyleClipboardPackageCategory,
+    unknown
+  >
+  | SlideEditStyleClipboardStopPaintCommand<string, string>
+>
 
 const PPT_STYLE_CLIPBOARD_TEXT_RUN_STYLE_CATEGORY = 'text-run-style' as const
 const PPT_STYLE_CLIPBOARD_PACKAGE_CATEGORY_REGISTRY = [
@@ -4283,7 +4311,11 @@ function App() {
     useState<PPTFallbackHTMLImportEffect | null>(null)
   const [lastImageImportEffect, setLastImageImportEffect] = useState<PPTImageImportEffect | null>(null)
   const [lastTableImportEffect, setLastTableImportEffect] = useState<PPTTableImportEffect | null>(null)
+  const [styleClipboardPaintSession, setStyleClipboardPaintSession] =
+    useState<PPTStyleClipboardPaintSession | null>(null)
   const [lastStyleClipboardEffect, setLastStyleClipboardEffect] = useState<PPTStyleClipboardHostCommandEffect | null>(null)
+  const [lastStyleClipboardPaintEffect, setLastStyleClipboardPaintEffect] =
+    useState<PPTStyleClipboardPaintHostCommandEffect | null>(null)
   const [lastPlaceholderVisibilityEffect, setLastPlaceholderVisibilityEffect] = useState<PPTLayoutPlaceholderVisibilityHostCommandEffect | null>(null)
   const [lastSlideRailCommandEffect, setLastSlideRailCommandEffect] = useState<SlideEditRailHostCommandEffect<string> | null>(null)
   const [lastSelectionCycleEffect, setLastSelectionCycleEffect] =
@@ -5163,6 +5195,11 @@ function App() {
 
       if (systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
+        if (styleClipboardPaintSession) {
+          stopStyleClipboardPaintSession('escape')
+          return
+        }
+
         if (cancelActivePPTInteraction()) {
           return
         }
@@ -10581,39 +10618,32 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     executePPTCanvasStandardSelectionCommand({ kind: 'unlock-all' })
   }
 
-  function copyFormatting() {
-    if (!commandAvailability.copyFormatting) {
-      return
-    }
+  function stopStyleClipboardPaintSession(
+    reason: SlideEditStyleClipboardStopPaintReason,
+    objectIds: readonly string[] = selection,
+  ) {
+    const effect = getSlideEditStyleClipboardStopPaintCommandEffect({
+      objectIds,
+      reason,
+      slideId: activeSlide.id,
+    })
 
-    const source = selectedElements[0]
-    const next = source ? createPPTStyleClipboard(source) : null
-
-    if (!next) {
-      return
-    }
-
-    const effect = getSlideEditStyleClipboardCopyCommandEffect(
-      createPPTStyleClipboardDescriptor(activeSlide.id, next),
-    )
-
-    setStyleClipboard(next)
-    setLastStyleClipboardEffect(effect)
+    setStyleClipboardPaintSession(null)
+    setLastStyleClipboardPaintEffect(effect)
   }
 
-  function pasteFormatting() {
-    if (!commandAvailability.pasteFormatting || !styleClipboard) {
-      return
-    }
-
+  function applyStyleClipboardToElements(
+    clipboard: PPTStyleClipboard,
+    targetElements: readonly PPTElement[],
+  ) {
     const effect = createSlideEditStyleClipboardPasteCommandEffect({
-      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, styleClipboard),
+      clipboard: createPPTStyleClipboardDescriptor(activeSlide.id, clipboard),
       targetSlideId: activeSlide.id,
-      targets: getPPTStyleClipboardTargetInputs(selectedElements),
+      targets: getPPTStyleClipboardTargetInputs(targetElements),
     })
 
     if (!effect) {
-      return
+      return null
     }
 
     setLastStyleClipboardEffect(effect)
@@ -10637,7 +10667,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             return appliedCategoryIds
               ? applyPPTStyleClipboardToElement(
                   element,
-                  styleClipboard,
+                  clipboard,
                   appliedCategoryIds,
                 )
               : element
@@ -10645,6 +10675,61 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         ),
       })),
     )
+
+    return effect
+  }
+
+  function copyFormatting(
+    activation: SlideEditStyleClipboardPointerActivationInput = {},
+  ) {
+    if (!commandAvailability.copyFormatting) {
+      return
+    }
+
+    const source = selectedElements[0]
+    const next = source ? createPPTStyleClipboard(source) : null
+
+    if (!next) {
+      return
+    }
+
+    const descriptor = createPPTStyleClipboardDescriptor(activeSlide.id, next)
+    const effect = getSlideEditStyleClipboardCopyCommandEffect(descriptor)
+    const paintSession = createSlideEditStyleClipboardPaintSession({
+      clipboard: descriptor,
+      mode: getSlideEditStyleClipboardPaintModeFromPointerActivation(activation),
+    })
+    const paintEffect =
+      getSlideEditStyleClipboardStartPaintCommandEffect(paintSession)
+
+    setStyleClipboard(next)
+    setStyleClipboardPaintSession(paintSession)
+    setLastStyleClipboardEffect(effect)
+    setLastStyleClipboardPaintEffect(paintEffect)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+  }
+
+  function pasteFormatting() {
+    if (!commandAvailability.pasteFormatting || !styleClipboard) {
+      return
+    }
+
+    const effect = applyStyleClipboardToElements(styleClipboard, selectedElements)
+
+    if (!effect) {
+      return
+    }
+
+    if (styleClipboardPaintSession?.mode === 'single-use') {
+      stopStyleClipboardPaintSession(
+        'single-use-complete',
+        effect.selection.objectIds,
+      )
+    }
   }
 
   function writePPTSelectionClipboard(
@@ -13130,6 +13215,40 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     focusPPTCanvasElement({ element: stageRef.current })
   }
 
+  function applyStyleClipboardPaintSessionToTarget(elementId: string) {
+    if (!styleClipboardPaintSession || !styleClipboard) {
+      return false
+    }
+
+    const targetSelection = getPPTGroupPointerSelection({
+      additive: false,
+      fallbackSelection: [elementId],
+      itemId: elementId,
+      selection,
+      slide: activeSlide,
+    })
+    const targetSelectionSet = new Set(targetSelection)
+    const targetElements = activeSlide.elements.filter((element) =>
+      targetSelectionSet.has(element.id))
+    const effect = applyStyleClipboardToElements(styleClipboard, targetElements)
+
+    if (!effect) {
+      setSelection(targetSelection)
+      return false
+    }
+
+    setSelection([...effect.selection.objectIds])
+
+    if (styleClipboardPaintSession.mode === 'single-use') {
+      stopStyleClipboardPaintSession(
+        'single-use-complete',
+        effect.selection.objectIds,
+      )
+    }
+
+    return true
+  }
+
   function handleElementPointerDown(
     event: ReactPointerEvent<HTMLDivElement>,
     elementId: string,
@@ -13165,6 +13284,19 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     }
 
     if (creationTool && beginElementCreation(event, screenToWorld(event.nativeEvent))) {
+      return
+    }
+
+    if (
+      styleClipboardPaintSession &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      applyStyleClipboardPaintSessionToTarget(elementId)
       return
     }
 
@@ -14896,7 +15028,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
             <Command size={17} />
           </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="copy-formatting" disabled={!commandAvailability.copyFormatting} onClick={copyFormatting} title="Copy formatting" type="button">
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={styleClipboardPaintSession ? 'true' : undefined} className="ppt-icon-button" data-ppt-command="copy-formatting" data-ppt-format-painter-active={styleClipboardPaintSession ? 'true' : 'false'} disabled={!commandAvailability.copyFormatting} onClick={(event) => copyFormatting({ detail: event.detail })} title="Copy formatting" type="button">
             <Paintbrush size={17} />
           </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} onClick={pasteFormatting} title="Paste formatting" type="button">
@@ -15538,6 +15670,27 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-style-clipboard-package-categories={styleClipboard
           ? getPPTStyleClipboardPackageCategoryIds(styleClipboard).join(' ')
           : undefined}
+        data-ppt-style-clipboard-painter-active={styleClipboardPaintSession ? 'true' : 'false'}
+        data-ppt-style-clipboard-painter-command={lastStyleClipboardPaintEffect?.payload.id}
+        data-ppt-style-clipboard-painter-command-mode={lastStyleClipboardPaintEffect?.payload.id === 'start-format-painter'
+          ? lastStyleClipboardPaintEffect.payload.session.mode
+          : undefined}
+        data-ppt-style-clipboard-painter-command-reason={lastStyleClipboardPaintEffect?.payload.id === 'stop-format-painter'
+          ? lastStyleClipboardPaintEffect.payload.reason
+          : undefined}
+        data-ppt-style-clipboard-painter-command-selection={lastStyleClipboardPaintEffect?.selection.objectIds.join(' ')}
+        data-ppt-style-clipboard-painter-command-slide={lastStyleClipboardPaintEffect?.selection.slideId}
+        data-ppt-style-clipboard-painter-command-source-id={lastStyleClipboardPaintEffect?.payload.id === 'start-format-painter'
+          ? lastStyleClipboardPaintEffect.payload.session.source.objectId
+          : undefined}
+        data-ppt-style-clipboard-painter-command-source-kind={lastStyleClipboardPaintEffect?.payload.id === 'start-format-painter'
+          ? lastStyleClipboardPaintEffect.payload.session.source.kind
+          : undefined}
+        data-ppt-style-clipboard-painter-command-type={lastStyleClipboardPaintEffect?.type}
+        data-ppt-style-clipboard-painter-mode={styleClipboardPaintSession?.mode}
+        data-ppt-style-clipboard-painter-source-id={styleClipboardPaintSession?.source.objectId}
+        data-ppt-style-clipboard-painter-source-kind={styleClipboardPaintSession?.source.kind}
+        data-ppt-style-clipboard-painter-type={styleClipboardPaintSession?.type}
         data-ppt-style-clipboard-run-bold={styleClipboard?.runStyle?.bold === undefined
           ? undefined
           : String(styleClipboard.runStyle.bold)}
