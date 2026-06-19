@@ -194,7 +194,9 @@ import {
   getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditObjectStrokeLineStyleJSONPasteValueFromText,
   getSlideEditObjectStrokeLineStylePasteCommand,
+  getSlideEditObjectTransformAxisLockedMoveDelta,
   getSlideEditObjectTransformJSONPasteValueFromText,
+  getSlideEditObjectTransformMoveDragModifierState,
   getSlideEditObjectTransformPasteCommandEffects,
   getSlideEditObjectAccessibilityJSONPasteValueFromText,
   getSlideEditObjectAccessibilityPasteCommand,
@@ -3922,6 +3924,12 @@ const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_DRAG_DUPLICATE_THRESHOLD = 4
+const PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE =
+  getSlideEditObjectTransformMoveDragModifierState({
+    event: {
+      shiftKey: false,
+    },
+  })
 const PPT_FILL_OPACITY_MIN = 0
 const PPT_FILL_OPACITY_MAX = 1
 const PPT_FILL_OPACITY_STEP = 0.05
@@ -13306,8 +13314,8 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
 
     const duplicateWithPointerModifier =
       event.altKey || event.ctrlKey || event.metaKey
-    const lockAxisWithShiftPointerModifier =
-      event.shiftKey
+    const moveDragModifierState =
+      getSlideEditObjectTransformMoveDragModifierState({ event })
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
@@ -13339,7 +13347,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           slide: activeSlide,
         })
       : null
-    const axisLockSourcePointerSelection = lockAxisWithShiftPointerModifier
+    const axisLockSourcePointerSelection = moveDragModifierState.axisLock
       ? getPPTElementPointerSelection({
           additive: false,
           elementId,
@@ -13946,7 +13954,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       const rawDx = point.x - moveInteraction.startPoint.x
       const rawDy = point.y - moveInteraction.startPoint.y
       const moveDelta = moveInteraction.axisLockOnDrag?.started
-        ? getPPTAxisLockedMoveDelta(rawDx, rawDy)
+        ? getSlideEditObjectTransformAxisLockedMoveDelta({
+            dx: rawDx,
+            dy: rawDy,
+          })
         : { dx: rawDx, dy: rawDy }
       const snap = getPPTCanvasMoveSnap({
         bounds: moveInteraction.bounds,
@@ -16131,6 +16142,8 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-creation-aspect-ratio-modifier="Shift"
         data-ppt-creation-from-center-modifier="Alt"
         data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-move-axis-lock-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.axisLockModifier}
+        data-ppt-move-drag-modifier-model={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.model}
         data-ppt-transform-constrain-angle-modifier="Shift"
         data-ppt-transform-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-transform-rotation-snap-step="15"
@@ -39295,12 +39308,6 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 }
 
 function noopPPTKeyboardCommandHandler() {}
-
-function getPPTAxisLockedMoveDelta(dx: number, dy: number) {
-  return Math.abs(dx) >= Math.abs(dy)
-    ? { dx, dy: 0 }
-    : { dx: 0, dy }
-}
 
 function getPPTAspectLockedCreationPoint(start: Point, current: Point): Point {
   const dx = current.x - start.x
