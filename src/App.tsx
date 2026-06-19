@@ -174,7 +174,7 @@ import {
   getSlideEditObjectImageReplacePasteCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
-  getSlideEditObjectOpacityJSONPasteValue,
+  getSlideEditObjectOpacityJSONPasteValueFromText,
   getSlideEditObjectOpacityPasteCommand,
   getSlideEditObjectShadowCommandEffect,
   getSlideEditObjectShadowFilter,
@@ -191,7 +191,7 @@ import {
   getSlideEditObjectStrokeLineStylePasteCommand,
   getSlideEditObjectTransformJSONPasteValue,
   getSlideEditObjectTransformPasteCommandEffects,
-  getSlideEditObjectAccessibilityJSONPasteValue,
+  getSlideEditObjectAccessibilityJSONPasteValueFromText,
   getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
   getSlideEditRailKeyboardCommandEffect,
@@ -21148,13 +21148,10 @@ function getPPTObjectOpacitySourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectOpacityJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectOpacityJSONPasteValueFromText(
+        json,
+        { mode: candidate.allowDirect ? 'direct' : 'wrapped' },
+      )
 
       if (pasteValue === null) {
         continue
@@ -21345,16 +21342,15 @@ function getPPTObjectAccessibilitySourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectAccessibilityJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-        storagePolicy: {
-          maxLength: PPT_ALT_TEXT_MAX_LENGTH,
+      const pasteValue = getSlideEditObjectAccessibilityJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          storagePolicy: {
+            maxLength: PPT_ALT_TEXT_MAX_LENGTH,
+          },
         },
-      })
+      )
 
       if (pasteValue === null) {
         continue
