@@ -20,6 +20,7 @@ import {
   type PPTStroke,
   type PPTTable,
   type PPTTableCellStyle,
+  type PPTTableCellTextStyle,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
@@ -1260,11 +1261,15 @@ function readPPTXTableCellStyles(
   const styles = cellRows.map((row) =>
     row.map((cell): PPTTableCellStyle => {
       const fill = readPPTXTableCellFill(cell)
+      const textStyle = readPPTXTableCellTextStyle(cell)
 
-      return fill ? { fill } : {}
+      return {
+        ...(fill ? { fill } : {}),
+        ...(textStyle ? { textStyle } : {}),
+      }
     }))
 
-  return styles.some((row) => row.some((style) => style.fill))
+  return styles.some((row) => row.some((style) => style.fill || style.textStyle))
     ? styles
     : undefined
 }
@@ -1273,6 +1278,27 @@ function readPPTXTableCellFill(cell: Element): PPTFill | undefined {
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
 
   return readPPTXSolidFill(tcPr) ?? undefined
+}
+
+function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | undefined {
+  const txBody = getDirectPPTXChildByLocalName(cell, 'txBody')
+  const textBody = readPPTXTextBody(txBody)
+  const firstRun = textBody?.paragraphs
+    .flatMap((paragraph) => paragraph.runs)
+    .find((run) => run.text.trim().length > 0) ??
+    textBody?.paragraphs[0]?.runs[0]
+
+  if (!firstRun) {
+    return undefined
+  }
+
+  const textStyle = {
+    ...(firstRun.color ? { color: firstRun.color } : {}),
+    ...(firstRun.size === undefined ? {} : { fontSize: firstRun.size }),
+    ...(firstRun.bold === true ? { fontWeight: 'bold' as const } : {}),
+  }
+
+  return Object.keys(textStyle).length > 0 ? textStyle : undefined
 }
 
 function readPPTXTableColumnWidths(

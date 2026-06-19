@@ -11165,6 +11165,7 @@ async function runExportScenario(page) {
       const columnWidths = element.columnWidths ?? []
       const rowHeights = element.rowHeights ?? []
       const wideColumnFill = element.cellStyles?.[0]?.[1]?.fill
+      const wideColumnTextStyle = element.cellStyles?.[0]?.[1]?.textStyle
 
       return element.rows?.[0]?.[1] === 'Wide column' &&
         columnWidths.length === 3 &&
@@ -11172,7 +11173,10 @@ async function runExportScenario(page) {
         columnWidths[1] > columnWidths[0] * 1.5 &&
         rowHeights[1] > rowHeights[0] * 1.5 &&
         wideColumnFill?.color === '#fee2e2' &&
-        wideColumnFill?.opacity === 0.5
+        wideColumnFill?.opacity === 0.5 &&
+        wideColumnTextStyle?.color === '#7f1d1d' &&
+        wideColumnTextStyle?.fontWeight === 'bold' &&
+        wideColumnTextStyle?.fontSize >= 20
     })
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
@@ -11241,6 +11245,9 @@ async function runExportScenario(page) {
       exportUnevenTableProbeColumnWidths: (exportUnevenTableProbe?.columnWidths ?? []).join(' '),
       exportUnevenTableProbeCellFill: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.color ?? '',
       exportUnevenTableProbeCellFillOpacity: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.opacity ?? '',
+      exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
+      exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
+      exportUnevenTableProbeCellTextFontWeight: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontWeight ?? '',
       exportUnevenTableProbeRowHeights: (exportUnevenTableProbe?.rowHeights ?? []).join(' '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
@@ -27399,12 +27406,17 @@ async function addPPTXUnevenTableProbe(base64) {
       '</a:tblGrid>',
       '<a:tr h="365760">',
       createPPTXTableCellXml('Narrow'),
-      createPPTXTableCellXml('Wide column', { color: 'FEE2E2', opacity: 0.5 }),
+      createPPTXTableCellXml('Wide column', {
+        fill: { color: 'FEE2E2', opacity: 0.5 },
+        textStyle: { bold: true, color: '7F1D1D', size: 1600 },
+      }),
       createPPTXTableCellXml('Narrow'),
       '</a:tr>',
       '<a:tr h="731520">',
       createPPTXTableCellXml('Q1'),
-      createPPTXTableCellXml('Imported sizing', { color: 'DCFCE7' }),
+      createPPTXTableCellXml('Imported sizing', {
+        fill: { color: 'DCFCE7' },
+      }),
       createPPTXTableCellXml('OK'),
       '</a:tr>',
       '</a:tbl>',
@@ -27428,7 +27440,21 @@ async function addPPTXUnevenTableProbe(base64) {
     : base64
 }
 
-function createPPTXTableCellXml(text, fill = null) {
+function createPPTXTableCellXml(text, options = {}) {
+  const fill = options.fill ?? null
+  const textStyle = options.textStyle ?? null
+  const runPropertiesXml = textStyle
+    ? [
+        '<a:rPr',
+        textStyle.bold ? ' b="1"' : '',
+        textStyle.size === undefined ? '' : ` sz="${textStyle.size}"`,
+        '>',
+        textStyle.color
+          ? `<a:solidFill><a:srgbClr val="${textStyle.color}"/></a:solidFill>`
+          : '',
+        '</a:rPr>',
+      ].join('')
+    : ''
   const tcPrXml = fill
     ? [
         '<a:tcPr>',
@@ -27446,7 +27472,9 @@ function createPPTXTableCellXml(text, fill = null) {
     '<a:txBody>',
     '<a:bodyPr/>',
     '<a:lstStyle/>',
-    '<a:p><a:r><a:t>',
+    '<a:p><a:r>',
+    runPropertiesXml,
+    '<a:t>',
     escapePPTXXmlText(text),
     '</a:t></a:r></a:p>',
     '</a:txBody>',

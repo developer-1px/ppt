@@ -11,8 +11,14 @@ const PPTFillSchema = z.object({
   color: z.string(),
   opacity: z.number().optional(),
 })
+const PPTTableCellTextStyleSchema = z.object({
+  color: z.string().optional(),
+  fontSize: z.number().optional(),
+  fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
+})
 const PPTTableCellStyleSchema = z.object({
   fill: PPTFillSchema.optional(),
+  textStyle: PPTTableCellTextStyleSchema.optional(),
 })
 
 const PPTStrokeSchema = z.object({
@@ -264,6 +270,7 @@ export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTFreeform = z.infer<typeof PPTFreeformSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
 export type PPTTableCellStyle = z.infer<typeof PPTTableCellStyleSchema>
+export type PPTTableCellTextStyle = z.infer<typeof PPTTableCellTextStyleSchema>
 export type PPTComment = z.infer<typeof PPTCommentSchema>
 export type PPTCommentThreadMessage = z.infer<typeof PPTCommentThreadMessageSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>

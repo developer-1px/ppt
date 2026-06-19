@@ -25,6 +25,7 @@ import {
 } from './pptModel'
 import {
   getPPTTableCellFill,
+  getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -1434,13 +1435,16 @@ function addPPTXTable({
   pptxSlide.addTable(element.rows.map((row, rowIndex) =>
     Array.from({ length: columnCount }, (_, columnIndex) => {
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
       const fallbackFillColor = rowIndex === 0 ? 'EFF6FF' : 'FFFFFF'
 
       return {
         options: {
-          bold: rowIndex === 0,
+          bold: cellTextStyle?.fontWeight === undefined
+            ? rowIndex === 0
+            : cellTextStyle.fontWeight !== 'regular',
           border: { color: 'DBE3EF', pt: 0.75 },
-          color: '111827',
+          color: toPPTXColor(cellTextStyle?.color ?? '#111827', '111827'),
           fill: {
             color: cellFill
               ? toPPTXColor(cellFill.color, fallbackFillColor)
@@ -1448,7 +1452,9 @@ function addPPTXTable({
             transparency: toPPTXTransparency((cellFill?.opacity ?? 1) * opacity),
           },
           fontFace: PPTX_DEFAULT_FONT_FACE,
-          fontSize: 13.5,
+          fontSize: cellTextStyle?.fontSize === undefined
+            ? 13.5
+            : pxToPt(cellTextStyle.fontSize),
           margin: 0.08,
           transparency: toPPTXTransparency(opacity),
         },

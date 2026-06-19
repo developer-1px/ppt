@@ -592,6 +592,7 @@ import {
   type PPTStroke,
   type PPTStrokeDash,
   type PPTTable,
+  type PPTTableCellTextStyle,
   type PPTTextBody,
   type PPTTextAutoFit,
   type PPTTextElement,
@@ -853,6 +854,7 @@ import {
 } from './pptExport'
 import {
   getPPTTableCellFill,
+  getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -36189,6 +36191,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
       {element.rows.flatMap((row, rowIndex) =>
         row.map((cell, columnIndex) => {
           const fill = getPPTTableCellFill(element, rowIndex, columnIndex)
+          const textStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
 
           return (
             <div
@@ -36196,9 +36199,12 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
               data-ppt-table-cell-fill={fill?.color}
               data-ppt-table-cell-fill-opacity={fill?.opacity}
+              data-ppt-table-cell-font-size={textStyle?.fontSize}
+              data-ppt-table-cell-font-weight={textStyle?.fontWeight}
+              data-ppt-table-cell-text-color={textStyle?.color}
               data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
               key={`${rowIndex}:${columnIndex}`}
-              style={getPPTTableCellStyleCSS(fill)}
+              style={getPPTTableCellStyleCSS(fill, textStyle)}
             >
               {cell}
             </div>
@@ -36219,10 +36225,32 @@ function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
   return trackSizes.map((size) => Math.round(size)).join(' ')
 }
 
-function getPPTTableCellStyleCSS(fill: PPTFill | undefined): CSSProperties | undefined {
-  return fill
-    ? { background: getPPTFillColorCSS(fill) }
-    : undefined
+function getPPTTableCellStyleCSS(
+  fill: PPTFill | undefined,
+  textStyle: PPTTableCellTextStyle | undefined,
+): CSSProperties | undefined {
+  if (!fill && !textStyle) {
+    return undefined
+  }
+
+  return {
+    ...(fill ? { background: getPPTFillColorCSS(fill) } : {}),
+    ...(textStyle?.color ? { color: textStyle.color } : {}),
+    ...(textStyle?.fontSize ? { fontSize: `${textStyle.fontSize}px` } : {}),
+    ...(textStyle?.fontWeight
+      ? { fontWeight: getPPTTableCellFontWeightCSS(textStyle.fontWeight) }
+      : {}),
+  }
+}
+
+function getPPTTableCellFontWeightCSS(
+  fontWeight: PPTTableCellTextStyle['fontWeight'],
+) {
+  if (fontWeight === 'bold') {
+    return 700
+  }
+
+  return fontWeight === 'semibold' ? 600 : 400
 }
 
 function createPPTTableClipboardHTML(element: PPTTable) {

@@ -5,7 +5,23 @@ export function getPPTTableCellFill(
   rowIndex: number,
   columnIndex: number,
 ) {
-  return element.cellStyles?.[rowIndex]?.[columnIndex]?.fill
+  return getPPTTableCellStyle(element, rowIndex, columnIndex)?.fill
+}
+
+export function getPPTTableCellStyle(
+  element: PPTTable,
+  rowIndex: number,
+  columnIndex: number,
+) {
+  return element.cellStyles?.[rowIndex]?.[columnIndex]
+}
+
+export function getPPTTableCellTextStyle(
+  element: PPTTable,
+  rowIndex: number,
+  columnIndex: number,
+) {
+  return getPPTTableCellStyle(element, rowIndex, columnIndex)?.textStyle
 }
 
 export function getPPTTableResolvedColumnWidths(element: PPTTable) {

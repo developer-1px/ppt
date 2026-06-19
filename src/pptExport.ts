@@ -40,11 +40,13 @@ import {
   type PPTStroke,
   type PPTStrokeDash,
   type PPTTable,
+  type PPTTableCellTextStyle,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
 import {
   getPPTTableCellFill,
+  getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -866,17 +868,29 @@ function renderPPTTableHTMLRow({
     : ` style="height:${formatNumber(rowHeight)}px"`
   const cells = Array.from({ length: columnCount }, (_, index) => {
     const fill = getPPTTableCellFill(element, rowIndex, index)
-    const fillAttrs = fill
+    const textStyle = getPPTTableCellTextStyle(element, rowIndex, index)
+    const cellAttrs = fill || textStyle
       ? [
-          ` data-ppt-table-cell-fill="${escapeHtml(fill.color)}"`,
-          fill.opacity === undefined
+          fill
+            ? ` data-ppt-table-cell-fill="${escapeHtml(fill.color)}"`
+            : '',
+          fill?.opacity === undefined
             ? ''
             : ` data-ppt-table-cell-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(fill)))}"`,
-          ` style="background:${escapeHtml(getPPTFillColorCSS(fill))}"`,
+          textStyle?.color
+            ? ` data-ppt-table-cell-text-color="${escapeHtml(textStyle.color)}"`
+            : '',
+          textStyle?.fontSize
+            ? ` data-ppt-table-cell-font-size="${escapeHtml(formatNumber(textStyle.fontSize))}"`
+            : '',
+          textStyle?.fontWeight
+            ? ` data-ppt-table-cell-font-weight="${escapeHtml(textStyle.fontWeight)}"`
+            : '',
+          formatPPTTableCellHTMLStyle(fill, textStyle),
         ].join('')
       : ''
 
-    return `<${tagName} data-ppt-table-cell="${index}"${fillAttrs}>${escapeHtml(row[index] ?? '')}</${tagName}>`
+    return `<${tagName} data-ppt-table-cell="${index}"${cellAttrs}>${escapeHtml(row[index] ?? '')}</${tagName}>`
   }).join('')
 
   return `<tr${rowStyle}>${cells}</tr>`
@@ -901,19 +915,25 @@ function renderPPTTableSVG(element: PPTTable) {
       const textX = x + Math.min(10, cellWidth * 0.12)
       const textY = y + cellHeight / 2
       const headerAttrs = rowIndex === 0
-        ? ' data-ppt-table-header="true" font-weight="700"'
+        ? ' data-ppt-table-header="true"'
         : ''
 
       columnX += cellWidth
 
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
       const fillAttrs = cellFill
         ? `fill="${escapeHtml(cellFill.color)}"${getPPTFillOpacitySvgAttr(cellFill)}`
         : `fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}"`
+      const textColor = cellTextStyle?.color ?? '#111827'
+      const textFontSize = cellTextStyle?.fontSize ?? fontSize
+      const textFontWeight = cellTextStyle?.fontWeight
+        ? getPPTTableCellFontWeightSvgAttr(cellTextStyle.fontWeight)
+        : rowIndex === 0 ? ' font-weight="700"' : ''
 
       return [
         `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
-        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(fontSize)}" dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
+        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
     })
   }).join('')
@@ -930,6 +950,40 @@ function renderPPTTableSVG(element: PPTTable) {
 
 function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
   return trackSizes.map((size) => Math.round(size)).join(' ')
+}
+
+function formatPPTTableCellHTMLStyle(
+  fill: PPTFill | undefined,
+  textStyle: PPTTableCellTextStyle | undefined,
+) {
+  const styles = [
+    fill ? `background:${getPPTFillColorCSS(fill)}` : '',
+    textStyle?.color ? `color:${textStyle.color}` : '',
+    textStyle?.fontSize ? `font-size:${formatNumber(textStyle.fontSize)}px` : '',
+    textStyle?.fontWeight
+      ? `font-weight:${getPPTTableCellFontWeightCSS(textStyle.fontWeight)}`
+      : '',
+  ].filter(Boolean)
+
+  return styles.length > 0
+    ? ` style="${escapeHtml(styles.join(';'))}"`
+    : ''
+}
+
+function getPPTTableCellFontWeightCSS(
+  fontWeight: PPTTableCellTextStyle['fontWeight'],
+) {
+  if (fontWeight === 'bold') {
+    return '700'
+  }
+
+  return fontWeight === 'semibold' ? '600' : '400'
+}
+
+function getPPTTableCellFontWeightSvgAttr(
+  fontWeight: PPTTableCellTextStyle['fontWeight'],
+) {
+  return ` font-weight="${getPPTTableCellFontWeightCSS(fontWeight)}"`
 }
 
 function getPPTElementTransform(element: PPTElement) {
