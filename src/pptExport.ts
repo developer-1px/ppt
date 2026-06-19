@@ -44,6 +44,7 @@ import {
   type PPTTextStyle,
 } from './pptModel'
 import {
+  getPPTTableCellFill,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -805,12 +806,26 @@ function renderPPTTableHTML(
         `<col style="width:${formatNumber(width)}px">`).join('')}</colgroup>`
     : ''
   const head = element.rows[0]
-    ? `<thead>${renderPPTTableHTMLRow(element.rows[0], columnCount, 'th', rowHeights[0])}</thead>`
+    ? `<thead>${renderPPTTableHTMLRow({
+        columnCount,
+        element,
+        row: element.rows[0],
+        rowHeight: rowHeights[0],
+        rowIndex: 0,
+        tagName: 'th',
+      })}</thead>`
     : ''
   const bodyRows = element.rows
     .slice(1)
     .map((row, index) =>
-      renderPPTTableHTMLRow(row, columnCount, 'td', rowHeights[index + 1]))
+      renderPPTTableHTMLRow({
+        columnCount,
+        element,
+        row,
+        rowHeight: rowHeights[index + 1],
+        rowIndex: index + 1,
+        tagName: 'td',
+      }))
     .join('')
   const body = `<tbody>${bodyRows}</tbody>`
   const attrs = [
@@ -831,18 +846,38 @@ function renderPPTTableHTML(
   return `    <table ${attrs}>${colGroup}${head}${body}</table>`
 }
 
-function renderPPTTableHTMLRow(
-  row: readonly string[],
-  columnCount: number,
-  tagName: 'td' | 'th',
-  rowHeight: number | undefined,
-) {
+function renderPPTTableHTMLRow({
+  columnCount,
+  element,
+  row,
+  rowHeight,
+  rowIndex,
+  tagName,
+}: {
+  columnCount: number
+  element: PPTTable
+  row: readonly string[]
+  rowHeight: number | undefined
+  rowIndex: number
+  tagName: 'td' | 'th'
+}) {
   const rowStyle = rowHeight === undefined
     ? ''
     : ` style="height:${formatNumber(rowHeight)}px"`
-  const cells = Array.from({ length: columnCount }, (_, index) =>
-    `<${tagName} data-ppt-table-cell="${index}">${escapeHtml(row[index] ?? '')}</${tagName}>`,
-  ).join('')
+  const cells = Array.from({ length: columnCount }, (_, index) => {
+    const fill = getPPTTableCellFill(element, rowIndex, index)
+    const fillAttrs = fill
+      ? [
+          ` data-ppt-table-cell-fill="${escapeHtml(fill.color)}"`,
+          fill.opacity === undefined
+            ? ''
+            : ` data-ppt-table-cell-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(fill)))}"`,
+          ` style="background:${escapeHtml(getPPTFillColorCSS(fill))}"`,
+        ].join('')
+      : ''
+
+    return `<${tagName} data-ppt-table-cell="${index}"${fillAttrs}>${escapeHtml(row[index] ?? '')}</${tagName}>`
+  }).join('')
 
   return `<tr${rowStyle}>${cells}</tr>`
 }
@@ -871,8 +906,13 @@ function renderPPTTableSVG(element: PPTTable) {
 
       columnX += cellWidth
 
+      const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const fillAttrs = cellFill
+        ? `fill="${escapeHtml(cellFill.color)}"${getPPTFillOpacitySvgAttr(cellFill)}`
+        : `fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}"`
+
       return [
-        `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}" stroke="#dbe3ef" stroke-width="1"></rect>`,
+        `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
         `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(fontSize)}" dominant-baseline="middle">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
     })

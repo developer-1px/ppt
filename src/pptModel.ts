@@ -11,6 +11,9 @@ const PPTFillSchema = z.object({
   color: z.string(),
   opacity: z.number().optional(),
 })
+const PPTTableCellStyleSchema = z.object({
+  fill: PPTFillSchema.optional(),
+})
 
 const PPTStrokeSchema = z.object({
   color: z.string(),
@@ -178,6 +181,7 @@ const PPTFreeformSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTTableSchema = PPTElementBaseSchema.extend({
+  cellStyles: z.array(z.array(PPTTableCellStyleSchema)).optional(),
   columnWidths: z.array(z.number()).optional(),
   kind: z.literal('table'),
   rowHeights: z.array(z.number()).optional(),
@@ -259,6 +263,7 @@ export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTFreeform = z.infer<typeof PPTFreeformSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
+export type PPTTableCellStyle = z.infer<typeof PPTTableCellStyleSchema>
 export type PPTComment = z.infer<typeof PPTCommentSchema>
 export type PPTCommentThreadMessage = z.infer<typeof PPTCommentThreadMessageSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>

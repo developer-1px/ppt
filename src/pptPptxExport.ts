@@ -24,6 +24,7 @@ import {
   type PPTTextStyle,
 } from './pptModel'
 import {
+  getPPTTableCellFill,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -1431,22 +1432,29 @@ function addPPTXTable({
     : undefined
 
   pptxSlide.addTable(element.rows.map((row, rowIndex) =>
-    Array.from({ length: columnCount }, (_, columnIndex) => ({
-      options: {
-        bold: rowIndex === 0,
-        border: { color: 'DBE3EF', pt: 0.75 },
-        color: '111827',
-        fill: {
-          color: rowIndex === 0 ? 'EFF6FF' : 'FFFFFF',
+    Array.from({ length: columnCount }, (_, columnIndex) => {
+      const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const fallbackFillColor = rowIndex === 0 ? 'EFF6FF' : 'FFFFFF'
+
+      return {
+        options: {
+          bold: rowIndex === 0,
+          border: { color: 'DBE3EF', pt: 0.75 },
+          color: '111827',
+          fill: {
+            color: cellFill
+              ? toPPTXColor(cellFill.color, fallbackFillColor)
+              : fallbackFillColor,
+            transparency: toPPTXTransparency((cellFill?.opacity ?? 1) * opacity),
+          },
+          fontFace: PPTX_DEFAULT_FONT_FACE,
+          fontSize: 13.5,
+          margin: 0.08,
           transparency: toPPTXTransparency(opacity),
         },
-        fontFace: PPTX_DEFAULT_FONT_FACE,
-        fontSize: 13.5,
-        margin: 0.08,
-        transparency: toPPTXTransparency(opacity),
-      },
-      text: row[columnIndex] ?? '',
-    }))),
+        text: row[columnIndex] ?? '',
+      }
+    })),
   {
     ...position,
     border: { color: 'DBE3EF', pt: 0.75 },

@@ -852,6 +852,7 @@ import {
   exportPPTSlideSVG,
 } from './pptExport'
 import {
+  getPPTTableCellFill,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
 } from './pptTableLayout'
@@ -36186,16 +36187,23 @@ function PPTTableView({ element }: { element: PPTTable }) {
       }}
     >
       {element.rows.flatMap((row, rowIndex) =>
-        row.map((cell, columnIndex) => (
-          <div
-            className="ppt-table-cell"
-            data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
-            data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
-            key={`${rowIndex}:${columnIndex}`}
-          >
-            {cell}
-          </div>
-        )),
+        row.map((cell, columnIndex) => {
+          const fill = getPPTTableCellFill(element, rowIndex, columnIndex)
+
+          return (
+            <div
+              className="ppt-table-cell"
+              data-ppt-table-cell={`${rowIndex}:${columnIndex}`}
+              data-ppt-table-cell-fill={fill?.color}
+              data-ppt-table-cell-fill-opacity={fill?.opacity}
+              data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
+              key={`${rowIndex}:${columnIndex}`}
+              style={getPPTTableCellStyleCSS(fill)}
+            >
+              {cell}
+            </div>
+          )
+        }),
       )}
     </div>
   )
@@ -36209,6 +36217,12 @@ function formatPPTTableGridTemplate(trackSizes: readonly number[]) {
 
 function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
   return trackSizes.map((size) => Math.round(size)).join(' ')
+}
+
+function getPPTTableCellStyleCSS(fill: PPTFill | undefined): CSSProperties | undefined {
+  return fill
+    ? { background: getPPTFillColorCSS(fill) }
+    : undefined
 }
 
 function createPPTTableClipboardHTML(element: PPTTable) {

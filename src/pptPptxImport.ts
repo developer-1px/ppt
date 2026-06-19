@@ -19,6 +19,7 @@ import {
   type PPTSlideTransition,
   type PPTStroke,
   type PPTTable,
+  type PPTTableCellStyle,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
@@ -1216,18 +1217,19 @@ function readPPTXTableElement(
   const table = getFirstPPTXDescendantByLocalName(graphicFrame, 'tbl')
   const geometry = readPPTXElementGeometry(graphicFrame)
   const shadow = readPPTXElementShadow(graphicFrame)
-  const rows = table
+  const cellRows = table
     ? getDirectPPTXChildrenByLocalName(table, 'tr')
-      .map((row) =>
-        getDirectPPTXChildrenByLocalName(row, 'tc')
-          .map((cell) => readPPTXPlainTextBody(cell).trim()))
+      .map((row) => getDirectPPTXChildrenByLocalName(row, 'tc'))
       .filter((row) => row.length > 0)
     : []
+  const rows = cellRows.map((row) =>
+    row.map((cell) => readPPTXPlainTextBody(cell).trim()))
 
   if (!geometry || rows.length === 0) {
     return null
   }
 
+  const cellStyles = readPPTXTableCellStyles(cellRows)
   const columnWidths = table
     ? readPPTXTableColumnWidths(table, getPPTTableColumnCount(rows))
     : undefined
@@ -1237,6 +1239,7 @@ function readPPTXTableElement(
 
   return {
     ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    ...(cellStyles ? { cellStyles } : {}),
     ...(columnWidths ? { columnWidths } : {}),
     ...readPPTXElementFlip(graphicFrame),
     geometry,
@@ -1249,6 +1252,27 @@ function readPPTXTableElement(
     ...(shadow ? { shadow } : {}),
     rows,
   }
+}
+
+function readPPTXTableCellStyles(
+  cellRows: readonly (readonly Element[])[],
+): PPTTable['cellStyles'] {
+  const styles = cellRows.map((row) =>
+    row.map((cell): PPTTableCellStyle => {
+      const fill = readPPTXTableCellFill(cell)
+
+      return fill ? { fill } : {}
+    }))
+
+  return styles.some((row) => row.some((style) => style.fill))
+    ? styles
+    : undefined
+}
+
+function readPPTXTableCellFill(cell: Element): PPTFill | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
+
+  return readPPTXSolidFill(tcPr) ?? undefined
 }
 
 function readPPTXTableColumnWidths(

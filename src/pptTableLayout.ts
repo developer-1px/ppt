@@ -1,5 +1,13 @@
 import type { PPTTable } from './pptModel'
 
+export function getPPTTableCellFill(
+  element: PPTTable,
+  rowIndex: number,
+  columnIndex: number,
+) {
+  return element.cellStyles?.[rowIndex]?.[columnIndex]?.fill
+}
+
 export function getPPTTableResolvedColumnWidths(element: PPTTable) {
   return resolvePPTTableTrackSizes({
     totalSize: element.geometry.w,
