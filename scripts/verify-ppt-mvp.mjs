@@ -11175,7 +11175,7 @@ async function runExportScenario(page) {
 
       return element.rows?.[0]?.[1] === 'Wide column' &&
         element.rows?.[0]?.[2] === 'Tall cell' &&
-        element.rows?.[1]?.[0] === 'Merged cells' &&
+        element.rows?.[1]?.[0] === 'Merged cells\\nSoft break' &&
         columnWidths.length === 3 &&
         rowHeights.length === 2 &&
         columnWidths[1] > columnWidths[0] * 1.5 &&
@@ -11304,6 +11304,7 @@ async function runExportScenario(page) {
       exportUnevenTableProbeHorizontalMergeColSpan: exportUnevenTableProbe?.cellStyles?.[1]?.[0]?.colSpan ?? '',
       exportUnevenTableProbeHorizontalMergeHidden: exportUnevenTableProbe?.cellStyles?.[1]?.[1]?.hidden ?? '',
       exportUnevenTableProbeHorizontalMergeText: exportUnevenTableProbe?.rows?.[1]?.[0] ?? '',
+      exportUnevenTableProbeSoftBreakText: exportUnevenTableProbe?.rows?.[1]?.[0] ?? '',
       exportUnevenTableProbeCellTextAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.align ?? '',
       exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
       exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
@@ -27503,7 +27504,7 @@ async function addPPTXUnevenTableProbe(base64) {
       createPPTXTableCellXml('Tall cell', { rowSpan: 2 }),
       '</a:tr>',
       '<a:tr h="731520">',
-      createPPTXTableCellXml('Merged cells', {
+      createPPTXTableCellXml('Merged cells\nSoft break', {
         fill: { color: 'DCFCE7' },
         gridSpan: 2,
       }),
@@ -27553,6 +27554,18 @@ function createPPTXTableCellXml(text, options = {}) {
         '</a:rPr>',
       ].join('')
     : ''
+  const textRunsXml = String(text)
+    .split('\n')
+    .map((line, index) =>
+      [
+        index === 0 ? '' : '<a:br/>',
+        '<a:r>',
+        runPropertiesXml,
+        '<a:t>',
+        escapePPTXXmlText(line),
+        '</a:t></a:r>',
+      ].join(''))
+    .join('')
   const tcPrAttrs = [
     textStyle?.verticalAlign ? ` anchor="${textStyle.verticalAlign}"` : '',
     textStyle?.textInset
@@ -27592,11 +27605,8 @@ function createPPTXTableCellXml(text, options = {}) {
     '<a:lstStyle/>',
     '<a:p>',
     textStyle?.align ? `<a:pPr algn="${textStyle.align}"/>` : '',
-    '<a:r>',
-    runPropertiesXml,
-    '<a:t>',
-    escapePPTXXmlText(text),
-    '</a:t></a:r></a:p>',
+    textRunsXml,
+    '</a:p>',
     '</a:txBody>',
     tcPrXml,
     '</a:tc>',

@@ -1191,7 +1191,7 @@
   font-size: 18px;
   line-height: 1.15;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
 }
 
 .ppt-table-cell[data-ppt-table-header='true'] {

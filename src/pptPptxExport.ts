@@ -1563,15 +1563,21 @@ function createPPTXTextRuns({
       : [{ text: '' }]
 
     paragraphRuns.forEach((run, runIndex) => {
-      runs.push({
-        options: {
-          ...createPPTXTextStyleOptions(style, opacity),
-          ...createPPTXParagraphOptions(paragraph),
-          ...createPPTXTextRunOptions(run),
-          breakLine: paragraphIndex > 0 && runIndex === 0,
-          hyperlink,
-        },
-        text: run.text,
+      run.text.split('\n').forEach((text, segmentIndex) => {
+        runs.push({
+          options: {
+            ...createPPTXTextStyleOptions(style, opacity),
+            ...createPPTXParagraphOptions(paragraph),
+            ...createPPTXTextRunOptions(run),
+            breakLine: (
+              paragraphIndex > 0 &&
+              runIndex === 0 &&
+              segmentIndex === 0
+            ) || segmentIndex > 0,
+            hyperlink,
+          },
+          text,
+        })
       })
     })
   })

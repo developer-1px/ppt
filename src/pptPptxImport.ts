@@ -1700,12 +1700,25 @@ function readPPTXTextBody(txBody: Element | null): PPTTextBody | null {
 
 function readPPTXPlainTextBody(root: Document | Element) {
   return getPPTXDescendantsByLocalName(root, 'p')
-    .map((paragraph) =>
-      getPPTXDescendantsByLocalName(paragraph, 't')
-        .map((text) => text.textContent ?? '')
-        .join(''))
+    .map(readPPTXPlainParagraphText)
     .filter((text) => text.length > 0)
     .join('\n')
+}
+
+function readPPTXPlainParagraphText(paragraph: Element) {
+  return Array.from(paragraph.children)
+    .map((child) => {
+      if (child.localName === 'br') {
+        return '\n'
+      }
+
+      if (child.localName === 'r' || child.localName === 'fld') {
+        return getFirstPPTXDescendantByLocalName(child, 't')?.textContent ?? ''
+      }
+
+      return ''
+    })
+    .join('')
 }
 
 function readPPTXParagraph(paragraph: Element): PPTParagraph {
@@ -1742,18 +1755,32 @@ function readPPTXTextRun(
   node: Element,
   defaultRunProperties: Element | null,
 ): PPTRun[] {
-  if (node.localName !== 'r' && node.localName !== 'fld') {
+  if (node.localName !== 'r' && node.localName !== 'fld' && node.localName !== 'br') {
     return []
   }
 
-  const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
   const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
+  const style = readPPTXTextRunStyle(rPr, defaultRunProperties)
+
+  if (node.localName === 'br') {
+    return [{ ...style, text: '\n' }]
+  }
+
+  const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
+
+  return [{ ...style, text }]
+}
+
+function readPPTXTextRunStyle(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+): Omit<PPTRun, 'text'> {
   const color = readPPTXRunColor(rPr, defaultRunProperties)
   const highlight = readPPTXRunHighlight(rPr) ??
     readPPTXRunHighlight(defaultRunProperties)
   const size = readPPTXRunSize(rPr, defaultRunProperties)
 
-  return [{
+  return {
     ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'b')
       ? { bold: true }
       : {}),
@@ -1769,8 +1796,7 @@ function readPPTXTextRun(
     ...(readPPTXRunUnderline(rPr, defaultRunProperties)
       ? { underline: true }
       : {}),
-    text,
-  }]
+  }
 }
 
 function readPPTXRunColor(
