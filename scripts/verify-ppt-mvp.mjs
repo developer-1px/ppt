@@ -4086,7 +4086,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:cut') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -21294,6 +21294,7 @@ async function runSlideManagementScenario(page) {
       afterCopySlide.slideClipboardSourceSlide === afterDuplicate.activeId &&
       afterCopySlide.slideClipboardElementCount > 0 &&
       afterCopySlide.slideClipboardHTMLLength > 0 &&
+      afterCopySlide.slideClipboardOperation === 'copy' &&
       afterCopySlide.slideClipboardWriteMode === 'clipboard-item' &&
       slideClipboardWrite.writeCount === 1 &&
       slideClipboardWrite.itemTypes.includes('application/vnd.interactive-os.ppt.slide+json') &&
@@ -21331,6 +21332,7 @@ async function runSlideManagementScenario(page) {
       afterPasteSlideButton.slideClipboardPasteCommandType === 'slide-command-effect' &&
       afterPasteSlideButton.slideClipboardPasteMappingCount === 1 &&
       afterPasteSlideButton.slideClipboardPasteObjectMappingCount > 0 &&
+      afterPasteSlideButton.slideClipboardPasteOperation === 'copy' &&
       afterPasteSlideButton.slideClipboardPasteSelectionSlide === afterPasteSlideButton.activeId &&
       afterPasteSlideButton.slideClipboardPasteTargetSlides === afterPasteSlideButton.activeId &&
       afterPasteSlideButton.slideClipboardImported !== 'true',
@@ -21587,7 +21589,7 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.focusableOption === expectedActiveOptionId &&
       initialKeyboard.slideOrder === expectedSlideOrder &&
       initialKeyboard.commandShortcuts ===
-        'Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Delete Backspace' &&
+        'Cmd/Ctrl+X Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Delete Backspace' &&
       initialKeyboard.commandShortcutIntent === 'ppt-slide-rail-command-shortcut-intent' &&
       initialKeyboard.commandShortcutModel === 'ppt-slide-rail-command-shortcuts' &&
       initialKeyboard.optionCount === initialKeyboard.count &&
@@ -21631,7 +21633,8 @@ async function runSlideManagementScenario(page) {
       afterRailCopyShortcut.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
       afterRailCopyShortcut.slideClipboardSourceSlide === initialKeyboard.activeId &&
       afterRailCopyShortcut.slideClipboardElementCount > 0 &&
-      afterRailCopyShortcut.slideClipboardHTMLLength > 0,
+      afterRailCopyShortcut.slideClipboardHTMLLength > 0 &&
+      afterRailCopyShortcut.slideClipboardOperation === 'copy',
     {
       afterRailCopyShortcut,
       initialKeyboard,
@@ -21658,6 +21661,7 @@ async function runSlideManagementScenario(page) {
       afterRailPasteShortcut.slideClipboardPasteAfterSlide === initialKeyboard.activeId &&
       afterRailPasteShortcut.slideClipboardPasteCommand === 'paste-slides' &&
       afterRailPasteShortcut.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterRailPasteShortcut.slideClipboardPasteOperation === 'copy' &&
       afterRailPasteShortcut.slideClipboardPasteSelectionSlide === afterRailPasteShortcut.activeId,
     {
       afterRailCopyShortcut,
@@ -21688,6 +21692,68 @@ async function runSlideManagementScenario(page) {
       initialKeyboard,
     },
   )
+
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await delay(50)
+  await pressKey(page, {
+    code: 'KeyX',
+    key: 'x',
+    modifiers: 2,
+    windowsVirtualKeyCode: 88,
+  })
+  await delay(80)
+
+  const afterRailCutShortcut = await getSlideRailState(page)
+
+  record(
+    'cuts focused PPT slide thumbnail with Cmd/Ctrl+X',
+    afterRailCutShortcut.count === initialKeyboard.count - 1 &&
+      afterRailCutShortcut.activeId !== initialKeyboard.activeId &&
+      afterRailCutShortcut.focusedId === afterRailCutShortcut.activeId &&
+      !afterRailCutShortcut.ids.includes(initialKeyboard.activeId) &&
+      afterRailCutShortcut.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
+      afterRailCutShortcut.slideClipboardOperation === 'cut' &&
+      afterRailCutShortcut.slideClipboardSourceSlide === initialKeyboard.activeId &&
+      afterRailCutShortcut.slideClipboardElementCount > 0,
+    {
+      afterRailCutShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyV',
+    key: 'v',
+    modifiers: 2,
+    windowsVirtualKeyCode: 86,
+  })
+  await delay(80)
+
+  const afterRailCutPasteShortcut = await getSlideRailState(page)
+
+  record(
+    'pastes cut PPT slide thumbnail with Cmd/Ctrl+V as move',
+    afterRailCutPasteShortcut.count === initialKeyboard.count &&
+      afterRailCutPasteShortcut.activeId === initialKeyboard.activeId &&
+      afterRailCutPasteShortcut.ids.includes(initialKeyboard.activeId) &&
+      !afterRailCutPasteShortcut.activeName.includes('Copy') &&
+      afterRailCutPasteShortcut.slideClipboardOperation === 'cut' &&
+      afterRailCutPasteShortcut.slideClipboardPasteOperation === 'cut' &&
+      afterRailCutPasteShortcut.slideClipboardSourceSlide === initialKeyboard.activeId &&
+      afterRailCutPasteShortcut.slideClipboardTargetSlide === initialKeyboard.activeId &&
+      afterRailCutPasteShortcut.slideClipboardPasteAfterSlide === afterRailCutShortcut.activeId &&
+      afterRailCutPasteShortcut.slideClipboardPasteCommand === 'paste-slides' &&
+      afterRailCutPasteShortcut.slideClipboardPasteCommandType === 'slide-command-effect' &&
+      afterRailCutPasteShortcut.slideClipboardPasteSelectionSlide === initialKeyboard.activeId,
+    {
+      afterRailCutPasteShortcut,
+      afterRailCutShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await delay(50)
 
   await pressKey(page, {
     code: 'KeyD',
@@ -23714,12 +23780,14 @@ function getSlideRailState(page) {
       slideClipboardImported: stage?.getAttribute('data-ppt-slide-clipboard-imported') ?? '',
       slideClipboardJsonMimeType: stage?.getAttribute('data-ppt-slide-clipboard-json-mime-type') ?? '',
       slideClipboardModel: stage?.getAttribute('data-ppt-slide-clipboard-model') ?? '',
+      slideClipboardOperation: stage?.getAttribute('data-ppt-slide-clipboard-operation') ?? '',
       slideClipboardPasteAfterSlide: stage?.getAttribute('data-ppt-slide-clipboard-paste-after-slide') ?? '',
       slideClipboardPasteCommand: stage?.getAttribute('data-ppt-slide-clipboard-paste-command') ?? '',
       slideClipboardPasteCommandType: stage?.getAttribute('data-ppt-slide-clipboard-paste-command-type') ?? '',
       slideClipboardPasteInsertIndex: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-insert-index') ?? -1),
       slideClipboardPasteMappingCount: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-mapping-count') ?? 0),
       slideClipboardPasteObjectMappingCount: Number(stage?.getAttribute('data-ppt-slide-clipboard-paste-object-mapping-count') ?? 0),
+      slideClipboardPasteOperation: stage?.getAttribute('data-ppt-slide-clipboard-paste-operation') ?? '',
       slideClipboardPasteSelectionSlide: stage?.getAttribute('data-ppt-slide-clipboard-paste-selection-slide') ?? '',
       slideClipboardPasteTargetSlides: stage?.getAttribute('data-ppt-slide-clipboard-paste-target-slides') ?? '',
       slideClipboardSlideName: stage?.getAttribute('data-ppt-slide-clipboard-slide-name') ?? '',

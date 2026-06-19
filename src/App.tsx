@@ -60,6 +60,7 @@ import {
   Redo2,
   RotateCw,
   Ruler,
+  Scissors,
   Search,
   SendToBack,
   Square,
@@ -390,6 +391,7 @@ import {
   type SlideEditSlideMetadataInspectorDescriptor,
   type SlideEditSlideMetadataReadModel,
   type SlideEditSlideMetadataUpdateCommand,
+  type SlideEditSlideClipboardOperation,
   type SlideEditSlideClipboardPasteHostCommandEffect,
   type SlideEditSlideOrientation,
   type SlideEditSlideSizeDescriptor,
@@ -1732,6 +1734,7 @@ type PPTRichClipboardFallback = {
   plainText: string
 }
 type PPTSlideClipboardPayload = {
+  operation: SlideEditSlideClipboardOperation
   slide: PPTSlide
   sourceSlideId: string
 }
@@ -1747,6 +1750,7 @@ type PPTSlideClipboardExportPayload = {
   kind: typeof PPT_SLIDE_CLIPBOARD_KIND
   metadata: {
     elementCount: number
+    operation: SlideEditSlideClipboardOperation
     sourceSlideId: string
   }
   payload: PPTSlideClipboardPayload
@@ -1759,12 +1763,14 @@ type PPTSlideClipboardEffect = {
   imported?: boolean
   jsonMimeType: typeof PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE
   model: typeof PPT_SLIDE_CLIPBOARD_MODEL
+  operation: SlideEditSlideClipboardOperation
   pasteAfterSlideId?: string | null
   pasteCommandId?: PPTSlideClipboardPasteCommandEffect['payload']['id']
   pasteCommandType?: PPTSlideClipboardPasteCommandEffect['type']
   pasteInsertIndex?: number
   pasteMappingCount?: number
   pasteObjectMappingCount?: number
+  pasteOperation?: SlideEditSlideClipboardOperation
   pasteSelectionSlideId?: string
   pasteTargetSlideIds?: readonly string[]
   slideName: string
@@ -3695,13 +3701,14 @@ const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
 const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
 const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
+const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
 const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
 const PPT_SLIDE_PASTE_SHORTCUT = 'Cmd/Ctrl+V'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
-  `${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
+  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
   'ppt-slide-rail-command-shortcut-intent'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
@@ -5554,6 +5561,11 @@ function App() {
         return
       }
 
+      if (commandIntent.kind === 'cut-slide') {
+        cutSlide(slideId, { focusRail: true })
+        return
+      }
+
       if (commandIntent.kind === 'paste-slide') {
         pasteCopiedSlideAfterSlide(slideId)
         return
@@ -5814,13 +5826,50 @@ function App() {
   }
 
   function copySlide(slideId: string) {
+    return writeSlideClipboard(slideId, 'copy')
+  }
+
+  function cutActiveSlide() {
+    cutSlide(activeSlide.id)
+  }
+
+  function cutSlide(slideId: string, options: { focusRail?: boolean } = {}) {
+    const current = deckRef.current
+
+    if (current.slides.length <= 1) {
+      return false
+    }
+
+    const sourceIndex = current.slides.findIndex((slide) => slide.id === slideId)
+
+    if (sourceIndex < 0 || !writeSlideClipboard(slideId, 'cut')) {
+      return false
+    }
+
+    const nextSlides = current.slides.filter((slide) => slide.id !== slideId)
+    const nextFocusSlideId =
+      nextSlides[Math.min(sourceIndex, nextSlides.length - 1)]?.id ?? null
+
+    deleteSlide(slideId)
+
+    if (options.focusRail && nextFocusSlideId) {
+      focusPPTSlideThumb(nextFocusSlideId)
+    }
+
+    return true
+  }
+
+  function writeSlideClipboard(
+    slideId: string,
+    operation: SlideEditSlideClipboardOperation,
+  ) {
     const slide = findPPTSlide(deckRef.current, slideId)
 
     if (!slide) {
       return false
     }
 
-    const payload = createPPTSlideClipboardPayload(slide)
+    const payload = createPPTSlideClipboardPayload(slide, { operation })
     const html = createPPTSlideClipboardHTML(payload)
     const effect = createPPTSlideClipboardEffect({
       html,
@@ -5868,14 +5917,23 @@ function App() {
     let pastedSlide: PPTSlide | null = null
 
     commitDeck((current) => {
+      const sourceSlideWillMove = payload.operation === 'cut' &&
+        current.slides.some((slide) => slide.id === payload.sourceSlideId)
+      const pasteSourceSlides = sourceSlideWillMove
+        ? current.slides.filter((slide) => slide.id !== payload.sourceSlideId)
+        : current.slides
+      const pasteSourceDeck = { ...current, slides: pasteSourceSlides }
       const optionTargetSlide = options.targetSlideId
-        ? findPPTSlide(current, options.targetSlideId)
+        ? findPPTSlide(pasteSourceDeck, options.targetSlideId)
         : null
-      const activeTargetSlide = findPPTSlide(current, activeSlide.id)
+      const activeTargetSlide = findPPTSlide(
+        pasteSourceDeck,
+        activeSlide.id,
+      )
       const targetSlideId =
         optionTargetSlide?.id ??
         activeTargetSlide?.id ??
-        current.slides.at(-1)?.id ??
+        pasteSourceSlides.at(-1)?.id ??
         null
       const slideEditPayload = createPPTSlideEditClipboardPayload(payload)
 
@@ -5883,11 +5941,17 @@ function App() {
         return current
       }
 
-      const id = createPPTSlideId(current)
-      const slide = clonePPTSlide(payload.slide, id)
+      const canReuseCutSlideId = payload.operation === 'cut' &&
+        !pasteSourceSlides.some((slide) => slide.id === payload.slide.id)
+      const id = canReuseCutSlideId
+        ? payload.slide.id
+        : createPPTSlideId(pasteSourceDeck)
+      const slide = canReuseCutSlideId
+        ? payload.slide
+        : clonePPTSlide(payload.slide, id)
       const targetObjectIds = slide.elements.map((element) => element.id)
       const placement = resolveSlideEditSlideClipboardPastePlacement({
-        slideOrder: current.slides.map((deckSlide) => deckSlide.id),
+        slideOrder: pasteSourceSlides.map((deckSlide) => deckSlide.id),
         target: {
           kind: 'after-slide',
           slideId: targetSlideId,
@@ -5920,7 +5984,7 @@ function App() {
         return current
       }
 
-      const nextSlides = [...current.slides]
+      const nextSlides = [...pasteSourceSlides]
       nextSlides.splice(
         pasteEffect.payload.pastePlan.insertIndex,
         0,
@@ -13368,6 +13432,13 @@ function App() {
     shortcut: PPT_SLIDE_COPY_SHORTCUT,
     title: 'Copy slide',
   }, {
+    disabled: !canDeleteSlide,
+    id: 'slide:cut',
+    onSelect: cutActiveSlide,
+    section: 'Slides',
+    shortcut: PPT_SLIDE_CUT_SHORTCUT,
+    title: 'Cut slide',
+  }, {
     disabled: !canPasteSlide,
     id: 'slide:paste',
     onSelect: pasteCopiedSlide,
@@ -13947,6 +14018,9 @@ function App() {
             <button className="ppt-slide-action" data-ppt-slide-action="copy" onClick={copyActiveSlide} title="Copy slide" type="button">
               <Copy size={16} />
             </button>
+            <button className="ppt-slide-action" data-ppt-slide-action="cut" disabled={!canDeleteSlide} onClick={cutActiveSlide} title="Cut slide" type="button">
+              <Scissors size={16} />
+            </button>
             <button className="ppt-slide-action" data-ppt-slide-action="paste" disabled={!canPasteSlide} onClick={pasteCopiedSlide} title="Paste slide" type="button">
               <ClipboardPaste size={16} />
             </button>
@@ -14049,12 +14123,14 @@ function App() {
           : undefined}
         data-ppt-slide-clipboard-json-mime-type={lastSlideClipboardEffect?.jsonMimeType}
         data-ppt-slide-clipboard-model={lastSlideClipboardEffect?.model}
+        data-ppt-slide-clipboard-operation={lastSlideClipboardEffect?.operation}
         data-ppt-slide-clipboard-paste-after-slide={lastSlideClipboardEffect?.pasteAfterSlideId ?? undefined}
         data-ppt-slide-clipboard-paste-command={lastSlideClipboardEffect?.pasteCommandId}
         data-ppt-slide-clipboard-paste-command-type={lastSlideClipboardEffect?.pasteCommandType}
         data-ppt-slide-clipboard-paste-insert-index={lastSlideClipboardEffect?.pasteInsertIndex}
         data-ppt-slide-clipboard-paste-mapping-count={lastSlideClipboardEffect?.pasteMappingCount}
         data-ppt-slide-clipboard-paste-object-mapping-count={lastSlideClipboardEffect?.pasteObjectMappingCount}
+        data-ppt-slide-clipboard-paste-operation={lastSlideClipboardEffect?.pasteOperation}
         data-ppt-slide-clipboard-paste-selection-slide={lastSlideClipboardEffect?.pasteSelectionSlideId}
         data-ppt-slide-clipboard-paste-target-slides={lastSlideClipboardEffect?.pasteTargetSlideIds?.join(' ')}
         data-ppt-slide-clipboard-slide-name={lastSlideClipboardEffect?.slideName}
@@ -16716,8 +16792,12 @@ function createPPTRichClipboardEffect(
   }
 }
 
-function createPPTSlideClipboardPayload(slide: PPTSlide): PPTSlideClipboardPayload {
+function createPPTSlideClipboardPayload(
+  slide: PPTSlide,
+  options: { operation?: SlideEditSlideClipboardOperation } = {},
+): PPTSlideClipboardPayload {
   return {
+    operation: options.operation ?? 'copy',
     slide,
     sourceSlideId: slide.id,
   }
@@ -16731,6 +16811,7 @@ function createPPTSlideEditClipboardPayload(
     getObjectCount: (slide) => slide.elements.length,
     getSlideId: (slide) => slide.id,
     getTitle: (slide) => slide.name,
+    operation: payload.operation,
     selectedSlideIds: [payload.slide.id],
     slides: [payload.slide],
     sourceSlideId: payload.sourceSlideId,
@@ -16763,6 +16844,7 @@ function createPPTSlideClipboardEffect({
     importFormat,
     jsonMimeType: PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE,
     model: PPT_SLIDE_CLIPBOARD_MODEL,
+    operation: payload.operation,
     pasteAfterSlideId: pastePlan?.afterSlideId,
     pasteCommandId: pasteEffect?.payload.id,
     pasteCommandType: pasteEffect?.type,
@@ -16772,6 +16854,7 @@ function createPPTSlideClipboardEffect({
       (total, mapping) => total + mapping.objectMappings.length,
       0,
     ),
+    pasteOperation: pastePlan?.operation,
     pasteSelectionSlideId: pasteEffect?.selection.slideId,
     pasteTargetSlideIds: pastePlan?.targetSlideIds,
     slideName: payload.slide.name,
@@ -16795,6 +16878,7 @@ function createPPTSlideClipboardFallbackHTMLEffect({
     imported: true,
     jsonMimeType: PPT_SLIDE_CLIPBOARD_JSON_MIME_TYPE,
     model: PPT_SLIDE_CLIPBOARD_MODEL,
+    operation: 'copy',
     slideName: source.name,
     sourceSlideId: source.sourceSlideId ?? '',
     targetSlideId,
@@ -19553,6 +19637,7 @@ function createPPTSlideClipboardExportPayload(
     kind: PPT_SLIDE_CLIPBOARD_KIND,
     metadata: {
       elementCount: payload.slide.elements.length,
+      operation: payload.operation,
       sourceSlideId: payload.sourceSlideId,
     },
     payload,
@@ -19588,7 +19673,7 @@ function createPPTSlideClipboardPlainText(slide: PPTSlide) {
 
 function createPPTSlideClipboardFallbackHTML(payload: PPTSlideClipboardPayload) {
   return [
-    `<section data-ppt-slide-export="${escapePPTCanvasXmlAttribute(payload.slide.id)}" data-ppt-slide-name="${escapePPTCanvasXmlAttribute(payload.slide.name)}">`,
+    `<section data-ppt-slide-export="${escapePPTCanvasXmlAttribute(payload.slide.id)}" data-ppt-slide-name="${escapePPTCanvasXmlAttribute(payload.slide.name)}" data-ppt-slide-clipboard-operation="${escapePPTCanvasXmlAttribute(payload.operation)}">`,
     exportPPTSlideSVG(payload.slide),
     '</section>',
   ].join('')
@@ -31172,6 +31257,7 @@ function normalizePPTSlideClipboardPayload(
   }
 
   return {
+    operation: normalizePPTSlideClipboardOperation(payloadValue.operation),
     slide: parsed.data,
     sourceSlideId: typeof payloadValue.sourceSlideId === 'string'
       ? payloadValue.sourceSlideId
@@ -31196,9 +31282,16 @@ function normalizePPTSlideEditClipboardPayload(
   }
 
   return {
+    operation: payload.operation,
     slide: parsed.data,
     sourceSlideId: payload.metadata[0]?.slideId ?? payload.sourceSlideId,
   }
+}
+
+function normalizePPTSlideClipboardOperation(
+  value: unknown,
+): SlideEditSlideClipboardOperation {
+  return value === 'cut' ? 'cut' : 'copy'
 }
 
 function normalizePPTRichClipboardPayload(value: unknown): PPTClipboardPayload | null {
@@ -36497,12 +36590,16 @@ function getPPTSlideRailCommandShortcutIntent({
   mod: boolean
   shiftKey: boolean
 }): {
-  kind: 'copy-slide' | 'delete-slide' | 'duplicate-slide' | 'paste-slide'
+  kind: 'copy-slide' | 'cut-slide' | 'delete-slide' | 'duplicate-slide' | 'paste-slide'
 } | null {
   const normalizedKey = key.toLowerCase()
 
   if (mod && !altKey && !shiftKey && normalizedKey === 'c') {
     return { kind: 'copy-slide' }
+  }
+
+  if (mod && !altKey && !shiftKey && normalizedKey === 'x' && canDelete) {
+    return { kind: 'cut-slide' }
   }
 
   if (mod && !altKey && !shiftKey && normalizedKey === 'v' && canPaste) {
