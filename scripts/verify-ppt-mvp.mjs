@@ -936,6 +936,105 @@ async function runAltDragDuplicateScenario(page) {
     beforeCtrlDrag,
   })
 
+  const ctrlShiftPoint = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, ctrlShiftPoint.x, ctrlShiftPoint.y, 1)
+  await delay(50)
+
+  const beforeCtrlShiftDrag = await page.eval(`(() => {
+    const element = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      left: parseFloat(element.style.left),
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      top: parseFloat(element.style.top),
+    }
+  })()`)
+  const primaryShiftModifier = PPT_PRIMARY_POINTER_MODIFIER | 8
+
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: primaryShiftModifier,
+    type: 'mousePressed',
+    x: ctrlShiftPoint.x,
+    y: ctrlShiftPoint.y,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    modifiers: primaryShiftModifier,
+    type: 'mouseMoved',
+    x: ctrlShiftPoint.x + 92,
+    y: ctrlShiftPoint.y + 38,
+  })
+  await page.send('Input.dispatchMouseEvent', {
+    button: 'left',
+    clickCount: 1,
+    modifiers: primaryShiftModifier,
+    type: 'mouseReleased',
+    x: ctrlShiftPoint.x + 92,
+    y: ctrlShiftPoint.y + 38,
+  })
+  await delay(100)
+
+  const afterCtrlShiftDrag = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+      selectedLeft: parseFloat(selected?.style.left ?? '0'),
+      selectedName: document.querySelector('[data-ppt-style-field="name"]')?.value ?? '',
+      selectedTop: parseFloat(selected?.style.top ?? '0'),
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'duplicates and axis-locks selected PPT object with Cmd/Ctrl Shift drag',
+    afterCtrlShiftDrag.count === beforeCtrlShiftDrag.count + 1 &&
+      afterCtrlShiftDrag.selectedId !== beforeCtrlShiftDrag.selectedId &&
+      afterCtrlShiftDrag.selectedName.includes('Copy') &&
+      afterCtrlShiftDrag.originalLeft === beforeCtrlShiftDrag.left &&
+      afterCtrlShiftDrag.originalTop === beforeCtrlShiftDrag.top &&
+      afterCtrlShiftDrag.selectedLeft > beforeCtrlShiftDrag.left + 40 &&
+      nearlyEqual(afterCtrlShiftDrag.selectedTop, beforeCtrlShiftDrag.top, 0.001) &&
+      afterCtrlShiftDrag.undoEnabled,
+    {
+      afterCtrlShiftDrag,
+      beforeCtrlShiftDrag,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterCtrlShiftDragUndo = await page.eval(`(() => {
+    const original = document.querySelector('[data-ppt-element="s1-card-1"]')
+
+    return {
+      count: document.querySelectorAll('[data-ppt-element]').length,
+      originalLeft: parseFloat(original.style.left),
+      originalTop: parseFloat(original.style.top),
+      redoEnabled: !document.querySelector('button[title="Redo"]').disabled,
+    }
+  })()`)
+
+  record(
+    'undoes PPT Cmd/Ctrl Shift drag duplicate axis lock as one history step',
+    afterCtrlShiftDragUndo.count === beforeCtrlShiftDrag.count &&
+      afterCtrlShiftDragUndo.originalLeft === beforeCtrlShiftDrag.left &&
+      afterCtrlShiftDragUndo.originalTop === beforeCtrlShiftDrag.top &&
+      afterCtrlShiftDragUndo.redoEnabled,
+    {
+      afterCtrlShiftDragUndo,
+      beforeCtrlShiftDrag,
+    },
+  )
+
   const additivePoint = await getElementCenter(page, 's1-card-2')
   await clickMouse(page, ctrlPoint.x, ctrlPoint.y, 1)
   await delay(50)

@@ -12625,9 +12625,9 @@ function App() {
     capturePPTCanvasPointerFromEvent(event)
 
     const duplicateWithPrimaryPointerModifier =
-      (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+      (event.ctrlKey || event.metaKey) && !event.altKey
     const lockAxisWithShiftPointerModifier =
-      event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey
+      event.shiftKey
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
@@ -12685,7 +12685,7 @@ function App() {
           sourceSelection: duplicateSourceSelection,
         }
       : undefined
-    const axisLockOnDrag = axisLockSourceSelection &&
+    let axisLockOnDrag = axisLockSourceSelection &&
       axisLockSourceSelection.some((id) => selection.includes(id))
       ? {
           pendingSelection: nextSelection,
@@ -12741,6 +12741,12 @@ function App() {
         interactionHistorySelection = nextSelection
         interactionSelection = cloneIds
         interactionStartDeck = liveDeck
+        if (axisLockOnDrag) {
+          axisLockOnDrag = {
+            ...axisLockOnDrag,
+            sourceSelection: cloneIds,
+          }
+        }
       }
     }
 
@@ -13251,6 +13257,12 @@ function App() {
           setSelection(cloneIds)
           moveInteraction = {
             ...moveInteraction,
+            axisLockOnDrag: moveInteraction.axisLockOnDrag
+              ? {
+                  ...moveInteraction.axisLockOnDrag,
+                  sourceSelection: cloneIds,
+                }
+              : undefined,
             bounds: liveScene.getBounds(cloneIds) ?? moveInteraction.bounds,
             duplicateOnDrag: {
               ...moveInteraction.duplicateOnDrag,
