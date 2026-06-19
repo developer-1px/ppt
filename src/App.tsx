@@ -233,6 +233,7 @@ import {
   getSlideEditTextParagraphAlignJSONPasteValueFromText,
   getSlideEditTextParagraphBulletCommandEffect,
   getSlideEditTextParagraphBulletJSONPasteValueFromText,
+  getSlideEditTextParagraphBulletKeyboardIntent,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextParagraphSpacingJSONPasteValueFromText,
@@ -293,6 +294,7 @@ import {
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
+  SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
@@ -3706,6 +3708,10 @@ const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT =
   'ppt-text-paragraph-align-keyboard-intent'
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
   'Cmd/Ctrl+L Cmd/Ctrl+E Cmd/Ctrl+R Cmd/Ctrl+J'
+const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL =
+  'slide-edit-text-paragraph-bullet-keyboard-shortcuts'
+const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT =
+  'slide-edit-text-paragraph-bullet-keyboard-intent'
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -4808,6 +4814,22 @@ function App() {
       if (textParagraphAlignKeyboardIntent && canFormatSelectedText) {
         event.preventDefault()
         updateSelectedParagraphAlign(textParagraphAlignKeyboardIntent.align)
+        return
+      }
+
+      const textParagraphBulletKeyboardIntent =
+        getSlideEditTextParagraphBulletKeyboardIntent({
+          altKey: event.altKey,
+          key: event.key,
+          mod,
+          shiftKey: event.shiftKey,
+        })
+
+      if (textParagraphBulletKeyboardIntent && canFormatSelectedText) {
+        if (textParagraphBulletKeyboardIntent.preventDefault) {
+          event.preventDefault()
+        }
+        toggleSelectedParagraphBullet()
         return
       }
 
@@ -14379,6 +14401,7 @@ function App() {
     id: 'format:bullet',
     onSelect: toggleSelectedParagraphBullet,
     section: 'Format',
+    shortcut: SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
     title: 'Toggle bullet list',
   }, {
     disabled: !canFormatSelectedText,
@@ -15417,6 +15440,9 @@ function App() {
         data-ppt-text-paragraph-align-shortcut-intent={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT}
         data-ppt-text-paragraph-align-shortcut-keys={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS}
         data-ppt-text-paragraph-align-shortcut-model={PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL}
+        data-ppt-text-paragraph-bullet-shortcut-intent={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT}
+        data-ppt-text-paragraph-bullet-shortcut-keys={SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT}
+        data-ppt-text-paragraph-bullet-shortcut-model={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL}
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}

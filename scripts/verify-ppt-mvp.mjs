@@ -5284,6 +5284,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.itemIds.includes('format:bold') &&
       afterShortcutOpen.itemIds.includes('format:italic') &&
       afterShortcutOpen.itemIds.includes('format:underline') &&
+      afterShortcutOpen.itemIds.includes('format:bullet') &&
       afterShortcutOpen.itemIds.includes('command:edit-selection') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-next') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-previous') &&
@@ -5301,6 +5302,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+I') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+U') &&
+      afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+Shift+L') &&
       afterShortcutOpen.shortcuts.includes('Tab') &&
       afterShortcutOpen.shortcuts.includes('Shift+Tab') &&
       afterShortcutOpen.shortcuts.includes('H') &&
@@ -6767,6 +6769,30 @@ function getPPTTextParagraphAlignShortcutState(page, elementId) {
   })(${JSON.stringify(elementId)})`)
 }
 
+function getPPTTextParagraphBulletShortcutState(page, elementId) {
+  return page.eval(`((id) => {
+    const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+    const paragraph = element?.querySelector('.ppt-text-paragraph')
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
+      bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
+      inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
+      numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
+      numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
+      paragraphBullet: paragraph?.getAttribute('data-ppt-bullet') === 'true'
+        ? paragraph.textContent ?? ''
+        : '',
+      paragraphList: paragraph?.getAttribute('data-ppt-list') ?? '',
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      shortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-bullet-shortcut-intent') ?? '',
+      shortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-bullet-shortcut-keys') ?? '',
+      shortcutModel: stage?.getAttribute('data-ppt-text-paragraph-bullet-shortcut-model') ?? '',
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
 function getPPTTextFormatPainterState(page, elementId) {
   return page.eval(`((id) => {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
@@ -7356,6 +7382,54 @@ async function runTextQuickFormatScenario(page) {
       afterTextAlignJustifyShortcut,
       afterTextAlignLeftShortcut,
       afterTextAlignRightShortcut,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    modifiers: 10,
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(80)
+
+  const afterBulletShortcut =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  await pressKey(page, {
+    code: 'KeyL',
+    key: 'l',
+    modifiers: 10,
+    windowsVirtualKeyCode: 76,
+  })
+  await delay(80)
+
+  const afterBulletShortcutRestore =
+    await getPPTTextParagraphBulletShortcutState(page, 's1-title')
+
+  record(
+    'toggles PPT bullet list with canvas paragraph bullet keyboard shortcut',
+    afterBulletShortcut.selectedId === 's1-title' &&
+      afterBulletShortcut.shortcutModel === 'slide-edit-text-paragraph-bullet-keyboard-shortcuts' &&
+      afterBulletShortcut.shortcutIntent === 'slide-edit-text-paragraph-bullet-keyboard-intent' &&
+      afterBulletShortcut.shortcutKeys === 'Cmd/Ctrl+Shift+L' &&
+      afterBulletShortcut.bulletList === 'true' &&
+      afterBulletShortcut.numberedList === '' &&
+      afterBulletShortcut.paragraphList === 'bullet' &&
+      afterBulletShortcut.bulletPressed === 'true' &&
+      afterBulletShortcut.numberedPressed === 'false' &&
+      afterBulletShortcut.inspectorBulletPressed === 'true' &&
+      afterBulletShortcut.paragraphBullet.length > 0 &&
+      afterBulletShortcutRestore.selectedId === 's1-title' &&
+      afterBulletShortcutRestore.bulletList === '' &&
+      afterBulletShortcutRestore.numberedList === '' &&
+      afterBulletShortcutRestore.paragraphList === '' &&
+      afterBulletShortcutRestore.bulletPressed === 'false' &&
+      afterBulletShortcutRestore.numberedPressed === 'false' &&
+      afterBulletShortcutRestore.inspectorBulletPressed === 'false',
+    {
+      afterBulletShortcut,
+      afterBulletShortcutRestore,
     },
   )
 
