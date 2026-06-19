@@ -146,7 +146,7 @@ import {
   getSlideEditLayerPaneRenamePasteCommandEffect,
   getSlideEditLayerPaneResolvedFocusObjectId,
   getSlideEditLayoutJSONPasteCommandEffects,
-  getSlideEditLayoutJSONPasteValue,
+  getSlideEditLayoutJSONPasteValueFromText,
   getSlideEditInspectorSurface,
   getSlideEditObjectVisibilityCommandAvailability,
   getSlideEditObjectVisibilityCommandEffect,
@@ -220,7 +220,7 @@ import {
   getSlideEditTextFormattingKeyboardIntent,
   getSlideEditTextRunFormattingCommandEffect,
   getSlideEditTextRunFormattingJSONPasteValue,
-  getSlideEditTextFrameInsetJSONPasteValue,
+  getSlideEditTextFrameInsetJSONPasteValueFromText,
   getSlideEditTextFrameInsetCommandEffect,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextFrameInsetPasteCommands,
@@ -232,11 +232,11 @@ import {
   getSlideEditTextParagraphBulletJSONPasteValue,
   getSlideEditTextParagraphSpacingCommandEffect,
   getSlideEditTextParagraphSpacingCSSStyle,
-  getSlideEditTextParagraphSpacingJSONPasteValue,
+  getSlideEditTextParagraphSpacingJSONPasteValueFromText,
   getSlideEditTextParagraphSpacingPasteCommands,
   getSlideEditTextVerticalAlignmentCommandEffect,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
-  getSlideEditTextVerticalAlignmentJSONPasteValue,
+  getSlideEditTextVerticalAlignmentJSONPasteValueFromText,
   getSlideEditTextVerticalAlignmentPasteCommands,
   getSlideEditTransitionCSSStyle,
   getSlideEditTransitionUpdateCommandEffect,
@@ -19792,13 +19792,10 @@ function getPPTSlideLayoutSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditLayoutJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditLayoutJSONPasteValueFromText(
+        json,
+        { mode: 'any' },
+      )
 
       if (pasteValue === null) {
         continue
@@ -26882,13 +26879,12 @@ function getPPTTextVerticalAlignSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditTextVerticalAlignmentJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (pasteValue === null) {
         continue
@@ -27609,13 +27605,12 @@ function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditTextParagraphSpacingJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (pasteValue === null) {
         continue
@@ -27632,7 +27627,7 @@ function getPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTTextParagraphSpacingSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextParagraphSpacingJSONPasteValue>>,
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextParagraphSpacingJSONPasteValueFromText>>,
   jsonLength: number,
 ): PPTTextParagraphSpacingImportSource | null {
   const fields: PPTTextParagraphSpacingImportField[] = []
@@ -28671,13 +28666,12 @@ function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditTextFrameInsetJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditTextFrameInsetJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+        },
+      )
 
       if (pasteValue === null) {
         continue
@@ -28694,7 +28688,7 @@ function getPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTTextFrameInsetSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextFrameInsetJSONPasteValue>>,
+  pasteValue: NonNullable<ReturnType<typeof getSlideEditTextFrameInsetJSONPasteValueFromText>>,
   jsonLength: number,
 ): PPTTextFrameInsetImportSource | null {
   const fields: PPTTextFrameInsetImportField[] = []
