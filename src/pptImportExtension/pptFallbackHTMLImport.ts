@@ -7,6 +7,9 @@ import {
   getPPTCanvasDataTransferText,
 } from '../pptCanvasAppAffordanceAdapter'
 import {
+  getSlideEditTextParagraphListLevelJSONPasteValueFromValue,
+} from '../pptSlideEditAffordanceAdapter'
+import {
   createPPTTextBody,
   PPT_SLIDE_HEIGHT,
   PPT_SLIDE_WIDTH,
@@ -1195,13 +1198,8 @@ function parsePPTFallbackHTMLListLevel(value: string | null) {
     return undefined
   }
 
-  const level = Number(value)
-
-  if (!Number.isFinite(level)) {
-    return undefined
-  }
-
-  return Math.round(Math.min(5, Math.max(0, level)))
+  return getSlideEditTextParagraphListLevelJSONPasteValueFromValue(value) ??
+    undefined
 }
 
 function getPPTFallbackHTMLRuns(root: HTMLElement): PPTRun[] {

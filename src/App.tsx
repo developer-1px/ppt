@@ -318,6 +318,18 @@ import {
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
   SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT,
   SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
+  createSlideEditTextParagraphListLevelDescriptor,
+  getSlideEditTextParagraphListLevelIndentCSSValue,
+  getSlideEditTextParagraphListLevelIndentEm,
+  getSlideEditTextParagraphListLevelJSONPasteValueFromValue,
+  getSlideEditTextParagraphListLevelModelValue,
+  normalizeSlideEditTextParagraphListLevel,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_JSON_MIME_TYPE,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_INTENT,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_KEYS as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_KEYS,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_MODEL as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_MODEL,
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
@@ -451,6 +463,7 @@ import {
   type SlideEditTextFrameInsetHostCommandEffect,
   type SlideEditTextParagraphAlignHostCommandEffect,
   type SlideEditTextParagraphBulletHostCommandEffect,
+  type SlideEditTextParagraphListLevelDescriptor,
   type SlideEditTextBodyJSONPasteValue,
   type SlideEditTextParagraphSpacingPasteFieldValue,
   type SlideEditTextRunFormattingBooleanFieldId,
@@ -4006,9 +4019,10 @@ const PPT_TEXT_RUN_HIGHLIGHT_DEFAULT = '#fde047'
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
-const PPT_PARAGRAPH_LIST_LEVEL_MIN = 0
-const PPT_PARAGRAPH_LIST_LEVEL_MAX = 5
-const PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM = 1.35
+const PPT_PARAGRAPH_LIST_LEVEL_MIN =
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.min
+const PPT_PARAGRAPH_LIST_LEVEL_MAX =
+  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.max
 const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
 const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
 const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
@@ -16138,6 +16152,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-paragraph-numbered-shortcut-intent={PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT}
         data-ppt-text-paragraph-numbered-shortcut-keys={SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT}
         data-ppt-text-paragraph-numbered-shortcut-model={PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL}
+        data-ppt-text-paragraph-list-level-json-mime-type={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_JSON_MIME_TYPE}
+        data-ppt-text-paragraph-list-level-shortcut-intent={PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_INTENT}
+        data-ppt-text-paragraph-list-level-shortcut-keys={PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_KEYS}
+        data-ppt-text-paragraph-list-level-shortcut-model={PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_MODEL}
         data-ppt-text-edit-start-initial-text={lastTextEditStartEffect?.initialText}
         data-ppt-text-edit-start-intent={lastTextEditStartEffect?.keyboardIntent}
         data-ppt-text-edit-start-keys={PPT_KEYBOARD_TEXT_EDIT_START_KEYS}
@@ -17992,6 +18010,19 @@ function getPPTTextParagraphSpacingDescriptor(
   })
 }
 
+function getPPTTextParagraphListLevelDescriptor(
+  slideId: string,
+  element: PPTTextElement,
+): SlideEditTextParagraphListLevelDescriptor<string, string> {
+  return createSlideEditTextParagraphListLevelDescriptor({
+    level: getPPTParagraphListLevel(
+      element.textBody.paragraphs[0] ?? { runs: [] },
+    ),
+    objectId: element.id,
+    slideId,
+  })
+}
+
 function getPPTTextParagraphSpacingField(
   descriptor: SlideEditTextParagraphSpacingDescriptor<string, string> | null,
   fieldId: SlideEditTextParagraphSpacingFieldId,
@@ -18073,15 +18104,7 @@ function parsePPTParagraphSpacing(value: string) {
 }
 
 function normalizePPTParagraphListLevel(value: number | null | undefined) {
-  const finiteValue = Number.isFinite(value)
-    ? Number(value)
-    : PPT_PARAGRAPH_LIST_LEVEL_MIN
-
-  return Math.round(clampPPTCanvasValue(
-    finiteValue,
-    PPT_PARAGRAPH_LIST_LEVEL_MIN,
-    PPT_PARAGRAPH_LIST_LEVEL_MAX,
-  ))
+  return normalizeSlideEditTextParagraphListLevel(value)
 }
 
 function getPPTParagraphListLevel(paragraph: PPTParagraph) {
@@ -18089,9 +18112,7 @@ function getPPTParagraphListLevel(paragraph: PPTParagraph) {
 }
 
 function getPPTParagraphListLevelModelValue(value: number) {
-  const level = normalizePPTParagraphListLevel(value)
-
-  return level === PPT_PARAGRAPH_LIST_LEVEL_MIN ? undefined : level
+  return getSlideEditTextParagraphListLevelModelValue(value)
 }
 
 function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
@@ -18123,9 +18144,8 @@ function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
         value: getPPTParagraphSpacingBefore(paragraph),
       },
     }),
-    '--ppt-paragraph-list-level-indent': `${
-      Math.round(listLevel * PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM * 100) / 100
-    }em`,
+    '--ppt-paragraph-list-level-indent':
+      getSlideEditTextParagraphListLevelIndentCSSValue(listLevel),
     textAlign: paragraph.align,
   }
 }
@@ -30316,11 +30336,8 @@ function getPPTTextStyleParagraphBulletFromJSONValue(
 }
 
 function getPPTTextStyleParagraphListLevelFromJSONValue(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return undefined
-  }
-
-  return normalizePPTParagraphListLevel(value)
+  return getSlideEditTextParagraphListLevelJSONPasteValueFromValue(value) ??
+    undefined
 }
 
 function getPPTTextStyleParagraphLineHeightFromJSONValue(value: unknown) {
@@ -33490,8 +33507,9 @@ function createPPTParagraphClipboardStyleAttribute(paragraph: PPTParagraph) {
     ['line-height', paragraph.lineHeight === undefined ? undefined : String(paragraph.lineHeight)],
     ['margin-left', getPPTParagraphListLevel(paragraph) > 0
       ? `${Math.round(
-        getPPTParagraphListLevel(paragraph) *
-          PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM * 16,
+        getSlideEditTextParagraphListLevelIndentEm(
+          getPPTParagraphListLevel(paragraph),
+        ) * 16,
       )}px`
       : undefined],
     ['margin-bottom', paragraph.spacingAfter === undefined ? undefined : `${paragraph.spacingAfter}px`],
@@ -35082,7 +35100,13 @@ function PPTTextQuickFormatControls({
         aria-label="Decrease list level"
         className="ppt-floating-command"
         data-ppt-text-quick="list-level-down"
+        data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.decrease}
+        data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
         data-ppt-text-quick-list-level={state.listLevel}
+        data-ppt-text-quick-list-level-max={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.max}
+        data-ppt-text-quick-list-level-min={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.min}
+        data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
+        data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
         disabled={!state.canDecreaseListLevel}
         title="Decrease list level"
         type="button"
@@ -35098,7 +35122,13 @@ function PPTTextQuickFormatControls({
         aria-label="Increase list level"
         className="ppt-floating-command"
         data-ppt-text-quick="list-level-up"
+        data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.increase}
+        data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
         data-ppt-text-quick-list-level={state.listLevel}
+        data-ppt-text-quick-list-level-max={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.max}
+        data-ppt-text-quick-list-level-min={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.min}
+        data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
+        data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
         disabled={!state.canIncreaseListLevel}
         title="Increase list level"
         type="button"
@@ -36883,6 +36913,9 @@ function Inspector({
   const paragraphSpacingDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextParagraphSpacingDescriptor(slide.id, selectedElement)
     : null
+  const paragraphListLevelDescriptor = selectedElement && isPPTTextElement(selectedElement)
+    ? getPPTTextParagraphListLevelDescriptor(slide.id, selectedElement)
+    : null
   const paragraphLineHeightField = getPPTTextParagraphSpacingField(
     paragraphSpacingDescriptor,
     'lineHeightRatio',
@@ -38334,8 +38367,17 @@ function Inspector({
                     <button
                       aria-label="Decrease list level"
                       className="ppt-paragraph-bullet-button"
+                      data-ppt-paragraph-list-level-command={paragraphListLevelDescriptor?.field.commandIds.decrease}
+                      data-ppt-paragraph-list-level-control={paragraphListLevelDescriptor?.field.control}
                       data-ppt-paragraph-list-level-down
                       data-ppt-paragraph-list-level={paragraphListLevel}
+                      data-ppt-paragraph-list-level-can-decrease={paragraphListLevelDescriptor?.canDecrease ? 'true' : 'false'}
+                      data-ppt-paragraph-list-level-can-increase={paragraphListLevelDescriptor?.canIncrease ? 'true' : 'false'}
+                      data-ppt-paragraph-list-level-indent={paragraphListLevelDescriptor?.indent.cssValue}
+                      data-ppt-paragraph-list-level-max={paragraphListLevelDescriptor?.field.max}
+                      data-ppt-paragraph-list-level-min={paragraphListLevelDescriptor?.field.min}
+                      data-ppt-paragraph-list-level-step={paragraphListLevelDescriptor?.field.step}
+                      data-ppt-paragraph-list-level-surface={paragraphListLevelDescriptor?.surface}
                       disabled={paragraphListLevel <= PPT_PARAGRAPH_LIST_LEVEL_MIN}
                       title="Decrease list level"
                       type="button"
@@ -38346,8 +38388,17 @@ function Inspector({
                     <button
                       aria-label="Increase list level"
                       className="ppt-paragraph-bullet-button"
+                      data-ppt-paragraph-list-level-command={paragraphListLevelDescriptor?.field.commandIds.increase}
+                      data-ppt-paragraph-list-level-control={paragraphListLevelDescriptor?.field.control}
                       data-ppt-paragraph-list-level-up
                       data-ppt-paragraph-list-level={paragraphListLevel}
+                      data-ppt-paragraph-list-level-can-decrease={paragraphListLevelDescriptor?.canDecrease ? 'true' : 'false'}
+                      data-ppt-paragraph-list-level-can-increase={paragraphListLevelDescriptor?.canIncrease ? 'true' : 'false'}
+                      data-ppt-paragraph-list-level-indent={paragraphListLevelDescriptor?.indent.cssValue}
+                      data-ppt-paragraph-list-level-max={paragraphListLevelDescriptor?.field.max}
+                      data-ppt-paragraph-list-level-min={paragraphListLevelDescriptor?.field.min}
+                      data-ppt-paragraph-list-level-step={paragraphListLevelDescriptor?.field.step}
+                      data-ppt-paragraph-list-level-surface={paragraphListLevelDescriptor?.surface}
                       disabled={paragraphListLevel >= PPT_PARAGRAPH_LIST_LEVEL_MAX}
                       title="Increase list level"
                       type="button"

@@ -6799,6 +6799,10 @@ function getPPTTextParagraphBulletShortcutState(page, elementId) {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const paragraph = element?.querySelector('.ppt-text-paragraph')
     const stage = document.querySelector('.ppt-stage-shell')
+    const inspectorListLevelUp = document.querySelector('[data-ppt-paragraph-list-level-up]')
+    const inspectorListLevelDown = document.querySelector('[data-ppt-paragraph-list-level-down]')
+    const quickListLevelUp = document.querySelector('[data-ppt-text-quick="list-level-up"]')
+    const quickListLevelDown = document.querySelector('[data-ppt-text-quick="list-level-down"]')
 
     return {
       bulletList: element?.getAttribute('data-ppt-bullet-list') ?? '',
@@ -6806,10 +6810,24 @@ function getPPTTextParagraphBulletShortcutState(page, elementId) {
       exportHasListLevelHTML: exportCode.includes('data-ppt-list-level="2"'),
       exportHasListLevelModel: exportCode.includes('"level": 2'),
       inspectorBulletPressed: document.querySelector('[data-ppt-paragraph-bullet]')?.getAttribute('aria-pressed') ?? '',
-      inspectorListLevel: document.querySelector('[data-ppt-paragraph-list-level-up]')?.getAttribute('data-ppt-paragraph-list-level') ?? '',
-      inspectorListLevelDownDisabled: document.querySelector('[data-ppt-paragraph-list-level-down]')?.hasAttribute('disabled') === true ? 'true' : 'false',
-      inspectorListLevelUpDisabled: document.querySelector('[data-ppt-paragraph-list-level-up]')?.hasAttribute('disabled') === true ? 'true' : 'false',
+      inspectorListLevel: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level') ?? '',
+      inspectorListLevelCanDecrease: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-can-decrease') ?? '',
+      inspectorListLevelCanIncrease: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-can-increase') ?? '',
+      inspectorListLevelCommand: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-command') ?? '',
+      inspectorListLevelControl: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-control') ?? '',
+      inspectorListLevelDownCommand: inspectorListLevelDown?.getAttribute('data-ppt-paragraph-list-level-command') ?? '',
+      inspectorListLevelDownDisabled: inspectorListLevelDown?.hasAttribute('disabled') === true ? 'true' : 'false',
+      inspectorListLevelIndent: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-indent') ?? '',
+      inspectorListLevelMax: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-max') ?? '',
+      inspectorListLevelMin: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-min') ?? '',
+      inspectorListLevelStep: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-step') ?? '',
+      inspectorListLevelSurface: inspectorListLevelUp?.getAttribute('data-ppt-paragraph-list-level-surface') ?? '',
+      inspectorListLevelUpDisabled: inspectorListLevelUp?.hasAttribute('disabled') === true ? 'true' : 'false',
       inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
+      listLevelJsonMimeType: stage?.getAttribute('data-ppt-text-paragraph-list-level-json-mime-type') ?? '',
+      listLevelShortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-list-level-shortcut-intent') ?? '',
+      listLevelShortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-list-level-shortcut-keys') ?? '',
+      listLevelShortcutModel: stage?.getAttribute('data-ppt-text-paragraph-list-level-shortcut-model') ?? '',
       numberedList: element?.getAttribute('data-ppt-numbered-list') ?? '',
       numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
       paragraphBullet: paragraph?.getAttribute('data-ppt-bullet') === 'true'
@@ -6821,10 +6839,17 @@ function getPPTTextParagraphBulletShortcutState(page, elementId) {
       paragraphNumbered: paragraph?.getAttribute('data-ppt-numbered') === 'true'
         ? paragraph.textContent ?? ''
         : '',
-      quickListLevelDownDisabled: document.querySelector('[data-ppt-text-quick="list-level-down"]')?.hasAttribute('disabled') === true ? 'true' : 'false',
-      quickListLevelDownState: document.querySelector('[data-ppt-text-quick="list-level-down"]')?.getAttribute('data-ppt-text-quick-list-level') ?? '',
-      quickListLevelUpDisabled: document.querySelector('[data-ppt-text-quick="list-level-up"]')?.hasAttribute('disabled') === true ? 'true' : 'false',
-      quickListLevelUpState: document.querySelector('[data-ppt-text-quick="list-level-up"]')?.getAttribute('data-ppt-text-quick-list-level') ?? '',
+      quickListLevelDownCommand: quickListLevelDown?.getAttribute('data-ppt-text-quick-list-level-command') ?? '',
+      quickListLevelDownDisabled: quickListLevelDown?.hasAttribute('disabled') === true ? 'true' : 'false',
+      quickListLevelDownState: quickListLevelDown?.getAttribute('data-ppt-text-quick-list-level') ?? '',
+      quickListLevelSurface: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-surface') ?? '',
+      quickListLevelUpCommand: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-command') ?? '',
+      quickListLevelUpControl: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-control') ?? '',
+      quickListLevelUpDisabled: quickListLevelUp?.hasAttribute('disabled') === true ? 'true' : 'false',
+      quickListLevelUpMax: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-max') ?? '',
+      quickListLevelUpMin: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-min') ?? '',
+      quickListLevelUpState: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level') ?? '',
+      quickListLevelUpStep: quickListLevelUp?.getAttribute('data-ppt-text-quick-list-level-step') ?? '',
       numberedShortcutIntent: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-intent') ?? '',
       numberedShortcutKeys: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-keys') ?? '',
       numberedShortcutModel: stage?.getAttribute('data-ppt-text-paragraph-numbered-shortcut-model') ?? '',
@@ -7612,15 +7637,37 @@ async function runTextQuickFormatScenario(page) {
   record(
     'changes PPT paragraph list level from inspector and quick controls',
     beforeListLevel.paragraphListLevel === '0' &&
+      beforeListLevel.inspectorListLevelSurface === 'text-paragraph-list-level' &&
+      beforeListLevel.inspectorListLevelCommand === 'increase-text-paragraph-list-level' &&
+      beforeListLevel.inspectorListLevelDownCommand === 'decrease-text-paragraph-list-level' &&
+      beforeListLevel.inspectorListLevelControl === 'paragraph-list-level-stepper' &&
+      beforeListLevel.inspectorListLevelMin === '0' &&
+      beforeListLevel.inspectorListLevelMax === '5' &&
+      beforeListLevel.inspectorListLevelStep === '1' &&
+      beforeListLevel.listLevelJsonMimeType === 'application/vnd.interactive-os.slide-edit.text-paragraph-list-level+json' &&
+      beforeListLevel.listLevelShortcutModel === 'slide-edit-text-paragraph-list-level-keyboard-shortcuts' &&
+      beforeListLevel.listLevelShortcutIntent === 'slide-edit-text-paragraph-list-level-keyboard-intent' &&
+      beforeListLevel.listLevelShortcutKeys === 'Tab Shift+Tab' &&
+      beforeListLevel.quickListLevelSurface === 'text-paragraph-list-level' &&
+      beforeListLevel.quickListLevelUpCommand === 'increase-text-paragraph-list-level' &&
+      beforeListLevel.quickListLevelDownCommand === 'decrease-text-paragraph-list-level' &&
+      beforeListLevel.quickListLevelUpControl === 'paragraph-list-level-stepper' &&
+      beforeListLevel.quickListLevelUpMin === '0' &&
+      beforeListLevel.quickListLevelUpMax === '5' &&
+      beforeListLevel.quickListLevelUpStep === '1' &&
       beforeListLevel.inspectorListLevelDownDisabled === 'true' &&
       beforeListLevel.quickListLevelDownDisabled === 'true' &&
       afterInspectorListLevelUp.paragraphListLevel === '1' &&
       afterInspectorListLevelUp.inspectorListLevel === '1' &&
       afterInspectorListLevelUp.paragraphListIndent === '1.35em' &&
+      afterInspectorListLevelUp.inspectorListLevelIndent === '1.35em' &&
+      afterInspectorListLevelUp.inspectorListLevelCanDecrease === 'true' &&
+      afterInspectorListLevelUp.inspectorListLevelCanIncrease === 'true' &&
       afterInspectorListLevelUp.quickListLevelUpState === '1' &&
       afterQuickListLevelUp.paragraphListLevel === '2' &&
       afterQuickListLevelUp.inspectorListLevel === '2' &&
       afterQuickListLevelUp.paragraphListIndent === '2.7em' &&
+      afterQuickListLevelUp.inspectorListLevelIndent === '2.7em' &&
       afterQuickListLevelUp.exportHasListLevelHTML &&
       afterQuickListLevelUp.exportHasListLevelModel &&
       afterQuickListLevelUp.quickListLevelDownDisabled === 'false' &&

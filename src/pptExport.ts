@@ -3,6 +3,9 @@ import {
   getSlideEditObjectShadowFilter,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleDashArray,
+  getSlideEditTextParagraphListLevelIndentCSSValue,
+  getSlideEditTextParagraphListLevelIndentEm,
+  normalizeSlideEditTextParagraphListLevel,
   getSlideEditTextFrameInsetPaddingCSS,
   getSlideEditTextVerticalAlignmentFlexAlignItems,
   normalizeSlideEditObjectCornerRadius,
@@ -55,9 +58,6 @@ const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
-const PPT_PARAGRAPH_LIST_LEVEL_MIN = 0
-const PPT_PARAGRAPH_LIST_LEVEL_MAX = 5
-const PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM = 1.35
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', value: 'Inter' },
@@ -509,7 +509,7 @@ function renderPPTTextBodySVG({
       align: paragraph.align,
       geometry,
       inset,
-    }) + fontSize * listLevel * PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM
+    }) + fontSize * getSlideEditTextParagraphListLevelIndentEm(listLevel)
     y += spacingBefore + fontSize
     if (numbered) {
       numberedIndex += 1
@@ -1516,14 +1516,15 @@ function getPPTParagraphHTMLAttrs(paragraph: PPTParagraph) {
 }
 
 function getPPTParagraphStyleAttr(paragraph: PPTParagraph) {
-  const listLevelIndent = getPPTParagraphListLevel(paragraph) *
-    PPT_PARAGRAPH_LIST_LEVEL_INDENT_EM
-
   return ` style="${[
     `line-height:${formatNumber(getPPTParagraphLineHeight(paragraph))}`,
     `margin-bottom:${formatNumber(getPPTParagraphSpacingAfter(paragraph))}px`,
     `margin-top:${formatNumber(getPPTParagraphSpacingBefore(paragraph))}px`,
-    `--ppt-paragraph-list-level-indent:${formatNumber(listLevelIndent)}em`,
+    `--ppt-paragraph-list-level-indent:${
+      getSlideEditTextParagraphListLevelIndentCSSValue(
+        getPPTParagraphListLevel(paragraph),
+      )
+    }`,
   ].join(';')}"`
 }
 
@@ -1546,15 +1547,7 @@ function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
 }
 
 function normalizePPTParagraphListLevel(value: number | null | undefined) {
-  const next = Math.round(Math.min(
-    PPT_PARAGRAPH_LIST_LEVEL_MAX,
-    Math.max(
-      PPT_PARAGRAPH_LIST_LEVEL_MIN,
-      Number.isFinite(value) ? Number(value) : PPT_PARAGRAPH_LIST_LEVEL_MIN,
-    ),
-  ))
-
-  return next
+  return normalizeSlideEditTextParagraphListLevel(value)
 }
 
 function normalizePPTParagraphLineHeight(value: number) {

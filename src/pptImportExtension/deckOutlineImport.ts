@@ -12,6 +12,7 @@ import {
 import {
   getSlideEditMarkdownDeckSource,
   getSlideEditMarkdownDeckSourceFromDataTransfer,
+  getSlideEditTextParagraphListLevelModelValue,
   type SlideEditMarkdownDeckSource,
   type SlideEditMarkdownSlideBlock,
   type SlideEditMarkdownSlideSource,
@@ -45,7 +46,6 @@ type PPTMarkdownOutlineHeading = {
 const PPT_MARKDOWN_OUTLINE_TITLE_MAX_LENGTH = 80
 const PPT_MARKDOWN_OUTLINE_BODY_MAX_PARAGRAPHS = 8
 const PPT_MARKDOWN_OUTLINE_BODY_MAX_LENGTH = 140
-const PPT_MARKDOWN_OUTLINE_LIST_LEVEL_MAX = 5
 
 export function getPPTDeckMarkdownOutlineSourceFromDataTransfer(
   dataTransfer: DataTransfer | null,
@@ -265,12 +265,9 @@ function createPPTMarkdownOutlineParagraphsFromSlideEditBlocks(
 }
 
 function getPPTMarkdownOutlineListLevelModel(level: number | undefined) {
-  const normalized = Math.round(Math.min(
-    PPT_MARKDOWN_OUTLINE_LIST_LEVEL_MAX,
-    Math.max(0, Number.isFinite(level) ? Number(level) : 0),
-  ))
+  const normalized = getSlideEditTextParagraphListLevelModelValue(level)
 
-  return normalized > 0 ? { level: normalized } : {}
+  return normalized === undefined ? {} : { level: normalized }
 }
 
 function readPPTMarkdownOutlineTextFromSlideEditBlocks(
