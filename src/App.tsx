@@ -597,6 +597,9 @@ import {
   PPT_KEYBOARD_NUDGE_LARGE_STEP,
   PPT_KEYBOARD_NUDGE_MODEL,
   PPT_KEYBOARD_NUDGE_STEP,
+  PPT_KEYBOARD_SELECTION_CYCLE_INTENT_MODEL,
+  PPT_KEYBOARD_SELECTION_CYCLE_KEYS,
+  PPT_KEYBOARD_SELECTION_CYCLE_MODEL,
   PPT_KEYBOARD_TOOL_DISPATCH_MODEL,
   PPT_KEYBOARD_VIEWPORT_INTENT_MODEL,
   PPT_KEYBOARD_VIEWPORT_MODEL,
@@ -650,6 +653,7 @@ import {
   getPPTCanvasInlineEditKeyboardIntent,
   getPPTCanvasKeyboardBuiltinCommandShortcutIntent,
   getPPTCanvasKeyboardNudgeShortcutIntent,
+  getPPTCanvasKeyboardSelectionCycleIntent,
   getPPTCanvasKeyboardSystemShortcutIntent,
   getPPTCanvasKeyboardToolShortcutIntent,
   getPPTCanvasKeyboardViewportShortcutIntent,
@@ -732,6 +736,8 @@ import {
   type PPTCanvasFloatingAnchor,
   type PPTCanvasImagePasteReplaceRoute,
   type PPTCanvasImagePasteReplaceTarget,
+  type PPTCanvasKeyboardSelectionCycleDirection,
+  type PPTCanvasKeyboardSelectionCycleIntent,
   type PPTCanvasKeyboardToolIntent,
   type PPTCanvasMediaObjectHyperlinkRoute,
   type PPTCanvasMediaObjectHyperlinkTarget,
@@ -3578,12 +3584,11 @@ type PPTShapeQuickMenuState = {
   elementId: string
   shape: PPTShapeKind
 }
-type PPTSelectionCycleDirection = 'next' | 'previous'
 type PPTSelectionCycleEffect = {
-  direction: PPTSelectionCycleDirection
+  direction: PPTCanvasKeyboardSelectionCycleDirection
   fromObjectId: string
-  keyboardIntent: typeof PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL
-  keyboardModel: typeof PPT_SELECTION_CYCLE_KEYBOARD_MODEL
+  keyboardIntent: typeof PPT_KEYBOARD_SELECTION_CYCLE_INTENT_MODEL
+  keyboardModel: typeof PPT_KEYBOARD_SELECTION_CYCLE_MODEL
   objectIds: readonly string[]
   targetObjectId: string
 }
@@ -3591,12 +3596,6 @@ type PPTInlineEditInitialText = {
   elementId: string
   text: string
 }
-
-const PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL =
-  'ppt-selection-cycle-keyboard-intent'
-const PPT_SELECTION_CYCLE_KEYBOARD_MODEL =
-  'ppt-selection-cycle-keyboard-shortcuts'
-const PPT_SELECTION_CYCLE_KEYBOARD_KEYS = 'Tab Shift+Tab'
 
 const PPT_SLIDE_CONTEXT_MENU_GROUPS: readonly PPTSlideContextCommandGroup[] = [{
   commands: [{
@@ -5136,21 +5135,21 @@ function App() {
         return
       }
 
-      if (
-        event.key === 'Tab' &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !editingId &&
-        isPPTCanvasTargetWithinSelector({
-          selectors: '.ppt-stage-shell, [data-ppt-element]',
-          target: event.target,
+      if (!editingId) {
+        const selectionCycleIntent = getPPTCanvasKeyboardSelectionCycleIntent({
+          event,
+          selectableIds: getSelectablePPTObjectIds(activeSlide),
+          selection,
+          targetSelectors: '.ppt-stage-shell, [data-ppt-element]',
         })
-      ) {
-        if (cycleObjectSelection(event.shiftKey ? 'previous' : 'next')) {
-          event.preventDefault()
+
+        if (selectionCycleIntent.kind === 'cycle-selection') {
+          if (selectionCycleIntent.preventDefault) {
+            event.preventDefault()
+          }
+          cycleObjectSelection(selectionCycleIntent)
+          return
         }
-        return
       }
 
       const toolShortcutIntent = getPPTToolShortcutIntent(event)
@@ -11059,31 +11058,40 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     return true
   }
 
-  function cycleObjectSelection(direction: PPTSelectionCycleDirection) {
-    const selectableObjectIds = activeSlide.elements
+  function getSelectablePPTObjectIds(slide: PPTSlide) {
+    return slide.elements
       .filter((element) => element.visible !== false && element.locked !== true)
       .map((element) => element.id)
+  }
 
-    if (selectableObjectIds.length === 0) {
-      return false
+  function cycleObjectSelectionFromCommand(
+    direction: PPTCanvasKeyboardSelectionCycleDirection,
+  ) {
+    const intent = getPPTCanvasKeyboardSelectionCycleIntent({
+      event: {
+        altKey: false,
+        ctrlKey: false,
+        key: 'Tab',
+        metaKey: false,
+        shiftKey: direction === 'previous',
+        target: null,
+      },
+      selectableIds: getSelectablePPTObjectIds(activeSlide),
+      selection,
+    })
+
+    if (intent.kind === 'cycle-selection') {
+      cycleObjectSelection(intent)
     }
+  }
 
-    const fromObjectId = [...selection]
-      .reverse()
-      .find((objectId) => selectableObjectIds.includes(objectId)) ?? ''
-    const currentIndex = fromObjectId
-      ? selectableObjectIds.indexOf(fromObjectId)
-      : -1
-    const targetIndex = fromObjectId
-      ? direction === 'next'
-        ? (currentIndex + 1) % selectableObjectIds.length
-        : (currentIndex - 1 + selectableObjectIds.length) % selectableObjectIds.length
-      : direction === 'next'
-        ? 0
-        : selectableObjectIds.length - 1
-    const targetObjectId = selectableObjectIds[targetIndex]
-
-    setSelection([targetObjectId])
+  function cycleObjectSelection(
+    intent: Extract<
+      PPTCanvasKeyboardSelectionCycleIntent,
+      { kind: 'cycle-selection' }
+    >,
+  ) {
+    setSelection([intent.targetId])
     setEditingId(null)
     setInlineEditInitialText(null)
     setInteraction(null)
@@ -11095,15 +11103,13 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     setContextMenu(null)
     setSlideContextMenu(null)
     setLastSelectionCycleEffect({
-      direction,
-      fromObjectId,
-      keyboardIntent: PPT_SELECTION_CYCLE_KEYBOARD_INTENT_MODEL,
-      keyboardModel: PPT_SELECTION_CYCLE_KEYBOARD_MODEL,
-      objectIds: selectableObjectIds,
-      targetObjectId,
+      direction: intent.direction,
+      fromObjectId: intent.fromId ?? '',
+      keyboardIntent: PPT_KEYBOARD_SELECTION_CYCLE_INTENT_MODEL,
+      keyboardModel: PPT_KEYBOARD_SELECTION_CYCLE_MODEL,
+      objectIds: intent.selectableIds,
+      targetObjectId: intent.targetId,
     })
-
-    return true
   }
 
   function selectSameTypeElements() {
@@ -14467,7 +14473,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     disabled: activeSlide.elements.every((element) =>
       element.locked === true || element.visible === false),
     id: 'selection:cycle-next',
-    onSelect: () => cycleObjectSelection('next'),
+    onSelect: () => cycleObjectSelectionFromCommand('next'),
     section: 'Edit',
     shortcut: 'Tab',
     title: 'Select next object',
@@ -14475,7 +14481,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     disabled: activeSlide.elements.every((element) =>
       element.locked === true || element.visible === false),
     id: 'selection:cycle-previous',
-    onSelect: () => cycleObjectSelection('previous'),
+    onSelect: () => cycleObjectSelectionFromCommand('previous'),
     section: 'Edit',
     shortcut: 'Shift+Tab',
     title: 'Select previous object',
@@ -16091,9 +16097,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-selection-cycle-direction={lastSelectionCycleEffect?.direction}
         data-ppt-selection-cycle-from={lastSelectionCycleEffect?.fromObjectId}
         data-ppt-selection-cycle-intent={lastSelectionCycleEffect?.keyboardIntent}
-        data-ppt-selection-cycle-keys={PPT_SELECTION_CYCLE_KEYBOARD_KEYS}
+        data-ppt-selection-cycle-keys={PPT_KEYBOARD_SELECTION_CYCLE_KEYS}
         data-ppt-selection-cycle-model={lastSelectionCycleEffect?.keyboardModel ??
-          PPT_SELECTION_CYCLE_KEYBOARD_MODEL}
+          PPT_KEYBOARD_SELECTION_CYCLE_MODEL}
         data-ppt-selection-cycle-order={lastSelectionCycleEffect?.objectIds.join(' ')}
         data-ppt-selection-cycle-target={lastSelectionCycleEffect?.targetObjectId}
         data-ppt-arrow-tool-model={PPT_TOOL_AFFORDANCES.arrow.model}

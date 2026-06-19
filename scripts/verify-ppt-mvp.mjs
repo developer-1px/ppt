@@ -2725,14 +2725,14 @@ async function runAffordanceScenario(page) {
   })()`)
 
   record(
-    'cycles PPT object selection with Tab and Shift Tab',
+    'cycles PPT object selection with canvas Tab and Shift Tab intent',
     afterTabCycle.cycleDirection === 'next' &&
       afterTabCycle.cycleFrom === 's1-card-1' &&
       afterTabCycle.cycleTarget === 's1-card-2' &&
       afterTabCycle.selectedId === 's1-card-2' &&
       afterTabCycle.selectedCount === 1 &&
-      afterTabCycle.cycleIntent === 'ppt-selection-cycle-keyboard-intent' &&
-      afterTabCycle.cycleModel === 'ppt-selection-cycle-keyboard-shortcuts' &&
+      afterTabCycle.cycleIntent === 'canvas-keyboard-selection-cycle-intent' &&
+      afterTabCycle.cycleModel === 'canvas-keyboard-selection-cycle' &&
       afterTabCycle.cycleKeys === 'Tab Shift+Tab' &&
       afterTabCycle.cycleOrder.includes('s1-card-1') &&
       afterTabCycle.cycleOrder.includes('s1-card-2') &&
