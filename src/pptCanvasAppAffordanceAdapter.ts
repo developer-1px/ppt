@@ -68,6 +68,7 @@ import {
   cutCanvasClipboardSelection,
   duplicateCanvasClipboardSelection,
   createCanvasTextPasteItems,
+  downloadCanvasBlobFile,
   downloadCanvasTextFile,
   fitCanvasViewportToBounds,
   focusCanvasElement,
@@ -432,6 +433,7 @@ export const cutPPTCanvasClipboardSelection =
   cutCanvasClipboardSelection
 export const duplicatePPTCanvasClipboardSelection =
   duplicateCanvasClipboardSelection
+export const downloadPPTCanvasBlobFile = downloadCanvasBlobFile
 export const downloadPPTCanvasTextFile = downloadCanvasTextFile
 export const executePPTCanvasClipboardCommand =
   executeCanvasClipboardCommand

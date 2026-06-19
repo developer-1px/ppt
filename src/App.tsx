@@ -691,6 +691,7 @@ import {
   createPPTCanvasTabsDescriptor,
   cutPPTCanvasClipboardSelection,
   duplicatePPTCanvasClipboardSelection,
+  downloadPPTCanvasBlobFile,
   downloadPPTCanvasTextFile,
   executePPTCanvasClipboardCommand,
   executePPTCanvasStandardCommand,
@@ -850,6 +851,10 @@ import {
   exportPPTSelectionSVG,
   exportPPTSlideSVG,
 } from './pptExport'
+import {
+  exportPPTDeckPPTXBlob,
+  getPPTDeckPPTXFilename,
+} from './pptPptxExport'
 import {
   PPT_DEFAULT_TABLE_ROWS,
   PPT_DECK_MARKDOWN_OUTLINE_IMPORT_FORMAT,
@@ -12706,6 +12711,16 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     })
   }
 
+  async function downloadPPTX() {
+    const blob = await exportPPTDeckPPTXBlob(deck)
+
+    downloadPPTCanvasBlobFile({
+      blob,
+      filename: getPPTDeckPPTXFilename(deck),
+      revokeDelayMs: 5000,
+    })
+  }
+
   function downloadSlideSVG() {
     downloadTextFile({
       content: slideSvgCode,
@@ -14856,6 +14871,13 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     section: 'Export',
     title: 'Copy selection SVG',
   }, {
+    id: 'export:download-pptx',
+    onSelect: () => {
+      void downloadPPTX()
+    },
+    section: 'Export',
+    title: 'Download PPTX',
+  }, {
     id: 'export:download-slide-svg',
     onSelect: downloadSlideSVG,
     section: 'Export',
@@ -15431,6 +15453,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
             <Download size={16} /> HTML
+          </button>
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download PPTX" className="ppt-button" data-ppt-export-pptx onClick={() => { void downloadPPTX() }} type="button">
+            <Download size={16} /> PPTX
           </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy slide SVG" className="ppt-button" data-ppt-copy-slide-svg onClick={copySlideSVG} type="button">
             <Copy size={16} /> SVG

@@ -10763,6 +10763,45 @@ async function runExportScenario(page) {
     htmlClipboardState,
   )
 
+  await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
+  await delay(700)
+
+  const pptxDownloadState = await page.eval(`(() => {
+    const download = (window.__pptDownloads ?? [])
+      .find((entry) => entry.download === 'ai-retouch-demo.pptx') ?? {}
+    const text = download.text ?? ''
+
+    return {
+      byteLength: download.byteLength ?? 0,
+      download: download.download ?? '',
+      hasContentTypes: text.includes('[Content_Types].xml'),
+      hasPresentationXml: text.includes('ppt/presentation.xml'),
+      hasSlide1Xml: text.includes('ppt/slides/slide1.xml'),
+      hasSlide2Xml: text.includes('ppt/slides/slide2.xml'),
+      signature: download.signature ?? '',
+      size: download.size ?? 0,
+      type: download.type ?? '',
+    }
+  })()`)
+
+  record(
+    'downloads editable PPT deck as PPTX',
+    pptxDownloadState.download === 'ai-retouch-demo.pptx' &&
+      pptxDownloadState.type.includes('presentationml.presentation') &&
+      pptxDownloadState.signature === 'PK' &&
+      pptxDownloadState.size > 5000 &&
+      pptxDownloadState.byteLength === pptxDownloadState.size,
+    pptxDownloadState,
+  )
+  record(
+    'exports PPTX OpenXML package structure',
+    pptxDownloadState.hasContentTypes &&
+      pptxDownloadState.hasPresentationXml &&
+      pptxDownloadState.hasSlide1Xml &&
+      pptxDownloadState.hasSlide2Xml,
+    pptxDownloadState,
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -26463,13 +26502,21 @@ async function installPPTDownloadCapture(page) {
     URL.createObjectURL = (blob) => {
       const url = \`blob:ppt-download-\${downloadIndex++}\`
       const entry = {
+        byteLength: 0,
         download: '',
+        signature: '',
+        size: blob.size,
         text: '',
         type: blob.type,
         url,
       }
 
       window.__pptDownloads.push(entry)
+      void blob.arrayBuffer().then((buffer) => {
+        const bytes = new Uint8Array(buffer)
+        entry.byteLength = bytes.byteLength
+        entry.signature = String.fromCharCode(...bytes.slice(0, 2))
+      })
       void blob.text().then((text) => {
         entry.text = text
       })
