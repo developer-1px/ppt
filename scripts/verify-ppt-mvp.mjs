@@ -7455,8 +7455,8 @@ async function runTextQuickFormatScenario(page) {
   record(
     'aligns PPT text paragraphs with PPTX Cmd/Ctrl L E R J shortcuts',
     afterTextAlignCenterShortcut.selectedId === 's1-title' &&
-      afterTextAlignCenterShortcut.shortcutModel === 'ppt-text-paragraph-align-keyboard-shortcuts' &&
-      afterTextAlignCenterShortcut.shortcutIntent === 'ppt-text-paragraph-align-keyboard-intent' &&
+      afterTextAlignCenterShortcut.shortcutModel === 'slide-edit-text-paragraph-align-keyboard-shortcuts' &&
+      afterTextAlignCenterShortcut.shortcutIntent === 'slide-edit-text-paragraph-align-keyboard-intent' &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+L') &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+E') &&
       afterTextAlignCenterShortcut.shortcutKeys.includes('Cmd/Ctrl+R') &&

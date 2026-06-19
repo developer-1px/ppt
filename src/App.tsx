@@ -244,6 +244,7 @@ import {
   getSlideEditTableRowsPasteCommandEffect,
   getSlideEditTextParagraphAlignCommandEffect,
   getSlideEditTextParagraphAlignJSONPasteValueFromText,
+  getSlideEditTextParagraphAlignKeyboardIntent,
   getSlideEditTextParagraphBulletCommandEffect,
   getSlideEditTextParagraphBulletJSONPasteValueFromText,
   getSlideEditTextParagraphBulletKeyboardIntent,
@@ -308,6 +309,9 @@ import {
   SLIDE_EDIT_TEXT_CLEAR_FORMATTING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
+  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_KEYS as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS,
+  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_MODEL as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
   SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
@@ -3883,12 +3887,6 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 }
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
-const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL =
-  'ppt-text-paragraph-align-keyboard-shortcuts'
-const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT =
-  'ppt-text-paragraph-align-keyboard-intent'
-const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
-  'Cmd/Ctrl+L Cmd/Ctrl+E Cmd/Ctrl+R Cmd/Ctrl+J'
 const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_MODEL =
   'slide-edit-text-paragraph-bullet-keyboard-shortcuts'
 const PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT =
@@ -5029,10 +5027,17 @@ function App() {
       }
 
       const textParagraphAlignKeyboardIntent =
-        getPPTTextParagraphAlignKeyboardShortcutIntent(event)
+        getSlideEditTextParagraphAlignKeyboardIntent({
+          altKey: event.altKey,
+          key: event.key,
+          mod,
+          shiftKey: event.shiftKey,
+        })
 
       if (textParagraphAlignKeyboardIntent && canFormatSelectedText) {
-        event.preventDefault()
+        if (textParagraphAlignKeyboardIntent.preventDefault) {
+          event.preventDefault()
+        }
         updateSelectedParagraphAlign(textParagraphAlignKeyboardIntent.align)
         return
       }
@@ -41123,39 +41128,6 @@ function getPPTCreationToolIdPrefix(tool: PPTCreationTool) {
   }
 
   return tool.kind
-}
-
-function getPPTTextParagraphAlignKeyboardShortcutIntent(event: KeyboardEvent) {
-  const mod = event.metaKey || event.ctrlKey
-
-  if (!mod || event.shiftKey || event.altKey) {
-    return null
-  }
-
-  switch (event.key.toLowerCase()) {
-    case 'l':
-      return {
-        align: 'left' as const,
-        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
-      }
-    case 'e':
-      return {
-        align: 'center' as const,
-        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
-      }
-    case 'r':
-      return {
-        align: 'right' as const,
-        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
-      }
-    case 'j':
-      return {
-        align: 'justify' as const,
-        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
-      }
-    default:
-      return null
-  }
 }
 
 function getPPTDeckTextMatches(deck: PPTDeck, query: string): PPTFindMatch[] {
