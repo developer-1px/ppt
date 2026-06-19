@@ -1456,7 +1456,9 @@ function addPPTXTable({
           fontSize: cellTextStyle?.fontSize === undefined
             ? 13.5
             : pxToPt(cellTextStyle.fontSize),
-          margin: 0.08,
+          margin: cellTextStyle?.textInset
+            ? createPPTXTableCellMargin(cellTextStyle.textInset)
+            : 0.08,
           transparency: toPPTXTransparency(opacity),
           valign: cellTextStyle?.verticalAlign,
         },
@@ -1732,6 +1734,17 @@ function createPPTXMargin(inset: PPTXTextInset): [number, number, number, number
     pxToPt(inset.right),
     pxToPt(inset.bottom),
     pxToPt(inset.left),
+  ]
+}
+
+function createPPTXTableCellMargin(
+  inset: PPTXTextInset,
+): [number, number, number, number] {
+  return [
+    pxToIn(inset.top),
+    pxToIn(inset.right),
+    pxToIn(inset.bottom),
+    pxToIn(inset.left),
   ]
 }
 

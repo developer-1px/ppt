@@ -11166,6 +11166,7 @@ async function runExportScenario(page) {
       const rowHeights = element.rowHeights ?? []
       const wideColumnFill = element.cellStyles?.[0]?.[1]?.fill
       const wideColumnTextStyle = element.cellStyles?.[0]?.[1]?.textStyle
+      const wideColumnTextInset = wideColumnTextStyle?.textInset
 
       return element.rows?.[0]?.[1] === 'Wide column' &&
         columnWidths.length === 3 &&
@@ -11178,6 +11179,10 @@ async function runExportScenario(page) {
         wideColumnTextStyle?.color === '#7f1d1d' &&
         wideColumnTextStyle?.fontWeight === 'bold' &&
         wideColumnTextStyle?.fontSize >= 20 &&
+        wideColumnTextInset?.top === 12 &&
+        wideColumnTextInset?.right === 20 &&
+        wideColumnTextInset?.bottom === 16 &&
+        wideColumnTextInset?.left === 24 &&
         wideColumnTextStyle?.verticalAlign === 'bottom'
     })
     const exportLockedObjects = exportElements.filter((element) =>
@@ -11251,6 +11256,14 @@ async function runExportScenario(page) {
       exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
       exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
       exportUnevenTableProbeCellTextFontWeight: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontWeight ?? '',
+      exportUnevenTableProbeCellTextInset: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.textInset
+        ? [
+            exportUnevenTableProbe.cellStyles[0][1].textStyle.textInset.top,
+            exportUnevenTableProbe.cellStyles[0][1].textStyle.textInset.right,
+            exportUnevenTableProbe.cellStyles[0][1].textStyle.textInset.bottom,
+            exportUnevenTableProbe.cellStyles[0][1].textStyle.textInset.left,
+          ].join(' ')
+        : '',
       exportUnevenTableProbeCellTextVerticalAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.verticalAlign ?? '',
       exportUnevenTableProbeRowHeights: (exportUnevenTableProbe?.rowHeights ?? []).join(' '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
@@ -27417,6 +27430,12 @@ async function addPPTXUnevenTableProbe(base64) {
           bold: true,
           color: '7F1D1D',
           size: 1600,
+          textInset: {
+            bottom: 152400,
+            left: 228600,
+            right: 190500,
+            top: 114300,
+          },
           verticalAlign: 'b',
         },
       }),
@@ -27465,9 +27484,17 @@ function createPPTXTableCellXml(text, options = {}) {
         '</a:rPr>',
       ].join('')
     : ''
-  const tcPrAttrs = textStyle?.verticalAlign
-    ? ` anchor="${textStyle.verticalAlign}"`
-    : ''
+  const tcPrAttrs = [
+    textStyle?.verticalAlign ? ` anchor="${textStyle.verticalAlign}"` : '',
+    textStyle?.textInset
+      ? [
+          ` marT="${textStyle.textInset.top}"`,
+          ` marR="${textStyle.textInset.right}"`,
+          ` marB="${textStyle.textInset.bottom}"`,
+          ` marL="${textStyle.textInset.left}"`,
+        ].join('')
+      : '',
+  ].join('')
   const tcPrXml = fill
     ? [
         `<a:tcPr${tcPrAttrs}>`,

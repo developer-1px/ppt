@@ -1284,6 +1284,7 @@ function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | unde
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
   const txBody = getDirectPPTXChildByLocalName(cell, 'txBody')
   const textBody = readPPTXTextBody(txBody)
+  const textInset = readPPTXTextInset(tcPr)
   const verticalAlign = readPPTXTableCellVerticalAlign(tcPr)
   const firstParagraph = textBody?.paragraphs
     .find((paragraph) =>
@@ -1298,6 +1299,7 @@ function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | unde
     ...(firstRun?.color ? { color: firstRun.color } : {}),
     ...(firstRun?.size === undefined ? {} : { fontSize: firstRun.size }),
     ...(firstRun?.bold === true ? { fontWeight: 'bold' as const } : {}),
+    ...(textInset ? { textInset } : {}),
     ...(verticalAlign ? { verticalAlign } : {}),
   }
 

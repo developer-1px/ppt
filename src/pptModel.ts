@@ -11,11 +11,18 @@ const PPTFillSchema = z.object({
   color: z.string(),
   opacity: z.number().optional(),
 })
+const PPTTextInsetSchema = z.object({
+  bottom: z.number(),
+  left: z.number(),
+  right: z.number(),
+  top: z.number(),
+})
 const PPTTableCellTextStyleSchema = z.object({
   align: z.enum(['left', 'center', 'right', 'justify']).optional(),
   color: z.string().optional(),
   fontSize: z.number().optional(),
   fontWeight: z.enum(['regular', 'semibold', 'bold']).optional(),
+  textInset: PPTTextInsetSchema.optional(),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
 })
 const PPTTableCellStyleSchema = z.object({
@@ -60,13 +67,6 @@ const PPTParagraphSchema = z.object({
 
 export const PPTTextBodySchema = z.object({
   paragraphs: z.array(PPTParagraphSchema),
-})
-
-const PPTTextInsetSchema = z.object({
-  bottom: z.number(),
-  left: z.number(),
-  right: z.number(),
-  top: z.number(),
 })
 
 const PPTTextStyleSchema = z.object({

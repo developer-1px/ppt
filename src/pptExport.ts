@@ -889,6 +889,9 @@ function renderPPTTableHTMLRow({
           textStyle?.fontWeight
             ? ` data-ppt-table-cell-font-weight="${escapeHtml(textStyle.fontWeight)}"`
             : '',
+          textStyle?.textInset
+            ? ` data-ppt-table-cell-text-inset="${escapeHtml(formatPPTTextInsetData(textStyle.textInset))}"`
+            : '',
           textStyle?.verticalAlign
             ? ` data-ppt-table-cell-vertical-align="${escapeHtml(textStyle.verticalAlign)}"`
             : '',
@@ -918,7 +921,6 @@ function renderPPTTableSVG(element: PPTTable) {
       const cellWidth = columnWidths[columnIndex] ?? (columnCount > 0 ? element.geometry.w / columnCount : element.geometry.w)
       const x = columnX
       const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
-      const textPadding = Math.min(10, cellWidth * 0.12)
       const headerAttrs = rowIndex === 0
         ? ' data-ppt-table-header="true"'
         : ''
@@ -932,20 +934,28 @@ function renderPPTTableSVG(element: PPTTable) {
         : `fill="${rowIndex === 0 ? '#eff6ff' : '#ffffff'}"`
       const textColor = cellTextStyle?.color ?? '#111827'
       const textFontSize = cellTextStyle?.fontSize ?? fontSize
+      const textInset = getPPTTableCellTextInset({
+        cellHeight,
+        cellWidth,
+        textInset: cellTextStyle?.textInset,
+      })
       const textAnchor = getPPTTableCellTextAnchor(cellTextStyle?.align)
       const textBaseline = getPPTTableCellDominantBaseline(cellTextStyle?.verticalAlign)
+      const textInsetAttr = cellTextStyle?.textInset
+        ? ` data-ppt-table-cell-text-inset="${escapeHtml(formatPPTTextInsetData(textInset))}"`
+        : ''
       const textVerticalAlignAttr = cellTextStyle?.verticalAlign
         ? ` data-ppt-table-cell-vertical-align="${escapeHtml(cellTextStyle.verticalAlign)}"`
         : ''
       const textX = getPPTTableCellTextX({
         align: cellTextStyle?.align,
         cellWidth,
-        padding: textPadding,
+        inset: textInset,
         x,
       })
       const textY = getPPTTableCellTextY({
         cellHeight,
-        padding: textPadding,
+        inset: textInset,
         verticalAlign: cellTextStyle?.verticalAlign,
         y,
       })
@@ -955,7 +965,7 @@ function renderPPTTableSVG(element: PPTTable) {
 
       return [
         `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
-        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs}${textVerticalAlignAttr} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="${textBaseline}">${escapeHtml(row[columnIndex] ?? '')}</text>`,
+        `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs}${textInsetAttr}${textVerticalAlignAttr} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="${textBaseline}">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
     })
   }).join('')
@@ -986,6 +996,7 @@ function formatPPTTableCellHTMLStyle(
     textStyle?.fontWeight
       ? `font-weight:${getPPTTableCellFontWeightCSS(textStyle.fontWeight)}`
       : '',
+    textStyle?.textInset ? `padding:${getPPTTextInsetCSS(textStyle.textInset)}` : '',
     textStyle?.verticalAlign ? `vertical-align:${textStyle.verticalAlign}` : '',
   ].filter(Boolean)
 
@@ -1021,45 +1032,45 @@ function getPPTTableCellTextAnchor(align: PPTTableCellTextStyle['align']) {
 function getPPTTableCellTextX({
   align,
   cellWidth,
-  padding,
+  inset,
   x,
 }: {
   align: PPTTableCellTextStyle['align']
   cellWidth: number
-  padding: number
+  inset: PPTTextInset
   x: number
 }) {
   if (align === 'center') {
-    return x + cellWidth / 2
+    return x + inset.left + Math.max(0, cellWidth - inset.left - inset.right) / 2
   }
 
   if (align === 'right') {
-    return x + cellWidth - padding
+    return x + cellWidth - inset.right
   }
 
-  return x + padding
+  return x + inset.left
 }
 
 function getPPTTableCellTextY({
   cellHeight,
-  padding,
+  inset,
   verticalAlign,
   y,
 }: {
   cellHeight: number
-  padding: number
+  inset: PPTTextInset
   verticalAlign: PPTTableCellTextStyle['verticalAlign']
   y: number
 }) {
   if (verticalAlign === 'top') {
-    return y + padding
+    return y + inset.top
   }
 
   if (verticalAlign === 'bottom') {
-    return y + cellHeight - padding
+    return y + cellHeight - inset.bottom
   }
 
-  return y + cellHeight / 2
+  return y + inset.top + Math.max(0, cellHeight - inset.top - inset.bottom) / 2
 }
 
 function getPPTTableCellDominantBaseline(
@@ -1070,6 +1081,26 @@ function getPPTTableCellDominantBaseline(
   }
 
   return verticalAlign === 'bottom' ? 'text-after-edge' : 'middle'
+}
+
+function getPPTTableCellTextInset({
+  cellHeight,
+  cellWidth,
+  textInset,
+}: {
+  cellHeight: number
+  cellWidth: number
+  textInset: PPTTableCellTextStyle['textInset']
+}): PPTTextInset {
+  const horizontal = Math.min(10, cellWidth * 0.12)
+  const vertical = Math.min(8, cellHeight * 0.2)
+
+  return {
+    bottom: textInset?.bottom ?? vertical,
+    left: textInset?.left ?? horizontal,
+    right: textInset?.right ?? horizontal,
+    top: textInset?.top ?? vertical,
+  }
 }
 
 function getPPTElementTransform(element: PPTElement) {

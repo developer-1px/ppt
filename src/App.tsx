@@ -36203,6 +36203,9 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell-font-size={textStyle?.fontSize}
               data-ppt-table-cell-font-weight={textStyle?.fontWeight}
               data-ppt-table-cell-text-color={textStyle?.color}
+              data-ppt-table-cell-text-inset={textStyle?.textInset
+                ? formatPPTTextInsetData(textStyle.textInset)
+                : undefined}
               data-ppt-table-cell-vertical-align={textStyle?.verticalAlign}
               data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
               key={`${rowIndex}:${columnIndex}`}
@@ -36243,6 +36246,9 @@ function getPPTTableCellStyleCSS(
     ...(textStyle?.fontWeight
       ? { fontWeight: getPPTTableCellFontWeightCSS(textStyle.fontWeight) }
       : {}),
+    ...(textStyle?.textInset
+      ? { padding: getPPTTableCellTextInsetCSS(textStyle.textInset) }
+      : {}),
     ...(textStyle?.verticalAlign
       ? { alignItems: getPPTTableCellVerticalAlignCSS(textStyle.verticalAlign) }
       : {}),
@@ -36257,6 +36263,12 @@ function getPPTTableCellVerticalAlignCSS(
   }
 
   return verticalAlign === 'bottom' ? 'flex-end' : 'center'
+}
+
+function getPPTTableCellTextInsetCSS(
+  textInset: NonNullable<PPTTableCellTextStyle['textInset']>,
+) {
+  return getSlideEditTextFrameInsetPaddingCSS(textInset)
 }
 
 function getPPTTableCellFontWeightCSS(
