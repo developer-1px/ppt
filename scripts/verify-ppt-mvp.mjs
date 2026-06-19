@@ -797,6 +797,48 @@ async function runTextEditingScenario(page) {
 
   record('commits inline PPT text edit on blur', afterCommit.text.includes('Edited title') && afterCommit.undoEnabled, afterCommit)
 
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(80)
+
+  const afterKeyboardEdit = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+    const selected = document.querySelector('[data-selected="true"]')
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      active: document.activeElement === editor,
+      editable: editor?.isContentEditable === true,
+      inlineEditActive: editor?.getAttribute('data-ppt-inline-edit-active') ?? '',
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record(
+    'enters PPT inline text edit with canvas edit-selection keyboard intent',
+    afterKeyboardEdit.active &&
+      afterKeyboardEdit.editable &&
+      afterKeyboardEdit.inlineEditActive === 'true' &&
+      afterKeyboardEdit.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterKeyboardEdit.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
+      afterKeyboardEdit.selectedId === 's1-title',
+    afterKeyboardEdit,
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   const summaryPoint = await getElementCenter(page, 's1-summary')
   const beforeCancel = await page.eval(`document.querySelector('[data-ppt-element="s1-summary"]')?.textContent ?? ''`)
 
@@ -4185,11 +4227,13 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.itemIds.includes('format:bold') &&
       afterShortcutOpen.itemIds.includes('format:italic') &&
       afterShortcutOpen.itemIds.includes('format:underline') &&
+      afterShortcutOpen.itemIds.includes('command:edit-selection') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-next') &&
       afterShortcutOpen.itemIds.includes('selection:cycle-previous') &&
       afterShortcutOpen.shortcuts.includes('Shift+/') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') &&
+      afterShortcutOpen.shortcuts.includes('Enter') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') &&
       afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') &&
@@ -10108,6 +10152,10 @@ async function runViewAndShapeScenario(page) {
 
   await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]')?.click()`)
   await delay(20)
+  await waitUntil(
+    () => page.eval(`!!document.querySelector('.ppt-slide')`),
+    'PPT slide frame was not ready for shape insertion',
+  )
 
   const createEllipse = await page.eval(`(() => {
     const slide = document.querySelector('.ppt-slide').getBoundingClientRect()

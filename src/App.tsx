@@ -831,6 +831,7 @@ const PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS = new Set([
   'cut-selection',
   'delete-selection',
   'duplicate-selection',
+  'edit-selection',
   'group-selection',
   'lock-selection',
   'paste-selection',
@@ -4772,7 +4773,7 @@ function App() {
             cutSelection,
             deleteSelection,
             duplicateSelection,
-            editSelection: noopPPTKeyboardCommandHandler,
+            editSelection: editSelectedElement,
             groupSelection,
             lockSelection: lockSelectedElements,
             moveSelection: nudgeSelection,
@@ -10467,6 +10468,28 @@ function App() {
     executePPTCanvasStandardSelectionCommand({ kind: 'select-all' })
   }
 
+  function editSelectedElement() {
+    if (
+      !selectedElement ||
+      !isPPTTextElement(selectedElement) ||
+      selectedElement.locked === true ||
+      selectedElement.visible === false
+    ) {
+      return
+    }
+
+    setEditingId(selectedElement.id)
+    setSelection([selectedElement.id])
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    setContextMenu(null)
+    setSlideContextMenu(null)
+  }
+
   function cycleObjectSelection(direction: PPTSelectionCycleDirection) {
     const selectableObjectIds = activeSlide.elements
       .filter((element) => element.visible !== false && element.locked !== true)
@@ -13415,6 +13438,14 @@ function App() {
     section: 'Edit',
     shortcut: 'Cmd/Ctrl+A',
     title: PPT_COMMAND_AFFORDANCES.selectAll.title,
+  }, {
+    disabled: !selectedElement || !isPPTTextElement(selectedElement) ||
+      selectedElement.locked === true || selectedElement.visible === false,
+    id: 'command:edit-selection',
+    onSelect: editSelectedElement,
+    section: 'Edit',
+    shortcut: 'Enter',
+    title: 'Edit text',
   }, {
     disabled: activeSlide.elements.every((element) =>
       element.locked === true || element.visible === false),
