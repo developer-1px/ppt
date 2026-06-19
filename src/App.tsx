@@ -13098,12 +13098,17 @@ function App() {
 
     if (interaction.kind === 'element-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
+      const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
+      const current = interaction.tool.kind === 'shape' &&
+        transformModifierState.preserveAspectRatio
+        ? getPPTAspectLockedCreationPoint(interaction.startPoint, point)
+        : point
       const elements = mapPPTElementsByIds(
         currentSlide.elements,
         [interaction.elementId],
         () =>
           createPPTElementFromCreationTool({
-            current: point,
+            current,
             id: interaction.elementId,
             start: interaction.startPoint,
             tool: interaction.tool,
@@ -37197,6 +37202,21 @@ function getPPTAxisLockedMoveDelta(dx: number, dy: number) {
   return Math.abs(dx) >= Math.abs(dy)
     ? { dx, dy: 0 }
     : { dx: 0, dy }
+}
+
+function getPPTAspectLockedCreationPoint(start: Point, current: Point): Point {
+  const dx = current.x - start.x
+  const dy = current.y - start.y
+  const size = Math.max(Math.abs(dx), Math.abs(dy))
+
+  return {
+    x: start.x + getPPTCreationDirectionSign(dx) * size,
+    y: start.y + getPPTCreationDirectionSign(dy) * size,
+  }
+}
+
+function getPPTCreationDirectionSign(value: number) {
+  return value < 0 ? -1 : 1
 }
 
 function getPPTSlideKeyboardShortcutIntent({

@@ -10757,6 +10757,7 @@ async function runViewAndShapeScenario(page) {
 
     return {
       height: parseFloat(selected?.style.height ?? '0'),
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
       selectedKind: selected?.getAttribute('data-kind') ?? '',
       shape: selected?.getAttribute('data-shape') ?? null,
       width: parseFloat(selected?.style.width ?? '0'),
@@ -10767,6 +10768,63 @@ async function runViewAndShapeScenario(page) {
     afterDragRect,
     dragRect,
   })
+
+  await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]')?.click()`)
+  await delay(20)
+
+  const shiftEllipseDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.78,
+      endY: slide.top + slide.height * 0.39,
+      pressed: document.querySelector('[data-ppt-insert-shape="ellipse"]')?.getAttribute('aria-pressed'),
+      startX: slide.left + slide.width * 0.62,
+      startY: slide.top + slide.height * 0.27,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: shiftEllipseDrag.startX,
+    y: shiftEllipseDrag.startY,
+  }, {
+    x: shiftEllipseDrag.endX,
+    y: shiftEllipseDrag.endY,
+  }], 8)
+  await delay(100)
+
+  const afterShiftEllipseDrag = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      height: parseFloat(selected?.style.height ?? '0'),
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      shape: selected?.getAttribute('data-shape') ?? null,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+      width: parseFloat(selected?.style.width ?? '0'),
+    }
+  })()`)
+
+  record(
+    'preserves aspect ratio while Shift-drag creating PPT shape',
+    shiftEllipseDrag.pressed === 'true' &&
+      afterShiftEllipseDrag.selectedKind === 'shape' &&
+      afterShiftEllipseDrag.shape === 'ellipse' &&
+      afterShiftEllipseDrag.width > 120 &&
+      nearlyEqual(afterShiftEllipseDrag.width, afterShiftEllipseDrag.height, 0.001) &&
+      afterShiftEllipseDrag.undoEnabled,
+    {
+      afterShiftEllipseDrag,
+      shiftEllipseDrag,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const restoredRectPoint = await getElementCenter(page, afterDragRect.selectedId)
+  await clickMouse(page, restoredRectPoint.x, restoredRectPoint.y, 1)
+  await delay(50)
 
   const beforeShapeColorSwatch = await getPPTColorSwatchState(page, 'shape-fill')
 
