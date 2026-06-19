@@ -198,6 +198,7 @@ import {
   getSlideEditObjectTransformJSONPasteValueFromText,
   getSlideEditObjectTransformMoveDragModifierState,
   getSlideEditObjectTransformPasteCommandEffects,
+  hasSlideEditObjectTransformMoveDragExceededThreshold,
   getSlideEditObjectAccessibilityJSONPasteValueFromText,
   getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
@@ -289,6 +290,7 @@ import {
   SLIDE_EDIT_OBJECT_OPACITY_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_SHADOW_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
+  SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD,
   SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
   SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
@@ -3923,7 +3925,8 @@ const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
 const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 const PPT_ALT_TEXT_MAX_LENGTH = 1000
-const PPT_DRAG_DUPLICATE_THRESHOLD = 4
+const PPT_DRAG_DUPLICATE_THRESHOLD =
+  SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD
 const PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE =
   getSlideEditObjectTransformMoveDragModifierState({
     event: {
@@ -13312,10 +13315,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     event.stopPropagation()
     capturePPTCanvasPointerFromEvent(event)
 
-    const duplicateWithPointerModifier =
-      event.altKey || event.ctrlKey || event.metaKey
     const moveDragModifierState =
       getSlideEditObjectTransformMoveDragModifierState({ event })
+    const duplicateWithPointerModifier = moveDragModifierState.duplicate
     const additive = isAdditivePPTPointerInput(event)
     const pointerSelection = getPPTElementPointerSelection({
       additive,
@@ -13872,8 +13874,11 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         !moveInteraction.duplicateOnDrag.duplicated
       ) {
         if (
-          getPPTCanvasPointDistance(moveInteraction.startPoint, point) <=
-          PPT_DRAG_DUPLICATE_THRESHOLD
+          !hasSlideEditObjectTransformMoveDragExceededThreshold({
+            dx: point.x - moveInteraction.startPoint.x,
+            dy: point.y - moveInteraction.startPoint.y,
+            threshold: PPT_DRAG_DUPLICATE_THRESHOLD,
+          })
         ) {
           return
         }
@@ -13934,8 +13939,11 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         !moveInteraction.axisLockOnDrag.started
       ) {
         if (
-          getPPTCanvasPointDistance(moveInteraction.startPoint, point) <=
-          PPT_DRAG_DUPLICATE_THRESHOLD
+          !hasSlideEditObjectTransformMoveDragExceededThreshold({
+            dx: point.x - moveInteraction.startPoint.x,
+            dy: point.y - moveInteraction.startPoint.y,
+            threshold: PPT_DRAG_DUPLICATE_THRESHOLD,
+          })
         ) {
           return
         }
@@ -16143,6 +16151,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-creation-from-center-modifier="Alt"
         data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-move-axis-lock-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.axisLockModifier}
+        data-ppt-move-duplicate-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.duplicateModifier}
         data-ppt-move-drag-modifier-model={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.model}
         data-ppt-transform-constrain-angle-modifier="Shift"
         data-ppt-transform-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
