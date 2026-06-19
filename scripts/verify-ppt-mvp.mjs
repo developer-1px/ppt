@@ -21614,6 +21614,106 @@ async function runSlideManagementScenario(page) {
     },
   )
 
+  const slideContextPoint = await getSlideThumbCenter(page, initialKeyboard.activeId)
+  await rightClickMouse(page, slideContextPoint.x, slideContextPoint.y)
+  await delay(80)
+
+  const afterSlideContextOpen = await getPPTSlideContextMenuState(page)
+
+  record(
+    'opens PPT slide thumbnail context menu with canvas menu affordance',
+    afterSlideContextOpen.open &&
+      afterSlideContextOpen.objectMenuOpen === false &&
+      afterSlideContextOpen.slideId === initialKeyboard.activeId &&
+      afterSlideContextOpen.activeSlide === initialKeyboard.activeId &&
+      afterSlideContextOpen.role === 'menu' &&
+      afterSlideContextOpen.keyboard === 'arrow-left-right-up-down-home-end-enter-space-escape' &&
+      afterSlideContextOpen.focusModel === 'enabled-menuitem-roving' &&
+      afterSlideContextOpen.model === 'canvas-menu-roving-focus' &&
+      afterSlideContextOpen.canvasMenuItemCount === afterSlideContextOpen.commandItemCount &&
+      afterSlideContextOpen.commandItemCount >= 6 &&
+      afterSlideContextOpen.enabledCommands.includes('add') &&
+      afterSlideContextOpen.enabledCommands.includes('duplicate') &&
+      afterSlideContextOpen.enabledCommands.includes('copy') &&
+      afterSlideContextOpen.enabledCommands.includes('cut') &&
+      afterSlideContextOpen.enabledCommands.includes('paste') &&
+      afterSlideContextOpen.enabledCommands.includes('delete') &&
+      afterSlideContextOpen.activeCanvasMenuItem &&
+      afterSlideContextOpen.activeRole === 'menuitem' &&
+      afterSlideContextOpen.activeCommand === 'add',
+    {
+      afterSlideContextOpen,
+      initialKeyboard,
+      slideContextPoint,
+    },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-slide-context-command="copy"]')?.click()`)
+  await delay(80)
+
+  const afterSlideContextCopy = await getSlideRailState(page)
+  const afterSlideContextCopyMenu = await getPPTSlideContextMenuState(page)
+
+  record(
+    'copies PPT slide from slide thumbnail context menu',
+    afterSlideContextCopy.count === initialKeyboard.count &&
+      afterSlideContextCopy.activeId === initialKeyboard.activeId &&
+      afterSlideContextCopy.slideClipboardModel === 'canvas-board-io-ppt-slide-clipboard' &&
+      afterSlideContextCopy.slideClipboardOperation === 'copy' &&
+      afterSlideContextCopy.slideClipboardSourceSlide === initialKeyboard.activeId &&
+      !afterSlideContextCopyMenu.open,
+    {
+      afterSlideContextCopy,
+      afterSlideContextCopyMenu,
+      afterSlideContextOpen,
+      initialKeyboard,
+    },
+  )
+
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await delay(50)
+  await pressKey(page, {
+    code: 'ContextMenu',
+    key: 'ContextMenu',
+    windowsVirtualKeyCode: 93,
+  })
+  await delay(80)
+
+  const afterSlideContextKeyboardOpen = await getPPTSlideContextMenuState(page)
+
+  record(
+    'opens PPT slide thumbnail context menu from keyboard menu key',
+    afterSlideContextKeyboardOpen.open &&
+      afterSlideContextKeyboardOpen.slideId === initialKeyboard.activeId &&
+      afterSlideContextKeyboardOpen.activeCommand === 'add' &&
+      afterSlideContextKeyboardOpen.activeCanvasMenuItem &&
+      afterSlideContextKeyboardOpen.activeRole === 'menuitem',
+    {
+      afterSlideContextKeyboardOpen,
+      initialKeyboard,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
+  const afterSlideContextKeyboardEscape = await getPPTSlideContextMenuState(page)
+
+  record(
+    'closes PPT slide thumbnail context menu with Escape',
+    !afterSlideContextKeyboardEscape.open &&
+      afterSlideContextKeyboardEscape.activeSlide === initialKeyboard.activeId,
+    {
+      afterSlideContextKeyboardEscape,
+      afterSlideContextKeyboardOpen,
+      initialKeyboard,
+    },
+  )
+
   await focusPPTSlideThumb(page, initialKeyboard.activeId)
   await delay(50)
   await pressKey(page, {
@@ -23804,6 +23904,60 @@ function getSlideRailState(page) {
       thumbnailCount: rail?.getAttribute('data-ppt-slide-rail-thumbnail-count') ?? '',
     }
   })()`)
+}
+
+function getPPTSlideContextMenuState(page) {
+  return page.eval(`(() => {
+    const menu = document.querySelector('[data-ppt-slide-context-menu]')
+    const active = document.activeElement
+    const commands = [...document.querySelectorAll('[data-ppt-slide-context-command]')]
+    const enabledCommands = commands
+      .filter((item) => !(item.disabled ?? false))
+      .map((item) => item.getAttribute('data-ppt-slide-context-command') ?? '')
+
+    return {
+      activeCanvasMenuItem: active?.hasAttribute('data-canvas-menu-item') ?? false,
+      activeCommand: active?.getAttribute('data-ppt-slide-context-command') ?? '',
+      activeRole: active?.getAttribute('role') ?? '',
+      activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      canvasMenuItemCount: document.querySelectorAll('[data-ppt-slide-context-menu] [data-canvas-menu-item]').length,
+      commandItemCount: commands.length,
+      copyDisabled: document.querySelector('[data-ppt-slide-context-command="copy"]')?.disabled ?? true,
+      cutDisabled: document.querySelector('[data-ppt-slide-context-command="cut"]')?.disabled ?? true,
+      deleteDisabled: document.querySelector('[data-ppt-slide-context-command="delete"]')?.disabled ?? true,
+      duplicateDisabled: document.querySelector('[data-ppt-slide-context-command="duplicate"]')?.disabled ?? true,
+      enabledCommands,
+      focusModel: menu?.getAttribute('data-ppt-slide-context-menu-focus-model') ?? '',
+      keyboard: menu?.getAttribute('data-ppt-slide-context-menu-keyboard') ?? '',
+      model: menu?.getAttribute('data-ppt-slide-context-menu-model') ?? '',
+      objectMenuOpen: !!document.querySelector('[data-ppt-context-menu]'),
+      open: !!menu,
+      pasteDisabled: document.querySelector('[data-ppt-slide-context-command="paste"]')?.disabled ?? true,
+      role: menu?.getAttribute('role') ?? '',
+      slideId: menu?.getAttribute('data-ppt-slide-context-menu-slide') ?? '',
+    }
+  })()`)
+}
+
+async function getSlideThumbCenter(page, slideId) {
+  await waitUntil(
+    () => page.eval(`((slideId) => [...document.querySelectorAll('.ppt-thumb')]
+      .some((thumb) => thumb.getAttribute('data-ppt-slide-id') === slideId)
+    )(${JSON.stringify(slideId)})`),
+    `Timed out waiting for PPT slide thumbnail ${slideId}`,
+    2000,
+  )
+
+  return page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+    const rect = thumb.getBoundingClientRect()
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+  })(${JSON.stringify(slideId)})`)
 }
 
 function getActivePPTSlideLayoutState(page) {

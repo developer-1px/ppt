@@ -3358,6 +3358,26 @@ type PPTContextMenuState = {
   x: number
   y: number
 }
+type PPTSlideContextMenuState = PPTContextMenuState & {
+  slideId: string
+}
+type PPTSlideContextCommand =
+  | 'add'
+  | 'copy'
+  | 'cut'
+  | 'delete'
+  | 'duplicate'
+  | 'paste'
+type PPTSlideContextCommandDescriptor = {
+  command: PPTSlideContextCommand
+  dataCommand: string
+  label: string
+  title: string
+}
+type PPTSlideContextCommandGroup = {
+  commands: readonly PPTSlideContextCommandDescriptor[]
+  id: string
+}
 type PPTSlideDropPlacement = 'after' | 'before'
 type PPTSlideDragState = {
   draggingSlideId: string
@@ -3379,6 +3399,47 @@ type PPTShapeQuickMenuState = {
   elementId: string
   shape: PPTShapeKind
 }
+
+const PPT_SLIDE_CONTEXT_MENU_GROUPS: readonly PPTSlideContextCommandGroup[] = [{
+  commands: [{
+    command: 'add',
+    dataCommand: 'add',
+    label: 'New Slide',
+    title: 'New Slide',
+  }, {
+    command: 'duplicate',
+    dataCommand: 'duplicate',
+    label: 'Duplicate Slide',
+    title: 'Duplicate Slide',
+  }],
+  id: 'create',
+}, {
+  commands: [{
+    command: 'cut',
+    dataCommand: 'cut',
+    label: 'Cut Slide',
+    title: 'Cut Slide',
+  }, {
+    command: 'copy',
+    dataCommand: 'copy',
+    label: 'Copy Slide',
+    title: 'Copy Slide',
+  }, {
+    command: 'paste',
+    dataCommand: 'paste',
+    label: 'Paste Slide',
+    title: 'Paste Slide',
+  }],
+  id: 'clipboard',
+}, {
+  commands: [{
+    command: 'delete',
+    dataCommand: 'delete',
+    label: 'Delete Slide',
+    title: 'Delete Slide',
+  }],
+  id: 'delete',
+}]
 
 const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
   commands: [{
@@ -4043,6 +4104,8 @@ function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<PPTContextMenuState | null>(null)
+  const [slideContextMenu, setSlideContextMenu] =
+    useState<PPTSlideContextMenuState | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
   const [replaceQuery, setReplaceQuery] = useState('')
@@ -4385,6 +4448,7 @@ function App() {
     setPresentationSlideId(slideId)
     setCommandPaletteOpen(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
     setIsPanToolActive(false)
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
@@ -4438,19 +4502,20 @@ function App() {
   })
 
   useEffect(() => {
-    if (!contextMenu) {
+    if (!contextMenu && !slideContextMenu) {
       return
     }
 
     function onPointerDown(event: PointerEvent) {
       if (isPPTCanvasTargetWithinSelector({
-        selectors: '[data-ppt-context-menu]',
+        selectors: '[data-ppt-context-menu], [data-ppt-slide-context-menu]',
         target: event.target,
       })) {
         return
       }
 
       setContextMenu(null)
+      setSlideContextMenu(null)
     }
 
     const cleanup = bindPPTCanvasEventListener({
@@ -4462,7 +4527,7 @@ function App() {
     return () => {
       cleanup()
     }
-  }, [contextMenu])
+  }, [contextMenu, slideContextMenu])
 
   useEffect(() => {
     if (!findOpen) {
@@ -4580,9 +4645,10 @@ function App() {
         return
       }
 
-      if (contextMenu && systemShortcutIntent?.kind === 'escape') {
+      if ((contextMenu || slideContextMenu) && systemShortcutIntent?.kind === 'escape') {
         event.preventDefault()
         setContextMenu(null)
+        setSlideContextMenu(null)
         return
       }
 
@@ -5506,6 +5572,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
   }
 
   function focusPPTSlideThumb(slideId: string) {
@@ -5515,6 +5582,47 @@ function App() {
       root: document,
       selector: '.ppt-thumb',
     })
+  }
+
+  function runPPTSlideContextMenuCommand(
+    command: PPTSlideContextCommand,
+    slideId: string,
+  ) {
+    switch (command) {
+      case 'add':
+        addSlideAfterSlide(slideId)
+        break
+      case 'copy':
+        copySlide(slideId)
+        break
+      case 'cut':
+        cutSlide(slideId, { focusRail: true })
+        break
+      case 'delete':
+        deleteSlide(slideId)
+        break
+      case 'duplicate':
+        duplicateSlide(slideId)
+        break
+      case 'paste':
+        pasteCopiedSlideAfterSlide(slideId)
+        break
+    }
+  }
+
+  function handleSlideThumbContextMenu(
+    slideId: string,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    setInteraction(null)
+    setLineCreationMode(null)
+    setCreationTool(null)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    openPPTSlideContextMenu(slideId, event.clientX, event.clientY)
   }
 
   function handleSlideThumbSelect(
@@ -5538,6 +5646,24 @@ function App() {
     slideId: string,
     event: ReactKeyboardEvent<HTMLButtonElement>,
   ) {
+    const contextMenuKeyboardIntent = getPPTCanvasContextMenuKeyboardIntent({
+      event,
+      key: event.key,
+    })
+
+    if (contextMenuKeyboardIntent?.kind === 'open-context-menu') {
+      event.preventDefault()
+      event.stopPropagation()
+      const rect = event.currentTarget.getBoundingClientRect()
+
+      openPPTSlideContextMenu(
+        slideId,
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      )
+      return
+    }
+
     const commandIntent = getPPTSlideRailCommandShortcutIntent({
       canDelete: canDeleteSlide,
       canPaste: canPasteSlide,
@@ -5623,6 +5749,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
 
     if (activeFindMatch) {
       focusPPTFindMatch(activeFindMatch)
@@ -5645,6 +5772,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
   }
 
   function closeCommandPalette() {
@@ -5663,6 +5791,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
   }
 
   function closeShortcutHelp() {
@@ -5680,6 +5809,7 @@ function App() {
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
     setContextMenu(null)
+    setSlideContextMenu(null)
   }
 
   function updateFindQuery(query: string) {
@@ -5759,10 +5889,15 @@ function App() {
   }
 
   function addSlide() {
+    addSlideAfterSlide(activeSlide.id)
+  }
+
+  function addSlideAfterSlide(targetSlideId: string) {
     commitDeck((current) => {
       const nextIndex = current.slides.length + 1
       const id = createPPTSlideId(current)
-      const sourceSlide = current.slides.find((slide) => slide.id === activeSlide.id)
+      const sourceSlide = current.slides.find((slide) => slide.id === targetSlideId)
+        ?? current.slides.find((slide) => slide.id === activeSlide.id)
       const layout = getPPTLayoutDescriptor(sourceSlide?.layoutId ?? activeSlide.layoutId)
       const slide = createPPTSlideFromLayout({
         id,
@@ -5774,7 +5909,7 @@ function App() {
         placement: 'after',
         slide,
         slides: current.slides,
-        targetSlideId: sourceSlide?.id ?? activeSlide.id,
+        targetSlideId: sourceSlide?.id ?? targetSlideId,
       })
 
       setActiveSlideId(slide.id)
@@ -9067,6 +9202,7 @@ function App() {
     setIsEraserToolActive(false)
     setEditingId(null)
     setContextMenu(null)
+    setSlideContextMenu(null)
   }
 
   function activateLineCreationMode(mode: LineCreationMode) {
@@ -11927,7 +12063,24 @@ function App() {
       viewportSize,
     })
 
+    setSlideContextMenu(null)
     setContextMenu(position)
+  }
+
+  function openPPTSlideContextMenu(slideId: string, x: number, y: number) {
+    const viewportSize = getPPTCanvasClientViewportSize()
+    const position = getPPTCanvasContextMenuPosition({
+      menuSize: { height: 232, width: 220 },
+      point: { x, y },
+      viewportSize,
+    })
+
+    selectSlide(slideId)
+    setContextMenu(null)
+    setSlideContextMenu({
+      ...position,
+      slideId,
+    })
   }
 
   function openPPTContextMenuAtSelection() {
@@ -14079,12 +14232,20 @@ function App() {
               onDragOver={(event) => handleSlideThumbDragOver(slide.id, event)}
               onDragStart={(event) => handleSlideThumbDragStart(slide.id, event)}
               onDrop={(event) => handleSlideThumbDrop(slide.id, event)}
+              onContextMenu={(event) => handleSlideThumbContextMenu(slide.id, event)}
               onKeyDown={(event) => handleSlideThumbKeyDown(slide.id, event)}
               onSelect={(event) => handleSlideThumbSelect(slide.id, event)}
             />
           ))}
         </div>
       </aside>
+      <PPTSlideContextCommandMenu
+        canDelete={canDeleteSlide}
+        canPaste={canPasteSlide}
+        menu={slideContextMenu}
+        onClose={() => setSlideContextMenu(null)}
+        onCommand={runPPTSlideContextMenuCommand}
+      />
 
       <section
         className="ppt-stage-shell"
@@ -32595,6 +32756,116 @@ function PPTTextAlignIcon({
   }
 }
 
+function PPTSlideContextCommandMenu({
+  canDelete,
+  canPaste,
+  menu,
+  onClose,
+  onCommand,
+}: {
+  canDelete: boolean
+  canPaste: boolean
+  menu: PPTSlideContextMenuState | null
+  onClose: () => void
+  onCommand: (command: PPTSlideContextCommand, slideId: string) => void
+}) {
+  const {
+    onFocus: handleMenuFocus,
+    onKeyDown: handleMenuKeyDown,
+    ref: setMenuRoot,
+  } = usePPTCanvasMenuRovingFocus<HTMLDivElement>({ onClose })
+
+  if (!menu) {
+    return null
+  }
+
+  return (
+    <div
+      aria-label="Slide commands"
+      className="ppt-context-menu"
+      data-ppt-slide-context-menu
+      data-ppt-slide-context-menu-focus-model={PPT_MENU_FOCUS_MODEL}
+      data-ppt-slide-context-menu-keyboard={PPT_MENU_KEYBOARD_KEYS}
+      data-ppt-slide-context-menu-model={PPT_MENU_ROVING_FOCUS_MODEL}
+      data-ppt-slide-context-menu-slide={menu.slideId}
+      ref={setMenuRoot}
+      role="menu"
+      style={{
+        left: menu.x,
+        top: menu.y,
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+      onFocus={handleMenuFocus}
+      onKeyDown={handleMenuKeyDown}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {PPT_SLIDE_CONTEXT_MENU_GROUPS.map((group) => (
+        <div className="ppt-context-menu-group" key={group.id} role="group">
+          {group.commands.map((command) => {
+            const disabled =
+              (command.command === 'cut' || command.command === 'delete')
+                ? !canDelete
+                : command.command === 'paste'
+                  ? !canPaste
+                  : false
+
+            return (
+              <button
+                {...PPT_MENU_ITEM_PROPS}
+                aria-label={command.label}
+                className="ppt-context-menu-item"
+                data-ppt-slide-context-command={command.dataCommand}
+                disabled={disabled}
+                key={command.command}
+                role="menuitem"
+                title={command.title}
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+
+                  if (disabled) {
+                    return
+                  }
+
+                  onCommand(command.command, menu.slideId)
+                  onClose()
+                }}
+              >
+                <PPTSlideContextCommandIcon command={command.command} size={16} />
+                <span>{command.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PPTSlideContextCommandIcon({
+  command,
+  size,
+}: {
+  command: PPTSlideContextCommand
+  size: number
+}) {
+  switch (command) {
+    case 'add':
+      return <FilePlus2 size={size} />
+    case 'copy':
+      return <Copy size={size} />
+    case 'cut':
+      return <Scissors size={size} />
+    case 'delete':
+      return <Trash2 size={size} />
+    case 'duplicate':
+      return <CopyPlus size={size} />
+    case 'paste':
+      return <ClipboardPaste size={size} />
+  }
+}
+
 function PPTContextCommandMenu({
   groups,
   menu,
@@ -32758,6 +33029,7 @@ function SlideThumb({
   onDragOver,
   onDragStart,
   onDrop,
+  onContextMenu,
   onKeyDown,
   onSelect,
   slide,
@@ -32772,6 +33044,7 @@ function SlideThumb({
   onDragOver: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => void
   onDrop: (event: ReactDragEvent<HTMLButtonElement>) => void
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>) => void
   onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
   onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void
   slide: PPTSlide
@@ -32813,6 +33086,7 @@ function SlideThumb({
       onDragStart={onDragStart}
       onDrop={onDrop}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onKeyDown={onKeyDown}
       role="option"
       tabIndex={tabIndex}
