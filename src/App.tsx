@@ -4776,12 +4776,23 @@ function App() {
         shiftKey: event.shiftKey,
       })
 
-      if (textFormattingKeyboardIntent?.kind === 'toggle-bold') {
+      if (textFormattingKeyboardIntent) {
         if (canFormatSelectedText) {
           if (textFormattingKeyboardIntent.preventDefault) {
             event.preventDefault()
           }
-          toggleSelectedTextBold()
+
+          switch (textFormattingKeyboardIntent.kind) {
+            case 'toggle-bold':
+              toggleSelectedTextBold()
+              break
+            case 'toggle-italic':
+              toggleSelectedTextItalic()
+              break
+            case 'toggle-underline':
+              toggleSelectedTextUnderline()
+              break
+          }
         }
         return
       }
@@ -13718,12 +13729,14 @@ function App() {
     id: 'format:italic',
     onSelect: toggleSelectedTextItalic,
     section: 'Format',
+    shortcut: 'Cmd/Ctrl+I',
     title: 'Italic text',
   }, {
     disabled: !canFormatSelectedText,
     id: 'format:underline',
     onSelect: toggleSelectedTextUnderline,
     section: 'Format',
+    shortcut: 'Cmd/Ctrl+U',
     title: 'Underline text',
   }, {
     disabled: !canFormatSelectedText,

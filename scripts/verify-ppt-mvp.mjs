@@ -4086,7 +4086,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:cut') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:copy') && afterShortcutOpen.itemIds.includes('slide:cut') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('slide:paste') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.itemIds.includes('format:italic') && afterShortcutOpen.itemIds.includes('format:underline') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+I') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+U') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -5505,6 +5505,22 @@ function getPPTColorSwatchState(page, channel, elementId = '') {
   })(${JSON.stringify(channel)}, ${JSON.stringify(elementId)})`)
 }
 
+function getPPTTextShortcutFormatState(page, elementId) {
+  return page.eval(`((id) => {
+    const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
+
+    return {
+      italicPressed: document.querySelector('[data-ppt-text-quick="italic"]')?.getAttribute('aria-pressed') ?? '',
+      italicRun: element?.querySelector('[data-ppt-run-italic="true"]')?.style.fontStyle ?? '',
+      italicRunCount: element?.querySelectorAll('[data-ppt-run-italic="true"]').length ?? 0,
+      selectedId: document.querySelector('[data-selected="true"]')?.getAttribute('data-ppt-element') ?? '',
+      underlinePressed: document.querySelector('[data-ppt-text-quick="underline"]')?.getAttribute('aria-pressed') ?? '',
+      underlineRun: element?.querySelector('[data-ppt-run-underline="true"]')?.style.textDecoration ?? '',
+      underlineRunCount: element?.querySelectorAll('[data-ppt-run-underline="true"]').length ?? 0,
+    }
+  })(${JSON.stringify(elementId)})`)
+}
+
 function getPPTTextFormatPainterState(page, elementId) {
   return page.eval(`((id) => {
     const element = document.querySelector(\`[data-ppt-element="\${id}"]\`)
@@ -5888,6 +5904,76 @@ async function runTextQuickFormatScenario(page) {
   }))()`)
 
   record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
+
+  await pressKey(page, {
+    code: 'KeyI',
+    key: 'i',
+    modifiers: 2,
+    windowsVirtualKeyCode: 73,
+  })
+  await delay(80)
+
+  const afterItalicShortcut = await getPPTTextShortcutFormatState(page, 's1-title')
+
+  await pressKey(page, {
+    code: 'KeyU',
+    key: 'u',
+    modifiers: 2,
+    windowsVirtualKeyCode: 85,
+  })
+  await delay(80)
+
+  const afterUnderlineShortcut = await getPPTTextShortcutFormatState(page, 's1-title')
+
+  record(
+    'toggles PPT italic and underline with canvas text formatting keyboard shortcuts',
+    afterItalicShortcut.selectedId === 's1-title' &&
+      afterItalicShortcut.italicRun === 'italic' &&
+      afterItalicShortcut.italicRunCount > 0 &&
+      afterItalicShortcut.italicPressed === 'true' &&
+      afterItalicShortcut.underlineRunCount === 0 &&
+      afterUnderlineShortcut.italicRun === 'italic' &&
+      afterUnderlineShortcut.italicRunCount > 0 &&
+      afterUnderlineShortcut.italicPressed === 'true' &&
+      afterUnderlineShortcut.underlineRun.includes('underline') &&
+      afterUnderlineShortcut.underlineRunCount > 0 &&
+      afterUnderlineShortcut.underlinePressed === 'true',
+    {
+      afterItalicShortcut,
+      afterUnderlineShortcut,
+      initial,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyU',
+    key: 'u',
+    modifiers: 2,
+    windowsVirtualKeyCode: 85,
+  })
+  await pressKey(page, {
+    code: 'KeyI',
+    key: 'i',
+    modifiers: 2,
+    windowsVirtualKeyCode: 73,
+  })
+  await delay(80)
+
+  const afterTextShortcutRestore = await getPPTTextShortcutFormatState(page, 's1-title')
+
+  record(
+    'restores PPT text keyboard formatting toggles without losing selection',
+    afterTextShortcutRestore.selectedId === 's1-title' &&
+      afterTextShortcutRestore.italicRunCount === 0 &&
+      afterTextShortcutRestore.underlineRunCount === 0 &&
+      afterTextShortcutRestore.italicPressed === 'false' &&
+      afterTextShortcutRestore.underlinePressed === 'false',
+    {
+      afterItalicShortcut,
+      afterTextShortcutRestore,
+      afterUnderlineShortcut,
+    },
+  )
 
   const initialAlignRadio = await readPPTParagraphAlignRadioGroupState(page)
 
