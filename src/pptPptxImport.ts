@@ -9,6 +9,7 @@ import {
   type PPTFill,
   type PPTGeometry,
   type PPTImage,
+  type PPTLine,
   type PPTParagraph,
   type PPTRun,
   type PPTShapeKind,
@@ -274,20 +275,26 @@ async function readPPTXOpenXmlSlide({
   let objectIndex = 1
 
   for (const child of getPPTXSlideObjectNodes(spTree, xml)) {
-    const element = child.localName === 'sp'
-      ? readPPTXShapeElement(child, index, objectIndex, relationships)
-      : child.localName === 'pic'
-        ? await readPPTXPictureElement({
-            index,
-            objectIndex,
-            pic: child,
-            relationships,
-            slidePath: path,
-            zip,
-          })
-        : child.localName === 'graphicFrame'
-          ? readPPTXTableElement(child, index, objectIndex, relationships)
-          : null
+    let element: PPTElement | null = null
+
+    if (child.localName === 'sp') {
+      element = isPPTXLineShape(child)
+        ? readPPTXLineElement(child, index, objectIndex, relationships)
+        : readPPTXShapeElement(child, index, objectIndex, relationships)
+    } else if (child.localName === 'cxnSp') {
+      element = readPPTXLineElement(child, index, objectIndex, relationships)
+    } else if (child.localName === 'pic') {
+      element = await readPPTXPictureElement({
+        index,
+        objectIndex,
+        pic: child,
+        relationships,
+        slidePath: path,
+        zip,
+      })
+    } else if (child.localName === 'graphicFrame') {
+      element = readPPTXTableElement(child, index, objectIndex, relationships)
+    }
 
     if (element) {
       elements.push(element)
@@ -313,6 +320,7 @@ function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
     ? Array.from(spTree.children)
       .filter((child) =>
         child.localName === 'sp' ||
+        child.localName === 'cxnSp' ||
         child.localName === 'pic' ||
         child.localName === 'graphicFrame')
     : []
@@ -321,7 +329,7 @@ function getPPTXSlideObjectNodes(spTree: Element | null, xml: string) {
     return treeNodes
   }
 
-  return [...xml.matchAll(/<p:(sp|pic|graphicFrame)\b[\s\S]*?<\/p:\1>/g)]
+  return [...xml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame)\b[\s\S]*?<\/p:\1>/g)]
     .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
     .filter((element): element is Element => element !== null)
 }
@@ -394,6 +402,117 @@ async function readPPTXSlideNotes({
     : readPPTXPlainTextBody(doc)
 
   return text.trim() || undefined
+}
+
+function readPPTXLineElement(
+  element: Element,
+  slideIndex: number,
+  objectIndex: number,
+  relationships: PPTXRelationshipMap,
+): PPTElement | null {
+  const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
+  const line = getDirectPPTXChildByLocalName(spPr, 'ln')
+  const stroke = readPPTXStroke(spPr)
+  const lineGeometry = readPPTXLineGeometry(spPr)
+
+  if (!stroke || !lineGeometry) {
+    return null
+  }
+
+  return {
+    end: lineGeometry.end,
+    endMarker: readPPTXLineMarker(line, 'tailEnd'),
+    geometry: lineGeometry.geometry,
+    ...(readPPTXElementHyperlink(element, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'line',
+    name: readPPTXObjectName(element, `Line ${objectIndex}`),
+    route: 'straight',
+    start: lineGeometry.start,
+    startMarker: readPPTXLineMarker(line, 'headEnd'),
+    stroke,
+  }
+}
+
+function isPPTXLineShape(sp: Element) {
+  const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
+  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst')
+
+  return preset === 'line'
+}
+
+function readPPTXLineGeometry(spPr: Element | null): {
+  end: PPTLine['end']
+  geometry: PPTGeometry
+  start: PPTLine['start']
+} | null {
+  const xfrm = spPr ? getDirectPPTXChildByLocalName(spPr, 'xfrm') : null
+  const off = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'off') : null
+  const ext = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'ext') : null
+  const rawWidth = toPPTXNumber(ext?.getAttribute('cx'))
+  const rawHeight = toPPTXNumber(ext?.getAttribute('cy'))
+
+  if (!xfrm || rawWidth === null || rawHeight === null) {
+    return null
+  }
+
+  let start = {
+    x: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
+    y: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
+  }
+  let end = {
+    x: start.x + emuToPx(rawWidth),
+    y: start.y + emuToPx(rawHeight),
+  }
+
+  if (isPPTXTrue(xfrm.getAttribute('flipH'))) {
+    const startX = start.x
+    start = { ...start, x: end.x }
+    end = { ...end, x: startX }
+  }
+
+  if (isPPTXTrue(xfrm.getAttribute('flipV'))) {
+    const startY = start.y
+    start = { ...start, y: end.y }
+    end = { ...end, y: startY }
+  }
+
+  const minX = Math.min(start.x, end.x)
+  const minY = Math.min(start.y, end.y)
+  const rawBounds = {
+    h: Math.abs(end.y - start.y),
+    w: Math.abs(end.x - start.x),
+  }
+  const geometry = {
+    h: Math.max(24, rawBounds.h),
+    ...(readPPTXRotation(xfrm) ?? {}),
+    w: Math.max(24, rawBounds.w),
+    x: minX - Math.max(0, 24 - rawBounds.w) / 2,
+    y: minY - Math.max(0, 24 - rawBounds.h) / 2,
+  }
+
+  return {
+    end: {
+      x: end.x - geometry.x,
+      y: end.y - geometry.y,
+    },
+    geometry,
+    start: {
+      x: start.x - geometry.x,
+      y: start.y - geometry.y,
+    },
+  }
+}
+
+function readPPTXLineMarker(
+  line: Element | null,
+  marker: 'headEnd' | 'tailEnd',
+): PPTLine['endMarker'] {
+  const type = getDirectPPTXChildByLocalName(line, marker)
+    ?.getAttribute('type')
+
+  return type && type !== 'none' ? 'arrow' : 'none'
 }
 
 function readPPTXShapeElement(
@@ -603,15 +722,19 @@ function readPPTXElementGeometry(spPr: Element | null): PPTGeometry | null {
     return null
   }
 
-  const rotation = toPPTXNumber(xfrm.getAttribute('rot'))
-
   return {
     h: emuToPx(height),
-    ...(rotation === null ? {} : { rotation: rotation / 60_000 }),
+    ...(readPPTXRotation(xfrm) ?? {}),
     w: emuToPx(width),
     x: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
     y: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
   }
+}
+
+function readPPTXRotation(xfrm: Element) {
+  const rotation = toPPTXNumber(xfrm.getAttribute('rot'))
+
+  return rotation === null ? null : { rotation: rotation / 60_000 }
 }
 
 function readPPTXTextBody(txBody: Element | null): PPTTextBody | null {
@@ -992,6 +1115,10 @@ function toPPTXPositiveNumber(value: string | null | undefined) {
   const parsed = toPPTXNumber(value)
 
   return parsed === null || parsed < 0 ? null : parsed
+}
+
+function isPPTXTrue(value: string | null | undefined) {
+  return value === '1' || value === 'true'
 }
 
 function emuToPx(value: number) {
