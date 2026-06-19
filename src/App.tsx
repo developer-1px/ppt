@@ -166,11 +166,11 @@ import {
   getSlideEditObjectHyperlinkJSONPasteValue,
   getSlideEditObjectHyperlinkPasteCommands,
   getSlideEditObjectImageCropCommandEffect,
-  getSlideEditObjectImageCropJSONPasteValue,
+  getSlideEditObjectImageCropJSONPasteValueFromText,
   getSlideEditObjectImageCropPasteCommandEffects,
   getSlideEditObjectImageCropPositionCSS,
   getSlideEditObjectImageReplaceCommandEffect,
-  getSlideEditObjectImageReplaceJSONPasteValue,
+  getSlideEditObjectImageReplaceJSONPasteValueFromText,
   getSlideEditObjectImageReplacePasteCommandEffect,
   getSlideEditObjectAnimationUpdateCommandEffect,
   getSlideEditObjectOpacityCommandEffect,
@@ -340,6 +340,7 @@ import {
   type SlideEditObjectImageCropJSONPasteValue,
   type SlideEditObjectImageReplaceDescriptor,
   type SlideEditObjectImageReplaceHostCommandEffect,
+  type SlideEditObjectImageReplaceJSONPasteValue,
   type SlideEditBuiltInAnimationTrigger,
   type SlideEditColorSwatchBuiltInChannelId,
   type SlideEditColorSwatchHostCommandEffect,
@@ -22859,13 +22860,10 @@ function getPPTImageReplaceSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectImageReplaceJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectImageReplaceJSONPasteValueFromText(
+        json,
+        { mode: candidate.allowDirect ? 'direct' : 'wrapped' },
+      )
 
       if (pasteValue === null) {
         continue
@@ -22882,7 +22880,7 @@ function getPPTImageReplaceSourceFromSlideEditJSONPasteValue(
 }
 
 function createPPTImageReplaceSourceFromSlideEditJSONPasteValue(
-  pasteValue: NonNullable<ReturnType<typeof getSlideEditObjectImageReplaceJSONPasteValue>>,
+  pasteValue: SlideEditObjectImageReplaceJSONPasteValue,
   jsonLength: number,
 ): PPTImageReplaceImportSource {
   const fields = getPPTImageReplaceFieldsFromSlideEditSourceFields(
@@ -22916,7 +22914,7 @@ function createPPTImageReplaceSourceFromSlideEditJSONPasteValue(
 }
 
 function getPPTImageReplaceFieldsFromSlideEditSourceFields(
-  sourceFields: NonNullable<ReturnType<typeof getSlideEditObjectImageReplaceJSONPasteValue>>['sourceFields'],
+  sourceFields: SlideEditObjectImageReplaceJSONPasteValue['sourceFields'],
 ): readonly PPTImageReplaceImportField[] {
   const fields: PPTImageReplaceImportField[] = ['src']
 
@@ -23217,13 +23215,14 @@ function getPPTImageCropSourceFromSlideEditJSONPasteValue(
 
       seen.add(json)
 
-      const pasteValue = getSlideEditObjectImageCropJSONPasteValue({
-        dataTransfer: createPPTSlideEditJSONPasteCandidateDataTransfer(
-          candidate,
-          json,
-        ),
-        jsonMimeType: candidate.customMimeType,
-      })
+      const pasteValue = getSlideEditObjectImageCropJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          payloadLength: json.length,
+          sourceType: candidate.customMimeType || candidate.type,
+        },
+      )
 
       if (!pasteValue) {
         continue
