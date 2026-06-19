@@ -1282,6 +1282,9 @@ function collectPPTFallbackHTMLRuns(
     ...(tag === 's' || tag === 'strike' || tag === 'del'
       ? { strikethrough: true }
       : {}),
+    ...(tag === 'mark'
+      ? { highlight: '#fde047' }
+      : {}),
     ...(getPPTFallbackHTMLStyleValue(style, 'font-weight') === '700' ||
       getPPTFallbackHTMLStyleValue(style, 'font-weight') === 'bold'
       ? { bold: true }
@@ -1300,10 +1303,15 @@ function collectPPTFallbackHTMLRuns(
     getPPTFallbackHTMLStyleValue(style, 'color'),
     '',
   )
+  const highlight = parsePPTFallbackHTMLColor(
+    getPPTFallbackHTMLStyleValue(style, 'background-color'),
+    '',
+  )
   const size = parsePPTFallbackHTMLPositivePixelStyle(style, 'font-size')
   const styledRun = {
     ...nextRunStyle,
     ...(color ? { color } : {}),
+    ...(highlight ? { highlight } : {}),
     ...(size === undefined ? {} : { size }),
   }
 

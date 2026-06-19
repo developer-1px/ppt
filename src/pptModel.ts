@@ -29,6 +29,7 @@ const PPTGeometrySchema = z.object({
 const PPTRunSchema = z.object({
   bold: z.boolean().optional(),
   color: z.string().optional(),
+  highlight: z.string().optional(),
   italic: z.boolean().optional(),
   size: z.number().optional(),
   strikethrough: z.boolean().optional(),

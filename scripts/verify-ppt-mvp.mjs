@@ -6854,6 +6854,7 @@ function getPPTTextFormatPainterState(page, elementId) {
       styleClipboardCommandType: stage?.getAttribute('data-ppt-style-clipboard-command-type') ?? '',
       styleFontFamily: element?.style.fontFamily ?? '',
       styleClipboardPackageCategories: stage?.getAttribute('data-ppt-style-clipboard-package-categories') ?? '',
+      styleClipboardRunHighlight: stage?.getAttribute('data-ppt-style-clipboard-run-highlight') ?? '',
       styleClipboardRunItalic: stage?.getAttribute('data-ppt-style-clipboard-run-italic') ?? '',
       styleClipboardRunStrikethrough: stage?.getAttribute('data-ppt-style-clipboard-run-strikethrough') ?? '',
       styleClipboardRunUnderline: stage?.getAttribute('data-ppt-style-clipboard-run-underline') ?? '',
@@ -6917,6 +6918,22 @@ function getPPTTextFormatPainterState(page, elementId) {
       textRunColorImportRuns: Number(stage?.getAttribute('data-ppt-text-run-color-import-runs') ?? 0),
       textRunColorImportSlide: stage?.getAttribute('data-ppt-text-run-color-import-slide') ?? '',
       textRunColorImportValue: stage?.getAttribute('data-ppt-text-run-color-import-value') ?? '',
+      runHighlight: element?.querySelector('[data-ppt-run-highlight]')?.style.backgroundColor ?? '',
+      runHighlightCount: element?.querySelectorAll('[data-ppt-run-highlight]').length ?? 0,
+      runHighlightValue: element?.querySelector('[data-ppt-run-highlight]')?.getAttribute('data-ppt-run-highlight') ?? '',
+      textRunHighlightImportCommandFields: stage?.getAttribute('data-ppt-text-run-highlight-import-command-fields') ?? '',
+      textRunHighlightImportCommandIds: stage?.getAttribute('data-ppt-text-run-highlight-import-command-ids') ?? '',
+      textRunHighlightImportCommandTargets: stage?.getAttribute('data-ppt-text-run-highlight-import-command-targets') ?? '',
+      textRunHighlightImportCommandTypes: stage?.getAttribute('data-ppt-text-run-highlight-import-command-types') ?? '',
+      textRunHighlightImportCommandValues: stage?.getAttribute('data-ppt-text-run-highlight-import-command-values') ?? '',
+      textRunHighlightImportFields: stage?.getAttribute('data-ppt-text-run-highlight-import-fields') ?? '',
+      textRunHighlightImportFormat: stage?.getAttribute('data-ppt-text-run-highlight-import-format') ?? '',
+      textRunHighlightImportJsonLength: Number(stage?.getAttribute('data-ppt-text-run-highlight-import-json-length') ?? 0),
+      textRunHighlightImportModel: stage?.getAttribute('data-ppt-text-run-highlight-import-model') ?? '',
+      textRunHighlightImportObjects: stage?.getAttribute('data-ppt-text-run-highlight-import-objects') ?? '',
+      textRunHighlightImportRuns: Number(stage?.getAttribute('data-ppt-text-run-highlight-import-runs') ?? 0),
+      textRunHighlightImportSlide: stage?.getAttribute('data-ppt-text-run-highlight-import-slide') ?? '',
+      textRunHighlightImportValue: stage?.getAttribute('data-ppt-text-run-highlight-import-value') ?? '',
       textRunBoldImportCommandFields: stage?.getAttribute('data-ppt-text-run-bold-import-command-fields') ?? '',
       textRunBoldImportCommandIds: stage?.getAttribute('data-ppt-text-run-bold-import-command-ids') ?? '',
       textRunBoldImportCommandTargets: stage?.getAttribute('data-ppt-text-run-bold-import-command-targets') ?? '',
@@ -7013,6 +7030,7 @@ function getPPTTextFormatPainterState(page, elementId) {
       textStyleImportParagraphSpacingBefore: stage?.getAttribute('data-ppt-text-style-import-paragraph-spacing-before') ?? '',
       textStyleImportRunBold: stage?.getAttribute('data-ppt-text-style-import-run-bold') ?? '',
       textStyleImportRunColor: stage?.getAttribute('data-ppt-text-style-import-run-color') ?? '',
+      textStyleImportRunHighlight: stage?.getAttribute('data-ppt-text-style-import-run-highlight') ?? '',
       textStyleImportRunItalic: stage?.getAttribute('data-ppt-text-style-import-run-italic') ?? '',
       textStyleImportRunSize: stage?.getAttribute('data-ppt-text-style-import-run-size') ?? '',
       textStyleImportRunStrikethrough: stage?.getAttribute('data-ppt-text-style-import-run-strikethrough') ?? '',
@@ -7209,6 +7227,7 @@ async function runTextQuickFormatScenario(page) {
     bulletPressed: document.querySelector('[data-ppt-text-quick="bullet"]')?.getAttribute('aria-pressed') ?? '',
     boldPressed: document.querySelector('[data-ppt-text-quick="bold"]')?.getAttribute('aria-pressed') ?? '',
     fontSize: Number(document.querySelector('[data-ppt-style-field="font-size"]')?.value ?? 0),
+    highlightValue: document.querySelector('[data-ppt-text-quick="highlight"]')?.value ?? '',
     italicPressed: document.querySelector('[data-ppt-text-quick="italic"]')?.getAttribute('aria-pressed') ?? '',
     numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
     quickBarVisible: !!document.querySelector('[data-ppt-text-quick-bar]'),
@@ -7217,7 +7236,7 @@ async function runTextQuickFormatScenario(page) {
     underlinePressed: document.querySelector('[data-ppt-text-quick="underline"]')?.getAttribute('aria-pressed') ?? '',
   }))()`)
 
-  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.strikethroughPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0, initial)
+  record('renders PPT text quick format bar for selected text', initial.quickBarVisible && initial.selectedId === 's1-title' && initial.boldPressed === 'true' && initial.bulletPressed === 'false' && initial.numberedPressed === 'false' && initial.italicPressed === 'false' && initial.strikethroughPressed === 'false' && initial.underlinePressed === 'false' && initial.fontSize > 0 && initial.highlightValue === '#fde047', initial)
 
   await pressKey(page, {
     code: 'KeyI',
@@ -7796,6 +7815,7 @@ async function runTextQuickFormatScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-text-quick="strikethrough"]')?.click()`)
   await page.eval(`document.querySelector('[data-ppt-text-quick="font-size-up"]')?.click()`)
   await setTextQuickColor(page, '#0055ff')
+  await setTextQuickHighlight(page, '#fef08a')
   await page.eval(`document.querySelector('[data-ppt-text-quick="align-right"]')?.click()`)
   await page.eval(`document.querySelector('[data-ppt-text-quick="bullet"]')?.click()`)
   await delay(100)
@@ -7813,6 +7833,8 @@ async function runTextQuickFormatScenario(page) {
       inspectorNumberedPressed: document.querySelector('[data-ppt-paragraph-numbered]')?.getAttribute('aria-pressed') ?? '',
       italicPressed: document.querySelector('[data-ppt-text-quick="italic"]')?.getAttribute('aria-pressed') ?? '',
       italicRun: title?.querySelector('[data-ppt-run-italic="true"]')?.style.fontStyle ?? '',
+      runHighlight: title?.querySelector('[data-ppt-run-highlight]')?.style.backgroundColor ?? '',
+      runHighlightValue: title?.querySelector('[data-ppt-run-highlight]')?.getAttribute('data-ppt-run-highlight') ?? '',
       paragraphBullet: title?.querySelector('[data-ppt-bullet="true"]')?.textContent ?? '',
       numberedList: title?.getAttribute('data-ppt-numbered-list') ?? '',
       numberedPressed: document.querySelector('[data-ppt-text-quick="numbered"]')?.getAttribute('aria-pressed') ?? '',
@@ -7826,7 +7848,7 @@ async function runTextQuickFormatScenario(page) {
     }
   })()`)
 
-  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true' && afterSingleFormat.bulletList === 'true' && afterSingleFormat.numberedList === '' && afterSingleFormat.bulletPressed === 'true' && afterSingleFormat.numberedPressed === 'false' && afterSingleFormat.inspectorBulletPressed === 'true' && afterSingleFormat.inspectorNumberedPressed === 'false' && afterSingleFormat.italicPressed === 'true' && afterSingleFormat.strikethroughPressed === 'true' && afterSingleFormat.underlinePressed === 'true' && afterSingleFormat.italicRun === 'italic' && afterSingleFormat.strikethroughRun.includes('line-through') && afterSingleFormat.underlineRun.includes('underline') && afterSingleFormat.paragraphBullet.length > 0 && afterSingleFormat.thumbBulletCount > 0, {
+  record('applies PPT text quick formatting to selected text model', afterSingleFormat.color === 'rgb(0, 85, 255)' && afterSingleFormat.fontSize === initial.fontSize + 2 && afterSingleFormat.fontWeight === 'regular' && afterSingleFormat.textAlign === 'right' && afterSingleFormat.rightPressed === 'true' && afterSingleFormat.bulletList === 'true' && afterSingleFormat.numberedList === '' && afterSingleFormat.bulletPressed === 'true' && afterSingleFormat.numberedPressed === 'false' && afterSingleFormat.inspectorBulletPressed === 'true' && afterSingleFormat.inspectorNumberedPressed === 'false' && afterSingleFormat.italicPressed === 'true' && afterSingleFormat.strikethroughPressed === 'true' && afterSingleFormat.underlinePressed === 'true' && afterSingleFormat.italicRun === 'italic' && afterSingleFormat.runHighlight === 'rgb(254, 240, 138)' && afterSingleFormat.runHighlightValue === '#fef08a' && afterSingleFormat.strikethroughRun.includes('line-through') && afterSingleFormat.underlineRun.includes('underline') && afterSingleFormat.paragraphBullet.length > 0 && afterSingleFormat.thumbBulletCount > 0, {
     afterSingleFormat,
     initial,
   })
@@ -7859,6 +7881,8 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterFormatPaste.paragraphBullet.length > 0 &&
       summaryAfterFormatPaste.italicRun === 'italic' &&
       summaryAfterFormatPaste.italicRunCount > 0 &&
+      summaryAfterFormatPaste.runHighlight === 'rgb(254, 240, 138)' &&
+      summaryAfterFormatPaste.runHighlightCount > 0 &&
       summaryAfterFormatPaste.strikethroughRun.includes('line-through') &&
       summaryAfterFormatPaste.strikethroughRunCount > 0 &&
       summaryAfterFormatPaste.underlineRun.includes('underline') &&
@@ -7866,6 +7890,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterFormatPaste.styleClipboardCategories.includes('text-run') &&
       summaryAfterFormatPaste.styleClipboardPackageCategories.includes('text-run-style') &&
       summaryAfterFormatPaste.styleClipboardCommandApplications.includes('text-run-style') &&
+      summaryAfterFormatPaste.styleClipboardRunHighlight === '#fef08a' &&
       summaryAfterFormatPaste.styleClipboardRunItalic === 'true' &&
       summaryAfterFormatPaste.styleClipboardRunStrikethrough === 'true' &&
       summaryAfterFormatPaste.styleClipboardRunUnderline === 'true',
@@ -7903,6 +7928,7 @@ async function runTextQuickFormatScenario(page) {
         },
         runStyle: {
           bold: false,
+          highlight: '#fde047',
           italic: false,
           strikethrough: false,
           underline: false,
@@ -7947,7 +7973,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.textStyleImportCategories.includes('object-effect') &&
       summaryAfterTextStylePaste.textStyleImportCategories.includes('text-style') &&
       summaryAfterTextStylePaste.textStyleImportCategories.includes('text-run-style') &&
-      summaryAfterTextStylePaste.textStyleImportFields === 'color fontSize fontFamily fontWeight verticalAlign textInset paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter runBold runItalic runStrikethrough runUnderline' &&
+      summaryAfterTextStylePaste.textStyleImportFields === 'color fontSize fontFamily fontWeight verticalAlign textInset paragraphAlign paragraphBullet paragraphLineHeight paragraphSpacingBefore paragraphSpacingAfter runBold runHighlight runItalic runStrikethrough runUnderline' &&
       summaryAfterTextStylePaste.textStyleImportColor === '#7c3aed' &&
       summaryAfterTextStylePaste.textStyleImportFontFamily === 'Georgia' &&
       summaryAfterTextStylePaste.textStyleImportFontSize === '34' &&
@@ -7961,6 +7987,7 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.textStyleImportParagraphSpacingBefore === '4' &&
       summaryAfterTextStylePaste.textStyleImportRunBold === 'false' &&
       summaryAfterTextStylePaste.textStyleImportRunColor === '' &&
+      summaryAfterTextStylePaste.textStyleImportRunHighlight === '#fde047' &&
       summaryAfterTextStylePaste.textStyleImportRunItalic === 'false' &&
       summaryAfterTextStylePaste.textStyleImportRunSize === '' &&
       summaryAfterTextStylePaste.textStyleImportRunStrikethrough === 'false' &&
@@ -7974,6 +8001,9 @@ async function runTextQuickFormatScenario(page) {
       summaryAfterTextStylePaste.boldRunCount === 0 &&
       summaryAfterTextStylePaste.italicRunCount === 0 &&
       summaryAfterTextStylePaste.runColorCount === 0 &&
+      summaryAfterTextStylePaste.runHighlight === 'rgb(253, 224, 71)' &&
+      summaryAfterTextStylePaste.runHighlightCount > 0 &&
+      summaryAfterTextStylePaste.runHighlightValue === '#fde047' &&
       summaryAfterTextStylePaste.runSizeCount === 0 &&
       summaryAfterTextStylePaste.strikethroughRunCount === 0 &&
       summaryAfterTextStylePaste.underlineRunCount === 0 &&
@@ -8978,6 +9008,62 @@ async function runTextQuickFormatScenario(page) {
     {
       summaryAfterTextRunStrikethroughPaste,
       summaryAfterTextRunUnderlineCleanup,
+    },
+  )
+
+  await pressKey(page, {
+    code: 'KeyZ',
+    key: 'z',
+    modifiers: 2,
+    windowsVirtualKeyCode: 90,
+  })
+  await delay(80)
+
+  const summaryAfterTextRunStrikethroughCleanup =
+    await getPPTTextFormatPainterState(page, 's1-summary')
+
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('#fef08a')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.slide-edit.text-run-highlight+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
+
+  const summaryAfterTextRunHighlightPaste = await getPPTTextFormatPainterState(page, 's1-summary')
+
+  record(
+    'pastes canvas text run highlight JSON through run formatting command effect',
+    summaryAfterTextRunStrikethroughCleanup.strikethroughRunCount === 0 &&
+      summaryAfterTextRunHighlightPaste.selected === 'true' &&
+      summaryAfterTextRunHighlightPaste.text === summaryAfterTextStylePaste.text &&
+      summaryAfterTextRunHighlightPaste.runHighlight === 'rgb(254, 240, 138)' &&
+      summaryAfterTextRunHighlightPaste.runHighlightCount > 0 &&
+      summaryAfterTextRunHighlightPaste.runHighlightValue === '#fef08a' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportModel === 'ppt-text-run-highlight-import' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportFormat === 'application-json-ppt-text-run-highlight' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportCommandIds === 'update-text-run-formatting' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportCommandFields === 'highlight' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportCommandTargets === 's1-summary' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportCommandTypes === 'slide-command-effect' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportCommandValues === '#fef08a' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportFields === 'value' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportJsonLength >= 9 &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportObjects === 's1-summary' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportRuns > 0 &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportSlide === 'slide-1' &&
+      summaryAfterTextRunHighlightPaste.textRunHighlightImportValue === '#fef08a',
+    {
+      summaryAfterTextRunHighlightPaste,
+      summaryAfterTextRunStrikethroughCleanup,
     },
   )
 
@@ -10208,6 +10294,28 @@ async function runTextFrameInsetScenario(page) {
 
 async function runExportScenario(page) {
   await installPPTDownloadCapture(page)
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const titlePoint = await getElementCenter(page, 's1-title')
+
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(80)
+  await page.eval(`(() => {
+    const dataTransfer = new DataTransfer()
+    const json = JSON.stringify('#fef08a')
+
+    dataTransfer.setData(
+      'application/vnd.interactive-os.slide-edit.text-run-highlight+json',
+      json,
+    )
+    window.dispatchEvent(new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    }))
+  })()`)
+  await delay(120)
 
   const state = await page.eval(`(() => {
     const code = document.querySelector('.ppt-export-code')?.value ?? ''
@@ -10227,6 +10335,8 @@ async function runExportScenario(page) {
       hasCommentThreadModel: code.includes('"thread"') && code.includes('"body": "Looks good after headline edit."'),
       hasItalicMarkup: code.includes('data-ppt-run-italic="true"') && code.includes('font-style:italic'),
       hasItalicModel: code.includes('"italic": true'),
+      hasHighlightMarkup: code.includes('data-ppt-run-highlight="#fef08a"') && code.includes('background-color:#fef08a'),
+      hasHighlightModel: code.includes('"highlight": "#fef08a"'),
       hasObjectOpacityMarkup: code.includes('data-ppt-opacity="0.42"') && code.includes('opacity:0.42'),
       hasObjectOpacityModel: code.includes('"opacity": 0.42'),
       hasObjectShadowMarkup: code.includes('data-ppt-shadow="true"') && code.includes('data-ppt-shadow-color="#334155"') && code.includes('data-ppt-shadow-opacity="0.36"') && code.includes('filter:drop-shadow'),
@@ -10306,7 +10416,7 @@ async function runExportScenario(page) {
   record('exports PPT text vertical alignment markup and model data', state.hasTextVerticalAlignMarkup && state.hasTextVerticalAlignModel, state)
   record('exports PPT comment markup and model data', state.hasCommentMarkup && state.hasCommentModel, state)
   record('exports PPT comment thread markup and model data', state.hasCommentThreadMarkup && state.hasCommentThreadModel, state)
-  record('exports PPT italic, underline, and strikethrough run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasStrikethroughMarkup && state.hasStrikethroughModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
+  record('exports PPT italic, underline, strikethrough, and highlight run markup and model data', state.hasItalicMarkup && state.hasItalicModel && state.hasHighlightMarkup && state.hasHighlightModel && state.hasStrikethroughMarkup && state.hasStrikethroughModel && state.hasUnderlineMarkup && state.hasUnderlineModel, state)
   record('exports inserted PPT image markup and model data', state.hasImageMarkup && state.hasImageModel, state)
   record('exports PPT image fit markup and model data', state.hasImageFitMarkup && state.hasImageFitModel, state)
   record('exports PPT image crop position markup and model data', state.hasImageCropMarkup && state.hasImageCropModel, state)
@@ -25852,6 +25962,17 @@ async function rightClickMouse(page, x, y) {
 async function setTextQuickColor(page, color) {
   await page.eval(`((color) => {
     const input = document.querySelector('[data-ppt-text-quick="color"]')
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+
+    valueSetter.call(input, color)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })(${JSON.stringify(color)})`)
+}
+
+async function setTextQuickHighlight(page, color) {
+  await page.eval(`((color) => {
+    const input = document.querySelector('[data-ppt-text-quick="highlight"]')
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
 
     valueSetter.call(input, color)

@@ -425,6 +425,7 @@ import {
   type SlideEditTextRunFormattingBooleanFieldId,
   type SlideEditTextRunFormattingFieldId,
   type SlideEditTextRunFormattingHostCommandEffect,
+  type SlideEditTextRunFormattingValue,
   type SlideEditTextAutoFitHostCommandEffect,
   type SlideEditTextBodyReplaceHostCommandEffect,
   type SlideEditTextBoxMeasurement,
@@ -1587,6 +1588,12 @@ const PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT =
   'application-json-ppt-text-run-color' as const
 const PPT_TEXT_RUN_COLOR_JSON_MIME_TYPE =
   'application/vnd.interactive-os.ppt.text-run-color+json'
+const PPT_TEXT_RUN_HIGHLIGHT_IMPORT_MODEL =
+  'ppt-text-run-highlight-import' as const
+const PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT =
+  'application-json-ppt-text-run-highlight' as const
+const PPT_TEXT_RUN_HIGHLIGHT_JSON_MIME_TYPE =
+  'application/vnd.interactive-os.ppt.text-run-highlight+json'
 const PPT_TEXT_RUN_BOLD_IMPORT_MODEL =
   'ppt-text-run-bold-import' as const
 const PPT_TEXT_RUN_BOLD_JSON_IMPORT_FORMAT =
@@ -2031,6 +2038,7 @@ type PPTTextStyleImportField =
   | 'paragraphSpacingBefore'
   | 'runBold'
   | 'runColor'
+  | 'runHighlight'
   | 'runItalic'
   | 'runSize'
   | 'runStrikethrough'
@@ -2121,6 +2129,21 @@ type PPTTextRunColorImportSource = {
   color: string
   fields: readonly PPTTextRunColorImportField[]
   format: typeof PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT
+  jsonLength: number
+}
+type PPTTextRunHighlightImportField =
+  | 'backgroundColor'
+  | 'highlight'
+  | 'highlightColor'
+  | 'runHighlight'
+  | 'runHighlightColor'
+  | 'textRunHighlight'
+  | 'textRunHighlightColor'
+  | 'value'
+type PPTTextRunHighlightImportSource = {
+  fields: readonly PPTTextRunHighlightImportField[]
+  format: typeof PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT
+  highlight: string
   jsonLength: number
 }
 type PPTTextRunBoldImportField =
@@ -2670,6 +2693,7 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingBefore: string
   runBold: string
   runColor: string
+  runHighlight: string
   runItalic: string
   runSize: string
   runStrikethrough: string
@@ -2760,6 +2784,21 @@ type PPTTextRunColorImportEffect = {
   format: typeof PPT_TEXT_RUN_COLOR_JSON_IMPORT_FORMAT
   jsonLength: number
   model: typeof PPT_TEXT_RUN_COLOR_IMPORT_MODEL
+  objectIds: string
+  runCount: number
+  slideId: string
+}
+type PPTTextRunHighlightImportEffect = {
+  commandFields: string
+  commandIds: string
+  commandTargets: string
+  commandTypes: string
+  commandValues: string
+  fields: string
+  format: typeof PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT
+  highlight: string
+  jsonLength: number
+  model: typeof PPT_TEXT_RUN_HIGHLIGHT_IMPORT_MODEL
   objectIds: string
   runCount: number
   slideId: string
@@ -3456,6 +3495,7 @@ type PPTTextQuickFormatState = {
   canIncreaseListLevel: boolean
   color: string
   fontSize: number
+  highlight: string
   isBold: boolean
   isItalic: boolean
   isStrikethrough: boolean
@@ -3863,6 +3903,7 @@ const PPT_DEFAULT_ELEMENT_ANIMATION = Object.freeze({
   type: 'none',
 } as const satisfies PPTElementAnimation)
 const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
+const PPT_TEXT_RUN_HIGHLIGHT_DEFAULT = '#fde047'
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
@@ -4138,6 +4179,8 @@ function App() {
     useState<PPTTextRunSizeImportEffect | null>(null)
   const [lastTextRunColorImportEffect, setLastTextRunColorImportEffect] =
     useState<PPTTextRunColorImportEffect | null>(null)
+  const [lastTextRunHighlightImportEffect, setLastTextRunHighlightImportEffect] =
+    useState<PPTTextRunHighlightImportEffect | null>(null)
   const [lastTextRunBoldImportEffect, setLastTextRunBoldImportEffect] =
     useState<PPTTextRunBoldImportEffect | null>(null)
   const [lastTextRunItalicImportEffect, setLastTextRunItalicImportEffect] =
@@ -5278,6 +5321,12 @@ function App() {
           'text-run-color-source',
           getPPTTextRunColorSourceFromDataTransfer,
           pastePPTTextRunColorSource,
+        ),
+        createPPTClipboardSourcePasteResolver(
+          dataTransfer,
+          'text-run-highlight-source',
+          getPPTTextRunHighlightSourceFromDataTransfer,
+          pastePPTTextRunHighlightSource,
         ),
         createPPTClipboardSourcePasteResolver(
           dataTransfer,
@@ -7715,7 +7764,7 @@ function App() {
     return true
   }
 
-  function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
+function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     const textElements = selectedElements.filter((element): element is PPTTextElement =>
       isPPTTextElement(element) &&
         element.locked !== true &&
@@ -7756,6 +7805,51 @@ function App() {
                     })),
                   },
                 }
+              : element,
+        ),
+      })))
+
+    return true
+  }
+
+  function pastePPTTextRunHighlightSource(
+    source: PPTTextRunHighlightImportSource,
+  ) {
+    const textElements = selectedElements.filter((element): element is PPTTextElement =>
+      isPPTTextElement(element) &&
+        element.locked !== true &&
+        element.visible !== false)
+
+    if (textElements.length === 0) {
+      return false
+    }
+
+    const effect = getPPTTextRunFormattingCommandEffect({
+      fieldId: 'highlight',
+      objectIds: textElements.map((element) => element.id),
+      slideId: activeSlide.id,
+      value: source.highlight,
+    })
+
+    setLastTextRunHighlightImportEffect(createPPTTextRunHighlightImportEffect({
+      effect,
+      runCount: getPPTTextElementsRunCount(textElements),
+      source,
+    }))
+    rememberRecentColor(source.highlight)
+
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapPPTElementsByIds(
+          slide.elements,
+          effect.payload.objectIds,
+          (element) =>
+            isPPTTextElement(element)
+              ? applyPPTTextRunFormattingCommandEffectToElement(
+                  element,
+                  effect,
+                )
               : element,
         ),
       })))
@@ -11573,6 +11667,37 @@ function App() {
     }))
   }
 
+  function updateSelectedTextHighlight(color: string) {
+    if (!canFormatSelectedText) {
+      return
+    }
+
+    const highlight = normalizePPTSwatchColor(color)
+
+    if (!highlight) {
+      return
+    }
+
+    rememberRecentColor(highlight)
+    commitDeck((current) =>
+      updatePPTDeckSlide(current, activeSlide.id, (slide) => ({
+        ...slide,
+        elements: mapSelectedPPTTextElements(slide.elements, (element) => ({
+          ...element,
+          textBody: {
+            paragraphs: element.textBody.paragraphs.map((paragraph) => ({
+              ...paragraph,
+              runs: paragraph.runs.map((run) => ({
+                ...run,
+                highlight,
+              })),
+            })),
+          },
+        })),
+      })),
+    )
+  }
+
   function updateElementName(elementId: string, name: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) => ({
@@ -15296,6 +15421,7 @@ function App() {
           ? undefined
           : String(styleClipboard.runStyle.bold)}
         data-ppt-style-clipboard-run-color={styleClipboard?.runStyle?.color}
+        data-ppt-style-clipboard-run-highlight={styleClipboard?.runStyle?.highlight}
         data-ppt-style-clipboard-run-italic={styleClipboard?.runStyle?.italic === undefined
           ? undefined
           : String(styleClipboard.runStyle.italic)}
@@ -15366,6 +15492,7 @@ function App() {
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
         data-ppt-text-style-import-run-bold={lastTextStyleImportEffect?.runBold}
         data-ppt-text-style-import-run-color={lastTextStyleImportEffect?.runColor}
+        data-ppt-text-style-import-run-highlight={lastTextStyleImportEffect?.runHighlight}
         data-ppt-text-style-import-run-italic={lastTextStyleImportEffect?.runItalic}
         data-ppt-text-style-import-run-size={lastTextStyleImportEffect?.runSize}
         data-ppt-text-style-import-run-strikethrough={lastTextStyleImportEffect?.runStrikethrough}
@@ -15407,6 +15534,19 @@ function App() {
         data-ppt-text-run-color-import-runs={lastTextRunColorImportEffect?.runCount}
         data-ppt-text-run-color-import-slide={lastTextRunColorImportEffect?.slideId}
         data-ppt-text-run-color-import-value={lastTextRunColorImportEffect?.color}
+        data-ppt-text-run-highlight-import-command-fields={lastTextRunHighlightImportEffect?.commandFields}
+        data-ppt-text-run-highlight-import-command-ids={lastTextRunHighlightImportEffect?.commandIds}
+        data-ppt-text-run-highlight-import-command-targets={lastTextRunHighlightImportEffect?.commandTargets}
+        data-ppt-text-run-highlight-import-command-types={lastTextRunHighlightImportEffect?.commandTypes}
+        data-ppt-text-run-highlight-import-command-values={lastTextRunHighlightImportEffect?.commandValues}
+        data-ppt-text-run-highlight-import-fields={lastTextRunHighlightImportEffect?.fields}
+        data-ppt-text-run-highlight-import-format={lastTextRunHighlightImportEffect?.format}
+        data-ppt-text-run-highlight-import-json-length={lastTextRunHighlightImportEffect?.jsonLength}
+        data-ppt-text-run-highlight-import-model={lastTextRunHighlightImportEffect?.model}
+        data-ppt-text-run-highlight-import-objects={lastTextRunHighlightImportEffect?.objectIds}
+        data-ppt-text-run-highlight-import-runs={lastTextRunHighlightImportEffect?.runCount}
+        data-ppt-text-run-highlight-import-slide={lastTextRunHighlightImportEffect?.slideId}
+        data-ppt-text-run-highlight-import-value={lastTextRunHighlightImportEffect?.highlight}
         data-ppt-text-run-bold-import-command-fields={lastTextRunBoldImportEffect?.commandFields}
         data-ppt-text-run-bold-import-command-ids={lastTextRunBoldImportEffect?.commandIds}
         data-ppt-text-run-bold-import-command-targets={lastTextRunBoldImportEffect?.commandTargets}
@@ -16260,6 +16400,7 @@ function App() {
               onShapeKindChange={updateShapeKind}
               onTextBoldToggle={toggleSelectedTextBold}
               onTextColorChange={updateSelectedTextColor}
+              onTextHighlightChange={updateSelectedTextHighlight}
               onTextItalicToggle={toggleSelectedTextItalic}
               onTextStrikethroughToggle={toggleSelectedTextStrikethrough}
               onTextUnderlineToggle={toggleSelectedTextUnderline}
@@ -19508,6 +19649,7 @@ function createPPTTextStyleImportEffect({
       : String(paragraph.spacingBefore),
     runBold: runStyle?.bold === undefined ? '' : String(runStyle.bold),
     runColor: runStyle?.color ?? '',
+    runHighlight: runStyle?.highlight ?? '',
     runItalic: runStyle?.italic === undefined ? '' : String(runStyle.italic),
     runSize: runStyle?.size === undefined ? '' : String(runStyle.size),
     runStrikethrough: runStyle?.strikethrough === undefined
@@ -19695,16 +19837,44 @@ function createPPTTextRunColorImportEffect({
   }
 }
 
-function getPPTTextRunFormattingCommandEffect({
+function createPPTTextRunHighlightImportEffect({
+  effect,
+  runCount,
+  source,
+}: {
+  effect: PPTTextRunFormattingHostCommandEffect
+  runCount: number
+  source: PPTTextRunHighlightImportSource
+}): PPTTextRunHighlightImportEffect {
+  return {
+    commandFields: effect.payload.fieldId,
+    commandIds: effect.payload.id,
+    commandTargets: effect.payload.objectIds.join(' '),
+    commandTypes: effect.type,
+    commandValues: String(effect.payload.value),
+    fields: source.fields.join(' '),
+    format: source.format,
+    highlight: source.highlight,
+    jsonLength: source.jsonLength,
+    model: PPT_TEXT_RUN_HIGHLIGHT_IMPORT_MODEL,
+    objectIds: effect.payload.objectIds.join(' '),
+    runCount,
+    slideId: effect.payload.slideId,
+  }
+}
+
+function getPPTTextRunFormattingCommandEffect<
+  TFieldId extends SlideEditTextRunFormattingFieldId,
+>({
   fieldId,
   objectIds,
   slideId,
   value,
 }: {
-  fieldId: SlideEditTextRunFormattingBooleanFieldId
+  fieldId: TFieldId
   objectIds: readonly string[]
   slideId: string
-  value: boolean
+  value: SlideEditTextRunFormattingValue<TFieldId>
 }): PPTTextRunFormattingHostCommandEffect {
   return getSlideEditTextRunFormattingCommandEffect({
     fieldId,
@@ -19832,7 +20002,7 @@ function applyPPTTextRunFormattingCommandEffectToElement(
   effect: PPTTextRunFormattingHostCommandEffect,
 ): PPTTextElement {
   const field = effect.payload.fieldId
-  const value = effect.payload.value ? true : undefined
+  const value = getPPTTextRunFormattingCommandModelValue(effect)
 
   return {
     ...element,
@@ -19845,6 +20015,25 @@ function applyPPTTextRunFormattingCommandEffectToElement(
         })),
       })),
     },
+  }
+}
+
+function getPPTTextRunFormattingCommandModelValue(
+  effect: PPTTextRunFormattingHostCommandEffect,
+) {
+  const value = effect.payload.value
+
+  switch (effect.payload.fieldId) {
+    case 'bold':
+    case 'italic':
+    case 'strikethrough':
+    case 'underline':
+      return value === true ? true : undefined
+    case 'color':
+    case 'highlight':
+      return typeof value === 'string' && value ? value : undefined
+    case 'size':
+      return typeof value === 'number' ? value : undefined
   }
 }
 
@@ -26110,6 +26299,10 @@ function getPPTTextStyleSourceFromJSONValue(
     fields.push('runColor')
   }
 
+  if (runStyle?.highlight !== undefined) {
+    fields.push('runHighlight')
+  }
+
   if (runStyle?.italic !== undefined) {
     fields.push('runItalic')
   }
@@ -26175,6 +26368,15 @@ function getPPTTextStyleRunStyleFromJSONValue(
   const color = getPPTTextRunColorImportValueFromJSONValue(
     value.color ?? value.runColor ?? value.textRunColor,
   )
+  const highlight = getPPTTextRunHighlightImportValueFromJSONValue(
+    value.highlight ??
+      value.highlightColor ??
+      value.backgroundColor ??
+      value.runHighlight ??
+      value.runHighlightColor ??
+      value.textRunHighlight ??
+      value.textRunHighlightColor,
+  )
   const italic = getPPTTextRunItalicImportValueFromJSONValue(
     value.italic ?? value.runItalic ?? value.textRunItalic,
   )
@@ -26200,6 +26402,10 @@ function getPPTTextStyleRunStyleFromJSONValue(
 
   if (color !== undefined) {
     runStyle.color = color
+  }
+
+  if (highlight !== undefined) {
+    runStyle.highlight = highlight
   }
 
   if (italic !== undefined) {
@@ -27245,6 +27451,255 @@ function getPPTTextRunColorImportValueFromJSONValue(
     ] as const) {
       if (value[field] !== undefined) {
         return getPPTTextRunColorImportValueFromJSONValue(value[field])
+      }
+    }
+
+    return undefined
+  }
+
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  return normalizePPTSwatchColor(value) || undefined
+}
+
+function getPPTTextRunHighlightSourceFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  if (!dataTransfer) {
+    return null
+  }
+
+  const slideEditSource =
+    getPPTTextRunHighlightSourceFromSlideEditJSONPasteValue(dataTransfer)
+
+  if (slideEditSource) {
+    return slideEditSource
+  }
+
+  const candidates: readonly PPTDirectJSONDataTransferCandidate<
+    PPTTextRunHighlightImportSource['format']
+  >[] = [
+    {
+      allowDirect: true,
+      format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+      mimeType: PPT_TEXT_RUN_HIGHLIGHT_JSON_MIME_TYPE,
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+      mimeType: 'application/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+      mimeType: 'text/json',
+    },
+    {
+      allowDirect: false,
+      format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+      mimeType: PPT_CANVAS_DATA_TRANSFER_TEXT_MIME_TYPE,
+    },
+  ]
+
+  return readPPTJSONDataTransferSource({
+    candidates,
+    dataTransfer,
+    parseJSONValue: ({ candidate, json, jsonLength }) =>
+      getPPTTextRunHighlightSourceFromJSONValue(
+        json,
+        jsonLength,
+        candidate.allowDirect,
+      ),
+    parseText: (text, candidate) =>
+      getPPTTextRunHighlightSourceFromText(text, candidate.allowDirect),
+  })
+}
+
+function getPPTTextRunHighlightSourceFromSlideEditJSONPasteValue(
+  dataTransfer: DataTransfer,
+): PPTTextRunHighlightImportSource | null {
+  const seen = new Set<string>()
+
+  for (const customMimeType of [
+    PPT_TEXT_RUN_HIGHLIGHT_JSON_MIME_TYPE,
+    getPPTTextRunFormattingJSONMimeType('highlight'),
+  ]) {
+    if (!customMimeType) {
+      continue
+    }
+
+    for (const candidate of getPPTSlideEditJSONPasteCandidates({
+      customMimeType,
+      dataTransfer,
+    })) {
+      const json = getPPTImportJSONText(candidate.text) ?? candidate.text
+
+      if (seen.has(json)) {
+        continue
+      }
+
+      seen.add(json)
+
+      const highlight = getSlideEditTextRunFormattingJSONPasteValueFromText(
+        json,
+        {
+          mode: candidate.allowDirect ? 'direct' : 'wrapped',
+          fieldId: 'highlight',
+        },
+      )
+
+      if (highlight === null) {
+        continue
+      }
+
+      const normalizedHighlight =
+        getPPTTextRunHighlightImportValueFromJSONValue(highlight)
+
+      if (normalizedHighlight === undefined) {
+        continue
+      }
+
+      const payload = getPPTTextRunHighlightPayloadEntry(
+        getPPTJSONValueFromText(json),
+        candidate.allowDirect,
+      )
+
+      return {
+        fields: payload?.fields ?? ['value'],
+        format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+        highlight: normalizedHighlight,
+        jsonLength: json.length,
+      }
+    }
+  }
+
+  return null
+}
+
+function getPPTTextRunHighlightSourceFromText(
+  text: string,
+  allowDirect: boolean,
+): PPTTextRunHighlightImportSource | null {
+  const json = getPPTImportJSONText(text)
+
+  if (!json) {
+    const rawText = text.trim()
+
+    if (!allowDirect || !rawText) {
+      return null
+    }
+
+    try {
+      return getPPTTextRunHighlightSourceFromJSONValue(
+        JSON.parse(rawText),
+        rawText.length,
+        true,
+      )
+    } catch {
+      return getPPTTextRunHighlightSourceFromJSONValue(
+        rawText,
+        rawText.length,
+        true,
+      )
+    }
+  }
+
+  try {
+    return getPPTTextRunHighlightSourceFromJSONValue(
+      JSON.parse(json),
+      json.length,
+      allowDirect,
+    )
+  } catch {
+    return null
+  }
+}
+
+function getPPTTextRunHighlightSourceFromJSONValue(
+  value: unknown,
+  jsonLength: number,
+  allowDirect: boolean,
+): PPTTextRunHighlightImportSource | null {
+  const payload = getPPTTextRunHighlightPayloadEntry(value, allowDirect)
+
+  if (!payload) {
+    return null
+  }
+
+  const highlight = getPPTTextRunHighlightImportValueFromJSONValue(
+    payload.value,
+  )
+
+  return highlight === undefined
+    ? null
+    : {
+        fields: payload.fields,
+        format: PPT_TEXT_RUN_HIGHLIGHT_JSON_IMPORT_FORMAT,
+        highlight,
+        jsonLength,
+      }
+}
+
+function getPPTTextRunHighlightPayloadEntry(
+  value: unknown,
+  allowDirect: boolean,
+): {
+  fields: readonly PPTTextRunHighlightImportField[]
+  value: unknown
+} | null {
+  if (!isPPTRecord(value)) {
+    return allowDirect
+      ? {
+          fields: ['value'],
+          value,
+        }
+      : null
+  }
+
+  for (const field of [
+    'textRunHighlight',
+    'textRunHighlightColor',
+    'runHighlight',
+    'runHighlightColor',
+    'highlight',
+    'highlightColor',
+    'backgroundColor',
+    'value',
+  ] as const) {
+    if (value[field] !== undefined) {
+      return {
+        fields: [field],
+        value: value[field],
+      }
+    }
+  }
+
+  return allowDirect
+    ? {
+        fields: ['value'],
+        value,
+      }
+    : null
+}
+
+function getPPTTextRunHighlightImportValueFromJSONValue(
+  value: unknown,
+): string | undefined {
+  if (isPPTRecord(value)) {
+    for (const field of [
+      'value',
+      'highlight',
+      'highlightColor',
+      'backgroundColor',
+      'runHighlight',
+      'runHighlightColor',
+      'textRunHighlight',
+      'textRunHighlightColor',
+    ] as const) {
+      if (value[field] !== undefined) {
+        return getPPTTextRunHighlightImportValueFromJSONValue(value[field])
       }
     }
 
@@ -32429,6 +32884,7 @@ function createPPTRunClipboardHTML(run: PPTRun) {
   }
 
   const styleAttribute = createPPTClipboardStyleAttribute([
+    ['background-color', run.highlight],
     ['color', run.color],
     ['font-size', run.size === undefined ? undefined : `${run.size}px`],
   ])
@@ -33414,6 +33870,7 @@ function PPTSelectionFloatingBar({
   onShapeKindChange,
   onTextBoldToggle,
   onTextColorChange,
+  onTextHighlightChange,
   onTextItalicToggle,
   onTextStrikethroughToggle,
   onTextUnderlineToggle,
@@ -33434,6 +33891,7 @@ function PPTSelectionFloatingBar({
   onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
+  onTextHighlightChange: (color: string) => void
   onTextItalicToggle: () => void
   onTextStrikethroughToggle: () => void
   onTextUnderlineToggle: () => void
@@ -33469,6 +33927,7 @@ function PPTSelectionFloatingBar({
           onParagraphNumberedToggle={onParagraphNumberedToggle}
           onTextBoldToggle={onTextBoldToggle}
           onTextColorChange={onTextColorChange}
+          onTextHighlightChange={onTextHighlightChange}
           onTextItalicToggle={onTextItalicToggle}
           onTextStrikethroughToggle={onTextStrikethroughToggle}
           onTextUnderlineToggle={onTextUnderlineToggle}
@@ -33843,6 +34302,7 @@ function PPTTextQuickFormatControls({
   onParagraphNumberedToggle,
   onTextBoldToggle,
   onTextColorChange,
+  onTextHighlightChange,
   onTextItalicToggle,
   onTextStrikethroughToggle,
   onTextUnderlineToggle,
@@ -33855,6 +34315,7 @@ function PPTTextQuickFormatControls({
   onParagraphNumberedToggle: () => void
   onTextBoldToggle: () => void
   onTextColorChange: (color: string) => void
+  onTextHighlightChange: (color: string) => void
   onTextItalicToggle: () => void
   onTextStrikethroughToggle: () => void
   onTextUnderlineToggle: () => void
@@ -33962,6 +34423,17 @@ function PPTTextQuickFormatControls({
           type="color"
           value={state.color}
           onChange={(event) => onTextColorChange(event.target.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+        />
+      </label>
+      <label className="ppt-floating-color" title="Highlight color">
+        <Highlighter size={15} />
+        <input
+          aria-label="Highlight color"
+          data-ppt-text-quick="highlight"
+          type="color"
+          value={state.highlight}
+          onChange={(event) => onTextHighlightChange(event.target.value)}
           onPointerDown={(event) => event.stopPropagation()}
         />
       </label>
@@ -35070,6 +35542,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
             <span
               data-ppt-run-bold={run.bold === true ? 'true' : undefined}
               data-ppt-run-color={run.color}
+              data-ppt-run-highlight={run.highlight}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
               data-ppt-run-size={run.size}
               data-ppt-run-strikethrough={run.strikethrough === true ? 'true' : undefined}
@@ -38204,6 +38677,7 @@ function pptTextStyle(style: PPTTextStyle | undefined): CSSProperties {
 
 function pptTextRunStyle(run: PPTRun): CSSProperties {
   return {
+    backgroundColor: run.highlight,
     color: run.color,
     fontSize: run.size,
     fontStyle: run.italic === true ? 'italic' : undefined,
@@ -38937,6 +39411,7 @@ function clonePPTTextRunStyle(style: PPTTextRunStyle): PPTTextRunStyle {
   return {
     ...(style.bold === undefined ? {} : { bold: style.bold }),
     ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
     ...(style.italic === undefined ? {} : { italic: style.italic }),
     ...(style.size === undefined ? {} : { size: style.size }),
     ...(style.strikethrough === undefined
@@ -38954,6 +39429,7 @@ function applyPPTTextRunStyle(
     text: run.text,
     ...(style.bold === true ? { bold: true } : {}),
     ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
     ...(style.italic === true ? { italic: true } : {}),
     ...(style.size === undefined ? {} : { size: style.size }),
     ...(style.strikethrough === true ? { strikethrough: true } : {}),
@@ -38970,6 +39446,17 @@ function getPPTTextQuickFormatState(
   const listLevels = elements.flatMap((element) =>
     element.textBody.paragraphs.map(getPPTParagraphListLevel))
   const firstListLevel = listLevels[0] ?? PPT_PARAGRAPH_LIST_LEVEL_MIN
+  const firstRunHighlight = elements.flatMap((element) =>
+    element.textBody.paragraphs.flatMap((paragraph) =>
+      paragraph.runs.map((run) => run.highlight)))
+    .find((highlight): highlight is string => Boolean(highlight)) ??
+    PPT_TEXT_RUN_HIGHLIGHT_DEFAULT
+  const hasUniformRunHighlight = elements.length > 0 &&
+    elements.every((element) =>
+      element.textBody.paragraphs.length > 0 &&
+      element.textBody.paragraphs.every((paragraph) =>
+        paragraph.runs.length > 0 &&
+        paragraph.runs.every((run) => run.highlight === firstRunHighlight)))
 
   return {
     align: elements.every((element) =>
@@ -38987,6 +39474,9 @@ function getPPTTextQuickFormatState(
     fontSize: styles.every((style) => style.fontSize === firstStyle.fontSize)
       ? firstStyle.fontSize
       : Math.round(styles.reduce((sum, style) => sum + style.fontSize, 0) / styles.length),
+    highlight: hasUniformRunHighlight
+      ? firstRunHighlight
+      : PPT_TEXT_RUN_HIGHLIGHT_DEFAULT,
     isBold: styles.length > 0 &&
       styles.every((style) => style.fontWeight === 'bold'),
     isItalic: areAllPPTTextRunsStyled(elements, 'italic'),
@@ -40424,6 +40914,7 @@ function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunSty
   return {
     ...(firstRun.bold === undefined ? {} : { bold: firstRun.bold }),
     ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
+    ...(firstRun.highlight === undefined ? {} : { highlight: firstRun.highlight }),
     ...(firstRun.italic === undefined ? {} : { italic: firstRun.italic }),
     ...(firstRun.size === undefined ? {} : { size: firstRun.size }),
     ...(firstRun.strikethrough === undefined
@@ -40439,6 +40930,7 @@ function arePPTTextRunStylesEqual(
 ) {
   return left.bold === right.bold &&
     left.color === right.color &&
+    left.highlight === right.highlight &&
     left.italic === right.italic &&
     left.size === right.size &&
     left.strikethrough === right.strikethrough &&
