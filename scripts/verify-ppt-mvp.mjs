@@ -23854,8 +23854,8 @@ async function runSlideManagementScenario(page) {
       afterShortcutAdd.activeName.includes(`Slide ${before.count + 1}`) &&
       afterShortcutAdd.selectedIds === afterShortcutAddLayout.elementIds[0] &&
       afterShortcutAdd.slideAddShortcut === 'Cmd/Ctrl+M' &&
-      afterShortcutAdd.slideKeyboardIntent === 'ppt-slide-keyboard-shortcut-intent' &&
-      afterShortcutAdd.slideKeyboardModel === 'ppt-slide-keyboard-shortcuts' &&
+      afterShortcutAdd.slideKeyboardIntent === 'slide-edit-rail-command-keyboard-intent' &&
+      afterShortcutAdd.slideKeyboardModel === 'slide-edit-rail-command-keyboard-shortcuts' &&
       afterShortcutAddLayout.layout === beforeAddLayout.layout &&
       afterShortcutAddLayout.theme === beforeAddLayout.theme &&
       afterShortcutAddLayout.elementCount === afterShortcutAddLayout.visiblePlaceholderCount &&
@@ -24261,9 +24261,9 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.focusableOption === expectedActiveOptionId &&
       initialKeyboard.slideOrder === expectedSlideOrder &&
       initialKeyboard.commandShortcuts ===
-        'Cmd/Ctrl+X Cmd/Ctrl+C Cmd/Ctrl+V Cmd/Ctrl+D Cmd/Ctrl+Up Cmd/Ctrl+Down Cmd/Ctrl+Shift+Up Cmd/Ctrl+Shift+Down Delete Backspace' &&
-      initialKeyboard.commandShortcutIntent === 'ppt-slide-rail-command-shortcut-intent' &&
-      initialKeyboard.commandShortcutModel === 'ppt-slide-rail-command-shortcuts' &&
+        'Cmd/Ctrl+M Cmd/Ctrl+C Cmd/Ctrl+X Cmd/Ctrl+V Cmd/Ctrl+D Delete Backspace Cmd/Ctrl+Up Cmd/Ctrl+Down Cmd/Ctrl+Shift+Up Cmd/Ctrl+Shift+Down' &&
+      initialKeyboard.commandShortcutIntent === 'slide-edit-rail-command-keyboard-intent' &&
+      initialKeyboard.commandShortcutModel === 'slide-edit-rail-command-keyboard-shortcuts' &&
       initialKeyboard.optionCount === initialKeyboard.count &&
       initialKeyboard.optionCountAttr === String(initialKeyboard.count) &&
       initialKeyboard.thumbnailCount === String(initialKeyboard.count) &&

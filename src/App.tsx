@@ -202,6 +202,7 @@ import {
   getSlideEditObjectAccessibilityJSONPasteValueFromText,
   getSlideEditObjectAccessibilityPasteCommand,
   createSlideEditRailDescriptor,
+  getSlideEditRailCommandKeyboardShortcutIntent,
   getSlideEditRailKeyboardCommandEffect,
   getSlideEditRailListboxKeyboardIntent,
   getSlideEditRailPointerCommandEffect,
@@ -345,7 +346,17 @@ import {
   SLIDE_EDIT_COMMENT_THREAD_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYOUT_JSON_MIME_TYPE,
   SLIDE_EDIT_TABLE_ROWS_JSON_MIME_TYPE,
+  SLIDE_EDIT_RAIL_ADD_KEYBOARD_SHORTCUT as PPT_SLIDE_ADD_SHORTCUT,
+  SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_INTENT as PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL,
+  SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_INTENT as PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL,
+  SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_KEYS,
+  SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_MODEL as PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL,
+  SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_MODEL as PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL,
+  SLIDE_EDIT_RAIL_COPY_KEYBOARD_SHORTCUT as PPT_SLIDE_COPY_SHORTCUT,
+  SLIDE_EDIT_RAIL_CUT_KEYBOARD_SHORTCUT as PPT_SLIDE_CUT_SHORTCUT,
+  SLIDE_EDIT_RAIL_DUPLICATE_KEYBOARD_SHORTCUT as PPT_SLIDE_DUPLICATE_SHORTCUT,
   SLIDE_EDIT_RAIL_KEYBOARD_KEYS,
+  SLIDE_EDIT_RAIL_PASTE_KEYBOARD_SHORTCUT as PPT_SLIDE_PASTE_SHORTCUT,
   SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS,
   SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_INTENT as PPT_SLIDE_RAIL_REORDER_SHORTCUT_INTENT,
   SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_MODEL as PPT_SLIDE_RAIL_REORDER_SHORTCUT_MODEL,
@@ -4023,20 +4034,8 @@ const PPT_PARAGRAPH_LIST_LEVEL_MIN =
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.min
 const PPT_PARAGRAPH_LIST_LEVEL_MAX =
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.max
-const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
-const PPT_SLIDE_COPY_SHORTCUT = 'Cmd/Ctrl+C'
-const PPT_SLIDE_CUT_SHORTCUT = 'Cmd/Ctrl+X'
-const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
-const PPT_SLIDE_PASTE_SHORTCUT = 'Cmd/Ctrl+V'
-const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
-  'ppt-slide-keyboard-shortcut-intent'
-const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
-  `${PPT_SLIDE_CUT_SHORTCUT} ${PPT_SLIDE_COPY_SHORTCUT} ${PPT_SLIDE_PASTE_SHORTCUT} ${PPT_SLIDE_DUPLICATE_SHORTCUT} ${SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS} Delete Backspace`
-const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
-  'ppt-slide-rail-command-shortcut-intent'
-const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
-  'ppt-slide-rail-command-shortcuts'
+  `${SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_KEYS} ${SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS}`
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -4060,12 +4059,6 @@ const PPT_LAYER_PANE_GROUP_ROW_PREFIX = 'ppt-layer-group:'
 type LineCreationMode = 'arrow' | 'line'
 type PPTFlipAxis = 'horizontal' | 'vertical'
 type PPTFreeformTool = 'highlight' | 'marker' | 'pen'
-type PPTSlideRailCommandShortcutIntent =
-  | { kind: 'copy-slide' }
-  | { kind: 'cut-slide' }
-  | { kind: 'delete-slide' }
-  | { kind: 'duplicate-slide' }
-  | { kind: 'paste-slide' }
 type PPTCreationTool =
   | {
       kind: 'shape'
@@ -5025,10 +5018,14 @@ function App() {
         return
       }
 
-      const slideKeyboardIntent = getPPTSlideKeyboardShortcutIntent({
-        event,
+      const slideKeyboardIntent = getSlideEditRailCommandKeyboardShortcutIntent({
+        activeSlideId: activeSlide.id,
+        altKey: event.altKey,
+        canDelete: canDeleteSlide,
+        canPaste: canPasteSlide,
         key: event.key,
         mod,
+        shiftKey: event.shiftKey,
       })
 
       if (slideKeyboardIntent?.kind === 'add-slide') {
@@ -6128,18 +6125,24 @@ function App() {
       return
     }
 
-    const commandIntent = getPPTSlideRailCommandShortcutIntent({
+    const commandIntent = getSlideEditRailCommandKeyboardShortcutIntent({
+      activeSlideId: slideId,
+      altKey: event.altKey,
       canDelete: canDeleteSlide,
       canPaste: canPasteSlide,
       key: event.key,
       mod: event.metaKey || event.ctrlKey,
       shiftKey: event.shiftKey,
-      altKey: event.altKey,
     })
 
     if (commandIntent) {
       event.preventDefault()
       event.stopPropagation()
+
+      if (commandIntent.kind === 'add-slide') {
+        addSlideAfterSlide(slideId)
+        return
+      }
 
       if (commandIntent.kind === 'duplicate-slide') {
         duplicateSlide(slideId)
@@ -39460,66 +39463,6 @@ function getPPTSlideIndexReorderResult({
     items,
     toIndex: normalizedToIndex,
   }
-}
-
-function getPPTSlideKeyboardShortcutIntent({
-  event,
-  key,
-  mod,
-}: {
-  event: KeyboardEvent
-  key: string
-  mod: boolean
-}): { kind: 'add-slide'; preventDefault: boolean } | null {
-  if (!mod || event.altKey || event.shiftKey) {
-    return null
-  }
-
-  return key.toLowerCase() === 'm'
-    ? { kind: 'add-slide', preventDefault: true }
-    : null
-}
-
-function getPPTSlideRailCommandShortcutIntent({
-  altKey,
-  canDelete,
-  canPaste,
-  key,
-  mod,
-  shiftKey,
-}: {
-  altKey: boolean
-  canDelete: boolean
-  canPaste: boolean
-  key: string
-  mod: boolean
-  shiftKey: boolean
-}): PPTSlideRailCommandShortcutIntent | null {
-  const normalizedKey = key.toLowerCase()
-
-  if (mod && !altKey && !shiftKey && normalizedKey === 'c') {
-    return { kind: 'copy-slide' }
-  }
-
-  if (mod && !altKey && !shiftKey && normalizedKey === 'x' && canDelete) {
-    return { kind: 'cut-slide' }
-  }
-
-  if (mod && !altKey && !shiftKey && normalizedKey === 'v' && canPaste) {
-    return { kind: 'paste-slide' }
-  }
-
-  if (mod && !altKey && !shiftKey && normalizedKey === 'd') {
-    return { kind: 'duplicate-slide' }
-  }
-
-  if (!mod && !altKey && !shiftKey && canDelete) {
-    if (key === 'Delete' || key === 'Backspace') {
-      return { kind: 'delete-slide' }
-    }
-  }
-
-  return null
 }
 
 function selectSameTypePPTSelection(
