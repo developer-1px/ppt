@@ -10982,6 +10982,7 @@ async function runExportScenario(page) {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
 
     return {
+      imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
@@ -11027,8 +11028,12 @@ async function runExportScenario(page) {
       elementCount: elements.length,
       exportHasHyperlink: exportCode.includes('https://example.com/ppt') && exportCode.includes('data-ppt-hyperlink-url='),
       exportHasImage: exportCode.includes('"kind": "image"') && exportCode.includes('data:image/'),
+      exportHasImageCrop: exportCode.includes('"crop": {') &&
+        exportCode.includes('"x": 25') &&
+        exportCode.includes('"y": 70'),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
+      exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
@@ -11069,6 +11074,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.textBoxCount >= 1 &&
       openXmlPPTXImportState.shapeCount >= 1 &&
       openXmlPPTXImportState.exportHasImage &&
+      openXmlPPTXImportState.exportHasImageCrop &&
+      openXmlPPTXImportState.exportImageCropModelCount > beforeOpenXmlPPTXDrop.imageCropModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&

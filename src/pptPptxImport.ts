@@ -602,11 +602,13 @@ async function readPPTXPictureElement({
   const mimeType = getPPTXMediaMimeType(mediaPath)
   const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(pic)
+  const crop = readPPTXImageCrop(pic)
 
   return {
     ...(altText ? { accessibility: { altText } } : {}),
     alt: altText || name,
-    fit: 'contain',
+    ...(crop ? { crop } : {}),
+    fit: crop ? 'cover' : 'contain',
     geometry,
     ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
     id: createPPTXImportedElementId(index, objectIndex),
@@ -614,6 +616,23 @@ async function readPPTXPictureElement({
     name,
     src: `data:${mimeType};base64,${base64}`,
   }
+}
+
+function readPPTXImageCrop(pic: Element): PPTImage['crop'] | null {
+  const srcRect = getFirstPPTXDescendantByLocalName(pic, 'srcRect')
+
+  if (!srcRect) {
+    return null
+  }
+
+  const left = toPPTXNumber(srcRect.getAttribute('l')) ?? 0
+  const right = toPPTXNumber(srcRect.getAttribute('r')) ?? 0
+  const top = toPPTXNumber(srcRect.getAttribute('t')) ?? 0
+  const bottom = toPPTXNumber(srcRect.getAttribute('b')) ?? 0
+  const x = clampPPTXPercent(50 + (left - right) / 2_000)
+  const y = clampPPTXPercent(50 + (top - bottom) / 2_000)
+
+  return x === 50 && y === 50 ? null : { x, y }
 }
 
 function readPPTXTableElement(
@@ -1119,6 +1138,10 @@ function toPPTXPositiveNumber(value: string | null | undefined) {
 
 function isPPTXTrue(value: string | null | undefined) {
   return value === '1' || value === 'true'
+}
+
+function clampPPTXPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function emuToPx(value: number) {
