@@ -47,10 +47,13 @@ import {
 } from './pptModel'
 import {
   getPPTTableCellBorders,
+  getPPTTableCellColSpan,
   getPPTTableCellFill,
+  getPPTTableCellRowSpan,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
+  isPPTTableCellHidden,
 } from './pptTableLayout'
 import {
   createPPTCanvasCssBoundsTransform,
@@ -869,10 +872,16 @@ function renderPPTTableHTMLRow({
     ? ''
     : ` style="height:${formatNumber(rowHeight)}px"`
   const cells = Array.from({ length: columnCount }, (_, index) => {
+    if (isPPTTableCellHidden(element, rowIndex, index)) {
+      return ''
+    }
+
     const borders = getPPTTableCellBorders(element, rowIndex, index)
+    const colSpan = getPPTTableCellColSpan(element, rowIndex, index)
     const fill = getPPTTableCellFill(element, rowIndex, index)
+    const rowSpan = getPPTTableCellRowSpan(element, rowIndex, index)
     const textStyle = getPPTTableCellTextStyle(element, rowIndex, index)
-    const cellAttrs = fill || textStyle || borders
+    const cellAttrs = fill || textStyle || borders || colSpan > 1 || rowSpan > 1
       ? [
           borders?.bottom
             ? ` data-ppt-table-cell-border-bottom="${escapeHtml(formatPPTTableCellBorderData(borders.bottom))}"`
@@ -886,12 +895,18 @@ function renderPPTTableHTMLRow({
           borders?.top
             ? ` data-ppt-table-cell-border-top="${escapeHtml(formatPPTTableCellBorderData(borders.top))}"`
             : '',
+          colSpan > 1
+            ? ` data-ppt-table-cell-col-span="${colSpan}" colspan="${colSpan}"`
+            : '',
           fill
             ? ` data-ppt-table-cell-fill="${escapeHtml(fill.color)}"`
             : '',
           fill?.opacity === undefined
             ? ''
             : ` data-ppt-table-cell-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(fill)))}"`,
+          rowSpan > 1
+            ? ` data-ppt-table-cell-row-span="${rowSpan}" rowspan="${rowSpan}"`
+            : '',
           textStyle?.align
             ? ` data-ppt-table-cell-align="${escapeHtml(textStyle.align)}"`
             : '',
@@ -935,12 +950,20 @@ function renderPPTTableSVG(element: PPTTable) {
     return Array.from({ length: columnCount }, (_, columnIndex) => {
       const cellWidth = columnWidths[columnIndex] ?? (columnCount > 0 ? element.geometry.w / columnCount : element.geometry.w)
       const x = columnX
-      const fontSize = Math.max(10, Math.min(18, cellHeight * 0.38))
+      const colSpan = getPPTTableCellColSpan(element, rowIndex, columnIndex)
+      const rowSpan = getPPTTableCellRowSpan(element, rowIndex, columnIndex)
+      const spannedCellHeight = sumPPTTableTrackSizes(rowHeights, rowIndex, rowSpan, cellHeight)
+      const spannedCellWidth = sumPPTTableTrackSizes(columnWidths, columnIndex, colSpan, cellWidth)
+      const fontSize = Math.max(10, Math.min(18, spannedCellHeight * 0.38))
       const headerAttrs = rowIndex === 0
         ? ' data-ppt-table-header="true"'
         : ''
 
       columnX += cellWidth
+
+      if (isPPTTableCellHidden(element, rowIndex, columnIndex)) {
+        return ''
+      }
 
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
       const cellBorders = getPPTTableCellBorders(element, rowIndex, columnIndex)
@@ -951,8 +974,8 @@ function renderPPTTableSVG(element: PPTTable) {
       const textColor = cellTextStyle?.color ?? '#111827'
       const textFontSize = cellTextStyle?.fontSize ?? fontSize
       const textInset = getPPTTableCellTextInset({
-        cellHeight,
-        cellWidth,
+        cellHeight: spannedCellHeight,
+        cellWidth: spannedCellWidth,
         textInset: cellTextStyle?.textInset,
       })
       const textAnchor = getPPTTableCellTextAnchor(cellTextStyle?.align)
@@ -965,12 +988,12 @@ function renderPPTTableSVG(element: PPTTable) {
         : ''
       const textX = getPPTTableCellTextX({
         align: cellTextStyle?.align,
-        cellWidth,
+        cellWidth: spannedCellWidth,
         inset: textInset,
         x,
       })
       const textY = getPPTTableCellTextY({
-        cellHeight,
+        cellHeight: spannedCellHeight,
         inset: textInset,
         verticalAlign: cellTextStyle?.verticalAlign,
         y,
@@ -980,14 +1003,14 @@ function renderPPTTableSVG(element: PPTTable) {
         : rowIndex === 0 ? ' font-weight="700"' : ''
       const borderLines = renderPPTTableCellBorderSVG({
         borders: cellBorders,
-        cellHeight,
-        cellWidth,
+        cellHeight: spannedCellHeight,
+        cellWidth: spannedCellWidth,
         x,
         y,
       })
 
       return [
-        `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}" x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(cellWidth)}" height="${formatNumber(cellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
+        `<rect data-ppt-table-cell="${rowIndex}:${columnIndex}"${colSpan > 1 ? ` data-ppt-table-cell-col-span="${colSpan}"` : ''}${rowSpan > 1 ? ` data-ppt-table-cell-row-span="${rowSpan}"` : ''} x="${formatNumber(x)}" y="${formatNumber(y)}" width="${formatNumber(spannedCellWidth)}" height="${formatNumber(spannedCellHeight)}" ${fillAttrs} stroke="#dbe3ef" stroke-width="1"></rect>`,
         borderLines,
         `<text data-ppt-table-text="${rowIndex}:${columnIndex}"${headerAttrs}${textInsetAttr}${textVerticalAlignAttr} x="${formatNumber(textX)}" y="${formatNumber(textY)}" fill="${escapeHtml(textColor)}" font-family="Inter, Arial, sans-serif" font-size="${formatNumber(textFontSize)}"${textFontWeight} text-anchor="${textAnchor}" dominant-baseline="${textBaseline}">${escapeHtml(row[columnIndex] ?? '')}</text>`,
       ].join('')
@@ -1006,6 +1029,21 @@ function renderPPTTableSVG(element: PPTTable) {
 
 function formatPPTTableTrackSizesAttribute(trackSizes: readonly number[]) {
   return trackSizes.map((size) => Math.round(size)).join(' ')
+}
+
+function sumPPTTableTrackSizes(
+  trackSizes: readonly number[],
+  startIndex: number,
+  span: number,
+  fallbackSize: number,
+) {
+  if (span <= 1) {
+    return fallbackSize
+  }
+
+  return trackSizes
+    .slice(startIndex, startIndex + span)
+    .reduce((total, size) => total + size, 0) || fallbackSize
 }
 
 function formatPPTTableCellHTMLStyle(

@@ -855,10 +855,13 @@ import {
 } from './pptExport'
 import {
   getPPTTableCellBorders,
+  getPPTTableCellColSpan,
   getPPTTableCellFill,
+  getPPTTableCellRowSpan,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
+  isPPTTableCellHidden,
 } from './pptTableLayout'
 import {
   exportPPTDeckPPTXBlob,
@@ -36192,8 +36195,14 @@ function PPTTableView({ element }: { element: PPTTable }) {
     >
       {element.rows.flatMap((row, rowIndex) =>
         row.map((cell, columnIndex) => {
+          if (isPPTTableCellHidden(element, rowIndex, columnIndex)) {
+            return null
+          }
+
           const borders = getPPTTableCellBorders(element, rowIndex, columnIndex)
+          const colSpan = getPPTTableCellColSpan(element, rowIndex, columnIndex)
           const fill = getPPTTableCellFill(element, rowIndex, columnIndex)
+          const rowSpan = getPPTTableCellRowSpan(element, rowIndex, columnIndex)
           const textStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
 
           return (
@@ -36204,8 +36213,10 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell-border-left={formatPPTTableCellBorderData(borders?.left)}
               data-ppt-table-cell-border-right={formatPPTTableCellBorderData(borders?.right)}
               data-ppt-table-cell-border-top={formatPPTTableCellBorderData(borders?.top)}
+              data-ppt-table-cell-col-span={colSpan > 1 ? colSpan : undefined}
               data-ppt-table-cell-fill={fill?.color}
               data-ppt-table-cell-fill-opacity={fill?.opacity}
+              data-ppt-table-cell-row-span={rowSpan > 1 ? rowSpan : undefined}
               data-ppt-table-cell-align={textStyle?.align}
               data-ppt-table-cell-font-size={textStyle?.fontSize}
               data-ppt-table-cell-font-weight={textStyle?.fontWeight}
@@ -36216,7 +36227,7 @@ function PPTTableView({ element }: { element: PPTTable }) {
               data-ppt-table-cell-vertical-align={textStyle?.verticalAlign}
               data-ppt-table-header={rowIndex === 0 ? 'true' : undefined}
               key={`${rowIndex}:${columnIndex}`}
-              style={getPPTTableCellStyleCSS(fill, textStyle, borders)}
+              style={getPPTTableCellStyleCSS(fill, textStyle, borders, colSpan, rowSpan)}
             >
               {cell}
             </div>
@@ -36241,8 +36252,10 @@ function getPPTTableCellStyleCSS(
   fill: PPTFill | undefined,
   textStyle: PPTTableCellTextStyle | undefined,
   borders: PPTTableCellBorders | undefined,
+  colSpan: number,
+  rowSpan: number,
 ): CSSProperties | undefined {
-  if (!fill && !textStyle && !borders) {
+  if (!fill && !textStyle && !borders && colSpan <= 1 && rowSpan <= 1) {
     return undefined
   }
 
@@ -36264,6 +36277,8 @@ function getPPTTableCellStyleCSS(
     ...(textStyle?.verticalAlign
       ? { alignItems: getPPTTableCellVerticalAlignCSS(textStyle.verticalAlign) }
       : {}),
+    ...(colSpan > 1 ? { gridColumn: `span ${colSpan}` } : {}),
+    ...(rowSpan > 1 ? { gridRow: `span ${rowSpan}` } : {}),
   }
 }
 

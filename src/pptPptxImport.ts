@@ -1263,19 +1263,52 @@ function readPPTXTableCellStyles(
     row.map((cell): PPTTableCellStyle => {
       const borders = readPPTXTableCellBorders(cell)
       const fill = readPPTXTableCellFill(cell)
+      const span = readPPTXTableCellSpan(cell)
       const textStyle = readPPTXTableCellTextStyle(cell)
 
       return {
         ...(borders ? { borders } : {}),
         ...(fill ? { fill } : {}),
+        ...span,
         ...(textStyle ? { textStyle } : {}),
       }
     }))
 
   return styles.some((row) =>
-    row.some((style) => style.borders || style.fill || style.textStyle))
+    row.some((style) =>
+      style.borders ||
+      style.colSpan ||
+      style.fill ||
+      style.hidden ||
+      style.rowSpan ||
+      style.textStyle))
     ? styles
     : undefined
+}
+
+function readPPTXTableCellSpan(cell: Element): Pick<
+  PPTTableCellStyle,
+  'colSpan' | 'hidden' | 'rowSpan'
+> {
+  const colSpan = readPPTXTableCellSpanValue(cell, 'gridSpan')
+  const rowSpan = readPPTXTableCellSpanValue(cell, 'rowSpan')
+  const hidden = isPPTXTrue(cell.getAttribute('hMerge')) ||
+    isPPTXTrue(cell.getAttribute('vMerge'))
+
+  return {
+    ...(colSpan > 1 ? { colSpan } : {}),
+    ...(hidden ? { hidden: true } : {}),
+    ...(rowSpan > 1 ? { rowSpan } : {}),
+  }
+}
+
+function readPPTXTableCellSpanValue(
+  cell: Element,
+  attribute: 'gridSpan' | 'rowSpan',
+) {
+  const value = toPPTXPositiveNumber(cell.getAttribute(attribute))
+
+  return value === null ? 1 : Math.max(1, Math.floor(value))
 }
 
 function readPPTXTableCellBorders(cell: Element): PPTTableCellBorders | undefined {

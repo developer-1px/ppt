@@ -26,10 +26,13 @@ import {
 } from './pptModel'
 import {
   getPPTTableCellBorders,
+  getPPTTableCellColSpan,
   getPPTTableCellFill,
+  getPPTTableCellRowSpan,
   getPPTTableCellTextStyle,
   getPPTTableResolvedColumnWidths,
   getPPTTableResolvedRowHeights,
+  isPPTTableCellHidden,
 } from './pptTableLayout'
 
 export const PPTX_MIME_TYPE =
@@ -1435,13 +1438,19 @@ function addPPTXTable({
     : undefined
 
   pptxSlide.addTable(element.rows.map((row, rowIndex) =>
-    Array.from({ length: columnCount }, (_, columnIndex) => {
+    Array.from({ length: columnCount }).flatMap((_, columnIndex) => {
+      if (isPPTTableCellHidden(element, rowIndex, columnIndex)) {
+        return []
+      }
+
       const cellBorders = getPPTTableCellBorders(element, rowIndex, columnIndex)
+      const colSpan = getPPTTableCellColSpan(element, rowIndex, columnIndex)
       const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const rowSpan = getPPTTableCellRowSpan(element, rowIndex, columnIndex)
       const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
       const fallbackFillColor = rowIndex === 0 ? 'EFF6FF' : 'FFFFFF'
 
-      return {
+      return [{
         options: {
           align: cellTextStyle?.align,
           bold: cellTextStyle?.fontWeight === undefined
@@ -1461,14 +1470,16 @@ function addPPTXTable({
           fontSize: cellTextStyle?.fontSize === undefined
             ? 13.5
             : pxToPt(cellTextStyle.fontSize),
+          colspan: colSpan > 1 ? colSpan : undefined,
           margin: cellTextStyle?.textInset
             ? createPPTXTableCellMargin(cellTextStyle.textInset)
             : 0.08,
+          rowspan: rowSpan > 1 ? rowSpan : undefined,
           transparency: toPPTXTransparency(opacity),
           valign: cellTextStyle?.verticalAlign,
         },
         text: row[columnIndex] ?? '',
-      }
+      }]
     })),
   {
     ...position,

@@ -11168,12 +11168,22 @@ async function runExportScenario(page) {
       const wideColumnFill = element.cellStyles?.[0]?.[1]?.fill
       const wideColumnTextStyle = element.cellStyles?.[0]?.[1]?.textStyle
       const wideColumnTextInset = wideColumnTextStyle?.textInset
+      const horizontalMergeAnchorStyle = element.cellStyles?.[1]?.[0]
+      const horizontalMergeContinuationStyle = element.cellStyles?.[1]?.[1]
+      const verticalMergeAnchorStyle = element.cellStyles?.[0]?.[2]
+      const verticalMergeContinuationStyle = element.cellStyles?.[1]?.[2]
 
       return element.rows?.[0]?.[1] === 'Wide column' &&
+        element.rows?.[0]?.[2] === 'Tall cell' &&
+        element.rows?.[1]?.[0] === 'Merged cells' &&
         columnWidths.length === 3 &&
         rowHeights.length === 2 &&
         columnWidths[1] > columnWidths[0] * 1.5 &&
         rowHeights[1] > rowHeights[0] * 1.5 &&
+        horizontalMergeAnchorStyle?.colSpan === 2 &&
+        horizontalMergeContinuationStyle?.hidden === true &&
+        verticalMergeAnchorStyle?.rowSpan === 2 &&
+        verticalMergeContinuationStyle?.hidden === true &&
         wideColumnBorders?.top?.color === '#2563eb' &&
         wideColumnBorders?.top?.width === 2 &&
         wideColumnBorders?.right?.color === '#f97316' &&
@@ -11291,6 +11301,9 @@ async function runExportScenario(page) {
         : '',
       exportUnevenTableProbeCellFill: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.color ?? '',
       exportUnevenTableProbeCellFillOpacity: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.fill?.opacity ?? '',
+      exportUnevenTableProbeHorizontalMergeColSpan: exportUnevenTableProbe?.cellStyles?.[1]?.[0]?.colSpan ?? '',
+      exportUnevenTableProbeHorizontalMergeHidden: exportUnevenTableProbe?.cellStyles?.[1]?.[1]?.hidden ?? '',
+      exportUnevenTableProbeHorizontalMergeText: exportUnevenTableProbe?.rows?.[1]?.[0] ?? '',
       exportUnevenTableProbeCellTextAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.align ?? '',
       exportUnevenTableProbeCellTextColor: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.color ?? '',
       exportUnevenTableProbeCellTextFontSize: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.fontSize ?? '',
@@ -11304,6 +11317,9 @@ async function runExportScenario(page) {
           ].join(' ')
         : '',
       exportUnevenTableProbeCellTextVerticalAlign: exportUnevenTableProbe?.cellStyles?.[0]?.[1]?.textStyle?.verticalAlign ?? '',
+      exportUnevenTableProbeVerticalMergeHidden: exportUnevenTableProbe?.cellStyles?.[1]?.[2]?.hidden ?? '',
+      exportUnevenTableProbeVerticalMergeRowSpan: exportUnevenTableProbe?.cellStyles?.[0]?.[2]?.rowSpan ?? '',
+      exportUnevenTableProbeVerticalMergeText: exportUnevenTableProbe?.rows?.[0]?.[2] ?? '',
       exportUnevenTableProbeRowHeights: (exportUnevenTableProbe?.rowHeights ?? []).join(' '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
@@ -27484,14 +27500,15 @@ async function addPPTXUnevenTableProbe(base64) {
           verticalAlign: 'b',
         },
       }),
-      createPPTXTableCellXml('Narrow'),
+      createPPTXTableCellXml('Tall cell', { rowSpan: 2 }),
       '</a:tr>',
       '<a:tr h="731520">',
-      createPPTXTableCellXml('Q1'),
-      createPPTXTableCellXml('Imported sizing', {
+      createPPTXTableCellXml('Merged cells', {
         fill: { color: 'DCFCE7' },
+        gridSpan: 2,
       }),
-      createPPTXTableCellXml('OK'),
+      createPPTXTableCellXml('', { hMerge: true }),
+      createPPTXTableCellXml('', { vMerge: true }),
       '</a:tr>',
       '</a:tbl>',
       '</a:graphicData>',
@@ -27518,6 +27535,12 @@ function createPPTXTableCellXml(text, options = {}) {
   const borders = options.borders ?? null
   const fill = options.fill ?? null
   const textStyle = options.textStyle ?? null
+  const cellAttrs = [
+    options.gridSpan ? ` gridSpan="${options.gridSpan}"` : '',
+    options.hMerge ? ' hMerge="1"' : '',
+    options.rowSpan ? ` rowSpan="${options.rowSpan}"` : '',
+    options.vMerge ? ' vMerge="1"' : '',
+  ].join('')
   const runPropertiesXml = textStyle
     ? [
         '<a:rPr',
@@ -27563,7 +27586,7 @@ function createPPTXTableCellXml(text, options = {}) {
       : `<a:tcPr${tcPrAttrs}/>`
 
   return [
-    '<a:tc>',
+    `<a:tc${cellAttrs}>`,
     '<a:txBody>',
     '<a:bodyPr/>',
     '<a:lstStyle/>',

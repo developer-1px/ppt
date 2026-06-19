@@ -38,7 +38,10 @@ const PPTTableCellTextStyleSchema = z.object({
 })
 const PPTTableCellStyleSchema = z.object({
   borders: PPTTableCellBordersSchema.optional(),
+  colSpan: z.number().int().positive().optional(),
   fill: PPTFillSchema.optional(),
+  hidden: z.boolean().optional(),
+  rowSpan: z.number().int().positive().optional(),
   textStyle: PPTTableCellTextStyleSchema.optional(),
 })
 
