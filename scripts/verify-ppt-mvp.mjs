@@ -839,6 +839,43 @@ async function runTextEditingScenario(page) {
   })
   await delay(50)
 
+  await clickMouse(page, titlePoint.x, titlePoint.y, 1)
+  await delay(50)
+  await pressKey(page, {
+    code: 'F2',
+    key: 'F2',
+    windowsVirtualKeyCode: 113,
+  })
+  await delay(80)
+
+  const afterF2KeyboardEdit = await page.eval(`(() => {
+    const editor = document.querySelector('[data-ppt-element="s1-title"] .ppt-element-editor')
+    const selected = document.querySelector('[data-selected="true"]')
+
+    return {
+      active: document.activeElement === editor,
+      editable: editor?.isContentEditable === true,
+      inlineEditActive: editor?.getAttribute('data-ppt-inline-edit-active') ?? '',
+      selectedId: selected?.getAttribute('data-ppt-element') ?? '',
+    }
+  })()`)
+
+  record(
+    'enters PPT inline text edit with F2 fallback shortcut',
+    afterF2KeyboardEdit.active &&
+      afterF2KeyboardEdit.editable &&
+      afterF2KeyboardEdit.inlineEditActive === 'true' &&
+      afterF2KeyboardEdit.selectedId === 's1-title',
+    afterF2KeyboardEdit,
+  )
+
+  await pressKey(page, {
+    code: 'Escape',
+    key: 'Escape',
+    windowsVirtualKeyCode: 27,
+  })
+  await delay(50)
+
   const summaryPoint = await getElementCenter(page, 's1-summary')
   const beforeCancel = await page.eval(`document.querySelector('[data-ppt-element="s1-summary"]')?.textContent ?? ''`)
 
@@ -2006,6 +2043,76 @@ async function runAffordanceScenario(page) {
     afterDistribute,
     beforeDistribute,
   })
+
+  await pressKey(page, {
+    code: 'KeyG',
+    key: 'g',
+    modifiers: 2,
+    windowsVirtualKeyCode: 71,
+  })
+  await delay(80)
+
+  const afterKeyboardGroup = await page.eval(`(() => {
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+    const groupIds = selected.map((element) => element.getAttribute('data-group-id'))
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      groupedLayerCount: document.querySelectorAll('[data-ppt-layer-row][data-grouped="true"]').length,
+      groupIds,
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
+      selectedCount: selected.length,
+      uniqueGroupCount: new Set(groupIds).size,
+      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]')?.disabled ?? true,
+    }
+  })()`)
+
+  record(
+    'groups selected PPT objects with Ctrl+G canvas command binding',
+    afterKeyboardGroup.selectedCount === 3 &&
+      afterKeyboardGroup.groupIds.every(Boolean) &&
+      afterKeyboardGroup.uniqueGroupCount === 1 &&
+      afterKeyboardGroup.groupedLayerCount >= 4 &&
+      afterKeyboardGroup.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterKeyboardGroup.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
+      !afterKeyboardGroup.ungroupDisabled,
+    afterKeyboardGroup,
+  )
+
+  await pressKey(page, {
+    code: 'KeyG',
+    key: 'G',
+    modifiers: 10,
+    windowsVirtualKeyCode: 71,
+  })
+  await delay(80)
+
+  const afterKeyboardUngroup = await page.eval(`(() => {
+    const selected = [...document.querySelectorAll('[data-selected="true"]')]
+    const groupIds = selected.map((element) => element.getAttribute('data-group-id'))
+    const shell = document.querySelector('.ppt-stage-shell')
+
+    return {
+      groupedLayerCount: document.querySelectorAll('[data-ppt-layer-row][data-grouped="true"]').length,
+      groupIds,
+      keyboardCommandDispatch: shell?.getAttribute('data-ppt-keyboard-command-dispatch') ?? '',
+      keyboardCommandIntent: shell?.getAttribute('data-ppt-keyboard-command-intent') ?? '',
+      selectedCount: selected.length,
+      ungroupDisabled: document.querySelector('[data-ppt-command="ungroup"]')?.disabled ?? true,
+    }
+  })()`)
+
+  record(
+    'ungroups selected PPT objects with Ctrl+Shift+G canvas command binding',
+    afterKeyboardUngroup.selectedCount === 3 &&
+      afterKeyboardUngroup.groupIds.every((groupId) => groupId === null) &&
+      afterKeyboardUngroup.groupedLayerCount === 0 &&
+      afterKeyboardUngroup.keyboardCommandDispatch === 'canvas-keyboard-command-dispatch' &&
+      afterKeyboardUngroup.keyboardCommandIntent === 'canvas-keyboard-command-shortcut-intent' &&
+      afterKeyboardUngroup.ungroupDisabled,
+    afterKeyboardUngroup,
+  )
 
   await page.eval(`document.querySelector('[data-ppt-command="group"]')?.click()`)
   await delay(50)
@@ -4233,7 +4340,7 @@ async function runShortcutHelpScenario(page) {
       afterShortcutOpen.shortcuts.includes('Shift+/') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+X') &&
-      afterShortcutOpen.shortcuts.includes('Enter') &&
+      afterShortcutOpen.shortcuts.includes('Enter / F2') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') &&
       afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') &&
       afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') &&

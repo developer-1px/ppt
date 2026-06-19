@@ -4791,6 +4791,26 @@ function App() {
         return
       }
 
+      if (
+        event.key === 'F2' &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        !isPPTCanvasControlTarget({
+          extraSelectors: ['[data-ppt-layer-pane]'],
+          target: event.target,
+        }) &&
+        selectedElement &&
+        isPPTTextElement(selectedElement) &&
+        selectedElement.locked !== true &&
+        selectedElement.visible !== false
+      ) {
+        event.preventDefault()
+        editSelectedElement()
+        return
+      }
+
       const textFormattingKeyboardIntent = getSlideEditTextFormattingKeyboardIntent({
         altKey: event.altKey,
         key: event.key,
@@ -13444,7 +13464,7 @@ function App() {
     id: 'command:edit-selection',
     onSelect: editSelectedElement,
     section: 'Edit',
-    shortcut: 'Enter',
+    shortcut: 'Enter / F2',
     title: 'Edit text',
   }, {
     disabled: activeSlide.elements.every((element) =>

@@ -13,6 +13,7 @@ const canvasMinimapModelEntry = fileURLToPath(new URL('../canvas/src/canvas/app/
 const canvasPastePositionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts', import.meta.url))
 const canvasPointerClickMemoryEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts', import.meta.url))
 const canvasPointerStartSessionEntry = fileURLToPath(new URL('../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts', import.meta.url))
+const canvasAppEntry = fileURLToPath(new URL('../canvas/src/canvas/app/index.ts', import.meta.url))
 const canvasCoreEntry = fileURLToPath(new URL('../canvas/src/canvas/core/index.ts', import.meta.url))
 const canvasFoundationEntry = fileURLToPath(new URL('../canvas/src/canvas/foundation/index.ts', import.meta.url))
 const canvasEngineEntry = fileURLToPath(new URL('../canvas/src/canvas/engine/index.ts', import.meta.url))
@@ -35,6 +36,7 @@ export default defineConfig({
       { find: 'canvas/app/paste-position', replacement: canvasPastePositionEntry },
       { find: 'canvas/app/pointer-click-memory', replacement: canvasPointerClickMemoryEntry },
       { find: 'canvas/app/pointer-start-session', replacement: canvasPointerStartSessionEntry },
+      { find: 'canvas/app', replacement: canvasAppEntry },
       { find: 'canvas/core', replacement: canvasCoreEntry },
       { find: 'canvas/foundation', replacement: canvasFoundationEntry },
       { find: 'canvas/engine', replacement: canvasEngineEntry },
