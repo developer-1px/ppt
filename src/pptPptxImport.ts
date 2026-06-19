@@ -502,6 +502,7 @@ function readPPTXLineElement(
   const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
   const line = getDirectPPTXChildByLocalName(spPr, 'ln')
   const stroke = readPPTXStroke(spPr)
+  const opacity = readPPTXLineOpacity(line)
   const lineGeometry = readPPTXLineGeometry(spPr)
 
   if (!stroke || !lineGeometry) {
@@ -516,6 +517,7 @@ function readPPTXLineElement(
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'line',
     name: readPPTXObjectName(element, `Line ${objectIndex}`),
+    ...(opacity === null ? {} : { opacity }),
     route: 'straight',
     start: lineGeometry.start,
     startMarker: readPPTXLineMarker(line, 'headEnd'),
@@ -602,6 +604,12 @@ function readPPTXLineMarker(
     ?.getAttribute('type')
 
   return type && type !== 'none' ? 'arrow' : 'none'
+}
+
+function readPPTXLineOpacity(line: Element | null) {
+  const opacity = readPPTXSolidFill(line)?.opacity
+
+  return opacity === undefined || opacity === 1 ? null : opacity
 }
 
 function readPPTXShapeElement(

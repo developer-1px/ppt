@@ -10984,6 +10984,7 @@ async function runExportScenario(page) {
     return {
       imageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
+      objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       tableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       transitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
@@ -11033,6 +11034,7 @@ async function runExportScenario(page) {
         exportCode.includes('"x": 25') &&
         exportCode.includes('"y": 70'),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
+      exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
       exportHasTransition: exportCode.includes('"transition": {') &&
         exportCode.includes('"type": "push"') &&
@@ -11041,6 +11043,7 @@ async function runExportScenario(page) {
         exportCode.includes('"advanceAfterMs": 3000'),
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
+      exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportTableModelCount: (exportCode.match(/"kind": "table"/g) ?? []).length,
       exportTransitionModelCount: (exportCode.match(/"transition": \{/g) ?? []).length,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
@@ -11084,6 +11087,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportHasImageCrop &&
       openXmlPPTXImportState.exportImageCropModelCount > beforeOpenXmlPPTXDrop.imageCropModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
+      openXmlPPTXImportState.exportHasObjectOpacity &&
+      openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
       openXmlPPTXImportState.exportTableModelCount > beforeOpenXmlPPTXDrop.tableModelCount &&
       openXmlPPTXImportState.exportHasTransition &&
