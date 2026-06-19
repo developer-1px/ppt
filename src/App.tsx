@@ -12676,8 +12676,7 @@ function App() {
           slide: activeSlide,
         })
       : null
-    const duplicateOnDrag = duplicateSourceSelection &&
-      duplicateSourceSelection.some((id) => selection.includes(id))
+    const duplicateOnDrag = duplicateSourceSelection
       ? {
           duplicated: false,
           pendingSelection: nextSelection,
@@ -12686,7 +12685,7 @@ function App() {
         }
       : undefined
     let axisLockOnDrag = axisLockSourceSelection &&
-      axisLockSourceSelection.some((id) => selection.includes(id))
+      (axisLockSourceSelection.some((id) => selection.includes(id)) || !!duplicateOnDrag)
       ? {
           pendingSelection: nextSelection,
           sourceSelection: axisLockSourceSelection,
