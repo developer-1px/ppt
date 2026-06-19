@@ -11028,6 +11028,8 @@ async function runExportScenario(page) {
       imageFlipModelCount: elements.filter((element) =>
         element.kind === 'image' && element.flipH === true).length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
+      objectLockingModelCount: elements.filter((element) =>
+        element.locked === true).length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       objectShadowModelCount: elements.filter((element) => element.shadow).length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
@@ -11089,6 +11091,8 @@ async function runExportScenario(page) {
     const exportElements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
     const exportFlippedImages = exportElements.filter((element) =>
       element.kind === 'image' && element.flipH === true)
+    const exportLockedObjects = exportElements.filter((element) =>
+      element.locked === true)
     const exportShadowedObjects = exportElements.filter((element) => element.shadow)
     const exportRuns = exportElements.flatMap((element) =>
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
@@ -11119,8 +11123,10 @@ async function runExportScenario(page) {
       exportHasImageFlip: exportFlippedImages.length > 0,
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
+      exportHasObjectLocking: exportLockedObjects.length > 0,
       exportHasObjectOpacity: exportCode.includes('"opacity": 0.42'),
       exportHasObjectShadow: exportShadowedObjects.length > 0,
+      exportObjectLockingNames: exportLockedObjects.map((element) => element.name).join(' | '),
       exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
       exportHasParagraphSpacing: exportSpacedParagraphs.length > 0,
       exportHasTableText: exportCode.includes('"kind": "table"') && exportCode.includes('"Region"'),
@@ -11136,6 +11142,7 @@ async function runExportScenario(page) {
       exportImageCropModelCount: (exportCode.match(/"crop": \{/g) ?? []).length,
       exportImageFlipModelCount: exportFlippedImages.length,
       exportLineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
+      exportObjectLockingModelCount: exportLockedObjects.length,
       exportObjectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
       exportObjectShadowModelCount: exportShadowedObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
@@ -11188,6 +11195,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportHasImageFlip &&
       openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
       openXmlPPTXImportState.exportLineModelCount > beforeOpenXmlPPTXDrop.lineModelCount &&
+      openXmlPPTXImportState.exportHasObjectLocking &&
+      openXmlPPTXImportState.exportObjectLockingModelCount > beforeOpenXmlPPTXDrop.objectLockingModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
       openXmlPPTXImportState.exportObjectOpacityModelCount > beforeOpenXmlPPTXDrop.objectOpacityModelCount &&
       openXmlPPTXImportState.exportHasObjectShadow &&

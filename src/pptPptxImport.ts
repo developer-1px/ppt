@@ -54,6 +54,22 @@ const PPTX_DEFAULT_TEXT_COLOR = '#111827'
 const PPTX_DEFAULT_TEXT_SIZE = 24
 const PPTX_DEFAULT_FILL_COLOR = '#ffffff'
 const PPTX_DEFAULT_STROKE_COLOR = '#111827'
+const PPTX_LOCK_ATTRIBUTE_NAMES = [
+  'noAdjustHandles',
+  'noEditPoints',
+  'noMove',
+  'noResize',
+  'noRot',
+  'noSelect',
+  'noTextEdit',
+] as const
+const PPTX_LOCK_TAG_NAMES = [
+  'cxnSpLocks',
+  'graphicFrameLocks',
+  'grpSpLocks',
+  'picLocks',
+  'spLocks',
+] as const
 const PPTX_SCHEME_COLORS: Record<string, string> = {
   accent1: '#2563eb',
   accent2: '#0ea5e9',
@@ -518,6 +534,7 @@ function readPPTXLineElement(
     ...(readPPTXElementHyperlink(element, relationships) ?? {}),
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'line',
+    ...(readPPTXElementLocked(element) ? { locked: true } : {}),
     name: readPPTXObjectName(element, `Line ${objectIndex}`),
     ...(opacity === null ? {} : { opacity }),
     route: 'straight',
@@ -645,6 +662,7 @@ function readPPTXShapeElement(
       ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
       id,
       kind: 'textBox',
+      ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
       name,
       ...(shadow ? { shadow } : {}),
       style: readPPTXTextStyle(textBody, txBody),
@@ -667,6 +685,7 @@ function readPPTXShapeElement(
     geometry,
     id,
     kind: 'shape',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
     name,
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
@@ -720,6 +739,7 @@ async function readPPTXPictureElement({
     ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
     id: createPPTXImportedElementId(index, objectIndex),
     kind: 'image',
+    ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
     name,
     ...(shadow ? { shadow } : {}),
     src: `data:${mimeType};base64,${base64}`,
@@ -770,6 +790,7 @@ function readPPTXTableElement(
     ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'table',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
     name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
     ...(shadow ? { shadow } : {}),
     rows,
@@ -886,6 +907,14 @@ function readPPTXElementShadow(container: Element | null): PPTElementShadow | nu
     distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
     opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
   }
+}
+
+function readPPTXElementLocked(element: Element) {
+  return PPTX_LOCK_TAG_NAMES.some((tagName) =>
+    getPPTXDescendantsByLocalName(element, tagName)
+      .some((locks) =>
+        PPTX_LOCK_ATTRIBUTE_NAMES.some((attribute) =>
+          isPPTXTrue(locks.getAttribute(attribute)))))
 }
 
 function readPPTXRotation(xfrm: Element) {
