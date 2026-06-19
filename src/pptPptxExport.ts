@@ -490,11 +490,7 @@ function addPPTXImage({
     objectName: element.name,
     rotate: element.geometry.rotation,
     shadow: createPPTXShadow(element.shadow),
-    sizing: {
-      h: position.h,
-      type: element.fit === 'contain' ? 'contain' : 'cover',
-      w: position.w,
-    },
+    sizing: createPPTXImageSizing(element, position),
     transparency: toPPTXTransparency(element.opacity ?? 1),
   })
 }
@@ -825,6 +821,32 @@ function createPPTXHyperlink(
   return hyperlink?.url
     ? { url: hyperlink.url }
     : undefined
+}
+
+function createPPTXImageSizing(
+  element: PPTImage,
+  position: PPTXPosition,
+): PptxGenJS.ImageProps['sizing'] {
+  if (element.crop &&
+    (element.crop.x !== 50 || element.crop.y !== 50)) {
+    return {
+      h: position.h,
+      type: 'crop',
+      w: position.w,
+      x: getPPTXImageCropOffset(element.crop.x, position.w),
+      y: getPPTXImageCropOffset(element.crop.y, position.h),
+    }
+  }
+
+  return {
+    h: position.h,
+    type: element.fit === 'contain' ? 'contain' : 'cover',
+    w: position.w,
+  }
+}
+
+function getPPTXImageCropOffset(value: number, size: number) {
+  return ((clamp(value, 0, 100) - 50) / 100) * size
 }
 
 function createPPTXShadow(shadow: PPTElementShadow | undefined) {

@@ -10819,6 +10819,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX image crop position',
+    pptxPackageState.hasImageCropSrcRect,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -26586,6 +26591,7 @@ async function inspectPPTXPackage(base64) {
     hasEditableShapeTree: false,
     hasEditableTextRuns: false,
     hasHyperlinkRelationship: false,
+    hasImageCropSrcRect: false,
     hasMediaPart: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
@@ -26646,6 +26652,9 @@ async function inspectPPTXPackage(base64) {
       hasHyperlinkRelationship:
         relationshipXml.includes('hyperlink') &&
         relationshipXml.includes('https://example.com/ppt'),
+      hasImageCropSrcRect: slideXml.includes(
+        '<a:srcRect l="-25000" r="25000" t="20000" b="-20000"/>',
+      ),
       hasMediaPart: entries.some((path) => path.startsWith('ppt/media/')),
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
