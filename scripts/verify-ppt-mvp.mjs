@@ -12207,6 +12207,7 @@ async function runViewAndShapeScenario(page) {
       centerY: rect ? rect.top + rect.height / 2 : 0,
       creationAspectModifier: stage?.getAttribute('data-ppt-creation-aspect-ratio-modifier') ?? '',
       creationBoundsModel: stage?.getAttribute('data-ppt-creation-bounds-model') ?? '',
+      creationCenterOutModel: stage?.getAttribute('data-ppt-creation-center-out-model') ?? '',
       creationCenterModifier: stage?.getAttribute('data-ppt-creation-from-center-modifier') ?? '',
       creationModifierModel: stage?.getAttribute('data-ppt-creation-modifier-model') ?? '',
       height: parseFloat(selected?.style.height ?? '0'),
@@ -12224,6 +12225,7 @@ async function runViewAndShapeScenario(page) {
     centerEllipseDrag.pressed === 'true' &&
       afterCenterEllipseDrag.creationModifierModel === 'canvas-resize-pointer-modifiers' &&
       afterCenterEllipseDrag.creationBoundsModel === 'canvas-created-rect-bounds' &&
+      afterCenterEllipseDrag.creationCenterOutModel === 'canvas-center-out-creation-points' &&
       afterCenterEllipseDrag.creationCenterModifier === 'Alt' &&
       afterCenterEllipseDrag.creationAspectModifier === 'Shift' &&
       afterCenterEllipseDrag.selectedKind === 'shape' &&

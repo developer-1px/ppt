@@ -571,9 +571,10 @@ import {
   createPPTCanvasAffordanceConfig,
   createPPTCanvasShape,
   createPPTCanvasText,
-  getPPTCanvasAspectLockedCreationPoint,
+  getPPTCanvasCenterOutCreationPoints,
   deletePPTCanvasCommand,
   getPPTCanvasCreatedRectBounds,
+  PPT_CENTER_OUT_CREATION_POINTS_MODEL,
   PPT_CREATED_RECT_BOUNDS_MODEL,
   PPT_COMMAND_AFFORDANCES,
   PPT_TOOL_AFFORDANCES,
@@ -4075,6 +4076,11 @@ type PPTCreationTool =
       kind: 'freeform'
       tool: PPTFreeformTool
     }
+type PPTCreationModifierState = Readonly<{
+  preserveAspectRatio: boolean
+  resizeFromCenter: boolean
+}>
+
 type PPTFindMatch = {
   elementId: string
   elementIndex: number
@@ -13217,6 +13223,10 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     const element = createPPTElementFromCreationTool({
       current: point,
       id,
+      modifiers: {
+        preserveAspectRatio: false,
+        resizeFromCenter: false,
+      },
       start: point,
       tool: creationTool,
     })
@@ -13832,27 +13842,15 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     if (interaction.kind === 'element-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
-      const constrainedCurrent = interaction.tool.kind === 'shape' &&
-        transformModifierState.preserveAspectRatio
-        ? getPPTCanvasAspectLockedCreationPoint({
-          currentWorld: point,
-          startWorld: interaction.startPoint,
-        })
-        : point
-      const creationPoints = transformModifierState.resizeFromCenter
-        ? getPPTCenterOutCreationPoints(interaction.startPoint, constrainedCurrent)
-        : {
-            current: constrainedCurrent,
-            start: interaction.startPoint,
-          }
       const elements = mapPPTElementsByIds(
         currentSlide.elements,
         [interaction.elementId],
         () =>
           createPPTElementFromCreationTool({
-            current: creationPoints.current,
+            current: point,
             id: interaction.elementId,
-            start: creationPoints.start,
+            modifiers: transformModifierState,
+            start: interaction.startPoint,
             tool: interaction.tool,
           }),
       )
@@ -16177,6 +16175,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-resize-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-creation-aspect-ratio-modifier="Shift"
         data-ppt-creation-bounds-model={PPT_CREATED_RECT_BOUNDS_MODEL}
+        data-ppt-creation-center-out-model={PPT_CENTER_OUT_CREATION_POINTS_MODEL}
         data-ppt-creation-from-center-modifier="Alt"
         data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-move-axis-lock-modifier={PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE.axisLockModifier}
@@ -39347,19 +39346,6 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
 
 function noopPPTKeyboardCommandHandler() {}
 
-function getPPTCenterOutCreationPoints(center: Point, current: Point) {
-  const dx = current.x - center.x
-  const dy = current.y - center.y
-
-  return {
-    current,
-    start: {
-      x: center.x - dx,
-      y: center.y - dy,
-    },
-  }
-}
-
 function getPPTAngleConstrainedLineEndPoint(start: Point, current: Point): Point {
   const distance = getPPTCanvasPointDistance(start, current)
 
@@ -40771,11 +40757,13 @@ function throwUnsupportedPPTCreationTool(): never {
 function createPPTElementFromCreationTool({
   current,
   id,
+  modifiers,
   start,
   tool,
 }: {
   current: Point
   id: string
+  modifiers: PPTCreationModifierState
   start: Point
   tool: PPTCreationTool
 }): PPTElement {
@@ -40795,6 +40783,7 @@ function createPPTElementFromCreationTool({
       ...item,
       geometry: getPPTCreatedTextBounds({
         currentWorld: current,
+        resizeFromCenter: modifiers.resizeFromCenter,
         startWorld: start,
       }),
       textBody: createPPTTextBody(created.editValue),
@@ -40812,6 +40801,7 @@ function createPPTElementFromCreationTool({
     return createPPTStickyElement({
       bounds: getPPTCreatedStickyBounds({
         currentWorld: current,
+        resizeFromCenter: modifiers.resizeFromCenter,
         startWorld: start,
       }),
       id,
@@ -40822,6 +40812,7 @@ function createPPTElementFromCreationTool({
     return createPPTSectionElement({
       bounds: getPPTCreatedSectionBounds({
         currentWorld: current,
+        resizeFromCenter: modifiers.resizeFromCenter,
         startWorld: start,
       }),
       id,
@@ -40830,12 +40821,21 @@ function createPPTElementFromCreationTool({
 
   if (tool.kind === 'freeform') {
     const style = getPPTFreeformToolStyle(tool.tool)
+    const creationPoints = modifiers.resizeFromCenter
+      ? getPPTCanvasCenterOutCreationPoints({
+        currentWorld: current,
+        startWorld: start,
+      })
+      : {
+          current,
+          start,
+        }
 
     return createPPTFreeformElement({
       id,
       name: style.name,
       opacity: style.opacity,
-      points: [start, current],
+      points: [creationPoints.start, creationPoints.current],
       stroke: style.stroke,
     })
   }
@@ -40844,6 +40844,8 @@ function createPPTElementFromCreationTool({
     adapter: PPT_CANVAS_CREATION_ADAPTER,
     createId: () => id,
     currentWorld: current,
+    preserveAspectRatio: modifiers.preserveAspectRatio,
+    resizeFromCenter: modifiers.resizeFromCenter,
     shapeType: tool.shape,
     startWorld: start,
   })
@@ -40986,43 +40988,52 @@ function createPPTShapeElement({
 
 function getPPTCreatedTextBounds({
   currentWorld,
+  resizeFromCenter = false,
   startWorld,
 }: {
   currentWorld: Point
+  resizeFromCenter?: boolean
   startWorld: Point
 }): Bounds {
   return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
     currentWorld,
     defaultSize: PPT_DEFAULT_TEXT_BOUNDS,
+    resizeFromCenter,
     startWorld,
   }))
 }
 
 function getPPTCreatedStickyBounds({
   currentWorld,
+  resizeFromCenter = false,
   startWorld,
 }: {
   currentWorld: Point
+  resizeFromCenter?: boolean
   startWorld: Point
 }): Bounds {
   return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
     currentWorld,
     defaultSize: PPT_STICKY_BOUNDS,
+    resizeFromCenter,
     startWorld,
   }))
 }
 
 function getPPTCreatedSectionBounds({
   currentWorld,
+  resizeFromCenter = false,
   startWorld,
 }: {
   currentWorld: Point
+  resizeFromCenter?: boolean
   startWorld: Point
 }): Bounds {
   return clampPPTCreationBounds(getPPTCanvasCreatedRectBounds({
     currentWorld,
     defaultSize: PPT_SECTION_BOUNDS,
     dragThreshold: 12,
+    resizeFromCenter,
     startWorld,
   }))
 }
