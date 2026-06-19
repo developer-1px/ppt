@@ -13161,18 +13161,24 @@ function App() {
     if (interaction.kind === 'element-create') {
       const currentSlide = findPPTSlide(deckRef.current, interaction.slideId)
       const transformModifierState = getPPTCanvasPointerTransformModifierState(event)
-      const current = interaction.tool.kind === 'shape' &&
+      const constrainedCurrent = interaction.tool.kind === 'shape' &&
         transformModifierState.preserveAspectRatio
         ? getPPTAspectLockedCreationPoint(interaction.startPoint, point)
         : point
+      const creationPoints = transformModifierState.resizeFromCenter
+        ? getPPTCenterOutCreationPoints(interaction.startPoint, constrainedCurrent)
+        : {
+            current: constrainedCurrent,
+            start: interaction.startPoint,
+          }
       const elements = mapPPTElementsByIds(
         currentSlide.elements,
         [interaction.elementId],
         () =>
           createPPTElementFromCreationTool({
-            current,
+            current: creationPoints.current,
             id: interaction.elementId,
-            start: interaction.startPoint,
+            start: creationPoints.start,
             tool: interaction.tool,
           }),
       )
@@ -15308,6 +15314,9 @@ function App() {
         data-ppt-resize-aspect-ratio-modifier="Shift"
         data-ppt-resize-from-center-modifier="Alt"
         data-ppt-resize-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
+        data-ppt-creation-aspect-ratio-modifier="Shift"
+        data-ppt-creation-from-center-modifier="Alt"
+        data-ppt-creation-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-transform-constrain-angle-modifier="Shift"
         data-ppt-transform-modifier-model={PPT_RESIZE_POINTER_MODIFIERS_MODEL}
         data-ppt-transform-rotation-snap-step="15"
@@ -37397,6 +37406,19 @@ function getPPTAspectLockedCreationPoint(start: Point, current: Point): Point {
   return {
     x: start.x + getPPTCreationDirectionSign(dx) * size,
     y: start.y + getPPTCreationDirectionSign(dy) * size,
+  }
+}
+
+function getPPTCenterOutCreationPoints(center: Point, current: Point) {
+  const dx = current.x - center.x
+  const dy = current.y - center.y
+
+  return {
+    current,
+    start: {
+      x: center.x - dx,
+      y: center.y - dy,
+    },
   }
 }
 

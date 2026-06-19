@@ -11017,6 +11017,81 @@ async function runViewAndShapeScenario(page) {
   await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
   await delay(100)
 
+  await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]')?.click()`)
+  await delay(20)
+
+  const centerEllipseDrag = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+    const startX = slide.left + slide.width * 0.34
+    const startY = slide.top + slide.height * 0.64
+    const endX = slide.left + slide.width * 0.48
+    const endY = slide.top + slide.height * 0.72
+
+    return {
+      dx: Math.abs(endX - startX),
+      dy: Math.abs(endY - startY),
+      endX,
+      endY,
+      pressed: document.querySelector('[data-ppt-insert-shape="ellipse"]')?.getAttribute('aria-pressed'),
+      startX,
+      startY,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: centerEllipseDrag.startX,
+    y: centerEllipseDrag.startY,
+  }, {
+    x: centerEllipseDrag.endX,
+    y: centerEllipseDrag.endY,
+  }], 1)
+  await delay(100)
+
+  const afterCenterEllipseDrag = await page.eval(`(() => {
+    const selected = document.querySelector('[data-selected="true"]')
+    const rect = selected?.getBoundingClientRect()
+    const stage = document.querySelector('.ppt-stage-shell')
+
+    return {
+      centerX: rect ? rect.left + rect.width / 2 : 0,
+      centerY: rect ? rect.top + rect.height / 2 : 0,
+      creationAspectModifier: stage?.getAttribute('data-ppt-creation-aspect-ratio-modifier') ?? '',
+      creationCenterModifier: stage?.getAttribute('data-ppt-creation-from-center-modifier') ?? '',
+      creationModifierModel: stage?.getAttribute('data-ppt-creation-modifier-model') ?? '',
+      height: parseFloat(selected?.style.height ?? '0'),
+      screenHeight: rect?.height ?? 0,
+      screenWidth: rect?.width ?? 0,
+      selectedKind: selected?.getAttribute('data-kind') ?? '',
+      shape: selected?.getAttribute('data-shape') ?? null,
+      undoEnabled: !document.querySelector('button[title="Undo"]').disabled,
+      width: parseFloat(selected?.style.width ?? '0'),
+    }
+  })()`)
+
+  record(
+    'creates PPT shape from center with Alt drag',
+    centerEllipseDrag.pressed === 'true' &&
+      afterCenterEllipseDrag.creationModifierModel === 'canvas-resize-pointer-modifiers' &&
+      afterCenterEllipseDrag.creationCenterModifier === 'Alt' &&
+      afterCenterEllipseDrag.creationAspectModifier === 'Shift' &&
+      afterCenterEllipseDrag.selectedKind === 'shape' &&
+      afterCenterEllipseDrag.shape === 'ellipse' &&
+      nearlyEqual(afterCenterEllipseDrag.centerX, centerEllipseDrag.startX, 1) &&
+      nearlyEqual(afterCenterEllipseDrag.centerY, centerEllipseDrag.startY, 1) &&
+      afterCenterEllipseDrag.screenWidth > centerEllipseDrag.dx * 1.8 &&
+      afterCenterEllipseDrag.screenHeight > centerEllipseDrag.dy * 1.8 &&
+      afterCenterEllipseDrag.width > 0 &&
+      afterCenterEllipseDrag.height > 0 &&
+      afterCenterEllipseDrag.undoEnabled,
+    {
+      afterCenterEllipseDrag,
+      centerEllipseDrag,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
   const restoredRectPoint = await getElementCenter(page, afterDragRect.selectedId)
   await clickMouse(page, restoredRectPoint.x, restoredRectPoint.y, 1)
   await delay(50)
