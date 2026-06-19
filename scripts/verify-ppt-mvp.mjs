@@ -10824,6 +10824,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX object opacity',
+    pptxPackageState.hasObjectOpacityAlpha,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -26593,6 +26598,7 @@ async function inspectPPTXPackage(base64) {
     hasHyperlinkRelationship: false,
     hasImageCropSrcRect: false,
     hasMediaPart: false,
+    hasObjectOpacityAlpha: false,
     hasPresentationXml: false,
     hasPresetGeometry: false,
     hasSlide1Xml: false,
@@ -26656,6 +26662,7 @@ async function inspectPPTXPackage(base64) {
         '<a:srcRect l="-25000" r="25000" t="20000" b="-20000"/>',
       ),
       hasMediaPart: entries.some((path) => path.startsWith('ppt/media/')),
+      hasObjectOpacityAlpha: slideXml.includes('<a:alpha val="42000"/>'),
       hasPresentationXml: entries.includes('ppt/presentation.xml'),
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
       hasSlide1Xml: entries.includes('ppt/slides/slide1.xml'),

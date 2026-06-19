@@ -407,16 +407,19 @@ function addPPTXTextBox({
   pptxSlide: PPTXSlide
 }) {
   const hyperlink = createPPTXHyperlink(element.hyperlink)
+  const opacity = getPPTXElementOpacity(element)
 
   pptxSlide.addText(createPPTXTextRuns({
     body: element.textBody,
     hyperlink,
+    opacity,
     style: element.style,
   }), {
     ...createPPTXElementTextOptions({
       element,
       hyperlink,
       inset: getPPTXTextInset(element.style, PPTX_DEFAULT_TEXT_BOX_INSET),
+      opacity,
     }),
     isTextBox: true,
   })
@@ -430,16 +433,17 @@ function addPPTXShape({
   pptxSlide: PPTXSlide
 }) {
   const shapeName = getPPTXShapeName(element)
+  const opacity = getPPTXElementOpacity(element)
   const shapeOptions = {
     ...createPPTXElementPosition(element.geometry),
-    fill: createPPTXFill(element.fill),
+    fill: createPPTXFill(element.fill, opacity),
     flipH: element.flipH === true,
     flipV: element.flipV === true,
     hyperlink: createPPTXHyperlink(element.hyperlink),
-    line: createPPTXLineProps(element.stroke),
+    line: createPPTXLineProps(element.stroke, {}, opacity),
     objectName: element.name,
     rectRadius: getPPTXRectRadius(element),
-    shadow: createPPTXShadow(element.shadow),
+    shadow: createPPTXShadow(element.shadow, opacity),
   }
 
   if (element.textBody) {
@@ -448,10 +452,11 @@ function addPPTXShape({
     pptxSlide.addText(createPPTXTextRuns({
       body: element.textBody,
       hyperlink,
+      opacity,
       style: element.style,
     }), {
       ...shapeOptions,
-      ...createPPTXTextStyleOptions(element.style),
+      ...createPPTXTextStyleOptions(element.style, opacity),
       fit: getPPTXTextFit(element.textAutoFit),
       hyperlink,
       margin: createPPTXMargin(getPPTXTextInset(
@@ -479,6 +484,7 @@ function addPPTXImage({
     ? { data: src }
     : { path: src }
   const position = createPPTXElementPosition(element.geometry)
+  const opacity = getPPTXElementOpacity(element)
 
   pptxSlide.addImage({
     ...source,
@@ -489,9 +495,9 @@ function addPPTXImage({
     hyperlink: createPPTXHyperlink(element.hyperlink),
     objectName: element.name,
     rotate: element.geometry.rotation,
-    shadow: createPPTXShadow(element.shadow),
+    shadow: createPPTXShadow(element.shadow, opacity),
     sizing: createPPTXImageSizing(element, position),
-    transparency: toPPTXTransparency(element.opacity ?? 1),
+    transparency: toPPTXTransparency(opacity),
   })
 }
 
@@ -504,11 +510,13 @@ function addPPTXLine({
 }) {
   const start = getPPTXLineWorldPoint(element, element.start)
   const end = getPPTXLineWorldPoint(element, element.end)
+  const opacity = getPPTXElementOpacity(element)
 
   if (element.route === 'elbow') {
     addPPTXElbowRoute({
       element,
       pptxSlide,
+      opacity,
       start,
       end,
     })
@@ -520,10 +528,10 @@ function addPPTXLine({
     line: createPPTXLineProps(element.stroke, {
       endMarker: element.endMarker,
       startMarker: element.startMarker,
-    }),
+    }, opacity),
     objectName: element.name,
     rotate: element.geometry.rotation,
-    shadow: createPPTXShadow(element.shadow),
+    shadow: createPPTXShadow(element.shadow, opacity),
     w: pxToIn(end.x - start.x),
     x: pxToIn(start.x),
     y: pxToIn(start.y),
@@ -534,11 +542,13 @@ function addPPTXLine({
 function addPPTXElbowRoute({
   element,
   end,
+  opacity,
   pptxSlide,
   start,
 }: {
   element: PPTLine
   end: { x: number, y: number }
+  opacity: number
   pptxSlide: PPTXSlide
   start: { x: number, y: number }
 }) {
@@ -556,7 +566,7 @@ function addPPTXElbowRoute({
       line: createPPTXLineProps(element.stroke, {
         endMarker: index === segments.length - 1 ? element.endMarker : undefined,
         startMarker: index === 0 ? element.startMarker : undefined,
-      }),
+      }, opacity),
       objectName: `${element.name} route`,
       w: pxToIn(segmentEnd.x - segmentStart.x),
       x: pxToIn(segmentStart.x),
@@ -572,13 +582,15 @@ function addPPTXFreeform({
   element: PPTFreeform
   pptxSlide: PPTXSlide
 }) {
+  const opacity = getPPTXElementOpacity(element)
+
   for (let index = 1; index < element.points.length; index += 1) {
     const start = element.points[index - 1]
     const end = element.points[index]
 
     pptxSlide.addShape('line', {
       h: pxToIn(end.y - start.y),
-      line: createPPTXLineProps(element.stroke),
+      line: createPPTXLineProps(element.stroke, {}, opacity),
       objectName: `${element.name} segment ${index}`,
       w: pxToIn(end.x - start.x),
       x: pxToIn(element.geometry.x + start.x),
@@ -599,6 +611,7 @@ function addPPTXTable({
     1,
     ...element.rows.map((row) => row.length),
   )
+  const opacity = getPPTXElementOpacity(element)
   const position = createPPTXElementPosition(element.geometry)
   const colW = Array.from(
     { length: columnCount },
@@ -614,10 +627,14 @@ function addPPTXTable({
         bold: rowIndex === 0,
         border: { color: 'DBE3EF', pt: 0.75 },
         color: '111827',
-        fill: { color: rowIndex === 0 ? 'EFF6FF' : 'FFFFFF' },
+        fill: {
+          color: rowIndex === 0 ? 'EFF6FF' : 'FFFFFF',
+          transparency: toPPTXTransparency(opacity),
+        },
         fontFace: PPTX_DEFAULT_FONT_FACE,
         fontSize: 13.5,
         margin: 0.08,
+        transparency: toPPTXTransparency(opacity),
       },
       text: row[columnIndex] ?? '',
     }))),
@@ -637,6 +654,7 @@ function addPPTXComment({
   element: PPTComment
   pptxSlide: PPTXSlide
 }) {
+  const opacity = getPPTXElementOpacity(element)
   const body = [
     element.body,
     ...(element.thread ?? []).map((message) =>
@@ -646,13 +664,17 @@ function addPPTXComment({
   pptxSlide.addText(body, {
     ...createPPTXElementPosition(element.geometry),
     color: '78350F',
-    fill: { color: element.resolved ? 'FEF3C7' : 'FFFBEB' },
+    fill: {
+      color: element.resolved ? 'FEF3C7' : 'FFFBEB',
+      transparency: toPPTXTransparency(opacity),
+    },
     fontFace: PPTX_DEFAULT_FONT_FACE,
     fontSize: 12.75,
-    line: { color: 'D97706', width: 0.75 },
+    line: createPPTXLineProps({ color: '#D97706', width: 1 }, {}, opacity),
     margin: [6, 8, 6, 8],
     objectName: element.name,
     shape: 'roundRect',
+    transparency: toPPTXTransparency(opacity),
   })
 }
 
@@ -660,19 +682,21 @@ function createPPTXElementTextOptions({
   element,
   hyperlink,
   inset,
+  opacity,
 }: {
   element: Extract<PPTElement, { kind: 'textBox' }>
   hyperlink: PptxGenJS.HyperlinkProps | undefined
   inset: PPTXTextInset
+  opacity: number
 }) {
   return {
     ...createPPTXElementPosition(element.geometry),
-    ...createPPTXTextStyleOptions(element.style),
+    ...createPPTXTextStyleOptions(element.style, opacity),
     fit: getPPTXTextFit(element.textAutoFit),
     hyperlink,
     margin: createPPTXMargin(inset),
     objectName: element.name,
-    shadow: createPPTXShadow(element.shadow),
+    shadow: createPPTXShadow(element.shadow, opacity),
     valign: element.style.verticalAlign ?? 'top',
   }
 }
@@ -680,10 +704,12 @@ function createPPTXElementTextOptions({
 function createPPTXTextRuns({
   body,
   hyperlink,
+  opacity = 1,
   style,
 }: {
   body: PPTTextBody
   hyperlink?: PptxGenJS.HyperlinkProps
+  opacity?: number
   style?: PPTTextStyle
 }): PptxGenJS.TextProps[] {
   const runs: PptxGenJS.TextProps[] = []
@@ -696,7 +722,7 @@ function createPPTXTextRuns({
     paragraphRuns.forEach((run, runIndex) => {
       runs.push({
         options: {
-          ...createPPTXTextStyleOptions(style),
+          ...createPPTXTextStyleOptions(style, opacity),
           ...createPPTXParagraphOptions(paragraph),
           ...createPPTXTextRunOptions(run),
           breakLine: paragraphIndex > 0 && runIndex === 0,
@@ -757,12 +783,14 @@ function createPPTXTextRunOptions(
 
 function createPPTXTextStyleOptions(
   style: PPTTextStyle | undefined,
+  opacity = 1,
 ): Partial<PptxGenJS.TextPropsOptions> {
   return {
     bold: style?.fontWeight === 'bold',
     color: toPPTXColor(style?.color ?? PPTX_DEFAULT_TEXT_COLOR, '111827'),
     fontFace: style?.fontFamily ?? PPTX_DEFAULT_FONT_FACE,
     fontSize: pxToPt(style?.fontSize ?? PPTX_DEFAULT_FONT_SIZE),
+    transparency: toPPTXTransparency(opacity),
   }
 }
 
@@ -778,10 +806,10 @@ function createPPTXElementPosition(
   }
 }
 
-function createPPTXFill(fill: PPTFill) {
+function createPPTXFill(fill: PPTFill, opacity = 1) {
   return {
     color: toPPTXColor(fill.color, 'FFFFFF'),
-    transparency: toPPTXTransparency(fill.opacity ?? 1),
+    transparency: toPPTXTransparency((fill.opacity ?? 1) * opacity),
   }
 }
 
@@ -791,6 +819,7 @@ function createPPTXLineProps(
     endMarker?: PPTLine['endMarker']
     startMarker?: PPTLine['startMarker']
   } = {},
+  opacity = 1,
 ): PptxGenJS.ShapeLineProps {
   if (!stroke) {
     return {
@@ -811,6 +840,7 @@ function createPPTXLineProps(
     color: toPPTXColor(stroke.color, '000000'),
     dashType,
     endArrowType: markers.endMarker === 'arrow' ? 'arrow' : undefined,
+    transparency: toPPTXTransparency(opacity),
     width: Math.max(0.25, pxToPt(stroke.width)),
   }
 }
@@ -849,7 +879,14 @@ function getPPTXImageCropOffset(value: number, size: number) {
   return ((clamp(value, 0, 100) - 50) / 100) * size
 }
 
-function createPPTXShadow(shadow: PPTElementShadow | undefined) {
+function getPPTXElementOpacity(element: Pick<PPTElement, 'opacity'>) {
+  return clamp(element.opacity ?? 1, 0, 1)
+}
+
+function createPPTXShadow(
+  shadow: PPTElementShadow | undefined,
+  opacity = 1,
+) {
   if (!shadow) {
     return undefined
   }
@@ -859,7 +896,7 @@ function createPPTXShadow(shadow: PPTElementShadow | undefined) {
     blur: pxToPt(shadow.blur),
     color: toPPTXColor(shadow.color, '000000'),
     offset: pxToPt(shadow.distance),
-    opacity: clamp(shadow.opacity, 0, 1),
+    opacity: clamp(shadow.opacity * opacity, 0, 1),
     type: 'outer',
   } satisfies PptxGenJS.ShadowProps
 }
