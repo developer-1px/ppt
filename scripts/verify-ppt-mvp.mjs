@@ -10826,6 +10826,14 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX embedded PPT model metadata',
+    pptxPackageState.hasCustomModelXml &&
+      pptxPackageState.hasCustomModelContentTypes &&
+      pptxPackageState.hasCustomModelRelationships &&
+      pptxPackageState.hasCustomModelProperties,
+    pptxPackageState,
+  )
+  record(
     'exports editable PPTX slide XML content',
     pptxPackageState.hasEditableShapeTree &&
       pptxPackageState.hasEditableTextRuns &&
@@ -26629,6 +26637,10 @@ async function inspectPPTXPackage(base64) {
     entryCount: 0,
     error: '',
     hasContentTypes: false,
+    hasCustomModelContentTypes: false,
+    hasCustomModelProperties: false,
+    hasCustomModelRelationships: false,
+    hasCustomModelXml: false,
     hasEditableShapeTree: false,
     hasEditableTextRuns: false,
     hasHyperlinkRelationship: false,
@@ -26688,6 +26700,14 @@ async function inspectPPTXPackage(base64) {
     const relationshipXml = (await Promise.all(relationshipPaths.map((path) =>
       readPPTXZipText(zip, path),
     ))).join('\n')
+    const contentTypesXml = await readPPTXZipText(zip, '[Content_Types].xml')
+    const modelXml = await readPPTXZipText(zip, 'customXml/item1.xml')
+    const modelPropsXml = await readPPTXZipText(zip, 'customXml/itemProps1.xml')
+    const modelPropsRelationshipXml = await readPPTXZipText(
+      zip,
+      'customXml/_rels/item1.xml.rels',
+    )
+    const packageRelationshipXml = await readPPTXZipText(zip, '_rels/.rels')
     const themeXml = await readPPTXZipText(zip, 'ppt/theme/theme1.xml')
     const textRunCount = countOccurrences(slideXml, '<a:t>')
     const transitionCount = countOccurrences(slideXml, '<p:transition')
@@ -26696,6 +26716,26 @@ async function inspectPPTXPackage(base64) {
       entryCount: entries.length,
       error: '',
       hasContentTypes: entries.includes('[Content_Types].xml'),
+      hasCustomModelContentTypes:
+        contentTypesXml.includes('PartName="/customXml/item1.xml" ContentType="application/xml"') &&
+        contentTypesXml.includes('PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"'),
+      hasCustomModelProperties:
+        entries.includes('customXml/itemProps1.xml') &&
+        modelPropsXml.includes('<ds:datastoreItem') &&
+        modelPropsXml.includes('ds:itemID="{5B4D0724-5E4E-4F9A-9FD7-7B91A0712F8E}"') &&
+        modelPropsXml.includes('<ds:schemaRefs/>'),
+      hasCustomModelRelationships:
+        packageRelationshipXml.includes('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"') &&
+        packageRelationshipXml.includes('Target="customXml/item1.xml"') &&
+        modelPropsRelationshipXml.includes('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps"') &&
+        modelPropsRelationshipXml.includes('Target="itemProps1.xml"'),
+      hasCustomModelXml:
+        entries.includes('customXml/item1.xml') &&
+        modelXml.includes('xmlns="https://interactive-os.dev/ppt/model/v1"') &&
+        modelXml.includes('contentType="application/vnd.interactive-os.ppt.deck+json"') &&
+        modelXml.includes('"id":"deck-ai-retouch"') &&
+        modelXml.includes('"slides":') &&
+        modelXml.includes('"kind":"textBox"'),
       hasEditableShapeTree: slideXml.includes('<p:spTree>') ||
         slideXml.includes('<p:spTree '),
       hasEditableTextRuns: textRunCount >= 10,

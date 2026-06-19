@@ -49,6 +49,23 @@ const PPTX_MARKUP_COMPATIBILITY_NS =
   'http://schemas.openxmlformats.org/markup-compatibility/2006'
 const PPTX_POWERPOINT_2010_NS =
   'http://schemas.microsoft.com/office/powerpoint/2010/main'
+const PPTX_PACKAGE_RELATIONSHIP_NS =
+  'http://schemas.openxmlformats.org/package/2006/relationships'
+const PPTX_CUSTOM_XML_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml'
+const PPTX_CUSTOM_XML_PROPS_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps'
+const PPTX_CUSTOM_XML_PROPS_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.customXmlProperties+xml'
+const PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE =
+  'application/vnd.interactive-os.ppt.deck+json'
+const PPTX_MODEL_CUSTOM_XML_NAMESPACE =
+  'https://interactive-os.dev/ppt/model/v1'
+const PPTX_MODEL_CUSTOM_XML_PATH = 'customXml/item1.xml'
+const PPTX_MODEL_CUSTOM_XML_PROPS_PATH = 'customXml/itemProps1.xml'
+const PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH = 'customXml/_rels/item1.xml.rels'
+const PPTX_MODEL_CUSTOM_XML_ITEM_ID =
+  '{5B4D0724-5E4E-4F9A-9FD7-7B91A0712F8E}'
 const PPTX_FLY_IN_MOTION_PATH = 'M 0 0.25 L 0 0 E'
 const PPTX_DEFAULT_THEME_COLOR_SCHEME = Object.freeze({
   accent1: '#2563eb',
@@ -192,7 +209,8 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
 }
 
 function shouldPatchPPTXPackage(deck: PPTDeck) {
-  return hasPPTXDefaultTheme(deck) ||
+  return hasPPTXModelPayload(deck) ||
+    hasPPTXDefaultTheme(deck) ||
     deck.slides.some((slide) =>
       hasPPTXSlideName(slide) ||
       slide.transition !== undefined ||
@@ -210,6 +228,7 @@ async function applyPPTXPackagePatches({
   deck: PPTDeck
   zip: JSZip
 }) {
+  await applyPPTXModelPackagePatch({ deck, zip })
   await applyPPTXThemePackagePatch({ deck, zip })
 
   await Promise.all(deck.slides.map(async (slide, index) => {
@@ -239,6 +258,179 @@ async function applyPPTXPackagePatches({
       zip.file(path, nextXml)
     }
   }))
+}
+
+async function applyPPTXModelPackagePatch({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  if (!hasPPTXModelPayload(deck)) {
+    return
+  }
+
+  zip.file(PPTX_MODEL_CUSTOM_XML_PATH, createPPTXModelCustomXml(deck))
+  zip.file(
+    PPTX_MODEL_CUSTOM_XML_PROPS_PATH,
+    createPPTXModelCustomXmlPropsXml(),
+  )
+  zip.file(
+    PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH,
+    createPPTXRelationshipsXml([{
+      target: 'itemProps1.xml',
+      type: PPTX_CUSTOM_XML_PROPS_RELATIONSHIP_TYPE,
+    }]),
+  )
+
+  await patchPPTXContentTypesForModelXml(zip)
+  await patchPPTXPackageRelationshipsForModelXml(zip)
+}
+
+function hasPPTXModelPayload(deck: PPTDeck) {
+  return deck.slides.length > 0
+}
+
+function createPPTXModelCustomXml(deck: PPTDeck) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    `<pptDeck xmlns="${PPTX_MODEL_CUSTOM_XML_NAMESPACE}" `,
+    `contentType="${PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE}" version="1">`,
+    escapePPTXXmlText(JSON.stringify(deck)),
+    '</pptDeck>',
+  ].join('')
+}
+
+function createPPTXModelCustomXmlPropsXml() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<ds:datastoreItem ',
+    `ds:itemID="${PPTX_MODEL_CUSTOM_XML_ITEM_ID}" `,
+    'xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml">',
+    '<ds:schemaRefs/>',
+    '</ds:datastoreItem>',
+  ].join('')
+}
+
+async function patchPPTXContentTypesForModelXml(zip: JSZip) {
+  const path = '[Content_Types].xml'
+  const file = zip.file(path)
+
+  if (!file) {
+    return
+  }
+
+  const xml = await file.async('string')
+  const nextXml = setPPTXContentTypeOverrideXml(
+    setPPTXContentTypeOverrideXml(
+      xml,
+      `/${PPTX_MODEL_CUSTOM_XML_PATH}`,
+      'application/xml',
+    ),
+    `/${PPTX_MODEL_CUSTOM_XML_PROPS_PATH}`,
+    PPTX_CUSTOM_XML_PROPS_CONTENT_TYPE,
+  )
+
+  if (nextXml !== xml) {
+    zip.file(path, nextXml)
+  }
+}
+
+async function patchPPTXPackageRelationshipsForModelXml(zip: JSZip) {
+  const path = '_rels/.rels'
+  const file = zip.file(path)
+  const xml = file
+    ? await file.async('string')
+    : createPPTXRelationshipsXml([])
+  const nextXml = setPPTXRelationshipXml(xml, {
+    target: PPTX_MODEL_CUSTOM_XML_PATH,
+    type: PPTX_CUSTOM_XML_RELATIONSHIP_TYPE,
+  })
+
+  if (nextXml !== xml || !file) {
+    zip.file(path, nextXml)
+  }
+}
+
+function setPPTXContentTypeOverrideXml(
+  xml: string,
+  partName: string,
+  contentType: string,
+) {
+  const overrideXml =
+    `<Override PartName="${escapePPTXXmlAttribute(partName)}" ` +
+    `ContentType="${escapePPTXXmlAttribute(contentType)}"/>`
+  const pattern = new RegExp(
+    `<Override\\b(?=[^>]*\\bPartName="${escapePPTXRegExp(partName)}")[^>]*/>`,
+  )
+
+  if (pattern.test(xml)) {
+    return xml.replace(pattern, overrideXml)
+  }
+
+  return xml.replace('</Types>', `${overrideXml}</Types>`)
+}
+
+function createPPTXRelationshipsXml(
+  relationships: ReadonlyArray<{ target: string, type: string }>,
+) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    `<Relationships xmlns="${PPTX_PACKAGE_RELATIONSHIP_NS}">`,
+    ...relationships.map((relationship, index) =>
+      createPPTXRelationshipXml({
+        id: `rId${index + 1}`,
+        ...relationship,
+      })),
+    '</Relationships>',
+  ].join('')
+}
+
+function setPPTXRelationshipXml(
+  xml: string,
+  relationship: { target: string, type: string },
+) {
+  const existingPattern = new RegExp(
+    `<Relationship\\b(?=[^>]*\\bType="${escapePPTXRegExp(relationship.type)}")` +
+    `(?=[^>]*\\bTarget="${escapePPTXRegExp(relationship.target)}")[^>]*/>`,
+  )
+
+  if (existingPattern.test(xml)) {
+    return xml
+  }
+
+  const nextId = getNextPPTXRelationshipId(xml)
+  const relationshipXml = createPPTXRelationshipXml({
+    id: nextId,
+    ...relationship,
+  })
+
+  return xml.replace('</Relationships>', `${relationshipXml}</Relationships>`)
+}
+
+function createPPTXRelationshipXml({
+  id,
+  target,
+  type,
+}: {
+  id: string
+  target: string
+  type: string
+}) {
+  return [
+    `<Relationship Id="${escapePPTXXmlAttribute(id)}" `,
+    `Type="${escapePPTXXmlAttribute(type)}" `,
+    `Target="${escapePPTXXmlAttribute(target)}"/>`,
+  ].join('')
+}
+
+function getNextPPTXRelationshipId(xml: string) {
+  const ids = [...xml.matchAll(/<Relationship\b[^>]*\bId="rId(\d+)"/g)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite)
+
+  return `rId${Math.max(0, ...ids) + 1}`
 }
 
 async function applyPPTXThemePackagePatch({
@@ -850,6 +1042,13 @@ function escapePPTXXmlAttribute(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;')
+}
+
+function escapePPTXXmlText(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
 }
 
 function escapePPTXRegExp(value: string) {
