@@ -1,6 +1,7 @@
 import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
 import {
+  PPT_DEFAULT_THEME_ID,
   type PPTComment,
   type PPTDeck,
   type PPTElement,
@@ -49,6 +50,20 @@ const PPTX_MARKUP_COMPATIBILITY_NS =
 const PPTX_POWERPOINT_2010_NS =
   'http://schemas.microsoft.com/office/powerpoint/2010/main'
 const PPTX_FLY_IN_MOTION_PATH = 'M 0 0.25 L 0 0 E'
+const PPTX_DEFAULT_THEME_COLOR_SCHEME = Object.freeze({
+  accent1: '#2563eb',
+  accent2: '#0ea5e9',
+  accent3: '#22c55e',
+  accent4: '#fb923c',
+  accent5: '#7c2d12',
+  accent6: '#dc2626',
+  dk1: '#111827',
+  dk2: '#475569',
+  folHlink: '#7c3aed',
+  hlink: '#2563eb',
+  lt1: '#ffffff',
+  lt2: '#f8fafc',
+} as const)
 
 type PPTXPptx = InstanceType<typeof PptxGenJS>
 type PPTXSlide = ReturnType<PPTXPptx['addSlide']>
@@ -74,6 +89,7 @@ type PPTXLockDescriptor = {
   lockXml: string
   propertyTagName: string
 }
+type PPTXThemeColorName = keyof typeof PPTX_DEFAULT_THEME_COLOR_SCHEME
 
 export function createPPTDeckPPTX(deck: PPTDeck) {
   const pptx = new PptxGenJS()
@@ -176,14 +192,15 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
 }
 
 function shouldPatchPPTXPackage(deck: PPTDeck) {
-  return deck.slides.some((slide) =>
-    hasPPTXSlideName(slide) ||
-    slide.transition !== undefined ||
-    hasPPTXSlideAnimations(slide) ||
-    hasPPTXLockedElements(slide) ||
-    slide.elements.some((element) =>
-      element.visible !== false &&
-      Boolean(element.accessibility?.altText.trim())))
+  return hasPPTXDefaultTheme(deck) ||
+    deck.slides.some((slide) =>
+      hasPPTXSlideName(slide) ||
+      slide.transition !== undefined ||
+      hasPPTXSlideAnimations(slide) ||
+      hasPPTXLockedElements(slide) ||
+      slide.elements.some((element) =>
+        element.visible !== false &&
+        Boolean(element.accessibility?.altText.trim())))
 }
 
 async function applyPPTXPackagePatches({
@@ -193,6 +210,8 @@ async function applyPPTXPackagePatches({
   deck: PPTDeck
   zip: JSZip
 }) {
+  await applyPPTXThemePackagePatch({ deck, zip })
+
   await Promise.all(deck.slides.map(async (slide, index) => {
     const path = `ppt/slides/slide${index + 1}.xml`
     const file = zip.file(path)
@@ -220,6 +239,61 @@ async function applyPPTXPackagePatches({
       zip.file(path, nextXml)
     }
   }))
+}
+
+async function applyPPTXThemePackagePatch({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  if (!hasPPTXDefaultTheme(deck)) {
+    return
+  }
+
+  const path = 'ppt/theme/theme1.xml'
+  const file = zip.file(path)
+
+  if (!file) {
+    return
+  }
+
+  const xml = await file.async('string')
+  const nextXml = setPPTXThemeColorSchemeXml(xml)
+
+  if (nextXml !== xml) {
+    zip.file(path, nextXml)
+  }
+}
+
+function hasPPTXDefaultTheme(deck: PPTDeck) {
+  return deck.slides.some((slide) =>
+    slide.themeId === undefined ||
+    slide.themeId === PPT_DEFAULT_THEME_ID)
+}
+
+function setPPTXThemeColorSchemeXml(xml: string) {
+  return (Object.entries(PPTX_DEFAULT_THEME_COLOR_SCHEME) as Array<[
+    PPTXThemeColorName,
+    string,
+  ]>).reduce((nextXml, [name, color]) =>
+    setPPTXThemeColorXml(nextXml, name, color), xml)
+}
+
+function setPPTXThemeColorXml(
+  xml: string,
+  name: PPTXThemeColorName,
+  color: string,
+) {
+  const fallback = PPTX_DEFAULT_THEME_COLOR_SCHEME[name].slice(1).toUpperCase()
+  const value = toPPTXColor(color, fallback)
+  const colorXml = `<a:${name}><a:srgbClr val="${value}"/></a:${name}>`
+  const pattern = new RegExp(`<a:${name}>[\\s\\S]*?</a:${name}>`)
+
+  return pattern.test(xml)
+    ? xml.replace(pattern, colorXml)
+    : xml
 }
 
 function hasPPTXSlideName(slide: PPTSlide) {

@@ -10821,6 +10821,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX theme color scheme',
+    pptxPackageState.hasThemeColorScheme,
+    pptxPackageState,
+  )
+  record(
     'exports editable PPTX slide XML content',
     pptxPackageState.hasEditableShapeTree &&
       pptxPackageState.hasEditableTextRuns &&
@@ -26643,6 +26648,7 @@ async function inspectPPTXPackage(base64) {
     hasSpeakerNotes: false,
     hasTableText: false,
     hasTableXml: false,
+    hasThemeColorScheme: false,
     hasSlideTransition: false,
     hasSlideTransitionNamespace: false,
     hasSlideTransitionTiming: false,
@@ -26682,6 +26688,7 @@ async function inspectPPTXPackage(base64) {
     const relationshipXml = (await Promise.all(relationshipPaths.map((path) =>
       readPPTXZipText(zip, path),
     ))).join('\n')
+    const themeXml = await readPPTXZipText(zip, 'ppt/theme/theme1.xml')
     const textRunCount = countOccurrences(slideXml, '<a:t>')
     const transitionCount = countOccurrences(slideXml, '<p:transition')
 
@@ -26738,6 +26745,12 @@ async function inspectPPTXPackage(base64) {
       hasSpeakerNotes: notesXml.includes('Presenter cue: review image crop and final CTA.'),
       hasTableText: slideXml.includes('Region'),
       hasTableXml: slideXml.includes('<a:tbl>') || slideXml.includes('<a:tbl '),
+      hasThemeColorScheme:
+        themeXml.includes('<a:dk1><a:srgbClr val="111827"/></a:dk1>') &&
+        themeXml.includes('<a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>') &&
+        themeXml.includes('<a:lt2><a:srgbClr val="F8FAFC"/></a:lt2>') &&
+        themeXml.includes('<a:accent1><a:srgbClr val="2563EB"/></a:accent1>') &&
+        themeXml.includes('<a:hlink><a:srgbClr val="2563EB"/></a:hlink>'),
       notesCount: notesPaths.length,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
