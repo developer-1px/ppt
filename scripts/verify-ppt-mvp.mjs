@@ -18899,6 +18899,67 @@ async function runLineAffordanceScenario(page) {
     drawArrow,
   })
 
+  await page.eval(`document.querySelector('[data-ppt-insert-line="line"]').click()`)
+  await delay(20)
+
+  const shiftLine = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide').getBoundingClientRect()
+
+    return {
+      endX: slide.left + slide.width * 0.26,
+      endY: slide.top + slide.height * 0.83,
+      pressed: document.querySelector('[data-ppt-insert-line="line"]').getAttribute('aria-pressed'),
+      startX: slide.left + slide.width * 0.08,
+      startY: slide.top + slide.height * 0.9,
+    }
+  })()`)
+
+  await dragMouse(page, [{
+    x: shiftLine.startX,
+    y: shiftLine.startY,
+  }, {
+    x: shiftLine.endX,
+    y: shiftLine.endY,
+  }], 8)
+  await delay(80)
+
+  const afterShiftLine = await getPPTLineState(page)
+
+  record(
+    'constrains PPT line creation angle with Shift drag',
+    shiftLine.pressed === 'true' &&
+      afterShiftLine.lineCount === afterArrow.lineCount + 1 &&
+      afterShiftLine.selectedKind === 'line' &&
+      afterShiftLine.selectedName === 'Line' &&
+      afterShiftLine.endConnection === '' &&
+      afterShiftLine.worldX2 > afterShiftLine.worldX1 &&
+      nearlyEqual(afterShiftLine.worldY2, afterShiftLine.worldY1, 0.001),
+    {
+      afterArrow,
+      afterShiftLine,
+      shiftLine,
+    },
+  )
+
+  await page.eval(`document.querySelector('button[title="Undo"]')?.click()`)
+  await delay(100)
+
+  const afterShiftLineUndo = await getPPTLineState(page, afterArrow.selectedId)
+
+  record(
+    'undoes PPT Shift line creation as one history step',
+    afterShiftLineUndo.lineCount === afterArrow.lineCount &&
+      afterShiftLineUndo.selectedKind === 'line' &&
+      afterShiftLineUndo.redoEnabled,
+    {
+      afterArrow,
+      afterShiftLineUndo,
+    },
+  )
+
+  await page.eval(`document.querySelector(${JSON.stringify(`[data-ppt-layer-select="${afterArrow.selectedId}"]`)})?.click()`)
+  await delay(50)
+
   const beforeResize = await page.eval(`(() => {
     const selected = document.querySelector('[data-selected="true"]')
     const handle = document.querySelector('button[aria-label="Resize e"]').getBoundingClientRect()
@@ -23319,6 +23380,7 @@ function getPPTLineState(page, elementId = null) {
       inspectorDash: document.querySelector('[data-ppt-style-field="line-stroke-dash"]')?.value ?? '',
       markerEnd: selectedStrokeElement?.getAttribute('marker-end') ?? '',
       pathD: selectedPath?.getAttribute('d') ?? '',
+      redoEnabled: !document.querySelector('button[title="Redo"]')?.disabled,
       route: selected?.getAttribute('data-line-route') ?? '',
       routeHandleCount: document.querySelectorAll('[data-ppt-line-route-handle]').length,
       selectedId: selected?.getAttribute('data-ppt-element') ?? '',
