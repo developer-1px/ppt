@@ -10825,6 +10825,13 @@ async function runExportScenario(page) {
       pptxPackageState.hasHyperlinkRelationship,
     pptxPackageState,
   )
+  record(
+    'exports PPTX slide transition timing',
+    pptxPackageState.hasSlideTransition &&
+      pptxPackageState.hasSlideTransitionTiming &&
+      pptxPackageState.hasSlideTransitionNamespace,
+    pptxPackageState,
+  )
 
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
@@ -26587,9 +26594,13 @@ async function inspectPPTXPackage(base64) {
     hasSpeakerNotes: false,
     hasTableText: false,
     hasTableXml: false,
+    hasSlideTransition: false,
+    hasSlideTransitionNamespace: false,
+    hasSlideTransitionTiming: false,
     notesCount: 0,
     relationshipCount: 0,
     slideCount: 0,
+    transitionCount: 0,
     textRunCount: 0,
   }
 
@@ -26613,6 +26624,9 @@ async function inspectPPTXPackage(base64) {
     const slideXml = (await Promise.all(slidePaths.map((path) =>
       readPPTXZipText(zip, path),
     ))).join('\n')
+    const slide1Xml = slidePaths[0]
+      ? await readPPTXZipText(zip, slidePaths[0])
+      : ''
     const notesXml = (await Promise.all(notesPaths.map((path) =>
       readPPTXZipText(zip, path),
     ))).join('\n')
@@ -26620,6 +26634,7 @@ async function inspectPPTXPackage(base64) {
       readPPTXZipText(zip, path),
     ))).join('\n')
     const textRunCount = countOccurrences(slideXml, '<a:t>')
+    const transitionCount = countOccurrences(slideXml, '<p:transition')
 
     return {
       entryCount: entries.length,
@@ -26636,12 +26651,25 @@ async function inspectPPTXPackage(base64) {
       hasPresetGeometry: slideXml.includes('<a:prstGeom'),
       hasSlide1Xml: entries.includes('ppt/slides/slide1.xml'),
       hasSlide2Xml: entries.includes('ppt/slides/slide2.xml'),
+      hasSlideTransition:
+        slide1Xml.includes('<p:transition') &&
+        slide1Xml.includes('<p:push dir="l"/>'),
+      hasSlideTransitionNamespace:
+        slide1Xml.includes('xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"') &&
+        slide1Xml.includes('xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"') &&
+        slide1Xml.includes('mc:Ignorable="p14"'),
+      hasSlideTransitionTiming:
+        slide1Xml.includes('advClick="0"') &&
+        slide1Xml.includes('advTm="3000"') &&
+        slide1Xml.includes('p14:dur="650"') &&
+        slide1Xml.includes('spd="med"'),
       hasSpeakerNotes: notesXml.includes('Presenter cue: review image crop and final CTA.'),
       hasTableText: slideXml.includes('Region'),
       hasTableXml: slideXml.includes('<a:tbl>') || slideXml.includes('<a:tbl '),
       notesCount: notesPaths.length,
       relationshipCount: relationshipPaths.length,
       slideCount: slidePaths.length,
+      transitionCount,
       textRunCount,
     }
   } catch (error) {

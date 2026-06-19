@@ -14,6 +14,9 @@ importers:
       canvas:
         specifier: link:../canvas
         version: link:../canvas
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       lucide-react:
         specifier: ^1.16.0
         version: 1.16.0(react@19.2.6)
@@ -60,9 +63,6 @@ importers:
       globals:
         specifier: ^17.6.0
         version: 17.6.0
-      jszip:
-        specifier: ^3.10.1
-        version: 3.10.1
       tailwindcss:
         specifier: ^4.3.0
         version: 4.3.0

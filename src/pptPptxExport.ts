@@ -1,4 +1,5 @@
 import PptxGenJS from 'pptxgenjs'
+import JSZip from 'jszip'
 import {
   type PPTComment,
   type PPTDeck,
@@ -13,6 +14,7 @@ import {
   type PPTRun,
   type PPTShape,
   type PPTSlide,
+  type PPTSlideTransition,
   type PPTStroke,
   type PPTTable,
   type PPTTextBody,
@@ -41,6 +43,10 @@ const PPTX_DEFAULT_TEXT_BOX_INSET = Object.freeze({
   top: 0,
 } as const)
 const PPTX_DEFAULT_SHAPE_CORNER_RADIUS = 24
+const PPTX_MARKUP_COMPATIBILITY_NS =
+  'http://schemas.openxmlformats.org/markup-compatibility/2006'
+const PPTX_POWERPOINT_2010_NS =
+  'http://schemas.microsoft.com/office/powerpoint/2010/main'
 
 type PPTXPptx = InstanceType<typeof PptxGenJS>
 type PPTXSlide = ReturnType<PPTXPptx['addSlide']>
@@ -90,24 +96,62 @@ export function createPPTDeckPPTX(deck: PPTDeck) {
 export async function exportPPTDeckPPTXBlob(deck: PPTDeck) {
   const output = await createPPTDeckPPTX(deck).write({
     compression: true,
-    outputType: 'blob',
+    outputType: 'arraybuffer',
   })
+  const arrayBuffer = await toPPTXArrayBuffer(output)
 
-  if (output instanceof Blob) {
-    return output.type === PPTX_MIME_TYPE
-      ? output
-      : new Blob([output], {
-          type: PPTX_MIME_TYPE,
-        })
+  if (!deck.slides.some((slide) => slide.transition !== undefined)) {
+    return createPPTXBlob(arrayBuffer)
   }
 
-  const blobPart = typeof output === 'string' || output instanceof ArrayBuffer
-    ? output
-    : new Uint8Array(output).buffer
-
-  return new Blob([blobPart], {
-    type: PPTX_MIME_TYPE,
+  const zip = await JSZip.loadAsync(arrayBuffer)
+  await applyPPTXSlideTransitions({ deck, zip })
+  const patchedOutput = await zip.generateAsync({
+    compression: 'DEFLATE',
+    mimeType: PPTX_MIME_TYPE,
+    type: 'blob',
   })
+
+  return createPPTXBlob(patchedOutput)
+}
+
+async function toPPTXArrayBuffer(
+  output: Awaited<ReturnType<PPTXPptx['write']>>,
+): Promise<ArrayBuffer> {
+  if (output instanceof Blob) {
+    return output.arrayBuffer()
+  }
+
+  if (output instanceof ArrayBuffer) {
+    return output
+  }
+
+  if (typeof output === 'string') {
+    return copyPPTXBytes(new TextEncoder().encode(output))
+  }
+
+  if (ArrayBuffer.isView(output)) {
+    return copyPPTXBytes(output)
+  }
+
+  return new Blob([output as BlobPart]).arrayBuffer()
+}
+
+function copyPPTXBytes(view: ArrayBufferView) {
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+  const copy = new Uint8Array(bytes.byteLength)
+
+  copy.set(bytes)
+
+  return copy.buffer
+}
+
+function createPPTXBlob(part: BlobPart | Blob) {
+  return part instanceof Blob && part.type === PPTX_MIME_TYPE
+    ? part
+    : new Blob([part], {
+        type: PPTX_MIME_TYPE,
+      })
 }
 
 export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
@@ -118,6 +162,151 @@ export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
     .replace(/^-+|-+$/g, '')
 
   return `${slug || 'ppt-deck'}.pptx`
+}
+
+async function applyPPTXSlideTransitions({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  await Promise.all(deck.slides.map(async (slide, index) => {
+    const path = `ppt/slides/slide${index + 1}.xml`
+    const file = zip.file(path)
+
+    if (!file) {
+      return
+    }
+
+    const xml = await file.async('string')
+    const nextXml = setPPTXSlideTransitionXml(
+      xml,
+      createPPTXSlideTransitionXml(slide.transition),
+    )
+
+    if (nextXml !== xml) {
+      zip.file(path, nextXml)
+    }
+  }))
+}
+
+function setPPTXSlideTransitionXml(
+  xml: string,
+  transitionXml: string | null,
+) {
+  const xmlWithoutTransition = xml.replace(
+    /<p:transition\b[\s\S]*?<\/p:transition>|<p:transition\b[^/]*\/>/,
+    '',
+  )
+
+  if (!transitionXml) {
+    return xmlWithoutTransition
+  }
+
+  const xmlWithNamespaces = ensurePPTXSlideTransitionNamespaces(
+    xmlWithoutTransition,
+  )
+  const anchor = xmlWithNamespaces.includes('</p:clrMapOvr>')
+    ? '</p:clrMapOvr>'
+    : '</p:cSld>'
+
+  return xmlWithNamespaces.replace(anchor, `${anchor}${transitionXml}`)
+}
+
+function ensurePPTXSlideTransitionNamespaces(xml: string) {
+  return ensurePPTXIgnorableNamespace(
+    ensurePPTXRootNamespace(
+      ensurePPTXRootNamespace(xml, 'p14', PPTX_POWERPOINT_2010_NS),
+      'mc',
+      PPTX_MARKUP_COMPATIBILITY_NS,
+    ),
+    'p14',
+  )
+}
+
+function ensurePPTXRootNamespace(
+  xml: string,
+  prefix: string,
+  namespace: string,
+) {
+  if (xml.includes(`xmlns:${prefix}=`)) {
+    return xml
+  }
+
+  return xml.replace('<p:sld ', `<p:sld xmlns:${prefix}="${namespace}" `)
+}
+
+function ensurePPTXIgnorableNamespace(xml: string, prefix: string) {
+  return xml.replace(/<p:sld\b([^>]*)>/, (tag, attrs: string) => {
+    const ignorable = attrs.match(/\smc:Ignorable="([^"]*)"/)
+
+    if (!ignorable) {
+      return tag.replace('<p:sld', `<p:sld mc:Ignorable="${prefix}"`)
+    }
+
+    const prefixes = ignorable[1].split(/\s+/).filter(Boolean)
+
+    if (prefixes.includes(prefix)) {
+      return tag
+    }
+
+    return tag.replace(
+      /\smc:Ignorable="[^"]*"/,
+      ` mc:Ignorable="${[...prefixes, prefix].join(' ')}"`,
+    )
+  })
+}
+
+function createPPTXSlideTransitionXml(
+  transition: PPTSlideTransition | undefined,
+) {
+  if (!transition) {
+    return null
+  }
+
+  const attributes = [
+    `advClick="${transition.advanceOnClick === false ? '0' : '1'}"`,
+    `p14:dur="${clampPPTXTransitionMs(transition.durationMs)}"`,
+    `spd="${getPPTXSlideTransitionSpeed(transition.durationMs)}"`,
+  ]
+
+  if (transition.advanceAfterMs !== null &&
+    transition.advanceAfterMs !== undefined) {
+    attributes.push(`advTm="${clampPPTXTransitionMs(transition.advanceAfterMs)}"`)
+  }
+
+  const childXml = getPPTXSlideTransitionChildXml(transition.type)
+
+  return childXml
+    ? `<p:transition ${attributes.join(' ')}>${childXml}</p:transition>`
+    : `<p:transition ${attributes.join(' ')}/>`
+}
+
+function getPPTXSlideTransitionChildXml(
+  type: PPTSlideTransition['type'],
+) {
+  if (type === 'fade') {
+    return '<p:fade/>'
+  }
+
+  if (type === 'push') {
+    return '<p:push dir="l"/>'
+  }
+
+  return null
+}
+
+function getPPTXSlideTransitionSpeed(durationMs: number) {
+  if (durationMs <= 500) {
+    return 'fast'
+  }
+
+  return durationMs <= 1000 ? 'med' : 'slow'
+}
+
+function clampPPTXTransitionMs(value: number) {
+  return Math.round(clamp(value, 0, 2_147_483_647))
 }
 
 function addPPTXSlide({
