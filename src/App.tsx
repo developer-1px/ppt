@@ -3694,9 +3694,16 @@ const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
 const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
 const PPT_PARAGRAPH_SPACING_MAX = 240
 const PPT_SLIDE_ADD_SHORTCUT = 'Cmd/Ctrl+M'
+const PPT_SLIDE_DUPLICATE_SHORTCUT = 'Cmd/Ctrl+D'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_INTENT_MODEL =
   'ppt-slide-keyboard-shortcut-intent'
 const PPT_SLIDE_KEYBOARD_SHORTCUT_MODEL = 'ppt-slide-keyboard-shortcuts'
+const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
+  `${PPT_SLIDE_DUPLICATE_SHORTCUT} Delete Backspace`
+const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL =
+  'ppt-slide-rail-command-shortcut-intent'
+const PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL =
+  'ppt-slide-rail-command-shortcuts'
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
 const PPT_SHORTCUT_HELP_SECTION_ORDER = [
   'Create',
@@ -5522,6 +5529,27 @@ function App() {
     slideId: string,
     event: ReactKeyboardEvent<HTMLButtonElement>,
   ) {
+    const commandIntent = getPPTSlideRailCommandShortcutIntent({
+      canDelete: canDeleteSlide,
+      key: event.key,
+      mod: event.metaKey || event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    })
+
+    if (commandIntent) {
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (commandIntent.kind === 'duplicate-slide') {
+        duplicateSlide(slideId)
+        return
+      }
+
+      deleteSlide(slideId)
+      return
+    }
+
     if (event.altKey || event.ctrlKey || event.metaKey) {
       return
     }
@@ -5735,8 +5763,12 @@ function App() {
   }
 
   function duplicateActiveSlide() {
+    duplicateSlide(activeSlide.id)
+  }
+
+  function duplicateSlide(slideId: string) {
     commitDeck((current) => {
-      const source = current.slides.find((slide) => slide.id === activeSlide.id)
+      const source = current.slides.find((slide) => slide.id === slideId)
 
       if (!source) {
         return current
@@ -5748,7 +5780,7 @@ function App() {
         placement: 'after',
         slide,
         slides: current.slides,
-        targetSlideId: activeSlide.id,
+        targetSlideId: slideId,
       })
 
       if (!result) {
@@ -8709,6 +8741,10 @@ function App() {
   }
 
   function deleteActiveSlide() {
+    deleteSlide(activeSlide.id)
+  }
+
+  function deleteSlide(slideId: string) {
     if (deck.slides.length <= 1) {
       return
     }
@@ -8718,11 +8754,11 @@ function App() {
         return current
       }
 
-      const index = current.slides.findIndex((slide) => slide.id === activeSlide.id)
+      const index = current.slides.findIndex((slide) => slide.id === slideId)
       const slides = deletePPTCanvasSelectionItems({
         getItemId: (slide) => slide.id,
         items: current.slides,
-        selection: [activeSlide.id],
+        selection: [slideId],
       })
       const nextSlide = slides[Math.min(Math.max(index, 0), slides.length - 1)]
 
@@ -13286,6 +13322,7 @@ function App() {
     id: 'slide:duplicate',
     onSelect: duplicateActiveSlide,
     section: 'Slides',
+    shortcut: PPT_SLIDE_DUPLICATE_SHORTCUT,
     title: 'Duplicate slide',
   }, {
     id: 'slide:copy',
@@ -13901,6 +13938,9 @@ function App() {
           data-ppt-slide-rail-command-to-index={lastSlideRailReorderPayload?.toIndex}
           data-ppt-slide-rail-command-type={lastSlideRailCommandEffect?.type}
           data-ppt-slide-rail-focusable-option={slideRailDescriptor.listbox.focusableOptionId ?? undefined}
+          data-ppt-slide-rail-command-shortcut-intent={PPT_SLIDE_RAIL_COMMAND_SHORTCUT_INTENT_MODEL}
+          data-ppt-slide-rail-command-shortcut-model={PPT_SLIDE_RAIL_COMMAND_SHORTCUT_MODEL}
+          data-ppt-slide-rail-command-shortcuts={PPT_SLIDE_RAIL_COMMAND_SHORTCUTS}
           data-ppt-slide-rail-keyboard-keys={SLIDE_EDIT_RAIL_KEYBOARD_KEYS}
           data-ppt-slide-rail-keyboard-model={slideRailDescriptor.listbox.keyboardModel}
           data-ppt-slide-rail-model="slide-edit-rail-interactions"
@@ -36401,6 +36441,34 @@ function getPPTSlideKeyboardShortcutIntent({
   return key.toLowerCase() === 'm'
     ? { kind: 'add-slide', preventDefault: true }
     : null
+}
+
+function getPPTSlideRailCommandShortcutIntent({
+  altKey,
+  canDelete,
+  key,
+  mod,
+  shiftKey,
+}: {
+  altKey: boolean
+  canDelete: boolean
+  key: string
+  mod: boolean
+  shiftKey: boolean
+}): { kind: 'delete-slide' | 'duplicate-slide' } | null {
+  const normalizedKey = key.toLowerCase()
+
+  if (mod && !altKey && !shiftKey && normalizedKey === 'd') {
+    return { kind: 'duplicate-slide' }
+  }
+
+  if (!mod && !altKey && !shiftKey && canDelete) {
+    if (key === 'Delete' || key === 'Backspace') {
+      return { kind: 'delete-slide' }
+    }
+  }
+
+  return null
 }
 
 function selectSameTypePPTSelection(

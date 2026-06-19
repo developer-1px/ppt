@@ -4086,7 +4086,7 @@ async function runShortcutHelpScenario(page) {
 
   record('opens PPT keyboard shortcut help from Shift+/ shortcut', afterShortcutOpen.open && afterShortcutOpen.closeFocused && afterShortcutOpen.focusLifecycle === 'canvas-modal-focus-lifecycle' && afterShortcutOpen.itemCount >= 12, afterShortcutOpen)
   record('groups PPT keyboard shortcut help items by command section', afterShortcutOpen.sectionNames.includes('Create') && afterShortcutOpen.sectionNames.includes('Edit') && afterShortcutOpen.sectionNames.includes('Arrange') && afterShortcutOpen.sectionNames.includes('View') && afterShortcutOpen.sectionNames.includes('Format'), afterShortcutOpen)
-  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
+  record('derives PPT keyboard shortcut help from command palette shortcuts', afterShortcutOpen.itemIds.includes('system:keyboard-shortcuts') && afterShortcutOpen.itemIds.includes('command:duplicate') && afterShortcutOpen.itemIds.includes('command:bring-forward') && afterShortcutOpen.itemIds.includes('command:lock-selection') && afterShortcutOpen.itemIds.includes('slide:add') && afterShortcutOpen.itemIds.includes('slide:duplicate') && afterShortcutOpen.itemIds.includes('view:fit-slide') && afterShortcutOpen.itemIds.includes('view:reset-zoom') && afterShortcutOpen.itemIds.includes('view:zoom-in') && afterShortcutOpen.itemIds.includes('tool:pan') && afterShortcutOpen.itemIds.includes('tool:laser') && afterShortcutOpen.itemIds.includes('tool:text') && afterShortcutOpen.itemIds.includes('tool:sticky') && afterShortcutOpen.itemIds.includes('tool:section') && afterShortcutOpen.itemIds.includes('tool:arrow') && afterShortcutOpen.itemIds.includes('tool:marker') && afterShortcutOpen.itemIds.includes('tool:highlight') && afterShortcutOpen.itemIds.includes('tool:eraser') && afterShortcutOpen.itemIds.includes('format:bold') && afterShortcutOpen.shortcuts.includes('Shift+/') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+D') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+]') && afterShortcutOpen.shortcuts.includes('Shift+Cmd/Ctrl+L') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+M') && afterShortcutOpen.shortcuts.includes('0') && afterShortcutOpen.shortcuts.includes('1') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+0') && afterShortcutOpen.shortcuts.includes('Cmd/Ctrl+=') && afterShortcutOpen.shortcuts.includes('H') && afterShortcutOpen.shortcuts.includes('P') && afterShortcutOpen.shortcuts.includes('S') && afterShortcutOpen.shortcuts.includes('Shift+S') && afterShortcutOpen.shortcuts.includes('L') && afterShortcutOpen.shortcuts.includes('M') && afterShortcutOpen.shortcuts.includes('Shift+M') && afterShortcutOpen.shortcuts.includes('E'), afterShortcutOpen)
 
   await pressKey(page, {
     code: 'Escape',
@@ -21547,6 +21547,9 @@ async function runSlideManagementScenario(page) {
       initialKeyboard.activeOption === expectedActiveOptionId &&
       initialKeyboard.focusableOption === expectedActiveOptionId &&
       initialKeyboard.slideOrder === expectedSlideOrder &&
+      initialKeyboard.commandShortcuts === 'Cmd/Ctrl+D Delete Backspace' &&
+      initialKeyboard.commandShortcutIntent === 'ppt-slide-rail-command-shortcut-intent' &&
+      initialKeyboard.commandShortcutModel === 'ppt-slide-rail-command-shortcuts' &&
       initialKeyboard.optionCount === initialKeyboard.count &&
       initialKeyboard.optionCountAttr === String(initialKeyboard.count) &&
       initialKeyboard.thumbnailCount === String(initialKeyboard.count) &&
@@ -21568,6 +21571,60 @@ async function runSlideManagementScenario(page) {
       initialKeyboard,
     },
   )
+
+  await pressKey(page, {
+    code: 'KeyD',
+    key: 'd',
+    modifiers: 2,
+    windowsVirtualKeyCode: 68,
+  })
+  await delay(80)
+
+  const afterRailDuplicateShortcut = await getSlideRailState(page)
+
+  record(
+    'duplicates focused PPT slide thumbnail with Cmd/Ctrl+D',
+    afterRailDuplicateShortcut.count === initialKeyboard.count + 1 &&
+      afterRailDuplicateShortcut.activeId !== initialKeyboard.activeId &&
+      afterRailDuplicateShortcut.activeName.includes('Copy') &&
+      afterRailDuplicateShortcut.slideOrder.includes(initialKeyboard.activeId) &&
+      afterRailDuplicateShortcut.selectedIds === '',
+    {
+      afterRailDuplicateShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await focusPPTSlideThumb(page, afterRailDuplicateShortcut.activeId)
+  await delay(50)
+  await pressKey(page, {
+    code: 'Delete',
+    key: 'Delete',
+    windowsVirtualKeyCode: 46,
+  })
+  await delay(80)
+
+  const afterRailDeleteShortcut = await getSlideRailState(page)
+
+  record(
+    'deletes focused PPT slide thumbnail with Delete',
+    afterRailDeleteShortcut.count === initialKeyboard.count &&
+      !afterRailDeleteShortcut.ids.includes(afterRailDuplicateShortcut.activeId) &&
+      afterRailDeleteShortcut.selectedIds === '',
+    {
+      afterRailDeleteShortcut,
+      afterRailDuplicateShortcut,
+      initialKeyboard,
+    },
+  )
+
+  await focusPPTSlideThumb(page, initialKeyboard.activeId)
+  await pressKey(page, {
+    code: 'Enter',
+    key: 'Enter',
+    windowsVirtualKeyCode: 13,
+  })
+  await delay(50)
 
   await pressKey(page, {
     code: 'Home',
@@ -23505,6 +23562,9 @@ function getSlideRailState(page) {
       command: rail?.getAttribute('data-ppt-slide-rail-command') ?? '',
       commandFromIndex: rail?.getAttribute('data-ppt-slide-rail-command-from-index') ?? '',
       commandSelectionSlide: rail?.getAttribute('data-ppt-slide-rail-command-selection-slide') ?? '',
+      commandShortcutIntent: rail?.getAttribute('data-ppt-slide-rail-command-shortcut-intent') ?? '',
+      commandShortcutModel: rail?.getAttribute('data-ppt-slide-rail-command-shortcut-model') ?? '',
+      commandShortcuts: rail?.getAttribute('data-ppt-slide-rail-command-shortcuts') ?? '',
       commandSlide: rail?.getAttribute('data-ppt-slide-rail-command-slide') ?? '',
       commandToIndex: rail?.getAttribute('data-ppt-slide-rail-command-to-index') ?? '',
       commandType: rail?.getAttribute('data-ppt-slide-rail-command-type') ?? '',
