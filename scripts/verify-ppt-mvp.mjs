@@ -11004,10 +11004,12 @@ async function runExportScenario(page) {
         await addPPTXHyperlinkProbe(
           await addPPTXImageOpacityProbe(
             await addPPTXNoFillShapeProbe(
-              await addPPTXUnevenTableProbe(
-                await addPPTXGroupedObjectProbe(
-                  await reversePPTXPresentationSlideOrder(
-                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+              await addPPTXPresetSystemColorProbe(
+                await addPPTXUnevenTableProbe(
+                  await addPPTXGroupedObjectProbe(
+                    await reversePPTXPresentationSlideOrder(
+                      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                    ),
                   ),
                 ),
               ),
@@ -11052,6 +11054,11 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#99b3cc' &&
         element.stroke?.color === '#496ec0').length,
+      presetSystemColorProbeModelCount: elements.filter((element) =>
+        element.name === 'Preset/System Color Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#ffd700' &&
+        element.stroke?.color === '#00aa55').length,
       imageSvgModelCount: elements.filter((element) =>
         element.kind === 'image' &&
         typeof element.src === 'string' &&
@@ -11171,6 +11178,11 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#99b3cc' &&
       element.stroke?.color === '#496ec0')
+    const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Preset/System Color Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#ffd700' &&
+      element.stroke?.color === '#00aa55')
     const exportSvgImages = exportElements.filter((element) =>
       element.kind === 'image' &&
       typeof element.src === 'string' &&
@@ -11345,6 +11357,10 @@ async function runExportScenario(page) {
       exportColorModifierProbeFill: exportColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportColorModifierProbeModelCount: exportColorModifierProbeObjects.length,
       exportColorModifierProbeStroke: exportColorModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
+      exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
+      exportPresetSystemColorProbeStroke: exportPresetSystemColorProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasSVGImage: exportSvgImages.length > 0,
       exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
       exportHasGroupedProbe,
@@ -11512,6 +11528,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
       openXmlPPTXImportState.exportHasColorModifierProbe &&
       openXmlPPTXImportState.exportColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.colorModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
+      openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasSVGImage &&
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportHasGroupedProbe &&
@@ -27984,6 +28002,60 @@ async function addPPTXNoFillShapeProbe(base64) {
     '</p:spTree>',
     `${probeShapeXml}${probeLineXml}${roundRectProbeXml}${colorModifierProbeXml}</p:spTree>`,
   )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXPresetSystemColorProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Preset/System Color Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9970" name="Preset/System Color Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="1828800" y="5845800"/>',
+    '<a:ext cx="1828800" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:prstClr val="gold"/></a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill><a:sysClr val="windowText" lastClr="00AA55"/></a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64

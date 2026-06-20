@@ -122,6 +122,64 @@ const PPTX_SCHEME_COLORS: Record<string, string> = {
   tx1: '#111827',
   tx2: '#475569',
 }
+const PPTX_PRESET_COLORS: Record<string, string> = {
+  black: '#000000',
+  blue: '#0000ff',
+  cyan: '#00ffff',
+  dkBlue: '#00008b',
+  dkCyan: '#008b8b',
+  dkGray: '#a9a9a9',
+  dkGreen: '#006400',
+  dkMagenta: '#8b008b',
+  dkRed: '#8b0000',
+  dkYellow: '#808000',
+  gold: '#ffd700',
+  green: '#008000',
+  ltBlue: '#add8e6',
+  ltCyan: '#e0ffff',
+  ltGray: '#d3d3d3',
+  ltGreen: '#90ee90',
+  ltMagenta: '#ff77ff',
+  ltYellow: '#ffffe0',
+  magenta: '#ff00ff',
+  orange: '#ffa500',
+  purple: '#800080',
+  red: '#ff0000',
+  white: '#ffffff',
+  yellow: '#ffff00',
+}
+const PPTX_SYSTEM_COLORS: Record<string, string> = {
+  '3dDkShadow': '#696969',
+  '3dLight': '#e3e3e3',
+  activeBorder: '#b4b4b4',
+  activeCaption: '#99b4d1',
+  appWorkspace: '#ababab',
+  background: '#000000',
+  btnFace: '#f0f0f0',
+  btnHighlight: '#ffffff',
+  btnShadow: '#a0a0a0',
+  btnText: '#000000',
+  captionText: '#000000',
+  gradientActiveCaption: '#b9d1ea',
+  gradientInactiveCaption: '#d7e4f2',
+  grayText: '#6d6d6d',
+  highlight: '#0078d7',
+  highlightText: '#ffffff',
+  hotLight: '#0066cc',
+  inactiveBorder: '#f4f7fc',
+  inactiveCaption: '#bfcddb',
+  inactiveCaptionText: '#000000',
+  infoBk: '#ffffe1',
+  infoText: '#000000',
+  menu: '#f0f0f0',
+  menuBar: '#f0f0f0',
+  menuHighlight: '#3399ff',
+  menuText: '#000000',
+  scrollBar: '#c8c8c8',
+  window: '#ffffff',
+  windowFrame: '#646464',
+  windowText: '#000000',
+}
 
 export async function importPPTDeckFromPPTXBlob(
   blob: Blob,
@@ -2286,16 +2344,49 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
 function readPPTXColor(solidFill: Element) {
   const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
   const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
-  const srgb = srgbColor?.getAttribute('val')
-  const scheme = schemeColor?.getAttribute('val')
-  const base = srgb && /^[\da-f]{6}$/i.test(srgb)
-    ? `#${srgb.toLowerCase()}`
-    : scheme ? PPTX_SCHEME_COLORS[scheme] : undefined
-  const colorElement = srgbColor ?? schemeColor
+  const presetColor = getDirectPPTXChildByLocalName(solidFill, 'prstClr')
+  const systemColor = getDirectPPTXChildByLocalName(solidFill, 'sysClr')
+  const color = [
+    {
+      color: readPPTXHexColor(srgbColor?.getAttribute('val')),
+      element: srgbColor,
+    },
+    {
+      color: readPPTXSchemeColor(schemeColor?.getAttribute('val')),
+      element: schemeColor,
+    },
+    {
+      color: readPPTXPresetColor(presetColor?.getAttribute('val')),
+      element: presetColor,
+    },
+    {
+      color: readPPTXHexColor(systemColor?.getAttribute('lastClr')) ??
+        readPPTXSystemColor(systemColor?.getAttribute('val')),
+      element: systemColor,
+    },
+  ].find((candidate) => candidate.color && candidate.element)
 
-  return base && colorElement
-    ? applyPPTXColorModifiers(base, colorElement)
-    : base
+  return color?.color && color.element
+    ? applyPPTXColorModifiers(color.color, color.element)
+    : color?.color
+}
+
+function readPPTXHexColor(value: string | null | undefined) {
+  return value && /^[\da-f]{6}$/i.test(value)
+    ? `#${value.toLowerCase()}`
+    : undefined
+}
+
+function readPPTXSchemeColor(value: string | null | undefined) {
+  return value ? PPTX_SCHEME_COLORS[value] : undefined
+}
+
+function readPPTXPresetColor(value: string | null | undefined) {
+  return value ? PPTX_PRESET_COLORS[value] : undefined
+}
+
+function readPPTXSystemColor(value: string | null | undefined) {
+  return value ? PPTX_SYSTEM_COLORS[value] : undefined
 }
 
 function applyPPTXColorModifiers(color: string, colorElement: Element) {
