@@ -1166,7 +1166,7 @@ function readPPTXLineElement(
     ...(readPPTXElementVisibility(element) ?? {}),
     name: readPPTXObjectName(element, `Line ${objectIndex}`),
     ...(opacity === null ? {} : { opacity }),
-    route: 'straight',
+    route: readPPTXLineRoute(spPr),
     ...(shadow ? { shadow } : {}),
     start: lineGeometry.start,
     startMarker: readPPTXLineMarker(line, 'headEnd'),
@@ -1179,7 +1179,14 @@ function isPPTXLineShape(sp: Element) {
   const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
     ?.getAttribute('prst')
 
-  return preset === 'line'
+  return preset === 'line' || preset === 'straightConnector1'
+}
+
+function readPPTXLineRoute(spPr: Element | null): PPTLine['route'] {
+  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst')
+
+  return preset?.startsWith('bentConnector') ? 'elbow' : 'straight'
 }
 
 function readPPTXLineGeometry(spPr: Element | null): {

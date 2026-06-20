@@ -11006,15 +11006,17 @@ async function runExportScenario(page) {
             await addPPTXThemeTypefaceProbe(
               await addPPTXHyperlinkProbe(
                 await addPPTXImageOpacityProbe(
-                  await addPPTXHiddenObjectProbe(
-                    await addPPTXNoFillShapeProbe(
-                      await addPPTXGradientPatternFillProbe(
-                        await addPPTXThemeColorProbe(
-                          await addPPTXPresetSystemColorProbe(
-                            await addPPTXUnevenTableProbe(
-                              await addPPTXGroupedObjectProbe(
-                                await reversePPTXPresentationSlideOrder(
-                                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                  await addPPTXElbowConnectorProbe(
+                    await addPPTXHiddenObjectProbe(
+                      await addPPTXNoFillShapeProbe(
+                        await addPPTXGradientPatternFillProbe(
+                          await addPPTXThemeColorProbe(
+                            await addPPTXPresetSystemColorProbe(
+                              await addPPTXUnevenTableProbe(
+                                await addPPTXGroupedObjectProbe(
+                                  await reversePPTXPresentationSlideOrder(
+                                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                  ),
                                 ),
                               ),
                             ),
@@ -11113,6 +11115,10 @@ async function runExportScenario(page) {
       unevenTableProbeModelCount: elements.filter((element) =>
         element.name === 'Uneven Table Probe').length,
       lineModelCount: (exportCode.match(/"kind": "line"/g) ?? []).length,
+      elbowConnectorProbeModelCount: elements.filter((element) =>
+        element.name === 'Elbow Connector Probe' &&
+        element.kind === 'line' &&
+        element.route === 'elbow').length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
       objectLockingModelCount: elements.filter((element) =>
@@ -11349,6 +11355,10 @@ async function runExportScenario(page) {
       element.name === 'Dot Line Probe' &&
       element.kind === 'line' &&
       element.stroke?.dash === 'dot')
+    const exportElbowConnectorProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Elbow Connector Probe' &&
+      element.kind === 'line' &&
+      element.route === 'elbow')
     const exportRoundRectProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Round Rect Probe' &&
       element.kind === 'shape' &&
@@ -11540,6 +11550,9 @@ async function runExportScenario(page) {
       exportOpenXmlDashProbeStrokeDash: exportNoFillShapeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportOpenXmlDotLineProbeModelCount: exportDotLineProbeObjects.length,
       exportOpenXmlDotLineProbeStrokeDash: exportDotLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
+      exportHasElbowConnectorProbe: exportElbowConnectorProbeObjects.length > 0,
+      exportElbowConnectorProbeModelCount: exportElbowConnectorProbeObjects.length,
+      exportElbowConnectorProbeRoutes: exportElbowConnectorProbeObjects.map((element) => element.route ?? '').join(' | '),
       exportHasRoundRectProbe: exportRoundRectProbeObjects.length > 0,
       exportRoundRectProbeCornerRadius: exportRoundRectProbeObjects.map((element) => element.cornerRadius ?? '').join(' | '),
       exportRoundRectProbeModelCount: exportRoundRectProbeObjects.length,
@@ -11677,6 +11690,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportOpenXmlDashProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashProbeModelCount &&
       openXmlPPTXImportState.exportHasOpenXmlDotLineProbe &&
       openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
+      openXmlPPTXImportState.exportHasElbowConnectorProbe &&
+      openXmlPPTXImportState.exportElbowConnectorProbeModelCount > beforeOpenXmlPPTXDrop.elbowConnectorProbeModelCount &&
       openXmlPPTXImportState.exportHasRoundRectProbe &&
       openXmlPPTXImportState.exportRoundRectProbeModelCount > beforeOpenXmlPPTXDrop.roundRectProbeModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
@@ -28185,6 +28200,60 @@ async function addPPTXHiddenObjectProbe(base64) {
     '<a:ln w="19050"><a:solidFill><a:srgbClr val="92400E"/></a:solidFill></a:ln>',
     '</p:spPr>',
     '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXElbowConnectorProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Elbow Connector Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:cxnSp>',
+    '<p:nvCxnSpPr>',
+    '<p:cNvPr id="9978" name="Elbow Connector Probe"/>',
+    '<p:cNvCxnSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvCxnSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8686800" y="5029200"/>',
+    '<a:ext cx="1371600" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="bentConnector2"><a:avLst/></a:prstGeom>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="0F766E"/></a:solidFill>',
+    '<a:tailEnd type="triangle"/>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:cxnSp>',
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
 
