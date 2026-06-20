@@ -1694,8 +1694,9 @@ function readPPTXTextBody(txBody: Element | null): PPTTextBody | null {
     return null
   }
 
+  const listStyle = getDirectPPTXChildByLocalName(txBody, 'lstStyle')
   const paragraphs = getDirectPPTXChildrenByLocalName(txBody, 'p')
-    .map(readPPTXParagraph)
+    .map((paragraph) => readPPTXParagraph(paragraph, listStyle))
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
@@ -1725,16 +1726,25 @@ function readPPTXPlainParagraphText(paragraph: Element) {
     .join('')
 }
 
-function readPPTXParagraph(paragraph: Element): PPTParagraph {
+function readPPTXParagraph(
+  paragraph: Element,
+  listStyle: Element | null,
+): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
+  const level = readPPTXParagraphLevel(pPr)
+  const listStylePPr = readPPTXTextListStyleParagraphProperties(
+    listStyle,
+    level ?? 0,
+  )
   const defaultRunProperties = readPPTXParagraphDefaultRunProperties(
     paragraph,
     pPr,
+    listStylePPr,
   )
-  const align = readPPTXParagraphAlign(pPr)
-  const bullet = readPPTXParagraphBullet(pPr)
-  const level = readPPTXParagraphLevel(pPr)
-  const spacing = readPPTXParagraphSpacing(pPr)
+  const align = readPPTXParagraphAlign(pPr) ??
+    readPPTXParagraphAlign(listStylePPr)
+  const bullet = readPPTXParagraphBullet(pPr, listStylePPr)
+  const spacing = readPPTXParagraphSpacing(pPr, listStylePPr)
   const runs = Array.from(paragraph.children)
     .flatMap((child) => readPPTXTextRun(child, defaultRunProperties))
 
@@ -1750,9 +1760,25 @@ function readPPTXParagraph(paragraph: Element): PPTParagraph {
 function readPPTXParagraphDefaultRunProperties(
   paragraph: Element,
   pPr: Element | null,
+  listStylePPr: Element | null,
 ) {
   return getDirectPPTXChildByLocalName(pPr, 'defRPr') ??
+    getDirectPPTXChildByLocalName(listStylePPr, 'defRPr') ??
     getDirectPPTXChildByLocalName(paragraph, 'endParaRPr')
+}
+
+function readPPTXTextListStyleParagraphProperties(
+  listStyle: Element | null,
+  level: number,
+) {
+  if (!listStyle) {
+    return null
+  }
+
+  const clampedLevel = Math.max(0, Math.min(8, Math.floor(level)))
+
+  return getDirectPPTXChildByLocalName(listStyle, `lvl${clampedLevel + 1}pPr`) ??
+    getDirectPPTXChildByLocalName(listStyle, 'defPPr')
 }
 
 function readPPTXTextRun(
@@ -1957,6 +1983,27 @@ function readPPTXParagraphAlign(
 
 function readPPTXParagraphBullet(
   pPr: Element | null,
+  fallbackPPr: Element | null,
+): PPTParagraph['bullet'] | undefined {
+  if (getDirectPPTXChildByLocalName(pPr, 'buNone')) {
+    return undefined
+  }
+
+  const bullet = readPPTXParagraphBulletFromProperties(pPr)
+
+  if (bullet) {
+    return bullet
+  }
+
+  if (getDirectPPTXChildByLocalName(fallbackPPr, 'buNone')) {
+    return undefined
+  }
+
+  return readPPTXParagraphBulletFromProperties(fallbackPPr)
+}
+
+function readPPTXParagraphBulletFromProperties(
+  pPr: Element | null,
 ): PPTParagraph['bullet'] | undefined {
   if (!pPr) {
     return undefined
@@ -1966,7 +2013,10 @@ function readPPTXParagraphBullet(
     return 'numbered'
   }
 
-  return getDirectPPTXChildByLocalName(pPr, 'buChar') ? 'bullet' : undefined
+  return getDirectPPTXChildByLocalName(pPr, 'buChar') ||
+    getDirectPPTXChildByLocalName(pPr, 'buBlip')
+    ? 'bullet'
+    : undefined
 }
 
 function readPPTXParagraphLevel(pPr: Element | null) {
@@ -1977,10 +2027,14 @@ function readPPTXParagraphLevel(pPr: Element | null) {
 
 function readPPTXParagraphSpacing(
   pPr: Element | null,
+  fallbackPPr: Element | null,
 ): Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> {
-  const lineHeight = readPPTXParagraphLineHeight(pPr)
-  const spacingBefore = readPPTXParagraphSpacingPixels(pPr, 'spcBef')
-  const spacingAfter = readPPTXParagraphSpacingPixels(pPr, 'spcAft')
+  const lineHeight = readPPTXParagraphLineHeight(pPr) ??
+    readPPTXParagraphLineHeight(fallbackPPr)
+  const spacingBefore = readPPTXParagraphSpacingPixels(pPr, 'spcBef') ??
+    readPPTXParagraphSpacingPixels(fallbackPPr, 'spcBef')
+  const spacingAfter = readPPTXParagraphSpacingPixels(pPr, 'spcAft') ??
+    readPPTXParagraphSpacingPixels(fallbackPPr, 'spcAft')
 
   return {
     ...(lineHeight === undefined ? {} : { lineHeight }),

@@ -10998,14 +10998,16 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(
-    await addPPTXHyperlinkProbe(
-      await addPPTXImageOpacityProbe(
-        await addPPTXNoFillShapeProbe(
-          await addPPTXUnevenTableProbe(
-            await addPPTXGroupedObjectProbe(
-              await reversePPTXPresentationSlideOrder(
-                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXListStyleBulletProbe(
+    await addPPTXParagraphDefaultRunStyleProbe(
+      await addPPTXHyperlinkProbe(
+        await addPPTXImageOpacityProbe(
+          await addPPTXNoFillShapeProbe(
+            await addPPTXUnevenTableProbe(
+              await addPPTXGroupedObjectProbe(
+                await reversePPTXPresentationSlideOrder(
+                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                ),
               ),
             ),
           ),
@@ -11084,6 +11086,8 @@ async function runExportScenario(page) {
         element.name === 'Default Run Style Probe').length,
       eastAsianTypefaceProbeModelCount: elements.filter((element) =>
         element.name === 'East Asian Typeface Probe').length,
+      listStyleBulletProbeModelCount: elements.filter((element) =>
+        element.name === 'List Style Bullet Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
         paragraph.lineHeight !== undefined ||
         paragraph.spacingAfter !== undefined ||
@@ -11280,6 +11284,16 @@ async function runExportScenario(page) {
       element.textBody?.paragraphs?.some((paragraph) =>
         paragraph.runs?.some((run) =>
           run.text === 'East Asian typeface probe')) === true)
+    const exportListStyleBulletProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'List Style Bullet Probe' &&
+      element.kind === 'textBox' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.bullet === 'bullet' &&
+        paragraph.level === 1 &&
+        paragraph.runs?.some((run) =>
+          run.text === 'List style bullet probe' &&
+          run.color === '#1d4ed8' &&
+          run.size === 28)) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11425,6 +11439,8 @@ async function runExportScenario(page) {
       exportHasEastAsianTypefaceProbe: exportEastAsianTypefaceProbeObjects.length > 0,
       exportEastAsianTypefaceProbeFontFamily: exportEastAsianTypefaceProbeObjects.map((element) => element.style?.fontFamily ?? '').join(' | '),
       exportEastAsianTypefaceProbeModelCount: exportEastAsianTypefaceProbeObjects.length,
+      exportHasListStyleBulletProbe: exportListStyleBulletProbeObjects.length > 0,
+      exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
       exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
@@ -11508,6 +11524,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportParagraphDefaultRunStyleModelCount > beforeOpenXmlPPTXDrop.paragraphDefaultRunStyleModelCount &&
       openXmlPPTXImportState.exportHasEastAsianTypefaceProbe &&
       openXmlPPTXImportState.exportEastAsianTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.eastAsianTypefaceProbeModelCount &&
+      openXmlPPTXImportState.exportHasListStyleBulletProbe &&
+      openXmlPPTXImportState.exportListStyleBulletProbeModelCount > beforeOpenXmlPPTXDrop.listStyleBulletProbeModelCount &&
       openXmlPPTXImportState.exportHasParagraphSpacing &&
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
@@ -28051,6 +28069,71 @@ async function addPPTXParagraphDefaultRunStyleProbe(base64) {
     '</p:spTree>',
     `${probeShapeXml}${eastAsianTypefaceProbeXml}</p:spTree>`,
   )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXListStyleBulletProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('List Style Bullet Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9968" name="List Style Bullet Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5029200" y="6431280"/>',
+    '<a:ext cx="3200400" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle>',
+    '<a:lvl2pPr>',
+    '<a:buChar char="&#8226;"/>',
+    '<a:defRPr sz="2100">',
+    '<a:solidFill><a:srgbClr val="1D4ED8"/></a:solidFill>',
+    '</a:defRPr>',
+    '</a:lvl2pPr>',
+    '</a:lstStyle>',
+    '<a:p>',
+    '<a:pPr lvl="1"/>',
+    '<a:r><a:t>List style bullet probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64
