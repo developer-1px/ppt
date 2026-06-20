@@ -11004,12 +11004,14 @@ async function runExportScenario(page) {
         await addPPTXHyperlinkProbe(
           await addPPTXImageOpacityProbe(
             await addPPTXNoFillShapeProbe(
-              await addPPTXThemeColorProbe(
-                await addPPTXPresetSystemColorProbe(
-                  await addPPTXUnevenTableProbe(
-                    await addPPTXGroupedObjectProbe(
-                      await reversePPTXPresentationSlideOrder(
-                        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+              await addPPTXGradientPatternFillProbe(
+                await addPPTXThemeColorProbe(
+                  await addPPTXPresetSystemColorProbe(
+                    await addPPTXUnevenTableProbe(
+                      await addPPTXGroupedObjectProbe(
+                        await reversePPTXPresentationSlideOrder(
+                          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                        ),
                       ),
                     ),
                   ),
@@ -11066,6 +11068,15 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#cc3366' &&
         element.stroke?.color === '#203040').length,
+      gradientFillProbeModelCount: elements.filter((element) =>
+        element.name === 'Gradient Fill Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#aa5500' &&
+        element.fill?.opacity === 0.65).length,
+      patternFillProbeModelCount: elements.filter((element) =>
+        element.name === 'Pattern Fill Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#800080').length,
       imageSvgModelCount: elements.filter((element) =>
         element.kind === 'image' &&
         typeof element.src === 'string' &&
@@ -11195,6 +11206,15 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#cc3366' &&
       element.stroke?.color === '#203040')
+    const exportGradientFillProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Gradient Fill Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#aa5500' &&
+      element.fill?.opacity === 0.65)
+    const exportPatternFillProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Pattern Fill Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#800080')
     const exportSvgImages = exportElements.filter((element) =>
       element.kind === 'image' &&
       typeof element.src === 'string' &&
@@ -11377,6 +11397,13 @@ async function runExportScenario(page) {
       exportThemeColorProbeFill: exportThemeColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportThemeColorProbeModelCount: exportThemeColorProbeObjects.length,
       exportThemeColorProbeStroke: exportThemeColorProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasGradientFillProbe: exportGradientFillProbeObjects.length > 0,
+      exportGradientFillProbeFill: exportGradientFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportGradientFillProbeModelCount: exportGradientFillProbeObjects.length,
+      exportGradientFillProbeOpacity: exportGradientFillProbeObjects.map((element) => element.fill?.opacity ?? '').join(' | '),
+      exportHasPatternFillProbe: exportPatternFillProbeObjects.length > 0,
+      exportPatternFillProbeFill: exportPatternFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportPatternFillProbeModelCount: exportPatternFillProbeObjects.length,
       exportHasSVGImage: exportSvgImages.length > 0,
       exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
       exportHasGroupedProbe,
@@ -11548,6 +11575,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
       openXmlPPTXImportState.exportThemeColorProbeModelCount > beforeOpenXmlPPTXDrop.themeColorProbeModelCount &&
+      openXmlPPTXImportState.exportHasGradientFillProbe &&
+      openXmlPPTXImportState.exportGradientFillProbeModelCount > beforeOpenXmlPPTXDrop.gradientFillProbeModelCount &&
+      openXmlPPTXImportState.exportHasPatternFillProbe &&
+      openXmlPPTXImportState.exportPatternFillProbeModelCount > beforeOpenXmlPPTXDrop.patternFillProbeModelCount &&
       openXmlPPTXImportState.exportHasSVGImage &&
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportHasGroupedProbe &&
@@ -28161,6 +28192,93 @@ function setPPTXThemeSchemeColorXml(xml, localName, color) {
   }
 
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
+}
+
+async function addPPTXGradientPatternFillProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (
+    xml.includes('Gradient Fill Probe') &&
+    xml.includes('Pattern Fill Probe')
+  ) {
+    return base64
+  }
+
+  const gradientProbeXml = xml.includes('Gradient Fill Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9972" name="Gradient Fill Probe"/>',
+        '<p:cNvSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="5943600" y="5845800"/>',
+        '<a:ext cx="1371600" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '<a:gradFill>',
+        '<a:gsLst>',
+        '<a:gs pos="100000"><a:srgbClr val="003399"/></a:gs>',
+        '<a:gs pos="0"><a:srgbClr val="AA5500"><a:alpha val="65000"/></a:srgbClr></a:gs>',
+        '</a:gsLst>',
+        '<a:lin ang="5400000" scaled="1"/>',
+        '</a:gradFill>',
+        '</p:spPr>',
+        '</p:sp>',
+      ].join('')
+  const patternProbeXml = xml.includes('Pattern Fill Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9973" name="Pattern Fill Probe"/>',
+        '<p:cNvSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="7315200" y="5845800"/>',
+        '<a:ext cx="1371600" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '<a:pattFill prst="pct20">',
+        '<a:fgClr><a:prstClr val="purple"/></a:fgClr>',
+        '<a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>',
+        '</a:pattFill>',
+        '</p:spPr>',
+        '</p:sp>',
+      ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${gradientProbeXml}${patternProbeXml}</p:spTree>`,
+  )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function addPPTXParagraphDefaultRunStyleProbe(base64) {

@@ -694,7 +694,7 @@ function readPPTXSlideBackground(
   const bgPr = cSld
     ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr')
     : null
-  const fill = readPPTXSolidFill(bgPr, themeColors)
+  const fill = readPPTXFill(bgPr, themeColors)
 
   return fill ? { background: fill } : null
 }
@@ -705,7 +705,7 @@ function readPPTXSlideBackgroundFromXml(
 ) {
   const bgPrXml = xml.match(/<p:bgPr\b[\s\S]*?<\/p:bgPr>/)?.[0]
   const bgPr = bgPrXml ? parsePPTXXmlElementFragment(bgPrXml, 'bgPr') : null
-  const fill = readPPTXSolidFill(bgPr, themeColors)
+  const fill = readPPTXFill(bgPr, themeColors)
 
   return fill ? { background: fill } : null
 }
@@ -1513,7 +1513,7 @@ function readPPTXTableCellFill(
 ): PPTFill | undefined {
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
 
-  return readPPTXSolidFill(tcPr, themeColors) ?? undefined
+  return readPPTXFill(tcPr, themeColors) ?? undefined
 }
 
 function readPPTXTableCellTextStyle(
@@ -2025,8 +2025,8 @@ function readPPTXRunColor(
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
 ) {
-  return readPPTXSolidFill(rPr, themeColors)?.color ??
-    readPPTXSolidFill(defaultRunProperties, themeColors)?.color
+  return readPPTXFill(rPr, themeColors)?.color ??
+    readPPTXFill(defaultRunProperties, themeColors)?.color
 }
 
 function readPPTXRunSize(
@@ -2405,7 +2405,7 @@ function readPPTXShapeFill(
   stroke: PPTStroke | undefined,
   themeColors: PPTXThemeColorMap,
 ): PPTFill | null {
-  const fill = readPPTXSolidFill(spPr, themeColors)
+  const fill = readPPTXFill(spPr, themeColors)
 
   if (fill || !hasPPTXNoFill(spPr) || !stroke) {
     return fill
@@ -2417,7 +2417,7 @@ function readPPTXShapeFill(
   }
 }
 
-function readPPTXSolidFill(
+function readPPTXFill(
   container: Element | null,
   themeColors: PPTXThemeColorMap,
 ): PPTFill | null {
@@ -2425,24 +2425,66 @@ function readPPTXSolidFill(
     return null
   }
 
+  return readPPTXSolidFill(container, themeColors) ??
+    readPPTXGradientFill(container, themeColors) ??
+    readPPTXPatternFill(container, themeColors)
+}
+
+function readPPTXSolidFill(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
   const solidFill = getDirectPPTXChildByLocalName(container, 'solidFill')
 
-  if (!solidFill) {
+  return solidFill ? readPPTXColorFill(solidFill, themeColors) : null
+}
+
+function readPPTXGradientFill(
+  container: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  const gradFill = getDirectPPTXChildByLocalName(container, 'gradFill')
+  const stop = gradFill
+    ? getPPTXDescendantsByLocalName(gradFill, 'gs')
+      .sort(comparePPTXGradientStopPositions)
+      .find((gradientStop) => readPPTXColor(gradientStop, themeColors))
+    : null
+
+  return stop ? readPPTXColorFill(stop, themeColors) : null
+}
+
+function readPPTXPatternFill(
+  container: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  const pattFill = getDirectPPTXChildByLocalName(container, 'pattFill')
+
+  if (!pattFill) {
     return null
   }
 
-  const color = readPPTXColor(solidFill, themeColors)
+  const foreground = getDirectPPTXChildByLocalName(pattFill, 'fgClr')
+  const background = getDirectPPTXChildByLocalName(pattFill, 'bgClr')
 
-  if (!color) {
+  return readPPTXColorFill(foreground, themeColors) ??
+    readPPTXColorFill(background, themeColors)
+}
+
+function readPPTXColorFill(
+  colorContainer: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  const color = colorContainer
+    ? readPPTXColor(colorContainer, themeColors)
+    : undefined
+
+  if (!color || !colorContainer) {
     return null
   }
 
-  const opacity = readPPTXAlphaOpacity(solidFill)
+  const opacity = readPPTXAlphaOpacity(colorContainer)
 
-  return {
-    color,
-    ...(opacity === null ? {} : { opacity }),
-  }
+  return opacity === null ? { color } : { color, opacity }
 }
 
 function readPPTXStroke(
@@ -2466,9 +2508,14 @@ function readPPTXStrokeLine(
 
   return {
     ...(dash ? { dash } : {}),
-    color: readPPTXSolidFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
+    color: readPPTXFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
     width: Math.max(1, emuToPx(toPPTXPositiveNumber(line.getAttribute('w')) ?? PPTX_EMUS_PER_PIXEL)),
   }
+}
+
+function comparePPTXGradientStopPositions(left: Element, right: Element) {
+  return (toPPTXPositiveNumber(left.getAttribute('pos')) ?? 0) -
+    (toPPTXPositiveNumber(right.getAttribute('pos')) ?? 0)
 }
 
 function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
