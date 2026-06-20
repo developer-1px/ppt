@@ -11002,16 +11002,18 @@ async function runExportScenario(page) {
     await addPPTXTextAutoFitProbe(
       await addPPTXListStyleBulletProbe(
         await addPPTXParagraphDefaultRunStyleProbe(
-          await addPPTXHyperlinkProbe(
-            await addPPTXImageOpacityProbe(
-              await addPPTXNoFillShapeProbe(
-                await addPPTXGradientPatternFillProbe(
-                  await addPPTXThemeColorProbe(
-                    await addPPTXPresetSystemColorProbe(
-                      await addPPTXUnevenTableProbe(
-                        await addPPTXGroupedObjectProbe(
-                          await reversePPTXPresentationSlideOrder(
-                            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          await addPPTXThemeTypefaceProbe(
+            await addPPTXHyperlinkProbe(
+              await addPPTXImageOpacityProbe(
+                await addPPTXNoFillShapeProbe(
+                  await addPPTXGradientPatternFillProbe(
+                    await addPPTXThemeColorProbe(
+                      await addPPTXPresetSystemColorProbe(
+                        await addPPTXUnevenTableProbe(
+                          await addPPTXGroupedObjectProbe(
+                            await reversePPTXPresentationSlideOrder(
+                              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                            ),
                           ),
                         ),
                       ),
@@ -11127,6 +11129,10 @@ async function runExportScenario(page) {
         element.name === 'Default Run Style Probe').length,
       eastAsianTypefaceProbeModelCount: elements.filter((element) =>
         element.name === 'East Asian Typeface Probe').length,
+      themeTypefaceProbeModelCount: elements.filter((element) =>
+        element.name === 'Theme Typeface Probe' &&
+        element.kind === 'textBox' &&
+        element.style?.fontFamily === 'Theme Minor Probe').length,
       listStyleBulletProbeModelCount: elements.filter((element) =>
         element.name === 'List Style Bullet Probe').length,
       lineSpacingPointsProbeModelCount: elements.filter((element) =>
@@ -11358,6 +11364,13 @@ async function runExportScenario(page) {
       element.textBody?.paragraphs?.some((paragraph) =>
         paragraph.runs?.some((run) =>
           run.text === 'East Asian typeface probe')) === true)
+    const exportThemeTypefaceProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Theme Typeface Probe' &&
+      element.kind === 'textBox' &&
+      element.style?.fontFamily === 'Theme Minor Probe' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'Theme typeface probe')) === true)
     const exportListStyleBulletProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'List Style Bullet Probe' &&
       element.kind === 'textBox' &&
@@ -11545,6 +11558,9 @@ async function runExportScenario(page) {
       exportHasEastAsianTypefaceProbe: exportEastAsianTypefaceProbeObjects.length > 0,
       exportEastAsianTypefaceProbeFontFamily: exportEastAsianTypefaceProbeObjects.map((element) => element.style?.fontFamily ?? '').join(' | '),
       exportEastAsianTypefaceProbeModelCount: exportEastAsianTypefaceProbeObjects.length,
+      exportHasThemeTypefaceProbe: exportThemeTypefaceProbeObjects.length > 0,
+      exportThemeTypefaceProbeFontFamily: exportThemeTypefaceProbeObjects.map((element) => element.style?.fontFamily ?? '').join(' | '),
+      exportThemeTypefaceProbeModelCount: exportThemeTypefaceProbeObjects.length,
       exportHasListStyleBulletProbe: exportListStyleBulletProbeObjects.length > 0,
       exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
       exportHasLineSpacingPointsProbe: exportLineSpacingPointsProbeObjects.length > 0,
@@ -11646,6 +11662,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportParagraphDefaultRunStyleModelCount > beforeOpenXmlPPTXDrop.paragraphDefaultRunStyleModelCount &&
       openXmlPPTXImportState.exportHasEastAsianTypefaceProbe &&
       openXmlPPTXImportState.exportEastAsianTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.eastAsianTypefaceProbeModelCount &&
+      openXmlPPTXImportState.exportHasThemeTypefaceProbe &&
+      openXmlPPTXImportState.exportThemeTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.themeTypefaceProbeModelCount &&
       openXmlPPTXImportState.exportHasListStyleBulletProbe &&
       openXmlPPTXImportState.exportListStyleBulletProbeModelCount > beforeOpenXmlPPTXDrop.listStyleBulletProbeModelCount &&
       openXmlPPTXImportState.exportHasLineSpacingPointsProbe &&
@@ -28233,6 +28251,95 @@ function setPPTXThemeSchemeColorXml(xml, localName, color) {
   }
 
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
+}
+
+async function addPPTXThemeTypefaceProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const themePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath || !themePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+  const themeXml = await readPPTXZipText(zip, themePath)
+  const nextThemeXml = setPPTXThemeFontXml(
+    themeXml,
+    'minorFont',
+    'latin',
+    'Theme Minor Probe',
+  )
+  const probeXml = xml.includes('Theme Typeface Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9977" name="Theme Typeface Probe"/>',
+        '<p:cNvSpPr txBox="1"/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="914400" y="5943600"/>',
+        '<a:ext cx="2286000" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '</p:spPr>',
+        '<p:txBody>',
+        '<a:bodyPr/>',
+        '<a:lstStyle/>',
+        '<a:p>',
+        '<a:pPr>',
+        '<a:defRPr sz="2000">',
+        '<a:latin typeface="+mn-lt"/>',
+        '</a:defRPr>',
+        '</a:pPr>',
+        '<a:r><a:t>Theme typeface probe</a:t></a:r>',
+        '</a:p>',
+        '</p:txBody>',
+        '</p:sp>',
+      ].join('')
+  const nextXml = probeXml
+    ? xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+    : xml
+
+  if (nextXml === xml && nextThemeXml === themeXml) {
+    return base64
+  }
+
+  zip.file(themePath, nextThemeXml)
+  if (nextXml !== xml) {
+    zip.file(slidePath, nextXml)
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function setPPTXThemeFontXml(xml, fontGroup, localName, typeface) {
+  const fontXml = `<a:${localName} typeface="${typeface}"/>`
+  const existingFontPattern = new RegExp(
+    `(<a:${fontGroup}>[\\s\\S]*?)<a:${localName}\\b[^>]*/>([\\s\\S]*?</a:${fontGroup}>)`,
+  )
+
+  if (existingFontPattern.test(xml)) {
+    return xml.replace(existingFontPattern, `$1${fontXml}$2`)
+  }
+
+  const fontGroupPattern = new RegExp(`(<a:${fontGroup}>)([\\s\\S]*?</a:${fontGroup}>)`)
+
+  return xml.replace(fontGroupPattern, `$1${fontXml}$2`)
 }
 
 async function addPPTXGradientPatternFillProbe(base64) {

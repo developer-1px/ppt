@@ -76,6 +76,7 @@ type PPTXSlideObjectNode = {
   transform: PPTXGroupTransform
 }
 type PPTXThemeColorMap = Readonly<Record<string, string>>
+type PPTXThemeFontMap = Readonly<Record<string, string>>
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -248,13 +249,16 @@ async function importPPTDeckFromOpenXmlZip(
   }
 
   const size = await readPPTXOpenXmlDeckSize(zip)
-  const themeColors = await readPPTXOpenXmlThemeColors(zip)
+  const themePath = await readPPTXOpenXmlThemePath(zip)
+  const themeColors = await readPPTXOpenXmlThemeColors(zip, themePath)
+  const themeFonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
   const title = await readPPTXOpenXmlDeckTitle(zip)
   const slides = await Promise.all(slidePaths.map((path, index) =>
     readPPTXOpenXmlSlide({
       index,
       path,
       themeColors,
+      themeFonts,
       zip,
     }),
   ))
@@ -372,8 +376,10 @@ async function readPPTXOpenXmlDeckTitle(zip: JSZip) {
   return title || 'Imported PPTX Deck'
 }
 
-async function readPPTXOpenXmlThemeColors(zip: JSZip): Promise<PPTXThemeColorMap> {
-  const themePath = await readPPTXOpenXmlThemePath(zip)
+async function readPPTXOpenXmlThemeColors(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeColorMap> {
   const xml = themePath ? await zip.file(themePath)?.async('string') : null
   const doc = xml ? parsePPTXXmlDocument(xml) : null
   const colorScheme = doc
@@ -394,6 +400,50 @@ async function readPPTXOpenXmlThemeColors(zip: JSZip): Promise<PPTXThemeColorMap
     }, {})
 
   return resolvePPTXThemeSchemeColors(colors)
+}
+
+async function readPPTXOpenXmlThemeFonts(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeFontMap> {
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const fontScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'fontScheme')
+    : null
+  const majorFont = getDirectPPTXChildByLocalName(fontScheme, 'majorFont')
+  const minorFont = getDirectPPTXChildByLocalName(fontScheme, 'minorFont')
+
+  return {
+    ...readPPTXThemeFontGroup(majorFont, '+mj'),
+    ...readPPTXThemeFontGroup(minorFont, '+mn'),
+  }
+}
+
+function readPPTXThemeFontGroup(
+  fontGroup: Element | null,
+  prefix: '+mj' | '+mn',
+): Record<string, string> {
+  const latin = readPPTXThemeTypeface(fontGroup, 'latin')
+  const eastAsian = readPPTXThemeTypeface(fontGroup, 'ea') ?? latin
+  const complexScript = readPPTXThemeTypeface(fontGroup, 'cs') ?? latin
+
+  return {
+    ...(latin ? { [`${prefix}-lt`]: latin } : {}),
+    ...(eastAsian ? { [`${prefix}-ea`]: eastAsian } : {}),
+    ...(complexScript ? { [`${prefix}-cs`]: complexScript } : {}),
+  }
+}
+
+function readPPTXThemeTypeface(
+  fontGroup: Element | null,
+  localName: 'cs' | 'ea' | 'latin',
+) {
+  const typeface = getDirectPPTXChildByLocalName(fontGroup, localName)
+    ?.getAttribute('typeface')
+    ?.trim()
+
+  return typeface && !typeface.startsWith('+') ? typeface : undefined
 }
 
 async function readPPTXOpenXmlThemePath(zip: JSZip) {
@@ -457,11 +507,13 @@ async function readPPTXOpenXmlSlide({
   index,
   path,
   themeColors,
+  themeFonts,
   zip,
 }: {
   index: number
   path: string
   themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
   zip: JSZip
 }): Promise<PPTSlide> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -488,7 +540,7 @@ async function readPPTXOpenXmlSlide({
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
         ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
-        : readPPTXShapeElement(child, index, objectIndex, relationships, themeColors)
+        : readPPTXShapeElement(child, index, objectIndex, relationships, themeColors, themeFonts)
     } else if (child.localName === 'cxnSp') {
       element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
     } else if (child.localName === 'pic') {
@@ -1200,6 +1252,7 @@ function readPPTXShapeElement(
   objectIndex: number,
   relationships: PPTXRelationshipMap,
   themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
@@ -1230,7 +1283,7 @@ function readPPTXShapeElement(
       ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
       name,
       ...(shadow ? { shadow } : {}),
-      style: readPPTXTextStyle(textBody, txBody),
+      style: readPPTXTextStyle(textBody, txBody, themeFonts),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody: textBody ?? { paragraphs: [] },
     }
@@ -1243,7 +1296,7 @@ function readPPTXShapeElement(
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
-      style: readPPTXTextStyle(textBody, txBody),
+      style: readPPTXTextStyle(textBody, txBody, themeFonts),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody,
     } : {}),
@@ -2072,12 +2125,13 @@ function readPPTXRunStrikethrough(
 function readPPTXTextStyle(
   textBody: PPTTextBody | null,
   txBody: Element | null,
+  themeFonts: PPTXThemeFontMap,
 ): PPTTextStyle {
   const firstRun = textBody?.paragraphs
     .flatMap((paragraph) => paragraph.runs)
     .find((run) => run.text.trim().length > 0) ??
     textBody?.paragraphs[0]?.runs[0]
-  const fontFamily = readPPTXFirstTypeface(txBody)
+  const fontFamily = readPPTXFirstTypeface(txBody, themeFonts)
 
   return {
     color: firstRun?.color ?? PPTX_DEFAULT_TEXT_COLOR,
@@ -2313,21 +2367,37 @@ function readPPTXRunHighlight(
   return highlight ? readPPTXColor(highlight, themeColors) : undefined
 }
 
-function readPPTXTypeface(rPr: Element | null) {
+function readPPTXTypeface(
+  rPr: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
   for (const localName of ['latin', 'ea', 'cs']) {
     const typeface = getDirectPPTXChildByLocalName(rPr, localName)
       ?.getAttribute('typeface')
       ?.trim()
 
-    if (typeface && !typeface.startsWith('+')) {
+    if (!typeface) {
+      continue
+    }
+
+    if (!typeface.startsWith('+')) {
       return typeface
+    }
+
+    const themeTypeface = themeFonts[typeface]
+
+    if (themeTypeface) {
+      return themeTypeface
     }
   }
 
   return undefined
 }
 
-function readPPTXFirstTypeface(txBody: Element | null) {
+function readPPTXFirstTypeface(
+  txBody: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
   if (!txBody) {
     return undefined
   }
@@ -2339,7 +2409,7 @@ function readPPTXFirstTypeface(txBody: Element | null) {
       continue
     }
 
-    const typeface = readPPTXTypeface(properties)
+    const typeface = readPPTXTypeface(properties, themeFonts)
 
     if (typeface) {
       return typeface
