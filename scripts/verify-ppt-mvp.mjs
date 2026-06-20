@@ -11006,14 +11006,16 @@ async function runExportScenario(page) {
             await addPPTXThemeTypefaceProbe(
               await addPPTXHyperlinkProbe(
                 await addPPTXImageOpacityProbe(
-                  await addPPTXNoFillShapeProbe(
-                    await addPPTXGradientPatternFillProbe(
-                      await addPPTXThemeColorProbe(
-                        await addPPTXPresetSystemColorProbe(
-                          await addPPTXUnevenTableProbe(
-                            await addPPTXGroupedObjectProbe(
-                              await reversePPTXPresentationSlideOrder(
-                                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                  await addPPTXHiddenObjectProbe(
+                    await addPPTXNoFillShapeProbe(
+                      await addPPTXGradientPatternFillProbe(
+                        await addPPTXThemeColorProbe(
+                          await addPPTXPresetSystemColorProbe(
+                            await addPPTXUnevenTableProbe(
+                              await addPPTXGroupedObjectProbe(
+                                await reversePPTXPresentationSlideOrder(
+                                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                ),
                               ),
                             ),
                           ),
@@ -11115,6 +11117,9 @@ async function runExportScenario(page) {
         element.accessibility?.altText).length,
       objectLockingModelCount: elements.filter((element) =>
         element.locked === true).length,
+      hiddenObjectProbeModelCount: elements.filter((element) =>
+        element.name === 'Hidden Object Probe' &&
+        element.visible === false).length,
       noFillShapeModelCount: elements.filter((element) =>
         element.name === 'No Fill Shape Probe').length,
       objectOpacityModelCount: (exportCode.match(/"opacity": 0\.42/g) ?? []).length,
@@ -11331,6 +11336,9 @@ async function runExportScenario(page) {
     })
     const exportLockedObjects = exportElements.filter((element) =>
       element.locked === true)
+    const exportHiddenObjectProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Hidden Object Probe' &&
+      element.visible === false)
     const exportNoFillShapeObjects = exportElements.filter((element) =>
       element.name === 'No Fill Shape Probe' &&
       element.kind === 'shape' &&
@@ -11525,6 +11533,7 @@ async function runExportScenario(page) {
       exportHasNotes: exportCode.includes('Presenter cue: review image crop and final CTA.'),
       exportHasObjectAltText: exportAltTextObjects.length > 0,
       exportHasObjectLocking: exportLockedObjects.length > 0,
+      exportHasHiddenObjectProbe: exportHiddenObjectProbeObjects.length > 0,
       exportHasNoFillShape: exportNoFillShapeObjects.length > 0,
       exportHasOpenXmlDotLineProbe: exportDotLineProbeObjects.length > 0,
       exportOpenXmlDashProbeModelCount: exportNoFillShapeObjects.length,
@@ -11538,6 +11547,8 @@ async function runExportScenario(page) {
       exportHasObjectShadow: exportShadowedObjects.length > 0,
       exportObjectAltTextNames: exportAltTextObjects.map((element) => element.name).join(' | '),
       exportObjectLockingNames: exportLockedObjects.map((element) => element.name).join(' | '),
+      exportHiddenObjectProbeModelCount: exportHiddenObjectProbeObjects.length,
+      exportHiddenObjectProbeNames: exportHiddenObjectProbeObjects.map((element) => element.name).join(' | '),
       exportObjectShadowNames: exportShadowedObjects.map((element) => element.name).join(' | '),
       exportHasParagraphDefaultRunStyle: exportParagraphDefaultRunStyleObjects.length > 0,
       exportHasParagraphSpacing: exportSpacedParagraphs.length > 0,
@@ -11659,6 +11670,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportObjectAltTextModelCount > beforeOpenXmlPPTXDrop.objectAltTextModelCount &&
       openXmlPPTXImportState.exportHasObjectLocking &&
       openXmlPPTXImportState.exportObjectLockingModelCount > beforeOpenXmlPPTXDrop.objectLockingModelCount &&
+      openXmlPPTXImportState.exportHasHiddenObjectProbe &&
+      openXmlPPTXImportState.exportHiddenObjectProbeModelCount > beforeOpenXmlPPTXDrop.hiddenObjectProbeModelCount &&
       openXmlPPTXImportState.exportHasNoFillShape &&
       openXmlPPTXImportState.exportNoFillShapeModelCount > beforeOpenXmlPPTXDrop.noFillShapeModelCount &&
       openXmlPPTXImportState.exportOpenXmlDashProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashProbeModelCount &&
@@ -28122,6 +28135,58 @@ async function addPPTXNoFillShapeProbe(base64) {
     '</p:spTree>',
     `${probeShapeXml}${probeLineXml}${roundRectProbeXml}${colorModifierProbeXml}</p:spTree>`,
   )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXHiddenObjectProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Hidden Object Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9969" name="Hidden Object Probe" hidden="1"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7315200" y="5486400"/>',
+    '<a:ext cx="1371600" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="FDE68A"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="92400E"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64

@@ -1163,6 +1163,7 @@ function readPPTXLineElement(
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'line',
     ...(readPPTXElementLocked(element) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(element) ?? {}),
     name: readPPTXObjectName(element, `Line ${objectIndex}`),
     ...(opacity === null ? {} : { opacity }),
     route: 'straight',
@@ -1296,6 +1297,7 @@ function readPPTXShapeElement(
       id,
       kind: 'textBox',
       ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+      ...(readPPTXElementVisibility(sp) ?? {}),
       name,
       ...(shadow ? { shadow } : {}),
       style: readPPTXTextStyle(textBody, txBody, themeFonts),
@@ -1320,6 +1322,7 @@ function readPPTXShapeElement(
     id,
     kind: 'shape',
     ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
     name,
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
@@ -1378,6 +1381,7 @@ async function readPPTXPictureElement({
     id: createPPTXImportedElementId(index, objectIndex),
     kind: 'image',
     ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(pic) ?? {}),
     name,
     ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
@@ -1486,6 +1490,7 @@ function readPPTXTableElement(
     id: createPPTXImportedElementId(slideIndex, objectIndex),
     kind: 'table',
     ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
     name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
     ...(rowHeights ? { rowHeights } : {}),
     ...(shadow ? { shadow } : {}),
@@ -1931,6 +1936,13 @@ function readPPTXElementLocked(element: Element) {
       .some((locks) =>
         PPTX_LOCK_ATTRIBUTE_NAMES.some((attribute) =>
           isPPTXTrue(locks.getAttribute(attribute)))))
+}
+
+function readPPTXElementVisibility(element: Element) {
+  const hidden = getFirstPPTXDescendantByLocalName(element, 'cNvPr')
+    ?.getAttribute('hidden')
+
+  return isPPTXTrue(hidden) ? { visible: false } : null
 }
 
 function readPPTXRotation(xfrm: Element) {
