@@ -74,6 +74,7 @@ type PPTXSlideObjectNode = {
   groupId?: string
   transform: PPTXGroupTransform
 }
+type PPTXThemeColorMap = Readonly<Record<string, string>>
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -180,6 +181,12 @@ const PPTX_SYSTEM_COLORS: Record<string, string> = {
   windowFrame: '#646464',
   windowText: '#000000',
 }
+const PPTX_THEME_SCHEME_ALIASES: Record<string, string> = {
+  bg1: 'lt1',
+  bg2: 'lt2',
+  tx1: 'dk1',
+  tx2: 'dk2',
+}
 
 export async function importPPTDeckFromPPTXBlob(
   blob: Blob,
@@ -240,11 +247,13 @@ async function importPPTDeckFromOpenXmlZip(
   }
 
   const size = await readPPTXOpenXmlDeckSize(zip)
+  const themeColors = await readPPTXOpenXmlThemeColors(zip)
   const title = await readPPTXOpenXmlDeckTitle(zip)
   const slides = await Promise.all(slidePaths.map((path, index) =>
     readPPTXOpenXmlSlide({
       index,
       path,
+      themeColors,
       zip,
     }),
   ))
@@ -362,13 +371,96 @@ async function readPPTXOpenXmlDeckTitle(zip: JSZip) {
   return title || 'Imported PPTX Deck'
 }
 
+async function readPPTXOpenXmlThemeColors(zip: JSZip): Promise<PPTXThemeColorMap> {
+  const themePath = await readPPTXOpenXmlThemePath(zip)
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const colorScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'clrScheme')
+    : null
+
+  if (!colorScheme) {
+    return PPTX_SCHEME_COLORS
+  }
+
+  const colors = Array.from(colorScheme.children)
+    .reduce<Record<string, string>>((next, colorNode) => {
+      const color = readPPTXThemeColorNode(colorNode)
+
+      return color
+        ? { ...next, [colorNode.localName]: color }
+        : next
+    }, {})
+
+  return resolvePPTXThemeSchemeColors(colors)
+}
+
+async function readPPTXOpenXmlThemePath(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const themeRelationship = Array.from(relationships.values())
+    .find((relationship) =>
+      relationship.targetMode !== 'External' &&
+      relationship.type.endsWith('/theme'))
+  const relatedThemePath = themeRelationship
+    ? resolvePPTXRelationshipTarget(presentationPath, themeRelationship.target)
+    : null
+
+  if (relatedThemePath && zip.file(relatedThemePath)) {
+    return relatedThemePath
+  }
+
+  return Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0] ?? null
+}
+
+function readPPTXThemeColorNode(colorNode: Element) {
+  const srgbColor = getDirectPPTXChildByLocalName(colorNode, 'srgbClr')
+  const presetColor = getDirectPPTXChildByLocalName(colorNode, 'prstClr')
+  const systemColor = getDirectPPTXChildByLocalName(colorNode, 'sysClr')
+  const color = [
+    {
+      color: readPPTXHexColor(srgbColor?.getAttribute('val')),
+      element: srgbColor,
+    },
+    {
+      color: readPPTXPresetColor(presetColor?.getAttribute('val')),
+      element: presetColor,
+    },
+    {
+      color: readPPTXHexColor(systemColor?.getAttribute('lastClr')) ??
+        readPPTXSystemColor(systemColor?.getAttribute('val')),
+      element: systemColor,
+    },
+  ].find((candidate) => candidate.color && candidate.element)
+
+  return color?.color && color.element
+    ? applyPPTXColorModifiers(color.color, color.element)
+    : color?.color
+}
+
+function resolvePPTXThemeSchemeColors(
+  themeColors: Readonly<Record<string, string>>,
+): PPTXThemeColorMap {
+  const colors = { ...PPTX_SCHEME_COLORS, ...themeColors }
+
+  for (const [alias, source] of Object.entries(PPTX_THEME_SCHEME_ALIASES)) {
+    colors[alias] = themeColors[source] ?? themeColors[alias] ?? colors[alias]
+  }
+
+  return colors
+}
+
 async function readPPTXOpenXmlSlide({
   index,
   path,
+  themeColors,
   zip,
 }: {
   index: number
   path: string
+  themeColors: PPTXThemeColorMap
   zip: JSZip
 }): Promise<PPTSlide> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -394,10 +486,10 @@ async function readPPTXOpenXmlSlide({
 
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
-        ? readPPTXLineElement(child, index, objectIndex, relationships)
-        : readPPTXShapeElement(child, index, objectIndex, relationships)
+        ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+        : readPPTXShapeElement(child, index, objectIndex, relationships, themeColors)
     } else if (child.localName === 'cxnSp') {
-      element = readPPTXLineElement(child, index, objectIndex, relationships)
+      element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
     } else if (child.localName === 'pic') {
       element = await readPPTXPictureElement({
         index,
@@ -405,10 +497,11 @@ async function readPPTXOpenXmlSlide({
         pic: child,
         relationships,
         slidePath: path,
+        themeColors,
         zip,
       })
     } else if (child.localName === 'graphicFrame') {
-      element = readPPTXTableElement(child, index, objectIndex, relationships)
+      element = readPPTXTableElement(child, index, objectIndex, relationships, themeColors)
     }
 
     if (element) {
@@ -428,8 +521,8 @@ async function readPPTXOpenXmlSlide({
   })
 
   return {
-    ...(readPPTXSlideBackground(cSld) ??
-      readPPTXSlideBackgroundFromXml(xml) ?? {
+    ...(readPPTXSlideBackground(cSld, themeColors) ??
+      readPPTXSlideBackgroundFromXml(xml, themeColors) ?? {
         background: { color: PPTX_DEFAULT_FILL_COLOR },
       }),
     elements: animatedElements,
@@ -594,19 +687,25 @@ function readPPTXSlideName(
     : `Slide ${index + 1}`
 }
 
-function readPPTXSlideBackground(cSld: Element | null) {
+function readPPTXSlideBackground(
+  cSld: Element | null,
+  themeColors: PPTXThemeColorMap,
+) {
   const bgPr = cSld
     ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr')
     : null
-  const fill = readPPTXSolidFill(bgPr)
+  const fill = readPPTXSolidFill(bgPr, themeColors)
 
   return fill ? { background: fill } : null
 }
 
-function readPPTXSlideBackgroundFromXml(xml: string) {
+function readPPTXSlideBackgroundFromXml(
+  xml: string,
+  themeColors: PPTXThemeColorMap,
+) {
   const bgPrXml = xml.match(/<p:bgPr\b[\s\S]*?<\/p:bgPr>/)?.[0]
   const bgPr = bgPrXml ? parsePPTXXmlElementFragment(bgPrXml, 'bgPr') : null
-  const fill = readPPTXSolidFill(bgPr)
+  const fill = readPPTXSolidFill(bgPr, themeColors)
 
   return fill ? { background: fill } : null
 }
@@ -974,12 +1073,13 @@ function readPPTXLineElement(
   slideIndex: number,
   objectIndex: number,
   relationships: PPTXRelationshipMap,
+  themeColors: PPTXThemeColorMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
   const line = getDirectPPTXChildByLocalName(spPr, 'ln')
-  const stroke = readPPTXStroke(spPr)
+  const stroke = readPPTXStroke(spPr, themeColors)
   const opacity = readPPTXLineOpacity(line)
-  const shadow = readPPTXElementShadow(spPr)
+  const shadow = readPPTXElementShadow(spPr, themeColors)
   const lineGeometry = readPPTXLineGeometry(spPr)
 
   if (!stroke || !lineGeometry) {
@@ -1087,9 +1187,10 @@ function readPPTXLineMarker(
 }
 
 function readPPTXLineOpacity(line: Element | null) {
-  const opacity = readPPTXSolidFill(line)?.opacity
+  const solidFill = getDirectPPTXChildByLocalName(line, 'solidFill')
+  const opacity = solidFill ? readPPTXAlphaOpacity(solidFill) : null
 
-  return opacity === undefined || opacity === 1 ? null : opacity
+  return opacity === null || opacity === 1 ? null : opacity
 }
 
 function readPPTXShapeElement(
@@ -1097,14 +1198,15 @@ function readPPTXShapeElement(
   slideIndex: number,
   objectIndex: number,
   relationships: PPTXRelationshipMap,
+  themeColors: PPTXThemeColorMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const geometry = readPPTXElementGeometry(spPr)
-  const textBody = readPPTXTextBody(txBody)
-  const stroke = readPPTXStroke(spPr)
-  const fill = readPPTXShapeFill(spPr, stroke)
-  const shadow = readPPTXElementShadow(spPr)
+  const textBody = readPPTXTextBody(txBody, themeColors)
+  const stroke = readPPTXStroke(spPr, themeColors)
+  const fill = readPPTXShapeFill(spPr, stroke, themeColors)
+  const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
 
   if (!geometry || (!textBody && !hasPaint)) {
@@ -1160,6 +1262,7 @@ async function readPPTXPictureElement({
   pic,
   relationships,
   slidePath,
+  themeColors,
   zip,
 }: {
   index: number
@@ -1167,6 +1270,7 @@ async function readPPTXPictureElement({
   pic: Element
   relationships: PPTXRelationshipMap
   slidePath: string
+  themeColors: PPTXThemeColorMap
   zip: JSZip
 }): Promise<PPTImage | null> {
   const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
@@ -1191,7 +1295,7 @@ async function readPPTXPictureElement({
   const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
   const opacity = readPPTXImageOpacity(blip)
-  const shadow = readPPTXElementShadow(spPr)
+  const shadow = readPPTXElementShadow(spPr, themeColors)
 
   return {
     ...(accessibility ?? {}),
@@ -1277,10 +1381,11 @@ function readPPTXTableElement(
   slideIndex: number,
   objectIndex: number,
   relationships: PPTXRelationshipMap,
+  themeColors: PPTXThemeColorMap,
 ): PPTElement | null {
   const table = getFirstPPTXDescendantByLocalName(graphicFrame, 'tbl')
   const geometry = readPPTXElementGeometry(graphicFrame)
-  const shadow = readPPTXElementShadow(graphicFrame)
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
   const cellRows = table
     ? getDirectPPTXChildrenByLocalName(table, 'tr')
       .map((row) => getDirectPPTXChildrenByLocalName(row, 'tc'))
@@ -1293,7 +1398,7 @@ function readPPTXTableElement(
     return null
   }
 
-  const cellStyles = readPPTXTableCellStyles(cellRows)
+  const cellStyles = readPPTXTableCellStyles(cellRows, themeColors)
   const columnWidths = table
     ? readPPTXTableColumnWidths(table, getPPTTableColumnCount(rows))
     : undefined
@@ -1320,13 +1425,14 @@ function readPPTXTableElement(
 
 function readPPTXTableCellStyles(
   cellRows: readonly (readonly Element[])[],
+  themeColors: PPTXThemeColorMap,
 ): PPTTable['cellStyles'] {
   const styles = cellRows.map((row) =>
     row.map((cell): PPTTableCellStyle => {
-      const borders = readPPTXTableCellBorders(cell)
-      const fill = readPPTXTableCellFill(cell)
+      const borders = readPPTXTableCellBorders(cell, themeColors)
+      const fill = readPPTXTableCellFill(cell, themeColors)
       const span = readPPTXTableCellSpan(cell)
-      const textStyle = readPPTXTableCellTextStyle(cell)
+      const textStyle = readPPTXTableCellTextStyle(cell, themeColors)
 
       return {
         ...(borders ? { borders } : {}),
@@ -1373,13 +1479,16 @@ function readPPTXTableCellSpanValue(
   return value === null ? 1 : Math.max(1, Math.floor(value))
 }
 
-function readPPTXTableCellBorders(cell: Element): PPTTableCellBorders | undefined {
+function readPPTXTableCellBorders(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTTableCellBorders | undefined {
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
   const borders = {
-    bottom: readPPTXTableCellBorderSide(tcPr, 'lnB'),
-    left: readPPTXTableCellBorderSide(tcPr, 'lnL'),
-    right: readPPTXTableCellBorderSide(tcPr, 'lnR'),
-    top: readPPTXTableCellBorderSide(tcPr, 'lnT'),
+    bottom: readPPTXTableCellBorderSide(tcPr, 'lnB', themeColors),
+    left: readPPTXTableCellBorderSide(tcPr, 'lnL', themeColors),
+    right: readPPTXTableCellBorderSide(tcPr, 'lnR', themeColors),
+    top: readPPTXTableCellBorderSide(tcPr, 'lnT', themeColors),
   }
 
   return borders.bottom || borders.left || borders.right || borders.top
@@ -1390,20 +1499,30 @@ function readPPTXTableCellBorders(cell: Element): PPTTableCellBorders | undefine
 function readPPTXTableCellBorderSide(
   tcPr: Element | null,
   tagName: 'lnB' | 'lnL' | 'lnR' | 'lnT',
+  themeColors: PPTXThemeColorMap,
 ) {
-  return readPPTXStrokeLine(getDirectPPTXChildByLocalName(tcPr, tagName))
+  return readPPTXStrokeLine(
+    getDirectPPTXChildByLocalName(tcPr, tagName),
+    themeColors,
+  )
 }
 
-function readPPTXTableCellFill(cell: Element): PPTFill | undefined {
+function readPPTXTableCellFill(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | undefined {
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
 
-  return readPPTXSolidFill(tcPr) ?? undefined
+  return readPPTXSolidFill(tcPr, themeColors) ?? undefined
 }
 
-function readPPTXTableCellTextStyle(cell: Element): PPTTableCellTextStyle | undefined {
+function readPPTXTableCellTextStyle(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTTableCellTextStyle | undefined {
   const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
   const txBody = getDirectPPTXChildByLocalName(cell, 'txBody')
-  const textBody = readPPTXTextBody(txBody)
+  const textBody = readPPTXTextBody(txBody, themeColors)
   const textInset = readPPTXTextInset(tcPr)
   const verticalAlign = readPPTXTableCellVerticalAlign(tcPr)
   const firstParagraph = textBody?.paragraphs
@@ -1709,7 +1828,10 @@ function readPPTXElementFlip(container: Element | null) {
   }
 }
 
-function readPPTXElementShadow(container: Element | null): PPTElementShadow | null {
+function readPPTXElementShadow(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTElementShadow | null {
   const outerShadow = getFirstPPTXDescendantByLocalName(container, 'outerShdw')
 
   if (!outerShadow) {
@@ -1721,7 +1843,7 @@ function readPPTXElementShadow(container: Element | null): PPTElementShadow | nu
   return {
     angle: direction === null ? 45 : normalizePPTXAngle(direction / 60_000),
     blur: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('blurRad')) ?? 0),
-    color: readPPTXColor(outerShadow) ?? '#000000',
+    color: readPPTXColor(outerShadow, themeColors) ?? '#000000',
     distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
     opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
   }
@@ -1747,14 +1869,17 @@ function readPPTXRotation(xfrm: Element) {
   return rotation === null ? null : { rotation: rotation / 60_000 }
 }
 
-function readPPTXTextBody(txBody: Element | null): PPTTextBody | null {
+function readPPTXTextBody(
+  txBody: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTTextBody | null {
   if (!txBody) {
     return null
   }
 
   const listStyle = getDirectPPTXChildByLocalName(txBody, 'lstStyle')
   const paragraphs = getDirectPPTXChildrenByLocalName(txBody, 'p')
-    .map((paragraph) => readPPTXParagraph(paragraph, listStyle))
+    .map((paragraph) => readPPTXParagraph(paragraph, listStyle, themeColors))
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
@@ -1787,6 +1912,7 @@ function readPPTXPlainParagraphText(paragraph: Element) {
 function readPPTXParagraph(
   paragraph: Element,
   listStyle: Element | null,
+  themeColors: PPTXThemeColorMap,
 ): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
   const level = readPPTXParagraphLevel(pPr)
@@ -1808,7 +1934,8 @@ function readPPTXParagraph(
     defaultRunProperties,
   )
   const runs = Array.from(paragraph.children)
-    .flatMap((child) => readPPTXTextRun(child, defaultRunProperties))
+    .flatMap((child) =>
+      readPPTXTextRun(child, defaultRunProperties, themeColors))
 
   return {
     ...(align ? { align } : {}),
@@ -1846,13 +1973,14 @@ function readPPTXTextListStyleParagraphProperties(
 function readPPTXTextRun(
   node: Element,
   defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
 ): PPTRun[] {
   if (node.localName !== 'r' && node.localName !== 'fld' && node.localName !== 'br') {
     return []
   }
 
   const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
-  const style = readPPTXTextRunStyle(rPr, defaultRunProperties)
+  const style = readPPTXTextRunStyle(rPr, defaultRunProperties, themeColors)
 
   if (node.localName === 'br') {
     return [{ ...style, text: '\n' }]
@@ -1866,10 +1994,11 @@ function readPPTXTextRun(
 function readPPTXTextRunStyle(
   rPr: Element | null,
   defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
 ): Omit<PPTRun, 'text'> {
-  const color = readPPTXRunColor(rPr, defaultRunProperties)
-  const highlight = readPPTXRunHighlight(rPr) ??
-    readPPTXRunHighlight(defaultRunProperties)
+  const color = readPPTXRunColor(rPr, defaultRunProperties, themeColors)
+  const highlight = readPPTXRunHighlight(rPr, themeColors) ??
+    readPPTXRunHighlight(defaultRunProperties, themeColors)
   const size = readPPTXRunSize(rPr, defaultRunProperties)
 
   return {
@@ -1894,9 +2023,10 @@ function readPPTXTextRunStyle(
 function readPPTXRunColor(
   rPr: Element | null,
   defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
 ) {
-  return readPPTXSolidFill(rPr)?.color ??
-    readPPTXSolidFill(defaultRunProperties)?.color
+  return readPPTXSolidFill(rPr, themeColors)?.color ??
+    readPPTXSolidFill(defaultRunProperties, themeColors)?.color
 }
 
 function readPPTXRunSize(
@@ -2162,10 +2292,13 @@ function readPPTXStrikethrough(rPr: Element | null) {
     strike !== 'none'
 }
 
-function readPPTXRunHighlight(rPr: Element | null) {
+function readPPTXRunHighlight(
+  rPr: Element | null,
+  themeColors: PPTXThemeColorMap,
+) {
   const highlight = getDirectPPTXChildByLocalName(rPr, 'highlight')
 
-  return highlight ? readPPTXColor(highlight) : undefined
+  return highlight ? readPPTXColor(highlight, themeColors) : undefined
 }
 
 function readPPTXTypeface(rPr: Element | null) {
@@ -2270,8 +2403,9 @@ function readPPTXPresetGeometryAdjust(
 function readPPTXShapeFill(
   spPr: Element | null,
   stroke: PPTStroke | undefined,
+  themeColors: PPTXThemeColorMap,
 ): PPTFill | null {
-  const fill = readPPTXSolidFill(spPr)
+  const fill = readPPTXSolidFill(spPr, themeColors)
 
   if (fill || !hasPPTXNoFill(spPr) || !stroke) {
     return fill
@@ -2283,7 +2417,10 @@ function readPPTXShapeFill(
   }
 }
 
-function readPPTXSolidFill(container: Element | null): PPTFill | null {
+function readPPTXSolidFill(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
   if (!container || hasPPTXNoFill(container)) {
     return null
   }
@@ -2294,7 +2431,7 @@ function readPPTXSolidFill(container: Element | null): PPTFill | null {
     return null
   }
 
-  const color = readPPTXColor(solidFill)
+  const color = readPPTXColor(solidFill, themeColors)
 
   if (!color) {
     return null
@@ -2308,13 +2445,19 @@ function readPPTXSolidFill(container: Element | null): PPTFill | null {
   }
 }
 
-function readPPTXStroke(spPr: Element | null): PPTStroke | undefined {
+function readPPTXStroke(
+  spPr: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTStroke | undefined {
   const line = spPr ? getDirectPPTXChildByLocalName(spPr, 'ln') : null
 
-  return readPPTXStrokeLine(line)
+  return readPPTXStrokeLine(line, themeColors)
 }
 
-function readPPTXStrokeLine(line: Element | null): PPTStroke | undefined {
+function readPPTXStrokeLine(
+  line: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTStroke | undefined {
   if (!line || hasPPTXNoFill(line)) {
     return undefined
   }
@@ -2323,7 +2466,7 @@ function readPPTXStrokeLine(line: Element | null): PPTStroke | undefined {
 
   return {
     ...(dash ? { dash } : {}),
-    color: readPPTXSolidFill(line)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
+    color: readPPTXSolidFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
     width: Math.max(1, emuToPx(toPPTXPositiveNumber(line.getAttribute('w')) ?? PPTX_EMUS_PER_PIXEL)),
   }
 }
@@ -2341,7 +2484,10 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
     : undefined
 }
 
-function readPPTXColor(solidFill: Element) {
+function readPPTXColor(
+  solidFill: Element,
+  themeColors: PPTXThemeColorMap,
+) {
   const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
   const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
   const presetColor = getDirectPPTXChildByLocalName(solidFill, 'prstClr')
@@ -2352,7 +2498,7 @@ function readPPTXColor(solidFill: Element) {
       element: srgbColor,
     },
     {
-      color: readPPTXSchemeColor(schemeColor?.getAttribute('val')),
+      color: readPPTXSchemeColor(schemeColor?.getAttribute('val'), themeColors),
       element: schemeColor,
     },
     {
@@ -2377,8 +2523,11 @@ function readPPTXHexColor(value: string | null | undefined) {
     : undefined
 }
 
-function readPPTXSchemeColor(value: string | null | undefined) {
-  return value ? PPTX_SCHEME_COLORS[value] : undefined
+function readPPTXSchemeColor(
+  value: string | null | undefined,
+  themeColors: PPTXThemeColorMap,
+) {
+  return value ? themeColors[value] : undefined
 }
 
 function readPPTXPresetColor(value: string | null | undefined) {
