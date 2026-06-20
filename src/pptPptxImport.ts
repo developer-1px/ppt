@@ -1744,7 +1744,11 @@ function readPPTXParagraph(
   const align = readPPTXParagraphAlign(pPr) ??
     readPPTXParagraphAlign(listStylePPr)
   const bullet = readPPTXParagraphBullet(pPr, listStylePPr)
-  const spacing = readPPTXParagraphSpacing(pPr, listStylePPr)
+  const spacing = readPPTXParagraphSpacing(
+    pPr,
+    listStylePPr,
+    defaultRunProperties,
+  )
   const runs = Array.from(paragraph.children)
     .flatMap((child) => readPPTXTextRun(child, defaultRunProperties))
 
@@ -2028,9 +2032,10 @@ function readPPTXParagraphLevel(pPr: Element | null) {
 function readPPTXParagraphSpacing(
   pPr: Element | null,
   fallbackPPr: Element | null,
+  defaultRunProperties: Element | null,
 ): Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> {
-  const lineHeight = readPPTXParagraphLineHeight(pPr) ??
-    readPPTXParagraphLineHeight(fallbackPPr)
+  const lineHeight = readPPTXParagraphLineHeight(pPr, defaultRunProperties) ??
+    readPPTXParagraphLineHeight(fallbackPPr, defaultRunProperties)
   const spacingBefore = readPPTXParagraphSpacingPixels(pPr, 'spcBef') ??
     readPPTXParagraphSpacingPixels(fallbackPPr, 'spcBef')
   const spacingAfter = readPPTXParagraphSpacingPixels(pPr, 'spcAft') ??
@@ -2043,12 +2048,34 @@ function readPPTXParagraphSpacing(
   }
 }
 
-function readPPTXParagraphLineHeight(pPr: Element | null) {
+function readPPTXParagraphLineHeight(
+  pPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
   const spacing = getDirectPPTXChildByLocalName(pPr, 'lnSpc')
   const percent = getDirectPPTXChildByLocalName(spacing, 'spcPct')
-  const value = toPPTXPositiveNumber(percent?.getAttribute('val'))
+  const percentValue = toPPTXPositiveNumber(percent?.getAttribute('val'))
 
-  return value === null ? undefined : value / 100_000
+  if (percentValue !== null) {
+    return percentValue / 100_000
+  }
+
+  const points = getDirectPPTXChildByLocalName(spacing, 'spcPts')
+  const pointValue = toPPTXPositiveNumber(points?.getAttribute('val'))
+
+  if (pointValue === null) {
+    return undefined
+  }
+
+  const exactPoints = pointValue / 100
+  const fontSizeUnits = readPPTXRunSize(defaultRunProperties, null)
+  const fontPoints = fontSizeUnits === null
+    ? PPTX_DEFAULT_TEXT_SIZE * PPTX_POINTS_PER_PIXEL
+    : fontSizeUnits / PPTX_TEXT_SIZE_UNITS_PER_POINT
+
+  return fontPoints > 0
+    ? Math.round((exactPoints / fontPoints) * 1000) / 1000
+    : undefined
 }
 
 function readPPTXParagraphSpacingPixels(

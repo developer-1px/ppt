@@ -10998,15 +10998,17 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await addPPTXListStyleBulletProbe(
-    await addPPTXParagraphDefaultRunStyleProbe(
-      await addPPTXHyperlinkProbe(
-        await addPPTXImageOpacityProbe(
-          await addPPTXNoFillShapeProbe(
-            await addPPTXUnevenTableProbe(
-              await addPPTXGroupedObjectProbe(
-                await reversePPTXPresentationSlideOrder(
-                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXLineSpacingPointsProbe(
+    await addPPTXListStyleBulletProbe(
+      await addPPTXParagraphDefaultRunStyleProbe(
+        await addPPTXHyperlinkProbe(
+          await addPPTXImageOpacityProbe(
+            await addPPTXNoFillShapeProbe(
+              await addPPTXUnevenTableProbe(
+                await addPPTXGroupedObjectProbe(
+                  await reversePPTXPresentationSlideOrder(
+                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                  ),
                 ),
               ),
             ),
@@ -11088,6 +11090,8 @@ async function runExportScenario(page) {
         element.name === 'East Asian Typeface Probe').length,
       listStyleBulletProbeModelCount: elements.filter((element) =>
         element.name === 'List Style Bullet Probe').length,
+      lineSpacingPointsProbeModelCount: elements.filter((element) =>
+        element.name === 'Line Spacing Points Probe').length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
         paragraph.lineHeight !== undefined ||
         paragraph.spacingAfter !== undefined ||
@@ -11294,6 +11298,14 @@ async function runExportScenario(page) {
           run.text === 'List style bullet probe' &&
           run.color === '#1d4ed8' &&
           run.size === 28)) === true)
+    const exportLineSpacingPointsProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Line Spacing Points Probe' &&
+      element.kind === 'textBox' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.lineHeight === 1.5 &&
+        paragraph.runs?.some((run) =>
+          run.text === 'Line spacing points probe' &&
+          run.size === 28)) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11441,6 +11453,8 @@ async function runExportScenario(page) {
       exportEastAsianTypefaceProbeModelCount: exportEastAsianTypefaceProbeObjects.length,
       exportHasListStyleBulletProbe: exportListStyleBulletProbeObjects.length > 0,
       exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
+      exportHasLineSpacingPointsProbe: exportLineSpacingPointsProbeObjects.length > 0,
+      exportLineSpacingPointsProbeModelCount: exportLineSpacingPointsProbeObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
       exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
@@ -11526,6 +11540,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportEastAsianTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.eastAsianTypefaceProbeModelCount &&
       openXmlPPTXImportState.exportHasListStyleBulletProbe &&
       openXmlPPTXImportState.exportListStyleBulletProbeModelCount > beforeOpenXmlPPTXDrop.listStyleBulletProbeModelCount &&
+      openXmlPPTXImportState.exportHasLineSpacingPointsProbe &&
+      openXmlPPTXImportState.exportLineSpacingPointsProbeModelCount > beforeOpenXmlPPTXDrop.lineSpacingPointsProbeModelCount &&
       openXmlPPTXImportState.exportHasParagraphSpacing &&
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
@@ -28129,6 +28145,67 @@ async function addPPTXListStyleBulletProbe(base64) {
     '<a:p>',
     '<a:pPr lvl="1"/>',
     '<a:r><a:t>List style bullet probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXLineSpacingPointsProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Line Spacing Points Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9969" name="Line Spacing Points Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="1828800" y="6431280"/>',
+    '<a:ext cx="2743200" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr>',
+    '<a:lnSpc><a:spcPts val="3150"/></a:lnSpc>',
+    '<a:defRPr sz="2100"/>',
+    '</a:pPr>',
+    '<a:r><a:t>Line spacing points probe</a:t></a:r>',
     '</a:p>',
     '</p:txBody>',
     '</p:sp>',
