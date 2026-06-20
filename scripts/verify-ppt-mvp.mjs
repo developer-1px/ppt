@@ -10999,18 +10999,20 @@ async function runExportScenario(page) {
   )
 
   const openXmlPPTXBase64 = await addPPTXLineSpacingPointsProbe(
-    await addPPTXListStyleBulletProbe(
-      await addPPTXParagraphDefaultRunStyleProbe(
-        await addPPTXHyperlinkProbe(
-          await addPPTXImageOpacityProbe(
-            await addPPTXNoFillShapeProbe(
-              await addPPTXGradientPatternFillProbe(
-                await addPPTXThemeColorProbe(
-                  await addPPTXPresetSystemColorProbe(
-                    await addPPTXUnevenTableProbe(
-                      await addPPTXGroupedObjectProbe(
-                        await reversePPTXPresentationSlideOrder(
-                          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    await addPPTXTextAutoFitProbe(
+      await addPPTXListStyleBulletProbe(
+        await addPPTXParagraphDefaultRunStyleProbe(
+          await addPPTXHyperlinkProbe(
+            await addPPTXImageOpacityProbe(
+              await addPPTXNoFillShapeProbe(
+                await addPPTXGradientPatternFillProbe(
+                  await addPPTXThemeColorProbe(
+                    await addPPTXPresetSystemColorProbe(
+                      await addPPTXUnevenTableProbe(
+                        await addPPTXGroupedObjectProbe(
+                          await reversePPTXPresentationSlideOrder(
+                            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                          ),
                         ),
                       ),
                     ),
@@ -11077,6 +11079,18 @@ async function runExportScenario(page) {
         element.name === 'Pattern Fill Probe' &&
         element.kind === 'shape' &&
         element.fill?.color === '#800080').length,
+      shapeAutoFitProbeModelCount: elements.filter((element) =>
+        element.name === 'Shape Autofit Probe' &&
+        element.kind === 'textBox' &&
+        element.textAutoFit === 'resizeShapeToFitText').length,
+      noAutoFitProbeModelCount: elements.filter((element) =>
+        element.name === 'No Autofit Probe' &&
+        element.kind === 'textBox' &&
+        element.textAutoFit === undefined).length,
+      normalAutoFitProbeModelCount: elements.filter((element) =>
+        element.name === 'Normal Autofit Probe' &&
+        element.kind === 'textBox' &&
+        element.textAutoFit === undefined).length,
       imageSvgModelCount: elements.filter((element) =>
         element.kind === 'image' &&
         typeof element.src === 'string' &&
@@ -11215,6 +11229,18 @@ async function runExportScenario(page) {
       element.name === 'Pattern Fill Probe' &&
       element.kind === 'shape' &&
       element.fill?.color === '#800080')
+    const exportShapeAutoFitProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Shape Autofit Probe' &&
+      element.kind === 'textBox' &&
+      element.textAutoFit === 'resizeShapeToFitText')
+    const exportNoAutoFitProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'No Autofit Probe' &&
+      element.kind === 'textBox' &&
+      element.textAutoFit === undefined)
+    const exportNormalAutoFitProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Normal Autofit Probe' &&
+      element.kind === 'textBox' &&
+      element.textAutoFit === undefined)
     const exportSvgImages = exportElements.filter((element) =>
       element.kind === 'image' &&
       typeof element.src === 'string' &&
@@ -11404,6 +11430,15 @@ async function runExportScenario(page) {
       exportHasPatternFillProbe: exportPatternFillProbeObjects.length > 0,
       exportPatternFillProbeFill: exportPatternFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPatternFillProbeModelCount: exportPatternFillProbeObjects.length,
+      exportHasShapeAutoFitProbe: exportShapeAutoFitProbeObjects.length > 0,
+      exportShapeAutoFitProbeAutoFit: exportShapeAutoFitProbeObjects.map((element) => element.textAutoFit ?? '').join(' | '),
+      exportShapeAutoFitProbeModelCount: exportShapeAutoFitProbeObjects.length,
+      exportHasNoAutoFitProbe: exportNoAutoFitProbeObjects.length > 0,
+      exportNoAutoFitProbeAutoFit: exportNoAutoFitProbeObjects.map((element) => element.textAutoFit ?? '').join(' | '),
+      exportNoAutoFitProbeModelCount: exportNoAutoFitProbeObjects.length,
+      exportHasNormalAutoFitProbe: exportNormalAutoFitProbeObjects.length > 0,
+      exportNormalAutoFitProbeAutoFit: exportNormalAutoFitProbeObjects.map((element) => element.textAutoFit ?? '').join(' | '),
+      exportNormalAutoFitProbeModelCount: exportNormalAutoFitProbeObjects.length,
       exportHasSVGImage: exportSvgImages.length > 0,
       exportSVGImageNames: exportSvgImages.map((element) => element.name).join(' | '),
       exportHasGroupedProbe,
@@ -11579,6 +11614,12 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportGradientFillProbeModelCount > beforeOpenXmlPPTXDrop.gradientFillProbeModelCount &&
       openXmlPPTXImportState.exportHasPatternFillProbe &&
       openXmlPPTXImportState.exportPatternFillProbeModelCount > beforeOpenXmlPPTXDrop.patternFillProbeModelCount &&
+      openXmlPPTXImportState.exportHasShapeAutoFitProbe &&
+      openXmlPPTXImportState.exportShapeAutoFitProbeModelCount > beforeOpenXmlPPTXDrop.shapeAutoFitProbeModelCount &&
+      openXmlPPTXImportState.exportHasNoAutoFitProbe &&
+      openXmlPPTXImportState.exportNoAutoFitProbeModelCount > beforeOpenXmlPPTXDrop.noAutoFitProbeModelCount &&
+      openXmlPPTXImportState.exportHasNormalAutoFitProbe &&
+      openXmlPPTXImportState.exportNormalAutoFitProbeModelCount > beforeOpenXmlPPTXDrop.normalAutoFitProbeModelCount &&
       openXmlPPTXImportState.exportHasSVGImage &&
       openXmlPPTXImportState.exportImageSvgModelCount > beforeOpenXmlPPTXDrop.imageSvgModelCount &&
       openXmlPPTXImportState.exportHasGroupedProbe &&
@@ -28445,6 +28486,115 @@ async function addPPTXListStyleBulletProbe(base64) {
     compression: 'DEFLATE',
     type: 'base64',
   })
+}
+
+async function addPPTXTextAutoFitProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (
+    xml.includes('Shape Autofit Probe') &&
+    xml.includes('No Autofit Probe') &&
+    xml.includes('Normal Autofit Probe')
+  ) {
+    return base64
+  }
+
+  const shapeAutoFitProbeXml = xml.includes('Shape Autofit Probe')
+    ? ''
+    : createPPTXTextAutoFitProbeXml({
+        autofitXml: '<a:spAutoFit/>',
+        id: 9974,
+        name: 'Shape Autofit Probe',
+        text: 'Shape autofit probe',
+        x: 4572000,
+        y: 6431280,
+      })
+  const noAutoFitProbeXml = xml.includes('No Autofit Probe')
+    ? ''
+    : createPPTXTextAutoFitProbeXml({
+        autofitXml: '<a:noAutofit/>',
+        id: 9975,
+        name: 'No Autofit Probe',
+        text: 'No autofit probe',
+        x: 5943600,
+        y: 6431280,
+      })
+  const normalAutoFitProbeXml = xml.includes('Normal Autofit Probe')
+    ? ''
+    : createPPTXTextAutoFitProbeXml({
+        autofitXml: '<a:normAutofit fontScale="85000" lnSpcReduction="10000"/>',
+        id: 9976,
+        name: 'Normal Autofit Probe',
+        text: 'Normal autofit probe',
+        x: 7315200,
+        y: 6431280,
+      })
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    [
+      shapeAutoFitProbeXml,
+      noAutoFitProbeXml,
+      normalAutoFitProbeXml,
+      '</p:spTree>',
+    ].join(''),
+  )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXTextAutoFitProbeXml({
+  autofitXml,
+  id,
+  name,
+  text,
+  x,
+  y,
+}) {
+  return [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    `<p:cNvPr id="${id}" name="${name}"/>`,
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    `<a:off x="${x}" y="${y}"/>`,
+    '<a:ext cx="1280160" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    `<a:bodyPr>${autofitXml}</a:bodyPr>`,
+    '<a:lstStyle/>',
+    '<a:p>',
+    `<a:r><a:t>${text}</a:t></a:r>`,
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
 }
 
 async function addPPTXLineSpacingPointsProbe(base64) {

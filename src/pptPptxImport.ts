@@ -22,6 +22,7 @@ import {
   type PPTTableCellBorders,
   type PPTTableCellStyle,
   type PPTTableCellTextStyle,
+  type PPTTextAutoFit,
   type PPTTextBody,
   type PPTTextStyle,
 } from './pptModel'
@@ -1208,6 +1209,7 @@ function readPPTXShapeElement(
   const fill = readPPTXShapeFill(spPr, stroke, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
+  const textAutoFit = readPPTXTextAutoFit(txBody)
 
   if (!geometry || (!textBody && !hasPaint)) {
     return null
@@ -1229,7 +1231,7 @@ function readPPTXShapeElement(
       name,
       ...(shadow ? { shadow } : {}),
       style: readPPTXTextStyle(textBody, txBody),
-      textAutoFit: 'resizeShapeToFitText',
+      ...(textAutoFit ? { textAutoFit } : {}),
       textBody: textBody ?? { paragraphs: [] },
     }
   }
@@ -1242,7 +1244,7 @@ function readPPTXShapeElement(
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
       style: readPPTXTextStyle(textBody, txBody),
-      textAutoFit: 'resizeShapeToFitText' as const,
+      ...(textAutoFit ? { textAutoFit } : {}),
       textBody,
     } : {}),
     fill: fill ?? { color: PPTX_DEFAULT_FILL_COLOR },
@@ -2097,6 +2099,16 @@ function readPPTXTextFrameStyle(
     ...(textInset ? { textInset } : {}),
     ...(verticalAlign ? { verticalAlign } : {}),
   }
+}
+
+function readPPTXTextAutoFit(
+  txBody: Element | null,
+): PPTTextAutoFit | undefined {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+
+  return getDirectPPTXChildByLocalName(bodyPr, 'spAutoFit')
+    ? 'resizeShapeToFitText'
+    : undefined
 }
 
 function readPPTXTextVerticalAlign(
