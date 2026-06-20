@@ -744,10 +744,15 @@ function readPPTXSlideBackground(
   cSld: Element | null,
   themeColors: PPTXThemeColorMap,
 ) {
-  const bgPr = cSld
-    ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr')
+  const background = cSld
+    ? getDirectPPTXChildByLocalName(cSld, 'bg')
     : null
-  const fill = readPPTXFill(bgPr, themeColors)
+  const bgPr = getDirectPPTXChildByLocalName(background, 'bgPr') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr') : null)
+  const bgRef = getDirectPPTXChildByLocalName(background, 'bgRef') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgRef') : null)
+  const fill = readPPTXFill(bgPr, themeColors) ??
+    readPPTXBackgroundRefFill(bgRef, themeColors)
 
   return fill ? { background: fill } : null
 }
@@ -757,10 +762,20 @@ function readPPTXSlideBackgroundFromXml(
   themeColors: PPTXThemeColorMap,
 ) {
   const bgPrXml = xml.match(/<p:bgPr\b[\s\S]*?<\/p:bgPr>/)?.[0]
+  const bgRefXml = xml.match(/<p:bgRef\b[\s\S]*?<\/p:bgRef>/)?.[0]
   const bgPr = bgPrXml ? parsePPTXXmlElementFragment(bgPrXml, 'bgPr') : null
-  const fill = readPPTXFill(bgPr, themeColors)
+  const bgRef = bgRefXml ? parsePPTXXmlElementFragment(bgRefXml, 'bgRef') : null
+  const fill = readPPTXFill(bgPr, themeColors) ??
+    readPPTXBackgroundRefFill(bgRef, themeColors)
 
   return fill ? { background: fill } : null
+}
+
+function readPPTXBackgroundRefFill(
+  bgRef: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  return readPPTXColorFill(bgRef, themeColors)
 }
 
 function readPPTXSlideTransition(

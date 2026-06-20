@@ -11002,17 +11002,19 @@ async function runExportScenario(page) {
     await addPPTXTextAutoFitProbe(
       await addPPTXListStyleBulletProbe(
         await addPPTXParagraphDefaultRunStyleProbe(
-          await addPPTXThemeTypefaceProbe(
-            await addPPTXHyperlinkProbe(
-              await addPPTXImageOpacityProbe(
-                await addPPTXNoFillShapeProbe(
-                  await addPPTXGradientPatternFillProbe(
-                    await addPPTXThemeColorProbe(
-                      await addPPTXPresetSystemColorProbe(
-                        await addPPTXUnevenTableProbe(
-                          await addPPTXGroupedObjectProbe(
-                            await reversePPTXPresentationSlideOrder(
-                              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          await addPPTXBackgroundRefProbe(
+            await addPPTXThemeTypefaceProbe(
+              await addPPTXHyperlinkProbe(
+                await addPPTXImageOpacityProbe(
+                  await addPPTXNoFillShapeProbe(
+                    await addPPTXGradientPatternFillProbe(
+                      await addPPTXThemeColorProbe(
+                        await addPPTXPresetSystemColorProbe(
+                          await addPPTXUnevenTableProbe(
+                            await addPPTXGroupedObjectProbe(
+                              await reversePPTXPresentationSlideOrder(
+                                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                              ),
                             ),
                           ),
                         ),
@@ -11039,6 +11041,7 @@ async function runExportScenario(page) {
       }
     }
     const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
     const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
     const runs = elements.flatMap((element) =>
       element.textBody?.paragraphs?.flatMap((paragraph) => paragraph.runs ?? []) ?? [])
@@ -11072,6 +11075,8 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#cc3366' &&
         element.stroke?.color === '#203040').length,
+      backgroundRefSlideModelCount: slides.filter((slide) =>
+        slide.background?.color === '#e6fffa').length,
       gradientFillProbeModelCount: elements.filter((element) =>
         element.name === 'Gradient Fill Probe' &&
         element.kind === 'shape' &&
@@ -11226,6 +11231,8 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#cc3366' &&
       element.stroke?.color === '#203040')
+    const exportBackgroundRefSlides = exportImportedSlides.filter((slide) =>
+      slide.background?.color === '#e6fffa')
     const exportGradientFillProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Gradient Fill Probe' &&
       element.kind === 'shape' &&
@@ -11436,6 +11443,9 @@ async function runExportScenario(page) {
       exportThemeColorProbeFill: exportThemeColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportThemeColorProbeModelCount: exportThemeColorProbeObjects.length,
       exportThemeColorProbeStroke: exportThemeColorProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
+      exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
+      exportBackgroundRefSlideModelCount: exportBackgroundRefSlides.length,
       exportHasGradientFillProbe: exportGradientFillProbeObjects.length > 0,
       exportGradientFillProbeFill: exportGradientFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportGradientFillProbeModelCount: exportGradientFillProbeObjects.length,
@@ -11626,6 +11636,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
       openXmlPPTXImportState.exportThemeColorProbeModelCount > beforeOpenXmlPPTXDrop.themeColorProbeModelCount &&
+      openXmlPPTXImportState.exportHasBackgroundRefSlide &&
+      openXmlPPTXImportState.exportBackgroundRefSlideModelCount > beforeOpenXmlPPTXDrop.backgroundRefSlideModelCount &&
       openXmlPPTXImportState.exportHasGradientFillProbe &&
       openXmlPPTXImportState.exportGradientFillProbeModelCount > beforeOpenXmlPPTXDrop.gradientFillProbeModelCount &&
       openXmlPPTXImportState.exportHasPatternFillProbe &&
@@ -28251,6 +28263,48 @@ function setPPTXThemeSchemeColorXml(xml, localName, color) {
   }
 
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
+}
+
+async function addPPTXBackgroundRefProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const themePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath || !themePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+  const themeXml = await readPPTXZipText(zip, themePath)
+  const nextThemeXml = setPPTXThemeSchemeColorXml(themeXml, 'lt2', 'E6FFFA')
+  const backgroundRefXml = '<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg2"/></p:bgRef></p:bg>'
+  const nextXml = xml.includes('<p:bgRef idx="1001"><a:schemeClr val="bg2"/></p:bgRef>')
+    ? xml
+    : /<p:bg>[\s\S]*?<\/p:bg>/.test(xml)
+      ? xml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, backgroundRefXml)
+      : xml.replace(/(<p:cSld\b[^>]*>)/, `$1${backgroundRefXml}`)
+
+  if (nextXml === xml && nextThemeXml === themeXml) {
+    return base64
+  }
+
+  zip.file(themePath, nextThemeXml)
+  if (nextXml !== xml) {
+    zip.file(slidePath, nextXml)
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function addPPTXThemeTypefaceProbe(base64) {
