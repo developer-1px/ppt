@@ -575,6 +575,12 @@ async function readPPTXOpenXmlSlide({
     size,
     zip,
   })
+  const layoutBackground = await readPPTXSlideLayoutBackground({
+    relationships,
+    slidePath: path,
+    themeColors,
+    zip,
+  })
   let objectIndex = 1
 
   for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
@@ -637,12 +643,14 @@ async function readPPTXOpenXmlSlide({
     elements: connectedElements,
     importedAnimations: readPPTXSlideAnimations(doc, xml),
   })
+  const slideBackground = readPPTXSlideBackground(cSld, themeColors) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors) ??
+    layoutBackground ?? {
+      background: { color: PPTX_DEFAULT_FILL_COLOR },
+    }
 
   return {
-    ...(readPPTXSlideBackground(cSld, themeColors) ??
-      readPPTXSlideBackgroundFromXml(xml, themeColors) ?? {
-        background: { color: PPTX_DEFAULT_FILL_COLOR },
-      }),
+    ...slideBackground,
     elements: backgroundImage ? [backgroundImage, ...animatedElements] : animatedElements,
     id: `pptx-slide-${index + 1}`,
     name: readPPTXSlideName(cSld, index, xml),
@@ -891,6 +899,56 @@ function readPPTXBackgroundRefFill(
   themeColors: PPTXThemeColorMap,
 ): PPTFill | null {
   return readPPTXColorFill(bgRef, themeColors)
+}
+
+async function readPPTXSlideLayoutBackground({
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<Pick<PPTSlide, 'background'> | null> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterBackground = masterPath
+    ? await readPPTXPartBackground(zip, masterPath, themeColors)
+    : null
+  const layoutBackground = await readPPTXPartBackground(zip, layoutPath, themeColors)
+
+  return layoutBackground ?? masterBackground
+}
+
+async function readPPTXPartBackground(
+  zip: JSZip,
+  path: string,
+  themeColors: PPTXThemeColorMap,
+): Promise<Pick<PPTSlide, 'background'> | null> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+
+  return readPPTXSlideBackground(cSld, themeColors) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors)
 }
 
 async function readPPTXSlideBackgroundImage({
