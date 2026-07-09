@@ -1093,12 +1093,22 @@ async function readPPTXSlideThemePath({
 
 function readPPTXThemeColorNode(colorNode: Element) {
   const srgbColor = getDirectPPTXChildByLocalName(colorNode, 'srgbClr')
+  const scrgbColor = getDirectPPTXChildByLocalName(colorNode, 'scrgbClr')
+  const hslColor = getDirectPPTXChildByLocalName(colorNode, 'hslClr')
   const presetColor = getDirectPPTXChildByLocalName(colorNode, 'prstClr')
   const systemColor = getDirectPPTXChildByLocalName(colorNode, 'sysClr')
   const color = [
     {
       color: readPPTXHexColor(srgbColor?.getAttribute('val')),
       element: srgbColor,
+    },
+    {
+      color: readPPTXScrgbColor(scrgbColor),
+      element: scrgbColor,
+    },
+    {
+      color: readPPTXHslColor(hslColor),
+      element: hslColor,
     },
     {
       color: readPPTXPresetColor(presetColor?.getAttribute('val')),
