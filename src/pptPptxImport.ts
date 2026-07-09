@@ -2200,8 +2200,9 @@ async function readPPTXPartInheritedElements({
 
   for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
     const child = objectNode.element
+    const placeholder = readPPTXPlaceholderRef(child)
 
-    if (readPPTXPlaceholderRef(child)) {
+    if (placeholder && !isPPTXRenderableInheritedPlaceholder(child, placeholder)) {
       continue
     }
 
@@ -2233,6 +2234,21 @@ async function readPPTXPartInheritedElements({
   }
 
   return inheritedElements
+}
+
+function isPPTXRenderableInheritedPlaceholder(
+  element: Element,
+  placeholder: PPTXPlaceholderRef,
+) {
+  const type = placeholder.type ?? ''
+
+  if (!['dt', 'ftr', 'hdr', 'sldNum'].includes(type)) {
+    return false
+  }
+
+  const txBody = getDirectPPTXChildByLocalName(element, 'txBody')
+
+  return txBody ? readPPTXPlainTextBody(txBody).trim().length > 0 : false
 }
 
 async function readPPTXInheritedElement({

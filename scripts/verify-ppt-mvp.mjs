@@ -295,6 +295,8 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXSlideSpecificThemeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXMasterVisibilityProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 =
+    await addPPTXInheritedFooterPlaceholderProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
@@ -339,6 +341,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXColorMapStyleProbeState(page)
   const openXmlPPTXMasterVisibilityState =
     await readPPTXMasterVisibilityProbeState(page)
+  const openXmlPPTXInheritedFooterPlaceholderState =
+    await readPPTXInheritedFooterPlaceholderProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -622,6 +626,20 @@ async function runPPTXRenderScenario(page) {
       !openXmlPPTXMasterVisibilityState.hiddenSlideActiveExists,
     {
       openXmlPPTXMasterVisibilityState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX inherited footer placeholders for viewer rendering',
+    openXmlPPTXInheritedFooterPlaceholderState.totalProbeCount === 1 &&
+      openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideProbeCount === 0 &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideProbeCount === 1 &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideActiveExists &&
+      !openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideActiveExists &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideText.includes(
+        'Inherited footer probe',
+      ),
+    {
+      openXmlPPTXInheritedFooterPlaceholderState,
     },
   )
 
@@ -34597,6 +34615,78 @@ async function addPPTXMasterVisibilityProbe(base64) {
   })
 }
 
+async function addPPTXInheritedFooterPlaceholderProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const masterPaths = []
+
+  for (const slidePath of slidePaths.slice(0, 2)) {
+    const layoutPath = await ensurePPTXSlideLayoutPath(zip, slidePath)
+    const masterPath = layoutPath
+      ? await getPPTXRelatedPartPath(zip, layoutPath, '/slideMaster')
+      : ''
+
+    if (masterPath && zip.file(masterPath)) {
+      masterPaths.push(masterPath)
+    }
+  }
+
+  const uniqueMasterPaths = [...new Set(masterPaths)]
+
+  if (uniqueMasterPaths.length === 0) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9958" name="Inherited Footer Placeholder Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr><p:ph type="ftr" idx="12"/></p:nvPr>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8001000" y="6355080"/>',
+    '<a:ext cx="3200400" cy="365760"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr anchor="ctr" lIns="0" rIns="0" tIns="0" bIns="0"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr algn="r"><a:defRPr sz="1800">',
+    '<a:solidFill><a:srgbClr val="334155"/></a:solidFill>',
+    '</a:defRPr></a:pPr>',
+    '<a:r><a:t>Inherited footer probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+
+  for (const masterPath of uniqueMasterPaths) {
+    const masterXml = await readPPTXZipText(zip, masterPath)
+
+    if (
+      !masterXml.includes('Inherited Footer Placeholder Probe') &&
+      masterXml.includes('</p:spTree>')
+    ) {
+      zip.file(masterPath, masterXml.replace('</p:spTree>', `${probeXml}</p:spTree>`))
+    }
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLayoutPlaceholderGeometryProbe(base64) {
   if (!base64) {
     return ''
@@ -36296,6 +36386,95 @@ async function readPPTXMasterVisibilityProbeState(page) {
     hiddenSlideActiveExists,
     visibleSlideActiveExists,
   }
+}
+
+async function readPPTXInheritedFooterPlaceholderProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const readProbeText = (element) =>
+      element?.textBody?.paragraphs
+        ?.flatMap((paragraph) => paragraph.runs ?? [])
+        ?.map((run) => run.text)
+        ?.join('') ?? ''
+    const probesForSlide = (slide) => (slide?.elements ?? [])
+      .filter((element) =>
+        element.name === 'Inherited Footer Placeholder Probe' &&
+        element.kind === 'textBox' &&
+        element.locked === true)
+    const hiddenSlide = slides.find((slide) =>
+      (slide.name ?? '').includes('Master Hidden Source'))
+    const visibleSlide = slides.find((slide) =>
+      (slide.name ?? '').includes('Master Visible Source'))
+    const hiddenProbes = probesForSlide(hiddenSlide)
+    const visibleProbes = probesForSlide(visibleSlide)
+
+    return {
+      hiddenSlideId: hiddenSlide?.id ?? '',
+      hiddenSlideProbeCount: hiddenProbes.length,
+      hiddenSlideText: hiddenProbes.map(readProbeText).join(' | '),
+      totalProbeCount: slides.reduce(
+        (total, slide) => total + probesForSlide(slide).length,
+        0,
+      ),
+      visibleSlideId: visibleSlide?.id ?? '',
+      visibleSlideProbeCount: visibleProbes.length,
+      visibleSlideText: visibleProbes.map(readProbeText).join(' | '),
+    }
+  })()`)
+  const hiddenSlideActiveState = modelState.hiddenSlideId
+    ? await readPPTXSlideProbeActiveState(
+        page,
+        modelState.hiddenSlideId,
+        'Inherited Footer Placeholder Probe',
+      )
+    : { exists: false, text: '' }
+  const visibleSlideActiveState = modelState.visibleSlideId
+    ? await readPPTXSlideProbeActiveState(
+        page,
+        modelState.visibleSlideId,
+        'Inherited Footer Placeholder Probe',
+      )
+    : { exists: false, text: '' }
+
+  return {
+    ...modelState,
+    hiddenSlideActiveExists: hiddenSlideActiveState.exists,
+    hiddenSlideActiveText: hiddenSlideActiveState.text,
+    visibleSlideActiveExists: visibleSlideActiveState.exists,
+    visibleSlideActiveText: visibleSlideActiveState.text,
+  }
+}
+
+async function readPPTXSlideProbeActiveState(page, slideId, probeName) {
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+    thumb?.click()
+  })(${JSON.stringify(slideId)})`)
+  await delay(120)
+
+  return await page.eval(`((probeName) => {
+    const element = document.querySelector(
+      '.ppt-slide [data-ppt-element-name=' + JSON.stringify(probeName) + ']',
+    )
+
+    return {
+      exists: Boolean(element),
+      text: element?.textContent ?? '',
+    }
+  })(${JSON.stringify(probeName)})`)
 }
 
 async function readPPTXSlideProbeActiveExists(page, slideId, probeName) {
