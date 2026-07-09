@@ -12228,6 +12228,9 @@ async function runExportScenario(page) {
       'Preset Left Arrow Probe',
       'Preset Up Arrow Probe',
       'Preset Down Arrow Probe',
+      'Preset Left Right Arrow Probe',
+      'Preset Up Down Arrow Probe',
+      'Preset Quad Arrow Probe',
     ])
 
     return {
@@ -12285,6 +12288,9 @@ async function runExportScenario(page) {
       'Preset Left Arrow Probe',
       'Preset Up Arrow Probe',
       'Preset Down Arrow Probe',
+      'Preset Left Right Arrow Probe',
+      'Preset Up Down Arrow Probe',
+      'Preset Quad Arrow Probe',
     ]
     const freeformObjects = exportImportedElements.filter((element) =>
       expectedNames.includes(element.name) &&
@@ -12297,6 +12303,9 @@ async function runExportScenario(page) {
     const leftArrow = byName['Preset Left Arrow Probe'] ?? null
     const upArrow = byName['Preset Up Arrow Probe'] ?? null
     const downArrow = byName['Preset Down Arrow Probe'] ?? null
+    const leftRightArrow = byName['Preset Left Right Arrow Probe'] ?? null
+    const upDownArrow = byName['Preset Up Down Arrow Probe'] ?? null
+    const quadArrow = byName['Preset Quad Arrow Probe'] ?? null
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -12332,6 +12341,15 @@ async function runExportScenario(page) {
       downArrowFill: downArrow?.fill ?? null,
       downArrowGeometry: downArrow?.geometry ?? null,
       downArrowPointCount: downArrow?.points?.length ?? 0,
+      leftRightArrowFill: leftRightArrow?.fill ?? null,
+      leftRightArrowGeometry: leftRightArrow?.geometry ?? null,
+      leftRightArrowPointCount: leftRightArrow?.points?.length ?? 0,
+      upDownArrowFill: upDownArrow?.fill ?? null,
+      upDownArrowGeometry: upDownArrow?.geometry ?? null,
+      upDownArrowPointCount: upDownArrow?.points?.length ?? 0,
+      quadArrowFill: quadArrow?.fill ?? null,
+      quadArrowGeometry: quadArrow?.geometry ?? null,
+      quadArrowPointCount: quadArrow?.points?.length ?? 0,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
     }
@@ -12348,9 +12366,9 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       presetGeometryFreeformPPTXImportState.presetModelCount >
         beforePresetGeometryFreeformPPTXDrop.presetGeometryFreeformModelCount &&
-      presetGeometryFreeformPPTXImportState.presetModelCount === 7 &&
-      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Down Arrow Probe | Preset Hexagon Probe | Preset Left Arrow Probe | Preset Right Arrow Probe | Preset Triangle Probe | Preset Up Arrow Probe' &&
-      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline | polyline | polyline | polyline' &&
+      presetGeometryFreeformPPTXImportState.presetModelCount === 10 &&
+      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Down Arrow Probe | Preset Hexagon Probe | Preset Left Arrow Probe | Preset Left Right Arrow Probe | Preset Quad Arrow Probe | Preset Right Arrow Probe | Preset Triangle Probe | Preset Up Arrow Probe | Preset Up Down Arrow Probe' &&
+      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePointMode === 'polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('M ') &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('L ') &&
@@ -12388,7 +12406,19 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.downArrowFill?.color === '#fce7f3' &&
       presetGeometryFreeformPPTXImportState.downArrowPointCount === 8 &&
       presetGeometryFreeformPPTXImportState.downArrowGeometry?.x === 544 &&
-      presetGeometryFreeformPPTXImportState.downArrowGeometry?.y === 320,
+      presetGeometryFreeformPPTXImportState.downArrowGeometry?.y === 320 &&
+      presetGeometryFreeformPPTXImportState.leftRightArrowFill?.color === '#e0f2fe' &&
+      presetGeometryFreeformPPTXImportState.leftRightArrowPointCount === 11 &&
+      presetGeometryFreeformPPTXImportState.leftRightArrowGeometry?.x === 128 &&
+      presetGeometryFreeformPPTXImportState.leftRightArrowGeometry?.y === 512 &&
+      presetGeometryFreeformPPTXImportState.upDownArrowFill?.color === '#ffedd5' &&
+      presetGeometryFreeformPPTXImportState.upDownArrowPointCount === 11 &&
+      presetGeometryFreeformPPTXImportState.upDownArrowGeometry?.x === 336 &&
+      presetGeometryFreeformPPTXImportState.upDownArrowGeometry?.y === 512 &&
+      presetGeometryFreeformPPTXImportState.quadArrowFill?.color === '#dcfce7' &&
+      presetGeometryFreeformPPTXImportState.quadArrowPointCount === 25 &&
+      presetGeometryFreeformPPTXImportState.quadArrowGeometry?.x === 544 &&
+      presetGeometryFreeformPPTXImportState.quadArrowGeometry?.y === 512,
     {
       beforePresetGeometryFreeformPPTXDrop,
       presetGeometryFreeformPPTXImportState,
@@ -31473,6 +31503,42 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
       w: 1143000,
       x: 5181600,
       y: 3048000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'E0F2FE',
+      h: 1143000,
+      id: 9988,
+      name: 'Preset Left Right Arrow Probe',
+      preset: 'leftRightArrow',
+      stroke: '0284C7',
+      strokeWidth: 19050,
+      w: 1524000,
+      x: 1219200,
+      y: 4876800,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FFEDD5',
+      h: 1524000,
+      id: 9989,
+      name: 'Preset Up Down Arrow Probe',
+      preset: 'upDownArrow',
+      stroke: 'EA580C',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 3200400,
+      y: 4876800,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DCFCE7',
+      h: 1524000,
+      id: 9990,
+      name: 'Preset Quad Arrow Probe',
+      preset: 'quadArrow',
+      stroke: '16A34A',
+      strokeWidth: 19050,
+      w: 1524000,
+      x: 5181600,
+      y: 4876800,
     }),
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
