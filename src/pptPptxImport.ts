@@ -4570,13 +4570,14 @@ async function readPPTXGraphicFrameElement({
     relationships,
     slidePath,
     zip,
-  }) ?? readPPTXOleObjectElement({
+  }) ?? await readPPTXOleObjectElement({
     graphicFrame,
     index,
     objectIndex,
     relationships,
     slidePath,
     themeColors,
+    zip,
   }) ?? readPPTXUnsupportedGraphicFrameElement({
     graphicFrame,
     index,
@@ -4710,13 +4711,14 @@ function readPPTXRelationshipAttributeIds(element: Element) {
   return [...ids]
 }
 
-function readPPTXOleObjectElement({
+async function readPPTXOleObjectElement({
   graphicFrame,
   index,
   objectIndex,
   relationships,
   slidePath,
   themeColors,
+  zip,
 }: {
   graphicFrame: Element
   index: number
@@ -4724,7 +4726,8 @@ function readPPTXOleObjectElement({
   relationships: PPTXRelationshipMap
   slidePath: string
   themeColors: PPTXThemeColorMap
-}): PPTElement | null {
+  zip: JSZip
+}): Promise<PPTElement | null> {
   const oleObject = getFirstPPTXDescendantByLocalName(graphicFrame, 'oleObj')
   const geometry = readPPTXElementGeometry(graphicFrame)
 
@@ -4743,6 +4746,37 @@ function readPPTXOleObjectElement({
   const shadow = readPPTXElementShadow(graphicFrame, themeColors)
   const details = [progId, targetName]
     .filter((detail) => detail.length > 0)
+  const previewBlip = getFirstPPTXDescendantByLocalName(oleObject, 'blip') ??
+    getFirstPPTXDescendantByLocalName(graphicFrame, 'blip')
+  const previewSource = await readPPTXImageSource({
+    blip: previewBlip,
+    relationships,
+    slidePath,
+    zip,
+  })
+
+  if (previewSource?.renderable) {
+    const crop = readPPTXImageCrop(graphicFrame)
+    const opacity = readPPTXImageOpacity(previewBlip)
+
+    return {
+      ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+      alt: objectName,
+      ...(crop ? { crop } : {}),
+      fit: crop ? 'cover' : 'contain',
+      ...readPPTXElementFlip(graphicFrame),
+      geometry,
+      ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+      id: createPPTXImportedElementId(index, objectIndex),
+      kind: 'image',
+      ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+      ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+      name: readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`),
+      ...(opacity === null ? {} : { opacity }),
+      ...(shadow ? { shadow } : {}),
+      src: previewSource.src,
+    }
+  }
 
   return {
     ...(readPPTXElementAccessibility(graphicFrame) ?? {}),

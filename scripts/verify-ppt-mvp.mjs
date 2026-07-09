@@ -14225,7 +14225,7 @@ async function runExportScenario(page) {
     return {
       oleObjectModelCount: elements.filter((element) =>
         element.name === 'OLE Object Probe' &&
-        element.kind === 'shape').length,
+        element.kind === 'image').length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
     }
   })()`)
@@ -14251,7 +14251,7 @@ async function runExportScenario(page) {
   const oleObjectPPTXImportState = await page.eval(`(() => {
     const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
     const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
-    const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="OLE Object Probe"][data-kind="shape"]')
+    const activeImage = document.querySelector('.ppt-slide [data-ppt-element-name="OLE Object Probe"][data-kind="image"]')
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const readPPTExportDeckFromHTML = (html) => {
       try {
@@ -14270,35 +14270,31 @@ async function runExportScenario(page) {
       slide.elements ?? [])
     const oleObjects = exportImportedElements.filter((element) =>
       element.name === 'OLE Object Probe' &&
-      element.kind === 'shape')
+      element.kind === 'image')
     const oleObject = oleObjects[0] ?? null
-    const paragraphs = oleObject?.textBody?.paragraphs ?? []
-    const paragraphTexts = paragraphs.map((paragraph) =>
-      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
-      activeShape: activeShape?.getAttribute('data-shape') ?? '',
-      activeText: activeShape?.textContent ?? '',
-      activeTextAutofit: activeShape?.getAttribute('data-ppt-text-autofit') ?? '',
+      activeFit: activeImage?.getAttribute('data-ppt-image-fit') ?? '',
+      activeOpacity: activeImage?.style.opacity ?? '',
+      activeSrcDataUri: activeImage?.querySelector('img')?.getAttribute('src')?.startsWith('data:image/png') === true,
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
-      oleObjectFill: oleObject?.fill?.color ?? '',
+      oleObjectAlt: oleObject?.alt ?? '',
+      oleObjectFit: oleObject?.fit ?? '',
       oleObjectGeometry: oleObject?.geometry ?? null,
       oleObjectModelCount: oleObjects.length,
-      oleObjectShape: oleObject?.shape ?? '',
-      oleObjectStrokeDash: oleObject?.stroke?.dash ?? '',
-      oleObjectTextAutofit: oleObject?.textAutoFit ?? '',
-      paragraphTexts,
+      oleObjectOpacity: oleObject?.opacity ?? null,
+      oleObjectSrcDataUri: oleObject?.src?.startsWith('data:image/png') === true,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
     }
   })()`)
 
   record(
-    'drops PPTX OLE object as editable placeholder shape through OpenXML import',
+    'renders PPTX OLE object preview image through OpenXML import',
     oleObjectPPTXImportState.model === 'ppt-deck-pptx-import' &&
       oleObjectPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       oleObjectPPTXImportState.fileName === 'external-openxml-ole-object.pptx' &&
@@ -14309,19 +14305,13 @@ async function runExportScenario(page) {
       oleObjectPPTXImportState.oleObjectModelCount >
         beforeOleObjectPPTXDrop.oleObjectModelCount &&
       oleObjectPPTXImportState.oleObjectModelCount === 1 &&
-      oleObjectPPTXImportState.oleObjectShape === 'rect' &&
-      oleObjectPPTXImportState.activeShape === 'rect' &&
-      oleObjectPPTXImportState.oleObjectTextAutofit === 'resizeShapeToFitText' &&
-      oleObjectPPTXImportState.activeTextAutofit === 'resizeShapeToFitText' &&
-      oleObjectPPTXImportState.oleObjectFill === '#f8fafc' &&
-      oleObjectPPTXImportState.oleObjectStrokeDash === 'dash' &&
-      JSON.stringify(oleObjectPPTXImportState.paragraphTexts) === JSON.stringify([
-        'Embedded Workbook',
-        'Excel.Sheet.12',
-        'oleObject-pptx-probe.bin',
-      ]) &&
-      oleObjectPPTXImportState.activeText.includes('Embedded Workbook') &&
-      oleObjectPPTXImportState.activeText.includes('Excel.Sheet.12') &&
+      oleObjectPPTXImportState.oleObjectAlt === 'Embedded Workbook' &&
+      oleObjectPPTXImportState.oleObjectFit === 'contain' &&
+      oleObjectPPTXImportState.activeFit === 'contain' &&
+      oleObjectPPTXImportState.oleObjectSrcDataUri &&
+      oleObjectPPTXImportState.activeSrcDataUri &&
+      oleObjectPPTXImportState.oleObjectOpacity === 0.88 &&
+      oleObjectPPTXImportState.activeOpacity === '0.88' &&
       oleObjectPPTXImportState.oleObjectGeometry?.x === 720 &&
       oleObjectPPTXImportState.oleObjectGeometry?.y === 92 &&
       oleObjectPPTXImportState.oleObjectGeometry?.w === 300 &&
@@ -34645,6 +34635,7 @@ async function addPPTXOleObjectProbe(base64) {
     .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
     .sort(comparePPTXNumberedPaths)[0]
   const oleObjectPath = 'ppt/embeddings/oleObject-pptx-probe.bin'
+  const previewPath = 'ppt/media/ole-object-preview.png'
 
   if (!slidePath) {
     return base64
@@ -34661,12 +34652,26 @@ async function addPPTXOleObjectProbe(base64) {
     oleObjectPath,
     'application/vnd.openxmlformats-officedocument.oleObject',
   )
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
   zip.file(oleObjectPath, Buffer.from('pptx ole object probe'))
+  zip.file(
+    previewPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
 
   const relationshipId = await addPPTXInternalRelationship({
     sourcePath: slidePath,
     target: getPPTXRelativeTarget(slidePath, oleObjectPath),
     type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject',
+    zip,
+  })
+  const previewRelationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, previewPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
     zip,
   })
   const oleFrameXml = [
@@ -34682,7 +34687,9 @@ async function addPPTXOleObjectProbe(base64) {
     '</p:xfrm>',
     '<a:graphic>',
     '<a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">',
-    `<p:oleObj r:id="${relationshipId}" progId="Excel.Sheet.12" name="Embedded Workbook" showAsIcon="1" imgW="2857500" imgH="1428750"/>`,
+    `<p:oleObj r:id="${relationshipId}" progId="Excel.Sheet.12" name="Embedded Workbook" showAsIcon="1" imgW="2857500" imgH="1428750">`,
+    `<a:blip r:embed="${previewRelationshipId}"><a:alphaModFix amt="88000"/></a:blip>`,
+    '</p:oleObj>',
     '</a:graphicData>',
     '</a:graphic>',
     '</p:graphicFrame>',
