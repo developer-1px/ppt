@@ -710,7 +710,15 @@ async function readPPTXOpenXmlSlide({
         zip,
       })
     } else if (child.localName === 'graphicFrame') {
-      element = readPPTXTableElement(child, index, objectIndex, relationships, themeColors)
+      element = await readPPTXGraphicFrameElement({
+        graphicFrame: child,
+        index,
+        objectIndex,
+        relationships,
+        slidePath: path,
+        themeColors,
+        zip,
+      })
     }
 
     if (element) {
@@ -1463,7 +1471,15 @@ async function readPPTXInheritedElement({
   }
 
   if (child.localName === 'graphicFrame') {
-    return readPPTXTableElement(child, index, objectIndex, relationships, themeColors)
+    return await readPPTXGraphicFrameElement({
+      graphicFrame: child,
+      index,
+      objectIndex,
+      relationships,
+      slidePath: path,
+      themeColors,
+      zip,
+    })
   }
 
   return null
@@ -2664,6 +2680,198 @@ function readPPTXImageCrop(pic: Element | null): PPTImage['crop'] | null {
   const y = clampPPTXPercent(50 + (top - bottom) / 2_000)
 
   return x === 50 && y === 50 ? null : { x, y }
+}
+
+async function readPPTXGraphicFrameElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  return readPPTXTableElement(
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    themeColors,
+  ) ?? await readPPTXChartTableElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
+    zip,
+  })
+}
+
+async function readPPTXChartTableElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTTable | null> {
+  const chartPath = readPPTXChartPartPath({
+    graphicFrame,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const xml = chartPath ? await zip.file(chartPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const rows = doc ? readPPTXChartTableRows(doc) : []
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!geometry || rows.length < 2) {
+    return null
+  }
+
+  const columnCount = getPPTTableColumnCount(rows)
+  const rowCount = rows.length
+  const headerFill: PPTFill = { color: '#eff6ff' }
+  const headerTextStyle: PPTTableCellTextStyle = {
+    color: '#1e3a8a',
+    fontWeight: 'bold',
+    verticalAlign: 'middle',
+  }
+  const cellStyles = rows.map((row, rowIndex) =>
+    row.map((): PPTTableCellStyle => ({
+      fill: rowIndex === 0 ? headerFill : { color: '#ffffff' },
+      textStyle: rowIndex === 0
+        ? headerTextStyle
+        : { color: '#1f2937', verticalAlign: 'middle' },
+    })))
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    cellStyles,
+    columnWidths: Array.from({ length: columnCount }, () =>
+      Math.round(geometry.w / columnCount)),
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'table',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Chart ${objectIndex}`),
+    rowHeights: Array.from({ length: rowCount }, () =>
+      Math.round(geometry.h / rowCount)),
+    rows,
+    ...(shadow ? { shadow } : {}),
+  }
+}
+
+function readPPTXChartPartPath({
+  graphicFrame,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const chart = getFirstPPTXDescendantByLocalName(graphicFrame, 'chart')
+  const relationshipId = readPPTXRelationshipAttributeId(chart)
+  const relationship = relationshipId ? relationships.get(relationshipId) : null
+  const path = relationship
+    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
+}
+
+function readPPTXChartTableRows(root: Document) {
+  const series = getPPTXDescendantsByLocalName(root, 'ser')
+    .map((item, index) => readPPTXChartSeries(item, index))
+    .filter((item) => item.values.length > 0)
+
+  if (series.length === 0) {
+    return []
+  }
+
+  const maxDataLength = Math.max(
+    0,
+    ...series.map((item) => Math.max(item.categories.length, item.values.length)),
+  )
+  const categories = Array.from({ length: maxDataLength }, (_, index) =>
+    series.find((item) => item.categories[index])?.categories[index] ??
+      `Item ${index + 1}`)
+
+  return [
+    ['Category', ...series.map((item) => item.name)],
+    ...categories.map((category, rowIndex) => [
+      category,
+      ...series.map((item) => item.values[rowIndex] ?? ''),
+    ]),
+  ]
+}
+
+function readPPTXChartSeries(ser: Element, index: number) {
+  const tx = getDirectPPTXChildByLocalName(ser, 'tx')
+  const cat = getDirectPPTXChildByLocalName(ser, 'cat') ??
+    getDirectPPTXChildByLocalName(ser, 'xVal')
+  const val = getDirectPPTXChildByLocalName(ser, 'val') ??
+    getDirectPPTXChildByLocalName(ser, 'yVal')
+  const name = readPPTXChartTextValue(tx) || `Series ${index + 1}`
+  const categories = readPPTXChartCachedValues(cat)
+  const values = readPPTXChartCachedValues(val)
+
+  return {
+    categories,
+    name,
+    values,
+  }
+}
+
+function readPPTXChartTextValue(root: Element | null) {
+  return readPPTXChartCachedValues(root)[0] ??
+    getDirectPPTXChildByLocalName(root, 'v')?.textContent?.trim() ??
+    ''
+}
+
+function readPPTXChartCachedValues(root: Element | null) {
+  const cache = getFirstPPTXDescendantByLocalName(root, 'strCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'numCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'multiLvlStrCache')
+
+  return cache
+    ? getPPTXDescendantsByLocalName(cache, 'pt')
+      .sort(comparePPTXChartPointIndex)
+      .map((point) =>
+        getDirectPPTXChildByLocalName(point, 'v')?.textContent?.trim() ?? '')
+      .filter((value) => value.length > 0)
+    : []
+}
+
+function comparePPTXChartPointIndex(left: Element, right: Element) {
+  return (toPPTXPositiveNumber(left.getAttribute('idx')) ?? 0) -
+    (toPPTXPositiveNumber(right.getAttribute('idx')) ?? 0)
 }
 
 function readPPTXTableElement(

@@ -12343,6 +12343,150 @@ async function runExportScenario(page) {
     },
   )
 
+  const chartTablePPTXBase64 = await addPPTXChartTableProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeChartTablePPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      chartTableModelCount: elements.filter((element) =>
+        element.name === 'Chart Table Probe' &&
+        element.kind === 'table').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-chart-table.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(chartTablePPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const chartTablePPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeTable = document.querySelector('.ppt-slide [data-ppt-element-name="Chart Table Probe"][data-kind="table"]')
+    const activeText = activeTable?.textContent ?? ''
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const chartTables = exportImportedElements.filter((element) =>
+      element.name === 'Chart Table Probe' &&
+      element.kind === 'table')
+    const chartTable = chartTables[0] ?? null
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeTableCols: Number(activeTable?.getAttribute('data-ppt-table-cols') ?? 0),
+      activeTableRows: Number(activeTable?.getAttribute('data-ppt-table-rows') ?? 0),
+      activeText,
+      chartTableCellStyleHeaderFill: chartTable?.cellStyles?.[0]?.[0]?.fill?.color ?? '',
+      chartTableGeometry: chartTable?.geometry ?? null,
+      chartTableModelCount: chartTables.length,
+      columnWidths: (chartTable?.columnWidths ?? []).join(','),
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      rowHeights: (chartTable?.rowHeights ?? []).join(','),
+      rows: chartTable?.rows ?? [],
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX chart graphicFrame as editable table fallback through OpenXML import',
+    chartTablePPTXImportState.model === 'ppt-deck-pptx-import' &&
+      chartTablePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      chartTablePPTXImportState.fileName === 'external-openxml-chart-table.pptx' &&
+      chartTablePPTXImportState.importedCount === beforeChartTablePPTXDrop.slideCount &&
+      chartTablePPTXImportState.sourceSlideCount === beforeChartTablePPTXDrop.slideCount &&
+      chartTablePPTXImportState.slideCount === beforeChartTablePPTXDrop.slideCount * 2 &&
+      chartTablePPTXImportState.activeName.includes('Copy') &&
+      chartTablePPTXImportState.chartTableModelCount >
+        beforeChartTablePPTXDrop.chartTableModelCount &&
+      chartTablePPTXImportState.chartTableModelCount === 1 &&
+      chartTablePPTXImportState.activeTableCols === 3 &&
+      chartTablePPTXImportState.activeTableRows === 4 &&
+      chartTablePPTXImportState.activeText.includes('North') &&
+      chartTablePPTXImportState.activeText.includes('Revenue') &&
+      chartTablePPTXImportState.activeText.includes('Margin') &&
+      JSON.stringify(chartTablePPTXImportState.rows) === JSON.stringify([
+        ['Category', 'Revenue', 'Margin'],
+        ['North', '12', '5'],
+        ['South', '18', '7'],
+        ['West', '9', '4'],
+      ]) &&
+      chartTablePPTXImportState.chartTableCellStyleHeaderFill === '#eff6ff' &&
+      chartTablePPTXImportState.chartTableGeometry?.x === 104 &&
+      chartTablePPTXImportState.chartTableGeometry?.y === 320 &&
+      chartTablePPTXImportState.chartTableGeometry?.w === 560 &&
+      chartTablePPTXImportState.chartTableGeometry?.h === 240 &&
+      chartTablePPTXImportState.columnWidths === '187,187,187' &&
+      chartTablePPTXImportState.rowHeights === '60,60,60,60',
+    {
+      beforeChartTablePPTXDrop,
+      chartTablePPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterChartTablePPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes chart table PPTX drop probes before export scenario continues',
+    afterChartTablePPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterChartTablePPTXDropCleanup.slideCount === beforeChartTablePPTXDrop.slideCount,
+    {
+      afterChartTablePPTXDropCleanup,
+      beforeChartTablePPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -28777,6 +28921,23 @@ async function ensurePPTXDefaultContentType(zip, extension, contentType) {
   zip.file(path, xml.replace('</Types>', `${defaultXml}</Types>`))
 }
 
+async function ensurePPTXOverrideContentType(zip, partName, contentType) {
+  const path = '[Content_Types].xml'
+  const xml = await readPPTXZipText(zip, path)
+  const normalizedPartName = partName.startsWith('/') ? partName : `/${partName}`
+
+  if (!xml || xml.includes(`PartName="${escapePPTXXmlAttribute(normalizedPartName)}"`)) {
+    return
+  }
+
+  const overrideXml = [
+    `<Override PartName="${escapePPTXXmlAttribute(normalizedPartName)}"`,
+    ` ContentType="${escapePPTXXmlAttribute(contentType)}"/>`,
+  ].join('')
+
+  zip.file(path, xml.replace('</Types>', `${overrideXml}</Types>`))
+}
+
 async function addPPTXNoFillShapeProbe(base64) {
   if (!base64) {
     return ''
@@ -29650,6 +29811,147 @@ function createPPTXPresetGeometryShapeProbeXml({
     `<a:ln w="${strokeWidth}"><a:solidFill><a:srgbClr val="${stroke}"/></a:solidFill></a:ln>`,
     '</p:spPr>',
     '</p:sp>',
+  ].join('')
+}
+
+async function addPPTXChartTableProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const chartPath = 'ppt/charts/chart-pptx-table-probe.xml'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Chart Table Probe')) {
+    return base64
+  }
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    chartPath,
+    'application/vnd.openxmlformats-officedocument.drawingml.chart+xml',
+  )
+  zip.file(chartPath, createPPTXChartTableProbeChartXml())
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, chartPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart',
+    zip,
+  })
+  const chartFrameXml = [
+    '<p:graphicFrame>',
+    '<p:nvGraphicFramePr>',
+    '<p:cNvPr id="9984" name="Chart Table Probe"/>',
+    '<p:cNvGraphicFramePr/>',
+    '<p:nvPr/>',
+    '</p:nvGraphicFramePr>',
+    '<p:xfrm>',
+    '<a:off x="990600" y="3048000"/>',
+    '<a:ext cx="5334000" cy="2286000"/>',
+    '</p:xfrm>',
+    '<a:graphic>',
+    '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">',
+    `<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${relationshipId}"/>`,
+    '</a:graphicData>',
+    '</a:graphic>',
+    '</p:graphicFrame>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${chartFrameXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXChartTableProbeChartXml() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+    '<c:chart>',
+    '<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Regional metrics</a:t></a:r></a:p></c:rich></c:tx></c:title>',
+    '<c:plotArea>',
+    '<c:layout/>',
+    '<c:barChart>',
+    '<c:barDir val="col"/>',
+    '<c:grouping val="clustered"/>',
+    createPPTXChartSeriesXml({
+      categories: ['North', 'South', 'West'],
+      index: 0,
+      name: 'Revenue',
+      values: [12, 18, 9],
+    }),
+    createPPTXChartSeriesXml({
+      categories: ['North', 'South', 'West'],
+      index: 1,
+      name: 'Margin',
+      values: [5, 7, 4],
+    }),
+    '<c:axId val="1001"/>',
+    '<c:axId val="1002"/>',
+    '</c:barChart>',
+    '<c:catAx><c:axId val="1001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/></c:catAx>',
+    '<c:valAx><c:axId val="1002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/></c:valAx>',
+    '</c:plotArea>',
+    '<c:legend><c:legendPos val="r"/></c:legend>',
+    '<c:plotVisOnly val="1"/>',
+    '</c:chart>',
+    '</c:chartSpace>',
+  ].join('')
+}
+
+function createPPTXChartSeriesXml({ categories, index, name, values }) {
+  return [
+    '<c:ser>',
+    `<c:idx val="${index}"/>`,
+    `<c:order val="${index}"/>`,
+    '<c:tx>',
+    '<c:strRef>',
+    `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$1</c:f>`,
+    '<c:strCache>',
+    '<c:ptCount val="1"/>',
+    `<c:pt idx="0"><c:v>${escapePPTXXmlText(name)}</c:v></c:pt>`,
+    '</c:strCache>',
+    '</c:strRef>',
+    '</c:tx>',
+    '<c:cat>',
+    '<c:strRef>',
+    '<c:f>Sheet1!$A$2:$A$4</c:f>',
+    '<c:strCache>',
+    `<c:ptCount val="${categories.length}"/>`,
+    categories.map((category, categoryIndex) =>
+      `<c:pt idx="${categoryIndex}"><c:v>${escapePPTXXmlText(category)}</c:v></c:pt>`).join(''),
+    '</c:strCache>',
+    '</c:strRef>',
+    '</c:cat>',
+    '<c:val>',
+    '<c:numRef>',
+    `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$2:$${String.fromCharCode(66 + index)}$4</c:f>`,
+    '<c:numCache>',
+    '<c:formatCode>General</c:formatCode>',
+    `<c:ptCount val="${values.length}"/>`,
+    values.map((value, valueIndex) =>
+      `<c:pt idx="${valueIndex}"><c:v>${value}</c:v></c:pt>`).join(''),
+    '</c:numCache>',
+    '</c:numRef>',
+    '</c:val>',
+    '</c:ser>',
   ].join('')
 }
 
