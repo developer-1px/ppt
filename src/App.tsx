@@ -2515,6 +2515,7 @@ type PPTDeckPPTXImportEffect = {
   format: PPTDeckPPTXImportResult['format']
   importedSlideCount: number
   jsonLength: number
+  mode: 'append' | 'replace'
   model: typeof PPT_DECK_PPTX_IMPORT_MODEL
   sourceDeckId: string
   sourceSlideCount: number
@@ -6877,6 +6878,41 @@ function App() {
     })
   }
 
+  async function openPPTDeckPPTXFile(file: File) {
+    const result = await importPPTDeckFromPPTXBlob(file)
+
+    if (!result) {
+      return false
+    }
+
+    return replacePPTDeckPPTXSource({
+      ...result,
+      fileName: file.name,
+      fileSize: file.size,
+    })
+  }
+
+  function replacePPTDeckPPTXSource(source: PPTDeckPPTXImportSource) {
+    const firstSlide = source.deck.slides[0]
+
+    if (!firstSlide) {
+      return false
+    }
+
+    commitDeck(() => {
+      setLastDeckPPTXImportEffect(createPPTDeckPPTXImportEffect({
+        importedSlides: source.deck.slides,
+        mode: 'replace',
+        source,
+      }))
+      selectSlide(firstSlide.id)
+
+      return source.deck
+    })
+
+    return true
+  }
+
   function pastePPTDeckPPTXSource(source: PPTDeckPPTXImportSource) {
     if (source.deck.slides.length === 0) {
       return false
@@ -6922,6 +6958,7 @@ function App() {
 
       setLastDeckPPTXImportEffect(createPPTDeckPPTXImportEffect({
         importedSlides,
+        mode: 'append',
         source,
       }))
       selectSlide(importedSlides[0].id)
@@ -10740,7 +10777,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     const file = getPPTDeckPPTXFileFromList(event.target.files)
 
     if (file) {
-      void importPPTDeckPPTXFile(file)
+      void openPPTDeckPPTXFile(file)
     }
 
     event.target.value = ''
@@ -14700,7 +14737,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     id: 'file:open-pptx',
     onSelect: () => pptxInputRef.current?.click(),
     section: 'File',
-    title: 'Open PPTX',
+    title: 'Open PPTX File',
   }, {
     disabled: !commandAvailability.undo,
     id: 'command:undo',
@@ -15910,6 +15947,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-deck-pptx-import-format={lastDeckPPTXImportEffect?.format}
         data-ppt-deck-pptx-import-imported-count={lastDeckPPTXImportEffect?.importedSlideCount}
         data-ppt-deck-pptx-import-json-length={lastDeckPPTXImportEffect?.jsonLength}
+        data-ppt-deck-pptx-import-mode={lastDeckPPTXImportEffect?.mode}
         data-ppt-deck-pptx-import-model={lastDeckPPTXImportEffect?.model}
         data-ppt-deck-pptx-import-source-deck={lastDeckPPTXImportEffect?.sourceDeckId}
         data-ppt-deck-pptx-import-source-slide-count={lastDeckPPTXImportEffect?.sourceSlideCount}
@@ -18874,9 +18912,11 @@ function createPPTDeckJSONImportEffect({
 
 function createPPTDeckPPTXImportEffect({
   importedSlides,
+  mode,
   source,
 }: {
   importedSlides: readonly PPTSlide[]
+  mode: PPTDeckPPTXImportEffect['mode']
   source: PPTDeckPPTXImportSource
 }): PPTDeckPPTXImportEffect {
   return {
@@ -18886,6 +18926,7 @@ function createPPTDeckPPTXImportEffect({
     format: source.format,
     importedSlideCount: importedSlides.length,
     jsonLength: source.jsonLength,
+    mode,
     model: PPT_DECK_PPTX_IMPORT_MODEL,
     sourceDeckId: source.deck.id,
     sourceSlideCount: source.deck.slides.length,
