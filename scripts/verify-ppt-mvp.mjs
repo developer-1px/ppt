@@ -337,20 +337,28 @@ async function runPPTXRenderScenario(page) {
     fileName: 'external-openxml-4x3.pptx',
     format: 'pptx-open-xml-ppt-deck',
   })
+  await waitForPPTXActiveSlideFrameFit(page)
 
   const customSizePPTXImportState = await readPPTXDeckImportState(page)
   const customSizePPTXFrameState = await readPPTXActiveSlideFrameState(page)
+  const customSizePPTXOpenedDeckRenderState =
+    await readPPTXImportedSlideRenderState(page, {
+      slideNameIncludes: '',
+    })
 
   record(
     'opens custom-size OpenXML PPTX with imported slide frame dimensions',
     customSizePPTXImportState.model === 'ppt-deck-pptx-import' &&
       customSizePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       customSizePPTXImportState.fileName === 'external-openxml-4x3.pptx' &&
+      customSizePPTXImportState.mode === 'replace' &&
       customSizePPTXImportState.importedCount === 2 &&
       customSizePPTXImportState.slideCount === 2 &&
       customSizePPTXImportState.sourceSlideCount === 2 &&
       customSizePPTXFrameState.slideWidth === 960 &&
       customSizePPTXFrameState.slideHeight === 720 &&
+      customSizePPTXFrameState.viewportScale > 0 &&
+      customSizePPTXFrameState.slideFitsStage &&
       customSizePPTXFrameState.slideStyleWidth === '960px' &&
       customSizePPTXFrameState.slideStyleHeight === '720px' &&
       customSizePPTXFrameState.thumbWidth === 960 &&
@@ -360,6 +368,19 @@ async function runPPTXRenderScenario(page) {
     {
       customSizePPTXFrameState,
       customSizePPTXImportState,
+    },
+  )
+
+  record(
+    'opens PPTX file input as a page-by-page rendered viewer deck',
+    customSizePPTXOpenedDeckRenderState.importedSlideCount ===
+      customSizePPTXImportState.importedCount &&
+      customSizePPTXOpenedDeckRenderState.firstSlideId ===
+        customSizePPTXImportState.firstImportedSlideId &&
+      customSizePPTXOpenedDeckRenderState.allSlidesRendered,
+    {
+      customSizePPTXImportState,
+      customSizePPTXOpenedDeckRenderState,
     },
   )
 }
@@ -11153,6 +11174,7 @@ async function runExportScenario(page) {
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       jsonLength: Number(stage?.getAttribute('data-ppt-deck-pptx-import-json-length') ?? 0),
+      mode: stage?.getAttribute('data-ppt-deck-pptx-import-mode') ?? '',
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceDeck: stage?.getAttribute('data-ppt-deck-pptx-import-source-deck') ?? '',
@@ -34167,6 +34189,7 @@ function readPPTXDeckImportState(page) {
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       jsonLength: Number(stage?.getAttribute('data-ppt-deck-pptx-import-json-length') ?? 0),
+      mode: stage?.getAttribute('data-ppt-deck-pptx-import-mode') ?? '',
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceDeck: stage?.getAttribute('data-ppt-deck-pptx-import-source-deck') ?? '',
@@ -34229,9 +34252,12 @@ function openPPTXFileFromInput(page, { base64, fileName }) {
 
 function readPPTXActiveSlideFrameState(page) {
   return page.eval(`(() => {
+    const stage = document.querySelector('.ppt-stage-shell')
     const slide = document.querySelector('.ppt-stage-shell .ppt-slide[data-ppt-slide]')
     const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
     const thumbPreview = activeThumb?.querySelector('.ppt-thumb-preview')
+    const stageRect = stage?.getBoundingClientRect()
+    const slideRect = slide?.getBoundingClientRect()
     const thumbPreviewRect = thumbPreview?.getBoundingClientRect()
     const thumbWidth = Number(activeThumb?.getAttribute('data-ppt-slide-thumb-width') ?? 0)
     const thumbHeight = Number(activeThumb?.getAttribute('data-ppt-slide-thumb-height') ?? 0)
@@ -34241,6 +34267,11 @@ function readPPTXActiveSlideFrameState(page) {
       slideStyleHeight: slide?.style.height ?? '',
       slideStyleWidth: slide?.style.width ?? '',
       slideWidth: Number(slide?.getAttribute('data-ppt-slide-width') ?? 0),
+      slideFitsStage: Boolean(stageRect && slideRect &&
+        slideRect.left >= stageRect.left - 1 &&
+        slideRect.top >= stageRect.top - 1 &&
+        slideRect.right <= stageRect.right + 1 &&
+        slideRect.bottom <= stageRect.bottom + 1),
       thumbAspectRatio: thumbPreviewRect
         ? thumbPreviewRect.width / thumbPreviewRect.height
         : 0,
@@ -34248,15 +34279,40 @@ function readPPTXActiveSlideFrameState(page) {
       thumbPreviewHeight: thumbPreviewRect?.height ?? 0,
       thumbPreviewWidth: thumbPreviewRect?.width ?? 0,
       thumbWidth,
+      viewportScale: Number(
+        stage?.getAttribute('data-ppt-viewport-scale') ??
+          0,
+      ),
     }
   })()`)
 }
 
+function waitForPPTXActiveSlideFrameFit(page) {
+  return waitUntil(
+    () => page.eval(`(() => {
+      const stage = document.querySelector('.ppt-stage-shell')
+      const slide = document.querySelector('.ppt-stage-shell .ppt-slide[data-ppt-slide]')
+      const stageRect = stage?.getBoundingClientRect()
+      const slideRect = slide?.getBoundingClientRect()
+      const viewportScale = Number(stage?.getAttribute('data-ppt-viewport-scale') ?? 0)
+
+      return Boolean(stageRect && slideRect &&
+        viewportScale > 0 &&
+        slideRect.left >= stageRect.left - 1 &&
+        slideRect.top >= stageRect.top - 1 &&
+        slideRect.right <= stageRect.right + 1 &&
+        slideRect.bottom <= stageRect.bottom + 1)
+    })()`),
+    'Timed out waiting for PPTX slide frame fit',
+    5000,
+  )
+}
+
 async function readPPTXImportedSlideRenderState(
   page,
-  { requireElements = true } = {},
+  { requireElements = true, slideNameIncludes = 'Copy' } = {},
 ) {
-  const importedThumbs = await page.eval(`(() => {
+  const importedThumbs = await page.eval(`((input) => {
     return [...document.querySelectorAll('.ppt-thumb')]
       .map((thumb, index) => {
         const preview = thumb.querySelector('.ppt-thumb-preview')
@@ -34275,8 +34331,8 @@ async function readPPTXImportedSlideRenderState(
           thumbVisible: thumbRect.width > 0 && thumbRect.height > 0,
         }
       })
-      .filter((thumb) => thumb.id && thumb.name.includes('Copy'))
-  })()`)
+      .filter((thumb) => thumb.id && thumb.name.includes(input.slideNameIncludes))
+  })(${JSON.stringify({ slideNameIncludes })})`)
   const slides = []
 
   for (const thumb of importedThumbs) {

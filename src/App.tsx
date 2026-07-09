@@ -6924,6 +6924,18 @@ function App() {
       kind: 'success',
       slideCount: result.deck.slides.length,
     })
+    requestAnimationFrame(() => {
+      fitPPTCanvasViewportToBounds({
+        bounds: {
+          h: result.deck.size.h,
+          w: result.deck.size.w,
+          x: 0,
+          y: 0,
+        },
+        setViewport,
+        stageElement: canvasStageElement,
+      })
+    })
 
     return true
   }
@@ -17038,6 +17050,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-wheel-viewport-model={PPT_WHEEL_VIEWPORT_MODEL}
         data-ppt-wheel-viewport-pan={PPT_WHEEL_VIEWPORT_PAN_MODE}
         data-ppt-wheel-viewport-zoom-modifier={PPT_WHEEL_VIEWPORT_ZOOM_MODIFIER}
+        data-ppt-viewport-scale={viewport.scale}
+        data-ppt-viewport-x={viewport.x}
+        data-ppt-viewport-y={viewport.y}
         data-ppt-recent-colors={recentColors.join(' ')}
         data-ppt-recent-color-count={recentColors.length}
         data-creation-tool={getPPTCreationToolDataValue(creationTool)}
