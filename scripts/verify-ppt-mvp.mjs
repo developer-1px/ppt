@@ -285,7 +285,9 @@ async function runPPTXRenderScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
-  const openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(pptxDownloadBase64)
+  const openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
   await dropPPTXFile(page, {
@@ -300,6 +302,8 @@ async function runPPTXRenderScenario(page) {
   const openXmlPPTXImportState = await readPPTXDeckImportState(page)
   const openXmlPPTXRenderedSlideState =
     await readPPTXImportedSlideRenderState(page)
+  const openXmlPPTXAlphaModifierFillState =
+    await readPPTXAlphaModifierFillProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -318,6 +322,20 @@ async function runPPTXRenderScenario(page) {
       beforeOpenXmlPPTXDrop,
       openXmlPPTXImportState,
       openXmlPPTXRenderedSlideState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX alpha modifier fill opacity for viewer rendering',
+    openXmlPPTXAlphaModifierFillState.modelCount === 1 &&
+      openXmlPPTXAlphaModifierFillState.fill === '#3366ff' &&
+      openXmlPPTXAlphaModifierFillState.opacity > 0.69 &&
+      openXmlPPTXAlphaModifierFillState.opacity < 0.71 &&
+      openXmlPPTXAlphaModifierFillState.activeFillOpacity > 0.69 &&
+      openXmlPPTXAlphaModifierFillState.activeFillOpacity < 0.71,
+    {
+      openXmlPPTXAlphaModifierFillState,
+      openXmlPPTXImportState,
     },
   )
 
@@ -11362,6 +11380,9 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#aa5500' &&
         element.fill?.opacity === 0.65).length,
+      alphaModifierFillProbeModelCount: elements.filter((element) =>
+        element.name === 'Alpha Modifier Fill Probe' &&
+        element.kind === 'shape').length,
       patternFillProbeModelCount: elements.filter((element) =>
         element.name === 'Pattern Fill Probe' &&
         element.kind === 'shape' &&
@@ -11575,10 +11596,20 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#aa5500' &&
       element.fill?.opacity === 0.65)
+    const exportAlphaModifierFillProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Alpha Modifier Fill Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#3366ff' &&
+      typeof element.fill?.opacity === 'number' &&
+      element.fill.opacity > 0.69 &&
+      element.fill.opacity < 0.71)
     const exportPatternFillProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Pattern Fill Probe' &&
       element.kind === 'shape' &&
       element.fill?.color === '#800080')
+    const activeAlphaModifierFillProbe = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Alpha Modifier Fill Probe"]',
+    )
     const exportShapeAutoFitProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Shape Autofit Probe' &&
       element.kind === 'textBox' &&
@@ -11852,6 +11883,11 @@ async function runExportScenario(page) {
       exportGradientFillProbeFill: exportGradientFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportGradientFillProbeModelCount: exportGradientFillProbeObjects.length,
       exportGradientFillProbeOpacity: exportGradientFillProbeObjects.map((element) => element.fill?.opacity ?? '').join(' | '),
+      exportHasAlphaModifierFillProbe: exportAlphaModifierFillProbeObjects.length > 0,
+      exportAlphaModifierFillProbeFill: exportAlphaModifierFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportAlphaModifierFillProbeModelCount: exportAlphaModifierFillProbeObjects.length,
+      exportAlphaModifierFillProbeOpacity: exportAlphaModifierFillProbeObjects.map((element) => element.fill?.opacity ?? '').join(' | '),
+      activeAlphaModifierFillProbeOpacity: activeAlphaModifierFillProbe?.getAttribute('data-ppt-fill-opacity') ?? '',
       exportHasPatternFillProbe: exportPatternFillProbeObjects.length > 0,
       exportPatternFillProbeFill: exportPatternFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPatternFillProbeModelCount: exportPatternFillProbeObjects.length,
@@ -12075,6 +12111,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportBackgroundImageModelCount > beforeOpenXmlPPTXDrop.backgroundImageModelCount &&
       openXmlPPTXImportState.exportHasGradientFillProbe &&
       openXmlPPTXImportState.exportGradientFillProbeModelCount > beforeOpenXmlPPTXDrop.gradientFillProbeModelCount &&
+      openXmlPPTXImportState.exportHasAlphaModifierFillProbe &&
+      openXmlPPTXImportState.exportAlphaModifierFillProbeModelCount > beforeOpenXmlPPTXDrop.alphaModifierFillProbeModelCount &&
+      Number(openXmlPPTXImportState.exportAlphaModifierFillProbeOpacity) > 0.69 &&
+      Number(openXmlPPTXImportState.exportAlphaModifierFillProbeOpacity) < 0.71 &&
       openXmlPPTXImportState.exportHasPatternFillProbe &&
       openXmlPPTXImportState.exportPatternFillProbeModelCount > beforeOpenXmlPPTXDrop.patternFillProbeModelCount &&
       openXmlPPTXImportState.exportHasShapeAutoFitProbe &&
@@ -33094,6 +33134,7 @@ async function addPPTXGradientPatternFillProbe(base64) {
 
   if (
     xml.includes('Gradient Fill Probe') &&
+    xml.includes('Alpha Modifier Fill Probe') &&
     xml.includes('Pattern Fill Probe')
   ) {
     return base64
@@ -33124,6 +33165,30 @@ async function addPPTXGradientPatternFillProbe(base64) {
         '</p:spPr>',
         '</p:sp>',
       ].join('')
+  const alphaModifierProbeXml = xml.includes('Alpha Modifier Fill Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9978" name="Alpha Modifier Fill Probe"/>',
+        '<p:cNvSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="8686800" y="5845800"/>',
+        '<a:ext cx="1371600" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '<a:solidFill>',
+        '<a:srgbClr val="3366FF">',
+        '<a:alphaMod val="60000"/>',
+        '<a:alphaOff val="10000"/>',
+        '</a:srgbClr>',
+        '</a:solidFill>',
+        '</p:spPr>',
+        '</p:sp>',
+      ].join('')
   const patternProbeXml = xml.includes('Pattern Fill Probe')
     ? ''
     : [
@@ -33148,7 +33213,7 @@ async function addPPTXGradientPatternFillProbe(base64) {
       ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${gradientProbeXml}${patternProbeXml}</p:spTree>`,
+    `${gradientProbeXml}${alphaModifierProbeXml}${patternProbeXml}</p:spTree>`,
   )
 
   if (nextXml === xml) {
@@ -34285,6 +34350,66 @@ function readPPTXActiveSlideFrameState(page) {
       ),
     }
   })()`)
+}
+
+async function readPPTXAlphaModifierFillProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === 'Alpha Modifier Fill Probe' &&
+        element.kind === 'shape'))
+    const probes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === 'Alpha Modifier Fill Probe' &&
+        element.kind === 'shape')
+    const probe = probes[0] ?? null
+
+    return {
+      fill: probe?.fill?.color ?? '',
+      modelCount: probes.length,
+      opacity: Number(probe?.fill?.opacity ?? 0),
+      slideId: probeSlide?.id ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeProbe = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Alpha Modifier Fill Probe"]',
+    )
+
+    return {
+      activeFillOpacity: Number(activeProbe?.getAttribute('data-ppt-fill-opacity') ?? 0),
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
 }
 
 function waitForPPTXActiveSlideFrameFit(page) {

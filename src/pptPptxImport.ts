@@ -5524,10 +5524,53 @@ function hasPPTXNoFill(container: Element | null) {
 }
 
 function readPPTXAlphaOpacity(solidFill: Element) {
-  const alpha = getFirstPPTXDescendantByLocalName(solidFill, 'alpha')
-  const value = toPPTXPositiveNumber(alpha?.getAttribute('val'))
+  const transforms = getPPTXAlphaTransformElements(solidFill)
 
-  return value === null ? null : Math.max(0, Math.min(1, value / 100_000))
+  if (transforms.length === 0) {
+    return null
+  }
+
+  let opacity = 1
+  let hasTransform = false
+
+  for (const transform of transforms) {
+    const value = transform.localName === 'alphaModFix'
+      ? toPPTXPositiveNumber(transform.getAttribute('amt'))
+      : toPPTXNumber(transform.getAttribute('val'))
+
+    if (value === null) {
+      continue
+    }
+
+    const ratio = value / 100_000
+
+    if (transform.localName === 'alpha') {
+      opacity = ratio
+      hasTransform = true
+    } else if (
+      transform.localName === 'alphaMod' ||
+      transform.localName === 'alphaModFix'
+    ) {
+      opacity *= ratio
+      hasTransform = true
+    } else if (transform.localName === 'alphaOff') {
+      opacity += ratio
+      hasTransform = true
+    }
+
+    opacity = Math.max(0, Math.min(1, opacity))
+  }
+
+  return hasTransform ? opacity : null
+}
+
+function getPPTXAlphaTransformElements(root: Element) {
+  return Array.from(root.getElementsByTagName('*'))
+    .filter((element) =>
+      element.localName === 'alpha' ||
+      element.localName === 'alphaMod' ||
+      element.localName === 'alphaModFix' ||
+      element.localName === 'alphaOff')
 }
 
 function readPPTXImageOpacity(blip: Element | null) {
