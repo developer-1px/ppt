@@ -3798,7 +3798,24 @@ async function readPPTXShapeImageFillElement({
   })
 
   if (!source) {
-    return null
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource
+      ? createPPTXUnsupportedImagePlaceholderElement({
+          element: sp,
+          geometry,
+          id: createPPTXImportedElementId(slideIndex, objectIndex),
+          name: readPPTXObjectName(sp, `Image ${objectIndex}`),
+          relationships,
+          shadow,
+          source: missingSource,
+          spPr,
+        })
+      : null
   }
 
   const name = readPPTXObjectName(sp, `Image ${objectIndex}`)

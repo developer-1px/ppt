@@ -366,6 +366,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXShapeImageFillProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXMissingShapeImageFillProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXUnsupportedImageProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXMissingImageProbe(openXmlPPTXBase64)
 
@@ -421,6 +422,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXPictureClipShapeProbeState(page)
   const openXmlPPTXShapeImageFillState =
     await readPPTXShapeImageFillProbeState(page)
+  const openXmlPPTXMissingShapeImageFillState =
+    await readPPTXMissingShapeImageFillProbeState(page)
   const openXmlPPTXRunHyperlinkState =
     await readPPTXRunHyperlinkProbeState(page)
   const openXmlPPTXSlideMetadataState =
@@ -664,6 +667,27 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXShapeImageFillState,
+    },
+  )
+
+  record(
+    'renders missing OpenXML PPTX shape image-fill relationships as placeholder shapes',
+    openXmlPPTXMissingShapeImageFillState.modelCount === 1 &&
+      openXmlPPTXMissingShapeImageFillState.imageModelCount === 0 &&
+      openXmlPPTXMissingShapeImageFillState.kind === 'shape' &&
+      openXmlPPTXMissingShapeImageFillState.geometry?.x === 940 &&
+      openXmlPPTXMissingShapeImageFillState.geometry?.y === 448 &&
+      openXmlPPTXMissingShapeImageFillState.geometry?.w === 180 &&
+      openXmlPPTXMissingShapeImageFillState.geometry?.h === 120 &&
+      openXmlPPTXMissingShapeImageFillState.text.includes('Unsupported image') &&
+      openXmlPPTXMissingShapeImageFillState.text.includes('missing-shape-image-fill-probe.png') &&
+      openXmlPPTXMissingShapeImageFillState.text.includes('image/png') &&
+      openXmlPPTXMissingShapeImageFillState.activeExists &&
+      openXmlPPTXMissingShapeImageFillState.activeKind === 'shape' &&
+      !openXmlPPTXMissingShapeImageFillState.activeHasImage,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXMissingShapeImageFillState,
     },
   )
 
@@ -35321,6 +35345,73 @@ async function addPPTXShapeImageFillProbe(base64) {
   })
 }
 
+async function addPPTXMissingShapeImageFillProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/missing-shape-image-fill-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Missing Shape Image Fill Probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const shapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="10120" name="Missing Shape Image Fill Probe" descr="Missing shape image fill alt"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8953500" y="4267200"/>',
+    '<a:ext cx="1714500" cy="1143000"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '<a:ln w="28575"><a:solidFill><a:srgbClr val="64748B"/></a:solidFill><a:prstDash val="dash"/></a:ln>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p/>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${shapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXCommentsProbe(base64) {
   if (!base64) {
     return ''
@@ -38349,6 +38440,74 @@ function readPPTXShapeImageFillProbeState(page) {
       strokeWidth: Number(image?.stroke?.width ?? 0),
     }
   })()`)
+}
+
+async function readPPTXMissingShapeImageFillProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const readElementText = (element) => (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+      .map((run) => run.text ?? '')
+      .join('\\n')
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const importedSlides = (deck?.slides ?? []).filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const importedElements = importedSlides.flatMap((slide) =>
+      (slide.elements ?? []).map((element) => ({ element, slide })))
+    const placeholders = importedElements.filter(({ element }) =>
+      element.name === 'Missing Shape Image Fill Probe' &&
+      element.kind === 'shape')
+    const images = importedElements.filter(({ element }) =>
+      element.name === 'Missing Shape Image Fill Probe' &&
+      element.kind === 'image')
+    const placeholderEntry = placeholders[0] ?? null
+    const placeholder = placeholderEntry?.element ?? null
+    const slide = placeholderEntry?.slide ?? null
+
+    return {
+      geometry: placeholder?.geometry ?? null,
+      imageModelCount: images.length,
+      kind: placeholder?.kind ?? '',
+      modelCount: placeholders.length,
+      slideId: slide?.id ?? '',
+      text: readElementText(placeholder),
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeElement = document.querySelector('.ppt-slide [data-ppt-element-name="Missing Shape Image Fill Probe"]')
+
+    return {
+      activeExists: !!activeElement,
+      activeHasImage: !!activeElement?.querySelector('img'),
+      activeKind: activeElement?.getAttribute('data-kind') ?? '',
+      activeText: activeElement?.textContent ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
 }
 
 function readPPTXRunHyperlinkProbeState(page) {
