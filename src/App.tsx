@@ -866,10 +866,12 @@ import {
 import {
   exportPPTDeckPPTXBlob,
   getPPTDeckPPTXFilename,
+  PPTX_MIME_TYPE,
 } from './pptPptxExport'
 import {
   canImportPPTDeckPPTXFromDataTransfer,
   getPPTDeckPPTXFileFromDataTransfer,
+  getPPTDeckPPTXFileFromList,
   importPPTDeckFromPPTXBlob,
   type PPTDeckPPTXImportResult,
 } from './pptPptxImport'
@@ -4454,6 +4456,7 @@ function App() {
     stageRef.current = element
     canvasStageElement.mount.ref(element)
   }, [canvasStageElement.mount])
+  const pptxInputRef = useRef<HTMLInputElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
   const findInputRef = useRef<HTMLInputElement | null>(null)
   const {
@@ -10668,6 +10671,16 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     event.target.value = ''
   }
 
+  function handlePPTXInputChange(event: ReactChangeEvent<HTMLInputElement>) {
+    const file = getPPTDeckPPTXFileFromList(event.target.files)
+
+    if (file) {
+      void importPPTDeckPPTXFile(file)
+    }
+
+    event.target.value = ''
+  }
+
   function deleteSelection() {
     if (!commandAvailability.delete) {
       return
@@ -14579,6 +14592,11 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     shortcut: PPT_SHORTCUT_HELP_SHORTCUT,
     title: 'Keyboard shortcuts',
   }, {
+    id: 'file:open-pptx',
+    onSelect: () => pptxInputRef.current?.click(),
+    section: 'File',
+    title: 'Open PPTX',
+  }, {
     disabled: !commandAvailability.undo,
     id: 'command:undo',
     onSelect: undo,
@@ -15578,6 +15596,18 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           <span className="ppt-zoom-label">{Math.round(viewport.scale * 100)}%</span>
         </div>
         <div className="ppt-toolbar-group">
+          <input
+            accept={`${PPTX_MIME_TYPE},.pptx`}
+            className="ppt-file-input"
+            data-ppt-open-pptx-input
+            ref={pptxInputRef}
+            tabIndex={-1}
+            type="file"
+            onChange={handlePPTXInputChange}
+          />
+          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Open PPTX" className="ppt-button" data-ppt-open-pptx onClick={() => pptxInputRef.current?.click()} type="button">
+            <FilePlus2 size={16} /> PPTX
+          </button>
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
             <Copy size={16} /> HTML
           </button>

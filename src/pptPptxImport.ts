@@ -295,6 +295,10 @@ export function getPPTDeckPPTXFileFromDataTransfer(
   return getPPTDeckPPTXFilesFromDataTransfer(dataTransfer)[0] ?? null
 }
 
+export function getPPTDeckPPTXFileFromList(files: FileList | null) {
+  return getPPTDeckPPTXFilesFromList(files)[0] ?? null
+}
+
 export function canImportPPTDeckPPTXFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
@@ -305,8 +309,11 @@ export function canImportPPTDeckPPTXFromDataTransfer(
 function getPPTDeckPPTXFilesFromDataTransfer(
   dataTransfer: DataTransfer | null,
 ) {
-  return Array.from(dataTransfer?.files ?? [])
-    .filter(isPPTDeckPPTXFile)
+  return getPPTDeckPPTXFilesFromList(dataTransfer?.files ?? null)
+}
+
+function getPPTDeckPPTXFilesFromList(files: FileList | null) {
+  return Array.from(files ?? []).filter(isPPTDeckPPTXFile)
 }
 
 function hasPPTDeckPPTXItem(dataTransfer: DataTransfer | null) {

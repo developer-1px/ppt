@@ -149,6 +149,8 @@ async function runFirstScreenScenario(page) {
     elementCount: document.querySelectorAll('[data-ppt-element]').length,
     selectedCount: document.querySelectorAll('[data-selected="true"]').length,
     hasPPTLabel: document.querySelector('.ppt-brand strong')?.textContent === 'PPT',
+    hasPPTXOpenButton: !!document.querySelector('[data-ppt-open-pptx]'),
+    hasPPTXOpenInput: document.querySelector('[data-ppt-open-pptx-input]')?.getAttribute('accept')?.includes('.pptx') === true,
     hasRetouchShell: !!document.querySelector('.retouch-app, .slide-canvas'),
     hasStarterCopy: document.body.textContent.includes('React + TypeScript + Vite'),
     hasCanvasItemLeak: document.body.textContent.includes('CanvasItem'),
@@ -159,6 +161,7 @@ async function runFirstScreenScenario(page) {
   record('renders PPT elements', state.elementCount >= 5, state)
   record('has one selected element initially', state.selectedCount === 1, state)
   record('uses PPT label', state.hasPPTLabel, state)
+  record('exposes PPTX file viewer open control', state.hasPPTXOpenButton && state.hasPPTXOpenInput, state)
   record('removes old retouch shell', !state.hasRetouchShell, state)
   record('removes Vite starter copy', !state.hasStarterCopy, state)
   record('does not expose CanvasItem as product text', !state.hasCanvasItemLeak, state)
