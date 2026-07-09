@@ -13175,7 +13175,7 @@ async function runExportScenario(page) {
   })()`)
 
   record(
-    'drops PPTX shape blipFill as image fallback through OpenXML import',
+    'drops PPTX shape blipFill with empty text body as image fallback through OpenXML import',
     shapeImageFillPPTXImportState.model === 'ppt-deck-pptx-import' &&
       shapeImageFillPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       shapeImageFillPPTXImportState.fileName === 'external-openxml-shape-image-fill.pptx' &&
@@ -31983,6 +31983,11 @@ async function addPPTXShapeImageFillProbe(base64) {
     '<a:stretch><a:fillRect/></a:stretch>',
     '</a:blipFill>',
     '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p/>',
+    '</p:txBody>',
     '</p:sp>',
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${shapeXml}</p:spTree>`)

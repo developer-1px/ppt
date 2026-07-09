@@ -2570,12 +2570,13 @@ async function readPPTXShapeElement(
   const geometry = readPPTXElementGeometry(spPr) ??
     readPPTXPlaceholderGeometry(sp, placeholderGeometries)
   const textBody = readPPTXTextBody(txBody, themeColors, fallbackTxBody)
+  const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
-  const imageFill = !textBody && geometry
+  const imageFill = !hasTextContent && geometry
     ? await readPPTXShapeImageFillElement({
         geometry,
         objectIndex,
@@ -4430,6 +4431,11 @@ function readPPTXTextBody(
     paragraph.runs.some((run) => run.text.length > 0))
 
   return hasText || paragraphs.length > 0 ? { paragraphs } : null
+}
+
+function hasPPTXTextBodyText(textBody: PPTTextBody | null) {
+  return textBody?.paragraphs.some((paragraph) =>
+    paragraph.runs.some((run) => run.text.length > 0)) === true
 }
 
 function readPPTXPlainTextBody(root: Document | Element) {
