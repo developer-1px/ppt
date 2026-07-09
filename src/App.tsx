@@ -35975,6 +35975,9 @@ function SlideThumb({
             data-ppt-image-adjustment-grayscale={element.kind === 'image' && element.adjustments?.grayscale === true
               ? 'true'
               : undefined}
+            data-ppt-image-clip-shape={element.kind === 'image'
+              ? element.clipShape
+              : undefined}
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
@@ -36061,6 +36064,7 @@ function SlideThumb({
               backgroundSize: element.kind === 'image'
                 ? getPPTImageFit(element)
                 : undefined,
+              ...getPPTThumbImageClipShapeStyle(element),
               height: `${(element.geometry.h / slideSize.h) * 100}%`,
               fontFamily: isPPTTextElement(element)
                 ? getPPTTextFontFamilyCSS(getPPTTextElementStyle(element).fontFamily)
@@ -36436,6 +36440,9 @@ function PPTElementView({
         : undefined}
       data-ppt-image-adjustment-grayscale={element.kind === 'image' && element.adjustments?.grayscale === true
         ? 'true'
+        : undefined}
+      data-ppt-image-clip-shape={element.kind === 'image'
+        ? element.clipShape
         : undefined}
       data-ppt-image-fit={element.kind === 'image'
         ? getPPTImageFit(element)
@@ -39820,11 +39827,17 @@ function pptElementStyle(element: PPTElement): CSSProperties {
   if (
     element.kind === 'comment' ||
     element.kind === 'freeform' ||
-    element.kind === 'image' ||
     element.kind === 'line' ||
     element.kind === 'table'
   ) {
     return base
+  }
+
+  if (element.kind === 'image') {
+    return {
+      ...base,
+      ...getPPTImageClipShapeStyle(element),
+    }
   }
 
   return {
@@ -40735,6 +40748,22 @@ function getPPTImageElementStyle(element: PPTImage) {
       ? { filter: getPPTImageAdjustmentsFilter(element) }
       : {}),
   }
+}
+
+function getPPTImageClipShapeStyle(element: PPTImage): CSSProperties {
+  if (element.clipShape === 'ellipse') {
+    return { borderRadius: '999px' }
+  }
+
+  if (element.clipShape === 'diamond') {
+    return { clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' }
+  }
+
+  return {}
+}
+
+function getPPTThumbImageClipShapeStyle(element: PPTElement): CSSProperties {
+  return element.kind === 'image' ? getPPTImageClipShapeStyle(element) : {}
 }
 
 function getPPTImageAdjustmentsFilter(element: PPTImage) {

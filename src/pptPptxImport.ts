@@ -3763,6 +3763,7 @@ async function readPPTXShapeImageFillElement({
   const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
   const opacity = readPPTXImageOpacity(blip)
   const adjustments = readPPTXImageAdjustments(blip)
+  const clipShape = readPPTXImageClipShape(spPr)
 
   if (!source.renderable) {
     return createPPTXUnsupportedImagePlaceholderElement({
@@ -3781,6 +3782,7 @@ async function readPPTXShapeImageFillElement({
     ...(accessibility ?? {}),
     ...(adjustments ? { adjustments } : {}),
     alt: altText || name,
+    ...(clipShape ? { clipShape } : {}),
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
     ...readPPTXElementFlip(spPr),
@@ -4347,6 +4349,7 @@ async function readPPTXPictureElement({
   const crop = readPPTXImageCrop(pic)
   const opacity = readPPTXImageOpacity(blip)
   const adjustments = readPPTXImageAdjustments(blip)
+  const clipShape = readPPTXImageClipShape(spPr)
   const shadow = readPPTXElementShadow(spPr, themeColors) ??
     readPPTXStyleShadow(style, themeColors, themeStyles)
 
@@ -4367,6 +4370,7 @@ async function readPPTXPictureElement({
     ...(accessibility ?? {}),
     ...(adjustments ? { adjustments } : {}),
     alt: altText || name,
+    ...(clipShape ? { clipShape } : {}),
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
     ...readPPTXElementFlip(spPr),
@@ -4853,6 +4857,14 @@ function readPPTXImageAdjustmentMultiplier(
   return multiplier === 1
     ? undefined
     : Math.round(multiplier * 1000) / 1000
+}
+
+function readPPTXImageClipShape(
+  spPr: Element | null,
+): PPTImage['clipShape'] | undefined {
+  const shape = readPPTXShapeKind(spPr)
+
+  return shape === 'ellipse' || shape === 'diamond' ? shape : undefined
 }
 
 async function readPPTXGraphicFrameElement({

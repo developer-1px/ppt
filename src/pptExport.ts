@@ -313,7 +313,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}"${getPPTImageCropRectHTMLAttrs(element)}${getPPTImageAdjustmentsHTMLAttrs(element)} alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}"${getPPTImageCropRectHTMLAttrs(element)}${getPPTImageAdjustmentsHTMLAttrs(element)}${getPPTImageClipShapeHTMLAttr(element)} alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`, getPPTImageClipShapeStyle(element)].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -408,16 +408,19 @@ function renderPPTImageSVG(element: PPTImage) {
     `data-ppt-image-crop-y="${formatNumber(crop.y)}"`,
     getPPTImageCropRectSVGAttrs(element),
     getPPTImageAdjustmentsSVGAttrs(element),
+    getPPTImageClipShapeSVGAttr(element),
   ].join(' ')
+  const clipShape = getPPTImageClipShape(element)
+  const shouldClip = Boolean(cropRect || clipShape)
 
-  if (cropRect) {
-    const clipId = `ppt-svg-image-crop-${escapeHtml(element.id)}`
-    const image = [
-      `<defs><clipPath id="${clipId}"><rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}"></rect></clipPath></defs>`,
-      `<image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x - element.geometry.w * cropRect.left / cropRect.visibleWidth)}" y="${formatNumber(element.geometry.y - element.geometry.h * cropRect.top / cropRect.visibleHeight)}" width="${formatNumber(element.geometry.w * 100 / cropRect.visibleWidth)}" height="${formatNumber(element.geometry.h * 100 / cropRect.visibleHeight)}" preserveAspectRatio="none"><title>${escapeHtml(getPPTImageAltText(element))}</title></image>`,
-    ].join('')
+  if (shouldClip) {
+    const clipId = `ppt-svg-image-clip-${escapeHtml(element.id)}`
+    const image = cropRect
+      ? `<image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x - element.geometry.w * cropRect.left / cropRect.visibleWidth)}" y="${formatNumber(element.geometry.y - element.geometry.h * cropRect.top / cropRect.visibleHeight)}" width="${formatNumber(element.geometry.w * 100 / cropRect.visibleWidth)}" height="${formatNumber(element.geometry.h * 100 / cropRect.visibleHeight)}" preserveAspectRatio="none"><title>${escapeHtml(getPPTImageAltText(element))}</title></image>`
+      : `<image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(getPPTImageAltText(element))}</title></image>`
+    const defs = `<defs><clipPath id="${clipId}">${renderPPTImageClipPathSVG(element)}</clipPath></defs>`
 
-    return `<g ${attrs} clip-path="url(#${clipId})">${image}</g>`
+    return `<g ${attrs} clip-path="url(#${clipId})">${defs}${image}</g>`
   }
 
   return `<g ${attrs}><image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(getPPTImageAltText(element))}</title></image></g>`
@@ -446,6 +449,55 @@ function getPPTImageAdjustmentsHTMLAttrs(element: PPTImage) {
 
 function getPPTImageAdjustmentsSVGAttrs(element: PPTImage) {
   return getPPTImageAdjustmentAttrEntries(element).join(' ')
+}
+
+function getPPTImageClipShapeHTMLAttr(element: PPTImage) {
+  return element.clipShape
+    ? ` data-ppt-image-clip-shape="${escapeHtml(element.clipShape)}"`
+    : ''
+}
+
+function getPPTImageClipShapeSVGAttr(element: PPTImage) {
+  return element.clipShape
+    ? `data-ppt-image-clip-shape="${escapeHtml(element.clipShape)}"`
+    : ''
+}
+
+function getPPTImageClipShapeStyle(element: PPTImage) {
+  if (element.clipShape === 'ellipse') {
+    return 'border-radius:999px'
+  }
+
+  if (element.clipShape === 'diamond') {
+    return 'clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)'
+  }
+
+  return ''
+}
+
+function getPPTImageClipShape(element: PPTImage) {
+  return element.clipShape === 'ellipse' || element.clipShape === 'diamond'
+    ? element.clipShape
+    : undefined
+}
+
+function renderPPTImageClipPathSVG(element: PPTImage) {
+  const shape = getPPTImageClipShape(element)
+
+  if (shape === 'ellipse') {
+    return `<ellipse cx="${formatNumber(element.geometry.x + element.geometry.w / 2)}" cy="${formatNumber(element.geometry.y + element.geometry.h / 2)}" rx="${formatNumber(element.geometry.w / 2)}" ry="${formatNumber(element.geometry.h / 2)}"></ellipse>`
+  }
+
+  if (shape === 'diamond') {
+    const x = element.geometry.x
+    const y = element.geometry.y
+    const w = element.geometry.w
+    const h = element.geometry.h
+
+    return `<polygon points="${formatNumber(x + w / 2)},${formatNumber(y)} ${formatNumber(x + w)},${formatNumber(y + h / 2)} ${formatNumber(x + w / 2)},${formatNumber(y + h)} ${formatNumber(x)},${formatNumber(y + h / 2)}"></polygon>`
+  }
+
+  return `<rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}"></rect>`
 }
 
 function getPPTImageAdjustmentAttrEntries(element: PPTImage) {

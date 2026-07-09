@@ -125,6 +125,7 @@ const PPTImageAdjustmentsSchema = z.object({
   contrast: z.number().optional(),
   grayscale: z.boolean().optional(),
 })
+const PPTImageClipShapeSchema = z.enum(['ellipse', 'diamond'])
 
 const PPTElementBaseSchema = z.object({
   accessibility: PPTElementAccessibilitySchema.optional(),
@@ -163,6 +164,7 @@ const PPTShapeSchema = PPTElementBaseSchema.extend({
 const PPTImageSchema = PPTElementBaseSchema.extend({
   adjustments: PPTImageAdjustmentsSchema.optional(),
   alt: z.string(),
+  clipShape: PPTImageClipShapeSchema.optional(),
   crop: z.object({
     bottom: z.number().optional(),
     left: z.number().optional(),
@@ -307,6 +309,7 @@ export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
 export type PPTImageAdjustments = NonNullable<PPTImage['adjustments']>
+export type PPTImageClipShape = NonNullable<PPTImage['clipShape']>
 export type PPTImageCrop = NonNullable<PPTImage['crop']>
 export type PPTImageFit = NonNullable<PPTImage['fit']>
 export type PPTLine = z.infer<typeof PPTLineSchema>

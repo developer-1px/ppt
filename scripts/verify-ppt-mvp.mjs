@@ -355,6 +355,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXUnsupportedImageProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
@@ -405,6 +406,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXTextBodyRotationProbeState(page)
   const openXmlPPTXPresetGeometryFreeformState =
     await readPPTXPresetGeometryFreeformProbeState(page)
+  const openXmlPPTXPictureClipShapeState =
+    await readPPTXPictureClipShapeProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
 
@@ -534,6 +537,25 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXUnsupportedImageState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX picture preset geometry as image clip shape for viewer rendering',
+    openXmlPPTXPictureClipShapeState.modelCount === 2 &&
+      openXmlPPTXPictureClipShapeState.ellipseClipShape === 'ellipse' &&
+      openXmlPPTXPictureClipShapeState.diamondClipShape === 'diamond' &&
+      openXmlPPTXPictureClipShapeState.activeEllipseClipShape === 'ellipse' &&
+      openXmlPPTXPictureClipShapeState.activeDiamondClipShape === 'diamond' &&
+      openXmlPPTXPictureClipShapeState.activeEllipseHasImage &&
+      openXmlPPTXPictureClipShapeState.activeDiamondHasImage &&
+      openXmlPPTXPictureClipShapeState.activeEllipseBorderRadius === '999px' &&
+      openXmlPPTXPictureClipShapeState.activeDiamondClipPath.includes('polygon') &&
+      openXmlPPTXPictureClipShapeState.exportHasClipShapeMarkup &&
+      openXmlPPTXPictureClipShapeState.exportHasClipShapeModel,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXPictureClipShapeState,
     },
   )
 
@@ -35151,6 +35173,111 @@ async function addPPTXExternalImageProbe(base64) {
   })
 }
 
+async function addPPTXPictureClipShapeProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/pptx-picture-clip-shape-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Picture Clip Ellipse Probe')) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const pictureXml = [
+    createPPTXPictureClipShapeProbeXml({
+      geometry: {
+        cx: 1143000,
+        cy: 1143000,
+        x: 762000,
+        y: 4953000,
+      },
+      id: 10997,
+      name: 'Picture Clip Ellipse Probe',
+      preset: 'ellipse',
+      relationshipId,
+    }),
+    createPPTXPictureClipShapeProbeXml({
+      geometry: {
+        cx: 1143000,
+        cy: 1143000,
+        x: 2133600,
+        y: 4953000,
+      },
+      id: 10998,
+      name: 'Picture Clip Diamond Probe',
+      preset: 'diamond',
+      relationshipId,
+    }),
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXPictureClipShapeProbeXml({
+  geometry,
+  id,
+  name,
+  preset,
+  relationshipId,
+}) {
+  return [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    `<p:cNvPr id="${id}" name="${escapePPTXXmlAttribute(name)}" descr="${escapePPTXXmlAttribute(name)}"/>`,
+    '<p:cNvPicPr/>',
+    '<p:nvPr/>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    `<a:off x="${geometry.x}" y="${geometry.y}"/>`,
+    `<a:ext cx="${geometry.cx}" cy="${geometry.cy}"/>`,
+    '</a:xfrm>',
+    `<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>`,
+    '</p:spPr>',
+    '</p:pic>',
+  ].join('')
+}
+
 async function addPPTXUnsupportedImageProbe(base64) {
   if (!base64) {
     return ''
@@ -37747,6 +37874,55 @@ function readPPTXPresetGeometryFreeformProbeState(page) {
       expectedNamesLength: expectedNames.length,
       pointModes: freeformObjects.map((element) => element.pointMode ?? '').sort().join(' | '),
       presetModelCount: freeformObjects.length,
+    }
+  })()`)
+}
+
+function readPPTXPictureClipShapeProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const images = exportImportedElements.filter((element) =>
+      (element.name === 'Picture Clip Ellipse Probe' ||
+        element.name === 'Picture Clip Diamond Probe') &&
+      element.kind === 'image')
+    const ellipse = images.find((element) =>
+      element.name === 'Picture Clip Ellipse Probe')
+    const diamond = images.find((element) =>
+      element.name === 'Picture Clip Diamond Probe')
+    const activeEllipse = document.querySelector('.ppt-slide [data-ppt-element-name="Picture Clip Ellipse Probe"][data-kind="image"]')
+    const activeDiamond = document.querySelector('.ppt-slide [data-ppt-element-name="Picture Clip Diamond Probe"][data-kind="image"]')
+
+    return {
+      activeDiamondClipPath: activeDiamond?.style.clipPath ?? '',
+      activeDiamondClipShape: activeDiamond?.getAttribute('data-ppt-image-clip-shape') ?? '',
+      activeDiamondHasImage: !!activeDiamond?.querySelector('img'),
+      activeEllipseBorderRadius: activeEllipse?.style.borderRadius ?? '',
+      activeEllipseClipShape: activeEllipse?.getAttribute('data-ppt-image-clip-shape') ?? '',
+      activeEllipseHasImage: !!activeEllipse?.querySelector('img'),
+      diamondClipShape: diamond?.clipShape ?? '',
+      ellipseClipShape: ellipse?.clipShape ?? '',
+      exportHasClipShapeMarkup: exportCode.includes('data-ppt-image-clip-shape="ellipse"') &&
+        exportCode.includes('data-ppt-image-clip-shape="diamond"') &&
+        exportCode.includes('border-radius:999px') &&
+        exportCode.includes('clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)'),
+      exportHasClipShapeModel: exportCode.includes('"clipShape": "ellipse"') &&
+        exportCode.includes('"clipShape": "diamond"'),
+      modelCount: images.length,
     }
   })()`)
 }
