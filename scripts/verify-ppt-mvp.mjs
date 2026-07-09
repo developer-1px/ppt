@@ -11010,21 +11010,23 @@ async function runExportScenario(page) {
     await addPPTXTextAutoFitProbe(
       await addPPTXListStyleBulletProbe(
         await addPPTXParagraphDefaultRunStyleProbe(
-          await addPPTXBackgroundRefProbe(
-            await addPPTXThemeTypefaceProbe(
-              await addPPTXHyperlinkProbe(
-                await addPPTXImageOpacityProbe(
-                  await addPPTXElbowConnectorProbe(
-                    await addPPTXConnectedConnectorProbe(
-                      await addPPTXHiddenObjectProbe(
-                        await addPPTXNoFillShapeProbe(
-                          await addPPTXGradientPatternFillProbe(
-                            await addPPTXThemeColorProbe(
-                              await addPPTXPresetSystemColorProbe(
-                                await addPPTXUnevenTableProbe(
-                                  await addPPTXGroupedObjectProbe(
-                                    await reversePPTXPresentationSlideOrder(
-                                      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          await addPPTXBackgroundImageProbe(
+            await addPPTXBackgroundRefProbe(
+              await addPPTXThemeTypefaceProbe(
+                await addPPTXHyperlinkProbe(
+                  await addPPTXImageOpacityProbe(
+                    await addPPTXElbowConnectorProbe(
+                      await addPPTXConnectedConnectorProbe(
+                        await addPPTXHiddenObjectProbe(
+                          await addPPTXNoFillShapeProbe(
+                            await addPPTXGradientPatternFillProbe(
+                              await addPPTXThemeColorProbe(
+                                await addPPTXPresetSystemColorProbe(
+                                  await addPPTXUnevenTableProbe(
+                                    await addPPTXGroupedObjectProbe(
+                                      await reversePPTXPresentationSlideOrder(
+                                        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -11091,6 +11093,17 @@ async function runExportScenario(page) {
         element.stroke?.color === '#203040').length,
       backgroundRefSlideModelCount: slides.filter((slide) =>
         slide.background?.color === '#e6fffa').length,
+      backgroundImageModelCount: elements.filter((element) =>
+        element.name === 'Background Image' &&
+        element.kind === 'image' &&
+        element.locked === true &&
+        element.fit === 'cover' &&
+        element.geometry?.x === 0 &&
+        element.geometry?.y === 0 &&
+        element.geometry?.w === 1280 &&
+        element.geometry?.h === 720 &&
+        typeof element.src === 'string' &&
+        element.src.startsWith('data:image/')).length,
       gradientFillProbeModelCount: elements.filter((element) =>
         element.name === 'Gradient Fill Probe' &&
         element.kind === 'shape' &&
@@ -11240,6 +11253,17 @@ async function runExportScenario(page) {
     const exportElements = exportSlides.flatMap((slide) => slide.elements ?? [])
     const exportImportedElements = exportImportedSlides.flatMap((slide) =>
       slide.elements ?? [])
+    const exportBackgroundImageObjects = exportImportedElements.filter((element) =>
+      element.name === 'Background Image' &&
+      element.kind === 'image' &&
+      element.locked === true &&
+      element.fit === 'cover' &&
+      element.geometry?.x === 0 &&
+      element.geometry?.y === 0 &&
+      element.geometry?.w === 1280 &&
+      element.geometry?.h === 720 &&
+      typeof element.src === 'string' &&
+      element.src.startsWith('data:image/'))
     const exportAnimatedObjects = exportElements.filter((element) =>
       element.animation && element.animation.type !== 'none')
     const exportImportedAnimatedObjects = exportImportedElements.filter((element) =>
@@ -11504,6 +11528,10 @@ async function runExportScenario(page) {
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
       exportBackgroundRefSlideModelCount: exportBackgroundRefSlides.length,
+      exportHasBackgroundImage: exportBackgroundImageObjects.length > 0,
+      exportBackgroundImageFits: exportBackgroundImageObjects.map((element) => element.fit ?? '').join(' | '),
+      exportBackgroundImageModelCount: exportBackgroundImageObjects.length,
+      exportBackgroundImageNames: exportBackgroundImageObjects.map((element) => element.name).join(' | '),
       exportHasGradientFillProbe: exportGradientFillProbeObjects.length > 0,
       exportGradientFillProbeFill: exportGradientFillProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportGradientFillProbeModelCount: exportGradientFillProbeObjects.length,
@@ -11706,6 +11734,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportThemeColorProbeModelCount > beforeOpenXmlPPTXDrop.themeColorProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundRefSlide &&
       openXmlPPTXImportState.exportBackgroundRefSlideModelCount > beforeOpenXmlPPTXDrop.backgroundRefSlideModelCount &&
+      openXmlPPTXImportState.exportHasBackgroundImage &&
+      openXmlPPTXImportState.exportBackgroundImageModelCount > beforeOpenXmlPPTXDrop.backgroundImageModelCount &&
       openXmlPPTXImportState.exportHasGradientFillProbe &&
       openXmlPPTXImportState.exportGradientFillProbeModelCount > beforeOpenXmlPPTXDrop.gradientFillProbeModelCount &&
       openXmlPPTXImportState.exportHasPatternFillProbe &&
@@ -28056,12 +28086,72 @@ async function addPPTXExternalRelationship({
   return relationshipId
 }
 
+async function addPPTXInternalRelationship({
+  sourcePath,
+  target,
+  type,
+  zip,
+}) {
+  const relsPath = getPPTXRelationshipsPath(sourcePath)
+  const existingXml = await readPPTXZipText(zip, relsPath)
+  const xml = existingXml || [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    '</Relationships>',
+  ].join('')
+  const existingRelationship = [...xml.matchAll(/<Relationship\b[^>]*\/>/g)]
+    .map((match) => match[0])
+    .find((relationshipXml) =>
+      relationshipXml.includes(`Target="${escapePPTXXmlAttribute(target)}"`) &&
+      relationshipXml.includes(`Type="${escapePPTXXmlAttribute(type)}"`) &&
+      !relationshipXml.includes('TargetMode="External"'))
+  const existingId = existingRelationship?.match(/\bId="([^"]+)"/)?.[1]
+
+  if (existingId) {
+    return existingId
+  }
+
+  const relationshipId = getNextPPTXRelationshipId(xml)
+  const relationshipXml = [
+    `<Relationship Id="${relationshipId}"`,
+    ` Type="${escapePPTXXmlAttribute(type)}"`,
+    ` Target="${escapePPTXXmlAttribute(target)}"/>`,
+  ].join('')
+
+  zip.file(
+    relsPath,
+    xml.replace('</Relationships>', `${relationshipXml}</Relationships>`),
+  )
+
+  return relationshipId
+}
+
 function getPPTXRelationshipsPath(sourcePath) {
   const parts = sourcePath.split('/')
   const fileName = parts.pop()
   const directory = parts.join('/')
 
   return `${directory}/_rels/${fileName}.rels`
+}
+
+function getPPTXRelativeTarget(sourcePath, targetPath) {
+  const sourceParts = sourcePath.split('/')
+  const targetParts = targetPath.split('/')
+
+  sourceParts.pop()
+  while (
+    sourceParts.length > 0 &&
+    targetParts.length > 0 &&
+    sourceParts[0] === targetParts[0]
+  ) {
+    sourceParts.shift()
+    targetParts.shift()
+  }
+
+  return [
+    ...sourceParts.map(() => '..'),
+    ...targetParts,
+  ].join('/')
 }
 
 function getNextPPTXRelationshipId(xml) {
@@ -28085,6 +28175,22 @@ function escapePPTXXmlText(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+}
+
+async function ensurePPTXDefaultContentType(zip, extension, contentType) {
+  const path = '[Content_Types].xml'
+  const xml = await readPPTXZipText(zip, path)
+
+  if (!xml || xml.includes(`Extension="${extension}"`)) {
+    return
+  }
+
+  const defaultXml = [
+    `<Default Extension="${escapePPTXXmlAttribute(extension)}"`,
+    ` ContentType="${escapePPTXXmlAttribute(contentType)}"/>`,
+  ].join('')
+
+  zip.file(path, xml.replace('</Types>', `${defaultXml}</Types>`))
 }
 
 async function addPPTXNoFillShapeProbe(base64) {
@@ -28576,6 +28682,71 @@ async function addPPTXBackgroundRefProbe(base64) {
   if (nextXml !== xml) {
     zip.file(slidePath, nextXml)
   }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXBackgroundImageProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const mediaPath = 'ppt/media/pptx-background-image-probe.png'
+
+  if (slidePaths.length < 2) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  const slidePath = slidePaths[1]
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('pptx-background-image-probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const backgroundImageXml = [
+    '<p:bg>',
+    '<p:bgPr>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="88000"/></a:blip>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '<a:effectLst/>',
+    '</p:bgPr>',
+    '</p:bg>',
+  ].join('')
+  const markerComment = '<!-- pptx-background-image-probe -->'
+  const nextXml = /<p:bg>[\s\S]*?<\/p:bg>/.test(xml)
+    ? xml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, `${markerComment}${backgroundImageXml}`)
+    : xml.replace(/(<p:cSld\b[^>]*>)/, `$1${markerComment}${backgroundImageXml}`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
 
   return await zip.generateAsync({
     compression: 'DEFLATE',

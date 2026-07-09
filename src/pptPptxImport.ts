@@ -266,6 +266,7 @@ async function importPPTDeckFromOpenXmlZip(
     readPPTXOpenXmlSlide({
       index,
       path,
+      size,
       themeColors,
       themeFonts,
       zip,
@@ -522,12 +523,14 @@ function resolvePPTXThemeSchemeColors(
 async function readPPTXOpenXmlSlide({
   index,
   path,
+  size,
   themeColors,
   themeFonts,
   zip,
 }: {
   index: number
   path: string
+  size: PPTDeck['size']
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
   zip: JSZip
@@ -548,6 +551,14 @@ async function readPPTXOpenXmlSlide({
   const elements: PPTElement[] = []
   const elementIdByPptxObjectId = new Map<string, string>()
   const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
+  const backgroundImage = await readPPTXSlideBackgroundImage({
+    cSld,
+    index,
+    relationships,
+    slidePath: path,
+    size,
+    zip,
+  })
   let objectIndex = 1
 
   for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
@@ -607,7 +618,7 @@ async function readPPTXOpenXmlSlide({
       readPPTXSlideBackgroundFromXml(xml, themeColors) ?? {
         background: { color: PPTX_DEFAULT_FILL_COLOR },
       }),
-    elements: animatedElements,
+    elements: backgroundImage ? [backgroundImage, ...animatedElements] : animatedElements,
     id: `pptx-slide-${index + 1}`,
     name: readPPTXSlideName(cSld, index, xml),
     ...(notes ? { notes } : {}),
@@ -855,6 +866,65 @@ function readPPTXBackgroundRefFill(
   themeColors: PPTXThemeColorMap,
 ): PPTFill | null {
   return readPPTXColorFill(bgRef, themeColors)
+}
+
+async function readPPTXSlideBackgroundImage({
+  cSld,
+  index,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  cSld: Element | null
+  index: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTImage | null> {
+  const background = cSld
+    ? getDirectPPTXChildByLocalName(cSld, 'bg')
+    : null
+  const bgPr = getDirectPPTXChildByLocalName(background, 'bgPr') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr') : null)
+  const blipFill = getDirectPPTXChildByLocalName(bgPr, 'blipFill') ??
+    getFirstPPTXDescendantByLocalName(bgPr, 'blipFill')
+  const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
+  const mediaPath = readPPTXPictureMediaPath({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const media = mediaPath ? zip.file(mediaPath) : null
+
+  if (!mediaPath || !media) {
+    return null
+  }
+
+  const base64 = await media.async('base64')
+  const crop = readPPTXImageCrop(blipFill ?? bgPr ?? background ?? cSld)
+  const mimeType = getPPTXMediaMimeType(mediaPath)
+  const opacity = readPPTXImageOpacity(blip)
+
+  return {
+    alt: 'Slide background image',
+    ...(crop ? { crop } : {}),
+    fit: 'cover',
+    geometry: {
+      h: size.h,
+      w: size.w,
+      x: 0,
+      y: 0,
+    },
+    id: `pptx-slide-${index + 1}-background-image`,
+    kind: 'image',
+    locked: true,
+    name: 'Background Image',
+    ...(opacity === null ? {} : { opacity }),
+    src: `data:${mimeType};base64,${base64}`,
+  }
 }
 
 function readPPTXSlideTransition(
@@ -1575,7 +1645,7 @@ function readPPTXEmbedRelationshipId(element: Element | null) {
     null
 }
 
-function readPPTXImageCrop(pic: Element): PPTImage['crop'] | null {
+function readPPTXImageCrop(pic: Element | null): PPTImage['crop'] | null {
   const srcRect = getFirstPPTXDescendantByLocalName(pic, 'srcRect')
 
   if (!srcRect) {
