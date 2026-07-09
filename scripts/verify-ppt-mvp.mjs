@@ -12487,6 +12487,150 @@ async function runExportScenario(page) {
     },
   )
 
+  const shapeImageFillPPTXBase64 = await addPPTXShapeImageFillProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeShapeImageFillPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      shapeImageFillModelCount: elements.filter((element) =>
+        element.name === 'Shape Image Fill Probe' &&
+        element.kind === 'image').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-shape-image-fill.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(shapeImageFillPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const shapeImageFillPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeImage = document.querySelector('.ppt-slide [data-ppt-element-name="Shape Image Fill Probe"][data-kind="image"]')
+    const img = activeImage?.querySelector('img')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const shapeImages = exportImportedElements.filter((element) =>
+      element.name === 'Shape Image Fill Probe' &&
+      element.kind === 'image')
+    const shapeImage = shapeImages[0] ?? null
+
+    return {
+      activeCropX: activeImage?.getAttribute('data-ppt-image-crop-x') ?? '',
+      activeCropY: activeImage?.getAttribute('data-ppt-image-crop-y') ?? '',
+      activeFit: activeImage?.getAttribute('data-ppt-image-fit') ?? '',
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeOpacity: activeImage?.getAttribute('data-ppt-opacity') ?? '',
+      activeSrcDataUri: img?.getAttribute('src')?.startsWith('data:image/png') === true,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      shapeImageAlt: shapeImage?.alt ?? '',
+      shapeImageCrop: shapeImage?.crop ?? null,
+      shapeImageFit: shapeImage?.fit ?? '',
+      shapeImageGeometry: shapeImage?.geometry ?? null,
+      shapeImageModelCount: shapeImages.length,
+      shapeImageOpacity: shapeImage?.opacity ?? null,
+      shapeImageSrcDataUri: shapeImage?.src?.startsWith('data:image/png') === true,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX shape blipFill as image fallback through OpenXML import',
+    shapeImageFillPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      shapeImageFillPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      shapeImageFillPPTXImportState.fileName === 'external-openxml-shape-image-fill.pptx' &&
+      shapeImageFillPPTXImportState.importedCount === beforeShapeImageFillPPTXDrop.slideCount &&
+      shapeImageFillPPTXImportState.sourceSlideCount === beforeShapeImageFillPPTXDrop.slideCount &&
+      shapeImageFillPPTXImportState.slideCount === beforeShapeImageFillPPTXDrop.slideCount * 2 &&
+      shapeImageFillPPTXImportState.activeName.includes('Copy') &&
+      shapeImageFillPPTXImportState.shapeImageModelCount >
+        beforeShapeImageFillPPTXDrop.shapeImageFillModelCount &&
+      shapeImageFillPPTXImportState.shapeImageModelCount === 1 &&
+      shapeImageFillPPTXImportState.shapeImageFit === 'cover' &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.x === 55 &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.y === 40 &&
+      shapeImageFillPPTXImportState.shapeImageGeometry?.x === 760 &&
+      shapeImageFillPPTXImportState.shapeImageGeometry?.y === 320 &&
+      shapeImageFillPPTXImportState.shapeImageGeometry?.w === 180 &&
+      shapeImageFillPPTXImportState.shapeImageGeometry?.h === 120 &&
+      shapeImageFillPPTXImportState.shapeImageOpacity === 0.66 &&
+      shapeImageFillPPTXImportState.shapeImageSrcDataUri &&
+      shapeImageFillPPTXImportState.shapeImageAlt === 'Shape image fill alt' &&
+      shapeImageFillPPTXImportState.activeFit === 'cover' &&
+      shapeImageFillPPTXImportState.activeCropX === '55' &&
+      shapeImageFillPPTXImportState.activeCropY === '40' &&
+      shapeImageFillPPTXImportState.activeOpacity === '0.66' &&
+      shapeImageFillPPTXImportState.activeSrcDataUri,
+    {
+      beforeShapeImageFillPPTXDrop,
+      shapeImageFillPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterShapeImageFillPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes shape image fill PPTX drop probes before export scenario continues',
+    afterShapeImageFillPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterShapeImageFillPPTXDropCleanup.slideCount === beforeShapeImageFillPPTXDrop.slideCount,
+    {
+      afterShapeImageFillPPTXDropCleanup,
+      beforeShapeImageFillPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -29953,6 +30097,77 @@ function createPPTXChartSeriesXml({ categories, index, name, values }) {
     '</c:val>',
     '</c:ser>',
   ].join('')
+}
+
+async function addPPTXShapeImageFillProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/pptx-shape-image-fill-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Shape Image Fill Probe')) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const shapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9985" name="Shape Image Fill Probe" descr="Shape image fill alt"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7239000" y="3048000"/>',
+    '<a:ext cx="1714500" cy="1143000"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="66000"/></a:blip>`,
+    '<a:srcRect l="10000" t="0" r="0" b="20000"/>',
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${shapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
 }
 
 async function addPPTXLayoutObjectProbe(base64) {

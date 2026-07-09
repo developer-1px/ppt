@@ -687,15 +687,17 @@ async function readPPTXOpenXmlSlide({
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
         ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
-        : readPPTXShapeElement(
+        : await readPPTXShapeElement(
           child,
           index,
           objectIndex,
           relationships,
+          path,
           themeColors,
           themeFonts,
           placeholderGeometries,
           placeholderTextBodies,
+          zip,
         )
     } else if (child.localName === 'cxnSp') {
       element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
@@ -1442,15 +1444,17 @@ async function readPPTXInheritedElement({
   if (child.localName === 'sp') {
     return isPPTXLineShape(child)
       ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
-      : readPPTXShapeElement(
+      : await readPPTXShapeElement(
         child,
         index,
         objectIndex,
         relationships,
+        path,
         themeColors,
         themeFonts,
         new Map(),
         new Map(),
+        zip,
       )
   }
 
@@ -2224,16 +2228,18 @@ function readPPTXLineOpacity(line: Element | null) {
   return opacity === null || opacity === 1 ? null : opacity
 }
 
-function readPPTXShapeElement(
+async function readPPTXShapeElement(
   sp: Element,
   slideIndex: number,
   objectIndex: number,
   relationships: PPTXRelationshipMap,
+  slidePath: string,
   themeColors: PPTXThemeColorMap,
   themeFonts: PPTXThemeFontMap,
   placeholderGeometries: PPTXPlaceholderGeometryMap,
   placeholderTextBodies: PPTXPlaceholderTextBodyMap,
-): PPTElement | null {
+  zip: JSZip,
+): Promise<PPTElement | null> {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
@@ -2245,14 +2251,35 @@ function readPPTXShapeElement(
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
+  const imageFill = !textBody && geometry
+    ? await readPPTXShapeImageFillElement({
+        geometry,
+        objectIndex,
+        relationships,
+        slideIndex,
+        slidePath,
+        sp,
+        spPr,
+        themeColors,
+        zip,
+      })
+    : null
 
-  if (!geometry || (!textBody && !hasPaint)) {
+  if (!geometry || (!textBody && !hasPaint && !imageFill)) {
     return null
   }
 
   const id = createPPTXImportedElementId(slideIndex, objectIndex)
   const name = readPPTXObjectName(sp, `Object ${objectIndex}`)
   const isTextBox = isPPTXTextBoxShape(sp) || (textBody !== null && !hasPaint)
+
+  if (imageFill) {
+    return {
+      ...imageFill,
+      id,
+      name,
+    }
+  }
 
   if (!textBody) {
     const freeform = readPPTXCustomGeometryFreeformElement({
@@ -2326,6 +2353,69 @@ function readPPTXShapeElement(
     name,
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
+  }
+}
+
+async function readPPTXShapeImageFillElement({
+  geometry,
+  objectIndex,
+  relationships,
+  slideIndex,
+  slidePath,
+  sp,
+  spPr,
+  themeColors,
+  zip,
+}: {
+  geometry: PPTGeometry
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slideIndex: number
+  slidePath: string
+  sp: Element
+  spPr: Element | null
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTImage | null> {
+  const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
+  const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
+  const mediaPath = readPPTXPictureMediaPath({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const media = mediaPath ? zip.file(mediaPath) : null
+
+  if (!mediaPath || !media) {
+    return null
+  }
+
+  const base64 = await media.async('base64')
+  const mimeType = getPPTXMediaMimeType(mediaPath)
+  const name = readPPTXObjectName(sp, `Image ${objectIndex}`)
+  const altText = readPPTXObjectDescription(sp)
+  const accessibility = readPPTXElementAccessibility(sp)
+  const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
+  const opacity = readPPTXImageOpacity(blip)
+  const shadow = readPPTXElementShadow(spPr, themeColors)
+
+  return {
+    ...(accessibility ?? {}),
+    alt: altText || name,
+    ...(crop ? { crop } : {}),
+    fit: crop ? 'cover' : 'contain',
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'image',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    ...(opacity === null ? {} : { opacity }),
+    ...(shadow ? { shadow } : {}),
+    src: `data:${mimeType};base64,${base64}`,
   }
 }
 
