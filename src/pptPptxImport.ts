@@ -7228,7 +7228,14 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
     return 'dot'
   }
 
-  return value === 'dash' || value === 'lgDash' || value === 'sysDash'
+  return value === 'dash' ||
+    value === 'dashDot' ||
+    value === 'lgDash' ||
+    value === 'lgDashDot' ||
+    value === 'lgDashDotDot' ||
+    value === 'sysDash' ||
+    value === 'sysDashDot' ||
+    value === 'sysDashDotDot'
     ? 'dash'
     : undefined
 }

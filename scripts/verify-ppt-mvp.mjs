@@ -11963,6 +11963,10 @@ async function runExportScenario(page) {
         element.name === 'Dot Line Probe' &&
         element.kind === 'line' &&
         element.stroke?.dash === 'dot').length,
+      openXmlDashDotLineProbeModelCount: elements.filter((element) =>
+        element.name === 'Dash Dot Line Probe' &&
+        element.kind === 'line' &&
+        element.stroke?.dash === 'dash').length,
       roundRectProbeModelCount: elements.filter((element) =>
         element.name === 'Round Rect Probe' &&
         element.kind === 'shape' &&
@@ -12316,6 +12320,10 @@ async function runExportScenario(page) {
       element.name === 'Dot Line Probe' &&
       element.kind === 'line' &&
       element.stroke?.dash === 'dot')
+    const exportDashDotLineProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Dash Dot Line Probe' &&
+      element.kind === 'line' &&
+      element.stroke?.dash === 'dash')
     const exportElbowConnectorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Elbow Connector Probe' &&
       element.kind === 'line' &&
@@ -12645,6 +12653,9 @@ async function runExportScenario(page) {
       exportOpenXmlDashProbeStrokeDash: exportNoFillShapeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportOpenXmlDotLineProbeModelCount: exportDotLineProbeObjects.length,
       exportOpenXmlDotLineProbeStrokeDash: exportDotLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
+      exportHasOpenXmlDashDotLineProbe: exportDashDotLineProbeObjects.length > 0,
+      exportOpenXmlDashDotLineProbeModelCount: exportDashDotLineProbeObjects.length,
+      exportOpenXmlDashDotLineProbeStrokeDash: exportDashDotLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportHasElbowConnectorProbe: exportElbowConnectorProbeObjects.length > 0,
       exportElbowConnectorProbeModelCount: exportElbowConnectorProbeObjects.length,
       exportElbowConnectorProbeRoutes: exportElbowConnectorProbeObjects.map((element) => element.route ?? '').join(' | '),
@@ -12846,6 +12857,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportOpenXmlDashProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashProbeModelCount &&
       openXmlPPTXImportState.exportHasOpenXmlDotLineProbe &&
       openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
+      openXmlPPTXImportState.exportHasOpenXmlDashDotLineProbe &&
+      openXmlPPTXImportState.exportOpenXmlDashDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDashDotLineProbeModelCount &&
       openXmlPPTXImportState.exportHasElbowConnectorProbe &&
       openXmlPPTXImportState.exportElbowConnectorProbeModelCount > beforeOpenXmlPPTXDrop.elbowConnectorProbeModelCount &&
       openXmlPPTXImportState.exportHasShapeElbowConnectorProbe &&
@@ -31943,6 +31956,26 @@ async function addPPTXNoFillShapeProbe(base64) {
     '</p:spPr>',
     '</p:cxnSp>',
   ].join('')
+  const dashDotProbeLineXml = [
+    '<p:cxnSp>',
+    '<p:nvCxnSpPr>',
+    '<p:cNvPr id="9962" name="Dash Dot Line Probe"/>',
+    '<p:cNvCxnSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvCxnSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7315200" y="6172200"/>',
+    '<a:ext cx="1371600" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="line"><a:avLst/></a:prstGeom>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="F97316"/></a:solidFill>',
+    '<a:prstDash val="dashDot"/>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:cxnSp>',
+  ].join('')
   const roundRectProbeXml = [
     '<p:sp>',
     '<p:nvSpPr>',
@@ -31989,7 +32022,7 @@ async function addPPTXNoFillShapeProbe(base64) {
   ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${probeShapeXml}${probeLineXml}${roundRectProbeXml}${colorModifierProbeXml}</p:spTree>`,
+    `${probeShapeXml}${probeLineXml}${dashDotProbeLineXml}${roundRectProbeXml}${colorModifierProbeXml}</p:spTree>`,
   )
 
   if (nextXml === xml) {
