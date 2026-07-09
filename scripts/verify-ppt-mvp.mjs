@@ -355,6 +355,12 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXHyperlinkProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXSlideMetadataProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXChartTableProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXDiagramTextProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXOleObjectProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXMediaObjectProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXContentPartProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXUnsupportedGraphicFrameProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
@@ -417,6 +423,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXRunHyperlinkProbeState(page)
   const openXmlPPTXSlideMetadataState =
     await readPPTXSlideMetadataProbeState(page)
+  const openXmlPPTXGraphicFallbackState =
+    await readPPTXGraphicFallbackProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
 
@@ -642,6 +650,37 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXSlideMetadataState,
+    },
+  )
+
+  record(
+    'renders OpenXML PPTX graphicFrame and media fallbacks in viewer',
+    openXmlPPTXGraphicFallbackState.chartTableModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.chartTableActiveKind === 'table' &&
+      openXmlPPTXGraphicFallbackState.chartTableText.includes('Revenue') &&
+      openXmlPPTXGraphicFallbackState.chartTableText.includes('North') &&
+      openXmlPPTXGraphicFallbackState.diagramTextModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.diagramActiveKind === 'textBox' &&
+      openXmlPPTXGraphicFallbackState.diagramText.includes('Discover') &&
+      openXmlPPTXGraphicFallbackState.diagramText.includes('Deliver') &&
+      openXmlPPTXGraphicFallbackState.oleImageModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.oleActiveKind === 'image' &&
+      openXmlPPTXGraphicFallbackState.oleActiveHasImage &&
+      openXmlPPTXGraphicFallbackState.mediaShapeModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.mediaActiveKind === 'shape' &&
+      openXmlPPTXGraphicFallbackState.mediaText.includes('Video Media Probe') &&
+      openXmlPPTXGraphicFallbackState.mediaText.includes('pptx-media-probe.mp4') &&
+      openXmlPPTXGraphicFallbackState.contentPartModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.contentPartActiveKind === 'shape' &&
+      openXmlPPTXGraphicFallbackState.contentPartText.includes('Content Part Probe') &&
+      openXmlPPTXGraphicFallbackState.contentPartText.includes('content-part-probe.xml') &&
+      openXmlPPTXGraphicFallbackState.unsupportedGraphicFrameModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.unsupportedGraphicFrameActiveKind === 'shape' &&
+      openXmlPPTXGraphicFallbackState.unsupportedGraphicFrameText.includes('Unsupported Graphic Frame Probe') &&
+      openXmlPPTXGraphicFallbackState.unsupportedGraphicFrameText.includes('unsupported-graphic-frame-probe.xml'),
+    {
+      openXmlPPTXGraphicFallbackState,
+      openXmlPPTXImportState,
     },
   )
 
@@ -38221,6 +38260,68 @@ function readPPTXSlideMetadataProbeState(page) {
       modelCount: probeSlides.length,
       probeHidden: probeSlide?.hidden === true ? 'true' : '',
       probeSectionName: probeSlide?.sectionName ?? '',
+    }
+  })()`)
+}
+
+function readPPTXGraphicFallbackProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const importedSlides = (deck?.slides ?? []).filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const elements = importedSlides.flatMap((slide) => slide.elements ?? [])
+    const byName = (name, kind) => elements.filter((element) =>
+      element.name === name && element.kind === kind)
+    const activeElement = (name) =>
+      document.querySelector(\`.ppt-slide [data-ppt-element-name="\${name}"]\`)
+    const chartTable = byName('Chart Table Probe', 'table')
+    const diagramText = byName('SmartArt Text Probe', 'textBox')
+    const oleImage = byName('OLE Object Probe', 'image')
+    const mediaShape = byName('Video Media Probe', 'shape')
+    const contentPartShape = byName('Content Part Probe', 'shape')
+    const unsupportedGraphicFrameShape =
+      byName('Unsupported Graphic Frame Probe', 'shape')
+    const activeChartTable = activeElement('Chart Table Probe')
+    const activeDiagram = activeElement('SmartArt Text Probe')
+    const activeOle = activeElement('OLE Object Probe')
+    const activeMedia = activeElement('Video Media Probe')
+    const activeContentPart = activeElement('Content Part Probe')
+    const activeUnsupportedGraphicFrame =
+      activeElement('Unsupported Graphic Frame Probe')
+    const oleImageSource =
+      activeOle?.querySelector('img')?.getAttribute('src') ?? ''
+
+    return {
+      chartTableActiveKind: activeChartTable?.getAttribute('data-kind') ?? '',
+      chartTableModelCount: chartTable.length,
+      chartTableText: activeChartTable?.textContent ?? '',
+      contentPartActiveKind: activeContentPart?.getAttribute('data-kind') ?? '',
+      contentPartModelCount: contentPartShape.length,
+      contentPartText: activeContentPart?.textContent ?? '',
+      diagramActiveKind: activeDiagram?.getAttribute('data-kind') ?? '',
+      diagramText: activeDiagram?.textContent ?? '',
+      diagramTextModelCount: diagramText.length,
+      mediaActiveKind: activeMedia?.getAttribute('data-kind') ?? '',
+      mediaShapeModelCount: mediaShape.length,
+      mediaText: activeMedia?.textContent ?? '',
+      oleActiveHasImage: oleImageSource.startsWith('data:image/png'),
+      oleActiveKind: activeOle?.getAttribute('data-kind') ?? '',
+      oleImageModelCount: oleImage.length,
+      unsupportedGraphicFrameActiveKind:
+        activeUnsupportedGraphicFrame?.getAttribute('data-kind') ?? '',
+      unsupportedGraphicFrameModelCount: unsupportedGraphicFrameShape.length,
+      unsupportedGraphicFrameText:
+        activeUnsupportedGraphicFrame?.textContent ?? '',
     }
   })()`)
 }
