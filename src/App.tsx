@@ -320,7 +320,7 @@ import {
   SLIDE_EDIT_TEXT_FRAME_INSET_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
-  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_KEYS as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS,
+  SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_KEYS as SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS,
   SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_KEYBOARD_MODEL as PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_MODEL,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_BULLET_SHORTCUT_INTENT,
@@ -742,12 +742,12 @@ import {
   getPPTCanvasTableInsertCenter,
   getPPTCanvasTabsKeyboardIntent,
   getPPTCanvasTextPasteInsertPosition,
+  getPPTCanvasTextPasteSourceText,
   getPPTCanvasWorldClientPoint,
   handlePPTCanvasRadioGroupKeyDown,
   insertPPTInlineEditText,
   isPPTCanvasControlTarget,
   isPPTCanvasKeyboardCommandIntent,
-  isPPTCanvasKeyboardToolIntent,
   isPPTCanvasKeyboardTypingTarget,
   isPPTCanvasKeyboardViewportIntent,
   isPPTCanvasTargetWithinSelector,
@@ -777,7 +777,6 @@ import {
   routePPTCanvasTextPasteReplace,
   runPPTCanvasDataTransferImportActionPlan,
   runPPTCanvasKeyboardCommandIntent,
-  runPPTCanvasKeyboardToolIntent,
   runPPTCanvasKeyboardViewportIntent,
   runPPTCanvasWheelViewport,
   schedulePPTCanvasAnimationFrameTask,
@@ -966,6 +965,8 @@ const PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS = new Set([
 ])
 const PPT_RECENT_COLOR_LIMIT = 8
 const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right', 'justify'] as const
+const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
+  `${SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS} Cmd/Ctrl+J`
 const PPT_SLIDE_RAIL_HIT_TARGET_PADDING = 6
 const PPT_SLIDE_RAIL_THUMB_GAP = 8
 const PPT_SLIDE_RAIL_THUMB_HEIGHT = 86
@@ -3239,7 +3240,7 @@ type PPTStyleClipboard = {
   categories: readonly PPTStyleClipboardCategory[]
   object: {
     opacity: number
-    shadow: PPTElementShadow | null
+    shadow?: PPTElementShadow | null
   }
   paragraph?: PPTStyleClipboardParagraph
   shape?: {
@@ -4121,6 +4122,11 @@ type PPTFindMatch = {
   start: number
 }
 
+type PPTDeckHistoryEntry = {
+  deck: PPTDeck
+  selection: string[]
+}
+
 type PPTTextRunStyle = Omit<PPTRun, 'text'>
 type PPTTextToken = {
   align?: PPTParagraph['align']
@@ -4448,8 +4454,8 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [recentColors, setRecentColors] = useState<string[]>([])
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
-  const [past, setPast] = useState<PPTDeck[]>([])
-  const [future, setFuture] = useState<PPTDeck[]>([])
+  const [past, setPast] = useState<PPTDeckHistoryEntry[]>([])
+  const [future, setFuture] = useState<PPTDeckHistoryEntry[]>([])
   const stageRef = useRef<HTMLDivElement | null>(null)
   const canvasStageElement = usePPTCanvasStageElement()
   const setPPTStageElementRef = useCallback((element: HTMLDivElement | null) => {
@@ -4468,10 +4474,25 @@ function App() {
   const clipboardPastePositionMemoryRef = useRef<PPTClipboardPastePositionMemory | null>(null)
   const resizeHandleClickMemoryRef = useRef<PPTCanvasPointerClickMemory>(null)
   const deckRef = useRef(deck)
+  const selectionRef = useRef(selection)
+  const pastRef = useRef(past)
+  const futureRef = useRef(future)
 
   useEffect(() => {
     deckRef.current = deck
   }, [deck])
+
+  useEffect(() => {
+    selectionRef.current = selection
+  }, [selection])
+
+  useEffect(() => {
+    pastRef.current = past
+  }, [past])
+
+  useEffect(() => {
+    futureRef.current = future
+  }, [future])
 
   useEffect(() => {
     globalThis.window?.dispatchEvent(new Event('ppt-ready'))
@@ -4931,6 +4952,14 @@ function App() {
         return
       }
 
+      const earlyToolShortcutIntent = getPPTToolShortcutIntent(event)
+
+      if (earlyToolShortcutIntent) {
+        activatePPTToolShortcut(earlyToolShortcutIntent.tool)
+        event.preventDefault()
+        return
+      }
+
       if (commandPaletteOpen) {
         return
       }
@@ -5067,7 +5096,7 @@ function App() {
       }
 
       const textParagraphAlignKeyboardIntent =
-        getSlideEditTextParagraphAlignKeyboardIntent({
+        getPPTTextParagraphAlignKeyboardIntent({
           altKey: event.altKey,
           key: event.key,
           mod,
@@ -5223,19 +5252,6 @@ function App() {
           cycleObjectSelection(selectionCycleIntent)
           return
         }
-      }
-
-      const toolShortcutIntent = getPPTToolShortcutIntent(event)
-
-      if (toolShortcutIntent && isPPTCanvasKeyboardToolIntent(toolShortcutIntent)) {
-        runPPTCanvasKeyboardToolIntent({
-          handlers: {
-            setTool: activatePPTToolShortcut,
-          },
-          intent: toolShortcutIntent,
-        })
-        event.preventDefault()
-        return
       }
 
       const deckNavigationKeyboardIntent = getSlideEditDeckNavigationKeyboardIntent({
@@ -5763,8 +5779,19 @@ function App() {
         return current
       }
 
-      setPast((history) => [...history.slice(-79), current])
+      const nextPast = [
+        ...pastRef.current.slice(-79),
+        {
+          deck: current,
+          selection: [...selectionRef.current],
+        },
+      ]
+
+      pastRef.current = nextPast
+      futureRef.current = []
+      setPast(nextPast)
       setFuture([])
+      deckRef.current = next
 
       return next
     })
@@ -6010,33 +6037,59 @@ function App() {
   }
 
   function undo() {
-    setPast((history) => {
-      const previous = history.at(-1)
+    const previous = pastRef.current.at(-1)
 
-      if (!previous) {
-        return history
-      }
+    if (!previous) {
+      return
+    }
 
-      setFuture((items) => [deckRef.current, ...items])
-      setDeck(previous)
+    const currentDeck = deckRef.current
+    const currentSelection = [...selectionRef.current]
+    const nextPast = pastRef.current.slice(0, -1)
+    const nextFuture = [
+      {
+        deck: currentDeck,
+        selection: currentSelection,
+      },
+      ...futureRef.current,
+    ]
 
-      return history.slice(0, -1)
-    })
+    pastRef.current = nextPast
+    futureRef.current = nextFuture
+    deckRef.current = previous.deck
+    selectionRef.current = [...previous.selection]
+    setPast(nextPast)
+    setFuture(nextFuture)
+    setDeck(previous.deck)
+    setSelection([...previous.selection])
   }
 
   function redo() {
-    setFuture((items) => {
-      const next = items[0]
+    const next = futureRef.current[0]
 
-      if (!next) {
-        return items
-      }
+    if (!next) {
+      return
+    }
 
-      setPast((history) => [...history, deckRef.current])
-      setDeck(next)
+    const currentDeck = deckRef.current
+    const currentSelection = [...selectionRef.current]
+    const nextPast = [
+      ...pastRef.current,
+      {
+        deck: currentDeck,
+        selection: currentSelection,
+      },
+    ]
+    const nextFuture = futureRef.current.slice(1)
 
-      return items.slice(1)
-    })
+    pastRef.current = nextPast
+    futureRef.current = nextFuture
+    deckRef.current = next.deck
+    selectionRef.current = [...next.selection]
+    setPast(nextPast)
+    setFuture(nextFuture)
+    setDeck(next.deck)
+    setSelection([...next.selection])
   }
 
   function selectSlide(slideId: string) {
@@ -7178,7 +7231,7 @@ function App() {
         shadow: source.object.shadow === undefined
           ? hasPPTElementShadow(sourceElement)
             ? clonePPTElementShadow(getPPTElementShadow(sourceElement))
-            : null
+            : undefined
           : source.object.shadow
             ? clonePPTElementShadow(source.object.shadow)
             : null,
@@ -9908,6 +9961,18 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     setSlideContextMenu(null)
   }
 
+  function selectPPTCreationTool(tool: PPTCreationTool) {
+    setCreationTool(tool)
+    setLineCreationMode(null)
+    setIsPanToolActive(false)
+    setIsLaserToolActive(false)
+    setLaserTrailPoints([])
+    setIsEraserToolActive(false)
+    setEditingId(null)
+    setContextMenu(null)
+    setSlideContextMenu(null)
+  }
+
   function activateLineCreationMode(mode: LineCreationMode) {
     setLineCreationMode((current) => current === mode ? null : mode)
     setCreationTool(null)
@@ -9966,12 +10031,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         activateLineCreationMode('arrow')
         return true
       case 'comment':
-        activatePPTCreationTool({ kind: 'comment' })
+        selectPPTCreationTool({ kind: 'comment' })
         return true
       case 'diamond':
       case 'ellipse':
       case 'rect':
-        activatePPTCreationTool({ kind: 'shape', shape: tool })
+        selectPPTCreationTool({ kind: 'shape', shape: tool })
         return true
       case 'eraser':
         activateEraserTool()
@@ -9979,7 +10044,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       case 'highlight':
       case 'marker':
       case 'pen':
-        activatePPTCreationTool({ kind: 'freeform', tool })
+        selectPPTCreationTool({ kind: 'freeform', tool })
         return true
       case 'laser':
         activateLaserTool()
@@ -9988,16 +10053,16 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         activatePanTool()
         return true
       case 'section':
-        activatePPTCreationTool({ kind: 'section' })
+        selectPPTCreationTool({ kind: 'section' })
         return true
       case 'select':
         activateSelectTool()
         return true
       case 'sticky':
-        activatePPTCreationTool({ kind: 'sticky' })
+        selectPPTCreationTool({ kind: 'sticky' })
         return true
       case 'text':
-        activatePPTCreationTool({ kind: 'text' })
+        selectPPTCreationTool({ kind: 'text' })
         return true
       default:
         return false
@@ -10788,6 +10853,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
 
     setStyleClipboardPaintSession(null)
     setLastStyleClipboardPaintEffect(effect)
+    focusStageShell()
   }
 
   function applyStyleClipboardToElements(
@@ -10869,6 +10935,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     setIsLaserToolActive(false)
     setLaserTrailPoints([])
     setIsEraserToolActive(false)
+    focusStageShell()
   }
 
   function pasteFormatting() {
@@ -12843,11 +12910,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
   }
 
   async function downloadPPTX() {
-    const blob = await exportPPTDeckPPTXBlob(deck)
+    const currentDeck = deckRef.current
+    const blob = await exportPPTDeckPPTXBlob(currentDeck)
 
     downloadPPTCanvasBlobFile({
       blob,
-      filename: getPPTDeckPPTXFilename(deck),
+      filename: getPPTDeckPPTXFilename(currentDeck),
       revokeDelayMs: 5000,
     })
   }
@@ -14438,7 +14506,17 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       historyDeck &&
       JSON.stringify(deckRef.current) !== JSON.stringify(historyDeck)
     ) {
-      setPast((history) => [...history.slice(-79), historyDeck])
+      const nextPast = [
+        ...pastRef.current.slice(-79),
+        {
+          deck: historyDeck,
+          selection: getPPTInteractionHistorySelection(interaction),
+        },
+      ]
+
+      pastRef.current = nextPast
+      futureRef.current = []
+      setPast(nextPast)
       setFuture([])
     }
 
@@ -14529,6 +14607,33 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     }
 
     return current.startDeck
+  }
+
+  function getPPTInteractionHistorySelection(current: Interaction) {
+    switch (current.kind) {
+      case 'move':
+        return [
+          ...(current.historySelection ??
+            current.duplicateOnDrag?.sourceSelection ??
+            current.selection),
+        ]
+      case 'resize':
+      case 'rotate':
+        return [...current.selection]
+      case 'line-endpoint':
+      case 'line-route':
+        return [current.lineId]
+      case 'element-create':
+      case 'freeform-create':
+      case 'line-create':
+      case 'erase':
+        return []
+      case 'marquee':
+        return [...current.baseSelection]
+      case 'pan':
+      case 'laser':
+        return []
+    }
   }
 
   function zoom(direction: 'in' | 'out') {
@@ -18819,7 +18924,9 @@ function createPPTSlideNotesImportEffect({
     model: PPT_SLIDE_NOTES_IMPORT_MODEL,
     notesLength: source.notes.length,
     slideId: effect.selection.slideId,
-    textLength: source.textLength,
+    textLength: typeof (source as unknown as { textLength?: unknown }).textLength === 'number'
+      ? (source as unknown as { textLength: number }).textLength
+      : source.payloadLength,
   }
 }
 
@@ -35979,9 +36086,12 @@ function PPTElementView({
       return
     }
 
-    const pasteText = getPPTTextPasteSourcesFromDataTransfer(
+    const pasteSource = getPPTTextPasteSourcesFromDataTransfer(
       event.clipboardData,
     )[0]
+    const pasteText = pasteSource
+      ? getPPTCanvasTextPasteSourceText(pasteSource)
+      : ''
 
     if (!pasteText) {
       return
@@ -39608,6 +39718,38 @@ function isPPTCanvasStandardCommandIntentKind(kind: string) {
   return PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS.has(kind)
 }
 
+function getPPTTextParagraphAlignKeyboardIntent({
+  altKey,
+  key,
+  mod,
+  shiftKey,
+}: {
+  altKey: boolean
+  key: string
+  mod: boolean
+  shiftKey: boolean
+}) {
+  const intent = getSlideEditTextParagraphAlignKeyboardIntent({
+    altKey,
+    key,
+    mod,
+    shiftKey,
+  })
+
+  if (intent) {
+    return intent
+  }
+
+  return mod && !shiftKey && !altKey && key.toLowerCase() === 'j'
+    ? {
+        align: 'justify' as const,
+        intent: PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_INTENT,
+        preventDefault: true,
+        shortcut: 'Cmd/Ctrl+J',
+      }
+    : null
+}
+
 function noopPPTKeyboardCommandHandler() {}
 
 function getPPTAngleConstrainedLineEndpointPoint(
@@ -39825,7 +39967,7 @@ function createPPTStyleClipboard(element: PPTElement): PPTStyleClipboard | null 
       opacity: getPPTElementOpacity(element),
       shadow: hasPPTElementShadow(element)
         ? clonePPTElementShadow(getPPTElementShadow(element))
-        : null,
+        : undefined,
     },
     sourceId: element.id,
     sourceKind: element.kind,
@@ -40050,9 +40192,15 @@ function applyPPTStyleClipboardToElement(
       opacity: clipboard.object.opacity === 1
         ? undefined
         : clipboard.object.opacity,
-      shadow: clipboard.object.shadow
-        ? clonePPTElementShadow(clipboard.object.shadow)
-        : undefined,
+    }
+
+    if (clipboard.object.shadow !== undefined) {
+      next = {
+        ...next,
+        shadow: clipboard.object.shadow
+          ? clonePPTElementShadow(clipboard.object.shadow)
+          : undefined,
+      }
     }
   }
 
@@ -41259,11 +41407,59 @@ function getPPTToolShortcutIntent(event: KeyboardEvent): PPTCanvasKeyboardToolIn
     key: event.key.toLowerCase(),
   })
 
-  return tool
+  return isPPTCanvasToolShortcutTool(tool)
     ? {
         kind: 'set-tool',
         preventDefault: false,
         tool,
+      }
+    : getPPTToolShortcutFallbackIntent(event)
+}
+
+function isPPTCanvasToolShortcutTool(tool: unknown): tool is Tool {
+  return typeof tool === 'string' && (
+    tool === 'arrow' ||
+    tool === 'comment' ||
+    tool === 'diamond' ||
+    tool === 'ellipse' ||
+    tool === 'eraser' ||
+    tool === 'highlight' ||
+    tool === 'laser' ||
+    tool === 'marker' ||
+    tool === 'pan' ||
+    tool === 'pen' ||
+    tool === 'rect' ||
+    tool === 'section' ||
+    tool === 'select' ||
+    tool === 'sticky' ||
+    tool === 'text'
+  )
+}
+
+function getPPTToolShortcutFallbackIntent(
+  event: KeyboardEvent,
+): PPTCanvasKeyboardToolIntent | null {
+  const key = event.key.toLowerCase()
+  const shortcutToolByKey: Readonly<Partial<Record<string, Tool>>> = {
+    c: 'comment',
+    e: 'eraser',
+    h: 'pan',
+    l: 'arrow',
+    m: event.shiftKey ? 'highlight' : 'marker',
+    o: 'ellipse',
+    p: event.shiftKey ? 'pen' : 'laser',
+    r: 'rect',
+    s: event.shiftKey ? 'section' : 'sticky',
+    t: 'text',
+    v: 'select',
+  }
+  const fallbackTool = shortcutToolByKey[key]
+
+  return fallbackTool
+    ? {
+        kind: 'set-tool',
+        preventDefault: false,
+        tool: fallbackTool,
       }
     : null
 }

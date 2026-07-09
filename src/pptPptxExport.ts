@@ -79,6 +79,8 @@ const PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH = 'customXml/_rels/item1.xml.rels'
 const PPTX_MODEL_CUSTOM_XML_ITEM_ID =
   '{5B4D0724-5E4E-4F9A-9FD7-7B91A0712F8E}'
 const PPTX_FLY_IN_MOTION_PATH = 'M 0 0.25 L 0 0 E'
+const PPTX_EMUS_PER_PIXEL = 9_525
+const PPTX_ANGLE_UNITS_PER_DEGREE = 60_000
 const PPTX_DEFAULT_THEME_COLOR_SCHEME = Object.freeze({
   accent1: '#2563eb',
   accent2: '#0ea5e9',
@@ -230,6 +232,7 @@ function shouldPatchPPTXPackage(deck: PPTDeck) {
       hasPPTXFlippedElements(slide) ||
       hasPPTXLineConnections(slide) ||
       hasPPTXLockedElements(slide) ||
+      hasPPTXShadowedElements(slide) ||
       slide.elements.some((element) =>
         element.visible !== false &&
         Boolean(element.accessibility?.altText.trim())))
@@ -255,13 +258,16 @@ async function applyPPTXPackagePatches({
 
     const xml = await file.async('string')
     const nextXml = setPPTXElementLocksXml(
-      setPPTXLineConnectionXml(
-        setPPTXElementAccessibilityXml(
-          setPPTXElementFlipXml(
-            setPPTXSlideTimingXml(
-              setPPTXSlideTransitionXml(
-                setPPTXSlideNameXml(xml, slide),
-                createPPTXSlideTransitionXml(slide.transition),
+      setPPTXElementShadowXml(
+        setPPTXLineConnectionXml(
+          setPPTXElementAccessibilityXml(
+            setPPTXElementFlipXml(
+              setPPTXSlideTimingXml(
+                setPPTXSlideTransitionXml(
+                  setPPTXSlideNameXml(xml, slide),
+                  createPPTXSlideTransitionXml(slide.transition),
+                ),
+                slide,
               ),
               slide,
             ),
@@ -538,8 +544,18 @@ function hasPPTXLineConnections(slide: PPTSlide) {
     (element.startConnection !== undefined || element.endConnection !== undefined))
 }
 
+function hasPPTXShadowedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.shadow !== undefined)
+}
+
 function setPPTXLineConnectionXml(xml: string, slide: PPTSlide) {
-  const objectIdByElementId = getPPTXPatchObjectIdByElementId(xml, slide)
+  const objectIdsByName = getPPTXPatchObjectIdsByName(xml)
+  const objectIdByElementId = getPPTXPatchObjectIdByElementId(
+    objectIdsByName,
+    slide,
+  )
 
   if (objectIdByElementId.size === 0) {
     return xml
@@ -554,16 +570,31 @@ function setPPTXLineConnectionXml(xml: string, slide: PPTSlide) {
       return nextXml
     }
 
-    const objectId = objectIdByElementId.get(element.id)
+    return getPPTXLineConnectionPatchTargets(element).reduce(
+      (patchedXml, target) => {
+        const objectId = getSinglePPTXPatchObjectIdByName(
+          objectIdsByName,
+          target.objectName,
+        )
 
-    return objectId
-      ? setPPTXLineObjectConnectionXml(nextXml, objectId, element, objectIdByElementId)
-      : nextXml
+        return objectId
+          ? setPPTXLineObjectConnectionXml(
+            patchedXml,
+            objectId,
+            target.line,
+            objectIdByElementId,
+          )
+          : patchedXml
+      },
+      nextXml,
+    )
   }, xml)
 }
 
-function getPPTXPatchObjectIdByElementId(xml: string, slide: PPTSlide) {
-  const objectIdsByName = getPPTXPatchObjectIdsByName(xml)
+function getPPTXPatchObjectIdByElementId(
+  objectIdsByName: ReadonlyMap<string, readonly string[]>,
+  slide: PPTSlide,
+) {
   const objectIdByElementId = new Map<string, string>()
 
   for (const element of slide.elements) {
@@ -588,6 +619,28 @@ function getPPTXPatchObjectIdByElementId(xml: string, slide: PPTSlide) {
   }
 
   return objectIdByElementId
+}
+
+function getPPTXLineConnectionPatchTargets(line: PPTLine) {
+  if (line.route === 'elbow') {
+    return [
+      {
+        line: { ...line, endConnection: undefined },
+        objectName: getPPTXElbowRouteObjectName(line, 0),
+      },
+      {
+        line: { ...line, startConnection: undefined },
+        objectName: getPPTXElbowRouteObjectName(line, 2),
+      },
+    ].filter((target) =>
+      target.line.startConnection !== undefined ||
+      target.line.endConnection !== undefined)
+  }
+
+  return [{
+    line,
+    objectName: line.name,
+  }]
 }
 
 function getPPTXPatchObjectIdsByName(xml: string) {
@@ -633,12 +686,43 @@ function setPPTXLineObjectConnectionXml(
   objectIdByElementId: ReadonlyMap<string, string>,
 ) {
   return xml.replace(
-    /<p:cxnSp\b[\s\S]*?<\/p:cxnSp>/g,
-    (segment) =>
-      hasPPTXObjectIdXml(segment, objectId)
-        ? setPPTXConnectionShapeConnectionXml(segment, line, objectIdByElementId)
-        : segment,
+    /<p:(sp|cxnSp)\b[\s\S]*?<\/p:\1>/g,
+    (segment) => {
+      if (!hasPPTXObjectIdXml(segment, objectId)) {
+        return segment
+      }
+
+      return setPPTXConnectionShapeConnectionXml(
+        convertPPTXLineShapeToConnectionShapeXml(segment),
+        line,
+        objectIdByElementId,
+      )
+    },
   )
+}
+
+function convertPPTXLineShapeToConnectionShapeXml(segment: string) {
+  if (segment.startsWith('<p:cxnSp')) {
+    return segment
+  }
+
+  return segment
+    .replace(/^<p:sp\b/, '<p:cxnSp')
+    .replace(/<\/p:sp>$/, '</p:cxnSp>')
+    .replace('<p:nvSpPr>', '<p:nvCxnSpPr>')
+    .replace('</p:nvSpPr>', '</p:nvCxnSpPr>')
+    .replace(
+      /<p:cNvSpPr\b([^>]*)\/>/,
+      '<p:cNvCxnSpPr$1/>',
+    )
+    .replace(
+      /<p:cNvSpPr\b([^>]*)>([\s\S]*?)<\/p:cNvSpPr>/,
+      '<p:cNvCxnSpPr$1>$2</p:cNvCxnSpPr>',
+    )
+    .replace(
+      /<a:prstGeom\b[^>]*\bprst="line"[^>]*>/,
+      (tag) => setPPTXXmlTagAttribute(tag, 'prst', 'straightConnector1'),
+    )
 }
 
 function hasPPTXObjectIdXml(segment: string, objectId: string) {
@@ -821,10 +905,127 @@ function getPPTXElementObjectNames(element: PPTElement) {
   }
 
   if (element.kind === 'line' && element.route === 'elbow') {
-    return [`${element.name} route`]
+    return [0, 1, 2].map((index) =>
+      getPPTXElbowRouteObjectName(element, index))
   }
 
   return [element.name]
+}
+
+function getPPTXElbowRouteObjectName(element: PPTLine, index: number) {
+  return `${element.name} route ${index + 1}`
+}
+
+function setPPTXElementShadowXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false || element.shadow === undefined) {
+      return nextXml
+    }
+
+    const shadow = element.shadow
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectShadowXml(
+          patchedXml,
+          objectName,
+          shadow,
+          getPPTXElementOpacity(element),
+        ),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectShadowXml(
+  xml: string,
+  objectName: string,
+  shadow: PPTElementShadow,
+  opacity: number,
+) {
+  const outerShadowXml = createPPTXOuterShadowXml(shadow, opacity)
+
+  return replacePPTXObjectSegmentsByName(xml, objectName, (segment) =>
+    setPPTXObjectShadowSegmentXml(segment, outerShadowXml))
+}
+
+function replacePPTXObjectSegmentsByName(
+  xml: string,
+  objectName: string,
+  replace: (segment: string) => string,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+
+  return xml.replace(
+    /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g,
+    (segment) =>
+      hasPPTXObjectNameXml(segment, name)
+        ? replace(segment)
+        : segment,
+  )
+}
+
+function setPPTXObjectShadowSegmentXml(
+  segment: string,
+  outerShadowXml: string,
+) {
+  return segment.replace(
+    /<p:spPr\b[\s\S]*?<\/p:spPr>/,
+    (shapePropertiesXml) =>
+      setPPTXShapePropertiesShadowXml(shapePropertiesXml, outerShadowXml),
+  )
+}
+
+function setPPTXShapePropertiesShadowXml(
+  shapePropertiesXml: string,
+  outerShadowXml: string,
+) {
+  if (/<a:effectLst\b/.test(shapePropertiesXml)) {
+    return shapePropertiesXml.replace(
+      /<a:effectLst\b[^>]*(?:\/>|>[\s\S]*?<\/a:effectLst>)/,
+      (effectListXml) =>
+        setPPTXEffectListOuterShadowXml(effectListXml, outerShadowXml),
+    )
+  }
+
+  return shapePropertiesXml.replace(
+    '</p:spPr>',
+    `<a:effectLst>${outerShadowXml}</a:effectLst></p:spPr>`,
+  )
+}
+
+function setPPTXEffectListOuterShadowXml(
+  effectListXml: string,
+  outerShadowXml: string,
+) {
+  if (effectListXml.endsWith('/>')) {
+    return effectListXml.replace(/\/>$/, `>${outerShadowXml}</a:effectLst>`)
+  }
+
+  const withoutOuterShadow = effectListXml.replace(
+    /<a:outerShdw\b[\s\S]*?<\/a:outerShdw>/g,
+    '',
+  )
+
+  return withoutOuterShadow.replace(
+    '</a:effectLst>',
+    `${outerShadowXml}</a:effectLst>`,
+  )
+}
+
+function createPPTXOuterShadowXml(
+  shadow: PPTElementShadow,
+  opacity: number,
+) {
+  return [
+    `<a:outerShdw blurRad="${pxToEmu(shadow.blur)}" `,
+    `dist="${pxToEmu(shadow.distance)}" `,
+    `dir="${toPPTXAngle(shadow.angle)}" algn="ctr" rotWithShape="0">`,
+    `<a:srgbClr val="${toPPTXColor(shadow.color, '000000')}">`,
+    `<a:alpha val="${toPPTXAlpha(shadow.opacity * opacity)}"/>`,
+    '</a:srgbClr>',
+    '</a:outerShdw>',
+  ].join('')
 }
 
 function setPPTXElementLocksXml(xml: string, slide: PPTSlide) {
@@ -1578,7 +1779,7 @@ function addPPTXElbowRoute({
         endMarker: index === segments.length - 1 ? element.endMarker : undefined,
         startMarker: index === 0 ? element.startMarker : undefined,
       }, opacity),
-      objectName: `${element.name} route`,
+      objectName: getPPTXElbowRouteObjectName(element, index),
       w: pxToIn(segmentEnd.x - segmentStart.x),
       x: pxToIn(segmentStart.x),
       y: pxToIn(segmentStart.y),
@@ -2072,12 +2273,26 @@ function toPPTXTransparency(opacity: number) {
   return Math.round((1 - clamp(opacity, 0, 1)) * 100)
 }
 
+function toPPTXAlpha(opacity: number) {
+  return Math.round(clamp(opacity, 0, 1) * 100_000)
+}
+
+function toPPTXAngle(angle: number) {
+  const normalized = ((angle % 360) + 360) % 360
+
+  return Math.round(normalized * PPTX_ANGLE_UNITS_PER_DEGREE)
+}
+
 function pxToIn(value: number) {
   return value / PPTX_PIXELS_PER_INCH
 }
 
 function pxToPt(value: number) {
   return value * PPTX_POINTS_PER_PIXEL
+}
+
+function pxToEmu(value: number) {
+  return Math.round(value * PPTX_EMUS_PER_PIXEL)
 }
 
 function clamp(value: number, min: number, max: number) {
