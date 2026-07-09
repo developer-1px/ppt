@@ -93,6 +93,7 @@ type PPTXThemeColorMap = Readonly<Record<string, string>>
 type PPTXThemeFontMap = Readonly<Record<string, string>>
 type PPTXThemeLineStyle = Partial<PPTStroke>
 type PPTXThemeStyleMap = {
+  effectStyles: ReadonlyMap<number, Element>
   fillStyles: ReadonlyMap<number, Element>
   lineStyles: ReadonlyMap<number, PPTXThemeLineStyle>
 }
@@ -885,8 +886,18 @@ async function readPPTXOpenXmlThemeStyles(
     formatScheme,
     'lnStyleLst',
   )
+  const effectStyleList = getDirectPPTXChildByLocalName(
+    formatScheme,
+    'effectStyleLst',
+  )
+  const effectStyles = new Map<number, Element>()
   const fillStyles = readPPTXThemeFillStyles(formatScheme)
   const lineStyles = new Map<number, PPTXThemeLineStyle>()
+
+  readPPTXThemeEffectStyles(effectStyleList)
+    .forEach((effectStyle, index) => {
+      effectStyles.set(index + 1, effectStyle)
+    })
 
   getDirectPPTXChildrenByLocalName(lineStyleList, 'ln')
     .forEach((line, index) => {
@@ -897,7 +908,15 @@ async function readPPTXOpenXmlThemeStyles(
       }
     })
 
-  return { fillStyles, lineStyles }
+  return { effectStyles, fillStyles, lineStyles }
+}
+
+function readPPTXThemeEffectStyles(
+  effectStyleList: Element | null,
+): Element[] {
+  return effectStyleList
+    ? getPPTXDescendantsByLocalName(effectStyleList, 'effectStyle')
+    : []
 }
 
 function readPPTXThemeFillStyles(
@@ -2699,7 +2718,8 @@ function readPPTXLineElement(
   const stroke = readPPTXStroke(spPr, themeColors) ??
     readPPTXStyleStroke(style, themeColors, themeStyles)
   const opacity = readPPTXLineOpacity(line)
-  const shadow = readPPTXElementShadow(spPr, themeColors)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
   const lineGeometry = readPPTXLineGeometry(spPr)
 
   if (!stroke || !lineGeometry) {
@@ -2915,7 +2935,8 @@ async function readPPTXShapeElement(
     readPPTXStyleStroke(style, themeColors, themeStyles)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors) ??
     readPPTXStyleFill(style, themeColors, themeStyles)
-  const shadow = readPPTXElementShadow(spPr, themeColors)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
   const textStyle = textBody
@@ -4760,6 +4781,7 @@ function readPPTXElementFlip(container: Element | null) {
 function readPPTXElementShadow(
   container: Element | null,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTElementShadow | null {
   const outerShadow = getFirstPPTXDescendantByLocalName(container, 'outerShdw')
 
@@ -4772,7 +4794,7 @@ function readPPTXElementShadow(
   return {
     angle: direction === null ? 45 : normalizePPTXAngle(direction / 60_000),
     blur: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('blurRad')) ?? 0),
-    color: readPPTXColor(outerShadow, themeColors) ?? '#000000',
+    color: readPPTXColor(outerShadow, themeColors, placeholderColor) ?? '#000000',
     distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
     opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
   }
@@ -5696,6 +5718,28 @@ function readPPTXStyleStroke(
         width: styleStroke?.width ?? 1,
       }
     : undefined
+}
+
+function readPPTXStyleShadow(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTElementShadow | null {
+  const effectRef = getDirectPPTXChildByLocalName(style, 'effectRef')
+
+  if (effectRef?.getAttribute('idx') === '0') {
+    return null
+  }
+
+  const index = toPPTXPositiveNumber(effectRef?.getAttribute('idx'))
+  const effectStyle = index === null
+    ? null
+    : themeStyles.effectStyles.get(index)
+  const placeholderColor = effectRef
+    ? readPPTXColor(effectRef, themeColors)
+    : undefined
+
+  return readPPTXElementShadow(effectStyle ?? null, themeColors, placeholderColor)
 }
 
 function readPPTXStyleReferenceLineStyle(

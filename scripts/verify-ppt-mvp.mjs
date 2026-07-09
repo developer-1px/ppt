@@ -292,6 +292,7 @@ async function runPPTXRenderScenario(page) {
       ),
     ),
   )
+
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
   await dropPPTXFile(page, {
@@ -369,6 +370,29 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXStyleRefState.activeTextExists &&
       openXmlPPTXStyleRefState.activeTextFontFamily === 'Georgia' &&
       openXmlPPTXStyleRefState.activeTextRunColor === '#7c3aed',
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXStyleRefState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX style effect reference shadow for viewer rendering',
+    openXmlPPTXStyleRefState.effectCount === 1 &&
+      openXmlPPTXStyleRefState.effectShadowColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.effectShadowOpacity > 0.54 &&
+      openXmlPPTXStyleRefState.effectShadowOpacity < 0.56 &&
+      openXmlPPTXStyleRefState.effectShadowBlur === 6 &&
+      openXmlPPTXStyleRefState.effectShadowDistance === 4 &&
+      openXmlPPTXStyleRefState.effectShadowAngle === 45 &&
+      openXmlPPTXStyleRefState.activeEffectExists &&
+      openXmlPPTXStyleRefState.activeEffectShadowState === 'true' &&
+      openXmlPPTXStyleRefState.activeEffectShadowColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.activeEffectShadowOpacity > 0.54 &&
+      openXmlPPTXStyleRefState.activeEffectShadowOpacity < 0.56 &&
+      openXmlPPTXStyleRefState.activeEffectShadowBlur === 6 &&
+      openXmlPPTXStyleRefState.activeEffectShadowDistance === 4 &&
+      openXmlPPTXStyleRefState.activeEffectShadowAngle === 45,
     {
       openXmlPPTXImportState,
       openXmlPPTXStyleRefState,
@@ -11427,6 +11451,9 @@ async function runExportScenario(page) {
       styleRefLineProbeModelCount: elements.filter((element) =>
         element.name === 'Style Ref Line Probe' &&
         element.kind === 'line').length,
+      effectRefProbeModelCount: elements.filter((element) =>
+        element.name === 'Effect Ref Probe' &&
+        element.kind === 'shape').length,
       fontRefTextProbeModelCount: elements.filter((element) =>
         element.name === 'Font Ref Text Probe' &&
         element.style?.fontFamily === 'Georgia' &&
@@ -11678,6 +11705,15 @@ async function runExportScenario(page) {
       element.stroke?.color === '#9a3412' &&
       element.stroke?.dash === 'dash' &&
       element.stroke?.width === 4)
+    const exportEffectRefProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Effect Ref Probe' &&
+      element.kind === 'shape' &&
+      element.shadow?.color === '#7c3aed' &&
+      Number(element.shadow?.opacity ?? 0) > 0.54 &&
+      Number(element.shadow?.opacity ?? 0) < 0.56 &&
+      element.shadow?.blur === 6 &&
+      element.shadow?.distance === 4 &&
+      element.shadow?.angle === 45)
     const exportFontRefTextProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Font Ref Text Probe' &&
       element.kind === 'textBox' &&
@@ -11988,6 +12024,13 @@ async function runExportScenario(page) {
       exportStyleRefLineProbeModelCount: exportStyleRefLineProbeObjects.length,
       exportStyleRefLineProbeStroke: exportStyleRefLineProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportStyleRefLineProbeWidth: exportStyleRefLineProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
+      exportHasEffectRefProbe: exportEffectRefProbeObjects.length > 0,
+      exportEffectRefProbeModelCount: exportEffectRefProbeObjects.length,
+      exportEffectRefProbeShadowAngles: exportEffectRefProbeObjects.map((element) => element.shadow?.angle ?? '').join(' | '),
+      exportEffectRefProbeShadowBlurs: exportEffectRefProbeObjects.map((element) => element.shadow?.blur ?? '').join(' | '),
+      exportEffectRefProbeShadowColors: exportEffectRefProbeObjects.map((element) => element.shadow?.color ?? '').join(' | '),
+      exportEffectRefProbeShadowDistances: exportEffectRefProbeObjects.map((element) => element.shadow?.distance ?? '').join(' | '),
+      exportEffectRefProbeShadowOpacities: exportEffectRefProbeObjects.map((element) => element.shadow?.opacity ?? '').join(' | '),
       exportHasFontRefTextProbe: exportFontRefTextProbeObjects.length > 0,
       exportFontRefTextProbeModelCount: exportFontRefTextProbeObjects.length,
       exportFontRefTextProbeRunColor: exportFontRefTextProbeObjects.flatMap((element) =>
@@ -12236,6 +12279,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportStyleRefProbeModelCount > beforeOpenXmlPPTXDrop.styleRefProbeModelCount &&
       openXmlPPTXImportState.exportHasStyleRefLineProbe &&
       openXmlPPTXImportState.exportStyleRefLineProbeModelCount > beforeOpenXmlPPTXDrop.styleRefLineProbeModelCount &&
+      openXmlPPTXImportState.exportHasEffectRefProbe &&
+      openXmlPPTXImportState.exportEffectRefProbeModelCount > beforeOpenXmlPPTXDrop.effectRefProbeModelCount &&
       openXmlPPTXImportState.exportHasFontRefTextProbe &&
       openXmlPPTXImportState.exportFontRefTextProbeModelCount > beforeOpenXmlPPTXDrop.fontRefTextProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundRefSlide &&
@@ -31701,6 +31746,34 @@ function setPPTXThemeLineStyleXml(xml, index, lineXml) {
   ))
 }
 
+function setPPTXThemeEffectStyleXml(xml, index, effectXml) {
+  const effectStyleListMatch = xml.match(
+    /<a:effectStyleLst>[\s\S]*?<\/a:effectStyleLst>/,
+  )
+
+  if (!effectStyleListMatch) {
+    return xml
+  }
+
+  const effectStyleListXml = effectStyleListMatch[0]
+  const effectMatches = [
+    ...effectStyleListXml.matchAll(/<a:effectStyle\b[\s\S]*?<\/a:effectStyle>/g),
+  ]
+  const target = effectMatches[index - 1]
+
+  if (target) {
+    return xml.replace(
+      effectStyleListXml,
+      effectStyleListXml.replace(target[0], effectXml),
+    )
+  }
+
+  return xml.replace(effectStyleListXml, effectStyleListXml.replace(
+    '</a:effectStyleLst>',
+    `${effectXml}</a:effectStyleLst>`,
+  ))
+}
+
 function setPPTXThemeFillStyleXml(xml, index, fillXml) {
   return setPPTXThemeFillStyleListXml(xml, 'fillStyleLst', index, fillXml)
 }
@@ -31756,35 +31829,47 @@ async function addPPTXStyleRefProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
   const themeXml = await readPPTXZipText(zip, themePath)
-  const nextThemeXml = setPPTXThemeLineStyleXml(
-    setPPTXThemeFillStyleXml(
-      setPPTXThemeFontXml(
-        setPPTXThemeSchemeColorXml(
+  const nextThemeXml = setPPTXThemeEffectStyleXml(
+    setPPTXThemeLineStyleXml(
+      setPPTXThemeFillStyleXml(
+        setPPTXThemeFontXml(
           setPPTXThemeSchemeColorXml(
-            setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
-            'accent4',
-            '9A3412',
+            setPPTXThemeSchemeColorXml(
+              setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+              'accent4',
+              '9A3412',
+            ),
+            'accent5',
+            '7C3AED',
           ),
-          'accent5',
-          '7C3AED',
+          'majorFont',
+          'latin',
+          'Georgia',
         ),
-        'majorFont',
-        'latin',
-        'Georgia',
+        3,
+        [
+          '<a:solidFill>',
+          '<a:schemeClr val="phClr"><a:alpha val="65000"/></a:schemeClr>',
+          '</a:solidFill>',
+        ].join(''),
       ),
-      3,
+      2,
       [
-        '<a:solidFill>',
-        '<a:schemeClr val="phClr"><a:alpha val="65000"/></a:schemeClr>',
-        '</a:solidFill>',
+        '<a:ln w="38100" cap="flat" cmpd="sng" algn="ctr">',
+        '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',
+        '<a:prstDash val="dash"/>',
+        '</a:ln>',
       ].join(''),
     ),
-    2,
+    1,
     [
-      '<a:ln w="38100" cap="flat" cmpd="sng" algn="ctr">',
-      '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',
-      '<a:prstDash val="dash"/>',
-      '</a:ln>',
+      '<a:effectStyle>',
+      '<a:effectLst>',
+      '<a:outerShdw blurRad="57150" dist="38100" dir="2700000" algn="ctr" rotWithShape="0">',
+      '<a:schemeClr val="phClr"><a:alpha val="55000"/></a:schemeClr>',
+      '</a:outerShdw>',
+      '</a:effectLst>',
+      '</a:effectStyle>',
     ].join(''),
   )
 
@@ -31792,6 +31877,7 @@ async function addPPTXStyleRefProbe(base64) {
     xml.includes('Style Ref Probe') &&
     xml.includes('Style Ref Line Probe') &&
     xml.includes('Font Ref Text Probe') &&
+    xml.includes('Effect Ref Probe') &&
     nextThemeXml === themeXml
   ) {
     return base64
@@ -31876,9 +31962,35 @@ async function addPPTXStyleRefProbe(base64) {
         '</p:style>',
         '</p:sp>',
       ].join('')
+  const effectRefShapeXml = xml.includes('Effect Ref Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9987" name="Effect Ref Probe"/>',
+        '<p:cNvSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="10058400" y="6309360"/>',
+        '<a:ext cx="1219200" cy="365760"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>',
+        '<a:ln><a:noFill/></a:ln>',
+        '</p:spPr>',
+        '<p:style>',
+        '<a:lnRef idx="0"><a:schemeClr val="accent5"/></a:lnRef>',
+        '<a:fillRef idx="0"><a:schemeClr val="accent5"/></a:fillRef>',
+        '<a:effectRef idx="1"><a:schemeClr val="accent5"/></a:effectRef>',
+        '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>',
+        '</p:style>',
+        '</p:sp>',
+      ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${styleRefShapeXml}${styleRefLineXml}${fontRefTextXml}</p:spTree>`,
+    `${styleRefShapeXml}${styleRefLineXml}${fontRefTextXml}${effectRefShapeXml}</p:spTree>`,
   )
 
   if (nextXml === xml && nextThemeXml === themeXml) {
@@ -34793,10 +34905,14 @@ async function readPPTXStyleRefProbeState(page) {
     const probeSlide = slides.find((slide) =>
       (slide.elements ?? []).some((element) =>
         element.name === 'Style Ref Probe' ||
-        element.name === 'Style Ref Line Probe'))
+        element.name === 'Style Ref Line Probe' ||
+        element.name === 'Effect Ref Probe'))
     const elements = slides.flatMap((slide) => slide.elements ?? [])
     const shapes = elements.filter((element) =>
       element.name === 'Style Ref Probe' &&
+      element.kind === 'shape')
+    const effects = elements.filter((element) =>
+      element.name === 'Effect Ref Probe' &&
       element.kind === 'shape')
     const lines = elements.filter((element) =>
       element.name === 'Style Ref Line Probe' &&
@@ -34805,6 +34921,7 @@ async function readPPTXStyleRefProbeState(page) {
       element.name === 'Font Ref Text Probe' &&
       element.kind === 'textBox')
     const shape = shapes[0] ?? null
+    const effect = effects[0] ?? null
     const line = lines[0] ?? null
     const text = texts[0] ?? null
     const textRun = text?.textBody?.paragraphs
@@ -34812,6 +34929,12 @@ async function readPPTXStyleRefProbeState(page) {
       ?.find((run) => run.text === 'Font Ref Text Probe') ?? null
 
     return {
+      effectCount: effects.length,
+      effectShadowAngle: Number(effect?.shadow?.angle ?? 0),
+      effectShadowBlur: Number(effect?.shadow?.blur ?? 0),
+      effectShadowColor: effect?.shadow?.color ?? '',
+      effectShadowDistance: Number(effect?.shadow?.distance ?? 0),
+      effectShadowOpacity: Number(effect?.shadow?.opacity ?? 0),
       lineCount: lines.length,
       lineStrokeDash: line?.stroke?.dash ?? '',
       lineStroke: line?.stroke?.color ?? '',
@@ -34849,12 +34972,22 @@ async function readPPTXStyleRefProbeState(page) {
       '.ppt-slide [data-ppt-element-name="Style Ref Probe"]',
     )
     const shapeStyle = shapeElement ? getComputedStyle(shapeElement) : null
+    const effectElement = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Effect Ref Probe"]',
+    )
     const textElement = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Font Ref Text Probe"]',
     )
     const textRun = textElement?.querySelector('[data-ppt-run-color]') ?? null
 
     return {
+      activeEffectExists: Boolean(effectElement),
+      activeEffectShadowAngle: Number(effectElement?.getAttribute('data-ppt-shadow-angle') ?? 0),
+      activeEffectShadowBlur: Number(effectElement?.getAttribute('data-ppt-shadow-blur') ?? 0),
+      activeEffectShadowColor: effectElement?.getAttribute('data-ppt-shadow-color') ?? '',
+      activeEffectShadowDistance: Number(effectElement?.getAttribute('data-ppt-shadow-distance') ?? 0),
+      activeEffectShadowOpacity: Number(effectElement?.getAttribute('data-ppt-shadow-opacity') ?? 0),
+      activeEffectShadowState: effectElement?.getAttribute('data-ppt-shadow') ?? '',
       activeLineExists: Boolean(lineElement),
       activeLineStrokeDasharray: lineStrokeElement?.getAttribute('stroke-dasharray') ?? '',
       activeLineStrokeWidth: Number(lineStrokeElement?.getAttribute('stroke-width') ?? 0),
