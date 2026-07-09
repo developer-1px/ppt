@@ -280,8 +280,7 @@ async function runPPTXRenderScenario(page) {
   }
 
   await installPPTDownloadCapture(page)
-  await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
-  await waitForPPTXDownloadBlob(page)
+  await clickPPTXExportAndWaitForDownloadBlob(page)
 
   const pptxDownloadBlobState = await readPPTXDownloadBlobState(page)
   const { base64: pptxDownloadBase64, ...pptxDownloadState } =
@@ -36941,22 +36940,71 @@ async function readExternalPPTXRenderFixture() {
   }
 }
 
-function waitForPPTXDownloadBlob(page) {
-  return waitUntil(
-    () => page.eval(`(() => {
-      const downloads = (window.__pptDownloads ?? [])
-        .filter((entry) => String(entry.download ?? '').endsWith('.pptx'))
-      const download = downloads.at(-1)
+async function clickPPTXExportAndWaitForDownloadBlob(page) {
+  await page.eval(`(() => {
+    window.__pptLastPPTXExportClickAt = 0
+    window.__pptPPTXExportClickAttempts = 0
+  })()`)
 
-      return !!download &&
-        download.signature === 'PK' &&
-        (download.base64 ?? '').length > 0 &&
-        download.byteLength === download.size &&
-        download.size > 0
-    })()`),
-    'Timed out waiting for PPTX download blob',
-    30000,
-  )
+  try {
+    await waitUntil(
+      () => page.eval(`(() => {
+        const downloads = (window.__pptDownloads ?? [])
+          .filter((entry) => String(entry.download ?? '').endsWith('.pptx'))
+        const download = downloads.at(-1)
+
+        if (download &&
+          download.signature === 'PK' &&
+          (download.base64 ?? '').length > 0 &&
+          download.byteLength === download.size &&
+          download.size > 0
+        ) {
+          return true
+        }
+
+        const now = Date.now()
+
+        if (now - (window.__pptLastPPTXExportClickAt ?? 0) > 5000) {
+          window.__pptLastPPTXExportClickAt = now
+          window.__pptPPTXExportClickAttempts =
+            (window.__pptPPTXExportClickAttempts ?? 0) + 1
+          document.querySelector('[data-ppt-export-pptx]')?.click()
+        }
+
+        return false
+      })()`),
+      'Timed out waiting for PPTX download blob',
+      30000,
+    )
+  } catch (error) {
+    const state = await readPPTXDownloadWaitState(page)
+    const message = error instanceof Error ? error.message : String(error)
+
+    throw new Error(`${message}\nPPTX download wait state: ${JSON.stringify(state)}`)
+  }
+}
+
+function readPPTXDownloadWaitState(page) {
+  return page.eval(`(() => {
+    const downloads = window.__pptDownloads ?? []
+    const last = downloads.at(-1) ?? {}
+    const button = document.querySelector('[data-ppt-export-pptx]')
+
+    return {
+      buttonDisabled: button?.disabled === true,
+      buttonExists: !!button,
+      clickAttempts: window.__pptPPTXExportClickAttempts ?? 0,
+      downloadCount: downloads.length,
+      exportCodeLength: document.querySelector('.ppt-export-code')?.value?.length ?? 0,
+      lastBase64Length: (last.base64 ?? '').length,
+      lastByteLength: last.byteLength ?? 0,
+      lastDownload: last.download ?? '',
+      lastSignature: last.signature ?? '',
+      lastSize: last.size ?? 0,
+      lastType: last.type ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
 }
 
 function readPPTSlideCountState(page) {
