@@ -709,7 +709,7 @@ async function runPPTXRenderScenario(page) {
   )
 
   record(
-    'imports OpenXML PPTX p14 section and hidden slide metadata for viewer rendering',
+    'imports OpenXML PPTX p14 section hidden slide and notes metadata for viewer rendering',
     openXmlPPTXSlideMetadataState.modelCount === 1 &&
       openXmlPPTXSlideMetadataState.hiddenModelCount === 1 &&
       openXmlPPTXSlideMetadataState.probeHidden === 'true' &&
@@ -720,7 +720,13 @@ async function runPPTXRenderScenario(page) {
         'PPTX Metadata Probe Section' &&
       openXmlPPTXSlideMetadataState.activeThumbHidden === 'true' &&
       openXmlPPTXSlideMetadataState.activeThumbSectionName ===
-        'PPTX Metadata Probe Section',
+        'PPTX Metadata Probe Section' &&
+      openXmlPPTXSlideMetadataState.probeNotes.includes('PPTX Notes Probe: presenter cue') &&
+      openXmlPPTXSlideMetadataState.probeNotes.includes('Keep final wording editable.') &&
+      openXmlPPTXSlideMetadataState.exportHTMLNotes.includes('PPTX Notes Probe: presenter cue') &&
+      openXmlPPTXSlideMetadataState.exportHTMLNotes.includes('Keep final wording editable.') &&
+      openXmlPPTXSlideMetadataState.exportHTMLNotesFor ===
+        openXmlPPTXSlideMetadataState.probeId,
     {
       openXmlPPTXImportState,
       openXmlPPTXSlideMetadataState,
@@ -15292,6 +15298,9 @@ async function runExportScenario(page) {
       slide.sectionName === 'PPTX Metadata Probe Section')
     const hiddenProbeSlides = probeSlides.filter((slide) => slide.hidden === true)
     const probeSlide = probeSlides[0] ?? null
+    const exportHTMLNotes = Array.from(exportDoc.querySelectorAll('aside.ppt-notes'))
+      .find((element) =>
+        element.getAttribute('data-ppt-notes-for') === String(probeSlide?.id ?? '')) ?? null
 
     return {
       activeHidden: activeSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
@@ -15300,6 +15309,8 @@ async function runExportScenario(page) {
       activeThumbHidden: activeThumb?.getAttribute('data-ppt-slide-hidden') ?? '',
       activeThumbSectionName: activeThumb?.getAttribute('data-ppt-slide-section-name') ?? '',
       exportHTMLHidden: exportHTMLSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
+      exportHTMLNotes: exportHTMLNotes?.textContent ?? '',
+      exportHTMLNotesFor: exportHTMLNotes?.getAttribute('data-ppt-notes-for') ?? '',
       exportHTMLSectionName: exportHTMLSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
@@ -15307,6 +15318,8 @@ async function runExportScenario(page) {
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
       probeHidden: probeSlide?.hidden === true ? 'true' : '',
+      probeId: probeSlide?.id ?? '',
+      probeNotes: probeSlide?.notes ?? '',
       probeSectionName: probeSlide?.sectionName ?? '',
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       slideMetadataProbeCount: probeSlides.length,
@@ -15315,7 +15328,7 @@ async function runExportScenario(page) {
   })()`)
 
   record(
-    'drops PPTX slide section and hidden metadata through OpenXML import',
+    'drops PPTX slide section hidden and notes metadata through OpenXML import',
     slideMetadataPPTXImportState.model === 'ppt-deck-pptx-import' &&
       slideMetadataPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       slideMetadataPPTXImportState.fileName === 'external-openxml-slide-metadata.pptx' &&
@@ -15336,6 +15349,11 @@ async function runExportScenario(page) {
       slideMetadataPPTXImportState.activeThumbHidden === 'true' &&
       slideMetadataPPTXImportState.activeThumbSectionName === 'PPTX Metadata Probe Section' &&
       slideMetadataPPTXImportState.exportHTMLHidden === 'true' &&
+      slideMetadataPPTXImportState.probeNotes.includes('PPTX Notes Probe: presenter cue') &&
+      slideMetadataPPTXImportState.probeNotes.includes('Keep final wording editable.') &&
+      slideMetadataPPTXImportState.exportHTMLNotes.includes('PPTX Notes Probe: presenter cue') &&
+      slideMetadataPPTXImportState.exportHTMLNotes.includes('Keep final wording editable.') &&
+      slideMetadataPPTXImportState.exportHTMLNotesFor === slideMetadataPPTXImportState.probeId &&
       slideMetadataPPTXImportState.exportHTMLSectionName === 'PPTX Metadata Probe Section',
     {
       beforeSlideMetadataPPTXDrop,
@@ -31466,6 +31484,73 @@ async function addPPTXSlideMetadataProbe(base64) {
     zip.file(slidePath, nextSlideXml)
   }
 
+  const notesRelationshipType =
+    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide'
+  const slideRelationshipsPath = getPPTXRelationshipsPath(slidePath)
+  const slideRelationshipsXml = await readPPTXZipText(zip, slideRelationshipsPath)
+  const existingNotesRelationship = [
+    ...slideRelationshipsXml.matchAll(/<Relationship\b[^>]*\/>/g),
+  ]
+    .map((match) => match[0])
+    .find((candidate) =>
+      readPPTXXmlAttribute(candidate, 'Type')?.endsWith('/notesSlide') &&
+      readPPTXXmlAttribute(candidate, 'TargetMode') !== 'External')
+  const existingNotesTarget = existingNotesRelationship
+    ? readPPTXXmlAttribute(existingNotesRelationship, 'Target')
+    : ''
+  const notesPath = existingNotesTarget
+    ? resolvePPTXRelationshipTarget(slidePath, existingNotesTarget)
+    : getNextPPTXNumberedPartPath(zip, 'ppt/notesSlides/notesSlide', '.xml')
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    notesPath,
+    'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
+  )
+
+  if (!existingNotesTarget) {
+    await addPPTXInternalRelationship({
+      sourcePath: slidePath,
+      target: getPPTXRelativeTarget(slidePath, notesPath),
+      type: notesRelationshipType,
+      zip,
+    })
+  }
+
+  await addPPTXInternalRelationship({
+    sourcePath: notesPath,
+    target: getPPTXRelativeTarget(notesPath, slidePath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide',
+    zip,
+  })
+  zip.file(notesPath, [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+    '<p:cSld>',
+    '<p:spTree>',
+    '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>',
+    '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>',
+    '<p:sp>',
+    '<p:nvSpPr><p:cNvPr id="2" name="Notes Body Placeholder"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>',
+    '<p:spPr><a:xfrm><a:off x="685800" y="4114800"/><a:ext cx="7772400" cy="2743200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>PPTX Notes Probe: presenter cue</a:t></a:r></a:p>',
+    '<a:p><a:r><a:t>Keep final wording editable.</a:t></a:r></a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+    '<p:sp>',
+    '<p:nvSpPr><p:cNvPr id="3" name="Header Placeholder"/><p:cNvSpPr/><p:nvPr><p:ph type="hdr" idx="2"/></p:nvPr></p:nvSpPr>',
+    '<p:spPr/>',
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Header noise should not import</a:t></a:r></a:p></p:txBody>',
+    '</p:sp>',
+    '</p:spTree>',
+    '</p:cSld>',
+    '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>',
+    '</p:notes>',
+  ].join(''))
+
   return await zip.generateAsync({
     compression: 'DEFLATE',
     type: 'base64',
@@ -38627,6 +38712,7 @@ function readPPTXSlideMetadataProbeState(page) {
         return null
       }
     }
+    const exportDoc = new DOMParser().parseFromString(exportCode, 'text/html')
     const deck = readPPTExportDeckFromHTML(exportCode)
     const slides = deck?.slides ?? []
     const importedSlides = slides.filter((slide) =>
@@ -38635,15 +38721,22 @@ function readPPTXSlideMetadataProbeState(page) {
       slide.sectionName === sectionName)
     const hiddenProbeSlides = probeSlides.filter((slide) => slide.hidden === true)
     const probeSlide = probeSlides[0] ?? null
+    const exportHTMLNotes = Array.from(exportDoc.querySelectorAll('aside.ppt-notes'))
+      .find((element) =>
+        element.getAttribute('data-ppt-notes-for') === String(probeSlide?.id ?? '')) ?? null
 
     return {
       activeHidden: activeSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
       activeSectionName: activeSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
       activeThumbHidden: activeThumb?.getAttribute('data-ppt-slide-hidden') ?? '',
       activeThumbSectionName: activeThumb?.getAttribute('data-ppt-slide-section-name') ?? '',
+      exportHTMLNotes: exportHTMLNotes?.textContent ?? '',
+      exportHTMLNotesFor: exportHTMLNotes?.getAttribute('data-ppt-notes-for') ?? '',
       hiddenModelCount: hiddenProbeSlides.length,
       modelCount: probeSlides.length,
       probeHidden: probeSlide?.hidden === true ? 'true' : '',
+      probeId: probeSlide?.id ?? '',
+      probeNotes: probeSlide?.notes ?? '',
       probeSectionName: probeSlide?.sectionName ?? '',
     }
   })()`)
