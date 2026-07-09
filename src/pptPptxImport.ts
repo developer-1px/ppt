@@ -91,6 +91,7 @@ type PPTXPlaceholderRef = {
   type?: string
 }
 type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
+type PPTXPlaceholderTextBodyMap = Map<string, Element>
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -552,6 +553,11 @@ async function readPPTXOpenXmlSlide({
     slidePath: path,
     zip,
   })
+  const placeholderTextBodies = await readPPTXSlideLayoutPlaceholderTextBodies({
+    relationships,
+    slidePath: path,
+    zip,
+  })
   const notes = await readPPTXSlideNotes({
     relationships,
     slidePath: path,
@@ -586,6 +592,7 @@ async function readPPTXOpenXmlSlide({
           themeColors,
           themeFonts,
           placeholderGeometries,
+          placeholderTextBodies,
         )
     } else if (child.localName === 'cxnSp') {
       element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
@@ -980,6 +987,41 @@ async function readPPTXSlideLayoutPlaceholderGeometries({
   return new Map([...masterGeometries, ...layoutGeometries])
 }
 
+async function readPPTXSlideLayoutPlaceholderTextBodies({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXPlaceholderTextBodyMap> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return new Map()
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterTextBodies = masterPath
+    ? await readPPTXPartPlaceholderTextBodies(zip, masterPath)
+    : new Map()
+  const layoutTextBodies = await readPPTXPartPlaceholderTextBodies(zip, layoutPath)
+
+  return new Map([...masterTextBodies, ...layoutTextBodies])
+}
+
 async function readPPTXPartPlaceholderGeometries(
   zip: JSZip,
   path: string,
@@ -1012,6 +1054,36 @@ async function readPPTXPartPlaceholderGeometries(
   return geometries
 }
 
+async function readPPTXPartPlaceholderTextBodies(
+  zip: JSZip,
+  path: string,
+): Promise<PPTXPlaceholderTextBodyMap> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const textBodies: PPTXPlaceholderTextBodyMap = new Map()
+
+  if (!doc) {
+    return textBodies
+  }
+
+  for (const shape of getPPTXDescendantsByLocalName(doc, 'sp')) {
+    const placeholder = readPPTXPlaceholderRef(shape)
+    const txBody = getDirectPPTXChildByLocalName(shape, 'txBody')
+
+    if (!placeholder || !txBody) {
+      continue
+    }
+
+    for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+      if (!textBodies.has(key)) {
+        textBodies.set(key, txBody)
+      }
+    }
+  }
+
+  return textBodies
+}
+
 function readPPTXPlaceholderGeometry(
   element: Element,
   geometries: PPTXPlaceholderGeometryMap,
@@ -1027,6 +1099,27 @@ function readPPTXPlaceholderGeometry(
 
     if (geometry) {
       return { ...geometry }
+    }
+  }
+
+  return null
+}
+
+function readPPTXPlaceholderTextBody(
+  element: Element,
+  textBodies: PPTXPlaceholderTextBodyMap,
+): Element | null {
+  const placeholder = readPPTXPlaceholderRef(element)
+
+  if (!placeholder) {
+    return null
+  }
+
+  for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+    const txBody = textBodies.get(key)
+
+    if (txBody) {
+      return txBody
     }
   }
 
@@ -1663,12 +1756,14 @@ function readPPTXShapeElement(
   themeColors: PPTXThemeColorMap,
   themeFonts: PPTXThemeFontMap,
   placeholderGeometries: PPTXPlaceholderGeometryMap,
+  placeholderTextBodies: PPTXPlaceholderTextBodyMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
+  const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
   const geometry = readPPTXElementGeometry(spPr) ??
     readPPTXPlaceholderGeometry(sp, placeholderGeometries)
-  const textBody = readPPTXTextBody(txBody, themeColors)
+  const textBody = readPPTXTextBody(txBody, themeColors, fallbackTxBody)
   const stroke = readPPTXStroke(spPr, themeColors)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors)
@@ -1695,7 +1790,7 @@ function readPPTXShapeElement(
       ...(readPPTXElementVisibility(sp) ?? {}),
       name,
       ...(shadow ? { shadow } : {}),
-      style: readPPTXTextStyle(textBody, txBody, themeFonts),
+      style: readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody: textBody ?? { paragraphs: [] },
     }
@@ -1708,7 +1803,7 @@ function readPPTXShapeElement(
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
-      style: readPPTXTextStyle(textBody, txBody, themeFonts),
+      style: readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody,
     } : {}),
@@ -2349,14 +2444,17 @@ function readPPTXRotation(xfrm: Element) {
 function readPPTXTextBody(
   txBody: Element | null,
   themeColors: PPTXThemeColorMap,
+  fallbackTxBody: Element | null = null,
 ): PPTTextBody | null {
   if (!txBody) {
     return null
   }
 
   const listStyle = getDirectPPTXChildByLocalName(txBody, 'lstStyle')
+  const fallbackListStyle = getDirectPPTXChildByLocalName(fallbackTxBody, 'lstStyle')
   const paragraphs = getDirectPPTXChildrenByLocalName(txBody, 'p')
-    .map((paragraph) => readPPTXParagraph(paragraph, listStyle, themeColors))
+    .map((paragraph) =>
+      readPPTXParagraph(paragraph, listStyle, fallbackListStyle, themeColors))
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
@@ -2389,6 +2487,7 @@ function readPPTXPlainParagraphText(paragraph: Element) {
 function readPPTXParagraph(
   paragraph: Element,
   listStyle: Element | null,
+  fallbackListStyle: Element | null,
   themeColors: PPTXThemeColorMap,
 ): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
@@ -2397,17 +2496,22 @@ function readPPTXParagraph(
     listStyle,
     level ?? 0,
   )
+  const fallbackListStylePPr = readPPTXTextListStyleParagraphProperties(
+    fallbackListStyle,
+    level ?? 0,
+  )
+  const effectiveListStylePPr = listStylePPr ?? fallbackListStylePPr
   const defaultRunProperties = readPPTXParagraphDefaultRunProperties(
     paragraph,
     pPr,
-    listStylePPr,
+    effectiveListStylePPr,
   )
   const align = readPPTXParagraphAlign(pPr) ??
-    readPPTXParagraphAlign(listStylePPr)
-  const bullet = readPPTXParagraphBullet(pPr, listStylePPr)
+    readPPTXParagraphAlign(effectiveListStylePPr)
+  const bullet = readPPTXParagraphBullet(pPr, effectiveListStylePPr)
   const spacing = readPPTXParagraphSpacing(
     pPr,
-    listStylePPr,
+    effectiveListStylePPr,
     defaultRunProperties,
   )
   const runs = Array.from(paragraph.children)
@@ -2548,18 +2652,21 @@ function readPPTXTextStyle(
   textBody: PPTTextBody | null,
   txBody: Element | null,
   themeFonts: PPTXThemeFontMap,
+  fallbackTxBody: Element | null = null,
 ): PPTTextStyle {
   const firstRun = textBody?.paragraphs
     .flatMap((paragraph) => paragraph.runs)
     .find((run) => run.text.trim().length > 0) ??
     textBody?.paragraphs[0]?.runs[0]
-  const fontFamily = readPPTXFirstTypeface(txBody, themeFonts)
+  const fontFamily = readPPTXFirstTypeface(txBody, themeFonts) ??
+    readPPTXFirstTypeface(fallbackTxBody, themeFonts)
 
   return {
     color: firstRun?.color ?? PPTX_DEFAULT_TEXT_COLOR,
     ...(fontFamily ? { fontFamily } : {}),
     fontSize: firstRun?.size ?? PPTX_DEFAULT_TEXT_SIZE,
     ...(firstRun?.bold === true ? { fontWeight: 'bold' } : {}),
+    ...readPPTXTextFrameStyle(fallbackTxBody),
     ...readPPTXTextFrameStyle(txBody),
   }
 }

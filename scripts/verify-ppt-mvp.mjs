@@ -11494,9 +11494,19 @@ async function runExportScenario(page) {
       element.geometry?.y === 144 &&
       element.geometry?.w === 400 &&
       element.geometry?.h === 88 &&
+      element.style?.color === '#0f766e' &&
+      element.style?.fontFamily === 'Layout Placeholder Font' &&
+      element.style?.fontSize === 40 &&
+      element.style?.textInset?.bottom === 40 &&
+      element.style?.textInset?.left === 10 &&
+      element.style?.textInset?.right === 20 &&
+      element.style?.textInset?.top === 30 &&
+      element.style?.verticalAlign === 'middle' &&
       element.textBody?.paragraphs?.some((paragraph) =>
         paragraph.runs?.some((run) =>
-          run.text === 'Layout placeholder geometry probe')) === true)
+          run.text === 'Layout placeholder geometry probe' &&
+          run.color === '#0f766e' &&
+          run.size === 40)) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11693,6 +11703,8 @@ async function runExportScenario(page) {
       exportHasLayoutPlaceholderGeometryProbe: exportLayoutPlaceholderGeometryProbeObjects.length > 0,
       exportLayoutPlaceholderGeometryProbeBounds: exportLayoutPlaceholderGeometryProbeObjects.map((element) =>
         [element.geometry?.x, element.geometry?.y, element.geometry?.w, element.geometry?.h].join(' ')).join(' | '),
+      exportLayoutPlaceholderGeometryProbeStyles: exportLayoutPlaceholderGeometryProbeObjects.map((element) =>
+        [element.style?.color, element.style?.fontFamily, element.style?.fontSize, element.style?.verticalAlign].join(' ')).join(' | '),
       exportLayoutPlaceholderGeometryProbeModelCount: exportLayoutPlaceholderGeometryProbeObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
       exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
@@ -28886,7 +28898,18 @@ async function addPPTXLayoutPlaceholderGeometryProbe(base64) {
     '</a:xfrm>',
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
     '</p:spPr>',
-    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>',
+    '<p:txBody>',
+    '<a:bodyPr anchor="ctr" lIns="95250" rIns="190500" tIns="285750" bIns="381000"/>',
+    '<a:lstStyle>',
+    '<a:lvl1pPr>',
+    '<a:defRPr sz="3000">',
+    '<a:solidFill><a:srgbClr val="0F766E"/></a:solidFill>',
+    '<a:latin typeface="Layout Placeholder Font"/>',
+    '</a:defRPr>',
+    '</a:lvl1pPr>',
+    '</a:lstStyle>',
+    '<a:p/>',
+    '</p:txBody>',
     '</p:sp>',
   ].join('')
   const slideShapeXml = [
