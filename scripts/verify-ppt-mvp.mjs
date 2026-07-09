@@ -12487,6 +12487,151 @@ async function runExportScenario(page) {
     },
   )
 
+  const unsupportedGraphicFramePPTXBase64 = await addPPTXUnsupportedGraphicFrameProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeUnsupportedGraphicFramePPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      unsupportedGraphicFrameModelCount: elements.filter((element) =>
+        element.name === 'Unsupported Graphic Frame Probe' &&
+        element.kind === 'shape').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-unsupported-graphic-frame.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(unsupportedGraphicFramePPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const unsupportedGraphicFramePPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="Unsupported Graphic Frame Probe"][data-kind="shape"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const placeholders = exportImportedElements.filter((element) =>
+      element.name === 'Unsupported Graphic Frame Probe' &&
+      element.kind === 'shape')
+    const placeholder = placeholders[0] ?? null
+    const paragraphTexts = (placeholder?.textBody?.paragraphs ?? []).map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeShape: activeShape?.getAttribute('data-shape') ?? '',
+      activeText: activeShape?.textContent ?? '',
+      activeTextAutofit: activeShape?.getAttribute('data-ppt-text-autofit') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      paragraphTexts,
+      placeholderFill: placeholder?.fill?.color ?? '',
+      placeholderGeometry: placeholder?.geometry ?? null,
+      placeholderModelCount: placeholders.length,
+      placeholderShape: placeholder?.shape ?? '',
+      placeholderStrokeDash: placeholder?.stroke?.dash ?? '',
+      placeholderTextAutofit: placeholder?.textAutoFit ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops unsupported PPTX graphicFrame as editable placeholder shape through OpenXML import',
+    unsupportedGraphicFramePPTXImportState.model === 'ppt-deck-pptx-import' &&
+      unsupportedGraphicFramePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      unsupportedGraphicFramePPTXImportState.fileName === 'external-openxml-unsupported-graphic-frame.pptx' &&
+      unsupportedGraphicFramePPTXImportState.importedCount === beforeUnsupportedGraphicFramePPTXDrop.slideCount &&
+      unsupportedGraphicFramePPTXImportState.sourceSlideCount === beforeUnsupportedGraphicFramePPTXDrop.slideCount &&
+      unsupportedGraphicFramePPTXImportState.slideCount === beforeUnsupportedGraphicFramePPTXDrop.slideCount * 2 &&
+      unsupportedGraphicFramePPTXImportState.activeName.includes('Copy') &&
+      unsupportedGraphicFramePPTXImportState.placeholderModelCount >
+        beforeUnsupportedGraphicFramePPTXDrop.unsupportedGraphicFrameModelCount &&
+      unsupportedGraphicFramePPTXImportState.placeholderModelCount === 1 &&
+      unsupportedGraphicFramePPTXImportState.placeholderShape === 'rect' &&
+      unsupportedGraphicFramePPTXImportState.activeShape === 'rect' &&
+      unsupportedGraphicFramePPTXImportState.placeholderTextAutofit === 'resizeShapeToFitText' &&
+      unsupportedGraphicFramePPTXImportState.activeTextAutofit === 'resizeShapeToFitText' &&
+      unsupportedGraphicFramePPTXImportState.placeholderFill === '#f8fafc' &&
+      unsupportedGraphicFramePPTXImportState.placeholderStrokeDash === 'dash' &&
+      JSON.stringify(unsupportedGraphicFramePPTXImportState.paragraphTexts) === JSON.stringify([
+        'Unsupported Graphic Frame Probe',
+        'unsupportedGraphicFrame',
+        'customXml: unsupported-graphic-frame-probe.xml',
+      ]) &&
+      unsupportedGraphicFramePPTXImportState.activeText.includes('Unsupported Graphic Frame Probe') &&
+      unsupportedGraphicFramePPTXImportState.activeText.includes('unsupported-graphic-frame-probe.xml') &&
+      unsupportedGraphicFramePPTXImportState.placeholderGeometry?.x === 760 &&
+      unsupportedGraphicFramePPTXImportState.placeholderGeometry?.y === 380 &&
+      unsupportedGraphicFramePPTXImportState.placeholderGeometry?.w === 260 &&
+      unsupportedGraphicFramePPTXImportState.placeholderGeometry?.h === 120,
+    {
+      beforeUnsupportedGraphicFramePPTXDrop,
+      unsupportedGraphicFramePPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterUnsupportedGraphicFramePPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes unsupported graphicFrame PPTX drop probes before export scenario continues',
+    afterUnsupportedGraphicFramePPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterUnsupportedGraphicFramePPTXDropCleanup.slideCount === beforeUnsupportedGraphicFramePPTXDrop.slideCount,
+    {
+      afterUnsupportedGraphicFramePPTXDropCleanup,
+      beforeUnsupportedGraphicFramePPTXDrop,
+    },
+  )
+
   const diagramTextPPTXBase64 = await addPPTXDiagramTextProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -31081,6 +31226,75 @@ async function addPPTXChartTableProbe(base64) {
     '</p:graphicFrame>',
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${chartFrameXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXUnsupportedGraphicFrameProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const unsupportedPartPath = 'ppt/customXml/unsupported-graphic-frame-probe.xml'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Unsupported Graphic Frame Probe')) {
+    return base64
+  }
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    unsupportedPartPath,
+    'application/xml',
+  )
+  zip.file(unsupportedPartPath, [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<probe xmlns="urn:interactive-os:pptx-unsupported-graphic-frame">Unsupported Graphic Frame Probe</probe>',
+  ].join(''))
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, unsupportedPartPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml',
+    zip,
+  })
+  const unsupportedGraphicFrameXml = [
+    '<p:graphicFrame>',
+    '<p:nvGraphicFramePr>',
+    '<p:cNvPr id="9985" name="Unsupported Graphic Frame Probe"/>',
+    '<p:cNvGraphicFramePr/>',
+    '<p:nvPr/>',
+    '</p:nvGraphicFramePr>',
+    '<p:xfrm>',
+    '<a:off x="7239000" y="3619500"/>',
+    '<a:ext cx="2476500" cy="1143000"/>',
+    '</p:xfrm>',
+    '<a:graphic>',
+    '<a:graphicData uri="http://example.com/pptx/unsupportedGraphicFrame">',
+    `<u:payload xmlns:u="urn:interactive-os:pptx-unsupported-graphic-frame" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="${relationshipId}"/>`,
+    '</a:graphicData>',
+    '</a:graphic>',
+    '</p:graphicFrame>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${unsupportedGraphicFrameXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64

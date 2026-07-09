@@ -3368,7 +3368,137 @@ async function readPPTXGraphicFrameElement({
     relationships,
     slidePath,
     themeColors,
+  }) ?? readPPTXUnsupportedGraphicFrameElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
   })
+}
+
+function readPPTXUnsupportedGraphicFrameElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!geometry) {
+    return null
+  }
+
+  const name = readPPTXObjectName(graphicFrame, `Graphic Frame ${objectIndex}`)
+  const graphicData = getFirstPPTXDescendantByLocalName(graphicFrame, 'graphicData')
+  const uri = graphicData?.getAttribute('uri')?.trim() ?? ''
+  const details = [
+    uri ? readPPTXGraphicFrameUriLabel(uri) : 'graphicFrame',
+    ...readPPTXGraphicFrameRelationshipDetails({
+      element: graphicFrame,
+      relationships,
+      sourcePath: slidePath,
+    }),
+  ].filter((detail) => detail.length > 0)
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXGraphicFrameUriLabel(uri: string) {
+  return uri
+    .split(/[/:#]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .at(-1) ?? uri
+}
+
+function readPPTXGraphicFrameRelationshipDetails({
+  element,
+  relationships,
+  sourcePath,
+}: {
+  element: Element
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+}) {
+  return readPPTXRelationshipAttributeIds(element)
+    .map((relationshipId) => relationships.get(relationshipId))
+    .filter((relationship): relationship is PPTXRelationship =>
+      relationship !== undefined)
+    .map((relationship) => {
+      const type = relationship.type.split('/').at(-1) ?? 'relationship'
+      const target = relationship.targetMode === 'External'
+        ? relationship.target
+        : resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+      const fileName = target.split('/').at(-1)?.trim() || target
+
+      return `${type}: ${fileName}`
+    })
+}
+
+function readPPTXRelationshipAttributeIds(element: Element) {
+  const ids = new Set<string>()
+
+  for (const item of [element, ...Array.from(element.getElementsByTagName('*'))]) {
+    for (const attribute of Array.from(item.attributes)) {
+      if (
+        attribute.namespaceURI === PPTX_RELATIONSHIP_ATTRIBUTE_NS ||
+        attribute.name.startsWith('r:')
+      ) {
+        const value = attribute.value.trim()
+
+        if (value) {
+          ids.add(value)
+        }
+      }
+    }
+  }
+
+  return [...ids]
 }
 
 function readPPTXOleObjectElement({
