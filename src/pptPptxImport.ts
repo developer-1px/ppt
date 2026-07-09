@@ -4329,13 +4329,16 @@ async function readPPTXPictureElement({
     slidePath,
     zip,
   })
+  const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
 
   if (!geometry) {
     return null
   }
 
   if (!source) {
-    return readPPTXPictureMediaPlaceholderElement({
+    const mediaPlaceholder = readPPTXPictureMediaPlaceholderElement({
       geometry,
       index,
       objectIndex,
@@ -4346,9 +4349,31 @@ async function readPPTXPictureElement({
       themeColors,
       themeStyles,
     })
+
+    if (mediaPlaceholder) {
+      return mediaPlaceholder
+    }
+
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource
+      ? createPPTXUnsupportedImagePlaceholderElement({
+          element: pic,
+          geometry,
+          id: createPPTXImportedElementId(index, objectIndex),
+          name,
+          relationships,
+          shadow,
+          source: missingSource,
+          spPr,
+        })
+      : null
   }
 
-  const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(pic)
   const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
@@ -4356,8 +4381,6 @@ async function readPPTXPictureElement({
   const adjustments = readPPTXImageAdjustments(blip)
   const clipShape = readPPTXImageClipShape(spPr)
   const stroke = readPPTXStroke(spPr, themeColors)
-  const shadow = readPPTXElementShadow(spPr, themeColors) ??
-    readPPTXStyleShadow(style, themeColors, themeStyles)
 
   if (!source.renderable) {
     return createPPTXUnsupportedImagePlaceholderElement({
@@ -4680,6 +4703,38 @@ function readPPTXExternalImageSource({
         src: url,
       }
     : null
+}
+
+function readPPTXMissingImageSource({
+  blip,
+  relationships,
+  slidePath,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}): PPTXImageSource | null {
+  const relationshipId = readPPTXEmbedRelationshipId(blip) ??
+    readPPTXLinkRelationshipId(blip)
+
+  if (!relationshipId) {
+    return null
+  }
+
+  const relationship = relationships.get(relationshipId)
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : relationshipId
+  const fileName = target.split(/[?#]/)[0]?.split('/').at(-1)?.trim() || target
+
+  return {
+    fileName,
+    mimeType: getPPTXMediaMimeType(target),
+    renderable: false,
+    src: '',
+  }
 }
 
 function createPPTXUnsupportedImagePlaceholderElement({

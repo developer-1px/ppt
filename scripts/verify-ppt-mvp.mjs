@@ -366,6 +366,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXShapeImageFillProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXUnsupportedImageProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXMissingImageProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
@@ -427,6 +428,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXGraphicFallbackProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
+  const openXmlPPTXMissingImageState =
+    await readPPTXMissingImageProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -554,6 +557,27 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXUnsupportedImageState,
+    },
+  )
+
+  record(
+    'renders missing OpenXML PPTX image relationships as placeholder shapes',
+    openXmlPPTXMissingImageState.modelCount === 1 &&
+      openXmlPPTXMissingImageState.imageModelCount === 0 &&
+      openXmlPPTXMissingImageState.kind === 'shape' &&
+      openXmlPPTXMissingImageState.geometry?.x === 1040 &&
+      openXmlPPTXMissingImageState.geometry?.y === 380 &&
+      openXmlPPTXMissingImageState.geometry?.w === 180 &&
+      openXmlPPTXMissingImageState.geometry?.h === 96 &&
+      openXmlPPTXMissingImageState.text.includes('Unsupported image') &&
+      openXmlPPTXMissingImageState.text.includes('missing-image-probe.png') &&
+      openXmlPPTXMissingImageState.text.includes('image/png') &&
+      openXmlPPTXMissingImageState.activeExists &&
+      openXmlPPTXMissingImageState.activeKind === 'shape' &&
+      !openXmlPPTXMissingImageState.activeHasImage,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXMissingImageState,
     },
   )
 
@@ -35532,6 +35556,67 @@ async function addPPTXUnsupportedImageProbe(base64) {
   })
 }
 
+async function addPPTXMissingImageProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/missing-image-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Missing Image Probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const pictureXml = [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9986" name="Missing Image Probe" descr="Missing image alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr/>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9906000" y="3619500"/>',
+    '<a:ext cx="1714500" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '</p:pic>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLayoutObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -38353,6 +38438,48 @@ function readPPTXUnsupportedImageProbeState(page) {
       element.kind === 'image')
     const placeholder = placeholders[0] ?? null
     const activeElement = document.querySelector('.ppt-slide [data-ppt-element-name="Unsupported Image Media Probe"]')
+
+    return {
+      activeExists: !!activeElement,
+      activeHasImage: !!activeElement?.querySelector('img'),
+      activeKind: activeElement?.getAttribute('data-kind') ?? '',
+      activeText: activeElement?.textContent ?? '',
+      geometry: placeholder?.geometry ?? null,
+      imageModelCount: images.length,
+      kind: placeholder?.kind ?? '',
+      modelCount: placeholders.length,
+      text: readElementText(placeholder),
+    }
+  })()`)
+}
+
+function readPPTXMissingImageProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const readElementText = (element) => (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+      .map((run) => run.text ?? '')
+      .join('\\n')
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const elements = slides.flatMap((slide) => slide.elements ?? [])
+    const placeholders = elements.filter((element) =>
+      element.name === 'Missing Image Probe' &&
+      element.kind === 'shape')
+    const images = elements.filter((element) =>
+      element.name === 'Missing Image Probe' &&
+      element.kind === 'image')
+    const placeholder = placeholders[0] ?? null
+    const activeElement = document.querySelector('.ppt-slide [data-ppt-element-name="Missing Image Probe"]')
 
     return {
       activeExists: !!activeElement,
