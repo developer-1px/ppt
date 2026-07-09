@@ -334,6 +334,8 @@ async function runPPTXRenderScenario(page) {
     openXmlPPTXStyleRefState.shapeCount === 1 &&
       openXmlPPTXStyleRefState.lineCount === 1 &&
       openXmlPPTXStyleRefState.shapeFill === '#14b8a6' &&
+      openXmlPPTXStyleRefState.shapeFillOpacity > 0.64 &&
+      openXmlPPTXStyleRefState.shapeFillOpacity < 0.66 &&
       openXmlPPTXStyleRefState.shapeStroke === '#9a3412' &&
       openXmlPPTXStyleRefState.shapeStrokeDash === 'dash' &&
       openXmlPPTXStyleRefState.shapeStrokeWidth === 4 &&
@@ -341,6 +343,8 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXStyleRefState.lineStrokeDash === 'dash' &&
       openXmlPPTXStyleRefState.lineStrokeWidth === 4 &&
       openXmlPPTXStyleRefState.activeShapeExists &&
+      openXmlPPTXStyleRefState.activeShapeFillOpacity > 0.64 &&
+      openXmlPPTXStyleRefState.activeShapeFillOpacity < 0.66 &&
       openXmlPPTXStyleRefState.activeShapeStrokeDash === 'dash' &&
       openXmlPPTXStyleRefState.activeShapeStrokeWidth === 4 &&
       openXmlPPTXStyleRefState.activeLineExists &&
@@ -11617,6 +11621,8 @@ async function runExportScenario(page) {
       element.name === 'Style Ref Probe' &&
       element.kind === 'shape' &&
       element.fill?.color === '#14b8a6' &&
+      Number(element.fill?.opacity ?? 0) > 0.64 &&
+      Number(element.fill?.opacity ?? 0) < 0.66 &&
       element.stroke?.color === '#9a3412' &&
       element.stroke?.dash === 'dash' &&
       element.stroke?.width === 4)
@@ -11916,6 +11922,7 @@ async function runExportScenario(page) {
       exportHasStyleRefProbe: exportStyleRefProbeObjects.length > 0,
       exportStyleRefProbeDash: exportStyleRefProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportStyleRefProbeFill: exportStyleRefProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportStyleRefProbeFillOpacity: exportStyleRefProbeObjects.map((element) => element.fill?.opacity ?? '').join(' | '),
       exportStyleRefProbeModelCount: exportStyleRefProbeObjects.length,
       exportStyleRefProbeStroke: exportStyleRefProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportStyleRefProbeWidth: exportStyleRefProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
@@ -31627,6 +31634,32 @@ function setPPTXThemeLineStyleXml(xml, index, lineXml) {
   ))
 }
 
+function setPPTXThemeFillStyleXml(xml, index, fillXml) {
+  const fillStyleListMatch = xml.match(/<a:fillStyleLst>[\s\S]*?<\/a:fillStyleLst>/)
+
+  if (!fillStyleListMatch) {
+    return xml
+  }
+
+  const fillStyleListXml = fillStyleListMatch[0]
+  const fillMatches = [
+    ...fillStyleListXml.matchAll(/<a:(solidFill|gradFill|pattFill)\b[\s\S]*?<\/a:\1>/g),
+  ]
+  const target = fillMatches[index - 1]
+
+  if (target) {
+    return xml.replace(
+      fillStyleListXml,
+      fillStyleListXml.replace(target[0], fillXml),
+    )
+  }
+
+  return xml.replace(fillStyleListXml, fillStyleListXml.replace(
+    '</a:fillStyleLst>',
+    `${fillXml}</a:fillStyleLst>`,
+  ))
+}
+
 async function addPPTXStyleRefProbe(base64) {
   if (!base64) {
     return ''
@@ -31647,10 +31680,18 @@ async function addPPTXStyleRefProbe(base64) {
   const xml = await readPPTXZipText(zip, slidePath)
   const themeXml = await readPPTXZipText(zip, themePath)
   const nextThemeXml = setPPTXThemeLineStyleXml(
-    setPPTXThemeSchemeColorXml(
-      setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
-      'accent4',
-      '9A3412',
+    setPPTXThemeFillStyleXml(
+      setPPTXThemeSchemeColorXml(
+        setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+        'accent4',
+        '9A3412',
+      ),
+      3,
+      [
+        '<a:solidFill>',
+        '<a:schemeClr val="phClr"><a:alpha val="65000"/></a:schemeClr>',
+        '</a:solidFill>',
+      ].join(''),
     ),
     2,
     [
@@ -34644,6 +34685,7 @@ async function readPPTXStyleRefProbeState(page) {
       lineStrokeWidth: Number(line?.stroke?.width ?? 0),
       shapeCount: shapes.length,
       shapeFill: shape?.fill?.color ?? '',
+      shapeFillOpacity: Number(shape?.fill?.opacity ?? 0),
       shapeStrokeDash: shape?.stroke?.dash ?? '',
       shapeStroke: shape?.stroke?.color ?? '',
       shapeStrokeWidth: Number(shape?.stroke?.width ?? 0),
@@ -34676,6 +34718,7 @@ async function readPPTXStyleRefProbeState(page) {
       activeLineStrokeDasharray: lineStrokeElement?.getAttribute('stroke-dasharray') ?? '',
       activeLineStrokeWidth: Number(lineStrokeElement?.getAttribute('stroke-width') ?? 0),
       activeShapeExists: Boolean(shapeElement),
+      activeShapeFillOpacity: Number(shapeElement?.getAttribute('data-ppt-fill-opacity') ?? 0),
       activeShapeStrokeDash: shapeElement?.getAttribute('data-ppt-stroke-dash') ?? '',
       activeShapeStrokeWidth: Number.parseFloat(shapeStyle?.borderTopWidth ?? '0') || 0,
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',

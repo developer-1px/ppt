@@ -93,6 +93,7 @@ type PPTXThemeColorMap = Readonly<Record<string, string>>
 type PPTXThemeFontMap = Readonly<Record<string, string>>
 type PPTXThemeLineStyle = Partial<PPTStroke>
 type PPTXThemeStyleMap = {
+  fillStyles: ReadonlyMap<number, Element>
   lineStyles: ReadonlyMap<number, PPTXThemeLineStyle>
 }
 type PPTXPlaceholderRef = {
@@ -884,6 +885,7 @@ async function readPPTXOpenXmlThemeStyles(
     formatScheme,
     'lnStyleLst',
   )
+  const fillStyles = readPPTXThemeFillStyles(formatScheme)
   const lineStyles = new Map<number, PPTXThemeLineStyle>()
 
   getDirectPPTXChildrenByLocalName(lineStyleList, 'ln')
@@ -895,7 +897,39 @@ async function readPPTXOpenXmlThemeStyles(
       }
     })
 
-  return { lineStyles }
+  return { fillStyles, lineStyles }
+}
+
+function readPPTXThemeFillStyles(
+  formatScheme: Element | null,
+): ReadonlyMap<number, Element> {
+  const fillStyles = new Map<number, Element>()
+
+  readPPTXThemeFillStyleList(formatScheme, 'fillStyleLst', 0, fillStyles)
+  readPPTXThemeFillStyleList(formatScheme, 'bgFillStyleLst', 1000, fillStyles)
+
+  return fillStyles
+}
+
+function readPPTXThemeFillStyleList(
+  formatScheme: Element | null,
+  listName: 'bgFillStyleLst' | 'fillStyleLst',
+  indexOffset: number,
+  fillStyles: Map<number, Element>,
+) {
+  const fillStyleList = getDirectPPTXChildByLocalName(formatScheme, listName)
+
+  Array.from(fillStyleList?.children ?? [])
+    .filter(isPPTXFillStyleElement)
+    .forEach((fill, index) => {
+      fillStyles.set(indexOffset + index + 1, fill)
+    })
+}
+
+function isPPTXFillStyleElement(element: Element) {
+  return element.localName === 'solidFill' ||
+    element.localName === 'gradFill' ||
+    element.localName === 'pattFill'
 }
 
 async function readPPTXOpenXmlThemePath(zip: JSZip) {
@@ -2853,7 +2887,7 @@ async function readPPTXShapeElement(
   const stroke = readPPTXStroke(spPr, themeColors) ??
     readPPTXStyleStroke(style, themeColors, themeStyles)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors) ??
-    readPPTXStyleFill(style, themeColors)
+    readPPTXStyleFill(style, themeColors, themeStyles)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
@@ -5380,62 +5414,121 @@ function readPPTXShapeFill(
 function readPPTXFill(
   container: Element | null,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTFill | null {
   if (!container || hasPPTXNoFill(container)) {
     return null
   }
 
-  return readPPTXSolidFill(container, themeColors) ??
-    readPPTXGradientFill(container, themeColors) ??
-    readPPTXPatternFill(container, themeColors)
+  return readPPTXSolidFill(container, themeColors, placeholderColor) ??
+    readPPTXGradientFill(container, themeColors, placeholderColor) ??
+    readPPTXPatternFill(container, themeColors, placeholderColor)
+}
+
+function readPPTXFillStyleElement(
+  fillElement: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  if (!fillElement || hasPPTXNoFill(fillElement)) {
+    return null
+  }
+
+  if (fillElement.localName === 'solidFill') {
+    return readPPTXColorFill(fillElement, themeColors, placeholderColor)
+  }
+
+  if (fillElement.localName === 'gradFill') {
+    return readPPTXGradientFillElement(
+      fillElement,
+      themeColors,
+      placeholderColor,
+    )
+  }
+
+  if (fillElement.localName === 'pattFill') {
+    return readPPTXPatternFillElement(
+      fillElement,
+      themeColors,
+      placeholderColor,
+    )
+  }
+
+  return null
 }
 
 function readPPTXSolidFill(
   container: Element | null,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTFill | null {
   const solidFill = getDirectPPTXChildByLocalName(container, 'solidFill')
 
-  return solidFill ? readPPTXColorFill(solidFill, themeColors) : null
+  return solidFill
+    ? readPPTXColorFill(solidFill, themeColors, placeholderColor)
+    : null
 }
 
 function readPPTXGradientFill(
   container: Element,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTFill | null {
   const gradFill = getDirectPPTXChildByLocalName(container, 'gradFill')
+
+  return gradFill
+    ? readPPTXGradientFillElement(gradFill, themeColors, placeholderColor)
+    : null
+}
+
+function readPPTXGradientFillElement(
+  gradFill: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
   const stop = gradFill
     ? getPPTXDescendantsByLocalName(gradFill, 'gs')
       .sort(comparePPTXGradientStopPositions)
-      .find((gradientStop) => readPPTXColor(gradientStop, themeColors))
+      .find((gradientStop) =>
+        readPPTXColor(gradientStop, themeColors, placeholderColor))
     : null
 
-  return stop ? readPPTXColorFill(stop, themeColors) : null
+  return stop
+    ? readPPTXColorFill(stop, themeColors, placeholderColor)
+    : null
 }
 
 function readPPTXPatternFill(
   container: Element,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTFill | null {
   const pattFill = getDirectPPTXChildByLocalName(container, 'pattFill')
 
-  if (!pattFill) {
-    return null
-  }
+  return pattFill
+    ? readPPTXPatternFillElement(pattFill, themeColors, placeholderColor)
+    : null
+}
 
+function readPPTXPatternFillElement(
+  pattFill: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
   const foreground = getDirectPPTXChildByLocalName(pattFill, 'fgClr')
   const background = getDirectPPTXChildByLocalName(pattFill, 'bgClr')
 
-  return readPPTXColorFill(foreground, themeColors) ??
-    readPPTXColorFill(background, themeColors)
+  return readPPTXColorFill(foreground, themeColors, placeholderColor) ??
+    readPPTXColorFill(background, themeColors, placeholderColor)
 }
 
 function readPPTXColorFill(
   colorContainer: Element | null,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ): PPTFill | null {
   const color = colorContainer
-    ? readPPTXColor(colorContainer, themeColors)
+    ? readPPTXColor(colorContainer, themeColors, placeholderColor)
     : undefined
 
   if (!color || !colorContainer) {
@@ -5459,6 +5552,7 @@ function readPPTXStroke(
 function readPPTXStyleFill(
   style: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ): PPTFill | null {
   const fillRef = getDirectPPTXChildByLocalName(style, 'fillRef')
 
@@ -5466,7 +5560,27 @@ function readPPTXStyleFill(
     return null
   }
 
-  return readPPTXColorFill(fillRef, themeColors)
+  const referenceFill = readPPTXColorFill(fillRef, themeColors)
+  const styleFill = readPPTXStyleReferenceFill(
+    fillRef,
+    themeColors,
+    themeStyles,
+    referenceFill?.color,
+  )
+
+  return styleFill ?? referenceFill
+}
+
+function readPPTXStyleReferenceFill(
+  fillRef: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const index = toPPTXPositiveNumber(fillRef?.getAttribute('idx'))
+  const fillStyle = index === null ? null : themeStyles.fillStyles.get(index)
+
+  return readPPTXFillStyleElement(fillStyle ?? null, themeColors, placeholderColor)
 }
 
 function readPPTXStyleStroke(
@@ -5572,6 +5686,7 @@ function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
 function readPPTXColor(
   solidFill: Element,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ) {
   const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
   const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
@@ -5583,7 +5698,11 @@ function readPPTXColor(
       element: srgbColor,
     },
     {
-      color: readPPTXSchemeColor(schemeColor?.getAttribute('val'), themeColors),
+      color: readPPTXSchemeColor(
+        schemeColor?.getAttribute('val'),
+        themeColors,
+        placeholderColor,
+      ),
       element: schemeColor,
     },
     {
@@ -5611,7 +5730,12 @@ function readPPTXHexColor(value: string | null | undefined) {
 function readPPTXSchemeColor(
   value: string | null | undefined,
   themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
 ) {
+  if (value === 'phClr') {
+    return placeholderColor
+  }
+
   return value ? themeColors[value] : undefined
 }
 
