@@ -12632,6 +12632,146 @@ async function runExportScenario(page) {
     },
   )
 
+  const alternateContentPPTXBase64 = await addPPTXAlternateContentProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeAlternateContentPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      alternateContentModelCount: elements.filter((element) =>
+        element.name === 'Alternate Content Probe' &&
+        element.kind === 'shape').length,
+      alternateFallbackModelCount: elements.filter((element) =>
+        element.name === 'Alternate Fallback Probe').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-alternate-content.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(alternateContentPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const alternateContentPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="Alternate Content Probe"][data-kind="shape"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const alternateShapes = exportImportedElements.filter((element) =>
+      element.name === 'Alternate Content Probe' &&
+      element.kind === 'shape')
+    const fallbackShapes = exportImportedElements.filter((element) =>
+      element.name === 'Alternate Fallback Probe')
+    const alternateShape = alternateShapes[0] ?? null
+
+    return {
+      activeFill: activeShape?.getAttribute('data-ppt-fill') ?? '',
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeShape: activeShape?.getAttribute('data-shape') ?? '',
+      activeText: activeShape?.textContent ?? '',
+      alternateFill: alternateShape?.fill?.color ?? '',
+      alternateGeometry: alternateShape?.geometry ?? null,
+      alternateModelCount: alternateShapes.length,
+      alternateShape: alternateShape?.shape ?? '',
+      alternateStroke: alternateShape?.stroke?.color ?? '',
+      fallbackModelCount: fallbackShapes.length,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX AlternateContent choice object through OpenXML import',
+    alternateContentPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      alternateContentPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      alternateContentPPTXImportState.fileName === 'external-openxml-alternate-content.pptx' &&
+      alternateContentPPTXImportState.importedCount === beforeAlternateContentPPTXDrop.slideCount &&
+      alternateContentPPTXImportState.sourceSlideCount === beforeAlternateContentPPTXDrop.slideCount &&
+      alternateContentPPTXImportState.slideCount === beforeAlternateContentPPTXDrop.slideCount * 2 &&
+      alternateContentPPTXImportState.activeName.includes('Copy') &&
+      alternateContentPPTXImportState.alternateModelCount >
+        beforeAlternateContentPPTXDrop.alternateContentModelCount &&
+      alternateContentPPTXImportState.alternateModelCount === 1 &&
+      alternateContentPPTXImportState.fallbackModelCount ===
+        beforeAlternateContentPPTXDrop.alternateFallbackModelCount &&
+      alternateContentPPTXImportState.alternateShape === 'rect' &&
+      alternateContentPPTXImportState.activeShape === 'rect' &&
+      alternateContentPPTXImportState.activeText.includes('Alternate Content Probe') &&
+      alternateContentPPTXImportState.alternateFill === '#ccfbf1' &&
+      alternateContentPPTXImportState.alternateStroke === '#0f766e' &&
+      alternateContentPPTXImportState.alternateGeometry?.x === 800 &&
+      alternateContentPPTXImportState.alternateGeometry?.y === 600 &&
+      alternateContentPPTXImportState.alternateGeometry?.w === 280 &&
+      alternateContentPPTXImportState.alternateGeometry?.h === 80,
+    {
+      alternateContentPPTXImportState,
+      beforeAlternateContentPPTXDrop,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterAlternateContentPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes AlternateContent PPTX drop probes before export scenario continues',
+    afterAlternateContentPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterAlternateContentPPTXDropCleanup.slideCount === beforeAlternateContentPPTXDrop.slideCount,
+    {
+      afterAlternateContentPPTXDropCleanup,
+      beforeAlternateContentPPTXDrop,
+    },
+  )
+
   const diagramTextPPTXBase64 = await addPPTXDiagramTextProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -29781,6 +29921,100 @@ async function addPPTXHyperlinkProbe(base64) {
     compression: 'DEFLATE',
     type: 'base64',
   })
+}
+
+async function addPPTXAlternateContentProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Alternate Content Probe')) {
+    return base64
+  }
+
+  const alternateContentXml = [
+    '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">',
+    '<mc:Choice Requires="p14">',
+    createPPTXAlternateContentShapeXml({
+      fill: 'CCFBF1',
+      id: 9964,
+      name: 'Alternate Content Probe',
+      stroke: '0F766E',
+      text: 'Alternate Content Probe',
+      x: 7620000,
+      y: 5715000,
+    }),
+    '</mc:Choice>',
+    '<mc:Fallback>',
+    createPPTXAlternateContentShapeXml({
+      fill: 'FEE2E2',
+      id: 9965,
+      name: 'Alternate Fallback Probe',
+      stroke: 'B91C1C',
+      text: 'Alternate Fallback Probe',
+      x: 7620000,
+      y: 5715000,
+    }),
+    '</mc:Fallback>',
+    '</mc:AlternateContent>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${alternateContentXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXAlternateContentShapeXml({
+  fill,
+  id,
+  name,
+  stroke,
+  text,
+  x,
+  y,
+}) {
+  return [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    `<p:cNvPr id="${id}" name="${escapePPTXXmlAttribute(name)}"/>`,
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    `<a:off x="${x}" y="${y}"/>`,
+    '<a:ext cx="2667000" cy="762000"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>`,
+    `<a:ln w="19050"><a:solidFill><a:srgbClr val="${stroke}"/></a:solidFill></a:ln>`,
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    `<a:p><a:r><a:t>${escapePPTXXmlText(text)}</a:t></a:r></a:p>`,
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
 }
 
 async function addPPTXGroupedObjectProbe(base64) {

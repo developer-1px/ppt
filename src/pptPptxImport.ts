@@ -1050,13 +1050,31 @@ function getPPTXSlideObjectNodes(
     return treeNodes
   }
 
-  return [...xml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame|contentPart)\b[\s\S]*?<\/p:\1>/g)]
+  const objectXml = selectPPTXAlternateContentXml(xml)
+
+  return [...objectXml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame|contentPart)\b[\s\S]*?<\/p:\1>/g)]
     .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
     .filter((element): element is Element => element !== null)
     .map((element) => ({
       element,
       transform: PPTX_IDENTITY_GROUP_TRANSFORM,
     }))
+}
+
+function selectPPTXAlternateContentXml(xml: string) {
+  return xml.replace(
+    /<(?:[\w.-]+:)?AlternateContent\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?AlternateContent>/g,
+    (_match, content: string) => {
+      const choice = content.match(
+        /<(?:[\w.-]+:)?Choice\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Choice>/,
+      )
+      const fallback = content.match(
+        /<(?:[\w.-]+:)?Fallback\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Fallback>/,
+      )
+
+      return choice?.[1] ?? fallback?.[1] ?? ''
+    },
+  )
 }
 
 function getPPTXSlideObjectNodesFromContainer({
@@ -1079,6 +1097,15 @@ function getPPTXSlideObjectNodesFromContainer({
       }]
     }
 
+    if (child.localName === 'AlternateContent') {
+      return getPPTXSlideObjectNodesFromAlternateContent({
+        alternateContent: child,
+        groupId,
+        slideIndex,
+        transform,
+      })
+    }
+
     if (child.localName !== 'grpSp') {
       return []
     }
@@ -1097,6 +1124,39 @@ function getPPTXSlideObjectNodesFromContainer({
       transform: nextTransform,
     })
   })
+}
+
+function getPPTXSlideObjectNodesFromAlternateContent({
+  alternateContent,
+  groupId,
+  slideIndex,
+  transform,
+}: {
+  alternateContent: Element
+  groupId: string | undefined
+  slideIndex: number
+  transform: PPTXGroupTransform
+}) {
+  const choices = getDirectPPTXChildrenByLocalName(alternateContent, 'Choice')
+  const fallback = getDirectPPTXChildByLocalName(alternateContent, 'Fallback')
+
+  for (const container of [
+    ...choices,
+    ...(fallback ? [fallback] : []),
+  ]) {
+    const nodes = getPPTXSlideObjectNodesFromContainer({
+      container,
+      groupId,
+      slideIndex,
+      transform,
+    })
+
+    if (nodes.length > 0) {
+      return nodes
+    }
+  }
+
+  return []
 }
 
 function isPPTXSlideObjectNode(element: Element) {
