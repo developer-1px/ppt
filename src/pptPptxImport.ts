@@ -7613,9 +7613,7 @@ function readPPTXAlphaOpacity(solidFill: Element) {
   let hasTransform = false
 
   for (const transform of transforms) {
-    const value = transform.localName === 'alphaModFix'
-      ? toPPTXPositiveNumber(transform.getAttribute('amt'))
-      : toPPTXNumber(transform.getAttribute('val'))
+    const value = readPPTXAlphaTransformValue(transform)
 
     if (value === null) {
       continue
@@ -7643,6 +7641,18 @@ function readPPTXAlphaOpacity(solidFill: Element) {
   return hasTransform ? opacity : null
 }
 
+function readPPTXAlphaTransformValue(transform: Element) {
+  const rawValue =
+    transform.localName === 'alphaMod' ||
+      transform.localName === 'alphaModFix'
+      ? transform.getAttribute('amt') ?? transform.getAttribute('val')
+      : transform.getAttribute('val') ?? transform.getAttribute('amt')
+
+  return transform.localName === 'alphaOff'
+    ? toPPTXNumber(rawValue)
+    : toPPTXPositiveNumber(rawValue)
+}
+
 function getPPTXAlphaTransformElements(root: Element) {
   return Array.from(root.getElementsByTagName('*'))
     .filter((element) =>
@@ -7653,22 +7663,13 @@ function getPPTXAlphaTransformElements(root: Element) {
 }
 
 function readPPTXImageOpacity(blip: Element | null) {
-  const alphaModFix = getFirstPPTXDescendantByLocalName(blip, 'alphaModFix')
-  const alphaMod = getFirstPPTXDescendantByLocalName(blip, 'alphaMod')
-  const alpha = getFirstPPTXDescendantByLocalName(blip, 'alpha')
-  const value = toPPTXPositiveNumber(
-    alphaModFix?.getAttribute('amt') ??
-      alphaMod?.getAttribute('amt') ??
-      alpha?.getAttribute('val'),
-  )
-
-  if (value === null) {
+  if (!blip) {
     return null
   }
 
-  const opacity = Math.max(0, Math.min(1, value / 100_000))
+  const opacity = readPPTXAlphaOpacity(blip)
 
-  return opacity === 1 ? null : opacity
+  return opacity === null || opacity === 1 ? null : opacity
 }
 
 function readPPTXObjectName(element: Element, fallback: string) {

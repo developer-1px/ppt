@@ -12457,6 +12457,7 @@ async function runExportScenario(page) {
       exportImageFlipObjectNames: exportFlippedImages.map((element) => element.name).join(' | '),
       exportHasImageOpacity: exportImageOpacityObjects.length > 0,
       exportImageOpacityObjectNames: exportImageOpacityObjects.map((element) => element.name).join(' | '),
+      exportImageOpacityValues: exportImageOpacityObjects.map((element) => Number(element.opacity ?? 0)),
       exportHasColorModifierProbe: exportColorModifierProbeObjects.length > 0,
       exportColorModifierProbeFill: exportColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportColorModifierProbeModelCount: exportColorModifierProbeObjects.length,
@@ -12768,6 +12769,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportHasImageFlip &&
       openXmlPPTXImportState.exportImageFlipModelCount > beforeOpenXmlPPTXDrop.imageFlipModelCount &&
       openXmlPPTXImportState.exportHasImageOpacity &&
+      openXmlPPTXImportState.exportImageOpacityValues.some((value) =>
+        value > 0.69 && value < 0.71) &&
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
       openXmlPPTXImportState.exportHasColorModifierProbe &&
       openXmlPPTXImportState.exportColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.colorModifierProbeModelCount &&
@@ -31138,7 +31141,7 @@ async function addPPTXImageOpacityProbe(base64) {
 
       const expandedBlip = picXml.replace(
         /<a:blip\b([^>]*)\/>/,
-        '<a:blip$1><a:alphaModFix amt="42000"/></a:blip>',
+        '<a:blip$1><a:alphaMod val="60000"/><a:alphaOff val="10000"/></a:blip>',
       )
 
       if (expandedBlip !== picXml) {
@@ -31149,7 +31152,7 @@ async function addPPTXImageOpacityProbe(base64) {
 
       const blipWithOpacity = picXml.replace(
         /(<a:blip\b[^>]*>)/,
-        '$1<a:alphaModFix amt="42000"/>',
+        '$1<a:alphaMod val="60000"/><a:alphaOff val="10000"/>',
       )
 
       if (blipWithOpacity !== picXml) {
