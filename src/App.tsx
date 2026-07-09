@@ -36223,6 +36223,29 @@ function PPTElementView({
     recordInlineEditEffect({ pasteText })
   }
 
+  function renderTextEditor() {
+    return (
+      <div
+        className="ppt-element-editor"
+        contentEditable={editing}
+        data-ppt-inline-edit-active={editing ? 'true' : 'false'}
+        data-ppt-inline-edit-model={PPT_INLINE_EDIT_DOM_MODEL}
+        ref={editorRef}
+        style={getPPTElementEditorStyle(element)}
+        suppressContentEditableWarning={true}
+        onBeforeInput={handleInlineEditBeforeInput}
+        onBlur={(event) => {
+          onCommitText(element.id, event.currentTarget.innerText)
+          onStopEdit()
+        }}
+        onKeyDown={handleInlineEditKeyDown}
+        onPaste={handleInlineEditPaste}
+      >
+        {editing || !textBody ? editorText : <PPTTextBodyView body={textBody} />}
+      </div>
+    )
+  }
+
   return (
     <div
       className="ppt-element"
@@ -36369,29 +36392,16 @@ function PPTElementView({
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
       ) : element.kind === 'freeform' ? (
-        <PPTFreeformSvg element={element} />
+        <>
+          <PPTFreeformSvg element={element} />
+          {textBody ? renderTextEditor() : null}
+        </>
       ) : element.kind === 'table' ? (
         <PPTTableView element={element} />
       ) : element.kind === 'comment' ? (
         <PPTCommentView element={element} />
       ) : (
-        <div
-          className="ppt-element-editor"
-          contentEditable={editing}
-          data-ppt-inline-edit-active={editing ? 'true' : 'false'}
-          data-ppt-inline-edit-model={PPT_INLINE_EDIT_DOM_MODEL}
-          ref={editorRef}
-          suppressContentEditableWarning={true}
-          onBeforeInput={handleInlineEditBeforeInput}
-          onBlur={(event) => {
-            onCommitText(element.id, event.currentTarget.innerText)
-            onStopEdit()
-          }}
-          onKeyDown={handleInlineEditKeyDown}
-          onPaste={handleInlineEditPaste}
-        >
-          {editing || !textBody ? editorText : <PPTTextBodyView body={textBody} />}
-        </div>
+        renderTextEditor()
       )}
     </div>
   )
@@ -39755,6 +39765,19 @@ function pptElementStyle(element: PPTElement): CSSProperties {
   }
 }
 
+function getPPTElementEditorStyle(element: PPTElement): CSSProperties | undefined {
+  if (!isPPTTextElement(element) || element.kind !== 'freeform') {
+    return undefined
+  }
+
+  return {
+    ...pptTextStyle(element.style),
+    alignItems: getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element)),
+    padding: getSlideEditTextFrameInsetPaddingCSS(getPPTTextElementInset(element)),
+    textAlign: getPPTElementParagraphAlign(element),
+  }
+}
+
 function getPPTElementTransform(element: PPTElement) {
   return createPPTCanvasCssBoundsTransform({
     flipX: element.flipH === true,
@@ -40654,13 +40677,16 @@ function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
 }
 
 function getPPTTextElementVerticalAlign(element: PPTElement) {
-  const verticalAlign = element.kind === 'shape' || element.kind === 'textBox'
+  const verticalAlign =
+    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
     ? element.style?.verticalAlign
     : undefined
 
   return normalizePPTTextVerticalAlign(
     verticalAlign,
-    element.kind === 'shape' ? 'middle' : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+    element.kind === 'freeform' || element.kind === 'shape'
+      ? 'middle'
+      : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
   )
 }
 
@@ -40710,10 +40736,11 @@ function getPPTTextFrameInsetField(
 }
 
 function getPPTTextElementInset(element: PPTElement): PPTTextInset {
-  const fallback = element.kind === 'shape'
+  const fallback = element.kind === 'freeform' || element.kind === 'shape'
     ? PPT_DEFAULT_SHAPE_TEXT_INSET
     : PPT_DEFAULT_TEXT_BOX_INSET
-  const inset = element.kind === 'shape' || element.kind === 'textBox'
+  const inset =
+    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
     ? element.style?.textInset
     : undefined
 

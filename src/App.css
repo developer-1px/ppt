@@ -1274,6 +1274,14 @@
   padding: 0;
 }
 
+.ppt-element[data-kind='freeform'] .ppt-element-editor {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  overflow: hidden;
+}
+
 .ppt-text-paragraph {
   --ppt-paragraph-list-level-indent: 0em;
   display: block;

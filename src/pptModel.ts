@@ -196,7 +196,10 @@ const PPTFreeformSchema = PPTElementBaseSchema.extend({
   kind: z.literal('freeform'),
   pointMode: z.enum(['freehand', 'polyline']).optional(),
   points: z.array(PPTLinePointSchema).min(1),
+  style: PPTTextStyleSchema.optional(),
   stroke: PPTStrokeSchema,
+  textAutoFit: PPTTextAutoFitSchema.optional(),
+  textBody: PPTTextBodySchema.optional(),
 })
 
 const PPTTableSchema = PPTElementBaseSchema.extend({
@@ -290,7 +293,10 @@ export type PPTTableCellTextStyle = z.infer<typeof PPTTableCellTextStyleSchema>
 export type PPTComment = z.infer<typeof PPTCommentSchema>
 export type PPTCommentThreadMessage = z.infer<typeof PPTCommentThreadMessageSchema>
 export type PPTElement = z.infer<typeof PPTElementSchema>
-export type PPTTextElement = PPTTextBox | (PPTShape & { textBody: PPTTextBody })
+export type PPTTextElement =
+  | PPTTextBox
+  | (PPTFreeform & { textBody: PPTTextBody })
+  | (PPTShape & { textBody: PPTTextBody })
 export type PPTSlide = z.infer<typeof PPTSlideSchema>
 export type PPTDeck = z.infer<typeof PPTDeckSchema>
 
@@ -316,6 +322,7 @@ export function isPPTTextElement(
   element: PPTElement,
 ): element is PPTTextElement {
   return element.kind === 'textBox' ||
+    (element.kind === 'freeform' && element.textBody !== undefined) ||
     (element.kind === 'shape' && element.textBody !== undefined)
 }
 

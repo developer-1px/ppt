@@ -598,6 +598,7 @@ function exportCSS() {
     '.ppt-element{position:absolute;margin:0;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:center;padding:18px;}',
     '.ppt-image{display:block;object-fit:cover;padding:0;}',
     '.ppt-freeform{display:block;overflow:visible;padding:0;}',
+    '.ppt-freeform-text{position:absolute;inset:0;display:flex;overflow:hidden;}',
     '.ppt-line{display:block;overflow:visible;padding:0;}',
     '.ppt-comment{display:grid;grid-template-rows:auto minmax(0,1fr);padding:0;border:1px solid #d97706;border-radius:8px;background:#fffbeb;color:#78350f;box-shadow:0 10px 22px rgb(120 53 15 / 18%);}',
     '.ppt-comment[data-ppt-comment-resolved="true"]{opacity:.62;}',
@@ -743,8 +744,21 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     getPPTElementOpacityHTMLAttr(element).trim(),
     getPPTElementShadowHTMLAttrs(element).trim(),
   ].join(' ')
+  const path = `<path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path>`
 
-  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></svg>`
+  if (!element.textBody) {
+    return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true">${path}</svg>`
+  }
+
+  const text = renderPPTTextBodyHTML(element.textBody)
+  const textStyle = element.style ? exportTextStyle(element.style) : ''
+  const paragraphStyle = `text-align:${element.textBody.paragraphs[0]?.align ?? 'left'}`
+  const textInset = getPPTElementTextInset(element)
+  const textInsetStyle = `padding:${getPPTTextInsetCSS(textInset)}`
+  const verticalAlign = getPPTElementTextVerticalAlign(element)
+  const verticalAlignStyle = `align-items:${getPPTTextVerticalAlignCSS(verticalAlign)}`
+
+  return `    <div class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}"><svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true">${path}</svg><div class="ppt-freeform-text" style="${[textStyle, textInsetStyle, verticalAlignStyle, paragraphStyle].filter(Boolean).join(';')}">${text}</div></div>`
 }
 
 function renderPPTFreeformSVG(element: PPTFreeform) {
@@ -754,8 +768,15 @@ function renderPPTFreeformSVG(element: PPTFreeform) {
     getPPTElementSVGAttrs(element),
     `data-ppt-freeform-points="${element.points.length}"`,
   ].join(' ')
+  const text = renderPPTTextBodySVG({
+    body: element.textBody,
+    geometry: element.geometry,
+    inset: getPPTElementTextInset(element),
+    style: element.style,
+    verticalAlign: getPPTElementTextVerticalAlign(element),
+  })
 
-  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></g>`
+  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path>${text}</g>`
 }
 
 function renderPPTCommentHTML(
@@ -1447,7 +1468,10 @@ function getPPTTextAutoFit(element: PPTElement) {
     return element.textAutoFit
   }
 
-  if (element.kind === 'shape' && element.textBody) {
+  if (
+    (element.kind === 'freeform' || element.kind === 'shape') &&
+    element.textBody
+  ) {
     return element.textAutoFit
   }
 
@@ -1571,7 +1595,8 @@ function exportTextStyle(style: PPTTextStyle) {
 }
 
 function isPPTElementWithText(element: PPTElement) {
-  return element.kind === 'textBox' || (element.kind === 'shape' && !!element.textBody)
+  return element.kind === 'textBox' ||
+    ((element.kind === 'freeform' || element.kind === 'shape') && !!element.textBody)
 }
 
 function normalizePPTTextFontFamily(fontFamily: string | undefined) {
@@ -1588,13 +1613,16 @@ function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
 }
 
 function getPPTElementTextVerticalAlign(element: PPTElement) {
-  const verticalAlign = element.kind === 'shape' || element.kind === 'textBox'
+  const verticalAlign =
+    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
     ? element.style?.verticalAlign
     : undefined
 
   return normalizePPTTextVerticalAlign(
     verticalAlign,
-    element.kind === 'shape' ? 'middle' : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+    element.kind === 'freeform' || element.kind === 'shape'
+      ? 'middle'
+      : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
   )
 }
 
@@ -1615,10 +1643,11 @@ function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
 }
 
 function getPPTElementTextInset(element: PPTElement): PPTTextInset {
-  const fallback = element.kind === 'shape'
+  const fallback = element.kind === 'freeform' || element.kind === 'shape'
     ? PPT_DEFAULT_SHAPE_TEXT_INSET
     : PPT_DEFAULT_TEXT_BOX_INSET
-  const inset = element.kind === 'shape' || element.kind === 'textBox'
+  const inset =
+    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
     ? element.style?.textInset
     : undefined
 

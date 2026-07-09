@@ -2669,6 +2669,9 @@ async function readPPTXShapeElement(
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
+  const textStyle = textBody
+    ? readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody)
+    : undefined
   const imageFill = !hasTextContent && geometry
     ? await readPPTXShapeImageFillElement({
         geometry,
@@ -2699,7 +2702,7 @@ async function readPPTXShapeElement(
     }
   }
 
-  if (!textBody) {
+  if (!isTextBox) {
     const freeform = readPPTXCustomGeometryFreeformElement({
       fill,
       geometry,
@@ -2710,6 +2713,9 @@ async function readPPTXShapeElement(
       sp,
       spPr,
       stroke,
+      textAutoFit,
+      textBody,
+      textStyle,
     })
 
     if (freeform) {
@@ -2726,6 +2732,9 @@ async function readPPTXShapeElement(
       sp,
       spPr,
       stroke,
+      textAutoFit,
+      textBody,
+      textStyle,
     })
 
     if (presetFreeform) {
@@ -2745,7 +2754,7 @@ async function readPPTXShapeElement(
       ...(readPPTXElementVisibility(sp) ?? {}),
       name,
       ...(shadow ? { shadow } : {}),
-      style: readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
+      style: textStyle ?? readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody: textBody ?? { paragraphs: [] },
     }
@@ -2758,7 +2767,7 @@ async function readPPTXShapeElement(
     ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
     ...(stroke ? { stroke } : {}),
     ...(textBody ? {
-      style: readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
+      style: textStyle,
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody,
     } : {}),
@@ -2844,6 +2853,9 @@ function readPPTXCustomGeometryFreeformElement({
   sp,
   spPr,
   stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
 }: {
   fill: PPTFill | null
   geometry: PPTGeometry
@@ -2854,6 +2866,9 @@ function readPPTXCustomGeometryFreeformElement({
   sp: Element
   spPr: Element | null
   stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
 }): PPTFreeform | null {
   const points = readPPTXCustomGeometryPoints(spPr, geometry)
 
@@ -2872,6 +2887,9 @@ function readPPTXCustomGeometryFreeformElement({
     sp,
     spPr,
     stroke,
+    textAutoFit,
+    textBody,
+    textStyle,
   })
 }
 
@@ -2885,6 +2903,9 @@ function readPPTXPresetGeometryFreeformElement({
   sp,
   spPr,
   stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
 }: {
   fill: PPTFill | null
   geometry: PPTGeometry
@@ -2895,6 +2916,9 @@ function readPPTXPresetGeometryFreeformElement({
   sp: Element
   spPr: Element | null
   stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
 }): PPTFreeform | null {
   const points = readPPTXPresetGeometryFreeformPoints(spPr, geometry)
 
@@ -2913,6 +2937,9 @@ function readPPTXPresetGeometryFreeformElement({
     sp,
     spPr,
     stroke,
+    textAutoFit,
+    textBody,
+    textStyle,
   })
 }
 
@@ -2927,6 +2954,9 @@ function createPPTXShapeFreeformElement({
   sp,
   spPr,
   stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
 }: {
   fill: PPTFill | null
   geometry: PPTGeometry
@@ -2938,6 +2968,9 @@ function createPPTXShapeFreeformElement({
   sp: Element
   spPr: Element | null
   stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
 }): PPTFreeform {
   const fallbackStroke = fill
     ? { color: fill.color, width: 0 }
@@ -2958,6 +2991,11 @@ function createPPTXShapeFreeformElement({
     points: points.map((point) => ({ ...point })),
     ...(shadow ? { shadow } : {}),
     stroke: stroke ?? fallbackStroke,
+    ...(textBody ? {
+      style: textStyle,
+      ...(textAutoFit ? { textAutoFit } : {}),
+      textBody,
+    } : {}),
   }
 }
 

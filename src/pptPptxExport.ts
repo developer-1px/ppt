@@ -1810,6 +1810,28 @@ function addPPTXFreeform({
     })
   }
 
+  if (element.textBody) {
+    const hyperlink = createPPTXHyperlink(element.hyperlink)
+
+    pptxSlide.addText(createPPTXTextRuns({
+      body: element.textBody,
+      hyperlink,
+      opacity,
+      style: element.style,
+    }), {
+      ...createPPTXElementPosition(element.geometry),
+      ...createPPTXTextStyleOptions(element.style, opacity),
+      fit: getPPTXTextFit(element.textAutoFit),
+      hyperlink,
+      isTextBox: true,
+      margin: createPPTXMargin(getPPTXTextInset(
+        element.style,
+        PPTX_DEFAULT_SHAPE_TEXT_INSET,
+      )),
+      objectName: `${element.name} text`,
+      valign: element.style?.verticalAlign ?? 'middle',
+    })
+  }
 }
 
 function addPPTXTable({
