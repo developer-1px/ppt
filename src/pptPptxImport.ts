@@ -3011,7 +3011,103 @@ async function readPPTXGraphicFrameElement({
     relationships,
     slidePath,
     zip,
+  }) ?? readPPTXOleObjectElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
   })
+}
+
+function readPPTXOleObjectElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const oleObject = getFirstPPTXDescendantByLocalName(graphicFrame, 'oleObj')
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!oleObject || !geometry) {
+    return null
+  }
+
+  const objectName = oleObject.getAttribute('name')?.trim() ||
+    readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`)
+  const progId = oleObject.getAttribute('progId')?.trim() || ''
+  const targetName = readPPTXOleObjectTargetName({
+    oleObject,
+    relationships,
+    slidePath,
+  })
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+  const details = [progId, targetName]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`),
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: objectName }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXOleObjectTargetName({
+  oleObject,
+  relationships,
+  slidePath,
+}: {
+  oleObject: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}) {
+  const relationshipId = readPPTXRelationshipAttributeId(oleObject)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const path = relationship && relationship.targetMode !== 'External'
+    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : relationship?.target
+  const fileName = path?.split('/').at(-1)?.trim()
+
+  return fileName ?? ''
 }
 
 async function readPPTXDiagramTextElement({
