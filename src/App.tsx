@@ -4534,6 +4534,7 @@ function App() {
   }, [])
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
+  const deckSlideSize = deck.size
   const pptxOpenStatusText = getPPTDeckPPTXOpenStatusText(pptxOpenStatus)
   const activeSlideIndex = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
   const slideRailDescriptor = useMemo(() => createSlideEditRailDescriptor({
@@ -4622,8 +4623,8 @@ function App() {
     () => [
       {
         bounds: {
-          h: PPT_SLIDE_HEIGHT,
-          w: PPT_SLIDE_WIDTH,
+          h: deckSlideSize.h,
+          w: deckSlideSize.w,
           x: 0,
           y: 0,
         },
@@ -4636,7 +4637,7 @@ function App() {
           id: element.id,
         })),
     ],
-    [activeSlide.elements],
+    [activeSlide.elements, deckSlideSize.h, deckSlideSize.w],
   )
   const stageRect = canvasStageElement.getRect()
   const minimapModel = stageRect && showMinimap
@@ -4666,13 +4667,13 @@ function App() {
     () => getSlideEditFrameGuideGeometry({
       config: PPT_FRAME_GUIDE_CONFIG,
       frameBounds: {
-        h: PPT_SLIDE_HEIGHT,
-        w: PPT_SLIDE_WIDTH,
+        h: deckSlideSize.h,
+        w: deckSlideSize.w,
         x: 0,
         y: 0,
       },
     }),
-    [],
+    [deckSlideSize.h, deckSlideSize.w],
   )
   const canExportSelectionSVG = selectionSvgCode !== null
   const hasLockedItems = activeSlide.elements.some((element) => element.locked === true)
@@ -4766,15 +4767,15 @@ function App() {
   const fitSlide = useCallback(() => {
     fitPPTCanvasViewportToBounds({
       bounds: {
-        h: PPT_SLIDE_HEIGHT,
-        w: PPT_SLIDE_WIDTH,
+        h: deckSlideSize.h,
+        w: deckSlideSize.w,
         x: 0,
         y: 0,
       },
       setViewport,
       stageElement: canvasStageElement,
     })
-  }, [canvasStageElement])
+  }, [canvasStageElement, deckSlideSize.h, deckSlideSize.w])
 
   const fitSelection = useCallback(() => {
     fitPPTCanvasViewportToBounds({
@@ -15898,6 +15899,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
               key={slide.id}
               optionDescriptor={slideRailDescriptor.listbox.options[index]}
               slide={slide}
+              slideSize={deckSlideSize}
               thumbnailDescriptor={slideRailDescriptor.thumbnails[index]}
               onDragEnd={handleSlideThumbDragEnd}
               onDragOver={(event) => handleSlideThumbDragOver(slide.id, event)}
@@ -17063,15 +17065,21 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             data-ppt-hidden-placeholders={(activeSlide.hiddenPlaceholderIds ?? []).join(' ')}
             data-ppt-layout-id={activeLayout.layoutId}
             data-ppt-slide={activeSlide.id}
+            data-ppt-slide-height={deckSlideSize.h}
             data-ppt-slide-hidden={activeSlide.hidden === true ? 'true' : undefined}
             data-ppt-slide-section-name={activeSlide.sectionName}
+            data-ppt-slide-width={deckSlideSize.w}
             data-ppt-theme-id={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
             data-ppt-transition-advance-after={activeSlideTransition.advanceAfterMs ?? ''}
             data-ppt-transition-advance-on-click={activeSlideTransition.advanceOnClick ? 'true' : 'false'}
             data-ppt-transition-duration={activeSlideTransition.durationMs}
             data-ppt-transition-model="slide-edit-slide-transition-timing"
             data-ppt-transition-type={activeSlideTransition.type}
-            style={{ background: activeSlide.background?.color ?? '#ffffff' }}
+            style={{
+              background: activeSlide.background?.color ?? '#ffffff',
+              height: deckSlideSize.h,
+              width: deckSlideSize.w,
+            }}
           >
             {activeSlide.elements.filter((element) => element.visible !== false).map((element) => (
               <PPTElementView
@@ -35825,6 +35833,7 @@ function SlideThumb({
   onKeyDown,
   onSelect,
   slide,
+  slideSize,
   thumbnailDescriptor,
 }: {
   active: boolean
@@ -35840,6 +35849,7 @@ function SlideThumb({
   onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
   onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void
   slide: PPTSlide
+  slideSize: PPTDeck['size']
   thumbnailDescriptor?: SlideEditRailThumbnailDescriptor<string>
 }) {
   const descriptorActive = thumbnailDescriptor?.isActive ?? active
@@ -35874,6 +35884,8 @@ function SlideThumb({
       data-ppt-slide-rail-thumb-y={thumbnailDescriptor?.bounds.y}
       data-ppt-slide-roving-tab-index={String(tabIndex)}
       data-ppt-slide-section-name={slide.sectionName}
+      data-ppt-slide-thumb-height={slideSize.h}
+      data-ppt-slide-thumb-width={slideSize.w}
       draggable
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
@@ -35886,7 +35898,13 @@ function SlideThumb({
       tabIndex={tabIndex}
       type="button"
     >
-      <span className="ppt-thumb-preview" style={{ background: slide.background?.color ?? '#fff' }}>
+      <span
+        className="ppt-thumb-preview"
+        style={{
+          aspectRatio: `${slideSize.w} / ${slideSize.h}`,
+          background: slide.background?.color ?? '#fff',
+        }}
+      >
         {slide.elements.map((element) => (
           <span
             className={getPPTThumbElementClassName(element)}
@@ -36000,19 +36018,19 @@ function SlideThumb({
               backgroundSize: element.kind === 'image'
                 ? getPPTImageFit(element)
                 : undefined,
-              height: `${(element.geometry.h / PPT_SLIDE_HEIGHT) * 100}%`,
+              height: `${(element.geometry.h / slideSize.h) * 100}%`,
               fontFamily: isPPTTextElement(element)
                 ? getPPTTextFontFamilyCSS(getPPTTextElementStyle(element).fontFamily)
                 : undefined,
               alignItems: isPPTTextElement(element)
                 ? getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))
                 : undefined,
-              left: `${(element.geometry.x / PPT_SLIDE_WIDTH) * 100}%`,
+              left: `${(element.geometry.x / slideSize.w) * 100}%`,
               filter: getPPTElementShadowFilter(element),
               opacity: getPPTElementOpacity(element),
-              top: `${(element.geometry.y / PPT_SLIDE_HEIGHT) * 100}%`,
+              top: `${(element.geometry.y / slideSize.h) * 100}%`,
               transform: getPPTElementTransform(element),
-              width: `${(element.geometry.w / PPT_SLIDE_WIDTH) * 100}%`,
+              width: `${(element.geometry.w / slideSize.w) * 100}%`,
               ...getPPTThumbLineDashStyle(element),
             }}
           />

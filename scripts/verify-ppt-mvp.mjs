@@ -320,6 +320,48 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXRenderedSlideState,
     },
   )
+
+  const customSizeOpenXmlPPTXBase64 = await setPPTXOpenXmlSlideSize(
+    openXmlPPTXBase64,
+    {
+      cx: 9144000,
+      cy: 6858000,
+    },
+  )
+
+  await openPPTXFileFromInput(page, {
+    base64: customSizeOpenXmlPPTXBase64,
+    fileName: 'external-openxml-4x3.pptx',
+  })
+  await waitForPPTXDeckImport(page, {
+    fileName: 'external-openxml-4x3.pptx',
+    format: 'pptx-open-xml-ppt-deck',
+  })
+
+  const customSizePPTXImportState = await readPPTXDeckImportState(page)
+  const customSizePPTXFrameState = await readPPTXActiveSlideFrameState(page)
+
+  record(
+    'opens custom-size OpenXML PPTX with imported slide frame dimensions',
+    customSizePPTXImportState.model === 'ppt-deck-pptx-import' &&
+      customSizePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      customSizePPTXImportState.fileName === 'external-openxml-4x3.pptx' &&
+      customSizePPTXImportState.importedCount === 2 &&
+      customSizePPTXImportState.slideCount === 2 &&
+      customSizePPTXImportState.sourceSlideCount === 2 &&
+      customSizePPTXFrameState.slideWidth === 960 &&
+      customSizePPTXFrameState.slideHeight === 720 &&
+      customSizePPTXFrameState.slideStyleWidth === '960px' &&
+      customSizePPTXFrameState.slideStyleHeight === '720px' &&
+      customSizePPTXFrameState.thumbWidth === 960 &&
+      customSizePPTXFrameState.thumbHeight === 720 &&
+      customSizePPTXFrameState.thumbAspectRatio > 1.32 &&
+      customSizePPTXFrameState.thumbAspectRatio < 1.34,
+    {
+      customSizePPTXFrameState,
+      customSizePPTXImportState,
+    },
+  )
 }
 
 async function runTopToolbarRovingFocusScenario(page) {
@@ -30091,6 +30133,35 @@ async function removePPTXEmbeddedPPTModel(base64) {
   })
 }
 
+async function setPPTXOpenXmlSlideSize(base64, { cx, cy }) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const presentationXml = await readPPTXZipText(zip, 'ppt/presentation.xml')
+
+  if (!presentationXml) {
+    return base64
+  }
+
+  const nextXml = presentationXml.replace(
+    /<p:sldSz\b[^>]*\/>/,
+    `<p:sldSz cx="${cx}" cy="${cy}" type="screen4x3"/>`,
+  )
+
+  if (nextXml === presentationXml) {
+    return base64
+  }
+
+  zip.file('ppt/presentation.xml', nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function reversePPTXPresentationSlideOrder(base64) {
   if (!base64) {
     return ''
@@ -34138,6 +34209,47 @@ function dropPPTXFile(page, { base64, fileName }) {
       dataTransfer,
     }))
   })(${JSON.stringify({ base64, fileName })})`)
+}
+
+function openPPTXFileFromInput(page, { base64, fileName }) {
+  return page.eval(`((input) => {
+    const fileInput = document.querySelector('[data-ppt-open-pptx-input]')
+    const filesSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files').set
+    const bytes = Uint8Array.from(atob(input.base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], input.fileName, {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    })
+    const dataTransfer = new DataTransfer()
+
+    dataTransfer.items.add(file)
+    filesSetter.call(fileInput, dataTransfer.files)
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }))
+  })(${JSON.stringify({ base64, fileName })})`)
+}
+
+function readPPTXActiveSlideFrameState(page) {
+  return page.eval(`(() => {
+    const slide = document.querySelector('.ppt-stage-shell .ppt-slide[data-ppt-slide]')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const thumbPreview = activeThumb?.querySelector('.ppt-thumb-preview')
+    const thumbPreviewRect = thumbPreview?.getBoundingClientRect()
+    const thumbWidth = Number(activeThumb?.getAttribute('data-ppt-slide-thumb-width') ?? 0)
+    const thumbHeight = Number(activeThumb?.getAttribute('data-ppt-slide-thumb-height') ?? 0)
+
+    return {
+      slideHeight: Number(slide?.getAttribute('data-ppt-slide-height') ?? 0),
+      slideStyleHeight: slide?.style.height ?? '',
+      slideStyleWidth: slide?.style.width ?? '',
+      slideWidth: Number(slide?.getAttribute('data-ppt-slide-width') ?? 0),
+      thumbAspectRatio: thumbPreviewRect
+        ? thumbPreviewRect.width / thumbPreviewRect.height
+        : 0,
+      thumbHeight,
+      thumbPreviewHeight: thumbPreviewRect?.height ?? 0,
+      thumbPreviewWidth: thumbPreviewRect?.width ?? 0,
+      thumbWidth,
+    }
+  })()`)
 }
 
 async function readPPTXImportedSlideRenderState(
