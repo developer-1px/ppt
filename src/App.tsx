@@ -2521,6 +2521,12 @@ type PPTDeckPPTXImportEffect = {
   sourceSlideCount: number
   sourceTitle: string
 }
+type PPTDeckPPTXOpenStatus = {
+  fileName: string
+  format?: PPTDeckPPTXImportResult['format']
+  kind: 'error' | 'loading' | 'success'
+  slideCount?: number
+}
 type PPTSlideJSONImportEffect = {
   firstImportedSlideId: string
   format:
@@ -4276,6 +4282,8 @@ function App() {
     useState<PPTDeckJSONImportEffect | null>(null)
   const [lastDeckPPTXImportEffect, setLastDeckPPTXImportEffect] =
     useState<PPTDeckPPTXImportEffect | null>(null)
+  const [pptxOpenStatus, setPPTXOpenStatus] =
+    useState<PPTDeckPPTXOpenStatus | null>(null)
   const [lastSlideJSONImportEffect, setLastSlideJSONImportEffect] =
     useState<PPTSlideJSONImportEffect | null>(null)
   const [lastSlideNotesImportEffect, setLastSlideNotesImportEffect] =
@@ -4526,6 +4534,7 @@ function App() {
   }, [])
 
   const activeSlide = findPPTSlide(deck, activeSlideId)
+  const pptxOpenStatusText = getPPTDeckPPTXOpenStatusText(pptxOpenStatus)
   const activeSlideIndex = deck.slides.findIndex((slide) => slide.id === activeSlide.id)
   const slideRailDescriptor = useMemo(() => createSlideEditRailDescriptor({
     activeSlideId: activeSlide.id,
@@ -6879,17 +6888,43 @@ function App() {
   }
 
   async function openPPTDeckPPTXFile(file: File) {
+    setPPTXOpenStatus({
+      fileName: file.name,
+      kind: 'loading',
+    })
+
     const result = await importPPTDeckFromPPTXBlob(file)
 
     if (!result) {
+      setPPTXOpenStatus({
+        fileName: file.name,
+        kind: 'error',
+      })
       return false
     }
 
-    return replacePPTDeckPPTXSource({
+    const source = {
       ...result,
       fileName: file.name,
       fileSize: file.size,
+    }
+
+    if (!replacePPTDeckPPTXSource(source)) {
+      setPPTXOpenStatus({
+        fileName: file.name,
+        kind: 'error',
+      })
+      return false
+    }
+
+    setPPTXOpenStatus({
+      fileName: file.name,
+      format: result.format,
+      kind: 'success',
+      slideCount: result.deck.slides.length,
     })
+
+    return true
   }
 
   function replacePPTDeckPPTXSource(source: PPTDeckPPTXImportSource) {
@@ -15750,6 +15785,20 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Open PPTX" className="ppt-button" data-ppt-open-pptx onClick={() => pptxInputRef.current?.click()} type="button">
             <FilePlus2 size={16} /> PPTX
           </button>
+          {pptxOpenStatus ? (
+            <span
+              aria-live="polite"
+              className="ppt-pptx-open-status"
+              data-ppt-open-pptx-file-name={pptxOpenStatus.fileName}
+              data-ppt-open-pptx-format={pptxOpenStatus.format}
+              data-ppt-open-pptx-slide-count={pptxOpenStatus.slideCount}
+              data-ppt-open-pptx-status={pptxOpenStatus.kind}
+              role="status"
+              title={pptxOpenStatusText}
+            >
+              {pptxOpenStatusText}
+            </span>
+          ) : null}
           <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
             <Copy size={16} /> HTML
           </button>
@@ -18932,6 +18981,26 @@ function createPPTDeckPPTXImportEffect({
     sourceSlideCount: source.deck.slides.length,
     sourceTitle: source.deck.title,
   }
+}
+
+function getPPTDeckPPTXOpenStatusText(
+  status: PPTDeckPPTXOpenStatus | null,
+) {
+  if (!status) {
+    return ''
+  }
+
+  if (status.kind === 'loading') {
+    return `Opening ${status.fileName}`
+  }
+
+  if (status.kind === 'error') {
+    return `Could not open ${status.fileName}`
+  }
+
+  const slideCount = status.slideCount ?? 0
+
+  return `${status.fileName} (${slideCount} ${slideCount === 1 ? 'slide' : 'slides'})`
 }
 
 function createPPTSlideJSONImportEffect({
