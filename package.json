@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "verify:mvp": "node scripts/verify-ppt-mvp.mjs",
+    "verify:pptx-render": "PPT_VERIFY_SCENARIO=pptx-render node scripts/verify-ppt-mvp.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

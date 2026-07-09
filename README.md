@@ -7,6 +7,7 @@ Lightweight PPT subset editor for AI-generated decks and final retouching.
 - Open a real `.pptx` file through file input or drop.
 - Use the embedded PPT model when present; otherwise import from PPTX OpenXML.
 - Render every imported slide as both a selectable thumbnail and the active slide page.
+- Use `pnpm verify:pptx-render` as the fast gate for real-file page rendering.
 - Keep `pnpm verify:mvp` checking imported PPTX pages by iterating the rendered slides one by one.
 
 ## Architecture
@@ -29,5 +30,6 @@ pnpm dev
 ```sh
 pnpm lint
 pnpm build
+pnpm verify:pptx-render
 pnpm verify:mvp
 ```

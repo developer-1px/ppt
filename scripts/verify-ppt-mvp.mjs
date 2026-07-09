@@ -21,6 +21,7 @@ const PPT_TEST_IMAGE_WIDTH = 640
 const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
+const PPT_VERIFY_SCENARIO = process.env.PPT_VERIFY_SCENARIO ?? 'mvp'
 const SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-accessibility+json'
 const SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE =
@@ -69,54 +70,60 @@ try {
     width: 1280,
   })
 
-  await runFirstScreenScenario(page)
-  await runTopToolbarRovingFocusScenario(page)
-  await runTextEditingScenario(page)
-  await runFindReplaceScenario(page)
-  await runSpacingGuideScenario(page)
-  await runSelectionAndDragScenario(page)
-  await runMarqueeSelectionScenario(page)
-  await runAltDragDuplicateScenario(page)
-  await runAffordanceScenario(page)
-  await runCommandSurfaceScenario(page)
-  await runCrossSlideClipboardScenario(page)
-  await runSelectSameTypeScenario(page)
-  await runCommandPaletteScenario(page)
-  await runShortcutHelpScenario(page)
-  await runSlideMetadataScenario(page)
-  await runThemeScenario(page)
-  await runSlideTransitionScenario(page)
-  await runObjectAnimationScenario(page)
-  await runObjectOpacityScenario(page)
-  await runObjectShadowScenario(page)
-  await runObjectHyperlinkScenario(page)
-  await runFitSelectionScenario(page)
-  await runMinimapScenario(page)
-  await runTidySelectionScenario(page)
-  await runTextQuickFormatScenario(page)
-  await runTextParagraphSpacingScenario(page)
-  await runTextFontFamilyScenario(page)
-  await runTextVerticalAlignScenario(page)
-  await runTextFrameInsetScenario(page)
-  await runViewAndShapeScenario(page)
-  await runStickySectionScenario(page)
-  await runLineAffordanceScenario(page)
-  await runFreeformScenario(page)
-  await runImageImportScenario(page)
-  await runObjectAltTextScenario(page)
-  await runTableImportScenario(page)
-  await runTextPasteScenario(page)
-  await runMediaImportScenario(page)
-  await runCommentReviewScenario(page)
-  await runFlipSelectionScenario(page)
-  await runSelectionPaneScenario(page)
-  await runTextOverflowScenario(page)
-  await runPresentationScenario(page)
-  await runExportScenario(page)
-  await runAlignmentPopoverScenario(page)
-  await runShapeMenuScenario(page)
-  await runSlideManagementScenario(page)
-  await runMobileScenario(cdpPort)
+  if (PPT_VERIFY_SCENARIO === 'pptx-render') {
+    await runPPTXRenderScenario(page)
+  } else if (PPT_VERIFY_SCENARIO === 'mvp') {
+    await runFirstScreenScenario(page)
+    await runTopToolbarRovingFocusScenario(page)
+    await runTextEditingScenario(page)
+    await runFindReplaceScenario(page)
+    await runSpacingGuideScenario(page)
+    await runSelectionAndDragScenario(page)
+    await runMarqueeSelectionScenario(page)
+    await runAltDragDuplicateScenario(page)
+    await runAffordanceScenario(page)
+    await runCommandSurfaceScenario(page)
+    await runCrossSlideClipboardScenario(page)
+    await runSelectSameTypeScenario(page)
+    await runCommandPaletteScenario(page)
+    await runShortcutHelpScenario(page)
+    await runSlideMetadataScenario(page)
+    await runThemeScenario(page)
+    await runSlideTransitionScenario(page)
+    await runObjectAnimationScenario(page)
+    await runObjectOpacityScenario(page)
+    await runObjectShadowScenario(page)
+    await runObjectHyperlinkScenario(page)
+    await runFitSelectionScenario(page)
+    await runMinimapScenario(page)
+    await runTidySelectionScenario(page)
+    await runTextQuickFormatScenario(page)
+    await runTextParagraphSpacingScenario(page)
+    await runTextFontFamilyScenario(page)
+    await runTextVerticalAlignScenario(page)
+    await runTextFrameInsetScenario(page)
+    await runViewAndShapeScenario(page)
+    await runStickySectionScenario(page)
+    await runLineAffordanceScenario(page)
+    await runFreeformScenario(page)
+    await runImageImportScenario(page)
+    await runObjectAltTextScenario(page)
+    await runTableImportScenario(page)
+    await runTextPasteScenario(page)
+    await runMediaImportScenario(page)
+    await runCommentReviewScenario(page)
+    await runFlipSelectionScenario(page)
+    await runSelectionPaneScenario(page)
+    await runTextOverflowScenario(page)
+    await runPresentationScenario(page)
+    await runExportScenario(page)
+    await runAlignmentPopoverScenario(page)
+    await runShapeMenuScenario(page)
+    await runSlideManagementScenario(page)
+    await runMobileScenario(cdpPort)
+  } else {
+    throw new Error(`Unknown PPT_VERIFY_SCENARIO: ${PPT_VERIFY_SCENARIO}`)
+  }
 
   await page.close()
 
@@ -165,6 +172,102 @@ async function runFirstScreenScenario(page) {
   record('removes old retouch shell', !state.hasRetouchShell, state)
   record('removes Vite starter copy', !state.hasStarterCopy, state)
   record('does not expose CanvasItem as product text', !state.hasCanvasItemLeak, state)
+}
+
+async function runPPTXRenderScenario(page) {
+  await runFirstScreenScenario(page)
+  await installPPTDownloadCapture(page)
+  await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
+  await waitForPPTXDownloadBlob(page)
+
+  const pptxDownloadBlobState = await readPPTXDownloadBlobState(page)
+  const { base64: pptxDownloadBase64, ...pptxDownloadState } =
+    pptxDownloadBlobState
+
+  record(
+    'creates a real PPTX file blob for render verification',
+    pptxDownloadState.download === 'ai-retouch-demo.pptx' &&
+      pptxDownloadState.type.includes('presentationml.presentation') &&
+      pptxDownloadState.signature === 'PK' &&
+      pptxDownloadState.size > 5000 &&
+      pptxDownloadState.byteLength === pptxDownloadState.size &&
+      pptxDownloadBlobState.base64Length > 0,
+    pptxDownloadState,
+  )
+
+  const beforeEmbeddedPPTXDrop = await readPPTSlideCountState(page)
+
+  await dropPPTXFile(page, {
+    base64: pptxDownloadBase64,
+    fileName: 'ai-retouch-demo.pptx',
+  })
+  await waitForPPTXDeckImport(page, {
+    fileName: 'ai-retouch-demo.pptx',
+    format: 'pptx-custom-xml-ppt-deck',
+  })
+
+  const embeddedPPTXImportState = await readPPTXDeckImportState(page)
+  const embeddedPPTXRenderedSlideState =
+    await readPPTXImportedSlideRenderState(page)
+
+  record(
+    'renders every embedded-model PPTX page from a dropped real file',
+    embeddedPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      embeddedPPTXImportState.format === 'pptx-custom-xml-ppt-deck' &&
+      embeddedPPTXImportState.fileName === 'ai-retouch-demo.pptx' &&
+      embeddedPPTXImportState.dropAction === 'pptx-deck-file' &&
+      embeddedPPTXImportState.sourceSlideCount === beforeEmbeddedPPTXDrop.slideCount &&
+      embeddedPPTXImportState.importedCount === beforeEmbeddedPPTXDrop.slideCount &&
+      embeddedPPTXImportState.slideCount === beforeEmbeddedPPTXDrop.slideCount * 2 &&
+      embeddedPPTXRenderedSlideState.importedSlideCount === embeddedPPTXImportState.importedCount &&
+      embeddedPPTXRenderedSlideState.firstSlideId === embeddedPPTXImportState.firstImportedSlideId &&
+      embeddedPPTXRenderedSlideState.allSlidesRendered,
+    {
+      beforeEmbeddedPPTXDrop,
+      embeddedPPTXImportState,
+      embeddedPPTXRenderedSlideState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(pptxDownloadBase64)
+  const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
+
+  await dropPPTXFile(page, {
+    base64: openXmlPPTXBase64,
+    fileName: 'external-openxml-basic.pptx',
+  })
+  await waitForPPTXDeckImport(page, {
+    fileName: 'external-openxml-basic.pptx',
+    format: 'pptx-open-xml-ppt-deck',
+  })
+
+  const openXmlPPTXImportState = await readPPTXDeckImportState(page)
+  const openXmlPPTXRenderedSlideState =
+    await readPPTXImportedSlideRenderState(page)
+
+  record(
+    'renders every OpenXML PPTX page from a dropped real file',
+    openXmlPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      openXmlPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      openXmlPPTXImportState.fileName === 'external-openxml-basic.pptx' &&
+      openXmlPPTXImportState.dropAction === 'pptx-deck-file' &&
+      openXmlPPTXImportState.jsonLength === 0 &&
+      openXmlPPTXImportState.sourceSlideCount === beforeOpenXmlPPTXDrop.slideCount &&
+      openXmlPPTXImportState.importedCount === beforeOpenXmlPPTXDrop.slideCount &&
+      openXmlPPTXImportState.slideCount === beforeOpenXmlPPTXDrop.slideCount * 2 &&
+      openXmlPPTXRenderedSlideState.importedSlideCount === openXmlPPTXImportState.importedCount &&
+      openXmlPPTXRenderedSlideState.firstSlideId === openXmlPPTXImportState.firstImportedSlideId &&
+      openXmlPPTXRenderedSlideState.allSlidesRendered,
+    {
+      beforeOpenXmlPPTXDrop,
+      openXmlPPTXImportState,
+      openXmlPPTXRenderedSlideState,
+    },
+  )
 }
 
 async function runTopToolbarRovingFocusScenario(page) {
@@ -33865,6 +33968,106 @@ function focusPPTSlideThumb(page, slideId) {
 
     thumb?.focus()
   })(${JSON.stringify(slideId)})`)
+}
+
+function readPPTXDownloadBlobState(page) {
+  return page.eval(`(() => {
+    const download = (window.__pptDownloads ?? [])
+      .find((entry) => entry.download === 'ai-retouch-demo.pptx') ?? {}
+
+    return {
+      base64: download.base64 ?? '',
+      base64Length: (download.base64 ?? '').length,
+      byteLength: download.byteLength ?? 0,
+      download: download.download ?? '',
+      signature: download.signature ?? '',
+      size: download.size ?? 0,
+      type: download.type ?? '',
+    }
+  })()`)
+}
+
+function waitForPPTXDownloadBlob(page) {
+  return waitUntil(
+    () => page.eval(`(() => {
+      const download = (window.__pptDownloads ?? [])
+        .find((entry) => entry.download === 'ai-retouch-demo.pptx')
+
+      return !!download &&
+        download.signature === 'PK' &&
+        (download.base64 ?? '').length > 0 &&
+        download.byteLength === download.size &&
+        download.size > 0
+    })()`),
+    'Timed out waiting for PPTX download blob',
+    5000,
+  )
+}
+
+function readPPTSlideCountState(page) {
+  return page.eval(`(() => ({
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+}
+
+function readPPTXDeckImportState(page) {
+  return page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? ''
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSlide,
+      dropAction: stage?.getAttribute('data-ppt-import-extension-last-drop-action') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      fileSize: Number(stage?.getAttribute('data-ppt-deck-pptx-import-file-size') ?? 0),
+      firstImportedSlideId: stage?.getAttribute('data-ppt-deck-pptx-import-first-slide') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      jsonLength: Number(stage?.getAttribute('data-ppt-deck-pptx-import-json-length') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceDeck: stage?.getAttribute('data-ppt-deck-pptx-import-source-deck') ?? '',
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+      sourceTitle: stage?.getAttribute('data-ppt-deck-pptx-import-source-title') ?? '',
+    }
+  })()`)
+}
+
+function waitForPPTXDeckImport(page, { fileName, format }) {
+  return waitUntil(
+    () => page.eval(`((input) => {
+      const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+
+      return stage?.getAttribute('data-ppt-deck-pptx-import-file-name') === input.fileName &&
+        stage?.getAttribute('data-ppt-deck-pptx-import-format') === input.format &&
+        Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0) > 0
+    })(${JSON.stringify({ fileName, format })})`),
+    `Timed out waiting for PPTX import: ${fileName}`,
+    5000,
+  )
+}
+
+function dropPPTXFile(page, { base64, fileName }) {
+  return page.eval(`((input) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(input.base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], input.fileName, {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify({ base64, fileName })})`)
 }
 
 async function readPPTXImportedSlideRenderState(page) {
