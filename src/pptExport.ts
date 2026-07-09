@@ -759,6 +759,7 @@ function renderPPTTextRunSVG(run: PPTRun) {
   const textDecoration = getPPTTextRunTextDecoration(run)
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true" font-style="italic"' : '',
+    run.hyperlink ? `data-ppt-run-hyperlink-url="${escapeHtml(run.hyperlink.url)}"` : '',
     run.underline === true ? 'data-ppt-run-underline="true"' : '',
     run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
     textDecoration ? `text-decoration="${textDecoration}"` : '',
@@ -840,6 +841,7 @@ function renderPPTTextRunHTML(run: PPTRun) {
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true"' : '',
     run.highlight ? `data-ppt-run-highlight="${escapeHtml(run.highlight)}"` : '',
+    run.hyperlink ? `data-ppt-run-hyperlink-url="${escapeHtml(run.hyperlink.url)}"` : '',
     run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
     run.underline === true ? 'data-ppt-run-underline="true"' : '',
     renderPPTTextRunStyleAttr(run),

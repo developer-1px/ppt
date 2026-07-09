@@ -3540,6 +3540,7 @@ async function readPPTXShapeElement(
     fallbackTxBody,
     fallbackTextColor,
     textFieldContext,
+    relationships,
   )
   const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors) ??
@@ -6429,6 +6430,7 @@ function readPPTXTextBody(
   fallbackTxBody: Element | null = null,
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
 ): PPTTextBody | null {
   if (!txBody) {
     return null
@@ -6445,6 +6447,7 @@ function readPPTXTextBody(
         themeColors,
         fallbackTextColor,
         textFieldContext,
+        relationships,
       ))
   const normalAutoFit = readPPTXNormalAutoFit(txBody)
   const scaledParagraphs = normalAutoFit === null
@@ -6549,6 +6552,7 @@ function readPPTXParagraph(
   themeColors: PPTXThemeColorMap,
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
 ): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
   const level = readPPTXParagraphLevel(pPr)
@@ -6582,6 +6586,7 @@ function readPPTXParagraph(
         themeColors,
         fallbackTextColor,
         textFieldContext,
+        relationships,
       ))
 
   return {
@@ -6623,6 +6628,7 @@ function readPPTXTextRun(
   themeColors: PPTXThemeColorMap,
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
 ): PPTRun[] {
   if (
     node.localName !== 'r' &&
@@ -6640,13 +6646,15 @@ function readPPTXTextRun(
     themeColors,
     fallbackTextColor,
   )
+  const hyperlink = readPPTXTextRunHyperlink(rPr, relationships)
+  const runStyle = hyperlink ? { ...style, hyperlink } : style
 
   if (node.localName === 'br') {
-    return [{ ...style, text: '\n' }]
+    return [{ ...runStyle, text: '\n' }]
   }
 
   if (node.localName === 'tab') {
-    return [{ ...style, text: '\t' }]
+    return [{ ...runStyle, text: '\t' }]
   }
 
   const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
@@ -6654,7 +6662,24 @@ function readPPTXTextRun(
     ? readPPTXTextFieldText(node, text, textFieldContext)
     : text
 
-  return [{ ...style, text: resolvedText }]
+  return [{ ...runStyle, text: resolvedText }]
+}
+
+function readPPTXTextRunHyperlink(
+  rPr: Element | null,
+  relationships: PPTXRelationshipMap | undefined,
+): PPTRun['hyperlink'] | undefined {
+  const relationshipId = readPPTXRelationshipAttributeId(
+    getDirectPPTXChildByLocalName(rPr, 'hlinkClick'),
+  )
+  const relationship = relationshipId && relationships
+    ? relationships.get(relationshipId)
+    : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target
+    : undefined
+
+  return url ? { url } : undefined
 }
 
 function readPPTXTextFieldText(

@@ -353,6 +353,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXTextBodyRotationProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXHyperlinkProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
@@ -411,6 +412,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXPictureClipShapeProbeState(page)
   const openXmlPPTXShapeImageFillState =
     await readPPTXShapeImageFillProbeState(page)
+  const openXmlPPTXRunHyperlinkState =
+    await readPPTXRunHyperlinkProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
 
@@ -600,6 +603,23 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXShapeImageFillState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX text run hyperlink for viewer rendering',
+    openXmlPPTXRunHyperlinkState.modelCount === 1 &&
+      openXmlPPTXRunHyperlinkState.runHyperlinkUrl ===
+        'https://example.com/openxml-run-hyperlink-probe' &&
+      openXmlPPTXRunHyperlinkState.activeRunHyperlinkUrl ===
+        'https://example.com/openxml-run-hyperlink-probe' &&
+      openXmlPPTXRunHyperlinkState.activeRunUnderline === 'true' &&
+      openXmlPPTXRunHyperlinkState.activeRunColor === '#2563eb' &&
+      openXmlPPTXRunHyperlinkState.exportHasRunHyperlinkMarkup &&
+      openXmlPPTXRunHyperlinkState.exportHasRunHyperlinkModel,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXRunHyperlinkState,
     },
   )
 
@@ -31351,6 +31371,12 @@ async function addPPTXHyperlinkProbe(base64) {
     zip,
     sourcePath: slidePath,
   })
+  const runRelationshipId = await addPPTXExternalRelationship({
+    target: 'https://example.com/openxml-run-hyperlink-probe',
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+    zip,
+    sourcePath: slidePath,
+  })
   const probeShapeXml = [
     '<p:sp>',
     '<p:nvSpPr>',
@@ -31373,6 +31399,26 @@ async function addPPTXHyperlinkProbe(base64) {
     '<a:bodyPr/>',
     '<a:lstStyle/>',
     '<a:p><a:r><a:t>Hyperlink Probe</a:t></a:r></a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9964" name="Run Hyperlink Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5029200" y="5036820"/>',
+    '<a:ext cx="2743200" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:noFill/>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:rPr lang="en-US" sz="1800" u="sng"><a:solidFill><a:srgbClr val="2563EB"/></a:solidFill><a:hlinkClick r:id="' + runRelationshipId + '"/></a:rPr><a:t>Run Hyperlink Probe</a:t></a:r></a:p>',
     '</p:txBody>',
     '</p:sp>',
   ].join('')
@@ -38066,6 +38112,49 @@ function readPPTXShapeImageFillProbeState(page) {
       strokeColor: image?.stroke?.color ?? '',
       strokeDash: image?.stroke?.dash ?? '',
       strokeWidth: Number(image?.stroke?.width ?? 0),
+    }
+  })()`)
+}
+
+function readPPTXRunHyperlinkProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const elements = exportImportedElements.filter((element) =>
+      element.name === 'Run Hyperlink Probe' &&
+      (element.kind === 'textBox' || element.kind === 'shape'))
+    const element = elements[0] ?? null
+    const runs = (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+    const linkRun = runs.find((run) =>
+      run.hyperlink?.url === 'https://example.com/openxml-run-hyperlink-probe') ?? null
+    const activeRun = document.querySelector('.ppt-slide [data-ppt-element-name="Run Hyperlink Probe"] [data-ppt-run-hyperlink-url]')
+
+    return {
+      activeRunColor: activeRun?.getAttribute('data-ppt-run-color') ?? '',
+      activeRunHyperlinkUrl: activeRun?.getAttribute('data-ppt-run-hyperlink-url') ?? '',
+      activeRunUnderline: activeRun?.getAttribute('data-ppt-run-underline') ?? '',
+      exportHasRunHyperlinkMarkup: exportCode.includes('data-ppt-run-hyperlink-url="https://example.com/openxml-run-hyperlink-probe"'),
+      exportHasRunHyperlinkModel: exportCode.includes('"name": "Run Hyperlink Probe"') &&
+        exportCode.includes('"hyperlink": {') &&
+        exportCode.includes('"url": "https://example.com/openxml-run-hyperlink-probe"'),
+      modelCount: elements.length,
+      runHyperlinkUrl: linkRun?.hyperlink?.url ?? '',
+      runText: linkRun?.text ?? '',
     }
   })()`)
 }

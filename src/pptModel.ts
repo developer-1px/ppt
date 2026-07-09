@@ -53,10 +53,15 @@ const PPTGeometrySchema = z.object({
   y: z.number(),
 })
 
+const PPTElementHyperlinkSchema = z.object({
+  url: z.string(),
+})
+
 const PPTRunSchema = z.object({
   bold: z.boolean().optional(),
   color: z.string().optional(),
   highlight: z.string().optional(),
+  hyperlink: PPTElementHyperlinkSchema.optional(),
   italic: z.boolean().optional(),
   size: z.number().optional(),
   strikethrough: z.boolean().optional(),
@@ -110,10 +115,6 @@ const PPTElementShadowSchema = z.object({
   color: z.string(),
   distance: z.number(),
   opacity: z.number(),
-})
-
-const PPTElementHyperlinkSchema = z.object({
-  url: z.string(),
 })
 
 const PPTElementAccessibilitySchema = z.object({

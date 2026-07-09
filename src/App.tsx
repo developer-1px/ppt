@@ -4135,7 +4135,7 @@ type PPTDeckHistoryEntry = {
   selection: string[]
 }
 
-type PPTTextRunStyle = Omit<PPTRun, 'text'>
+type PPTTextRunStyle = Omit<PPTRun, 'hyperlink' | 'text'>
 type PPTTextToken = {
   align?: PPTParagraph['align']
   bullet?: PPTParagraph['bullet']
@@ -36715,6 +36715,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
               data-ppt-run-bold={run.bold === true ? 'true' : undefined}
               data-ppt-run-color={run.color}
               data-ppt-run-highlight={run.highlight}
+              data-ppt-run-hyperlink-url={run.hyperlink?.url}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
               data-ppt-run-size={run.size}
               data-ppt-run-strikethrough={run.strikethrough === true ? 'true' : undefined}
@@ -40568,6 +40569,7 @@ function applyPPTTextRunStyle(
 ): PPTRun {
   return {
     text: run.text,
+    ...(run.hyperlink ? { hyperlink: run.hyperlink } : {}),
     ...(style.bold === true ? { bold: true } : {}),
     ...(style.color === undefined ? {} : { color: style.color }),
     ...(style.highlight === undefined ? {} : { highlight: style.highlight }),

@@ -1989,7 +1989,7 @@ function createPPTXTextRuns({
               runIndex === 0 &&
               segmentIndex === 0
             ) || segmentIndex > 0,
-            hyperlink,
+            hyperlink: createPPTXHyperlink(run.hyperlink) ?? hyperlink,
           },
           text,
         })
