@@ -356,6 +356,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXShapeImageFillProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXUnsupportedImageProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
@@ -408,6 +409,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXPresetGeometryFreeformProbeState(page)
   const openXmlPPTXPictureClipShapeState =
     await readPPTXPictureClipShapeProbeState(page)
+  const openXmlPPTXShapeImageFillState =
+    await readPPTXShapeImageFillProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
 
@@ -576,6 +579,27 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXPictureClipShapeState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX shape image-fill outline for viewer rendering',
+    openXmlPPTXShapeImageFillState.modelCount === 1 &&
+      openXmlPPTXShapeImageFillState.strokeColor === '#0ea5e9' &&
+      openXmlPPTXShapeImageFillState.strokeDash === 'dash' &&
+      openXmlPPTXShapeImageFillState.strokeWidth === 3 &&
+      openXmlPPTXShapeImageFillState.activeHasImage &&
+      openXmlPPTXShapeImageFillState.activeStrokeDash === 'dash' &&
+      openXmlPPTXShapeImageFillState.activeBorderColor.includes('14') &&
+      openXmlPPTXShapeImageFillState.activeBorderColor.includes('165') &&
+      openXmlPPTXShapeImageFillState.activeBorderColor.includes('233') &&
+      openXmlPPTXShapeImageFillState.activeBorderStyle === 'dashed' &&
+      openXmlPPTXShapeImageFillState.activeBorderWidth === '3px' &&
+      openXmlPPTXShapeImageFillState.exportHasOutlineMarkup &&
+      openXmlPPTXShapeImageFillState.exportHasOutlineModel,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXShapeImageFillState,
     },
   )
 
@@ -14496,6 +14520,7 @@ async function runExportScenario(page) {
       activeImageStyleObjectFit: img?.style.objectFit ?? '',
       activeImageStyleTop: img?.style.top ?? '',
       activeImageStyleWidth: img?.style.width ?? '',
+      activeStrokeDash: activeImage?.getAttribute('data-ppt-stroke-dash') ?? '',
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeOpacity: activeImage?.getAttribute('data-ppt-opacity') ?? '',
       activeSrcDataUri: img?.getAttribute('src')?.startsWith('data:image/png') === true,
@@ -14509,6 +14534,14 @@ async function runExportScenario(page) {
         exportCode.includes('data-ppt-image-crop-bottom="20"'),
       exportHasCropRectModel: exportCode.includes('"left": 10') &&
         exportCode.includes('"bottom": 20'),
+      exportHasOutlineMarkup: exportCode.includes('data-ppt-stroke-dash="dash"') &&
+        exportCode.includes('border:3px solid #0ea5e9') &&
+        exportCode.includes('border-style:dashed'),
+      exportHasOutlineModel: exportCode.includes('"name": "Shape Image Fill Probe"') &&
+        exportCode.includes('"stroke": {') &&
+        exportCode.includes('"color": "#0ea5e9"') &&
+        exportCode.includes('"dash": "dash"') &&
+        exportCode.includes('"width": 3'),
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
@@ -14521,6 +14554,7 @@ async function runExportScenario(page) {
       shapeImageModelCount: shapeImages.length,
       shapeImageOpacity: shapeImage?.opacity ?? null,
       shapeImageSrcDataUri: shapeImage?.src?.startsWith('data:image/png') === true,
+      shapeImageStroke: shapeImage?.stroke ?? null,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
     }
@@ -14553,6 +14587,9 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.shapeImageGeometry?.w === 180 &&
       shapeImageFillPPTXImportState.shapeImageGeometry?.h === 120 &&
       shapeImageFillPPTXImportState.shapeImageOpacity === 0.66 &&
+      shapeImageFillPPTXImportState.shapeImageStroke?.color === '#0ea5e9' &&
+      shapeImageFillPPTXImportState.shapeImageStroke?.dash === 'dash' &&
+      shapeImageFillPPTXImportState.shapeImageStroke?.width === 3 &&
       shapeImageFillPPTXImportState.shapeImageSrcDataUri &&
       shapeImageFillPPTXImportState.shapeImageAlt === 'Shape image fill alt' &&
       shapeImageFillPPTXImportState.activeFit === 'cover' &&
@@ -14571,9 +14608,12 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.activeImageStyleHeight === '125%' &&
       shapeImageFillPPTXImportState.activeImageStyleLeft.startsWith('-11.111') &&
       shapeImageFillPPTXImportState.activeImageStyleTop === '0%' &&
+      shapeImageFillPPTXImportState.activeStrokeDash === 'dash' &&
       shapeImageFillPPTXImportState.exportHasCropRectMarkup &&
       shapeImageFillPPTXImportState.exportHasCropRectModel &&
       shapeImageFillPPTXImportState.exportHasAdjustmentMarkup &&
+      shapeImageFillPPTXImportState.exportHasOutlineMarkup &&
+      shapeImageFillPPTXImportState.exportHasOutlineModel &&
       shapeImageFillPPTXImportState.activeOpacity === '0.66' &&
       shapeImageFillPPTXImportState.activeSrcDataUri,
     {
@@ -35038,6 +35078,7 @@ async function addPPTXShapeImageFillProbe(base64) {
     '<a:srcRect l="10000" t="0" r="0" b="20000"/>',
     '<a:stretch><a:fillRect/></a:stretch>',
     '</a:blipFill>',
+    '<a:ln w="28575"><a:solidFill><a:srgbClr val="0EA5E9"/></a:solidFill><a:prstDash val="dash"/></a:ln>',
     '</p:spPr>',
     '<p:txBody>',
     '<a:bodyPr/>',
@@ -37978,6 +38019,53 @@ function readPPTXPictureClipShapeProbeState(page) {
       outlineStrokeColor: outline?.stroke?.color ?? '',
       outlineStrokeDash: outline?.stroke?.dash ?? '',
       outlineStrokeWidth: Number(outline?.stroke?.width ?? 0),
+    }
+  })()`)
+}
+
+function readPPTXShapeImageFillProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const images = exportImportedElements.filter((element) =>
+      element.name === 'Shape Image Fill Probe' &&
+      element.kind === 'image')
+    const image = images[0] ?? null
+    const activeImage = document.querySelector('.ppt-slide [data-ppt-element-name="Shape Image Fill Probe"][data-kind="image"]')
+    const activeImageStyle = activeImage ? getComputedStyle(activeImage) : null
+
+    return {
+      activeBorderColor: activeImageStyle?.borderTopColor ?? '',
+      activeBorderStyle: activeImageStyle?.borderTopStyle ?? '',
+      activeBorderWidth: activeImageStyle?.borderTopWidth ?? '',
+      activeHasImage: !!activeImage?.querySelector('img'),
+      activeStrokeDash: activeImage?.getAttribute('data-ppt-stroke-dash') ?? '',
+      exportHasOutlineMarkup: exportCode.includes('data-ppt-stroke-dash="dash"') &&
+        exportCode.includes('border:3px solid #0ea5e9') &&
+        exportCode.includes('border-style:dashed'),
+      exportHasOutlineModel: exportCode.includes('"name": "Shape Image Fill Probe"') &&
+        exportCode.includes('"stroke": {') &&
+        exportCode.includes('"color": "#0ea5e9"') &&
+        exportCode.includes('"dash": "dash"') &&
+        exportCode.includes('"width": 3'),
+      modelCount: images.length,
+      strokeColor: image?.stroke?.color ?? '',
+      strokeDash: image?.stroke?.dash ?? '',
+      strokeWidth: Number(image?.stroke?.width ?? 0),
     }
   })()`)
 }
