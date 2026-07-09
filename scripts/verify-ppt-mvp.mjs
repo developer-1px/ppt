@@ -13157,7 +13157,7 @@ async function runExportScenario(page) {
   })()`)
 
   record(
-    'drops PPTX custom geometry curves as editable freeform through OpenXML fallback import',
+    'drops PPTX custom geometry curves and arcs as editable freeform through OpenXML fallback import',
     customGeometryFreeformPPTXImportState.model === 'ppt-deck-pptx-import' &&
       customGeometryFreeformPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       customGeometryFreeformPPTXImportState.fileName === 'external-openxml-custom-geometry-freeform.pptx' &&
@@ -13167,8 +13167,8 @@ async function runExportScenario(page) {
       customGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       customGeometryFreeformPPTXImportState.probeModelCount >
         beforeCustomGeometryFreeformPPTXDrop.customGeometryFreeformModelCount &&
-      customGeometryFreeformPPTXImportState.probePointCount >= 10 &&
-      customGeometryFreeformPPTXImportState.activePointCount >= 10 &&
+      customGeometryFreeformPPTXImportState.probePointCount >= 16 &&
+      customGeometryFreeformPPTXImportState.activePointCount >= 16 &&
       customGeometryFreeformPPTXImportState.probePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePathD.includes('M ') &&
@@ -33660,6 +33660,7 @@ async function addPPTXCustomGeometryFreeformProbe(base64) {
     '<a:pt x="0" y="21600"/>',
     '<a:pt x="10800" y="21600"/>',
     '</a:cubicBezTo>',
+    '<a:arcTo wR="5400" hR="5400" stAng="5400000" swAng="5400000"/>',
     '<a:lnTo><a:pt x="0" y="10800"/></a:lnTo>',
     '<a:close/>',
     '</a:path>',

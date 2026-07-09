@@ -3989,6 +3989,9 @@ function readPPTXCustomGeometryPoints(
 }
 
 const PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS = 4
+const PPTX_CUSTOM_GEOMETRY_ARC_SAMPLE_DEGREES = 15
+const PPTX_CUSTOM_GEOMETRY_ARC_MAX_SAMPLE_STEPS = 32
+const PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE = 60_000
 
 function readPPTXCustomGeometryPathPoints(path: Element) {
   const points: PPTLine['start'][] = []
@@ -4000,6 +4003,19 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
       points.push(firstPoint)
       currentPoint = firstPoint
       continue
+    }
+
+    if (command.localName === 'arcTo' && currentPoint) {
+      const arcPoints = approximatePPTXCustomGeometryArcToPoints(
+        command,
+        currentPoint,
+      )
+
+      if (arcPoints.length > 0) {
+        points.push(...arcPoints)
+        currentPoint = arcPoints.at(-1) ?? currentPoint
+        continue
+      }
     }
 
     const commandPoints = readPPTXCustomGeometryCommandPoints(command)
@@ -4122,6 +4138,54 @@ function approximatePPTXCustomGeometryCubicBezierPoints(
       }
     },
   )
+}
+
+function approximatePPTXCustomGeometryArcToPoints(
+  command: Element,
+  start: PPTLine['start'],
+) {
+  const widthRadius = toPPTXPositiveNumber(command.getAttribute('wR'))
+  const heightRadius = toPPTXPositiveNumber(command.getAttribute('hR'))
+  const startAngle = toPPTXNumber(command.getAttribute('stAng'))
+  const sweepAngle = toPPTXNumber(command.getAttribute('swAng'))
+
+  if (
+    !widthRadius ||
+    !heightRadius ||
+    startAngle === null ||
+    sweepAngle === null ||
+    sweepAngle === 0
+  ) {
+    return []
+  }
+
+  const startRadians = pptxAngleToRadians(startAngle)
+  const sweepDegrees = sweepAngle / PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE
+  const sampleSteps = Math.min(
+    PPTX_CUSTOM_GEOMETRY_ARC_MAX_SAMPLE_STEPS,
+    Math.max(
+      1,
+      Math.ceil(Math.abs(sweepDegrees) / PPTX_CUSTOM_GEOMETRY_ARC_SAMPLE_DEGREES),
+    ),
+  )
+  const center = {
+    x: start.x - Math.cos(startRadians) * widthRadius,
+    y: start.y - Math.sin(startRadians) * heightRadius,
+  }
+
+  return Array.from({ length: sampleSteps }, (_, index) => {
+    const ratio = (index + 1) / sampleSteps
+    const angle = pptxAngleToRadians(startAngle + sweepAngle * ratio)
+
+    return {
+      x: center.x + Math.cos(angle) * widthRadius,
+      y: center.y + Math.sin(angle) * heightRadius,
+    }
+  })
+}
+
+function pptxAngleToRadians(angle: number) {
+  return angle / PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE * Math.PI / 180
 }
 
 async function readPPTXPictureElement({
