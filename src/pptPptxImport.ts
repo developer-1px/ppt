@@ -3988,47 +3988,140 @@ function readPPTXCustomGeometryPoints(
   }))
 }
 
+const PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS = 4
+
 function readPPTXCustomGeometryPathPoints(path: Element) {
   const points: PPTLine['start'][] = []
   let firstPoint: PPTLine['start'] | null = null
+  let currentPoint: PPTLine['start'] | null = null
 
   for (const command of Array.from(path.children)) {
     if (command.localName === 'close' && firstPoint) {
       points.push(firstPoint)
+      currentPoint = firstPoint
       continue
     }
 
-    const point = readPPTXCustomGeometryCommandPoint(command)
+    const commandPoints = readPPTXCustomGeometryCommandPoints(command)
+    const endpoint = commandPoints.at(-1) ?? null
 
-    if (!point) {
+    if (!endpoint) {
       continue
     }
 
     if (command.localName === 'moveTo') {
-      firstPoint = point
+      firstPoint = endpoint
+      currentPoint = endpoint
+      points.push(endpoint)
+      continue
     }
 
-    points.push(point)
+    if (command.localName === 'quadBezTo' && currentPoint) {
+      const controlPoint = commandPoints.at(0) ?? null
+
+      if (controlPoint) {
+        points.push(
+          ...approximatePPTXCustomGeometryQuadraticBezierPoints(
+            currentPoint,
+            controlPoint,
+            endpoint,
+          ),
+        )
+        currentPoint = endpoint
+        continue
+      }
+    }
+
+    if (command.localName === 'cubicBezTo' && currentPoint) {
+      const firstControlPoint = commandPoints.at(0) ?? null
+      const secondControlPoint = commandPoints.at(1) ?? null
+
+      if (firstControlPoint && secondControlPoint) {
+        points.push(
+          ...approximatePPTXCustomGeometryCubicBezierPoints(
+            currentPoint,
+            firstControlPoint,
+            secondControlPoint,
+            endpoint,
+          ),
+        )
+        currentPoint = endpoint
+        continue
+      }
+    }
+
+    points.push(endpoint)
+    currentPoint = endpoint
   }
 
   return points
 }
 
-function readPPTXCustomGeometryCommandPoint(command: Element) {
+function readPPTXCustomGeometryCommandPoints(command: Element) {
   if (![
     'cubicBezTo',
     'lnTo',
     'moveTo',
     'quadBezTo',
   ].includes(command.localName)) {
-    return null
+    return []
   }
 
-  const point = getDirectPPTXChildrenByLocalName(command, 'pt').at(-1)
-  const x = toPPTXNumber(point?.getAttribute('x'))
-  const y = toPPTXNumber(point?.getAttribute('y'))
+  return getDirectPPTXChildrenByLocalName(command, 'pt').flatMap((point) => {
+    const x = toPPTXNumber(point.getAttribute('x'))
+    const y = toPPTXNumber(point.getAttribute('y'))
 
-  return x === null || y === null ? null : { x, y }
+    return x === null || y === null ? [] : [{ x, y }]
+  })
+}
+
+function approximatePPTXCustomGeometryQuadraticBezierPoints(
+  start: PPTLine['start'],
+  control: PPTLine['start'],
+  end: PPTLine['start'],
+) {
+  return Array.from(
+    { length: PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS },
+    (_, index) => {
+      const t = (index + 1) / PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS
+      const inverse = 1 - t
+
+      return {
+        x: inverse * inverse * start.x +
+          2 * inverse * t * control.x +
+          t * t * end.x,
+        y: inverse * inverse * start.y +
+          2 * inverse * t * control.y +
+          t * t * end.y,
+      }
+    },
+  )
+}
+
+function approximatePPTXCustomGeometryCubicBezierPoints(
+  start: PPTLine['start'],
+  firstControl: PPTLine['start'],
+  secondControl: PPTLine['start'],
+  end: PPTLine['start'],
+) {
+  return Array.from(
+    { length: PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS },
+    (_, index) => {
+      const t = (index + 1) / PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS
+      const inverse = 1 - t
+
+      return {
+        x: inverse * inverse * inverse * start.x +
+          3 * inverse * inverse * t * firstControl.x +
+          3 * inverse * t * t * secondControl.x +
+          t * t * t * end.x,
+        y: inverse * inverse * inverse * start.y +
+          3 * inverse * inverse * t * firstControl.y +
+          3 * inverse * t * t * secondControl.y +
+          t * t * t * end.y,
+      }
+    },
+  )
 }
 
 async function readPPTXPictureElement({

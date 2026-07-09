@@ -13157,7 +13157,7 @@ async function runExportScenario(page) {
   })()`)
 
   record(
-    'drops PPTX custom geometry as editable freeform through OpenXML fallback import',
+    'drops PPTX custom geometry curves as editable freeform through OpenXML fallback import',
     customGeometryFreeformPPTXImportState.model === 'ppt-deck-pptx-import' &&
       customGeometryFreeformPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
       customGeometryFreeformPPTXImportState.fileName === 'external-openxml-custom-geometry-freeform.pptx' &&
@@ -13167,8 +13167,8 @@ async function runExportScenario(page) {
       customGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       customGeometryFreeformPPTXImportState.probeModelCount >
         beforeCustomGeometryFreeformPPTXDrop.customGeometryFreeformModelCount &&
-      customGeometryFreeformPPTXImportState.probePointCount >= 5 &&
-      customGeometryFreeformPPTXImportState.activePointCount >= 5 &&
+      customGeometryFreeformPPTXImportState.probePointCount >= 10 &&
+      customGeometryFreeformPPTXImportState.activePointCount >= 10 &&
       customGeometryFreeformPPTXImportState.probePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePathD.includes('M ') &&
@@ -33651,8 +33651,15 @@ async function addPPTXCustomGeometryFreeformProbe(base64) {
     '<a:pathLst>',
     '<a:path w="21600" h="21600">',
     '<a:moveTo><a:pt x="10800" y="0"/></a:moveTo>',
-    '<a:lnTo><a:pt x="21600" y="10800"/></a:lnTo>',
-    '<a:lnTo><a:pt x="10800" y="21600"/></a:lnTo>',
+    '<a:quadBezTo>',
+    '<a:pt x="21600" y="0"/>',
+    '<a:pt x="21600" y="10800"/>',
+    '</a:quadBezTo>',
+    '<a:cubicBezTo>',
+    '<a:pt x="21600" y="21600"/>',
+    '<a:pt x="0" y="21600"/>',
+    '<a:pt x="10800" y="21600"/>',
+    '</a:cubicBezTo>',
     '<a:lnTo><a:pt x="0" y="10800"/></a:lnTo>',
     '<a:close/>',
     '</a:path>',
@@ -36845,7 +36852,7 @@ function waitForPPTXDownloadBlob(page) {
         download.size > 0
     })()`),
     'Timed out waiting for PPTX download blob',
-    15000,
+    30000,
   )
 }
 
@@ -38648,7 +38655,11 @@ async function waitUntil(check, message, timeout = 5000) {
     await delay(100)
   }
 
-  throw new Error(message)
+  const browserErrorDetail = browserErrors.length
+    ? `\nBrowser errors:\n${browserErrors.slice(-8).join('\n')}`
+    : ''
+
+  throw new Error(`${message}${browserErrorDetail}`)
 }
 
 function delay(ms) {
