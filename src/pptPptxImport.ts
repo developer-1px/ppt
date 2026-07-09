@@ -267,6 +267,16 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0, y: 0.38 },
     { x: 0.5, y: 0 },
   ],
+  rightArrow: [
+    { x: 0, y: 0.25 },
+    { x: 0.65, y: 0.25 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0.65, y: 0.75 },
+    { x: 0, y: 0.75 },
+    { x: 0, y: 0.25 },
+  ],
   rtTriangle: [
     { x: 0, y: 0 },
     { x: 1, y: 1 },

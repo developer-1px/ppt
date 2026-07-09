@@ -12220,7 +12220,12 @@ async function runExportScenario(page) {
     }
     const deck = readPPTExportDeckFromHTML(exportCode)
     const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
-    const names = new Set(['Preset Triangle Probe', 'Preset Hexagon Probe', 'Preset Chevron Probe'])
+    const names = new Set([
+      'Preset Triangle Probe',
+      'Preset Hexagon Probe',
+      'Preset Chevron Probe',
+      'Preset Right Arrow Probe',
+    ])
 
     return {
       presetGeometryFreeformModelCount: elements.filter((element) =>
@@ -12269,7 +12274,12 @@ async function runExportScenario(page) {
       String(slide.name ?? '').includes('Copy'))
     const exportImportedElements = exportImportedSlides.flatMap((slide) =>
       slide.elements ?? [])
-    const expectedNames = ['Preset Triangle Probe', 'Preset Hexagon Probe', 'Preset Chevron Probe']
+    const expectedNames = [
+      'Preset Triangle Probe',
+      'Preset Hexagon Probe',
+      'Preset Chevron Probe',
+      'Preset Right Arrow Probe',
+    ]
     const freeformObjects = exportImportedElements.filter((element) =>
       expectedNames.includes(element.name) &&
       element.kind === 'freeform')
@@ -12277,6 +12287,7 @@ async function runExportScenario(page) {
     const triangle = byName['Preset Triangle Probe'] ?? null
     const hexagon = byName['Preset Hexagon Probe'] ?? null
     const chevron = byName['Preset Chevron Probe'] ?? null
+    const rightArrow = byName['Preset Right Arrow Probe'] ?? null
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
@@ -12300,6 +12311,9 @@ async function runExportScenario(page) {
       chevronFill: chevron?.fill ?? null,
       chevronGeometry: chevron?.geometry ?? null,
       chevronPointCount: chevron?.points?.length ?? 0,
+      rightArrowFill: rightArrow?.fill ?? null,
+      rightArrowGeometry: rightArrow?.geometry ?? null,
+      rightArrowPointCount: rightArrow?.points?.length ?? 0,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
     }
@@ -12316,9 +12330,9 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       presetGeometryFreeformPPTXImportState.presetModelCount >
         beforePresetGeometryFreeformPPTXDrop.presetGeometryFreeformModelCount &&
-      presetGeometryFreeformPPTXImportState.presetModelCount === 3 &&
-      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Hexagon Probe | Preset Triangle Probe' &&
-      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline' &&
+      presetGeometryFreeformPPTXImportState.presetModelCount === 4 &&
+      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Hexagon Probe | Preset Right Arrow Probe | Preset Triangle Probe' &&
+      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePointMode === 'polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('M ') &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('L ') &&
@@ -12340,7 +12354,11 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.chevronFill?.color === '#fee2e2' &&
       presetGeometryFreeformPPTXImportState.chevronPointCount === 7 &&
       presetGeometryFreeformPPTXImportState.chevronGeometry?.x === 544 &&
-      presetGeometryFreeformPPTXImportState.chevronGeometry?.y === 128,
+      presetGeometryFreeformPPTXImportState.chevronGeometry?.y === 128 &&
+      presetGeometryFreeformPPTXImportState.rightArrowFill?.color === '#dbeafe' &&
+      presetGeometryFreeformPPTXImportState.rightArrowPointCount === 8 &&
+      presetGeometryFreeformPPTXImportState.rightArrowGeometry?.x === 752 &&
+      presetGeometryFreeformPPTXImportState.rightArrowGeometry?.y === 128,
     {
       beforePresetGeometryFreeformPPTXDrop,
       presetGeometryFreeformPPTXImportState,
@@ -31376,6 +31394,18 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
       strokeWidth: 28575,
       w: 1524000,
       x: 5181600,
+      y: 1219200,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DBEAFE',
+      h: 1143000,
+      id: 9984,
+      name: 'Preset Right Arrow Probe',
+      preset: 'rightArrow',
+      stroke: '2563EB',
+      strokeWidth: 19050,
+      w: 1524000,
+      x: 7162800,
       y: 1219200,
     }),
   ].join('')
