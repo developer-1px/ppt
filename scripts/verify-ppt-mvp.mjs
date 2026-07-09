@@ -754,13 +754,27 @@ async function runPPTXRenderScenario(page) {
 
   record(
     'imports OpenXML PPTX text body rotation for viewer rendering',
-    openXmlPPTXTextBodyRotationState.modelCount === 1 &&
+    openXmlPPTXTextBodyRotationState.rotationModelCount === 1 &&
       openXmlPPTXTextBodyRotationState.rotation === 90 &&
-      openXmlPPTXTextBodyRotationState.text.includes('Text body rotation probe') &&
-      openXmlPPTXTextBodyRotationState.activeExists &&
+      openXmlPPTXTextBodyRotationState.rotationText.includes('Text body rotation probe') &&
+      openXmlPPTXTextBodyRotationState.activeRotationExists &&
       openXmlPPTXTextBodyRotationState.activeRotation === '90' &&
       openXmlPPTXTextBodyRotationState.activeTransform.includes('rotate(90deg)') &&
       openXmlPPTXTextBodyRotationState.activeText.includes('Text body rotation probe'),
+    {
+      openXmlPPTXTextBodyRotationState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX vertical text direction as viewer rotation',
+    openXmlPPTXTextBodyRotationState.verticalModelCount === 1 &&
+      openXmlPPTXTextBodyRotationState.verticalRotation === 270 &&
+      openXmlPPTXTextBodyRotationState.verticalText.includes('Text body vertical probe') &&
+      openXmlPPTXTextBodyRotationState.activeVerticalExists &&
+      openXmlPPTXTextBodyRotationState.activeVerticalRotation === '270' &&
+      openXmlPPTXTextBodyRotationState.activeVerticalTransform.includes('rotate(270deg)') &&
+      openXmlPPTXTextBodyRotationState.activeVerticalText.includes('Text body vertical probe'),
     {
       openXmlPPTXTextBodyRotationState,
     },
@@ -35980,11 +35994,16 @@ async function addPPTXTextBodyRotationProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
 
-  if (xml.includes('Text Body Rotation Probe')) {
+  if (
+    xml.includes('Text Body Rotation Probe') &&
+    xml.includes('Text Body Vertical Probe')
+  ) {
     return base64
   }
 
-  const probeXml = [
+  const rotationProbeXml = xml.includes('Text Body Rotation Probe')
+    ? ''
+    : [
     '<p:sp>',
     '<p:nvSpPr>',
     '<p:cNvPr id="9968" name="Text Body Rotation Probe"/>',
@@ -36007,7 +36026,35 @@ async function addPPTXTextBodyRotationProbe(base64) {
     '</p:txBody>',
     '</p:sp>',
   ].join('')
-  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+  const verticalProbeXml = xml.includes('Text Body Vertical Probe')
+    ? ''
+    : [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9967" name="Text Body Vertical Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="10363200" y="6019800"/>',
+    '<a:ext cx="1219200" cy="609600"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr vert="vert270"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:r><a:t>Text body vertical probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${rotationProbeXml}${verticalProbeXml}</p:spTree>`,
+  )
 
   if (nextXml === xml) {
     return base64
@@ -37296,27 +37343,41 @@ function readPPTXTextBodyRotationProbeState(page) {
     }
     const deck = readPPTExportDeckFromHTML(exportCode)
     const slides = deck?.slides ?? []
-    const probes = slides
-      .flatMap((slide) => slide.elements ?? [])
-      .filter((element) =>
-        element.name === 'Text Body Rotation Probe' &&
-        element.kind === 'textBox')
-    const probe = probes[0] ?? null
-    const active = document.querySelector(
+    const elements = slides.flatMap((slide) => slide.elements ?? [])
+    const rotationProbes = elements.filter((element) =>
+      element.name === 'Text Body Rotation Probe' &&
+      element.kind === 'textBox')
+    const verticalProbes = elements.filter((element) =>
+      element.name === 'Text Body Vertical Probe' &&
+      element.kind === 'textBox')
+    const rotationProbe = rotationProbes[0] ?? null
+    const verticalProbe = verticalProbes[0] ?? null
+    const readText = (element) => (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+      .map((run) => run.text ?? '')
+      .join('')
+    const activeRotation = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Text Body Rotation Probe"]',
+    )
+    const activeVertical = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Text Body Vertical Probe"]',
     )
 
     return {
-      activeExists: !!active,
-      activeRotation: active?.getAttribute('data-rotation') ?? '',
-      activeText: active?.textContent ?? '',
-      activeTransform: active?.getAttribute('style') ?? '',
-      modelCount: probes.length,
-      rotation: Number(probe?.geometry?.rotation ?? 0),
-      text: (probe?.textBody?.paragraphs ?? [])
-        .flatMap((paragraph) => paragraph.runs ?? [])
-        .map((run) => run.text ?? '')
-        .join(''),
+      activeRotation: activeRotation?.getAttribute('data-rotation') ?? '',
+      activeRotationExists: !!activeRotation,
+      activeText: activeRotation?.textContent ?? '',
+      activeTransform: activeRotation?.getAttribute('style') ?? '',
+      activeVerticalExists: !!activeVertical,
+      activeVerticalRotation: activeVertical?.getAttribute('data-rotation') ?? '',
+      activeVerticalText: activeVertical?.textContent ?? '',
+      activeVerticalTransform: activeVertical?.getAttribute('style') ?? '',
+      rotation: Number(rotationProbe?.geometry?.rotation ?? 0),
+      rotationModelCount: rotationProbes.length,
+      rotationText: readText(rotationProbe),
+      verticalModelCount: verticalProbes.length,
+      verticalRotation: Number(verticalProbe?.geometry?.rotation ?? 0),
+      verticalText: readText(verticalProbe),
     }
   })()`)
 }

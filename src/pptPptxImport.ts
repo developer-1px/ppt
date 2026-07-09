@@ -3587,10 +3587,30 @@ function readPPTXTextBoxGeometry(
 function readPPTXTextBodyRotation(txBody: Element | null) {
   const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
   const rotation = toPPTXNumber(bodyPr?.getAttribute('rot'))
+  const verticalRotation = readPPTXTextBodyVerticalRotation(bodyPr)
 
-  return rotation === null
+  return rotation === null && verticalRotation === undefined
     ? undefined
-    : normalizePPTXAngle(rotation / 60_000)
+    : normalizePPTXAngle((rotation ?? 0) / 60_000 + (verticalRotation ?? 0))
+}
+
+function readPPTXTextBodyVerticalRotation(bodyPr: Element | null) {
+  const vertical = bodyPr?.getAttribute('vert')?.trim()
+
+  if (
+    vertical === 'vert' ||
+    vertical === 'eaVert' ||
+    vertical === 'mongolianVert' ||
+    vertical === 'wordArtVert'
+  ) {
+    return 90
+  }
+
+  if (vertical === 'vert270' || vertical === 'wordArtVertRtl') {
+    return 270
+  }
+
+  return undefined
 }
 
 async function readPPTXShapeImageFillElement({
