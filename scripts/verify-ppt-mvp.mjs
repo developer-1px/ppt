@@ -13345,6 +13345,145 @@ async function runExportScenario(page) {
     },
   )
 
+  const slideMetadataPPTXBase64 = await addPPTXSlideMetadataProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeSlideMetadataPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+
+    return {
+      hiddenSlideMetadataCount: slides.filter((slide) =>
+        slide.hidden === true &&
+        slide.sectionName === 'PPTX Metadata Probe Section').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      slideMetadataProbeCount: slides.filter((slide) =>
+        slide.sectionName === 'PPTX Metadata Probe Section').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-slide-metadata.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(slideMetadataPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const slideMetadataPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeSlide = document.querySelector('.ppt-slide')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const exportDoc = new DOMParser().parseFromString(exportCode, 'text/html')
+    const exportHTMLSlide = exportDoc.querySelector('section.ppt-slide[data-ppt-slide-section-name="PPTX Metadata Probe Section"]')
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const probeSlides = exportImportedSlides.filter((slide) =>
+      slide.sectionName === 'PPTX Metadata Probe Section')
+    const hiddenProbeSlides = probeSlides.filter((slide) => slide.hidden === true)
+    const probeSlide = probeSlides[0] ?? null
+
+    return {
+      activeHidden: activeSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSectionName: activeSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
+      activeThumbHidden: activeThumb?.getAttribute('data-ppt-slide-hidden') ?? '',
+      activeThumbSectionName: activeThumb?.getAttribute('data-ppt-slide-section-name') ?? '',
+      exportHTMLHidden: exportHTMLSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
+      exportHTMLSectionName: exportHTMLSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      hiddenSlideMetadataCount: hiddenProbeSlides.length,
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      probeHidden: probeSlide?.hidden === true ? 'true' : '',
+      probeSectionName: probeSlide?.sectionName ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      slideMetadataProbeCount: probeSlides.length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX slide section and hidden metadata through OpenXML import',
+    slideMetadataPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      slideMetadataPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      slideMetadataPPTXImportState.fileName === 'external-openxml-slide-metadata.pptx' &&
+      slideMetadataPPTXImportState.importedCount === beforeSlideMetadataPPTXDrop.slideCount &&
+      slideMetadataPPTXImportState.sourceSlideCount === beforeSlideMetadataPPTXDrop.slideCount &&
+      slideMetadataPPTXImportState.slideCount === beforeSlideMetadataPPTXDrop.slideCount * 2 &&
+      slideMetadataPPTXImportState.activeName.includes('Copy') &&
+      slideMetadataPPTXImportState.slideMetadataProbeCount >
+        beforeSlideMetadataPPTXDrop.slideMetadataProbeCount &&
+      slideMetadataPPTXImportState.hiddenSlideMetadataCount >
+        beforeSlideMetadataPPTXDrop.hiddenSlideMetadataCount &&
+      slideMetadataPPTXImportState.slideMetadataProbeCount === 1 &&
+      slideMetadataPPTXImportState.hiddenSlideMetadataCount === 1 &&
+      slideMetadataPPTXImportState.probeHidden === 'true' &&
+      slideMetadataPPTXImportState.probeSectionName === 'PPTX Metadata Probe Section' &&
+      slideMetadataPPTXImportState.activeHidden === 'true' &&
+      slideMetadataPPTXImportState.activeSectionName === 'PPTX Metadata Probe Section' &&
+      slideMetadataPPTXImportState.activeThumbHidden === 'true' &&
+      slideMetadataPPTXImportState.activeThumbSectionName === 'PPTX Metadata Probe Section' &&
+      slideMetadataPPTXImportState.exportHTMLHidden === 'true' &&
+      slideMetadataPPTXImportState.exportHTMLSectionName === 'PPTX Metadata Probe Section',
+    {
+      beforeSlideMetadataPPTXDrop,
+      slideMetadataPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterSlideMetadataPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes slide metadata PPTX drop probes before export scenario continues',
+    afterSlideMetadataPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterSlideMetadataPPTXDropCleanup.slideCount === beforeSlideMetadataPPTXDrop.slideCount,
+    {
+      afterSlideMetadataPPTXDropCleanup,
+      beforeSlideMetadataPPTXDrop,
+    },
+  )
+
   const commentsPPTXBase64 = await addPPTXCommentsProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -29295,6 +29434,83 @@ async function reversePPTXPresentationSlideOrder(base64) {
       slideIdTags.reverse().join(''),
     ),
   )
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXSlideMetadataProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const presentationPath = 'ppt/presentation.xml'
+  const presentationXml = await readPPTXZipText(zip, presentationPath)
+  const listMatch = presentationXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/)
+  const slideIdTag = listMatch
+    ? [...listMatch[1].matchAll(/<p:sldId\b[^>]*\/>/g)][0]?.[0] ?? ''
+    : ''
+  const slideId = readPPTXXmlAttribute(slideIdTag, 'id')
+  const relationshipId = readPPTXXmlAttribute(slideIdTag, 'r:id')
+
+  if (!presentationXml || !slideId || !relationshipId) {
+    return base64
+  }
+
+  const relationshipXml = [...(await readPPTXZipText(
+    zip,
+    getPPTXRelationshipsPath(presentationPath),
+  )).matchAll(/<Relationship\b[^>]*\/>/g)]
+    .map((match) => match[0])
+    .find((candidate) =>
+      readPPTXXmlAttribute(candidate, 'Id') === relationshipId &&
+      readPPTXXmlAttribute(candidate, 'Type').endsWith('/slide') &&
+      readPPTXXmlAttribute(candidate, 'TargetMode') !== 'External')
+  const target = relationshipXml
+    ? readPPTXXmlAttribute(relationshipXml, 'Target')
+    : ''
+  const slidePath = target
+    ? resolvePPTXRelationshipTarget(presentationPath, target)
+    : ''
+
+  if (!slidePath || !zip.file(slidePath)) {
+    return base64
+  }
+
+  const sectionName = 'PPTX Metadata Probe Section'
+  const sectionXml = [
+    `<p:section name="${escapePPTXXmlAttribute(sectionName)}"`,
+    ' id="{11111111-2222-3333-4444-555555555555}">',
+    `<p:sldIdLst><p:sldId id="${escapePPTXXmlAttribute(slideId)}"/></p:sldIdLst>`,
+    '</p:section>',
+  ].join('')
+  const nextPresentationXml = presentationXml.includes(sectionName)
+    ? presentationXml
+    : /<p:sectionLst\b/.test(presentationXml)
+      ? presentationXml.replace('</p:sectionLst>', `${sectionXml}</p:sectionLst>`)
+      : presentationXml.replace(
+          '</p:presentation>',
+          `<p:sectionLst>${sectionXml}</p:sectionLst></p:presentation>`,
+        )
+
+  if (nextPresentationXml !== presentationXml) {
+    zip.file(presentationPath, nextPresentationXml)
+  }
+
+  const slideXml = await readPPTXZipText(zip, slidePath)
+  const nextSlideXml = /<p:sld\b[^>]*\bshow=/.test(slideXml)
+    ? slideXml.replace(
+        /(<p:sld\b[^>]*\bshow=")[^"]*(")/,
+        (_match, prefix, suffix) => `${prefix}0${suffix}`,
+      )
+    : slideXml.replace(/<p:sld\b/, '<p:sld show="0"')
+
+  if (nextSlideXml !== slideXml) {
+    zip.file(slidePath, nextSlideXml)
+  }
 
   return await zip.generateAsync({
     compression: 'DEFLATE',

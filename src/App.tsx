@@ -17063,6 +17063,8 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             data-ppt-hidden-placeholders={(activeSlide.hiddenPlaceholderIds ?? []).join(' ')}
             data-ppt-layout-id={activeLayout.layoutId}
             data-ppt-slide={activeSlide.id}
+            data-ppt-slide-hidden={activeSlide.hidden === true ? 'true' : undefined}
+            data-ppt-slide-section-name={activeSlide.sectionName}
             data-ppt-theme-id={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
             data-ppt-transition-advance-after={activeSlideTransition.advanceAfterMs ?? ''}
             data-ppt-transition-advance-on-click={activeSlideTransition.advanceOnClick ? 'true' : 'false'}
@@ -35854,6 +35856,7 @@ function SlideThumb({
       data-ppt-slide-dragging={dragging ? 'true' : undefined}
       data-ppt-slide-draggable="true"
       data-ppt-slide-drop-target={dropPlacement}
+      data-ppt-slide-hidden={slide.hidden === true ? 'true' : undefined}
       data-ppt-slide-id={slide.id}
       data-ppt-slide-index={descriptorIndex}
       data-ppt-slide-rail-hit-h={thumbnailDescriptor?.hitTarget.h}
@@ -35870,6 +35873,7 @@ function SlideThumb({
       data-ppt-slide-rail-thumb-x={thumbnailDescriptor?.bounds.x}
       data-ppt-slide-rail-thumb-y={thumbnailDescriptor?.bounds.y}
       data-ppt-slide-roving-tab-index={String(tabIndex)}
+      data-ppt-slide-section-name={slide.sectionName}
       draggable
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}

@@ -352,11 +352,14 @@ async function importPPTDeckFromOpenXmlZip(
   const themeFonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
   const title = await readPPTXOpenXmlDeckTitle(zip)
   const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
+  const sectionNameBySlidePath =
+    await readPPTXPresentationSectionNamesBySlidePath(zip)
   const slides = await Promise.all(slidePaths.map((path, index) =>
     readPPTXOpenXmlSlide({
       commentAuthors,
       index,
       path,
+      sectionName: sectionNameBySlidePath.get(path),
       size,
       themeColors,
       themeFonts,
@@ -457,6 +460,79 @@ async function readPPTXPresentationSlideOrder(zip: JSZip) {
     .map((relationship) =>
       resolvePPTXRelationshipTarget(presentationPath, relationship.target))
     .filter((path) => zip.file(path) !== null)
+}
+
+async function readPPTXPresentationSectionNamesBySlidePath(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const xml = await zip.file(presentationPath)?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const sectionNameBySlidePath = new Map<string, string>()
+
+  if (!doc || relationships.size === 0) {
+    return sectionNameBySlidePath
+  }
+
+  const slidePathByPresentationSlideId = new Map<string, string>()
+  const presentationSlideList = getDirectPPTXChildByLocalName(
+    doc.documentElement,
+    'sldIdLst',
+  )
+
+  for (const slideId of getDirectPPTXChildrenByLocalName(
+    presentationSlideList,
+    'sldId',
+  )) {
+    const id = slideId.getAttribute('id')?.trim()
+    const relationshipId = slideId.getAttribute('r:id')?.trim()
+    const relationship = relationshipId
+      ? relationships.get(relationshipId)
+      : undefined
+
+    if (!id || !relationship || !relationship.type.endsWith('/slide')) {
+      continue
+    }
+
+    const path = resolvePPTXRelationshipTarget(
+      presentationPath,
+      relationship.target,
+    )
+
+    if (zip.file(path) !== null) {
+      slidePathByPresentationSlideId.set(id, path)
+    }
+  }
+
+  const sectionList = getDirectPPTXChildByLocalName(
+    doc.documentElement,
+    'sectionLst',
+  )
+
+  for (const section of getDirectPPTXChildrenByLocalName(
+    sectionList,
+    'section',
+  )) {
+    const sectionName = section.getAttribute('name')?.trim()
+    const sectionSlideList = getDirectPPTXChildByLocalName(section, 'sldIdLst')
+
+    if (!sectionName) {
+      continue
+    }
+
+    for (const slideId of getDirectPPTXChildrenByLocalName(
+      sectionSlideList,
+      'sldId',
+    )) {
+      const id = slideId.getAttribute('id')?.trim()
+      const path = id ? slidePathByPresentationSlideId.get(id) : undefined
+
+      if (path) {
+        sectionNameBySlidePath.set(path, sectionName)
+      }
+    }
+  }
+
+  return sectionNameBySlidePath
 }
 
 async function readPPTXOpenXmlDeckSize(zip: JSZip) {
@@ -657,6 +733,7 @@ async function readPPTXOpenXmlSlide({
   commentAuthors,
   index,
   path,
+  sectionName,
   size,
   themeColors,
   themeFonts,
@@ -665,6 +742,7 @@ async function readPPTXOpenXmlSlide({
   commentAuthors: PPTXCommentAuthorMap
   index: number
   path: string
+  sectionName?: string
   size: PPTDeck['size']
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
@@ -699,6 +777,7 @@ async function readPPTXOpenXmlSlide({
     slidePath: path,
     zip,
   })
+  const hidden = readPPTXSlideHidden(doc, xml)
   const transition = readPPTXSlideTransition(doc, xml)
   const elementIdByPptxObjectId = new Map<string, string>()
   const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
@@ -828,11 +907,24 @@ async function readPPTXOpenXmlSlide({
       ? [backgroundImage, ...animatedElements, ...comments]
       : [...animatedElements, ...comments],
     id: `pptx-slide-${index + 1}`,
+    ...(hidden ? { hidden: true } : {}),
     name: readPPTXSlideName(cSld, index, xml),
     ...(notes ? { notes } : {}),
+    ...(sectionName ? { sectionName } : {}),
     themeId: PPT_DEFAULT_THEME_ID,
     ...(transition ? { transition } : {}),
   }
+}
+
+function readPPTXSlideHidden(doc: Document | null, xml: string) {
+  const slide = doc?.documentElement?.localName === 'sld'
+    ? doc.documentElement
+    : null
+  const rootShow = slide?.getAttribute('show')
+  const xmlShow = xml.match(/<[\w.-]+:sld\b[^>]*\bshow="([^"]*)"/)?.[1] ??
+    xml.match(/<sld\b[^>]*\bshow="([^"]*)"/)?.[1]
+
+  return isPPTXFalse(rootShow) || isPPTXFalse(xmlShow)
 }
 
 function applyPPTXLineConnections({
@@ -5155,6 +5247,12 @@ function toPPTXPositiveNumber(value: string | null | undefined) {
 
 function isPPTXTrue(value: string | null | undefined) {
   return value === '1' || value === 'true'
+}
+
+function isPPTXFalse(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase()
+
+  return normalized === '0' || normalized === 'false'
 }
 
 function clampPPTXPercent(value: number) {

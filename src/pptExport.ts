@@ -125,6 +125,12 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     const themeAttr = slide.themeId
       ? ` data-ppt-theme-id="${escapeHtml(slide.themeId)}"`
       : ''
+    const hiddenAttr = slide.hidden === true
+      ? ' data-ppt-slide-hidden="true"'
+      : ''
+    const sectionNameAttr = slide.sectionName
+      ? ` data-ppt-slide-section-name="${escapeHtml(slide.sectionName)}"`
+      : ''
     const placeholderVisibilityAttr = getPPTSlideHiddenPlaceholderAttr(
       slide,
       'data-ppt-hidden-placeholders',
@@ -132,7 +138,7 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     const transitionAttrs = getPPTSlideTransitionAttrs(slide, 'data-ppt-transition')
 
     return [
-      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${placeholderVisibilityAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
+      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${hiddenAttr}${sectionNameAttr}${placeholderVisibilityAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
       elements,
       '  </section>',
       renderPPTSlideNotesHTML(slide.id, slide.notes),
