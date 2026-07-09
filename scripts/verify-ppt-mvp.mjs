@@ -289,9 +289,13 @@ async function runPPTXRenderScenario(page) {
     await addPPTXPictureEffectRefProbe(
       await addPPTXStyleRefProbe(
         await addPPTXRGBChannelModifierProbe(
-          await addPPTXSaturationModifierProbe(
-            await addPPTXGradientPatternFillProbe(
-              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          await addPPTXHueModifierProbe(
+            await addPPTXZeroValueColorModifierProbe(
+              await addPPTXSaturationModifierProbe(
+                await addPPTXGradientPatternFillProbe(
+                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                ),
+              ),
             ),
           ),
         ),
@@ -323,6 +327,10 @@ async function runPPTXRenderScenario(page) {
     await readPPTXSaturationModifierProbeState(page)
   const openXmlPPTXRGBChannelModifierState =
     await readPPTXRGBChannelModifierProbeState(page)
+  const openXmlPPTXHueModifierState =
+    await readPPTXHueModifierProbeState(page)
+  const openXmlPPTXZeroValueColorModifierState =
+    await readPPTXZeroValueColorModifierProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -489,6 +497,34 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXRGBChannelModifierState.activeStroke.includes('77'),
     {
       openXmlPPTXRGBChannelModifierState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX hue color modifiers for viewer rendering',
+    openXmlPPTXHueModifierState.modelCount === 1 &&
+      openXmlPPTXHueModifierState.fill === '#33cc33' &&
+      openXmlPPTXHueModifierState.stroke === '#80cc33' &&
+      openXmlPPTXHueModifierState.activeExists &&
+      openXmlPPTXHueModifierState.activeFill.includes('51') &&
+      openXmlPPTXHueModifierState.activeFill.includes('204') &&
+      openXmlPPTXHueModifierState.activeStroke.includes('128') &&
+      openXmlPPTXHueModifierState.activeStroke.includes('204'),
+    {
+      openXmlPPTXHueModifierState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX zero-value color modifiers for viewer rendering',
+    openXmlPPTXZeroValueColorModifierState.modelCount === 1 &&
+      openXmlPPTXZeroValueColorModifierState.fill === '#5f5f5f' &&
+      openXmlPPTXZeroValueColorModifierState.stroke === '#6699cc' &&
+      openXmlPPTXZeroValueColorModifierState.activeExists &&
+      openXmlPPTXZeroValueColorModifierState.activeFill.includes('95') &&
+      openXmlPPTXZeroValueColorModifierState.activeStroke.includes('102') &&
+      openXmlPPTXZeroValueColorModifierState.activeStroke.includes('153') &&
+      openXmlPPTXZeroValueColorModifierState.activeStroke.includes('204'),
+    {
+      openXmlPPTXZeroValueColorModifierState,
     },
   )
 
@@ -11419,6 +11455,8 @@ async function runExportScenario(page) {
   openXmlPPTXBase64 = await addPPTXThemeColorProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXSaturationModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXZeroValueColorModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(openXmlPPTXBase64)
@@ -11485,6 +11523,16 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#33b333' &&
         element.stroke?.color === '#e6334d').length,
+      hueModifierProbeModelCount: elements.filter((element) =>
+        element.name === 'Hue Modifier Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#33cc33' &&
+        element.stroke?.color === '#80cc33').length,
+      zeroValueColorModifierProbeModelCount: elements.filter((element) =>
+        element.name === 'Zero Value Color Modifier Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#5f5f5f' &&
+        element.stroke?.color === '#6699cc').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11743,6 +11791,16 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#33b333' &&
       element.stroke?.color === '#e6334d')
+    const exportHueModifierProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Hue Modifier Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#33cc33' &&
+      element.stroke?.color === '#80cc33')
+    const exportZeroValueColorModifierProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Zero Value Color Modifier Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#5f5f5f' &&
+      element.stroke?.color === '#6699cc')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12084,6 +12142,14 @@ async function runExportScenario(page) {
       exportRGBChannelModifierProbeFill: exportRGBChannelModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportRGBChannelModifierProbeModelCount: exportRGBChannelModifierProbeObjects.length,
       exportRGBChannelModifierProbeStroke: exportRGBChannelModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasHueModifierProbe: exportHueModifierProbeObjects.length > 0,
+      exportHueModifierProbeFill: exportHueModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportHueModifierProbeModelCount: exportHueModifierProbeObjects.length,
+      exportHueModifierProbeStroke: exportHueModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasZeroValueColorModifierProbe: exportZeroValueColorModifierProbeObjects.length > 0,
+      exportZeroValueColorModifierProbeFill: exportZeroValueColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportZeroValueColorModifierProbeModelCount: exportZeroValueColorModifierProbeObjects.length,
+      exportZeroValueColorModifierProbeStroke: exportZeroValueColorModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12362,6 +12428,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportSaturationModifierProbeModelCount > beforeOpenXmlPPTXDrop.saturationModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasRGBChannelModifierProbe &&
       openXmlPPTXImportState.exportRGBChannelModifierProbeModelCount > beforeOpenXmlPPTXDrop.rgbChannelModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasHueModifierProbe &&
+      openXmlPPTXImportState.exportHueModifierProbeModelCount > beforeOpenXmlPPTXDrop.hueModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasZeroValueColorModifierProbe &&
+      openXmlPPTXImportState.exportZeroValueColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.zeroValueColorModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -31576,6 +31646,122 @@ async function addPPTXRGBChannelModifierProbe(base64) {
   })
 }
 
+async function addPPTXHueModifierProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Hue Modifier Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9992" name="Hue Modifier Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9144000" y="5029200"/>',
+    '<a:ext cx="1371600" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:srgbClr val="CC3333"><a:hueOff val="7200000"/></a:srgbClr>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:srgbClr val="33CCCC"><a:hueMod val="50000"/></a:srgbClr>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXZeroValueColorModifierProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Zero Value Color Modifier Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9993" name="Zero Value Color Modifier Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="10668000" y="5029200"/>',
+    '<a:ext cx="1371600" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:srgbClr val="336699"><a:gray/></a:srgbClr>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:srgbClr val="336699"><a:comp/><a:inv/></a:srgbClr>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXHiddenObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -35305,6 +35491,81 @@ async function readPPTXRGBChannelModifierProbeState(page) {
   const activeState = await page.eval(`(() => {
     const activeProbe = document.querySelector(
       '.ppt-slide [data-ppt-element-name="RGB Channel Modifier Probe"]',
+    )
+    const style = activeProbe ? getComputedStyle(activeProbe) : null
+
+    return {
+      activeExists: Boolean(activeProbe),
+      activeFill: style?.backgroundColor ?? '',
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      activeStroke: style?.borderTopColor ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
+}
+
+async function readPPTXHueModifierProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(page, 'Hue Modifier Probe')
+}
+
+async function readPPTXZeroValueColorModifierProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(
+    page,
+    'Zero Value Color Modifier Probe',
+  )
+}
+
+async function readPPTXColorModifierShapeProbeState(page, probeName) {
+  const modelState = await page.eval(`(() => {
+    const probeName = ${JSON.stringify(probeName)}
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === probeName &&
+        element.kind === 'shape'))
+    const probes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === probeName &&
+        element.kind === 'shape')
+    const probe = probes[0] ?? null
+
+    return {
+      fill: probe?.fill?.color ?? '',
+      modelCount: probes.length,
+      slideId: probeSlide?.id ?? '',
+      stroke: probe?.stroke?.color ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeProbe = document.querySelector(
+      '.ppt-slide [data-ppt-element-name=${JSON.stringify(probeName)}]',
     )
     const style = activeProbe ? getComputedStyle(activeProbe) : null
 

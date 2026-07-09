@@ -5900,6 +5900,34 @@ function applyPPTXColorModifiers(color: string, colorElement: Element) {
   }
 
   for (const modifier of Array.from(colorElement.children)) {
+    if (modifier.localName === 'comp') {
+      rgb = applyPPTXHueTransform(rgb, (hue) => hue + 180)
+      continue
+    }
+
+    if (modifier.localName === 'gray') {
+      rgb = applyPPTXGrayscaleColorModifier(rgb)
+      continue
+    }
+
+    if (modifier.localName === 'inv') {
+      rgb = rgb.map((channel) => 255 - channel) as [number, number, number]
+      continue
+    }
+
+    if (
+      modifier.localName === 'hue' ||
+      modifier.localName === 'hueMod' ||
+      modifier.localName === 'hueOff'
+    ) {
+      const hueValue = readPPTXHueModifierValue(modifier)
+
+      if (hueValue !== null) {
+        rgb = applyPPTXHueColorModifier(rgb, modifier.localName, hueValue)
+      }
+      continue
+    }
+
     const ratio = readPPTXColorModifierRatio(modifier)
 
     if (ratio === null) {
@@ -5935,6 +5963,42 @@ function applyPPTXColorModifiers(color: string, colorElement: Element) {
   }
 
   return formatPPTXHexColor(rgb)
+}
+
+function applyPPTXHueColorModifier(
+  rgb: [number, number, number],
+  modifierName: 'hue' | 'hueMod' | 'hueOff',
+  value: number,
+): [number, number, number] {
+  if (modifierName === 'hue') {
+    return applyPPTXHueTransform(rgb, () => value)
+  }
+
+  if (modifierName === 'hueMod') {
+    return applyPPTXHueTransform(rgb, (hue) => hue * value)
+  }
+
+  return applyPPTXHueTransform(rgb, (hue) => hue + value)
+}
+
+function applyPPTXHueTransform(
+  rgb: [number, number, number],
+  transform: (hue: number) => number,
+): [number, number, number] {
+  const hsl = rgbToPPTXHsl(rgb)
+
+  return hslToPPTXRgb({
+    ...hsl,
+    h: transform(hsl.h),
+  })
+}
+
+function applyPPTXGrayscaleColorModifier(
+  rgb: [number, number, number],
+): [number, number, number] {
+  const gray = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+
+  return [gray, gray, gray]
 }
 
 function isPPTXColorChannelModifier(
@@ -5976,6 +6040,18 @@ function applyPPTXColorChannelModifier(
 
   return rgb.map((channel, index) =>
     index === channelIndex ? value : channel) as [number, number, number]
+}
+
+function readPPTXHueModifierValue(modifier: Element) {
+  const value = toPPTXNumber(modifier.getAttribute('val'))
+
+  if (value === null) {
+    return null
+  }
+
+  return modifier.localName === 'hueMod'
+    ? Math.max(0, value / 100_000)
+    : value / 60_000
 }
 
 function readPPTXColorModifierRatio(modifier: Element) {
