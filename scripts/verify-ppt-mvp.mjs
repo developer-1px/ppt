@@ -288,8 +288,10 @@ async function runPPTXRenderScenario(page) {
   const openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(
     await addPPTXPictureEffectRefProbe(
       await addPPTXStyleRefProbe(
-        await addPPTXGradientPatternFillProbe(
-          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        await addPPTXSaturationModifierProbe(
+          await addPPTXGradientPatternFillProbe(
+            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          ),
         ),
       ),
     ),
@@ -315,6 +317,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXBackgroundRefProbeState(page)
   const openXmlPPTXAlphaModifierFillState =
     await readPPTXAlphaModifierFillProbeState(page)
+  const openXmlPPTXSaturationModifierState =
+    await readPPTXSaturationModifierProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -453,6 +457,20 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXAlphaModifierFillState,
       openXmlPPTXImportState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX saturation color modifiers for viewer rendering',
+    openXmlPPTXSaturationModifierState.modelCount === 1 &&
+      openXmlPPTXSaturationModifierState.fill === '#999999' &&
+      openXmlPPTXSaturationModifierState.stroke === '#808080' &&
+      openXmlPPTXSaturationModifierState.activeExists &&
+      openXmlPPTXSaturationModifierState.activeFill.includes('153') &&
+      openXmlPPTXSaturationModifierState.activeStroke.includes('128'),
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXSaturationModifierState,
     },
   )
 
@@ -11395,12 +11413,14 @@ async function runExportScenario(page) {
                                     await addPPTXGradientPatternFillProbe(
                                       await addPPTXPictureEffectRefProbe(
                                         await addPPTXStyleRefProbe(
-                                          await addPPTXThemeColorProbe(
-                                            await addPPTXPresetSystemColorProbe(
-                                              await addPPTXUnevenTableProbe(
-                                                await addPPTXGroupedObjectProbe(
-                                                  await reversePPTXPresentationSlideOrder(
-                                                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                          await addPPTXSaturationModifierProbe(
+                                            await addPPTXThemeColorProbe(
+                                              await addPPTXPresetSystemColorProbe(
+                                                await addPPTXUnevenTableProbe(
+                                                  await addPPTXGroupedObjectProbe(
+                                                    await reversePPTXPresentationSlideOrder(
+                                                      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -11462,6 +11482,11 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#99b3cc' &&
         element.stroke?.color === '#496ec0').length,
+      saturationModifierProbeModelCount: elements.filter((element) =>
+        element.name === 'Saturation Modifier Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#999999' &&
+        element.stroke?.color === '#808080').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11710,6 +11735,11 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#99b3cc' &&
       element.stroke?.color === '#496ec0')
+    const exportSaturationModifierProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Saturation Modifier Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#999999' &&
+      element.stroke?.color === '#808080')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12043,6 +12073,10 @@ async function runExportScenario(page) {
       exportColorModifierProbeFill: exportColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportColorModifierProbeModelCount: exportColorModifierProbeObjects.length,
       exportColorModifierProbeStroke: exportColorModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasSaturationModifierProbe: exportSaturationModifierProbeObjects.length > 0,
+      exportSaturationModifierProbeFill: exportSaturationModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportSaturationModifierProbeModelCount: exportSaturationModifierProbeObjects.length,
+      exportSaturationModifierProbeStroke: exportSaturationModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12317,6 +12351,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportImageOpacityModelCount > beforeOpenXmlPPTXDrop.imageOpacityModelCount &&
       openXmlPPTXImportState.exportHasColorModifierProbe &&
       openXmlPPTXImportState.exportColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.colorModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasSaturationModifierProbe &&
+      openXmlPPTXImportState.exportSaturationModifierProbeModelCount > beforeOpenXmlPPTXDrop.saturationModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -31415,6 +31451,64 @@ async function addPPTXNoFillShapeProbe(base64) {
   })
 }
 
+async function addPPTXSaturationModifierProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Saturation Modifier Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9967" name="Saturation Modifier Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9144000" y="4343400"/>',
+    '<a:ext cx="1371600" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:srgbClr val="6699CC"><a:satMod val="0"/></a:srgbClr>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:srgbClr val="CC6633"><a:satMod val="0"/></a:srgbClr>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXHiddenObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -35026,6 +35120,69 @@ async function readPPTXAlphaModifierFillProbeState(page) {
     return {
       activeFillOpacity: Number(activeProbe?.getAttribute('data-ppt-fill-opacity') ?? 0),
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
+}
+
+async function readPPTXSaturationModifierProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === 'Saturation Modifier Probe' &&
+        element.kind === 'shape'))
+    const probes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === 'Saturation Modifier Probe' &&
+        element.kind === 'shape')
+    const probe = probes[0] ?? null
+
+    return {
+      fill: probe?.fill?.color ?? '',
+      modelCount: probes.length,
+      slideId: probeSlide?.id ?? '',
+      stroke: probe?.stroke?.color ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeProbe = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Saturation Modifier Probe"]',
+    )
+    const style = activeProbe ? getComputedStyle(activeProbe) : null
+
+    return {
+      activeExists: Boolean(activeProbe),
+      activeFill: style?.backgroundColor ?? '',
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      activeStroke: style?.borderTopColor ?? '',
     }
   })()`)
 

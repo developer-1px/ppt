@@ -5916,6 +5916,19 @@ function applyPPTXColorModifiers(color: string, colorElement: Element) {
     } else if (modifier.localName === 'lumOff') {
       rgb = rgb.map((channel) =>
         channel + 255 * ratio) as [number, number, number]
+    } else if (
+      modifier.localName === 'satMod' ||
+      modifier.localName === 'satOff'
+    ) {
+      const hsl = rgbToPPTXHsl(rgb)
+      const saturation = modifier.localName === 'satMod'
+        ? hsl.s * ratio
+        : hsl.s + ratio
+
+      rgb = hslToPPTXRgb({
+        ...hsl,
+        s: Math.max(0, Math.min(1, saturation)),
+      })
     }
   }
 
@@ -5941,6 +5954,60 @@ function parsePPTXHexColor(color: string): [number, number, number] | null {
     Number.parseInt(match[1].slice(0, 2), 16),
     Number.parseInt(match[1].slice(2, 4), 16),
     Number.parseInt(match[1].slice(4, 6), 16),
+  ]
+}
+
+function rgbToPPTXHsl(rgb: readonly number[]) {
+  const [red, green, blue] = rgb.map((channel) =>
+    Math.max(0, Math.min(255, channel)) / 255)
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const lightness = (max + min) / 2
+  const delta = max - min
+
+  if (delta === 0) {
+    return { h: 0, l: lightness, s: 0 }
+  }
+
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1))
+  const hue = max === red
+    ? ((green - blue) / delta) % 6
+    : max === green
+      ? (blue - red) / delta + 2
+      : (red - green) / delta + 4
+
+  return {
+    h: (hue * 60 + 360) % 360,
+    l: lightness,
+    s: saturation,
+  }
+}
+
+function hslToPPTXRgb(hsl: {
+  h: number
+  l: number
+  s: number
+}): [number, number, number] {
+  const chroma = (1 - Math.abs(2 * hsl.l - 1)) * hsl.s
+  const hue = ((hsl.h % 360) + 360) % 360
+  const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1))
+  const match = hsl.l - chroma / 2
+  const [red, green, blue] = hue < 60
+    ? [chroma, x, 0]
+    : hue < 120
+      ? [x, chroma, 0]
+      : hue < 180
+        ? [0, chroma, x]
+        : hue < 240
+          ? [0, x, chroma]
+          : hue < 300
+            ? [x, 0, chroma]
+            : [chroma, 0, x]
+
+  return [
+    (red + match) * 255,
+    (green + match) * 255,
+    (blue + match) * 255,
   ]
 }
 
