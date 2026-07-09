@@ -658,9 +658,11 @@ async function runPPTXRenderScenario(page) {
     openXmlPPTXNormalAutoFitState.modelCount === 1 &&
       openXmlPPTXNormalAutoFitState.textAutoFit === '' &&
       openXmlPPTXNormalAutoFitState.runSizes === '20' &&
+      openXmlPPTXNormalAutoFitState.lineHeights === '1.04' &&
       openXmlPPTXNormalAutoFitState.styleFontSize === 20 &&
       openXmlPPTXNormalAutoFitState.activeExists &&
       openXmlPPTXNormalAutoFitState.activeRunSize === '20' &&
+      openXmlPPTXNormalAutoFitState.activeLineHeight === '1.04' &&
       openXmlPPTXNormalAutoFitState.activeFontSize === '20px',
     {
       openXmlPPTXNormalAutoFitState,
@@ -12092,6 +12094,7 @@ async function runExportScenario(page) {
       element.kind === 'textBox' &&
       element.textAutoFit === undefined &&
       element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.lineHeight === 1.04 &&
         paragraph.runs?.some((run) =>
           run.text === 'Normal autofit probe' &&
           run.size === 20)) === true)
@@ -36671,8 +36674,11 @@ async function readPPTXNormalAutoFitProbeState(page) {
     const probe = probes[0] ?? null
     const runs = probe?.textBody?.paragraphs
       ?.flatMap((paragraph) => paragraph.runs ?? []) ?? []
+    const paragraphs = probe?.textBody?.paragraphs ?? []
 
     return {
+      lineHeights: paragraphs.map((paragraph) =>
+        String(paragraph.lineHeight ?? '')).join(' | '),
       modelCount: probes.length,
       runSizes: runs.map((run) => String(run.size ?? '')).join(' | '),
       slideId: probeSlide?.id ?? '',
@@ -36696,10 +36702,12 @@ async function readPPTXNormalAutoFitProbeState(page) {
       '.ppt-slide [data-ppt-element-name="Normal Autofit Probe"]',
     )
     const activeRun = active?.querySelector('[data-ppt-run-size]') ?? null
+    const activeParagraph = active?.querySelector('[data-ppt-line-height]') ?? null
 
     return {
       activeExists: Boolean(active),
       activeFontSize: activeRun ? getComputedStyle(activeRun).fontSize : '',
+      activeLineHeight: activeParagraph?.getAttribute('data-ppt-line-height') ?? '',
       activeRunSize: activeRun?.getAttribute('data-ppt-run-size') ?? '',
     }
   })()`)

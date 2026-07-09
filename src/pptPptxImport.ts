@@ -127,6 +127,7 @@ const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
 const PPTX_POINTS_PER_PIXEL = 0.75
 const PPTX_DEFAULT_TEXT_COLOR = '#111827'
 const PPTX_DEFAULT_TEXT_SIZE = 24
+const PPTX_DEFAULT_PARAGRAPH_LINE_HEIGHT = 1.14
 const PPTX_DEFAULT_FILL_COLOR = '#ffffff'
 const PPTX_DEFAULT_STROKE_COLOR = '#111827'
 const PPTX_IDENTITY_GROUP_TRANSFORM: PPTXGroupTransform = {
@@ -5274,43 +5275,66 @@ function readPPTXTextBody(
         fallbackTextColor,
         textFieldContext,
       ))
-  const fontScale = readPPTXNormalAutoFitFontScale(txBody)
-  const scaledParagraphs = fontScale === null
+  const normalAutoFit = readPPTXNormalAutoFit(txBody)
+  const scaledParagraphs = normalAutoFit === null
     ? paragraphs
-    : scalePPTXTextBodyParagraphs(paragraphs, fontScale)
+    : applyPPTXNormalAutoFitToParagraphs(paragraphs, normalAutoFit)
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
   return hasText || paragraphs.length > 0 ? { paragraphs: scaledParagraphs } : null
 }
 
-function readPPTXNormalAutoFitFontScale(txBody: Element | null) {
+function readPPTXNormalAutoFit(txBody: Element | null) {
   const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
   const normalAutoFit = getDirectPPTXChildByLocalName(bodyPr, 'normAutofit')
   const fontScale = toPPTXPositiveNumber(normalAutoFit?.getAttribute('fontScale'))
+  const lineSpacingReduction = toPPTXPositiveNumber(
+    normalAutoFit?.getAttribute('lnSpcReduction'),
+  )
 
-  return fontScale === null ? null : fontScale / 100_000
-}
-
-function scalePPTXTextBodyParagraphs(
-  paragraphs: readonly PPTParagraph[],
-  fontScale: number,
-): PPTParagraph[] {
-  if (fontScale <= 0 || fontScale === 1) {
-    return paragraphs.map((paragraph) => ({
-      ...paragraph,
-      runs: paragraph.runs.map((run) => ({ ...run })),
-    }))
+  if (!normalAutoFit || (fontScale === null && lineSpacingReduction === null)) {
+    return null
   }
 
+  return {
+    fontScale: fontScale === null ? 1 : fontScale / 100_000,
+    lineSpacingReduction: lineSpacingReduction === null
+      ? 0
+      : lineSpacingReduction / 100_000,
+  }
+}
+
+function applyPPTXNormalAutoFitToParagraphs(
+  paragraphs: readonly PPTParagraph[],
+  normalAutoFit: { fontScale: number; lineSpacingReduction: number },
+): PPTParagraph[] {
   return paragraphs.map((paragraph) => ({
     ...paragraph,
+    ...(normalAutoFit.lineSpacingReduction <= 0
+      ? {}
+      : {
+          lineHeight: Math.max(
+            0.1,
+            Math.round(
+              ((paragraph.lineHeight ?? PPTX_DEFAULT_PARAGRAPH_LINE_HEIGHT) -
+                normalAutoFit.lineSpacingReduction) * 1000,
+            ) / 1000,
+          ),
+        }),
     runs: paragraph.runs.map((run) => ({
       ...run,
-      size: Math.max(
-        1,
-        Math.round((run.size ?? PPTX_DEFAULT_TEXT_SIZE) * fontScale),
-      ),
+      ...(normalAutoFit.fontScale <= 0 || normalAutoFit.fontScale === 1
+        ? {}
+        : {
+            size: Math.max(
+              1,
+              Math.round(
+                (run.size ?? PPTX_DEFAULT_TEXT_SIZE) *
+                  normalAutoFit.fontScale,
+              ),
+            ),
+          }),
     })),
   }))
 }
