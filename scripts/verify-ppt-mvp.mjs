@@ -361,6 +361,19 @@ async function runPPTXRenderScenario(page) {
   )
 
   record(
+    'imports OpenXML PPTX style font reference text color for viewer rendering',
+    openXmlPPTXStyleRefState.textCount === 1 &&
+      openXmlPPTXStyleRefState.textRunColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.textStyleColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.activeTextExists &&
+      openXmlPPTXStyleRefState.activeTextRunColor === '#7c3aed',
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXStyleRefState,
+    },
+  )
+
+  record(
     'imports OpenXML PPTX background reference theme fill for viewer rendering',
     openXmlPPTXBackgroundRefState.modelCount === 1 &&
       openXmlPPTXBackgroundRefState.backgroundFill === '#e6fffa' &&
@@ -11412,6 +11425,12 @@ async function runExportScenario(page) {
       styleRefLineProbeModelCount: elements.filter((element) =>
         element.name === 'Style Ref Line Probe' &&
         element.kind === 'line').length,
+      fontRefTextProbeModelCount: elements.filter((element) =>
+        element.name === 'Font Ref Text Probe' &&
+        element.textBody?.paragraphs?.some((paragraph) =>
+          paragraph.runs?.some((run) =>
+            run.text === 'Font Ref Text Probe' &&
+            run.color === '#7c3aed'))).length,
       backgroundRefSlideModelCount: slides.filter((slide) =>
         slide.background?.color === '#e6fffa' &&
         Number(slide.background?.opacity ?? 0) > 0.71 &&
@@ -11656,6 +11675,14 @@ async function runExportScenario(page) {
       element.stroke?.color === '#9a3412' &&
       element.stroke?.dash === 'dash' &&
       element.stroke?.width === 4)
+    const exportFontRefTextProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Font Ref Text Probe' &&
+      element.kind === 'textBox' &&
+      element.style?.color === '#7c3aed' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'Font Ref Text Probe' &&
+          run.color === '#7c3aed')))
     const exportBackgroundRefSlides = exportImportedSlides.filter((slide) =>
       slide.background?.color === '#e6fffa' &&
       Number(slide.background?.opacity ?? 0) > 0.71 &&
@@ -11957,6 +11984,12 @@ async function runExportScenario(page) {
       exportStyleRefLineProbeModelCount: exportStyleRefLineProbeObjects.length,
       exportStyleRefLineProbeStroke: exportStyleRefLineProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportStyleRefLineProbeWidth: exportStyleRefLineProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
+      exportHasFontRefTextProbe: exportFontRefTextProbeObjects.length > 0,
+      exportFontRefTextProbeModelCount: exportFontRefTextProbeObjects.length,
+      exportFontRefTextProbeRunColor: exportFontRefTextProbeObjects.flatMap((element) =>
+        element.textBody?.paragraphs?.flatMap((paragraph) =>
+          paragraph.runs?.map((run) => run.color ?? '') ?? []) ?? []).join(' | '),
+      exportFontRefTextProbeStyleColor: exportFontRefTextProbeObjects.map((element) => element.style?.color ?? '').join(' | '),
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
       exportBackgroundRefSlideOpacity: exportBackgroundRefSlides.map((slide) => slide.background?.opacity ?? '').join(' | '),
@@ -12198,6 +12231,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportStyleRefProbeModelCount > beforeOpenXmlPPTXDrop.styleRefProbeModelCount &&
       openXmlPPTXImportState.exportHasStyleRefLineProbe &&
       openXmlPPTXImportState.exportStyleRefLineProbeModelCount > beforeOpenXmlPPTXDrop.styleRefLineProbeModelCount &&
+      openXmlPPTXImportState.exportHasFontRefTextProbe &&
+      openXmlPPTXImportState.exportFontRefTextProbeModelCount > beforeOpenXmlPPTXDrop.fontRefTextProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundRefSlide &&
       openXmlPPTXImportState.exportBackgroundRefSlideModelCount > beforeOpenXmlPPTXDrop.backgroundRefSlideModelCount &&
       openXmlPPTXImportState.exportHasLayoutBackgroundSlide &&
@@ -31719,7 +31754,11 @@ async function addPPTXStyleRefProbe(base64) {
   const nextThemeXml = setPPTXThemeLineStyleXml(
     setPPTXThemeFillStyleXml(
       setPPTXThemeSchemeColorXml(
-        setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+        setPPTXThemeSchemeColorXml(
+          setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+          'accent5',
+          '7C3AED',
+        ),
         'accent4',
         '9A3412',
       ),
@@ -31742,6 +31781,7 @@ async function addPPTXStyleRefProbe(base64) {
   if (
     xml.includes('Style Ref Probe') &&
     xml.includes('Style Ref Line Probe') &&
+    xml.includes('Font Ref Text Probe') &&
     nextThemeXml === themeXml
   ) {
     return base64
@@ -31795,9 +31835,40 @@ async function addPPTXStyleRefProbe(base64) {
         '</p:style>',
         '</p:cxnSp>',
       ].join('')
+  const fontRefTextXml = xml.includes('Font Ref Text Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9986" name="Font Ref Text Probe"/>',
+        '<p:cNvSpPr txBox="1"/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="10058400" y="5000000"/>',
+        '<a:ext cx="1676400" cy="365760"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '<a:noFill/>',
+        '<a:ln><a:noFill/></a:ln>',
+        '</p:spPr>',
+        '<p:txBody>',
+        '<a:bodyPr/>',
+        '<a:lstStyle/>',
+        '<a:p><a:r><a:t>Font Ref Text Probe</a:t></a:r></a:p>',
+        '</p:txBody>',
+        '<p:style>',
+        '<a:lnRef idx="0"><a:schemeClr val="accent5"/></a:lnRef>',
+        '<a:fillRef idx="0"><a:schemeClr val="accent5"/></a:fillRef>',
+        '<a:effectRef idx="0"><a:schemeClr val="accent5"/></a:effectRef>',
+        '<a:fontRef idx="minor"><a:schemeClr val="accent5"/></a:fontRef>',
+        '</p:style>',
+        '</p:sp>',
+      ].join('')
   const nextXml = xml.replace(
     '</p:spTree>',
-    `${styleRefShapeXml}${styleRefLineXml}</p:spTree>`,
+    `${styleRefShapeXml}${styleRefLineXml}${fontRefTextXml}</p:spTree>`,
   )
 
   if (nextXml === xml && nextThemeXml === themeXml) {
@@ -34720,8 +34791,15 @@ async function readPPTXStyleRefProbeState(page) {
     const lines = elements.filter((element) =>
       element.name === 'Style Ref Line Probe' &&
       element.kind === 'line')
+    const texts = elements.filter((element) =>
+      element.name === 'Font Ref Text Probe' &&
+      element.kind === 'textBox')
     const shape = shapes[0] ?? null
     const line = lines[0] ?? null
+    const text = texts[0] ?? null
+    const textRun = text?.textBody?.paragraphs
+      ?.flatMap((paragraph) => paragraph.runs ?? [])
+      ?.find((run) => run.text === 'Font Ref Text Probe') ?? null
 
     return {
       lineCount: lines.length,
@@ -34735,6 +34813,9 @@ async function readPPTXStyleRefProbeState(page) {
       shapeStroke: shape?.stroke?.color ?? '',
       shapeStrokeWidth: Number(shape?.stroke?.width ?? 0),
       slideId: probeSlide?.id ?? '',
+      textCount: texts.length,
+      textRunColor: textRun?.color ?? '',
+      textStyleColor: text?.style?.color ?? '',
     }
   })()`)
 
@@ -34757,6 +34838,10 @@ async function readPPTXStyleRefProbeState(page) {
       '.ppt-slide [data-ppt-element-name="Style Ref Probe"]',
     )
     const shapeStyle = shapeElement ? getComputedStyle(shapeElement) : null
+    const textElement = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Font Ref Text Probe"]',
+    )
+    const textRun = textElement?.querySelector('[data-ppt-run-color]') ?? null
 
     return {
       activeLineExists: Boolean(lineElement),
@@ -34767,6 +34852,8 @@ async function readPPTXStyleRefProbeState(page) {
       activeShapeStrokeDash: shapeElement?.getAttribute('data-ppt-stroke-dash') ?? '',
       activeShapeStrokeWidth: Number.parseFloat(shapeStyle?.borderTopWidth ?? '0') || 0,
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      activeTextExists: Boolean(textElement),
+      activeTextRunColor: textRun?.getAttribute('data-ppt-run-color') ?? '',
     }
   })()`)
 

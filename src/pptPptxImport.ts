@@ -2900,9 +2900,15 @@ async function readPPTXShapeElement(
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
   const style = getDirectPPTXChildByLocalName(sp, 'style')
+  const fallbackTextColor = readPPTXStyleTextColor(style, themeColors)
   const geometry = readPPTXElementGeometry(spPr) ??
     readPPTXPlaceholderGeometry(sp, placeholderGeometries)
-  const textBody = readPPTXTextBody(txBody, themeColors, fallbackTxBody)
+  const textBody = readPPTXTextBody(
+    txBody,
+    themeColors,
+    fallbackTxBody,
+    fallbackTextColor,
+  )
   const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors) ??
     readPPTXStyleStroke(style, themeColors, themeStyles)
@@ -4790,6 +4796,7 @@ function readPPTXTextBody(
   txBody: Element | null,
   themeColors: PPTXThemeColorMap,
   fallbackTxBody: Element | null = null,
+  fallbackTextColor?: string,
 ): PPTTextBody | null {
   if (!txBody) {
     return null
@@ -4799,7 +4806,13 @@ function readPPTXTextBody(
   const fallbackListStyle = getDirectPPTXChildByLocalName(fallbackTxBody, 'lstStyle')
   const paragraphs = getDirectPPTXChildrenByLocalName(txBody, 'p')
     .map((paragraph) =>
-      readPPTXParagraph(paragraph, listStyle, fallbackListStyle, themeColors))
+      readPPTXParagraph(
+        paragraph,
+        listStyle,
+        fallbackListStyle,
+        themeColors,
+        fallbackTextColor,
+      ))
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
@@ -4843,6 +4856,7 @@ function readPPTXParagraph(
   listStyle: Element | null,
   fallbackListStyle: Element | null,
   themeColors: PPTXThemeColorMap,
+  fallbackTextColor?: string,
 ): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
   const level = readPPTXParagraphLevel(pPr)
@@ -4870,7 +4884,12 @@ function readPPTXParagraph(
   )
   const runs = Array.from(paragraph.children)
     .flatMap((child) =>
-      readPPTXTextRun(child, defaultRunProperties, themeColors))
+      readPPTXTextRun(
+        child,
+        defaultRunProperties,
+        themeColors,
+        fallbackTextColor,
+      ))
 
   return {
     ...(align ? { align } : {}),
@@ -4909,6 +4928,7 @@ function readPPTXTextRun(
   node: Element,
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
+  fallbackTextColor?: string,
 ): PPTRun[] {
   if (
     node.localName !== 'r' &&
@@ -4920,7 +4940,12 @@ function readPPTXTextRun(
   }
 
   const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
-  const style = readPPTXTextRunStyle(rPr, defaultRunProperties, themeColors)
+  const style = readPPTXTextRunStyle(
+    rPr,
+    defaultRunProperties,
+    themeColors,
+    fallbackTextColor,
+  )
 
   if (node.localName === 'br') {
     return [{ ...style, text: '\n' }]
@@ -4939,8 +4964,14 @@ function readPPTXTextRunStyle(
   rPr: Element | null,
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
+  fallbackTextColor?: string,
 ): Omit<PPTRun, 'text'> {
-  const color = readPPTXRunColor(rPr, defaultRunProperties, themeColors)
+  const color = readPPTXRunColor(
+    rPr,
+    defaultRunProperties,
+    themeColors,
+    fallbackTextColor,
+  )
   const highlight = readPPTXRunHighlight(rPr, themeColors) ??
     readPPTXRunHighlight(defaultRunProperties, themeColors)
   const size = readPPTXRunSize(rPr, defaultRunProperties)
@@ -4968,9 +4999,11 @@ function readPPTXRunColor(
   rPr: Element | null,
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
+  fallbackTextColor?: string,
 ) {
   return readPPTXFill(rPr, themeColors)?.color ??
-    readPPTXFill(defaultRunProperties, themeColors)?.color
+    readPPTXFill(defaultRunProperties, themeColors)?.color ??
+    fallbackTextColor
 }
 
 function readPPTXRunSize(
@@ -5601,6 +5634,15 @@ function readPPTXStyleReferenceFill(
   const fillStyle = index === null ? null : themeStyles.fillStyles.get(index)
 
   return readPPTXFillStyleElement(fillStyle ?? null, themeColors, placeholderColor)
+}
+
+function readPPTXStyleTextColor(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+) {
+  const fontRef = getDirectPPTXChildByLocalName(style, 'fontRef')
+
+  return fontRef ? readPPTXColor(fontRef, themeColors) : undefined
 }
 
 function readPPTXStyleStroke(
