@@ -3523,7 +3523,7 @@ async function readPPTXShapeElement(
     return {
       ...(readPPTXElementAccessibility(sp) ?? {}),
       ...readPPTXElementFlip(spPr),
-      geometry,
+      geometry: readPPTXTextBoxGeometry(geometry, txBody, fallbackTxBody),
       ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
       id,
       kind: 'textBox',
@@ -3564,6 +3564,33 @@ async function readPPTXShapeElement(
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
   }
+}
+
+function readPPTXTextBoxGeometry(
+  geometry: PPTGeometry,
+  txBody: Element | null,
+  fallbackTxBody: Element | null,
+): PPTGeometry {
+  const rotation = readPPTXTextBodyRotation(txBody) ??
+    readPPTXTextBodyRotation(fallbackTxBody)
+
+  if (rotation === undefined || rotation === 0) {
+    return geometry
+  }
+
+  return {
+    ...geometry,
+    rotation: normalizePPTXAngle((geometry.rotation ?? 0) + rotation),
+  }
+}
+
+function readPPTXTextBodyRotation(txBody: Element | null) {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const rotation = toPPTXNumber(bodyPr?.getAttribute('rot'))
+
+  return rotation === null
+    ? undefined
+    : normalizePPTXAngle(rotation / 60_000)
 }
 
 async function readPPTXShapeImageFillElement({

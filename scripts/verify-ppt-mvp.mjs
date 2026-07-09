@@ -351,6 +351,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 =
     await addPPTXInheritedFooterPlaceholderProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXTextAutoFitProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXTextBodyRotationProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
@@ -401,6 +402,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXInheritedFooterPlaceholderProbeState(page)
   const openXmlPPTXNormalAutoFitState =
     await readPPTXNormalAutoFitProbeState(page)
+  const openXmlPPTXTextBodyRotationState =
+    await readPPTXTextBodyRotationProbeState(page)
   const openXmlPPTXPresetGeometryFreeformState =
     await readPPTXPresetGeometryFreeformProbeState(page)
   const openXmlPPTXUnsupportedImageState =
@@ -746,6 +749,20 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXNormalAutoFitState.activeFontSize === '20px',
     {
       openXmlPPTXNormalAutoFitState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX text body rotation for viewer rendering',
+    openXmlPPTXTextBodyRotationState.modelCount === 1 &&
+      openXmlPPTXTextBodyRotationState.rotation === 90 &&
+      openXmlPPTXTextBodyRotationState.text.includes('Text body rotation probe') &&
+      openXmlPPTXTextBodyRotationState.activeExists &&
+      openXmlPPTXTextBodyRotationState.activeRotation === '90' &&
+      openXmlPPTXTextBodyRotationState.activeTransform.includes('rotate(90deg)') &&
+      openXmlPPTXTextBodyRotationState.activeText.includes('Text body rotation probe'),
+    {
+      openXmlPPTXTextBodyRotationState,
     },
   )
 
@@ -35947,6 +35964,63 @@ function createPPTXTextAutoFitProbeXml({
   ].join('')
 }
 
+async function addPPTXTextBodyRotationProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Text Body Rotation Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9968" name="Text Body Rotation Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9144000" y="6019800"/>',
+    '<a:ext cx="1219200" cy="609600"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr rot="5400000"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:r><a:t>Text body rotation probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLineSpacingPointsProbe(base64) {
   if (!base64) {
     return ''
@@ -37208,6 +37282,45 @@ async function readPPTXNormalAutoFitProbeState(page) {
   }
 }
 
+function readPPTXTextBodyRotationProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === 'Text Body Rotation Probe' &&
+        element.kind === 'textBox')
+    const probe = probes[0] ?? null
+    const active = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Text Body Rotation Probe"]',
+    )
+
+    return {
+      activeExists: !!active,
+      activeRotation: active?.getAttribute('data-rotation') ?? '',
+      activeText: active?.textContent ?? '',
+      activeTransform: active?.getAttribute('style') ?? '',
+      modelCount: probes.length,
+      rotation: Number(probe?.geometry?.rotation ?? 0),
+      text: (probe?.textBody?.paragraphs ?? [])
+        .flatMap((paragraph) => paragraph.runs ?? [])
+        .map((run) => run.text ?? '')
+        .join(''),
+    }
+  })()`)
+}
+
 function readPPTXPresetGeometryFreeformProbeState(page) {
   return page.eval(`(() => {
     const expectedNames = [
@@ -37658,9 +37771,15 @@ async function reloadPPTApp(page) {
     ignoreCache: true,
   })
   await waitUntil(
-    () => page.eval(`document.readyState === 'complete' &&
-      !!document.querySelector('[data-ppt-app]') &&
-      document.querySelectorAll('.ppt-thumb').length >= 2`),
+    () => page.eval(`(() => {
+      const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+
+      return document.readyState === 'complete' &&
+        !!document.querySelector('[data-ppt-app]') &&
+        !!document.querySelector('[data-ppt-export-pptx]') &&
+        document.querySelectorAll('.ppt-thumb').length >= 2 &&
+        exportCode.includes('data-ppt-deck')
+    })()`),
     'Timed out reloading PPT app',
     PAGE_LOAD_TIMEOUT_MS,
   )
