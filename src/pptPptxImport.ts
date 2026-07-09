@@ -91,6 +91,10 @@ type PPTXLineConnectionRefs = {
 }
 type PPTXThemeColorMap = Readonly<Record<string, string>>
 type PPTXThemeFontMap = Readonly<Record<string, string>>
+type PPTXThemeLineStyle = Partial<PPTStroke>
+type PPTXThemeStyleMap = {
+  lineStyles: ReadonlyMap<number, PPTXThemeLineStyle>
+}
 type PPTXPlaceholderRef = {
   idx?: string
   type?: string
@@ -538,6 +542,11 @@ async function importPPTDeckFromOpenXmlZip(
   const themePath = await readPPTXOpenXmlThemePath(zip)
   const themeColors = await readPPTXOpenXmlThemeColors(zip, themePath)
   const themeFonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
+  const themeStyles = await readPPTXOpenXmlThemeStyles(
+    zip,
+    themePath,
+    themeColors,
+  )
   const title = await readPPTXOpenXmlDeckTitle(zip)
   const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
   const sectionNameBySlidePath =
@@ -551,6 +560,7 @@ async function importPPTDeckFromOpenXmlZip(
       size,
       themeColors,
       themeFonts,
+      themeStyles,
       zip,
     }),
   ))
@@ -860,6 +870,34 @@ function readPPTXThemeTypeface(
   return typeface && !typeface.startsWith('+') ? typeface : undefined
 }
 
+async function readPPTXOpenXmlThemeStyles(
+  zip: JSZip,
+  themePath: string | null,
+  themeColors: PPTXThemeColorMap,
+): Promise<PPTXThemeStyleMap> {
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const formatScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'fmtScheme')
+    : null
+  const lineStyleList = getDirectPPTXChildByLocalName(
+    formatScheme,
+    'lnStyleLst',
+  )
+  const lineStyles = new Map<number, PPTXThemeLineStyle>()
+
+  getDirectPPTXChildrenByLocalName(lineStyleList, 'ln')
+    .forEach((line, index) => {
+      const lineStyle = readPPTXThemeLineStyle(line, themeColors)
+
+      if (lineStyle) {
+        lineStyles.set(index + 1, lineStyle)
+      }
+    })
+
+  return { lineStyles }
+}
+
 async function readPPTXOpenXmlThemePath(zip: JSZip) {
   const presentationPath = 'ppt/presentation.xml'
   const relationships = await readPPTXRelationships(zip, presentationPath)
@@ -925,6 +963,7 @@ async function readPPTXOpenXmlSlide({
   size,
   themeColors,
   themeFonts,
+  themeStyles,
   zip,
 }: {
   commentAuthors: PPTXCommentAuthorMap
@@ -934,6 +973,7 @@ async function readPPTXOpenXmlSlide({
   size: PPTDeck['size']
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<PPTSlide> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -975,6 +1015,7 @@ async function readPPTXOpenXmlSlide({
     slidePath: path,
     themeColors,
     themeFonts,
+    themeStyles,
     zip,
   })
   const elements: PPTElement[] = [...inheritedElements]
@@ -1010,7 +1051,14 @@ async function readPPTXOpenXmlSlide({
 
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
-        ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+        ? readPPTXLineElement(
+          child,
+          index,
+          objectIndex,
+          relationships,
+          themeColors,
+          themeStyles,
+        )
         : await readPPTXShapeElement(
           child,
           index,
@@ -1019,12 +1067,20 @@ async function readPPTXOpenXmlSlide({
           path,
           themeColors,
           themeFonts,
+          themeStyles,
           placeholderGeometries,
           placeholderTextBodies,
           zip,
         )
     } else if (child.localName === 'cxnSp') {
-      element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+      element = readPPTXLineElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        themeColors,
+        themeStyles,
+      )
     } else if (child.localName === 'pic') {
       element = await readPPTXPictureElement({
         index,
@@ -1715,6 +1771,7 @@ async function readPPTXInheritedLayoutElements({
   slidePath,
   themeColors,
   themeFonts,
+  themeStyles,
   zip,
 }: {
   index: number
@@ -1722,6 +1779,7 @@ async function readPPTXInheritedLayoutElements({
   slidePath: string
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<PPTElement[]> {
   const layoutPath = readPPTXRelatedPartPath({
@@ -1750,6 +1808,7 @@ async function readPPTXInheritedLayoutElements({
         source: 'master',
         themeColors,
         themeFonts,
+        themeStyles,
         zip,
       })
     : []
@@ -1760,6 +1819,7 @@ async function readPPTXInheritedLayoutElements({
     source: 'layout',
     themeColors,
     themeFonts,
+    themeStyles,
     zip,
   })
 
@@ -1773,6 +1833,7 @@ async function readPPTXPartInheritedElements({
   source,
   themeColors,
   themeFonts,
+  themeStyles,
   zip,
 }: {
   index: number
@@ -1781,6 +1842,7 @@ async function readPPTXPartInheritedElements({
   source: PPTXInheritedElementSource
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<PPTElement[]> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -1807,6 +1869,7 @@ async function readPPTXPartInheritedElements({
       relationships,
       themeColors,
       themeFonts,
+      themeStyles,
       zip,
     })
 
@@ -1836,6 +1899,7 @@ async function readPPTXInheritedElement({
   relationships,
   themeColors,
   themeFonts,
+  themeStyles,
   zip,
 }: {
   child: Element
@@ -1845,11 +1909,19 @@ async function readPPTXInheritedElement({
   relationships: PPTXRelationshipMap
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<PPTElement | null> {
   if (child.localName === 'sp') {
     return isPPTXLineShape(child)
-      ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+      ? readPPTXLineElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        themeColors,
+        themeStyles,
+      )
       : await readPPTXShapeElement(
         child,
         index,
@@ -1858,6 +1930,7 @@ async function readPPTXInheritedElement({
         path,
         themeColors,
         themeFonts,
+        themeStyles,
         new Map(),
         new Map(),
         zip,
@@ -1865,7 +1938,14 @@ async function readPPTXInheritedElement({
   }
 
   if (child.localName === 'cxnSp') {
-    return readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+    return readPPTXLineElement(
+      child,
+      index,
+      objectIndex,
+      relationships,
+      themeColors,
+      themeStyles,
+    )
   }
 
   if (child.localName === 'pic') {
@@ -2557,12 +2637,13 @@ function readPPTXLineElement(
   objectIndex: number,
   relationships: PPTXRelationshipMap,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
   const style = getDirectPPTXChildByLocalName(element, 'style')
   const line = getDirectPPTXChildByLocalName(spPr, 'ln')
   const stroke = readPPTXStroke(spPr, themeColors) ??
-    readPPTXStyleStroke(style, themeColors)
+    readPPTXStyleStroke(style, themeColors, themeStyles)
   const opacity = readPPTXLineOpacity(line)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const lineGeometry = readPPTXLineGeometry(spPr)
@@ -2756,6 +2837,7 @@ async function readPPTXShapeElement(
   slidePath: string,
   themeColors: PPTXThemeColorMap,
   themeFonts: PPTXThemeFontMap,
+  themeStyles: PPTXThemeStyleMap,
   placeholderGeometries: PPTXPlaceholderGeometryMap,
   placeholderTextBodies: PPTXPlaceholderTextBodyMap,
   zip: JSZip,
@@ -2769,7 +2851,7 @@ async function readPPTXShapeElement(
   const textBody = readPPTXTextBody(txBody, themeColors, fallbackTxBody)
   const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors) ??
-    readPPTXStyleStroke(style, themeColors)
+    readPPTXStyleStroke(style, themeColors, themeStyles)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors) ??
     readPPTXStyleFill(style, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors)
@@ -5390,6 +5472,7 @@ function readPPTXStyleFill(
 function readPPTXStyleStroke(
   style: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ): PPTStroke | undefined {
   const lineRef = getDirectPPTXChildByLocalName(style, 'lnRef')
 
@@ -5398,13 +5481,25 @@ function readPPTXStyleStroke(
   }
 
   const fill = readPPTXColorFill(lineRef, themeColors)
+  const styleStroke = readPPTXStyleReferenceLineStyle(lineRef, themeStyles)
+  const color = fill?.color ?? styleStroke?.color
 
-  return fill
+  return color || styleStroke
     ? {
-        color: fill.color,
-        width: 1,
+        ...(styleStroke?.dash ? { dash: styleStroke.dash } : {}),
+        color: color ?? PPTX_DEFAULT_STROKE_COLOR,
+        width: styleStroke?.width ?? 1,
       }
     : undefined
+}
+
+function readPPTXStyleReferenceLineStyle(
+  lineRef: Element | null,
+  themeStyles: PPTXThemeStyleMap,
+): PPTXThemeLineStyle | undefined {
+  const index = toPPTXPositiveNumber(lineRef?.getAttribute('idx'))
+
+  return index === null ? undefined : themeStyles.lineStyles.get(index)
 }
 
 function readPPTXStrokeLine(
@@ -5415,12 +5510,44 @@ function readPPTXStrokeLine(
     return undefined
   }
 
+  const lineStyle = readPPTXLineStrokeStyle(line)
+
+  return {
+    ...(lineStyle.dash ? { dash: lineStyle.dash } : {}),
+    color: readPPTXFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
+    width: lineStyle.width,
+  }
+}
+
+function readPPTXThemeLineStyle(
+  line: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTXThemeLineStyle | null {
+  if (hasPPTXNoFill(line)) {
+    return null
+  }
+
+  const fill = readPPTXFill(line, themeColors)
+  const lineStyle = readPPTXLineStrokeStyle(line)
+
+  return {
+    ...(lineStyle.dash ? { dash: lineStyle.dash } : {}),
+    ...(fill ? { color: fill.color } : {}),
+    width: lineStyle.width,
+  }
+}
+
+function readPPTXLineStrokeStyle(line: Element): Pick<PPTStroke, 'width'> & {
+  dash?: PPTStroke['dash']
+} {
   const dash = readPPTXStrokeDash(line)
 
   return {
     ...(dash ? { dash } : {}),
-    color: readPPTXFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
-    width: Math.max(1, emuToPx(toPPTXPositiveNumber(line.getAttribute('w')) ?? PPTX_EMUS_PER_PIXEL)),
+    width: Math.max(
+      1,
+      emuToPx(toPPTXPositiveNumber(line.getAttribute('w')) ?? PPTX_EMUS_PER_PIXEL),
+    ),
   }
 }
 

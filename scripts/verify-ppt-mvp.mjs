@@ -335,9 +335,17 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXStyleRefState.lineCount === 1 &&
       openXmlPPTXStyleRefState.shapeFill === '#14b8a6' &&
       openXmlPPTXStyleRefState.shapeStroke === '#9a3412' &&
+      openXmlPPTXStyleRefState.shapeStrokeDash === 'dash' &&
+      openXmlPPTXStyleRefState.shapeStrokeWidth === 4 &&
       openXmlPPTXStyleRefState.lineStroke === '#9a3412' &&
+      openXmlPPTXStyleRefState.lineStrokeDash === 'dash' &&
+      openXmlPPTXStyleRefState.lineStrokeWidth === 4 &&
       openXmlPPTXStyleRefState.activeShapeExists &&
-      openXmlPPTXStyleRefState.activeLineExists,
+      openXmlPPTXStyleRefState.activeShapeStrokeDash === 'dash' &&
+      openXmlPPTXStyleRefState.activeShapeStrokeWidth === 4 &&
+      openXmlPPTXStyleRefState.activeLineExists &&
+      openXmlPPTXStyleRefState.activeLineStrokeDasharray !== '' &&
+      openXmlPPTXStyleRefState.activeLineStrokeWidth === 4,
     {
       openXmlPPTXImportState,
       openXmlPPTXStyleRefState,
@@ -11609,11 +11617,15 @@ async function runExportScenario(page) {
       element.name === 'Style Ref Probe' &&
       element.kind === 'shape' &&
       element.fill?.color === '#14b8a6' &&
-      element.stroke?.color === '#9a3412')
+      element.stroke?.color === '#9a3412' &&
+      element.stroke?.dash === 'dash' &&
+      element.stroke?.width === 4)
     const exportStyleRefLineProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Style Ref Line Probe' &&
       element.kind === 'line' &&
-      element.stroke?.color === '#9a3412')
+      element.stroke?.color === '#9a3412' &&
+      element.stroke?.dash === 'dash' &&
+      element.stroke?.width === 4)
     const exportBackgroundRefSlides = exportImportedSlides.filter((slide) =>
       slide.background?.color === '#e6fffa')
     const exportLayoutBackgroundSlides = exportImportedSlides.filter((slide) =>
@@ -11902,12 +11914,16 @@ async function runExportScenario(page) {
       exportThemeColorProbeModelCount: exportThemeColorProbeObjects.length,
       exportThemeColorProbeStroke: exportThemeColorProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasStyleRefProbe: exportStyleRefProbeObjects.length > 0,
+      exportStyleRefProbeDash: exportStyleRefProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportStyleRefProbeFill: exportStyleRefProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportStyleRefProbeModelCount: exportStyleRefProbeObjects.length,
       exportStyleRefProbeStroke: exportStyleRefProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportStyleRefProbeWidth: exportStyleRefProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
       exportHasStyleRefLineProbe: exportStyleRefLineProbeObjects.length > 0,
+      exportStyleRefLineProbeDash: exportStyleRefLineProbeObjects.map((element) => element.stroke?.dash ?? '').join(' | '),
       exportStyleRefLineProbeModelCount: exportStyleRefLineProbeObjects.length,
       exportStyleRefLineProbeStroke: exportStyleRefLineProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportStyleRefLineProbeWidth: exportStyleRefLineProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
       exportBackgroundRefSlideModelCount: exportBackgroundRefSlides.length,
@@ -31587,6 +31603,30 @@ function setPPTXThemeSchemeColorXml(xml, localName, color) {
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
 }
 
+function setPPTXThemeLineStyleXml(xml, index, lineXml) {
+  const lineStyleListMatch = xml.match(/<a:lnStyleLst>[\s\S]*?<\/a:lnStyleLst>/)
+
+  if (!lineStyleListMatch) {
+    return xml
+  }
+
+  const lineStyleListXml = lineStyleListMatch[0]
+  const lineMatches = [...lineStyleListXml.matchAll(/<a:ln\b[\s\S]*?<\/a:ln>/g)]
+  const target = lineMatches[index - 1]
+
+  if (target) {
+    return xml.replace(
+      lineStyleListXml,
+      lineStyleListXml.replace(target[0], lineXml),
+    )
+  }
+
+  return xml.replace(lineStyleListXml, lineStyleListXml.replace(
+    '</a:lnStyleLst>',
+    `${lineXml}</a:lnStyleLst>`,
+  ))
+}
+
 async function addPPTXStyleRefProbe(base64) {
   if (!base64) {
     return ''
@@ -31606,10 +31646,19 @@ async function addPPTXStyleRefProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
   const themeXml = await readPPTXZipText(zip, themePath)
-  const nextThemeXml = setPPTXThemeSchemeColorXml(
-    setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
-    'accent4',
-    '9A3412',
+  const nextThemeXml = setPPTXThemeLineStyleXml(
+    setPPTXThemeSchemeColorXml(
+      setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+      'accent4',
+      '9A3412',
+    ),
+    2,
+    [
+      '<a:ln w="38100" cap="flat" cmpd="sng" algn="ctr">',
+      '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>',
+      '<a:prstDash val="dash"/>',
+      '</a:ln>',
+    ].join(''),
   )
 
   if (
@@ -34590,10 +34639,14 @@ async function readPPTXStyleRefProbeState(page) {
 
     return {
       lineCount: lines.length,
+      lineStrokeDash: line?.stroke?.dash ?? '',
       lineStroke: line?.stroke?.color ?? '',
+      lineStrokeWidth: Number(line?.stroke?.width ?? 0),
       shapeCount: shapes.length,
       shapeFill: shape?.fill?.color ?? '',
+      shapeStrokeDash: shape?.stroke?.dash ?? '',
       shapeStroke: shape?.stroke?.color ?? '',
+      shapeStrokeWidth: Number(shape?.stroke?.width ?? 0),
       slideId: probeSlide?.id ?? '',
     }
   })()`)
@@ -34608,15 +34661,26 @@ async function readPPTXStyleRefProbeState(page) {
     await delay(120)
   }
 
-  const activeState = await page.eval(`(() => ({
-    activeLineExists: Boolean(document.querySelector(
+  const activeState = await page.eval(`(() => {
+    const lineElement = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Style Ref Line Probe"]',
-    )),
-    activeShapeExists: Boolean(document.querySelector(
+    )
+    const lineStrokeElement = lineElement?.querySelector('line,path') ?? null
+    const shapeElement = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Style Ref Probe"]',
-    )),
-    activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
-  }))()`)
+    )
+    const shapeStyle = shapeElement ? getComputedStyle(shapeElement) : null
+
+    return {
+      activeLineExists: Boolean(lineElement),
+      activeLineStrokeDasharray: lineStrokeElement?.getAttribute('stroke-dasharray') ?? '',
+      activeLineStrokeWidth: Number(lineStrokeElement?.getAttribute('stroke-width') ?? 0),
+      activeShapeExists: Boolean(shapeElement),
+      activeShapeStrokeDash: shapeElement?.getAttribute('data-ppt-stroke-dash') ?? '',
+      activeShapeStrokeWidth: Number.parseFloat(shapeStyle?.borderTopWidth ?? '0') || 0,
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    }
+  })()`)
 
   return {
     ...modelState,
