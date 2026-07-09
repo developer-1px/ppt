@@ -12246,6 +12246,9 @@ async function runExportScenario(page) {
       'Preset Up Down Arrow Probe',
       'Preset Quad Arrow Probe',
       'Preset Plus Probe',
+      'Preset Star Probe',
+      'Preset Math Multiply Probe',
+      'Preset Math Plus Probe',
       'Preset Text Right Arrow Probe',
     ])
 
@@ -12308,6 +12311,9 @@ async function runExportScenario(page) {
       'Preset Up Down Arrow Probe',
       'Preset Quad Arrow Probe',
       'Preset Plus Probe',
+      'Preset Star Probe',
+      'Preset Math Multiply Probe',
+      'Preset Math Plus Probe',
       'Preset Text Right Arrow Probe',
     ]
     const freeformObjects = exportImportedElements.filter((element) =>
@@ -12325,6 +12331,9 @@ async function runExportScenario(page) {
     const upDownArrow = byName['Preset Up Down Arrow Probe'] ?? null
     const quadArrow = byName['Preset Quad Arrow Probe'] ?? null
     const plus = byName['Preset Plus Probe'] ?? null
+    const star = byName['Preset Star Probe'] ?? null
+    const mathMultiply = byName['Preset Math Multiply Probe'] ?? null
+    const mathPlus = byName['Preset Math Plus Probe'] ?? null
     const textRightArrow = byName['Preset Text Right Arrow Probe'] ?? null
     const activeTextRightArrow = document.querySelector('.ppt-slide [data-ppt-element-name="Preset Text Right Arrow Probe"][data-kind="freeform"]')
     const activeTextRightArrowPath = activeTextRightArrow?.querySelector('[data-ppt-freeform-path]')
@@ -12381,6 +12390,15 @@ async function runExportScenario(page) {
       plusFill: plus?.fill ?? null,
       plusGeometry: plus?.geometry ?? null,
       plusPointCount: plus?.points?.length ?? 0,
+      starFill: star?.fill ?? null,
+      starGeometry: star?.geometry ?? null,
+      starPointCount: star?.points?.length ?? 0,
+      mathMultiplyFill: mathMultiply?.fill ?? null,
+      mathMultiplyGeometry: mathMultiply?.geometry ?? null,
+      mathMultiplyPointCount: mathMultiply?.points?.length ?? 0,
+      mathPlusFill: mathPlus?.fill ?? null,
+      mathPlusGeometry: mathPlus?.geometry ?? null,
+      mathPlusPointCount: mathPlus?.points?.length ?? 0,
       textRightArrowFill: textRightArrow?.fill ?? null,
       textRightArrowGeometry: textRightArrow?.geometry ?? null,
       textRightArrowParagraphAlign: textRightArrow?.textBody?.paragraphs?.[0]?.align ?? null,
@@ -12403,9 +12421,9 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       presetGeometryFreeformPPTXImportState.presetModelCount >
         beforePresetGeometryFreeformPPTXDrop.presetGeometryFreeformModelCount &&
-      presetGeometryFreeformPPTXImportState.presetModelCount === 12 &&
-      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Down Arrow Probe | Preset Hexagon Probe | Preset Left Arrow Probe | Preset Left Right Arrow Probe | Preset Plus Probe | Preset Quad Arrow Probe | Preset Right Arrow Probe | Preset Text Right Arrow Probe | Preset Triangle Probe | Preset Up Arrow Probe | Preset Up Down Arrow Probe' &&
-      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline' &&
+      presetGeometryFreeformPPTXImportState.presetModelCount === 15 &&
+      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Down Arrow Probe | Preset Hexagon Probe | Preset Left Arrow Probe | Preset Left Right Arrow Probe | Preset Math Multiply Probe | Preset Math Plus Probe | Preset Plus Probe | Preset Quad Arrow Probe | Preset Right Arrow Probe | Preset Star Probe | Preset Text Right Arrow Probe | Preset Triangle Probe | Preset Up Arrow Probe | Preset Up Down Arrow Probe' &&
+      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePointMode === 'polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('M ') &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('L ') &&
@@ -12460,6 +12478,18 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.plusPointCount === 13 &&
       presetGeometryFreeformPPTXImportState.plusGeometry?.x === 752 &&
       presetGeometryFreeformPPTXImportState.plusGeometry?.y === 320 &&
+      presetGeometryFreeformPPTXImportState.starFill?.color === '#fef3c7' &&
+      presetGeometryFreeformPPTXImportState.starPointCount === 11 &&
+      presetGeometryFreeformPPTXImportState.starGeometry?.x === 960 &&
+      presetGeometryFreeformPPTXImportState.starGeometry?.y === 128 &&
+      presetGeometryFreeformPPTXImportState.mathMultiplyFill?.color === '#fee2e2' &&
+      presetGeometryFreeformPPTXImportState.mathMultiplyPointCount === 13 &&
+      presetGeometryFreeformPPTXImportState.mathMultiplyGeometry?.x === 960 &&
+      presetGeometryFreeformPPTXImportState.mathMultiplyGeometry?.y === 320 &&
+      presetGeometryFreeformPPTXImportState.mathPlusFill?.color === '#ecfccb' &&
+      presetGeometryFreeformPPTXImportState.mathPlusPointCount === 13 &&
+      presetGeometryFreeformPPTXImportState.mathPlusGeometry?.x === 960 &&
+      presetGeometryFreeformPPTXImportState.mathPlusGeometry?.y === 512 &&
       presetGeometryFreeformPPTXImportState.textRightArrowFill?.color === '#fef9c3' &&
       presetGeometryFreeformPPTXImportState.textRightArrowPointCount === 8 &&
       presetGeometryFreeformPPTXImportState.textRightArrowGeometry?.x === 752 &&
@@ -31545,6 +31575,18 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
       y: 1219200,
     }),
     createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEF3C7',
+      h: 1143000,
+      id: 9993,
+      name: 'Preset Star Probe',
+      preset: 'star5',
+      stroke: 'D97706',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 9144000,
+      y: 1219200,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
       fill: 'EDE9FE',
       h: 1143000,
       id: 9985,
@@ -31629,6 +31671,18 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
       y: 3048000,
     }),
     createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEE2E2',
+      h: 1143000,
+      id: 9994,
+      name: 'Preset Math Multiply Probe',
+      preset: 'mathMultiply',
+      stroke: 'B91C1C',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 9144000,
+      y: 3048000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
       fill: 'FEF9C3',
       h: 1143000,
       id: 9991,
@@ -31639,6 +31693,18 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
       text: 'Arrow text',
       w: 1524000,
       x: 7162800,
+      y: 4876800,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'ECFCCB',
+      h: 1143000,
+      id: 9995,
+      name: 'Preset Math Plus Probe',
+      preset: 'mathPlus',
+      stroke: '4D7C0F',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 9144000,
       y: 4876800,
     }),
   ].join('')
