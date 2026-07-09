@@ -97,6 +97,11 @@ type PPTXThemeStyleMap = {
   fillStyles: ReadonlyMap<number, Element>
   lineStyles: ReadonlyMap<number, PPTXThemeLineStyle>
 }
+type PPTXThemeContext = {
+  colors: PPTXThemeColorMap
+  fonts: PPTXThemeFontMap
+  styles: PPTXThemeStyleMap
+}
 type PPTXPlaceholderRef = {
   idx?: string
   type?: string
@@ -542,13 +547,8 @@ async function importPPTDeckFromOpenXmlZip(
 
   const size = await readPPTXOpenXmlDeckSize(zip)
   const themePath = await readPPTXOpenXmlThemePath(zip)
-  const themeColors = await readPPTXOpenXmlThemeColors(zip, themePath)
-  const themeFonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
-  const themeStyles = await readPPTXOpenXmlThemeStyles(
-    zip,
-    themePath,
-    themeColors,
-  )
+  const defaultThemeContext = await readPPTXOpenXmlThemeContext(zip, themePath)
+  const themeContextByPath = new Map<string, Promise<PPTXThemeContext>>()
   const title = await readPPTXOpenXmlDeckTitle(zip)
   const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
   const sectionNameBySlidePath =
@@ -556,13 +556,12 @@ async function importPPTDeckFromOpenXmlZip(
   const slides = await Promise.all(slidePaths.map((path, index) =>
     readPPTXOpenXmlSlide({
       commentAuthors,
+      defaultThemeContext,
       index,
       path,
       sectionName: sectionNameBySlidePath.get(path),
       size,
-      themeColors,
-      themeFonts,
-      themeStyles,
+      themeContextByPath,
       zip,
     }),
   ))
@@ -911,6 +910,35 @@ async function readPPTXOpenXmlThemeStyles(
   return { effectStyles, fillStyles, lineStyles }
 }
 
+async function readPPTXOpenXmlThemeContext(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeContext> {
+  const colors = await readPPTXOpenXmlThemeColors(zip, themePath)
+  const fonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
+  const styles = await readPPTXOpenXmlThemeStyles(zip, themePath, colors)
+
+  return { colors, fonts, styles }
+}
+
+async function readPPTXOpenXmlThemeContextCached(
+  zip: JSZip,
+  themePath: string,
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>,
+) {
+  const cached = themeContextByPath.get(themePath)
+
+  if (cached) {
+    return await cached
+  }
+
+  const pending = readPPTXOpenXmlThemeContext(zip, themePath)
+
+  themeContextByPath.set(themePath, pending)
+
+  return await pending
+}
+
 function readPPTXThemeEffectStyles(
   effectStyleList: Element | null,
 ): Element[] {
@@ -971,6 +999,98 @@ async function readPPTXOpenXmlThemePath(zip: JSZip) {
     .sort(comparePPTXNumberedPaths)[0] ?? null
 }
 
+async function readPPTXSlideThemeContext({
+  defaultThemeContext,
+  relationships,
+  slidePath,
+  themeContextByPath,
+  zip,
+}: {
+  defaultThemeContext: PPTXThemeContext
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>
+  zip: JSZip
+}) {
+  const themePath = await readPPTXSlideThemePath({
+    relationships,
+    slidePath,
+    zip,
+  })
+
+  return themePath
+    ? await readPPTXOpenXmlThemeContextCached(
+        zip,
+        themePath,
+        themeContextByPath,
+      )
+    : defaultThemeContext
+}
+
+async function readPPTXSlideThemePath({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const slideThemePath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (slideThemePath) {
+    return slideThemePath
+  }
+
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const layoutThemePath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (layoutThemePath) {
+    return layoutThemePath
+  }
+
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (!masterPath) {
+    return null
+  }
+
+  const masterRelationships = await readPPTXRelationships(zip, masterPath)
+
+  return readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships: masterRelationships,
+    sourcePath: masterPath,
+    zip,
+  })
+}
+
 function readPPTXThemeColorNode(colorNode: Element) {
   const srgbColor = getDirectPPTXChildByLocalName(colorNode, 'srgbClr')
   const presetColor = getDirectPPTXChildByLocalName(colorNode, 'prstClr')
@@ -1010,23 +1130,21 @@ function resolvePPTXThemeSchemeColors(
 
 async function readPPTXOpenXmlSlide({
   commentAuthors,
+  defaultThemeContext,
   index,
   path,
   sectionName,
   size,
-  themeColors,
-  themeFonts,
-  themeStyles,
+  themeContextByPath,
   zip,
 }: {
   commentAuthors: PPTXCommentAuthorMap
+  defaultThemeContext: PPTXThemeContext
   index: number
   path: string
   sectionName?: string
   size: PPTDeck['size']
-  themeColors: PPTXThemeColorMap
-  themeFonts: PPTXThemeFontMap
-  themeStyles: PPTXThemeStyleMap
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>
   zip: JSZip
 }): Promise<PPTSlide> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -1036,6 +1154,16 @@ async function readPPTXOpenXmlSlide({
     ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
     : null
   const relationships = await readPPTXSlideRelationships(zip, path)
+  const themeContext = await readPPTXSlideThemeContext({
+    defaultThemeContext,
+    relationships,
+    slidePath: path,
+    themeContextByPath,
+    zip,
+  })
+  const themeColors = themeContext.colors
+  const themeFonts = themeContext.fonts
+  const themeStyles = themeContext.styles
   const placeholderGeometries = await readPPTXSlideLayoutPlaceholderGeometries({
     relationships,
     slidePath: path,

@@ -292,6 +292,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXZeroValueColorModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXSlideSpecificThemeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
@@ -326,6 +327,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXZeroValueColorModifierProbeState(page)
   const openXmlPPTXColorSpaceState =
     await readPPTXColorSpaceProbeState(page)
+  const openXmlPPTXSlideSpecificThemeState =
+    await readPPTXSlideSpecificThemeProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -535,6 +538,22 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXColorSpaceState.activeStroke.includes('191'),
     {
       openXmlPPTXColorSpaceState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX slide-specific theme colors for viewer rendering',
+    openXmlPPTXSlideSpecificThemeState.modelCount === 1 &&
+      openXmlPPTXSlideSpecificThemeState.fill === '#118833' &&
+      openXmlPPTXSlideSpecificThemeState.stroke === '#cc3344' &&
+      openXmlPPTXSlideSpecificThemeState.activeExists &&
+      openXmlPPTXSlideSpecificThemeState.activeFill.includes('17') &&
+      openXmlPPTXSlideSpecificThemeState.activeFill.includes('136') &&
+      openXmlPPTXSlideSpecificThemeState.activeFill.includes('51') &&
+      openXmlPPTXSlideSpecificThemeState.activeStroke.includes('204') &&
+      openXmlPPTXSlideSpecificThemeState.activeStroke.includes('51') &&
+      openXmlPPTXSlideSpecificThemeState.activeStroke.includes('68'),
+    {
+      openXmlPPTXSlideSpecificThemeState,
     },
   )
 
@@ -11468,6 +11487,7 @@ async function runExportScenario(page) {
   openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXZeroValueColorModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXColorSpaceProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXSlideSpecificThemeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(openXmlPPTXBase64)
@@ -11549,6 +11569,11 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#3366cc' &&
         element.stroke?.color === '#40bf40').length,
+      slideSpecificThemeProbeModelCount: elements.filter((element) =>
+        element.name === 'Slide Specific Theme Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#118833' &&
+        element.stroke?.color === '#cc3344').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11822,6 +11847,11 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#3366cc' &&
       element.stroke?.color === '#40bf40')
+    const exportSlideSpecificThemeProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Slide Specific Theme Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#118833' &&
+      element.stroke?.color === '#cc3344')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12175,6 +12205,10 @@ async function runExportScenario(page) {
       exportColorSpaceProbeFill: exportColorSpaceProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportColorSpaceProbeModelCount: exportColorSpaceProbeObjects.length,
       exportColorSpaceProbeStroke: exportColorSpaceProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasSlideSpecificThemeProbe: exportSlideSpecificThemeProbeObjects.length > 0,
+      exportSlideSpecificThemeProbeFill: exportSlideSpecificThemeProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportSlideSpecificThemeProbeModelCount: exportSlideSpecificThemeProbeObjects.length,
+      exportSlideSpecificThemeProbeStroke: exportSlideSpecificThemeProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12459,6 +12493,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportZeroValueColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.zeroValueColorModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasColorSpaceProbe &&
       openXmlPPTXImportState.exportColorSpaceProbeModelCount > beforeOpenXmlPPTXDrop.colorSpaceProbeModelCount &&
+      openXmlPPTXImportState.exportHasSlideSpecificThemeProbe &&
+      openXmlPPTXImportState.exportSlideSpecificThemeProbeModelCount > beforeOpenXmlPPTXDrop.slideSpecificThemeProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -31290,6 +31326,39 @@ function getPPTXRelationshipsPath(sourcePath) {
   return `${directory}/_rels/${fileName}.rels`
 }
 
+function getNextPPTXNumberedPartPath(zip, prefix, suffix) {
+  const pattern = new RegExp(`^${escapeRegExp(prefix)}(\\d+)${escapeRegExp(suffix)}$`)
+  const nextNumber = Object.keys(zip.files)
+    .map((path) => Number(path.match(pattern)?.[1] ?? 0))
+    .filter(Number.isFinite)
+    .reduce((max, value) => Math.max(max, value), 0) + 1
+
+  return `${prefix}${nextNumber}${suffix}`
+}
+
+function replacePPTXRelationshipTargetByTypeSuffix(
+  xml,
+  relationshipTypeSuffix,
+  target,
+) {
+  return xml.replace(/<Relationship\b[^>]*\/>/g, (relationshipXml) => {
+    const type = readPPTXXmlAttribute(relationshipXml, 'Type') ?? ''
+
+    if (!type.endsWith(relationshipTypeSuffix)) {
+      return relationshipXml
+    }
+
+    return relationshipXml.replace(
+      /\bTarget="[^"]*"/,
+      `Target="${escapePPTXXmlAttribute(target)}"`,
+    )
+  })
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function getPPTXRelativeTarget(sourcePath, targetPath) {
   const sourceParts = sourcePath.split('/')
   const targetParts = targetPath.split('/')
@@ -31840,6 +31909,138 @@ async function addPPTXColorSpaceProbe(base64) {
   }
 
   zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXSlideSpecificThemeProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const slidePath = slidePaths[1]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Slide Specific Theme Probe')) {
+    return base64
+  }
+
+  const layoutPath = await ensurePPTXSlideLayoutPath(zip, slidePath)
+  const masterPath = layoutPath
+    ? await getPPTXRelatedPartPath(zip, layoutPath, '/slideMaster')
+    : ''
+  const themePath = masterPath
+    ? await getPPTXRelatedPartPath(zip, masterPath, '/theme')
+    : ''
+
+  if (!layoutPath || !masterPath || !themePath) {
+    return base64
+  }
+
+  const nextLayoutPath = getNextPPTXNumberedPartPath(
+    zip,
+    'ppt/slideLayouts/slideLayout',
+    '.xml',
+  )
+  const nextMasterPath = getNextPPTXNumberedPartPath(
+    zip,
+    'ppt/slideMasters/slideMaster',
+    '.xml',
+  )
+  const nextThemePath = getNextPPTXNumberedPartPath(
+    zip,
+    'ppt/theme/theme',
+    '.xml',
+  )
+  const layoutXml = await readPPTXZipText(zip, layoutPath)
+  const masterXml = await readPPTXZipText(zip, masterPath)
+  const themeXml = await readPPTXZipText(zip, themePath)
+  const layoutRelsXml = await readPPTXZipText(
+    zip,
+    getPPTXRelationshipsPath(layoutPath),
+  )
+  const masterRelsXml = await readPPTXZipText(
+    zip,
+    getPPTXRelationshipsPath(masterPath),
+  )
+  const nextThemeXml = setPPTXThemeFontXml(
+    setPPTXThemeSchemeColorXml(
+      setPPTXThemeSchemeColorXml(themeXml, 'accent1', '118833'),
+      'accent2',
+      'CC3344',
+    ),
+    'minorFont',
+    'latin',
+    'Slide Theme Probe Font',
+  )
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9995" name="Slide Specific Theme Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="5715000"/>',
+    '<a:ext cx="1828800" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr><a:defRPr sz="1800"><a:latin typeface="+mn-lt"/></a:defRPr></a:pPr>',
+    '<a:r><a:t>Slide theme probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextSlideXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  zip.file(nextLayoutPath, layoutXml)
+  zip.file(nextMasterPath, masterXml)
+  zip.file(nextThemePath, nextThemeXml)
+  zip.file(
+    getPPTXRelationshipsPath(nextLayoutPath),
+    replacePPTXRelationshipTargetByTypeSuffix(
+      layoutRelsXml,
+      '/slideMaster',
+      getPPTXRelativeTarget(nextLayoutPath, nextMasterPath),
+    ),
+  )
+  zip.file(
+    getPPTXRelationshipsPath(nextMasterPath),
+    replacePPTXRelationshipTargetByTypeSuffix(
+      masterRelsXml,
+      '/theme',
+      getPPTXRelativeTarget(nextMasterPath, nextThemePath),
+    ),
+  )
+  zip.file(
+    getPPTXRelationshipsPath(slidePath),
+    replacePPTXRelationshipTargetByTypeSuffix(
+      await readPPTXZipText(zip, getPPTXRelationshipsPath(slidePath)),
+      '/slideLayout',
+      getPPTXRelativeTarget(slidePath, nextLayoutPath),
+    ),
+  )
+  zip.file(slidePath, nextSlideXml)
 
   return await zip.generateAsync({
     compression: 'DEFLATE',
@@ -35606,6 +35807,13 @@ async function readPPTXZeroValueColorModifierProbeState(page) {
 
 async function readPPTXColorSpaceProbeState(page) {
   return await readPPTXColorModifierShapeProbeState(page, 'Color Space Probe')
+}
+
+async function readPPTXSlideSpecificThemeProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(
+    page,
+    'Slide Specific Theme Probe',
+  )
 }
 
 async function readPPTXColorModifierShapeProbeState(page, probeName) {
