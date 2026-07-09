@@ -157,6 +157,10 @@ const PPTShapeSchema = PPTElementBaseSchema.extend({
 const PPTImageSchema = PPTElementBaseSchema.extend({
   alt: z.string(),
   crop: z.object({
+    bottom: z.number().optional(),
+    left: z.number().optional(),
+    right: z.number().optional(),
+    top: z.number().optional(),
     x: z.number(),
     y: z.number(),
   }).optional(),

@@ -14439,12 +14439,27 @@ async function runExportScenario(page) {
     const shapeImage = shapeImages[0] ?? null
 
     return {
+      activeCropBottom: activeImage?.getAttribute('data-ppt-image-crop-bottom') ?? '',
+      activeCropLeft: activeImage?.getAttribute('data-ppt-image-crop-left') ?? '',
+      activeCropRight: activeImage?.getAttribute('data-ppt-image-crop-right') ?? '',
+      activeCropTop: activeImage?.getAttribute('data-ppt-image-crop-top') ?? '',
       activeCropX: activeImage?.getAttribute('data-ppt-image-crop-x') ?? '',
       activeCropY: activeImage?.getAttribute('data-ppt-image-crop-y') ?? '',
       activeFit: activeImage?.getAttribute('data-ppt-image-fit') ?? '',
+      activeImageStyleHeight: img?.style.height ?? '',
+      activeImageStyleLeft: img?.style.left ?? '',
+      activeImageStyleObjectFit: img?.style.objectFit ?? '',
+      activeImageStyleTop: img?.style.top ?? '',
+      activeImageStyleWidth: img?.style.width ?? '',
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeOpacity: activeImage?.getAttribute('data-ppt-opacity') ?? '',
       activeSrcDataUri: img?.getAttribute('src')?.startsWith('data:image/png') === true,
+      exportHasCropRectMarkup: exportCode.includes('data-ppt-image-crop-left="10"') &&
+        exportCode.includes('data-ppt-image-crop-right="0"') &&
+        exportCode.includes('data-ppt-image-crop-top="0"') &&
+        exportCode.includes('data-ppt-image-crop-bottom="20"'),
+      exportHasCropRectModel: exportCode.includes('"left": 10') &&
+        exportCode.includes('"bottom": 20'),
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
@@ -14476,6 +14491,10 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.shapeImageFit === 'cover' &&
       shapeImageFillPPTXImportState.shapeImageCrop?.x === 55 &&
       shapeImageFillPPTXImportState.shapeImageCrop?.y === 40 &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.left === 10 &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.right === undefined &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.top === undefined &&
+      shapeImageFillPPTXImportState.shapeImageCrop?.bottom === 20 &&
       shapeImageFillPPTXImportState.shapeImageGeometry?.x === 760 &&
       shapeImageFillPPTXImportState.shapeImageGeometry?.y === 320 &&
       shapeImageFillPPTXImportState.shapeImageGeometry?.w === 180 &&
@@ -14486,6 +14505,17 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.activeFit === 'cover' &&
       shapeImageFillPPTXImportState.activeCropX === '55' &&
       shapeImageFillPPTXImportState.activeCropY === '40' &&
+      shapeImageFillPPTXImportState.activeCropLeft === '10' &&
+      shapeImageFillPPTXImportState.activeCropRight === '0' &&
+      shapeImageFillPPTXImportState.activeCropTop === '0' &&
+      shapeImageFillPPTXImportState.activeCropBottom === '20' &&
+      shapeImageFillPPTXImportState.activeImageStyleObjectFit === 'fill' &&
+      shapeImageFillPPTXImportState.activeImageStyleWidth.startsWith('111.111') &&
+      shapeImageFillPPTXImportState.activeImageStyleHeight === '125%' &&
+      shapeImageFillPPTXImportState.activeImageStyleLeft.startsWith('-11.111') &&
+      shapeImageFillPPTXImportState.activeImageStyleTop === '0%' &&
+      shapeImageFillPPTXImportState.exportHasCropRectMarkup &&
+      shapeImageFillPPTXImportState.exportHasCropRectModel &&
       shapeImageFillPPTXImportState.activeOpacity === '0.66' &&
       shapeImageFillPPTXImportState.activeSrcDataUri,
     {

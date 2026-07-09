@@ -4780,14 +4780,32 @@ function readPPTXImageCrop(pic: Element | null): PPTImage['crop'] | null {
     return null
   }
 
-  const left = toPPTXNumber(srcRect.getAttribute('l')) ?? 0
-  const right = toPPTXNumber(srcRect.getAttribute('r')) ?? 0
-  const top = toPPTXNumber(srcRect.getAttribute('t')) ?? 0
-  const bottom = toPPTXNumber(srcRect.getAttribute('b')) ?? 0
+  const left = readPPTXImageCropSide(srcRect, 'l')
+  const right = readPPTXImageCropSide(srcRect, 'r')
+  const top = readPPTXImageCropSide(srcRect, 't')
+  const bottom = readPPTXImageCropSide(srcRect, 'b')
   const x = clampPPTXPercent(50 + (left - right) / 2_000)
   const y = clampPPTXPercent(50 + (top - bottom) / 2_000)
 
-  return x === 50 && y === 50 ? null : { x, y }
+  if (x === 50 && y === 50 && left === 0 && right === 0 && top === 0 && bottom === 0) {
+    return null
+  }
+
+  return {
+    ...(bottom === 0 ? {} : { bottom: bottom / 1000 }),
+    ...(left === 0 ? {} : { left: left / 1000 }),
+    ...(right === 0 ? {} : { right: right / 1000 }),
+    ...(top === 0 ? {} : { top: top / 1000 }),
+    x,
+    y,
+  }
+}
+
+function readPPTXImageCropSide(
+  srcRect: Element,
+  attribute: 'b' | 'l' | 'r' | 't',
+) {
+  return toPPTXNumber(srcRect.getAttribute(attribute)) ?? 0
 }
 
 async function readPPTXGraphicFrameElement({

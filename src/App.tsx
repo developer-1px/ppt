@@ -12388,7 +12388,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
 
   function updateImageCrop(
     elementId: string,
-    field: keyof PPTImageCrop,
+    field: 'x' | 'y',
     value: number,
   ) {
     const effect = getSlideEditObjectImageCropCommandEffect({
@@ -35954,6 +35954,18 @@ function SlideThumb({
             data-ppt-image-crop-y={element.kind === 'image'
               ? getPPTImageCrop(element).y
               : undefined}
+            data-ppt-image-crop-bottom={element.kind === 'image'
+              ? getPPTImageCropRectData(element)?.bottom
+              : undefined}
+            data-ppt-image-crop-left={element.kind === 'image'
+              ? getPPTImageCropRectData(element)?.left
+              : undefined}
+            data-ppt-image-crop-right={element.kind === 'image'
+              ? getPPTImageCropRectData(element)?.right
+              : undefined}
+            data-ppt-image-crop-top={element.kind === 'image'
+              ? getPPTImageCropRectData(element)?.top
+              : undefined}
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
@@ -36395,6 +36407,18 @@ function PPTElementView({
       data-ppt-image-crop-y={element.kind === 'image'
         ? getPPTImageCrop(element).y
         : undefined}
+      data-ppt-image-crop-bottom={element.kind === 'image'
+        ? getPPTImageCropRectData(element)?.bottom
+        : undefined}
+      data-ppt-image-crop-left={element.kind === 'image'
+        ? getPPTImageCropRectData(element)?.left
+        : undefined}
+      data-ppt-image-crop-right={element.kind === 'image'
+        ? getPPTImageCropRectData(element)?.right
+        : undefined}
+      data-ppt-image-crop-top={element.kind === 'image'
+        ? getPPTImageCropRectData(element)?.top
+        : undefined}
       data-ppt-image-fit={element.kind === 'image'
         ? getPPTImageFit(element)
         : undefined}
@@ -36424,10 +36448,7 @@ function PPTElementView({
           alt={getPPTImageAltText(element)}
           draggable={false}
           src={element.src}
-          style={{
-            objectFit: getPPTImageFit(element),
-            objectPosition: getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element)),
-          }}
+          style={getPPTImageElementStyle(element)}
         />
       ) : element.kind === 'line' ? (
         <PPTLineSvg element={element} />
@@ -37303,7 +37324,7 @@ function Inspector({
   ) => void
   onImageCropChange: (
     elementId: string,
-    field: keyof PPTImageCrop,
+    field: 'x' | 'y',
     value: number,
   ) => void
   onImageCropReset: (elementId: string) => void
@@ -40642,6 +40663,55 @@ function normalizePPTImageFit(value: string | null | undefined): PPTImageFit {
 
 function getPPTImageCrop(element: PPTImage): PPTImageCrop {
   return element.crop ?? { x: 50, y: 50 }
+}
+
+function getPPTImageCropRectData(element: PPTImage) {
+  const crop = getPPTImageCrop(element)
+  const left = crop.left ?? 0
+  const right = crop.right ?? 0
+  const top = crop.top ?? 0
+  const bottom = crop.bottom ?? 0
+
+  return left !== 0 || right !== 0 || top !== 0 || bottom !== 0
+    ? { bottom, left, right, top }
+    : null
+}
+
+function getPPTImageCropRectStyle(element: PPTImage) {
+  const rect = getPPTImageCropRectData(element)
+
+  if (!rect ||
+    rect.left < 0 ||
+    rect.right < 0 ||
+    rect.top < 0 ||
+    rect.bottom < 0
+  ) {
+    return null
+  }
+
+  const visibleWidth = 100 - rect.left - rect.right
+  const visibleHeight = 100 - rect.top - rect.bottom
+
+  if (visibleWidth <= 0 || visibleHeight <= 0) {
+    return null
+  }
+
+  return {
+    height: `${10000 / visibleHeight}%`,
+    left: `${-rect.left * 100 / visibleWidth}%`,
+    objectFit: 'fill',
+    objectPosition: 'center',
+    position: 'absolute',
+    top: `${-rect.top * 100 / visibleHeight}%`,
+    width: `${10000 / visibleWidth}%`,
+  } as const
+}
+
+function getPPTImageElementStyle(element: PPTImage) {
+  return getPPTImageCropRectStyle(element) ?? {
+    objectFit: getPPTImageFit(element),
+    objectPosition: getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element)),
+  }
 }
 
 function getPPTImageCropDescriptor(

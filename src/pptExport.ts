@@ -313,7 +313,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}" alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}"${getPPTImageCropRectHTMLAttrs(element)} alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -399,15 +399,90 @@ function renderPPTElementSVG(element: PPTElement) {
 function renderPPTImageSVG(element: PPTImage) {
   const crop = element.crop ?? { x: 50, y: 50 }
   const fit = element.fit ?? 'cover'
+  const cropRect = getPPTImageCropRect(element)
   const preserveAspectRatio = `${getPPTSvgImageAlignX(crop.x)}${getPPTSvgImageAlignY(crop.y)} ${fit === 'contain' ? 'meet' : 'slice'}`
   const attrs = [
     getPPTElementSVGAttrs(element),
     `data-ppt-image-fit="${fit}"`,
     `data-ppt-image-crop-x="${formatNumber(crop.x)}"`,
     `data-ppt-image-crop-y="${formatNumber(crop.y)}"`,
+    getPPTImageCropRectSVGAttrs(element),
   ].join(' ')
 
+  if (cropRect) {
+    const clipId = `ppt-svg-image-crop-${escapeHtml(element.id)}`
+    const image = [
+      `<defs><clipPath id="${clipId}"><rect x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}"></rect></clipPath></defs>`,
+      `<image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x - element.geometry.w * cropRect.left / cropRect.visibleWidth)}" y="${formatNumber(element.geometry.y - element.geometry.h * cropRect.top / cropRect.visibleHeight)}" width="${formatNumber(element.geometry.w * 100 / cropRect.visibleWidth)}" height="${formatNumber(element.geometry.h * 100 / cropRect.visibleHeight)}" preserveAspectRatio="none"><title>${escapeHtml(getPPTImageAltText(element))}</title></image>`,
+    ].join('')
+
+    return `<g ${attrs} clip-path="url(#${clipId})">${image}</g>`
+  }
+
   return `<g ${attrs}><image href="${escapeHtml(element.src)}" x="${formatNumber(element.geometry.x)}" y="${formatNumber(element.geometry.y)}" width="${formatNumber(element.geometry.w)}" height="${formatNumber(element.geometry.h)}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(getPPTImageAltText(element))}</title></image></g>`
+}
+
+function getPPTImageCropRectHTMLAttrs(element: PPTImage) {
+  const cropRect = getPPTImageCropRectData(element)
+
+  return cropRect
+    ? [
+        `data-ppt-image-crop-left="${formatNumber(cropRect.left)}"`,
+        `data-ppt-image-crop-right="${formatNumber(cropRect.right)}"`,
+        `data-ppt-image-crop-top="${formatNumber(cropRect.top)}"`,
+        `data-ppt-image-crop-bottom="${formatNumber(cropRect.bottom)}"`,
+      ].map((attr) => ` ${attr}`).join('')
+    : ''
+}
+
+function getPPTImageCropRectSVGAttrs(element: PPTImage) {
+  const cropRect = getPPTImageCropRectData(element)
+
+  return cropRect
+    ? [
+        `data-ppt-image-crop-left="${formatNumber(cropRect.left)}"`,
+        `data-ppt-image-crop-right="${formatNumber(cropRect.right)}"`,
+        `data-ppt-image-crop-top="${formatNumber(cropRect.top)}"`,
+        `data-ppt-image-crop-bottom="${formatNumber(cropRect.bottom)}"`,
+      ].join(' ')
+    : ''
+}
+
+function getPPTImageCropRectData(element: PPTImage) {
+  const crop = element.crop
+
+  if (!crop) {
+    return null
+  }
+
+  const left = crop.left ?? 0
+  const right = crop.right ?? 0
+  const top = crop.top ?? 0
+  const bottom = crop.bottom ?? 0
+
+  return left !== 0 || right !== 0 || top !== 0 || bottom !== 0
+    ? { bottom, left, right, top }
+    : null
+}
+
+function getPPTImageCropRect(element: PPTImage) {
+  const rect = getPPTImageCropRectData(element)
+
+  if (!rect ||
+    rect.left < 0 ||
+    rect.right < 0 ||
+    rect.top < 0 ||
+    rect.bottom < 0
+  ) {
+    return null
+  }
+
+  const visibleWidth = 100 - rect.left - rect.right
+  const visibleHeight = 100 - rect.top - rect.bottom
+
+  return visibleWidth > 0 && visibleHeight > 0
+    ? { ...rect, visibleHeight, visibleWidth }
+    : null
 }
 
 function renderPPTShapeSVG(element: PPTShape) {
