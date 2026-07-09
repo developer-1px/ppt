@@ -11161,6 +11161,10 @@ async function runExportScenario(page) {
         element.name === 'Elbow Connector Probe' &&
         element.kind === 'line' &&
         element.route === 'elbow').length,
+      shapeElbowConnectorProbeModelCount: elements.filter((element) =>
+        element.name === 'Shape Elbow Connector Probe' &&
+        element.kind === 'line' &&
+        element.route === 'elbow').length,
       connectedConnectorProbeModelCount: elements.filter((element) => {
         if (element.name !== 'Connected Connector Probe' || element.kind !== 'line') {
           return false
@@ -11447,6 +11451,10 @@ async function runExportScenario(page) {
       element.name === 'Elbow Connector Probe' &&
       element.kind === 'line' &&
       element.route === 'elbow')
+    const exportShapeElbowConnectorProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Shape Elbow Connector Probe' &&
+      element.kind === 'line' &&
+      element.route === 'elbow')
     const exportConnectedConnectorProbeObjects = exportImportedElements.filter((element) => {
       if (element.name !== 'Connected Connector Probe' || element.kind !== 'line') {
         return false
@@ -11695,6 +11703,9 @@ async function runExportScenario(page) {
       exportHasElbowConnectorProbe: exportElbowConnectorProbeObjects.length > 0,
       exportElbowConnectorProbeModelCount: exportElbowConnectorProbeObjects.length,
       exportElbowConnectorProbeRoutes: exportElbowConnectorProbeObjects.map((element) => element.route ?? '').join(' | '),
+      exportHasShapeElbowConnectorProbe: exportShapeElbowConnectorProbeObjects.length > 0,
+      exportShapeElbowConnectorProbeModelCount: exportShapeElbowConnectorProbeObjects.length,
+      exportShapeElbowConnectorProbeRoutes: exportShapeElbowConnectorProbeObjects.map((element) => element.route ?? '').join(' | '),
       exportHasConnectedConnectorProbe: exportConnectedConnectorProbeObjects.length > 0,
       exportConnectedConnectorProbeAnchors: exportConnectedConnectorProbeObjects.map((element) =>
         [element.startConnection?.anchor ?? '', element.endConnection?.anchor ?? ''].join(' -> ')).join(' | '),
@@ -11858,6 +11869,9 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
       openXmlPPTXImportState.exportHasElbowConnectorProbe &&
       openXmlPPTXImportState.exportElbowConnectorProbeModelCount > beforeOpenXmlPPTXDrop.elbowConnectorProbeModelCount &&
+      openXmlPPTXImportState.exportHasShapeElbowConnectorProbe &&
+      openXmlPPTXImportState.exportShapeElbowConnectorProbeModelCount > beforeOpenXmlPPTXDrop.shapeElbowConnectorProbeModelCount &&
+      openXmlPPTXImportState.exportShapeElbowConnectorProbeRoutes === 'elbow' &&
       openXmlPPTXImportState.exportHasConnectedConnectorProbe &&
       openXmlPPTXImportState.exportConnectedConnectorProbeModelCount > beforeOpenXmlPPTXDrop.connectedConnectorProbeModelCount &&
       openXmlPPTXImportState.exportHasRoundRectProbe &&
@@ -30851,11 +30865,11 @@ async function addPPTXElbowConnectorProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
 
-  if (xml.includes('Elbow Connector Probe')) {
+  if (xml.includes('Elbow Connector Probe') && xml.includes('Shape Elbow Connector Probe')) {
     return base64
   }
 
-  const probeXml = [
+  const connectorProbeXml = [
     '<p:cxnSp>',
     '<p:nvCxnSpPr>',
     '<p:cNvPr id="9978" name="Elbow Connector Probe"/>',
@@ -30875,7 +30889,30 @@ async function addPPTXElbowConnectorProbe(base64) {
     '</p:spPr>',
     '</p:cxnSp>',
   ].join('')
-  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+  const shapeConnectorProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9977" name="Shape Elbow Connector Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="1828800" y="5029200"/>',
+    '<a:ext cx="1371600" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="bentConnector3"><a:avLst/></a:prstGeom>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="9333EA"/></a:solidFill>',
+    '<a:tailEnd type="triangle"/>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${connectorProbeXml}${shapeConnectorProbeXml}</p:spTree>`,
+  )
 
   if (nextXml === xml) {
     return base64

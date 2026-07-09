@@ -2499,7 +2499,13 @@ function isPPTXLineShape(sp: Element) {
   const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
     ?.getAttribute('prst')
 
-  return preset === 'line' || preset === 'straightConnector1'
+  return preset === 'line' || isPPTXConnectorPreset(preset)
+}
+
+function isPPTXConnectorPreset(preset: string | null | undefined) {
+  return preset?.startsWith('bentConnector') === true ||
+    preset?.startsWith('curvedConnector') === true ||
+    preset?.startsWith('straightConnector') === true
 }
 
 function readPPTXLineRoute(spPr: Element | null): PPTLine['route'] {
