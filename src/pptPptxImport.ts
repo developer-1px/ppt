@@ -224,6 +224,16 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0.35, y: 0.5 },
     { x: 0, y: 0 },
   ],
+  downArrow: [
+    { x: 0.25, y: 0 },
+    { x: 0.75, y: 0 },
+    { x: 0.75, y: 0.65 },
+    { x: 1, y: 0.65 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.65 },
+    { x: 0.25, y: 0.65 },
+    { x: 0.25, y: 0 },
+  ],
   hexagon: [
     { x: 0.25, y: 0 },
     { x: 0.75, y: 0 },
@@ -240,6 +250,16 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0.65, y: 1 },
     { x: 0, y: 1 },
     { x: 0, y: 0 },
+  ],
+  leftArrow: [
+    { x: 1, y: 0.25 },
+    { x: 0.35, y: 0.25 },
+    { x: 0.35, y: 0 },
+    { x: 0, y: 0.5 },
+    { x: 0.35, y: 1 },
+    { x: 0.35, y: 0.75 },
+    { x: 1, y: 0.75 },
+    { x: 1, y: 0.25 },
   ],
   octagon: [
     { x: 0.3, y: 0 },
@@ -295,6 +315,16 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 1, y: 1 },
     { x: 0, y: 1 },
     { x: 0.5, y: 0 },
+  ],
+  upArrow: [
+    { x: 0.25, y: 1 },
+    { x: 0.25, y: 0.35 },
+    { x: 0, y: 0.35 },
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.35 },
+    { x: 0.75, y: 0.35 },
+    { x: 0.75, y: 1 },
+    { x: 0.25, y: 1 },
   ],
 }
 
