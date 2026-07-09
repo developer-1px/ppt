@@ -124,6 +124,14 @@ type PPTXImageSource = {
   renderable: boolean
   src: string
 }
+type PPTXChartWorkbook = {
+  firstSheetName: string
+  sheets: ReadonlyMap<string, ReadonlyMap<string, string>>
+}
+type PPTXSpreadsheetCellRef = {
+  col: number
+  row: number
+}
 type PPTXRatioPoint = {
   x: number
   y: number
@@ -4787,7 +4795,14 @@ async function readPPTXChartTableElement({
   })
   const xml = chartPath ? await zip.file(chartPath)?.async('string') : ''
   const doc = xml ? parsePPTXXmlDocument(xml) : null
-  const rows = doc ? readPPTXChartTableRows(doc) : []
+  const workbook = doc && chartPath
+    ? await readPPTXChartWorkbook({
+        chartPath,
+        doc,
+        zip,
+      })
+    : null
+  const rows = doc ? readPPTXChartTableRows(doc, workbook) : []
   const geometry = readPPTXElementGeometry(graphicFrame)
 
   if (!geometry || rows.length < 2) {
@@ -4852,9 +4867,12 @@ function readPPTXChartPartPath({
   return path && zip.file(path) ? path : null
 }
 
-function readPPTXChartTableRows(root: Document) {
+function readPPTXChartTableRows(
+  root: Document,
+  workbook: PPTXChartWorkbook | null,
+) {
   const series = getPPTXDescendantsByLocalName(root, 'ser')
-    .map((item, index) => readPPTXChartSeries(item, index))
+    .map((item, index) => readPPTXChartSeries(item, index, workbook))
     .filter((item) => item.values.length > 0)
 
   if (series.length === 0) {
@@ -4878,24 +4896,35 @@ function readPPTXChartTableRows(root: Document) {
   ]
 }
 
-function readPPTXChartSeries(ser: Element, index: number) {
+function readPPTXChartSeries(
+  ser: Element,
+  index: number,
+  workbook: PPTXChartWorkbook | null,
+) {
   const tx = getDirectPPTXChildByLocalName(ser, 'tx')
   const cat = getDirectPPTXChildByLocalName(ser, 'cat') ??
     getDirectPPTXChildByLocalName(ser, 'xVal')
   const val = getDirectPPTXChildByLocalName(ser, 'val') ??
     getDirectPPTXChildByLocalName(ser, 'yVal')
-  const name = readPPTXChartTextValue(tx) || `Series ${index + 1}`
+  const name = readPPTXChartTextValue(tx, workbook) || `Series ${index + 1}`
   const categories = readPPTXChartCachedValues(cat)
   const values = readPPTXChartCachedValues(val)
 
   return {
-    categories,
+    categories: categories.length > 0
+      ? categories
+      : readPPTXChartWorkbookValues(cat, workbook),
     name,
-    values,
+    values: values.length > 0
+      ? values
+      : readPPTXChartWorkbookValues(val, workbook),
   }
 }
 
-function readPPTXChartTextValue(root: Element | null) {
+function readPPTXChartTextValue(
+  root: Element | null,
+  workbook: PPTXChartWorkbook | null,
+) {
   const cachedValue = readPPTXChartCachedValues(root)[0]
 
   if (cachedValue) {
@@ -4908,6 +4937,12 @@ function readPPTXChartTextValue(root: Element | null) {
 
   if (directValue) {
     return directValue
+  }
+
+  const workbookValue = readPPTXChartWorkbookValues(root, workbook)[0]
+
+  if (workbookValue) {
+    return workbookValue
   }
 
   return root ? readPPTXPlainTextBody(root).trim() : ''
@@ -4932,6 +4967,285 @@ function readPPTXChartCachedValues(root: Element | null) {
 function comparePPTXChartPointIndex(left: Element, right: Element) {
   return (toPPTXPositiveNumber(left.getAttribute('idx')) ?? 0) -
     (toPPTXPositiveNumber(right.getAttribute('idx')) ?? 0)
+}
+
+async function readPPTXChartWorkbook({
+  chartPath,
+  doc,
+  zip,
+}: {
+  chartPath: string
+  doc: Document
+  zip: JSZip
+}): Promise<PPTXChartWorkbook | null> {
+  const relationships = await readPPTXRelationships(zip, chartPath)
+  const workbookPath = readPPTXChartWorkbookPartPath({
+    chartPath,
+    doc,
+    relationships,
+    zip,
+  })
+  const workbookBytes = workbookPath
+    ? await zip.file(workbookPath)?.async('uint8array')
+    : null
+
+  if (!workbookBytes) {
+    return null
+  }
+
+  try {
+    const workbookZip = await JSZip.loadAsync(workbookBytes)
+
+    return await readPPTXSpreadsheetWorkbook(workbookZip)
+  } catch {
+    return null
+  }
+}
+
+function readPPTXChartWorkbookPartPath({
+  chartPath,
+  doc,
+  relationships,
+  zip,
+}: {
+  chartPath: string
+  doc: Document
+  relationships: PPTXRelationshipMap
+  zip: JSZip
+}) {
+  const externalData = getFirstPPTXDescendantByLocalName(doc, 'externalData')
+  const externalDataRelationshipId = readPPTXRelationshipAttributeId(externalData)
+  const relationship = externalDataRelationshipId
+    ? relationships.get(externalDataRelationshipId)
+    : Array.from(relationships.values())
+      .find((item) =>
+        item.targetMode !== 'External' &&
+        (item.type.endsWith('/package') ||
+          item.target.toLowerCase().endsWith('.xlsx')))
+
+  if (!relationship || relationship.targetMode === 'External') {
+    return null
+  }
+
+  const workbookPath = resolvePPTXRelationshipTarget(chartPath, relationship.target)
+
+  return zip.file(workbookPath) ? workbookPath : null
+}
+
+async function readPPTXSpreadsheetWorkbook(
+  zip: JSZip,
+): Promise<PPTXChartWorkbook | null> {
+  const workbookXml = await zip.file('xl/workbook.xml')?.async('string')
+  const workbookDoc = workbookXml ? parsePPTXXmlDocument(workbookXml) : null
+
+  if (!workbookDoc) {
+    return null
+  }
+
+  const relationships = await readPPTXRelationships(zip, 'xl/workbook.xml')
+  const sharedStrings = await readPPTXSpreadsheetSharedStrings(zip)
+  const sheets = new Map<string, ReadonlyMap<string, string>>()
+  let firstSheetName = ''
+
+  for (const sheet of getPPTXDescendantsByLocalName(workbookDoc, 'sheet')) {
+    const name = sheet.getAttribute('name')?.trim()
+    const relationshipId = readPPTXRelationshipAttributeId(sheet)
+    const relationship = relationshipId ? relationships.get(relationshipId) : null
+    const path = relationship && relationship.targetMode !== 'External'
+      ? resolvePPTXRelationshipTarget('xl/workbook.xml', relationship.target)
+      : null
+
+    if (!name || !path || !zip.file(path)) {
+      continue
+    }
+
+    const worksheetXml = await zip.file(path)?.async('string')
+    const worksheetDoc = worksheetXml ? parsePPTXXmlDocument(worksheetXml) : null
+    const cells = worksheetDoc
+      ? readPPTXSpreadsheetWorksheetCells(worksheetDoc, sharedStrings)
+      : null
+
+    if (cells) {
+      if (!firstSheetName) {
+        firstSheetName = name
+      }
+
+      sheets.set(name, cells)
+    }
+  }
+
+  return sheets.size === 0 ? null : { firstSheetName, sheets }
+}
+
+async function readPPTXSpreadsheetSharedStrings(zip: JSZip) {
+  const xml = await zip.file('xl/sharedStrings.xml')?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+  return doc
+    ? getPPTXDescendantsByLocalName(doc, 'si')
+      .map(readPPTXSpreadsheetTextContainer)
+    : []
+}
+
+function readPPTXSpreadsheetWorksheetCells(
+  doc: Document,
+  sharedStrings: readonly string[],
+) {
+  const cells = new Map<string, string>()
+
+  for (const cell of getPPTXDescendantsByLocalName(doc, 'c')) {
+    const ref = cell.getAttribute('r')?.trim().toUpperCase()
+    const value = readPPTXSpreadsheetCellValue(cell, sharedStrings)
+
+    if (ref && value !== null) {
+      cells.set(ref, value)
+    }
+  }
+
+  return cells
+}
+
+function readPPTXSpreadsheetCellValue(
+  cell: Element,
+  sharedStrings: readonly string[],
+) {
+  const type = cell.getAttribute('t')?.trim()
+
+  if (type === 'inlineStr') {
+    return readPPTXSpreadsheetTextContainer(
+      getDirectPPTXChildByLocalName(cell, 'is') ?? cell,
+    )
+  }
+
+  const value = getDirectPPTXChildByLocalName(cell, 'v')?.textContent?.trim()
+
+  if (value === undefined) {
+    return null
+  }
+
+  if (type === 's') {
+    return sharedStrings[toPPTXPositiveNumber(value) ?? -1] ?? value
+  }
+
+  return value
+}
+
+function readPPTXSpreadsheetTextContainer(root: Element) {
+  return getPPTXDescendantsByLocalName(root, 't')
+    .map((text) => text.textContent ?? '')
+    .join('')
+}
+
+function readPPTXChartWorkbookValues(
+  root: Element | null,
+  workbook: PPTXChartWorkbook | null,
+) {
+  const formula = getFirstPPTXDescendantByLocalName(root, 'f')
+    ?.textContent
+    ?.trim()
+
+  return formula && workbook
+    ? readPPTXSpreadsheetFormulaValues(workbook, formula)
+    : []
+}
+
+function readPPTXSpreadsheetFormulaValues(
+  workbook: PPTXChartWorkbook,
+  formula: string,
+) {
+  const range = readPPTXSpreadsheetFormulaRange(formula, workbook)
+
+  if (!range) {
+    return []
+  }
+
+  const sheet = workbook.sheets.get(range.sheetName)
+
+  if (!sheet) {
+    return []
+  }
+
+  const minCol = Math.min(range.start.col, range.end.col)
+  const maxCol = Math.max(range.start.col, range.end.col)
+  const minRow = Math.min(range.start.row, range.end.row)
+  const maxRow = Math.max(range.start.row, range.end.row)
+  const values: string[] = []
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      values.push(sheet.get(`${formatPPTXSpreadsheetColumn(col)}${row}`) ?? '')
+    }
+  }
+
+  return values.filter((value) => value.length > 0)
+}
+
+function readPPTXSpreadsheetFormulaRange(
+  formula: string,
+  workbook: PPTXChartWorkbook,
+) {
+  const normalized = formula.trim().replace(/^=/, '')
+  const match = normalized.match(
+    /^(?:(?:'((?:[^']|'')+)'|([^!']+))!)?(\$?[A-Z]{1,4}\$?\d+)(?::(\$?[A-Z]{1,4}\$?\d+))?$/i,
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const sheetName = readPPTXSpreadsheetFormulaSheetName(match[1] ?? match[2]) ??
+    workbook.firstSheetName
+  const start = readPPTXSpreadsheetCellRef(match[3])
+  const end = readPPTXSpreadsheetCellRef(match[4] ?? match[3])
+
+  return start && end
+    ? {
+        end,
+        sheetName,
+        start,
+      }
+    : null
+}
+
+function readPPTXSpreadsheetFormulaSheetName(value: string | undefined) {
+  const sheetName = value
+    ?.replace(/^\[[^\]]+\]/, '')
+    .replace(/''/g, "'")
+    .trim()
+
+  return sheetName || undefined
+}
+
+function readPPTXSpreadsheetCellRef(
+  value: string | undefined,
+): PPTXSpreadsheetCellRef | null {
+  const match = value?.match(/^\$?([A-Z]{1,4})\$?(\d+)$/i)
+  const row = toPPTXPositiveNumber(match?.[2])
+
+  return match && row !== null
+    ? {
+        col: readPPTXSpreadsheetColumnIndex(match[1]),
+        row,
+      }
+    : null
+}
+
+function readPPTXSpreadsheetColumnIndex(column: string) {
+  return column.toUpperCase().split('').reduce((total, char) =>
+    total * 26 + char.charCodeAt(0) - 64, 0)
+}
+
+function formatPPTXSpreadsheetColumn(index: number) {
+  let value = Math.max(1, Math.floor(index))
+  let column = ''
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    column = String.fromCharCode(65 + remainder) + column
+    value = Math.floor((value - 1) / 26)
+  }
+
+  return column
 }
 
 function readPPTXTableElement(

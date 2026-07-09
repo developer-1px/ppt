@@ -13659,23 +13659,24 @@ async function runExportScenario(page) {
       chartTablePPTXImportState.chartTableModelCount >
         beforeChartTablePPTXDrop.chartTableModelCount &&
       chartTablePPTXImportState.chartTableModelCount === 1 &&
-      chartTablePPTXImportState.activeTableCols === 3 &&
+      chartTablePPTXImportState.activeTableCols === 4 &&
       chartTablePPTXImportState.activeTableRows === 4 &&
       chartTablePPTXImportState.activeText.includes('North') &&
       chartTablePPTXImportState.activeText.includes('Revenue') &&
       chartTablePPTXImportState.activeText.includes('Margin') &&
+      chartTablePPTXImportState.activeText.includes('Workbook') &&
       JSON.stringify(chartTablePPTXImportState.rows) === JSON.stringify([
-        ['Category', 'Revenue', 'Margin'],
-        ['North', '12', '5'],
-        ['South', '18', '7'],
-        ['West', '9', '4'],
+        ['Category', 'Revenue', 'Margin', 'Workbook'],
+        ['North', '12', '5', '21'],
+        ['South', '18', '7', '13'],
+        ['West', '9', '4', '16'],
       ]) &&
       chartTablePPTXImportState.chartTableCellStyleHeaderFill === '#eff6ff' &&
       chartTablePPTXImportState.chartTableGeometry?.x === 104 &&
       chartTablePPTXImportState.chartTableGeometry?.y === 320 &&
       chartTablePPTXImportState.chartTableGeometry?.w === 560 &&
       chartTablePPTXImportState.chartTableGeometry?.h === 240 &&
-      chartTablePPTXImportState.columnWidths === '187,187,187' &&
+      chartTablePPTXImportState.columnWidths === '140,140,140,140' &&
       chartTablePPTXImportState.rowHeights === '60,60,60,60',
     {
       beforeChartTablePPTXDrop,
@@ -13690,6 +13691,18 @@ async function runExportScenario(page) {
       chartTablePPTXImportState.rows?.[2]?.[2] === '7' &&
       chartTablePPTXImportState.rows?.[3]?.[2] === '4' &&
       chartTablePPTXImportState.activeText.includes('Margin'),
+    {
+      chartTablePPTXImportState,
+    },
+  )
+
+  record(
+    'imports PPTX chart embedded workbook formula ranges into table fallback',
+    chartTablePPTXImportState.rows?.[0]?.[3] === 'Workbook' &&
+      chartTablePPTXImportState.rows?.[1]?.[3] === '21' &&
+      chartTablePPTXImportState.rows?.[2]?.[3] === '13' &&
+      chartTablePPTXImportState.rows?.[3]?.[3] === '16' &&
+      chartTablePPTXImportState.activeText.includes('Workbook'),
     {
       chartTablePPTXImportState,
     },
@@ -34027,6 +34040,7 @@ async function addPPTXChartTableProbe(base64) {
     .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
     .sort(comparePPTXNumberedPaths)[0]
   const chartPath = 'ppt/charts/chart-pptx-table-probe.xml'
+  const workbookPath = 'ppt/embeddings/chart-pptx-table-probe.xlsx'
 
   if (!slidePath) {
     return base64
@@ -34043,7 +34057,19 @@ async function addPPTXChartTableProbe(base64) {
     chartPath,
     'application/vnd.openxmlformats-officedocument.drawingml.chart+xml',
   )
-  zip.file(chartPath, createPPTXChartTableProbeChartXml())
+  await ensurePPTXOverrideContentType(
+    zip,
+    workbookPath,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  zip.file(workbookPath, await createPPTXChartTableProbeWorkbookBuffer())
+  const workbookRelationshipId = await addPPTXInternalRelationship({
+    sourcePath: chartPath,
+    target: getPPTXRelativeTarget(chartPath, workbookPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/package',
+    zip,
+  })
+  zip.file(chartPath, createPPTXChartTableProbeChartXml(workbookRelationshipId))
 
   const relationshipId = await addPPTXInternalRelationship({
     sourcePath: slidePath,
@@ -34152,7 +34178,7 @@ async function addPPTXUnsupportedGraphicFrameProbe(base64) {
   })
 }
 
-function createPPTXChartTableProbeChartXml() {
+function createPPTXChartTableProbeChartXml(workbookRelationshipId) {
   return [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
     '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
@@ -34177,6 +34203,13 @@ function createPPTXChartTableProbeChartXml() {
       useRichTextName: true,
       values: [5, 7, 4],
     }),
+    createPPTXChartSeriesXml({
+      categories: ['North', 'South', 'West'],
+      index: 2,
+      name: 'Workbook',
+      useWorkbookDataOnly: true,
+      values: [21, 13, 16],
+    }),
     '<c:axId val="1001"/>',
     '<c:axId val="1002"/>',
     '</c:barChart>',
@@ -34186,6 +34219,7 @@ function createPPTXChartTableProbeChartXml() {
     '<c:legend><c:legendPos val="r"/></c:legend>',
     '<c:plotVisOnly val="1"/>',
     '</c:chart>',
+    `<c:externalData r:id="${workbookRelationshipId}"><c:autoUpdate val="0"/></c:externalData>`,
     '</c:chartSpace>',
   ].join('')
 }
@@ -34196,9 +34230,19 @@ function createPPTXChartSeriesXml({
   name,
   useLiteralData = false,
   useRichTextName = false,
+  useWorkbookDataOnly = false,
   values,
 }) {
-  const textXml = useRichTextName
+  const workbookColumn = String.fromCharCode(66 + index)
+  const textXml = useWorkbookDataOnly
+    ? [
+      '<c:tx>',
+      '<c:strRef>',
+      `<c:f>Sheet1!$${workbookColumn}$1</c:f>`,
+      '</c:strRef>',
+      '</c:tx>',
+    ].join('')
+    : useRichTextName
     ? [
       '<c:tx>',
       '<c:rich>',
@@ -34210,7 +34254,7 @@ function createPPTXChartSeriesXml({
     : [
       '<c:tx>',
       '<c:strRef>',
-      `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$1</c:f>`,
+      `<c:f>Sheet1!$${workbookColumn}$1</c:f>`,
       '<c:strCache>',
       '<c:ptCount val="1"/>',
       `<c:pt idx="0"><c:v>${escapePPTXXmlText(name)}</c:v></c:pt>`,
@@ -34218,7 +34262,15 @@ function createPPTXChartSeriesXml({
       '</c:strRef>',
       '</c:tx>',
     ].join('')
-  const categoriesXml = useLiteralData
+  const categoriesXml = useWorkbookDataOnly
+    ? [
+      '<c:cat>',
+      '<c:strRef>',
+      '<c:f>Sheet1!$A$2:$A$4</c:f>',
+      '</c:strRef>',
+      '</c:cat>',
+    ].join('')
+    : useLiteralData
     ? [
       '<c:cat>',
       '<c:strLit>',
@@ -34240,7 +34292,15 @@ function createPPTXChartSeriesXml({
       '</c:strRef>',
       '</c:cat>',
     ].join('')
-  const valuesXml = useLiteralData
+  const valuesXml = useWorkbookDataOnly
+    ? [
+      '<c:val>',
+      '<c:numRef>',
+      `<c:f>Sheet1!$${workbookColumn}$2:$${workbookColumn}$4</c:f>`,
+      '</c:numRef>',
+      '</c:val>',
+    ].join('')
+    : useLiteralData
     ? [
       '<c:val>',
       '<c:numLit>',
@@ -34254,7 +34314,7 @@ function createPPTXChartSeriesXml({
     : [
       '<c:val>',
       '<c:numRef>',
-      `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$2:$${String.fromCharCode(66 + index)}$4</c:f>`,
+      `<c:f>Sheet1!$${workbookColumn}$2:$${workbookColumn}$4</c:f>`,
       '<c:numCache>',
       '<c:formatCode>General</c:formatCode>',
       `<c:ptCount val="${values.length}"/>`,
@@ -34274,6 +34334,72 @@ function createPPTXChartSeriesXml({
     valuesXml,
     '</c:ser>',
   ].join('')
+}
+
+async function createPPTXChartTableProbeWorkbookBuffer() {
+  const workbookZip = new JSZip()
+  const sharedStrings = [
+    'Category',
+    'Revenue',
+    'Margin',
+    'Workbook',
+    'North',
+    'South',
+    'West',
+  ]
+
+  workbookZip.file('[Content_Types].xml', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+    '<Default Extension="xml" ContentType="application/xml"/>',
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+    '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>',
+    '</Types>',
+  ].join(''))
+  workbookZip.file('_rels/.rels', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+    '</Relationships>',
+  ].join(''))
+  workbookZip.file('xl/workbook.xml', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+    '<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>',
+    '</workbook>',
+  ].join(''))
+  workbookZip.file('xl/_rels/workbook.xml.rels', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>',
+    '</Relationships>',
+  ].join(''))
+  workbookZip.file('xl/sharedStrings.xml', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${sharedStrings.length}" uniqueCount="${sharedStrings.length}">`,
+    sharedStrings.map((value) =>
+      `<si><t>${escapePPTXXmlText(value)}</t></si>`).join(''),
+    '</sst>',
+  ].join(''))
+  workbookZip.file('xl/worksheets/sheet1.xml', [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+    '<sheetData>',
+    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c></row>',
+    '<row r="2"><c r="A2" t="s"><v>4</v></c><c r="B2"><v>12</v></c><c r="C2"><v>5</v></c><c r="D2"><v>21</v></c></row>',
+    '<row r="3"><c r="A3" t="s"><v>5</v></c><c r="B3"><v>18</v></c><c r="C3"><v>7</v></c><c r="D3"><v>13</v></c></row>',
+    '<row r="4"><c r="A4" t="s"><v>6</v></c><c r="B4"><v>9</v></c><c r="C4"><v>4</v></c><c r="D4"><v>16</v></c></row>',
+    '</sheetData>',
+    '</worksheet>',
+  ].join(''))
+
+  return await workbookZip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'nodebuffer',
+  })
 }
 
 async function addPPTXDiagramTextProbe(base64) {
