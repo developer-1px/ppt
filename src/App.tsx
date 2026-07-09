@@ -35966,6 +35966,15 @@ function SlideThumb({
             data-ppt-image-crop-top={element.kind === 'image'
               ? getPPTImageCropRectData(element)?.top
               : undefined}
+            data-ppt-image-adjustment-brightness={element.kind === 'image'
+              ? element.adjustments?.brightness
+              : undefined}
+            data-ppt-image-adjustment-contrast={element.kind === 'image'
+              ? element.adjustments?.contrast
+              : undefined}
+            data-ppt-image-adjustment-grayscale={element.kind === 'image' && element.adjustments?.grayscale === true
+              ? 'true'
+              : undefined}
             data-ppt-image-fit={element.kind === 'image'
               ? getPPTImageFit(element)
               : undefined}
@@ -36060,7 +36069,7 @@ function SlideThumb({
                 ? getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element))
                 : undefined,
               left: `${(element.geometry.x / slideSize.w) * 100}%`,
-              filter: getPPTElementShadowFilter(element),
+              filter: getPPTThumbElementFilter(element),
               opacity: getPPTElementOpacity(element),
               top: `${(element.geometry.y / slideSize.h) * 100}%`,
               transform: getPPTElementTransform(element),
@@ -36418,6 +36427,15 @@ function PPTElementView({
         : undefined}
       data-ppt-image-crop-top={element.kind === 'image'
         ? getPPTImageCropRectData(element)?.top
+        : undefined}
+      data-ppt-image-adjustment-brightness={element.kind === 'image'
+        ? element.adjustments?.brightness
+        : undefined}
+      data-ppt-image-adjustment-contrast={element.kind === 'image'
+        ? element.adjustments?.contrast
+        : undefined}
+      data-ppt-image-adjustment-grayscale={element.kind === 'image' && element.adjustments?.grayscale === true
+        ? 'true'
         : undefined}
       data-ppt-image-fit={element.kind === 'image'
         ? getPPTImageFit(element)
@@ -40708,10 +40726,46 @@ function getPPTImageCropRectStyle(element: PPTImage) {
 }
 
 function getPPTImageElementStyle(element: PPTImage) {
-  return getPPTImageCropRectStyle(element) ?? {
-    objectFit: getPPTImageFit(element),
-    objectPosition: getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element)),
+  return {
+    ...(getPPTImageCropRectStyle(element) ?? {
+      objectFit: getPPTImageFit(element),
+      objectPosition: getSlideEditObjectImageCropPositionCSS(getPPTImageCrop(element)),
+    }),
+    ...(getPPTImageAdjustmentsFilter(element)
+      ? { filter: getPPTImageAdjustmentsFilter(element) }
+      : {}),
   }
+}
+
+function getPPTImageAdjustmentsFilter(element: PPTImage) {
+  const adjustments = element.adjustments
+
+  if (!adjustments) {
+    return undefined
+  }
+
+  const filters = [
+    adjustments.grayscale === true ? 'grayscale(1)' : '',
+    getPPTImageAdjustmentFilter('brightness', adjustments.brightness),
+    getPPTImageAdjustmentFilter('contrast', adjustments.contrast),
+  ].filter(Boolean)
+
+  return filters.length > 0 ? filters.join(' ') : undefined
+}
+
+function getPPTImageAdjustmentFilter(name: string, value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value !== 1
+    ? `${name}(${Math.max(0, value)})`
+    : ''
+}
+
+function getPPTThumbElementFilter(element: PPTElement) {
+  const filters = [
+    getPPTElementShadowFilter(element),
+    element.kind === 'image' ? getPPTImageAdjustmentsFilter(element) : undefined,
+  ].filter(Boolean)
+
+  return filters.length > 0 ? filters.join(' ') : undefined
 }
 
 function getPPTImageCropDescriptor(

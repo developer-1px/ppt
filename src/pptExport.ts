@@ -300,7 +300,7 @@ function renderPPTElementHTML(element: PPTElement) {
     `width:${toPercent(element.geometry.w, PPT_SLIDE_WIDTH)}`,
     `height:${toPercent(element.geometry.h, PPT_SLIDE_HEIGHT)}`,
     `opacity:${formatPPTElementOpacity(opacity)}`,
-    getPPTElementShadowStyle(element),
+    getPPTElementFilterStyle(element),
     transform
       ? `transform:${transform}`
       : '',
@@ -313,7 +313,7 @@ function renderPPTElementHTML(element: PPTElement) {
     const crop = element.crop ?? { x: 50, y: 50 }
     const fit = element.fit ?? 'cover'
 
-    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}"${getPPTImageCropRectHTMLAttrs(element)} alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
+    return `    <img class="ppt-element ppt-image" data-ppt-element="${escapeHtml(element.id)}"${transformAttrs}${altTextAttr}${hyperlinkAttr}${opacityAttr}${shadowAttrs} data-ppt-image-fit="${fit}" data-ppt-image-crop-x="${crop.x}" data-ppt-image-crop-y="${crop.y}"${getPPTImageCropRectHTMLAttrs(element)}${getPPTImageAdjustmentsHTMLAttrs(element)} alt="${escapeHtml(getPPTImageAltText(element))}" src="${escapeHtml(element.src)}" style="${[...style, `object-fit:${fit}`, `object-position:${crop.x}% ${crop.y}%`].filter(Boolean).join(';')}" />`
   }
 
   if (element.kind === 'line') {
@@ -407,6 +407,7 @@ function renderPPTImageSVG(element: PPTImage) {
     `data-ppt-image-crop-x="${formatNumber(crop.x)}"`,
     `data-ppt-image-crop-y="${formatNumber(crop.y)}"`,
     getPPTImageCropRectSVGAttrs(element),
+    getPPTImageAdjustmentsSVGAttrs(element),
   ].join(' ')
 
   if (cropRect) {
@@ -433,6 +434,38 @@ function getPPTImageCropRectHTMLAttrs(element: PPTImage) {
         `data-ppt-image-crop-bottom="${formatNumber(cropRect.bottom)}"`,
       ].map((attr) => ` ${attr}`).join('')
     : ''
+}
+
+function getPPTImageAdjustmentsHTMLAttrs(element: PPTImage) {
+  const attrs = getPPTImageAdjustmentAttrEntries(element)
+
+  return attrs.length > 0
+    ? ` ${attrs.join(' ')}`
+    : ''
+}
+
+function getPPTImageAdjustmentsSVGAttrs(element: PPTImage) {
+  return getPPTImageAdjustmentAttrEntries(element).join(' ')
+}
+
+function getPPTImageAdjustmentAttrEntries(element: PPTImage) {
+  const adjustments = element.adjustments
+
+  if (!adjustments) {
+    return []
+  }
+
+  return [
+    adjustments.grayscale === true
+      ? 'data-ppt-image-adjustment-grayscale="true"'
+      : '',
+    adjustments.brightness === undefined
+      ? ''
+      : `data-ppt-image-adjustment-brightness="${formatNumber(adjustments.brightness)}"`,
+    adjustments.contrast === undefined
+      ? ''
+      : `data-ppt-image-adjustment-contrast="${formatNumber(adjustments.contrast)}"`,
+  ].filter(Boolean)
 }
 
 function getPPTImageCropRectSVGAttrs(element: PPTImage) {
@@ -1491,22 +1524,51 @@ function getPPTElementShadowAttrEntries(element: PPTElement) {
   ]
 }
 
-function getPPTElementShadowStyle(element: PPTElement) {
-  const shadow = getPPTElementShadow(element)
-  const filter = shadow
-    ? getSlideEditObjectShadowFilter({
-        ...shadow,
-        enabled: true,
-      })
-    : undefined
+function getPPTElementFilterStyle(element: PPTElement) {
+  const filter = getPPTElementFilter(element)
 
   return filter ? `filter:${filter}` : ''
 }
 
-function getPPTElementShadowSVGStyleAttr(element: PPTElement) {
-  const style = getPPTElementShadowStyle(element)
+function getPPTElementSVGStyleAttr(element: PPTElement) {
+  const style = getPPTElementFilterStyle(element)
 
   return style ? `style="${escapeHtml(style)}"` : ''
+}
+
+function getPPTElementFilter(element: PPTElement) {
+  const shadow = getPPTElementShadow(element)
+  const filters = [
+    shadow
+      ? getSlideEditObjectShadowFilter({
+          ...shadow,
+          enabled: true,
+        })
+      : '',
+    element.kind === 'image' ? getPPTImageAdjustmentsFilter(element) : '',
+  ].filter(Boolean)
+
+  return filters.length > 0 ? filters.join(' ') : ''
+}
+
+function getPPTImageAdjustmentsFilter(element: PPTImage) {
+  const adjustments = element.adjustments
+
+  if (!adjustments) {
+    return ''
+  }
+
+  return [
+    adjustments.grayscale === true ? 'grayscale(1)' : '',
+    getPPTImageAdjustmentFilter('brightness', adjustments.brightness),
+    getPPTImageAdjustmentFilter('contrast', adjustments.contrast),
+  ].filter(Boolean).join(' ')
+}
+
+function getPPTImageAdjustmentFilter(name: string, value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value !== 1
+    ? `${name}(${Math.max(0, value)})`
+    : ''
 }
 
 function getPPTElementAnimationHTMLAttrs(element: PPTElement) {
@@ -1577,7 +1639,7 @@ function getPPTElementSVGAttrs(element: PPTElement) {
     ...getPPTElementAnimationAttrEntries(element),
     element.flipH === true ? 'data-ppt-flip-h="true"' : '',
     element.flipV === true ? 'data-ppt-flip-v="true"' : '',
-    getPPTElementShadowSVGStyleAttr(element),
+    getPPTElementSVGStyleAttr(element),
     transform ? `transform="${escapeHtml(transform)}"` : '',
   ].filter(Boolean).join(' ')
 }

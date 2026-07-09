@@ -120,6 +120,12 @@ const PPTElementAccessibilitySchema = z.object({
   altText: z.string(),
 })
 
+const PPTImageAdjustmentsSchema = z.object({
+  brightness: z.number().optional(),
+  contrast: z.number().optional(),
+  grayscale: z.boolean().optional(),
+})
+
 const PPTElementBaseSchema = z.object({
   accessibility: PPTElementAccessibilitySchema.optional(),
   animation: PPTElementAnimationSchema.optional(),
@@ -155,6 +161,7 @@ const PPTShapeSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTImageSchema = PPTElementBaseSchema.extend({
+  adjustments: PPTImageAdjustmentsSchema.optional(),
   alt: z.string(),
   crop: z.object({
     bottom: z.number().optional(),
@@ -299,6 +306,7 @@ export type PPTTextBox = z.infer<typeof PPTTextBoxSchema>
 export type PPTShape = z.infer<typeof PPTShapeSchema>
 export type PPTShapeKind = PPTShape['shape']
 export type PPTImage = z.infer<typeof PPTImageSchema>
+export type PPTImageAdjustments = NonNullable<PPTImage['adjustments']>
 export type PPTImageCrop = NonNullable<PPTImage['crop']>
 export type PPTImageFit = NonNullable<PPTImage['fit']>
 export type PPTLine = z.infer<typeof PPTLineSchema>

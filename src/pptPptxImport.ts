@@ -2210,8 +2210,10 @@ async function readPPTXBackgroundImage({
 
   const crop = readPPTXImageCrop(blipFill ?? bgPr ?? background ?? cSld)
   const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
 
   return {
+    ...(adjustments ? { adjustments } : {}),
     alt,
     ...(crop ? { crop } : {}),
     fit: 'cover',
@@ -3760,6 +3762,7 @@ async function readPPTXShapeImageFillElement({
   const accessibility = readPPTXElementAccessibility(sp)
   const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
   const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
 
   if (!source.renderable) {
     return createPPTXUnsupportedImagePlaceholderElement({
@@ -3776,6 +3779,7 @@ async function readPPTXShapeImageFillElement({
 
   return {
     ...(accessibility ?? {}),
+    ...(adjustments ? { adjustments } : {}),
     alt: altText || name,
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
@@ -4342,6 +4346,7 @@ async function readPPTXPictureElement({
   const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
   const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
   const shadow = readPPTXElementShadow(spPr, themeColors) ??
     readPPTXStyleShadow(style, themeColors, themeStyles)
 
@@ -4360,6 +4365,7 @@ async function readPPTXPictureElement({
 
   return {
     ...(accessibility ?? {}),
+    ...(adjustments ? { adjustments } : {}),
     alt: altText || name,
     ...(crop ? { crop } : {}),
     fit: crop ? 'cover' : 'contain',
@@ -4808,6 +4814,47 @@ function readPPTXImageCropSide(
   return toPPTXNumber(srcRect.getAttribute(attribute)) ?? 0
 }
 
+function readPPTXImageAdjustments(
+  blip: Element | null,
+): PPTImage['adjustments'] | undefined {
+  if (!blip) {
+    return undefined
+  }
+
+  const grayscale =
+    getDirectPPTXChildByLocalName(blip, 'grayscl') !== null
+  const lum = getDirectPPTXChildByLocalName(blip, 'lum')
+  const brightness = readPPTXImageAdjustmentMultiplier(
+    lum?.getAttribute('bright'),
+  )
+  const contrast = readPPTXImageAdjustmentMultiplier(
+    lum?.getAttribute('contrast'),
+  )
+  const adjustments: PPTImage['adjustments'] = {
+    ...(brightness === undefined ? {} : { brightness }),
+    ...(contrast === undefined ? {} : { contrast }),
+    ...(grayscale ? { grayscale: true } : {}),
+  }
+
+  return Object.keys(adjustments).length > 0 ? adjustments : undefined
+}
+
+function readPPTXImageAdjustmentMultiplier(
+  value: string | null | undefined,
+) {
+  const raw = toPPTXNumber(value)
+
+  if (raw === null) {
+    return undefined
+  }
+
+  const multiplier = Math.max(0, Math.min(2, 1 + raw / 100_000))
+
+  return multiplier === 1
+    ? undefined
+    : Math.round(multiplier * 1000) / 1000
+}
+
 async function readPPTXGraphicFrameElement({
   graphicFrame,
   index,
@@ -5034,9 +5081,11 @@ async function readPPTXOleObjectElement({
   if (previewSource?.renderable) {
     const crop = readPPTXImageCrop(graphicFrame)
     const opacity = readPPTXImageOpacity(previewBlip)
+    const adjustments = readPPTXImageAdjustments(previewBlip)
 
     return {
       ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+      ...(adjustments ? { adjustments } : {}),
       alt: objectName,
       ...(crop ? { crop } : {}),
       fit: crop ? 'cover' : 'contain',

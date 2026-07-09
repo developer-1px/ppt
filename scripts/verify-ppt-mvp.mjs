@@ -14439,6 +14439,9 @@ async function runExportScenario(page) {
     const shapeImage = shapeImages[0] ?? null
 
     return {
+      activeAdjustmentBrightness: activeImage?.getAttribute('data-ppt-image-adjustment-brightness') ?? '',
+      activeAdjustmentContrast: activeImage?.getAttribute('data-ppt-image-adjustment-contrast') ?? '',
+      activeAdjustmentGrayscale: activeImage?.getAttribute('data-ppt-image-adjustment-grayscale') ?? '',
       activeCropBottom: activeImage?.getAttribute('data-ppt-image-crop-bottom') ?? '',
       activeCropLeft: activeImage?.getAttribute('data-ppt-image-crop-left') ?? '',
       activeCropRight: activeImage?.getAttribute('data-ppt-image-crop-right') ?? '',
@@ -14446,6 +14449,7 @@ async function runExportScenario(page) {
       activeCropX: activeImage?.getAttribute('data-ppt-image-crop-x') ?? '',
       activeCropY: activeImage?.getAttribute('data-ppt-image-crop-y') ?? '',
       activeFit: activeImage?.getAttribute('data-ppt-image-fit') ?? '',
+      activeImageStyleFilter: img?.style.filter ?? '',
       activeImageStyleHeight: img?.style.height ?? '',
       activeImageStyleLeft: img?.style.left ?? '',
       activeImageStyleObjectFit: img?.style.objectFit ?? '',
@@ -14454,6 +14458,10 @@ async function runExportScenario(page) {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeOpacity: activeImage?.getAttribute('data-ppt-opacity') ?? '',
       activeSrcDataUri: img?.getAttribute('src')?.startsWith('data:image/png') === true,
+      exportHasAdjustmentMarkup: exportCode.includes('data-ppt-image-adjustment-grayscale="true"') &&
+        exportCode.includes('data-ppt-image-adjustment-brightness="1.2"') &&
+        exportCode.includes('data-ppt-image-adjustment-contrast="0.7"') &&
+        exportCode.includes('filter:grayscale(1) brightness(1.2) contrast(0.7)'),
       exportHasCropRectMarkup: exportCode.includes('data-ppt-image-crop-left="10"') &&
         exportCode.includes('data-ppt-image-crop-right="0"') &&
         exportCode.includes('data-ppt-image-crop-top="0"') &&
@@ -14465,6 +14473,7 @@ async function runExportScenario(page) {
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
       shapeImageAlt: shapeImage?.alt ?? '',
+      shapeImageAdjustments: shapeImage?.adjustments ?? null,
       shapeImageCrop: shapeImage?.crop ?? null,
       shapeImageFit: shapeImage?.fit ?? '',
       shapeImageGeometry: shapeImage?.geometry ?? null,
@@ -14488,6 +14497,9 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.shapeImageModelCount >
         beforeShapeImageFillPPTXDrop.shapeImageFillModelCount &&
       shapeImageFillPPTXImportState.shapeImageModelCount === 1 &&
+      shapeImageFillPPTXImportState.shapeImageAdjustments?.grayscale === true &&
+      shapeImageFillPPTXImportState.shapeImageAdjustments?.brightness === 1.2 &&
+      shapeImageFillPPTXImportState.shapeImageAdjustments?.contrast === 0.7 &&
       shapeImageFillPPTXImportState.shapeImageFit === 'cover' &&
       shapeImageFillPPTXImportState.shapeImageCrop?.x === 55 &&
       shapeImageFillPPTXImportState.shapeImageCrop?.y === 40 &&
@@ -14503,6 +14515,9 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.shapeImageSrcDataUri &&
       shapeImageFillPPTXImportState.shapeImageAlt === 'Shape image fill alt' &&
       shapeImageFillPPTXImportState.activeFit === 'cover' &&
+      shapeImageFillPPTXImportState.activeAdjustmentGrayscale === 'true' &&
+      shapeImageFillPPTXImportState.activeAdjustmentBrightness === '1.2' &&
+      shapeImageFillPPTXImportState.activeAdjustmentContrast === '0.7' &&
       shapeImageFillPPTXImportState.activeCropX === '55' &&
       shapeImageFillPPTXImportState.activeCropY === '40' &&
       shapeImageFillPPTXImportState.activeCropLeft === '10' &&
@@ -14510,12 +14525,14 @@ async function runExportScenario(page) {
       shapeImageFillPPTXImportState.activeCropTop === '0' &&
       shapeImageFillPPTXImportState.activeCropBottom === '20' &&
       shapeImageFillPPTXImportState.activeImageStyleObjectFit === 'fill' &&
+      shapeImageFillPPTXImportState.activeImageStyleFilter === 'grayscale(1) brightness(1.2) contrast(0.7)' &&
       shapeImageFillPPTXImportState.activeImageStyleWidth.startsWith('111.111') &&
       shapeImageFillPPTXImportState.activeImageStyleHeight === '125%' &&
       shapeImageFillPPTXImportState.activeImageStyleLeft.startsWith('-11.111') &&
       shapeImageFillPPTXImportState.activeImageStyleTop === '0%' &&
       shapeImageFillPPTXImportState.exportHasCropRectMarkup &&
       shapeImageFillPPTXImportState.exportHasCropRectModel &&
+      shapeImageFillPPTXImportState.exportHasAdjustmentMarkup &&
       shapeImageFillPPTXImportState.activeOpacity === '0.66' &&
       shapeImageFillPPTXImportState.activeSrcDataUri,
     {
@@ -34976,7 +34993,7 @@ async function addPPTXShapeImageFillProbe(base64) {
     '</a:xfrm>',
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
     '<a:blipFill>',
-    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="66000"/></a:blip>`,
+    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="66000"/><a:grayscl/><a:lum bright="20000" contrast="-30000"/></a:blip>`,
     '<a:srcRect l="10000" t="0" r="0" b="20000"/>',
     '<a:stretch><a:fillRect/></a:stretch>',
     '</a:blipFill>',
