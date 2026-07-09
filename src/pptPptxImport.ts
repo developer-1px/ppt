@@ -12,6 +12,7 @@ import {
   type PPTGeometry,
   type PPTImage,
   type PPTLine,
+  type PPTLineConnection,
   type PPTParagraph,
   type PPTRun,
   type PPTShapeKind,
@@ -74,6 +75,14 @@ type PPTXSlideObjectNode = {
   element: Element
   groupId?: string
   transform: PPTXGroupTransform
+}
+type PPTXLineConnectionRef = {
+  anchor: PPTLineConnection['anchor']
+  objectId: string
+}
+type PPTXLineConnectionRefs = {
+  end?: PPTXLineConnectionRef
+  start?: PPTXLineConnectionRef
 }
 type PPTXThemeColorMap = Readonly<Record<string, string>>
 type PPTXThemeFontMap = Readonly<Record<string, string>>
@@ -531,6 +540,7 @@ async function readPPTXOpenXmlSlide({
   const transition = readPPTXSlideTransition(doc, xml)
   const elements: PPTElement[] = []
   const elementIdByPptxObjectId = new Map<string, string>()
+  const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
   let objectIndex = 1
 
   for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
@@ -561,15 +571,27 @@ async function readPPTXOpenXmlSlide({
       const transformedElement = applyPPTXGroupObjectNode(element, objectNode)
 
       elements.push(transformedElement)
+      if (transformedElement.kind === 'line') {
+        const lineConnectionRefs = readPPTXLineConnectionRefs(child)
+
+        if (lineConnectionRefs) {
+          lineConnectionRefsByElementId.set(transformedElement.id, lineConnectionRefs)
+        }
+      }
       for (const pptxObjectId of readPPTXObjectIds(child)) {
         elementIdByPptxObjectId.set(pptxObjectId, transformedElement.id)
       }
       objectIndex += 1
     }
   }
-  const animatedElements = applyPPTXElementAnimations({
+  const connectedElements = applyPPTXLineConnections({
     elementIdByPptxObjectId,
     elements,
+    lineConnectionRefsByElementId,
+  })
+  const animatedElements = applyPPTXElementAnimations({
+    elementIdByPptxObjectId,
+    elements: connectedElements,
     importedAnimations: readPPTXSlideAnimations(doc, xml),
   })
 
@@ -585,6 +607,56 @@ async function readPPTXOpenXmlSlide({
     themeId: PPT_DEFAULT_THEME_ID,
     ...(transition ? { transition } : {}),
   }
+}
+
+function applyPPTXLineConnections({
+  elementIdByPptxObjectId,
+  elements,
+  lineConnectionRefsByElementId,
+}: {
+  elementIdByPptxObjectId: ReadonlyMap<string, string>
+  elements: readonly PPTElement[]
+  lineConnectionRefsByElementId: ReadonlyMap<string, PPTXLineConnectionRefs>
+}) {
+  return elements.map((element) => {
+    if (element.kind !== 'line') {
+      return element
+    }
+
+    const refs = lineConnectionRefsByElementId.get(element.id)
+
+    if (!refs) {
+      return element
+    }
+
+    const startConnection = resolvePPTXLineConnection(
+      refs.start,
+      elementIdByPptxObjectId,
+    )
+    const endConnection = resolvePPTXLineConnection(
+      refs.end,
+      elementIdByPptxObjectId,
+    )
+
+    return {
+      ...element,
+      ...(startConnection ? { startConnection } : {}),
+      ...(endConnection ? { endConnection } : {}),
+    }
+  })
+}
+
+function resolvePPTXLineConnection(
+  connection: PPTXLineConnectionRef | undefined,
+  elementIdByPptxObjectId: ReadonlyMap<string, string>,
+): PPTLineConnection | undefined {
+  if (!connection) {
+    return undefined
+  }
+
+  const elementId = elementIdByPptxObjectId.get(connection.objectId)
+
+  return elementId ? { anchor: connection.anchor, elementId } : undefined
 }
 
 function applyPPTXElementAnimations({
@@ -1187,6 +1259,62 @@ function readPPTXLineRoute(spPr: Element | null): PPTLine['route'] {
     ?.getAttribute('prst')
 
   return preset?.startsWith('bentConnector') ? 'elbow' : 'straight'
+}
+
+function readPPTXLineConnectionRefs(
+  element: Element,
+): PPTXLineConnectionRefs | null {
+  const nonVisualConnection = getFirstPPTXDescendantByLocalName(element, 'cNvCxnSpPr')
+  const start = readPPTXLineConnectionRef(
+    getDirectPPTXChildByLocalName(nonVisualConnection, 'stCxn'),
+  )
+  const end = readPPTXLineConnectionRef(
+    getDirectPPTXChildByLocalName(nonVisualConnection, 'endCxn'),
+  )
+
+  return start || end
+    ? {
+        ...(start ? { start } : {}),
+        ...(end ? { end } : {}),
+      }
+    : null
+}
+
+function readPPTXLineConnectionRef(
+  connection: Element | null,
+): PPTXLineConnectionRef | null {
+  if (!connection) {
+    return null
+  }
+
+  const objectId = connection.getAttribute('id')?.trim()
+
+  return objectId
+    ? {
+        anchor: readPPTXLineConnectionAnchor(connection),
+        objectId,
+      }
+    : null
+}
+
+function readPPTXLineConnectionAnchor(
+  connection: Element,
+): PPTLineConnection['anchor'] {
+  const index = toPPTXNumber(connection.getAttribute('idx'))
+
+  if (index === 0) {
+    return 'left'
+  }
+
+  if (index === 1) {
+    return 'top'
+  }
+
+  if (index === 2) {
+    return 'right'
+  }
+
+  return index === 3 ? 'bottom' : 'center'
 }
 
 function readPPTXLineGeometry(spPr: Element | null): {

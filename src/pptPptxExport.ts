@@ -12,6 +12,7 @@ import {
   type PPTGeometry,
   type PPTImage,
   type PPTLine,
+  type PPTLineConnection,
   type PPTParagraph,
   type PPTRun,
   type PPTShape,
@@ -227,6 +228,7 @@ function shouldPatchPPTXPackage(deck: PPTDeck) {
       slide.transition !== undefined ||
       hasPPTXSlideAnimations(slide) ||
       hasPPTXFlippedElements(slide) ||
+      hasPPTXLineConnections(slide) ||
       hasPPTXLockedElements(slide) ||
       slide.elements.some((element) =>
         element.visible !== false &&
@@ -253,12 +255,15 @@ async function applyPPTXPackagePatches({
 
     const xml = await file.async('string')
     const nextXml = setPPTXElementLocksXml(
-      setPPTXElementAccessibilityXml(
-        setPPTXElementFlipXml(
-          setPPTXSlideTimingXml(
-            setPPTXSlideTransitionXml(
-              setPPTXSlideNameXml(xml, slide),
-              createPPTXSlideTransitionXml(slide.transition),
+      setPPTXLineConnectionXml(
+        setPPTXElementAccessibilityXml(
+          setPPTXElementFlipXml(
+            setPPTXSlideTimingXml(
+              setPPTXSlideTransitionXml(
+                setPPTXSlideNameXml(xml, slide),
+                createPPTXSlideTransitionXml(slide.transition),
+              ),
+              slide,
             ),
             slide,
           ),
@@ -524,6 +529,193 @@ function hasPPTXFlippedElements(slide: PPTSlide) {
   return slide.elements.some((element) =>
     element.visible !== false &&
     (element.flipH === true || element.flipV === true))
+}
+
+function hasPPTXLineConnections(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.kind === 'line' &&
+    (element.startConnection !== undefined || element.endConnection !== undefined))
+}
+
+function setPPTXLineConnectionXml(xml: string, slide: PPTSlide) {
+  const objectIdByElementId = getPPTXPatchObjectIdByElementId(xml, slide)
+
+  if (objectIdByElementId.size === 0) {
+    return xml
+  }
+
+  return slide.elements.reduce((nextXml, element) => {
+    if (
+      element.visible === false ||
+      element.kind !== 'line' ||
+      (element.startConnection === undefined && element.endConnection === undefined)
+    ) {
+      return nextXml
+    }
+
+    const objectId = objectIdByElementId.get(element.id)
+
+    return objectId
+      ? setPPTXLineObjectConnectionXml(nextXml, objectId, element, objectIdByElementId)
+      : nextXml
+  }, xml)
+}
+
+function getPPTXPatchObjectIdByElementId(xml: string, slide: PPTSlide) {
+  const objectIdsByName = getPPTXPatchObjectIdsByName(xml)
+  const objectIdByElementId = new Map<string, string>()
+
+  for (const element of slide.elements) {
+    if (element.visible === false) {
+      continue
+    }
+
+    const objectNames = getPPTXElementObjectNames(element)
+
+    if (objectNames.length !== 1) {
+      continue
+    }
+
+    const objectId = getSinglePPTXPatchObjectIdByName(
+      objectIdsByName,
+      objectNames[0] ?? '',
+    )
+
+    if (objectId) {
+      objectIdByElementId.set(element.id, objectId)
+    }
+  }
+
+  return objectIdByElementId
+}
+
+function getPPTXPatchObjectIdsByName(xml: string) {
+  const objectIdsByName = new Map<string, string[]>()
+  const objectPattern = /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g
+
+  for (const match of xml.matchAll(objectPattern)) {
+    const nonVisualProperties = match[0].match(/<p:cNvPr\b[^>]*>/)?.[0] ?? ''
+    const objectId = getPPTXXmlTagAttribute(nonVisualProperties, 'id')
+    const objectName = getPPTXXmlTagAttribute(nonVisualProperties, 'name')
+
+    if (!objectId || !objectName) {
+      continue
+    }
+
+    const existing = objectIdsByName.get(objectName)
+
+    if (existing) {
+      existing.push(objectId)
+    } else {
+      objectIdsByName.set(objectName, [objectId])
+    }
+  }
+
+  return objectIdsByName
+}
+
+function getSinglePPTXPatchObjectIdByName(
+  objectIdsByName: ReadonlyMap<string, readonly string[]>,
+  objectName: string,
+) {
+  const objectIds = objectIdsByName.get(escapePPTXXmlAttribute(objectName))
+
+  return objectIds?.length === 1
+    ? objectIds[0]
+    : undefined
+}
+
+function setPPTXLineObjectConnectionXml(
+  xml: string,
+  objectId: string,
+  line: PPTLine,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  return xml.replace(
+    /<p:cxnSp\b[\s\S]*?<\/p:cxnSp>/g,
+    (segment) =>
+      hasPPTXObjectIdXml(segment, objectId)
+        ? setPPTXConnectionShapeConnectionXml(segment, line, objectIdByElementId)
+        : segment,
+  )
+}
+
+function hasPPTXObjectIdXml(segment: string, objectId: string) {
+  const nonVisualProperties = segment.match(/<p:cNvPr\b[^>]*>/)?.[0] ?? ''
+
+  return getPPTXXmlTagAttribute(nonVisualProperties, 'id') === objectId
+}
+
+function setPPTXConnectionShapeConnectionXml(
+  segment: string,
+  line: PPTLine,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  const connectionXml = [
+    createPPTXLineConnectionXml('stCxn', line.startConnection, objectIdByElementId),
+    createPPTXLineConnectionXml('endCxn', line.endConnection, objectIdByElementId),
+  ].join('')
+
+  if (!connectionXml) {
+    return segment
+  }
+
+  const existingPropertyPattern = /<p:cNvCxnSpPr\b[^>]*>[\s\S]*?<\/p:cNvCxnSpPr>/
+
+  if (existingPropertyPattern.test(segment)) {
+    return segment.replace(existingPropertyPattern, (propertyXml) => {
+      const withoutConnections = propertyXml.replace(
+        /<a:(?:stCxn|endCxn)\b[^>]*\/>/g,
+        '',
+      )
+
+      return withoutConnections.replace(
+        /<p:cNvCxnSpPr\b[^>]*>/,
+        (tag) => `${tag}${connectionXml}`,
+      )
+    })
+  }
+
+  return segment.replace(
+    /<p:cNvCxnSpPr\b[^>]*\/>/,
+    (tag) => tag.replace(/\/>$/, `>${connectionXml}</p:cNvCxnSpPr>`),
+  )
+}
+
+function createPPTXLineConnectionXml(
+  tagName: 'endCxn' | 'stCxn',
+  connection: PPTLineConnection | undefined,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  const objectId = connection
+    ? objectIdByElementId.get(connection.elementId)
+    : undefined
+  const connectionIndex = connection
+    ? getPPTXLineConnectionIndex(connection.anchor)
+    : undefined
+
+  return objectId && connectionIndex !== undefined
+    ? `<a:${tagName} id="${escapePPTXXmlAttribute(objectId)}" idx="${connectionIndex}"/>`
+    : ''
+}
+
+function getPPTXLineConnectionIndex(
+  anchor: PPTLineConnection['anchor'],
+): number | undefined {
+  if (anchor === 'left') {
+    return 0
+  }
+
+  if (anchor === 'top') {
+    return 1
+  }
+
+  if (anchor === 'right') {
+    return 2
+  }
+
+  return anchor === 'bottom' ? 3 : undefined
 }
 
 function setPPTXElementFlipXml(xml: string, slide: PPTSlide) {

@@ -10893,6 +10893,11 @@ async function runExportScenario(page) {
     pptxPackageState,
   )
   record(
+    'exports PPTX connector attachment references',
+    pptxPackageState.hasConnectorConnections,
+    pptxPackageState,
+  )
+  record(
     'exports PPTX notes media and hyperlink relationships',
     pptxPackageState.hasSpeakerNotes &&
       pptxPackageState.hasMediaPart &&
@@ -11007,15 +11012,17 @@ async function runExportScenario(page) {
               await addPPTXHyperlinkProbe(
                 await addPPTXImageOpacityProbe(
                   await addPPTXElbowConnectorProbe(
-                    await addPPTXHiddenObjectProbe(
-                      await addPPTXNoFillShapeProbe(
-                        await addPPTXGradientPatternFillProbe(
-                          await addPPTXThemeColorProbe(
-                            await addPPTXPresetSystemColorProbe(
-                              await addPPTXUnevenTableProbe(
-                                await addPPTXGroupedObjectProbe(
-                                  await reversePPTXPresentationSlideOrder(
-                                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                    await addPPTXConnectedConnectorProbe(
+                      await addPPTXHiddenObjectProbe(
+                        await addPPTXNoFillShapeProbe(
+                          await addPPTXGradientPatternFillProbe(
+                            await addPPTXThemeColorProbe(
+                              await addPPTXPresetSystemColorProbe(
+                                await addPPTXUnevenTableProbe(
+                                  await addPPTXGroupedObjectProbe(
+                                    await reversePPTXPresentationSlideOrder(
+                                      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -11119,6 +11126,21 @@ async function runExportScenario(page) {
         element.name === 'Elbow Connector Probe' &&
         element.kind === 'line' &&
         element.route === 'elbow').length,
+      connectedConnectorProbeModelCount: elements.filter((element) => {
+        if (element.name !== 'Connected Connector Probe' || element.kind !== 'line') {
+          return false
+        }
+
+        const startTarget = elements.find((target) =>
+          target.id === element.startConnection?.elementId)
+        const endTarget = elements.find((target) =>
+          target.id === element.endConnection?.elementId)
+
+        return startTarget?.name === 'Connected Start Probe' &&
+          endTarget?.name === 'Connected End Probe' &&
+          element.startConnection?.anchor === 'right' &&
+          element.endConnection?.anchor === 'left'
+      }).length,
       objectAltTextModelCount: elements.filter((element) =>
         element.accessibility?.altText).length,
       objectLockingModelCount: elements.filter((element) =>
@@ -11359,6 +11381,21 @@ async function runExportScenario(page) {
       element.name === 'Elbow Connector Probe' &&
       element.kind === 'line' &&
       element.route === 'elbow')
+    const exportConnectedConnectorProbeObjects = exportImportedElements.filter((element) => {
+      if (element.name !== 'Connected Connector Probe' || element.kind !== 'line') {
+        return false
+      }
+
+      const startTarget = exportImportedElements.find((target) =>
+        target.id === element.startConnection?.elementId)
+      const endTarget = exportImportedElements.find((target) =>
+        target.id === element.endConnection?.elementId)
+
+      return startTarget?.name === 'Connected Start Probe' &&
+        endTarget?.name === 'Connected End Probe' &&
+        element.startConnection?.anchor === 'right' &&
+        element.endConnection?.anchor === 'left'
+    })
     const exportRoundRectProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Round Rect Probe' &&
       element.kind === 'shape' &&
@@ -11553,6 +11590,10 @@ async function runExportScenario(page) {
       exportHasElbowConnectorProbe: exportElbowConnectorProbeObjects.length > 0,
       exportElbowConnectorProbeModelCount: exportElbowConnectorProbeObjects.length,
       exportElbowConnectorProbeRoutes: exportElbowConnectorProbeObjects.map((element) => element.route ?? '').join(' | '),
+      exportHasConnectedConnectorProbe: exportConnectedConnectorProbeObjects.length > 0,
+      exportConnectedConnectorProbeAnchors: exportConnectedConnectorProbeObjects.map((element) =>
+        [element.startConnection?.anchor ?? '', element.endConnection?.anchor ?? ''].join(' -> ')).join(' | '),
+      exportConnectedConnectorProbeModelCount: exportConnectedConnectorProbeObjects.length,
       exportHasRoundRectProbe: exportRoundRectProbeObjects.length > 0,
       exportRoundRectProbeCornerRadius: exportRoundRectProbeObjects.map((element) => element.cornerRadius ?? '').join(' | '),
       exportRoundRectProbeModelCount: exportRoundRectProbeObjects.length,
@@ -11692,6 +11733,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportOpenXmlDotLineProbeModelCount > beforeOpenXmlPPTXDrop.openXmlDotLineProbeModelCount &&
       openXmlPPTXImportState.exportHasElbowConnectorProbe &&
       openXmlPPTXImportState.exportElbowConnectorProbeModelCount > beforeOpenXmlPPTXDrop.elbowConnectorProbeModelCount &&
+      openXmlPPTXImportState.exportHasConnectedConnectorProbe &&
+      openXmlPPTXImportState.exportConnectedConnectorProbeModelCount > beforeOpenXmlPPTXDrop.connectedConnectorProbeModelCount &&
       openXmlPPTXImportState.exportHasRoundRectProbe &&
       openXmlPPTXImportState.exportRoundRectProbeModelCount > beforeOpenXmlPPTXDrop.roundRectProbeModelCount &&
       openXmlPPTXImportState.exportHasObjectOpacity &&
@@ -28269,6 +28312,102 @@ async function addPPTXElbowConnectorProbe(base64) {
   })
 }
 
+async function addPPTXConnectedConnectorProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Connected Connector Probe')) {
+    return base64
+  }
+
+  const startShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9979" name="Connected Start Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="6858000" y="5029200"/>',
+    '<a:ext cx="914400" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="DCFCE7"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="15803D"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const endShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9980" name="Connected End Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8229600" y="5029200"/>',
+    '<a:ext cx="914400" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="DBEAFE"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="1D4ED8"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const connectorXml = [
+    '<p:cxnSp>',
+    '<p:nvCxnSpPr>',
+    '<p:cNvPr id="9981" name="Connected Connector Probe"/>',
+    '<p:cNvCxnSpPr>',
+    '<a:stCxn id="9979" idx="2"/>',
+    '<a:endCxn id="9980" idx="0"/>',
+    '</p:cNvCxnSpPr>',
+    '<p:nvPr/>',
+    '</p:nvCxnSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="5303520"/>',
+    '<a:ext cx="457200" cy="0"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>',
+    '<a:ln w="28575">',
+    '<a:solidFill><a:srgbClr val="2563EB"/></a:solidFill>',
+    '<a:tailEnd type="triangle"/>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:cxnSp>',
+  ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${startShapeXml}${endShapeXml}${connectorXml}</p:spTree>`,
+  )
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXPresetSystemColorProbe(base64) {
   if (!base64) {
     return ''
@@ -28957,7 +29096,9 @@ async function inspectPPTXPackage(base64) {
   const empty = {
     entryCount: 0,
     error: '',
+    connectorConnectionCount: 0,
     hasContentTypes: false,
+    hasConnectorConnections: false,
     hasCustomModelContentTypes: false,
     hasCustomModelProperties: false,
     hasCustomModelRelationships: false,
@@ -29061,11 +29202,15 @@ async function inspectPPTXPackage(base64) {
       countOccurrences(slideXml, '<a:spcAft>')
     const textRunHighlightCount = countOccurrences(slideXml, '<a:highlight>')
     const textRunStrikethroughCount = countOccurrences(slideXml, 'strike="sngStrike"')
+    const connectorConnectionCount = countOccurrences(slideXml, '<a:stCxn ') +
+      countOccurrences(slideXml, '<a:endCxn ')
 
     return {
       entryCount: entries.length,
       error: '',
+      connectorConnectionCount,
       hasContentTypes: entries.includes('[Content_Types].xml'),
+      hasConnectorConnections: connectorConnectionCount > 0,
       hasCustomModelContentTypes:
         contentTypesXml.includes('PartName="/customXml/item1.xml" ContentType="application/xml"') &&
         contentTypesXml.includes('PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"'),
