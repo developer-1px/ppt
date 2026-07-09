@@ -1307,8 +1307,10 @@ async function readPPTXOpenXmlSlide({
   const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
   const inheritedElements = await readPPTXInheritedLayoutElements({
     index,
+    slideDoc: doc,
     relationships,
     slidePath: path,
+    slideXml: xml,
     themeColors,
     themeFonts,
     themeStyles,
@@ -2085,7 +2087,9 @@ async function readPPTXSlideLayoutPlaceholderTextBodies({
 async function readPPTXInheritedLayoutElements({
   index,
   relationships,
+  slideDoc,
   slidePath,
+  slideXml,
   themeColors,
   themeFonts,
   themeStyles,
@@ -2093,7 +2097,9 @@ async function readPPTXInheritedLayoutElements({
 }: {
   index: number
   relationships: PPTXRelationshipMap
+  slideDoc: Document | null
   slidePath: string
+  slideXml: string
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
   themeStyles: PPTXThemeStyleMap
@@ -2110,14 +2116,22 @@ async function readPPTXInheritedLayoutElements({
     return []
   }
 
+  const slideShowsMasterShapes = readPPTXPartShowsMasterShapes(slideDoc, slideXml)
   const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const layoutXml = await zip.file(layoutPath)?.async('string') ?? ''
+  const layoutDoc = layoutXml ? parsePPTXXmlDocument(layoutXml) : null
+  const layoutShowsMasterShapes = readPPTXPartShowsMasterShapes(
+    layoutDoc,
+    layoutXml,
+  )
   const masterPath = readPPTXRelatedPartPath({
     relationshipTypeSuffix: '/slideMaster',
     relationships: layoutRelationships,
     sourcePath: layoutPath,
     zip,
   })
-  const masterElements = masterPath
+  const showsMasterShapes = slideShowsMasterShapes && layoutShowsMasterShapes
+  const masterElements = masterPath && showsMasterShapes
     ? await readPPTXPartInheritedElements({
         index,
         path: masterPath,
@@ -2141,6 +2155,19 @@ async function readPPTXInheritedLayoutElements({
   })
 
   return [...masterElements, ...layoutElements]
+}
+
+function readPPTXPartShowsMasterShapes(
+  doc: Document | null,
+  xml: string,
+) {
+  const rootValue = doc?.documentElement?.getAttribute('showMasterSp')
+  const xmlValue = xml.match(
+    /<[\w.-]+:(?:sld|sldLayout)\b[^>]*\bshowMasterSp="([^"]*)"/,
+  )?.[1] ??
+    xml.match(/<(?:sld|sldLayout)\b[^>]*\bshowMasterSp="([^"]*)"/)?.[1]
+
+  return !isPPTXFalse(rootValue ?? xmlValue)
 }
 
 async function readPPTXPartInheritedElements({

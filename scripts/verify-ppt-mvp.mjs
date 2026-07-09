@@ -294,6 +294,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXSlideSpecificThemeProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXMasterVisibilityProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
@@ -336,6 +337,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXColorMapProbeState(page)
   const openXmlPPTXColorMapStyleState =
     await readPPTXColorMapStyleProbeState(page)
+  const openXmlPPTXMasterVisibilityState =
+    await readPPTXMasterVisibilityProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -608,6 +611,17 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXColorMapStyleState.activeStroke.includes('51'),
     {
       openXmlPPTXColorMapStyleState,
+    },
+  )
+  record(
+    'honors OpenXML PPTX showMasterSp hidden master shapes for viewer rendering',
+    openXmlPPTXMasterVisibilityState.totalProbeCount === 1 &&
+      openXmlPPTXMasterVisibilityState.hiddenSlideProbeCount === 0 &&
+      openXmlPPTXMasterVisibilityState.visibleSlideProbeCount === 1 &&
+      openXmlPPTXMasterVisibilityState.visibleSlideActiveExists &&
+      !openXmlPPTXMasterVisibilityState.hiddenSlideActiveExists,
+    {
+      openXmlPPTXMasterVisibilityState,
     },
   )
 
@@ -32655,6 +32669,22 @@ function setPPTXThemeSchemeColorRawXml(xml, localName, colorXml) {
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
 }
 
+function setPPTXFirstElementAttributeXml(xml, localName, attributeName, value) {
+  const elementPattern = new RegExp(
+    `(<(?:[\\w.-]+:)?${localName}\\b)([^>]*)(/?>)`,
+  )
+
+  return xml.replace(elementPattern, (_match, start, attributes, end) => {
+    const nextAttribute = ` ${attributeName}="${escapePPTXXmlAttribute(value)}"`
+    const attributePattern = new RegExp(`\\s${attributeName}="[^"]*"`)
+    const nextAttributes = attributePattern.test(attributes)
+      ? attributes.replace(attributePattern, nextAttribute)
+      : `${attributes}${nextAttribute}`
+
+    return `${start}${nextAttributes}${end}`
+  })
+}
+
 function setPPTXMasterColorMapXml(xml, entries) {
   const attributes = entries
     .map(([name, value]) =>
@@ -34454,6 +34484,119 @@ async function addPPTXLayoutObjectProbe(base64) {
   })
 }
 
+async function addPPTXMasterVisibilityProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const hiddenSlidePath = slidePaths[0]
+  const visibleSlidePath = slidePaths[1]
+
+  if (!hiddenSlidePath || !visibleSlidePath) {
+    return base64
+  }
+
+  const hiddenLayoutPath = await ensurePPTXSlideLayoutPath(zip, hiddenSlidePath)
+  const visibleLayoutPath = await ensurePPTXSlideLayoutPath(zip, visibleSlidePath)
+  const hiddenMasterPath = hiddenLayoutPath
+    ? await getPPTXRelatedPartPath(zip, hiddenLayoutPath, '/slideMaster')
+    : ''
+  const visibleMasterPath = visibleLayoutPath
+    ? await getPPTXRelatedPartPath(zip, visibleLayoutPath, '/slideMaster')
+    : ''
+  const masterPaths = [...new Set([hiddenMasterPath, visibleMasterPath]
+    .filter((path) => path && zip.file(path)))]
+
+  if (masterPaths.length === 0) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9959" name="Master Visibility Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="914400" y="6172200"/>',
+    '<a:ext cx="2057400" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="FDE68A"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="92400E"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+
+  for (const masterPath of masterPaths) {
+    const masterXml = await readPPTXZipText(zip, masterPath)
+
+    if (
+      !masterXml.includes('Master Visibility Probe') &&
+      masterXml.includes('</p:spTree>')
+    ) {
+      zip.file(masterPath, masterXml.replace('</p:spTree>', `${probeXml}</p:spTree>`))
+    }
+  }
+
+  const hiddenSlideXml = await readPPTXZipText(zip, hiddenSlidePath)
+  const visibleSlideXml = await readPPTXZipText(zip, visibleSlidePath)
+  zip.file(
+    hiddenSlidePath,
+    setPPTXFirstElementAttributeXml(
+      setPPTXFirstElementAttributeXml(
+        hiddenSlideXml,
+        'sld',
+        'showMasterSp',
+        '0',
+      ),
+      'cSld',
+      'name',
+      'Master Hidden Source',
+    ),
+  )
+  zip.file(
+    visibleSlidePath,
+    setPPTXFirstElementAttributeXml(
+      setPPTXFirstElementAttributeXml(
+        visibleSlideXml,
+        'sld',
+        'showMasterSp',
+        '1',
+      ),
+      'cSld',
+      'name',
+      'Master Visible Source',
+    ),
+  )
+
+  for (const layoutPath of new Set([hiddenLayoutPath, visibleLayoutPath]
+    .filter((path) => path && zip.file(path)))) {
+    const layoutXml = await readPPTXZipText(zip, layoutPath)
+
+    zip.file(
+      layoutPath,
+      setPPTXFirstElementAttributeXml(
+        layoutXml,
+        'sldLayout',
+        'showMasterSp',
+        '1',
+      ),
+    )
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLayoutPlaceholderGeometryProbe(base64) {
   if (!base64) {
     return ''
@@ -36098,6 +36241,77 @@ async function readPPTXColorMapStyleProbeState(page) {
     page,
     'Color Map Style Probe',
   )
+}
+
+async function readPPTXMasterVisibilityProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const countProbe = (slide) => (slide?.elements ?? [])
+      .filter((element) =>
+        element.name === 'Master Visibility Probe' &&
+        element.kind === 'shape').length
+    const hiddenSlide = slides.find((slide) =>
+      (slide.name ?? '').includes('Master Hidden Source'))
+    const visibleSlide = slides.find((slide) =>
+      (slide.name ?? '').includes('Master Visible Source'))
+
+    return {
+      hiddenSlideId: hiddenSlide?.id ?? '',
+      hiddenSlideName: hiddenSlide?.name ?? '',
+      hiddenSlideProbeCount: countProbe(hiddenSlide),
+      totalProbeCount: slides.reduce((total, slide) => total + countProbe(slide), 0),
+      visibleSlideId: visibleSlide?.id ?? '',
+      visibleSlideName: visibleSlide?.name ?? '',
+      visibleSlideProbeCount: countProbe(visibleSlide),
+    }
+  })()`)
+  const hiddenSlideActiveExists = modelState.hiddenSlideId
+    ? await readPPTXSlideProbeActiveExists(
+        page,
+        modelState.hiddenSlideId,
+        'Master Visibility Probe',
+      )
+    : false
+  const visibleSlideActiveExists = modelState.visibleSlideId
+    ? await readPPTXSlideProbeActiveExists(
+        page,
+        modelState.visibleSlideId,
+        'Master Visibility Probe',
+      )
+    : false
+
+  return {
+    ...modelState,
+    hiddenSlideActiveExists,
+    visibleSlideActiveExists,
+  }
+}
+
+async function readPPTXSlideProbeActiveExists(page, slideId, probeName) {
+  await page.eval(`((slideId) => {
+    const thumb = [...document.querySelectorAll('.ppt-thumb')]
+      .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+    thumb?.click()
+  })(${JSON.stringify(slideId)})`)
+  await delay(120)
+
+  return await page.eval(`((probeName) => {
+    return Boolean(document.querySelector(
+      '.ppt-slide [data-ppt-element-name=' + JSON.stringify(probeName) + ']',
+    ))
+  })(${JSON.stringify(probeName)})`)
 }
 
 async function readPPTXColorModifierShapeProbeState(page, probeName) {
