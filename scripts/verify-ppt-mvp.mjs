@@ -288,9 +288,11 @@ async function runPPTXRenderScenario(page) {
   const openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(
     await addPPTXPictureEffectRefProbe(
       await addPPTXStyleRefProbe(
-        await addPPTXSaturationModifierProbe(
-          await addPPTXGradientPatternFillProbe(
-            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        await addPPTXRGBChannelModifierProbe(
+          await addPPTXSaturationModifierProbe(
+            await addPPTXGradientPatternFillProbe(
+              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+            ),
           ),
         ),
       ),
@@ -319,6 +321,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXAlphaModifierFillProbeState(page)
   const openXmlPPTXSaturationModifierState =
     await readPPTXSaturationModifierProbeState(page)
+  const openXmlPPTXRGBChannelModifierState =
+    await readPPTXRGBChannelModifierProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -471,6 +475,20 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXSaturationModifierState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX RGB channel color modifiers for viewer rendering',
+    openXmlPPTXRGBChannelModifierState.modelCount === 1 &&
+      openXmlPPTXRGBChannelModifierState.fill === '#33b333' &&
+      openXmlPPTXRGBChannelModifierState.stroke === '#e6334d' &&
+      openXmlPPTXRGBChannelModifierState.activeExists &&
+      openXmlPPTXRGBChannelModifierState.activeFill.includes('51') &&
+      openXmlPPTXRGBChannelModifierState.activeFill.includes('179') &&
+      openXmlPPTXRGBChannelModifierState.activeStroke.includes('230') &&
+      openXmlPPTXRGBChannelModifierState.activeStroke.includes('77'),
+    {
+      openXmlPPTXRGBChannelModifierState,
     },
   )
 
@@ -11393,59 +11411,34 @@ async function runExportScenario(page) {
     },
   )
 
-  const openXmlPPTXBase64 = await addPPTXLineSpacingPointsProbe(
-    await addPPTXTextTabProbe(
-      await addPPTXTextAutoFitProbe(
-        await addPPTXListStyleBulletProbe(
-          await addPPTXParagraphDefaultRunStyleProbe(
-            await addPPTXLayoutPlaceholderGeometryProbe(
-              await addPPTXLayoutObjectProbe(
-                await addPPTXLayoutBackgroundProbe(
-                  await addPPTXBackgroundImageProbe(
-                    await addPPTXBackgroundRefProbe(
-                      await addPPTXThemeTypefaceProbe(
-                        await addPPTXHyperlinkProbe(
-                          await addPPTXImageOpacityProbe(
-                            await addPPTXElbowConnectorProbe(
-                              await addPPTXConnectedConnectorProbe(
-                                await addPPTXHiddenObjectProbe(
-                                  await addPPTXNoFillShapeProbe(
-                                    await addPPTXGradientPatternFillProbe(
-                                      await addPPTXPictureEffectRefProbe(
-                                        await addPPTXStyleRefProbe(
-                                          await addPPTXSaturationModifierProbe(
-                                            await addPPTXThemeColorProbe(
-                                              await addPPTXPresetSystemColorProbe(
-                                                await addPPTXUnevenTableProbe(
-                                                  await addPPTXGroupedObjectProbe(
-                                                    await reversePPTXPresentationSlideOrder(
-                                                      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  )
-  )
+  let openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(pptxDownloadBase64)
+  openXmlPPTXBase64 = await reversePPTXPresentationSlideOrder(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXGroupedObjectProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXUnevenTableProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXPresetSystemColorProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXThemeColorProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXSaturationModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXNoFillShapeProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXHiddenObjectProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXConnectedConnectorProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXElbowConnectorProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXImageOpacityProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXHyperlinkProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXThemeTypefaceProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXBackgroundImageProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXLayoutBackgroundProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXLayoutObjectProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXLayoutPlaceholderGeometryProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXParagraphDefaultRunStyleProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXListStyleBulletProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXTextAutoFitProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXTextTabProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXLineSpacingPointsProbe(openXmlPPTXBase64)
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const readPPTExportDeckFromHTML = (html) => {
@@ -11487,6 +11480,11 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#999999' &&
         element.stroke?.color === '#808080').length,
+      rgbChannelModifierProbeModelCount: elements.filter((element) =>
+        element.name === 'RGB Channel Modifier Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#33b333' &&
+        element.stroke?.color === '#e6334d').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11740,6 +11738,11 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#999999' &&
       element.stroke?.color === '#808080')
+    const exportRGBChannelModifierProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'RGB Channel Modifier Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#33b333' &&
+      element.stroke?.color === '#e6334d')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12077,6 +12080,10 @@ async function runExportScenario(page) {
       exportSaturationModifierProbeFill: exportSaturationModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportSaturationModifierProbeModelCount: exportSaturationModifierProbeObjects.length,
       exportSaturationModifierProbeStroke: exportSaturationModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasRGBChannelModifierProbe: exportRGBChannelModifierProbeObjects.length > 0,
+      exportRGBChannelModifierProbeFill: exportRGBChannelModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportRGBChannelModifierProbeModelCount: exportRGBChannelModifierProbeObjects.length,
+      exportRGBChannelModifierProbeStroke: exportRGBChannelModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12353,6 +12360,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.colorModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasSaturationModifierProbe &&
       openXmlPPTXImportState.exportSaturationModifierProbeModelCount > beforeOpenXmlPPTXDrop.saturationModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasRGBChannelModifierProbe &&
+      openXmlPPTXImportState.exportRGBChannelModifierProbeModelCount > beforeOpenXmlPPTXDrop.rgbChannelModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -31509,6 +31518,64 @@ async function addPPTXSaturationModifierProbe(base64) {
   })
 }
 
+async function addPPTXRGBChannelModifierProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('RGB Channel Modifier Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9991" name="RGB Channel Modifier Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="10668000" y="4343400"/>',
+    '<a:ext cx="914400" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:srgbClr val="6699CC"><a:redMod val="50000"/><a:greenOff val="10000"/><a:blueMod val="25000"/></a:srgbClr>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:srgbClr val="CC6633"><a:redOff val="10000"/><a:greenMod val="50000"/><a:blueOff val="10000"/></a:srgbClr>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXHiddenObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -35175,6 +35242,69 @@ async function readPPTXSaturationModifierProbeState(page) {
   const activeState = await page.eval(`(() => {
     const activeProbe = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Saturation Modifier Probe"]',
+    )
+    const style = activeProbe ? getComputedStyle(activeProbe) : null
+
+    return {
+      activeExists: Boolean(activeProbe),
+      activeFill: style?.backgroundColor ?? '',
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      activeStroke: style?.borderTopColor ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
+}
+
+async function readPPTXRGBChannelModifierProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === 'RGB Channel Modifier Probe' &&
+        element.kind === 'shape'))
+    const probes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === 'RGB Channel Modifier Probe' &&
+        element.kind === 'shape')
+    const probe = probes[0] ?? null
+
+    return {
+      fill: probe?.fill?.color ?? '',
+      modelCount: probes.length,
+      slideId: probeSlide?.id ?? '',
+      stroke: probe?.stroke?.color ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeProbe = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="RGB Channel Modifier Probe"]',
     )
     const style = activeProbe ? getComputedStyle(activeProbe) : null
 

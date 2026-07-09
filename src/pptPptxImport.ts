@@ -5929,10 +5929,53 @@ function applyPPTXColorModifiers(color: string, colorElement: Element) {
         ...hsl,
         s: Math.max(0, Math.min(1, saturation)),
       })
+    } else if (isPPTXColorChannelModifier(modifier.localName)) {
+      rgb = applyPPTXColorChannelModifier(rgb, modifier.localName, ratio)
     }
   }
 
   return formatPPTXHexColor(rgb)
+}
+
+function isPPTXColorChannelModifier(
+  modifierName: string,
+): modifierName is
+  | 'blueMod'
+  | 'blueOff'
+  | 'greenMod'
+  | 'greenOff'
+  | 'redMod'
+  | 'redOff' {
+  return modifierName === 'redMod' ||
+    modifierName === 'redOff' ||
+    modifierName === 'greenMod' ||
+    modifierName === 'greenOff' ||
+    modifierName === 'blueMod' ||
+    modifierName === 'blueOff'
+}
+
+function applyPPTXColorChannelModifier(
+  rgb: [number, number, number],
+  modifierName:
+    | 'blueMod'
+    | 'blueOff'
+    | 'greenMod'
+    | 'greenOff'
+    | 'redMod'
+    | 'redOff',
+  ratio: number,
+): [number, number, number] {
+  const channelIndex = modifierName.startsWith('red')
+    ? 0
+    : modifierName.startsWith('green')
+      ? 1
+      : 2
+  const value = modifierName.endsWith('Mod')
+    ? rgb[channelIndex] * ratio
+    : rgb[channelIndex] + 255 * ratio
+
+  return rgb.map((channel, index) =>
+    index === channelIndex ? value : channel) as [number, number, number]
 }
 
 function readPPTXColorModifierRatio(modifier: Element) {
