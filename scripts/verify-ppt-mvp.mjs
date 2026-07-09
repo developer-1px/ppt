@@ -12181,6 +12181,168 @@ async function runExportScenario(page) {
     },
   )
 
+  const presetGeometryFreeformPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforePresetGeometryFreeformPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+    const names = new Set(['Preset Triangle Probe', 'Preset Hexagon Probe', 'Preset Chevron Probe'])
+
+    return {
+      presetGeometryFreeformModelCount: elements.filter((element) =>
+        names.has(element.name) &&
+        element.kind === 'freeform').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-preset-geometry-freeform.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(presetGeometryFreeformPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const presetGeometryFreeformPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeTriangle = document.querySelector('.ppt-slide [data-ppt-element-name="Preset Triangle Probe"][data-kind="freeform"]')
+    const activeTrianglePath = activeTriangle?.querySelector('[data-ppt-freeform-path]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const expectedNames = ['Preset Triangle Probe', 'Preset Hexagon Probe', 'Preset Chevron Probe']
+    const freeformObjects = exportImportedElements.filter((element) =>
+      expectedNames.includes(element.name) &&
+      element.kind === 'freeform')
+    const byName = Object.fromEntries(freeformObjects.map((element) => [element.name, element]))
+    const triangle = byName['Preset Triangle Probe'] ?? null
+    const hexagon = byName['Preset Hexagon Probe'] ?? null
+    const chevron = byName['Preset Chevron Probe'] ?? null
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeTriangleFill: activeTrianglePath?.getAttribute('fill') ?? '',
+      activeTrianglePathD: activeTrianglePath?.getAttribute('d') ?? '',
+      activeTrianglePointMode: activeTriangle?.getAttribute('data-ppt-freeform-point-mode') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      names: freeformObjects.map((element) => element.name).sort().join(' | '),
+      presetModelCount: freeformObjects.length,
+      pointModes: freeformObjects.map((element) => element.pointMode ?? '').sort().join(' | '),
+      triangleFill: triangle?.fill ?? null,
+      triangleGeometry: triangle?.geometry ?? null,
+      trianglePointCount: triangle?.points?.length ?? 0,
+      triangleStroke: triangle?.stroke ?? null,
+      hexagonFill: hexagon?.fill ?? null,
+      hexagonGeometry: hexagon?.geometry ?? null,
+      hexagonPointCount: hexagon?.points?.length ?? 0,
+      chevronFill: chevron?.fill ?? null,
+      chevronGeometry: chevron?.geometry ?? null,
+      chevronPointCount: chevron?.points?.length ?? 0,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX preset geometry shapes as editable freeforms through OpenXML fallback import',
+    presetGeometryFreeformPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      presetGeometryFreeformPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      presetGeometryFreeformPPTXImportState.fileName === 'external-openxml-preset-geometry-freeform.pptx' &&
+      presetGeometryFreeformPPTXImportState.importedCount === beforePresetGeometryFreeformPPTXDrop.slideCount &&
+      presetGeometryFreeformPPTXImportState.sourceSlideCount === beforePresetGeometryFreeformPPTXDrop.slideCount &&
+      presetGeometryFreeformPPTXImportState.slideCount === beforePresetGeometryFreeformPPTXDrop.slideCount * 2 &&
+      presetGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
+      presetGeometryFreeformPPTXImportState.presetModelCount >
+        beforePresetGeometryFreeformPPTXDrop.presetGeometryFreeformModelCount &&
+      presetGeometryFreeformPPTXImportState.presetModelCount === 3 &&
+      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Hexagon Probe | Preset Triangle Probe' &&
+      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline' &&
+      presetGeometryFreeformPPTXImportState.activeTrianglePointMode === 'polyline' &&
+      presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('M ') &&
+      presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('L ') &&
+      !presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('Q ') &&
+      presetGeometryFreeformPPTXImportState.activeTriangleFill !== 'none' &&
+      presetGeometryFreeformPPTXImportState.triangleFill?.color === '#dcfce7' &&
+      presetGeometryFreeformPPTXImportState.triangleFill?.opacity === 0.7 &&
+      presetGeometryFreeformPPTXImportState.triangleStroke?.color === '#16a34a' &&
+      presetGeometryFreeformPPTXImportState.triangleStroke?.width === 2 &&
+      presetGeometryFreeformPPTXImportState.trianglePointCount === 4 &&
+      presetGeometryFreeformPPTXImportState.triangleGeometry?.x === 128 &&
+      presetGeometryFreeformPPTXImportState.triangleGeometry?.y === 128 &&
+      presetGeometryFreeformPPTXImportState.triangleGeometry?.w === 160 &&
+      presetGeometryFreeformPPTXImportState.triangleGeometry?.h === 120 &&
+      presetGeometryFreeformPPTXImportState.hexagonFill?.color === '#fde68a' &&
+      presetGeometryFreeformPPTXImportState.hexagonPointCount === 7 &&
+      presetGeometryFreeformPPTXImportState.hexagonGeometry?.x === 336 &&
+      presetGeometryFreeformPPTXImportState.hexagonGeometry?.y === 128 &&
+      presetGeometryFreeformPPTXImportState.chevronFill?.color === '#fee2e2' &&
+      presetGeometryFreeformPPTXImportState.chevronPointCount === 7 &&
+      presetGeometryFreeformPPTXImportState.chevronGeometry?.x === 544 &&
+      presetGeometryFreeformPPTXImportState.chevronGeometry?.y === 128,
+    {
+      beforePresetGeometryFreeformPPTXDrop,
+      presetGeometryFreeformPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterPresetGeometryFreeformPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes preset geometry freeform PPTX drop probes before export scenario continues',
+    afterPresetGeometryFreeformPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterPresetGeometryFreeformPPTXDropCleanup.slideCount === beforePresetGeometryFreeformPPTXDrop.slideCount,
+    {
+      afterPresetGeometryFreeformPPTXDropCleanup,
+      beforePresetGeometryFreeformPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -29379,6 +29541,116 @@ async function addPPTXCustomGeometryFreeformProbe(base64) {
     compression: 'DEFLATE',
     type: 'base64',
   })
+}
+
+async function addPPTXPresetGeometryFreeformProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Preset Triangle Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DCFCE7',
+      fillOpacity: 0.7,
+      h: 1143000,
+      id: 9981,
+      name: 'Preset Triangle Probe',
+      preset: 'triangle',
+      stroke: '16A34A',
+      strokeWidth: 19050,
+      w: 1524000,
+      x: 1219200,
+      y: 1219200,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FDE68A',
+      h: 1143000,
+      id: 9982,
+      name: 'Preset Hexagon Probe',
+      preset: 'hexagon',
+      stroke: 'B45309',
+      strokeWidth: 19050,
+      w: 1524000,
+      x: 3200400,
+      y: 1219200,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEE2E2',
+      h: 1143000,
+      id: 9983,
+      name: 'Preset Chevron Probe',
+      preset: 'chevron',
+      stroke: 'DC2626',
+      strokeWidth: 28575,
+      w: 1524000,
+      x: 5181600,
+      y: 1219200,
+    }),
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXPresetGeometryShapeProbeXml({
+  fill,
+  fillOpacity,
+  h,
+  id,
+  name,
+  preset,
+  stroke,
+  strokeWidth,
+  w,
+  x,
+  y,
+}) {
+  const fillOpacityXml = fillOpacity === undefined
+    ? ''
+    : `<a:alpha val="${Math.round(fillOpacity * 100000)}"/>`
+
+  return [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    `<p:cNvPr id="${id}" name="${name}"/>`,
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    `<a:off x="${x}" y="${y}"/>`,
+    `<a:ext cx="${w}" cy="${h}"/>`,
+    '</a:xfrm>',
+    `<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>`,
+    `<a:solidFill><a:srgbClr val="${fill}">${fillOpacityXml}</a:srgbClr></a:solidFill>`,
+    `<a:ln w="${strokeWidth}"><a:solidFill><a:srgbClr val="${stroke}"/></a:solidFill></a:ln>`,
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
 }
 
 async function addPPTXLayoutObjectProbe(base64) {

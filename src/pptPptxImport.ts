@@ -94,6 +94,10 @@ type PPTXPlaceholderRef = {
 type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
 type PPTXPlaceholderTextBodyMap = Map<string, Element>
 type PPTXInheritedElementSource = 'layout' | 'master'
+type PPTXRatioPoint = {
+  x: number
+  y: number
+}
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -205,6 +209,79 @@ const PPTX_THEME_SCHEME_ALIASES: Record<string, string> = {
   bg2: 'lt2',
   tx1: 'dk1',
   tx2: 'dk2',
+}
+const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRatioPoint[]>> = {
+  chevron: [
+    { x: 0, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.35, y: 0.5 },
+    { x: 0, y: 0 },
+  ],
+  hexagon: [
+    { x: 0.25, y: 0 },
+    { x: 0.75, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.75, y: 1 },
+    { x: 0.25, y: 1 },
+    { x: 0, y: 0.5 },
+    { x: 0.25, y: 0 },
+  ],
+  homePlate: [
+    { x: 0, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  octagon: [
+    { x: 0.3, y: 0 },
+    { x: 0.7, y: 0 },
+    { x: 1, y: 0.3 },
+    { x: 1, y: 0.7 },
+    { x: 0.7, y: 1 },
+    { x: 0.3, y: 1 },
+    { x: 0, y: 0.7 },
+    { x: 0, y: 0.3 },
+    { x: 0.3, y: 0 },
+  ],
+  parallelogram: [
+    { x: 0.25, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0.75, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.25, y: 0 },
+  ],
+  pentagon: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.38 },
+    { x: 0.82, y: 1 },
+    { x: 0.18, y: 1 },
+    { x: 0, y: 0.38 },
+    { x: 0.5, y: 0 },
+  ],
+  rtTriangle: [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  trapezoid: [
+    { x: 0.2, y: 0 },
+    { x: 0.8, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.2, y: 0 },
+  ],
+  triangle: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.5, y: 0 },
+  ],
 }
 
 export async function importPPTDeckFromPPTXBlob(
@@ -2177,6 +2254,22 @@ function readPPTXShapeElement(
     if (freeform) {
       return freeform
     }
+
+    const presetFreeform = readPPTXPresetGeometryFreeformElement({
+      fill,
+      geometry,
+      id,
+      name,
+      relationships,
+      shadow,
+      sp,
+      spPr,
+      stroke,
+    })
+
+    if (presetFreeform) {
+      return presetFreeform
+    }
   }
 
   if (isTextBox) {
@@ -2247,6 +2340,84 @@ function readPPTXCustomGeometryFreeformElement({
     return null
   }
 
+  return createPPTXShapeFreeformElement({
+    fill,
+    geometry,
+    id,
+    name,
+    points,
+    relationships,
+    shadow,
+    sp,
+    spPr,
+    stroke,
+  })
+}
+
+function readPPTXPresetGeometryFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+}): PPTFreeform | null {
+  const points = readPPTXPresetGeometryFreeformPoints(spPr, geometry)
+
+  if (points.length < 2) {
+    return null
+  }
+
+  return createPPTXShapeFreeformElement({
+    fill,
+    geometry,
+    id,
+    name,
+    points,
+    relationships,
+    shadow,
+    sp,
+    spPr,
+    stroke,
+  })
+}
+
+function createPPTXShapeFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  points,
+  relationships,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  points: readonly PPTLine['start'][]
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+}): PPTFreeform {
   const fallbackStroke = fill
     ? { color: fill.color, width: 0 }
     : { color: PPTX_DEFAULT_STROKE_COLOR, width: 1 }
@@ -2263,10 +2434,25 @@ function readPPTXCustomGeometryFreeformElement({
     ...(readPPTXElementVisibility(sp) ?? {}),
     name,
     pointMode: 'polyline',
-    points,
+    points: points.map((point) => ({ ...point })),
     ...(shadow ? { shadow } : {}),
     stroke: stroke ?? fallbackStroke,
   }
+}
+
+function readPPTXPresetGeometryFreeformPoints(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+) {
+  const preset = readPPTXPresetGeometryName(spPr)
+  const ratios = preset ? PPTX_PRESET_FREEFORM_POINT_RATIOS[preset] : undefined
+
+  return ratios
+    ? ratios.map((point) => ({
+        x: point.x * geometry.w,
+        y: point.y * geometry.h,
+      }))
+    : []
 }
 
 function readPPTXCustomGeometryPoints(
@@ -3494,8 +3680,7 @@ function isPPTXTextBoxShape(sp: Element) {
 }
 
 function readPPTXShapeKind(spPr: Element | null): PPTShapeKind {
-  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
-    ?.getAttribute('prst')
+  const preset = readPPTXPresetGeometryName(spPr)
 
   if (preset === 'ellipse') {
     return 'ellipse'
@@ -3508,13 +3693,17 @@ function readPPTXShapeKind(spPr: Element | null): PPTShapeKind {
   return 'rect'
 }
 
+function readPPTXPresetGeometryName(spPr: Element | null) {
+  return getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst') ?? null
+}
+
 function readPPTXShapeCornerRadius(
   spPr: Element | null,
   geometry: PPTGeometry,
 ) {
   const presetGeometry = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
-  const preset = presetGeometry
-    ?.getAttribute('prst')
+  const preset = readPPTXPresetGeometryName(spPr)
 
   if (preset !== 'roundRect') {
     return null
