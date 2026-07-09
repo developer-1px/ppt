@@ -13199,6 +13199,152 @@ async function runExportScenario(page) {
     },
   )
 
+  const contentPartPPTXBase64 = await addPPTXContentPartProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeContentPartPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      contentPartModelCount: elements.filter((element) =>
+        element.name === 'Content Part Probe' &&
+        element.kind === 'shape').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-content-part.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(contentPartPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const contentPartPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="Content Part Probe"][data-kind="shape"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const contentParts = exportImportedElements.filter((element) =>
+      element.name === 'Content Part Probe' &&
+      element.kind === 'shape')
+    const contentPart = contentParts[0] ?? null
+    const paragraphs = contentPart?.textBody?.paragraphs ?? []
+    const paragraphTexts = paragraphs.map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeShape: activeShape?.getAttribute('data-shape') ?? '',
+      activeText: activeShape?.textContent ?? '',
+      activeTextAutofit: activeShape?.getAttribute('data-ppt-text-autofit') ?? '',
+      contentPartFill: contentPart?.fill?.color ?? '',
+      contentPartGeometry: contentPart?.geometry ?? null,
+      contentPartModelCount: contentParts.length,
+      contentPartShape: contentPart?.shape ?? '',
+      contentPartStrokeDash: contentPart?.stroke?.dash ?? '',
+      contentPartTextAutofit: contentPart?.textAutoFit ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      paragraphTexts,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX contentPart as editable placeholder shape through OpenXML import',
+    contentPartPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      contentPartPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      contentPartPPTXImportState.fileName === 'external-openxml-content-part.pptx' &&
+      contentPartPPTXImportState.importedCount === beforeContentPartPPTXDrop.slideCount &&
+      contentPartPPTXImportState.sourceSlideCount === beforeContentPartPPTXDrop.slideCount &&
+      contentPartPPTXImportState.slideCount === beforeContentPartPPTXDrop.slideCount * 2 &&
+      contentPartPPTXImportState.activeName.includes('Copy') &&
+      contentPartPPTXImportState.contentPartModelCount >
+        beforeContentPartPPTXDrop.contentPartModelCount &&
+      contentPartPPTXImportState.contentPartModelCount === 1 &&
+      contentPartPPTXImportState.contentPartShape === 'rect' &&
+      contentPartPPTXImportState.activeShape === 'rect' &&
+      contentPartPPTXImportState.contentPartTextAutofit === 'resizeShapeToFitText' &&
+      contentPartPPTXImportState.activeTextAutofit === 'resizeShapeToFitText' &&
+      contentPartPPTXImportState.contentPartFill === '#f8fafc' &&
+      contentPartPPTXImportState.contentPartStrokeDash === 'dash' &&
+      JSON.stringify(contentPartPPTXImportState.paragraphTexts) === JSON.stringify([
+        'Content Part Probe',
+        'customXml',
+        'content-part-probe.xml',
+      ]) &&
+      contentPartPPTXImportState.activeText.includes('Content Part Probe') &&
+      contentPartPPTXImportState.activeText.includes('content-part-probe.xml') &&
+      contentPartPPTXImportState.contentPartGeometry?.x === 1040 &&
+      contentPartPPTXImportState.contentPartGeometry?.y === 260 &&
+      contentPartPPTXImportState.contentPartGeometry?.w === 180 &&
+      contentPartPPTXImportState.contentPartGeometry?.h === 120,
+    {
+      beforeContentPartPPTXDrop,
+      contentPartPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterContentPartPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes contentPart PPTX drop probes before export scenario continues',
+    afterContentPartPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterContentPartPPTXDropCleanup.slideCount === beforeContentPartPPTXDrop.slideCount,
+    {
+      afterContentPartPPTXDropCleanup,
+      beforeContentPartPPTXDrop,
+    },
+  )
+
   const commentsPPTXBase64 = await addPPTXCommentsProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -31018,6 +31164,70 @@ async function addPPTXMediaObjectProbe(base64) {
     '</p:pic>',
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${mediaPictureXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXContentPartProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const contentPartPath = 'ppt/contentParts/content-part-probe.xml'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Content Part Probe')) {
+    return base64
+  }
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    contentPartPath,
+    'application/xml',
+  )
+  zip.file(contentPartPath, [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<probe xmlns="urn:interactive-os:pptx-content-part">Content Part Probe</probe>',
+  ].join(''))
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, contentPartPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml',
+    zip,
+  })
+  const contentPartXml = [
+    `<p:contentPart r:id="${relationshipId}">`,
+    '<p:nvContentPartPr>',
+    '<p:cNvPr id="9990" name="Content Part Probe"/>',
+    '<p:cNvContentPartPr/>',
+    '<p:nvPr/>',
+    '</p:nvContentPartPr>',
+    '<p:xfrm>',
+    '<a:off x="9906000" y="2476500"/>',
+    '<a:ext cx="1714500" cy="1143000"/>',
+    '</p:xfrm>',
+    '</p:contentPart>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${contentPartXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64

@@ -778,6 +778,15 @@ async function readPPTXOpenXmlSlide({
         themeColors,
         zip,
       })
+    } else if (child.localName === 'contentPart') {
+      element = readPPTXContentPartElement({
+        contentPart: child,
+        index,
+        objectIndex,
+        relationships,
+        slidePath: path,
+        themeColors,
+      })
     }
 
     if (element) {
@@ -949,7 +958,7 @@ function getPPTXSlideObjectNodes(
     return treeNodes
   }
 
-  return [...xml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame)\b[\s\S]*?<\/p:\1>/g)]
+  return [...xml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame|contentPart)\b[\s\S]*?<\/p:\1>/g)]
     .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
     .filter((element): element is Element => element !== null)
     .map((element) => ({
@@ -1001,6 +1010,7 @@ function getPPTXSlideObjectNodesFromContainer({
 function isPPTXSlideObjectNode(element: Element) {
   return element.localName === 'sp' ||
     element.localName === 'cxnSp' ||
+    element.localName === 'contentPart' ||
     element.localName === 'pic' ||
     element.localName === 'graphicFrame'
 }
@@ -1539,6 +1549,17 @@ async function readPPTXInheritedElement({
       slidePath: path,
       themeColors,
       zip,
+    })
+  }
+
+  if (child.localName === 'contentPart') {
+    return readPPTXContentPartElement({
+      contentPart: child,
+      index,
+      objectIndex,
+      relationships,
+      slidePath: path,
+      themeColors,
     })
   }
 
@@ -3020,6 +3041,77 @@ function readPPTXMediaTypeFromTarget(target: string) {
   }
 
   return null
+}
+
+function readPPTXContentPartElement({
+  contentPart,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+}: {
+  contentPart: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const geometry = readPPTXElementGeometry(contentPart)
+
+  if (!geometry) {
+    return null
+  }
+
+  const relationshipId = readPPTXRelationshipAttributeId(contentPart)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : ''
+  const fileName = target.split('/').at(-1)?.trim() ?? ''
+  const relationshipType = relationship?.type.split('/').at(-1)?.trim() ?? ''
+  const name = readPPTXObjectName(contentPart, `Content Part ${objectIndex}`)
+  const shadow = readPPTXElementShadow(contentPart, themeColors)
+  const details = [relationshipType, fileName]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(contentPart) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(contentPart),
+    geometry,
+    ...(readPPTXElementHyperlink(contentPart, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(contentPart) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(contentPart) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
 }
 
 async function readPPTXImageSource({
