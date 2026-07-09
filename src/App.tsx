@@ -17091,7 +17091,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             data-ppt-transition-model="slide-edit-slide-transition-timing"
             data-ppt-transition-type={activeSlideTransition.type}
             style={{
-              background: activeSlide.background?.color ?? '#ffffff',
+              background: activeSlide.background
+                ? getPPTFillColorCSS(activeSlide.background)
+                : '#ffffff',
               height: deckSlideSize.h,
               width: deckSlideSize.w,
             }}
@@ -17627,7 +17629,9 @@ function PPTPresentationOverlay({
             style={{
               '--ppt-presentation-scale': String(scale),
               ...transitionStyle,
-              background: slide.background?.color ?? '#ffffff',
+              background: slide.background
+                ? getPPTFillColorCSS(slide.background)
+                : '#ffffff',
               transform: `scale(${scale})`,
             } as CSSProperties}
           >
@@ -35917,7 +35921,9 @@ function SlideThumb({
         className="ppt-thumb-preview"
         style={{
           aspectRatio: `${slideSize.w} / ${slideSize.h}`,
-          background: slide.background?.color ?? '#fff',
+          background: slide.background
+            ? getPPTFillColorCSS(slide.background)
+            : '#fff',
         }}
       >
         {slide.elements.map((element) => (

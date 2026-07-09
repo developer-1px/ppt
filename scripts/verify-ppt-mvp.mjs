@@ -285,9 +285,11 @@ async function runPPTXRenderScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
-  const openXmlPPTXBase64 = await addPPTXStyleRefProbe(
-    await addPPTXGradientPatternFillProbe(
-      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(
+    await addPPTXStyleRefProbe(
+      await addPPTXGradientPatternFillProbe(
+        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+      ),
     ),
   )
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
@@ -306,6 +308,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXImportedSlideRenderState(page)
   const openXmlPPTXStyleRefState =
     await readPPTXStyleRefProbeState(page)
+  const openXmlPPTXBackgroundRefState =
+    await readPPTXBackgroundRefProbeState(page)
   const openXmlPPTXAlphaModifierFillState =
     await readPPTXAlphaModifierFillProbeState(page)
 
@@ -353,6 +357,24 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXStyleRefState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX background reference theme fill for viewer rendering',
+    openXmlPPTXBackgroundRefState.modelCount === 1 &&
+      openXmlPPTXBackgroundRefState.backgroundFill === '#e6fffa' &&
+      openXmlPPTXBackgroundRefState.backgroundOpacity > 0.71 &&
+      openXmlPPTXBackgroundRefState.backgroundOpacity < 0.73 &&
+      openXmlPPTXBackgroundRefState.activeSlideExists &&
+      openXmlPPTXBackgroundRefState.activeBackgroundColor.includes('rgba') &&
+      openXmlPPTXBackgroundRefState.activeBackgroundColor.includes('230') &&
+      openXmlPPTXBackgroundRefState.activeBackgroundColor.includes('255') &&
+      openXmlPPTXBackgroundRefState.activeBackgroundColor.includes('250') &&
+      openXmlPPTXBackgroundRefState.activeBackgroundColor.includes('0.72'),
+    {
+      openXmlPPTXBackgroundRefState,
+      openXmlPPTXImportState,
     },
   )
 
@@ -11391,7 +11413,9 @@ async function runExportScenario(page) {
         element.name === 'Style Ref Line Probe' &&
         element.kind === 'line').length,
       backgroundRefSlideModelCount: slides.filter((slide) =>
-        slide.background?.color === '#e6fffa').length,
+        slide.background?.color === '#e6fffa' &&
+        Number(slide.background?.opacity ?? 0) > 0.71 &&
+        Number(slide.background?.opacity ?? 0) < 0.73).length,
       layoutBackgroundSlideModelCount: slides.filter((slide) =>
         slide.background?.color === '#d9f99d').length,
       layoutObjectProbeModelCount: elements.filter((element) =>
@@ -11633,7 +11657,9 @@ async function runExportScenario(page) {
       element.stroke?.dash === 'dash' &&
       element.stroke?.width === 4)
     const exportBackgroundRefSlides = exportImportedSlides.filter((slide) =>
-      slide.background?.color === '#e6fffa')
+      slide.background?.color === '#e6fffa' &&
+      Number(slide.background?.opacity ?? 0) > 0.71 &&
+      Number(slide.background?.opacity ?? 0) < 0.73)
     const exportLayoutBackgroundSlides = exportImportedSlides.filter((slide) =>
       slide.background?.color === '#d9f99d')
     const exportLayoutObjectProbeObjects = exportImportedElements.filter((element) =>
@@ -11933,6 +11959,7 @@ async function runExportScenario(page) {
       exportStyleRefLineProbeWidth: exportStyleRefLineProbeObjects.map((element) => element.stroke?.width ?? '').join(' | '),
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
+      exportBackgroundRefSlideOpacity: exportBackgroundRefSlides.map((slide) => slide.background?.opacity ?? '').join(' | '),
       exportBackgroundRefSlideModelCount: exportBackgroundRefSlides.length,
       exportHasLayoutBackgroundSlide: exportLayoutBackgroundSlides.length > 0,
       exportLayoutBackgroundSlideColors: exportLayoutBackgroundSlides.map((slide) => slide.background?.color ?? '').join(' | '),
@@ -31635,7 +31662,17 @@ function setPPTXThemeLineStyleXml(xml, index, lineXml) {
 }
 
 function setPPTXThemeFillStyleXml(xml, index, fillXml) {
-  const fillStyleListMatch = xml.match(/<a:fillStyleLst>[\s\S]*?<\/a:fillStyleLst>/)
+  return setPPTXThemeFillStyleListXml(xml, 'fillStyleLst', index, fillXml)
+}
+
+function setPPTXThemeBackgroundFillStyleXml(xml, index, fillXml) {
+  return setPPTXThemeFillStyleListXml(xml, 'bgFillStyleLst', index, fillXml)
+}
+
+function setPPTXThemeFillStyleListXml(xml, listName, index, fillXml) {
+  const fillStyleListMatch = xml.match(
+    new RegExp(`<a:${listName}>[\\s\\S]*?</a:${listName}>`),
+  )
 
   if (!fillStyleListMatch) {
     return xml
@@ -31655,8 +31692,8 @@ function setPPTXThemeFillStyleXml(xml, index, fillXml) {
   }
 
   return xml.replace(fillStyleListXml, fillStyleListXml.replace(
-    '</a:fillStyleLst>',
-    `${fillXml}</a:fillStyleLst>`,
+    `</a:${listName}>`,
+    `${fillXml}</a:${listName}>`,
   ))
 }
 
@@ -31797,7 +31834,15 @@ async function addPPTXBackgroundRefProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
   const themeXml = await readPPTXZipText(zip, themePath)
-  const nextThemeXml = setPPTXThemeSchemeColorXml(themeXml, 'lt2', 'E6FFFA')
+  const nextThemeXml = setPPTXThemeBackgroundFillStyleXml(
+    setPPTXThemeSchemeColorXml(themeXml, 'lt2', 'E6FFFA'),
+    1,
+    [
+      '<a:solidFill>',
+      '<a:schemeClr val="phClr"><a:alpha val="72000"/></a:schemeClr>',
+      '</a:solidFill>',
+    ].join(''),
+  )
   const backgroundRefXml = '<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg2"/></p:bgRef></p:bg>'
   const nextXml = xml.includes('<p:bgRef idx="1001"><a:schemeClr val="bg2"/></p:bgRef>')
     ? xml
@@ -34722,6 +34767,61 @@ async function readPPTXStyleRefProbeState(page) {
       activeShapeStrokeDash: shapeElement?.getAttribute('data-ppt-stroke-dash') ?? '',
       activeShapeStrokeWidth: Number.parseFloat(shapeStyle?.borderTopWidth ?? '0') || 0,
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
+}
+
+async function readPPTXBackgroundRefProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const backgroundSlides = slides.filter((slide) =>
+      slide.background?.color === '#e6fffa' &&
+      Number(slide.background?.opacity ?? 0) > 0.71 &&
+      Number(slide.background?.opacity ?? 0) < 0.73)
+    const slide = backgroundSlides[0] ?? null
+
+    return {
+      backgroundFill: slide?.background?.color ?? '',
+      backgroundOpacity: Number(slide?.background?.opacity ?? 0),
+      modelCount: backgroundSlides.length,
+      slideId: slide?.id ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const slide = document.querySelector('.ppt-slide')
+    const style = slide ? getComputedStyle(slide) : null
+
+    return {
+      activeBackgroundColor: style?.backgroundColor ?? '',
+      activeSlideExists: Boolean(slide),
+      activeSlideId: slide?.getAttribute('data-ppt-slide') ?? '',
     }
   })()`)
 

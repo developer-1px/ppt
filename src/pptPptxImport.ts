@@ -1075,6 +1075,7 @@ async function readPPTXOpenXmlSlide({
     relationships,
     slidePath: path,
     themeColors,
+    themeStyles,
     zip,
   })
   let objectIndex = 1
@@ -1173,8 +1174,8 @@ async function readPPTXOpenXmlSlide({
     elements: connectedElements,
     importedAnimations: readPPTXSlideAnimations(doc, xml),
   })
-  const slideBackground = readPPTXSlideBackground(cSld, themeColors) ??
-    readPPTXSlideBackgroundFromXml(xml, themeColors) ??
+  const slideBackground = readPPTXSlideBackground(cSld, themeColors, themeStyles) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors, themeStyles) ??
     layoutBackground ?? {
       background: { color: PPTX_DEFAULT_FILL_COLOR },
     }
@@ -1472,6 +1473,7 @@ function readPPTXSlideName(
 function readPPTXSlideBackground(
   cSld: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ) {
   const background = cSld
     ? getDirectPPTXChildByLocalName(cSld, 'bg')
@@ -1481,7 +1483,7 @@ function readPPTXSlideBackground(
   const bgRef = getDirectPPTXChildByLocalName(background, 'bgRef') ??
     (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgRef') : null)
   const fill = readPPTXFill(bgPr, themeColors) ??
-    readPPTXBackgroundRefFill(bgRef, themeColors)
+    readPPTXBackgroundRefFill(bgRef, themeColors, themeStyles)
 
   return fill ? { background: fill } : null
 }
@@ -1489,13 +1491,14 @@ function readPPTXSlideBackground(
 function readPPTXSlideBackgroundFromXml(
   xml: string,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ) {
   const bgPrXml = xml.match(/<p:bgPr\b[\s\S]*?<\/p:bgPr>/)?.[0]
   const bgRefXml = xml.match(/<p:bgRef\b[\s\S]*?<\/p:bgRef>/)?.[0]
   const bgPr = bgPrXml ? parsePPTXXmlElementFragment(bgPrXml, 'bgPr') : null
   const bgRef = bgRefXml ? parsePPTXXmlElementFragment(bgRefXml, 'bgRef') : null
   const fill = readPPTXFill(bgPr, themeColors) ??
-    readPPTXBackgroundRefFill(bgRef, themeColors)
+    readPPTXBackgroundRefFill(bgRef, themeColors, themeStyles)
 
   return fill ? { background: fill } : null
 }
@@ -1503,19 +1506,30 @@ function readPPTXSlideBackgroundFromXml(
 function readPPTXBackgroundRefFill(
   bgRef: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ): PPTFill | null {
-  return readPPTXColorFill(bgRef, themeColors)
+  const referenceFill = readPPTXColorFill(bgRef, themeColors)
+  const styleFill = readPPTXStyleReferenceFill(
+    bgRef,
+    themeColors,
+    themeStyles,
+    referenceFill?.color,
+  )
+
+  return styleFill ?? referenceFill
 }
 
 async function readPPTXSlideLayoutBackground({
   relationships,
   slidePath,
   themeColors,
+  themeStyles,
   zip,
 }: {
   relationships: PPTXRelationshipMap
   slidePath: string
   themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<Pick<PPTSlide, 'background'> | null> {
   const layoutPath = readPPTXRelatedPartPath({
@@ -1537,9 +1551,14 @@ async function readPPTXSlideLayoutBackground({
     zip,
   })
   const masterBackground = masterPath
-    ? await readPPTXPartBackground(zip, masterPath, themeColors)
+    ? await readPPTXPartBackground(zip, masterPath, themeColors, themeStyles)
     : null
-  const layoutBackground = await readPPTXPartBackground(zip, layoutPath, themeColors)
+  const layoutBackground = await readPPTXPartBackground(
+    zip,
+    layoutPath,
+    themeColors,
+    themeStyles,
+  )
 
   return layoutBackground ?? masterBackground
 }
@@ -1548,13 +1567,14 @@ async function readPPTXPartBackground(
   zip: JSZip,
   path: string,
   themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
 ): Promise<Pick<PPTSlide, 'background'> | null> {
   const xml = await zip.file(path)?.async('string') ?? ''
   const doc = xml ? parsePPTXXmlDocument(xml) : null
   const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
 
-  return readPPTXSlideBackground(cSld, themeColors) ??
-    readPPTXSlideBackgroundFromXml(xml, themeColors)
+  return readPPTXSlideBackground(cSld, themeColors, themeStyles) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors, themeStyles)
 }
 
 async function readPPTXSlideBackgroundImage({

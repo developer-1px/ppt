@@ -138,7 +138,7 @@ export function exportPPTDeckHTML(deck: PPTDeck) {
     const transitionAttrs = getPPTSlideTransitionAttrs(slide, 'data-ppt-transition')
 
     return [
-      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${hiddenAttr}${sectionNameAttr}${placeholderVisibilityAttr}${transitionAttrs} style="background:${escapeHtml(slide.background?.color ?? '#ffffff')}">`,
+      `  <section class="ppt-slide" data-ppt-slide="${escapeHtml(slide.id)}"${layoutAttr}${themeAttr}${hiddenAttr}${sectionNameAttr}${placeholderVisibilityAttr}${transitionAttrs} style="background:${escapeHtml(slide.background ? getPPTFillColorCSS(slide.background) : '#ffffff')}">`,
       elements,
       '  </section>',
       renderPPTSlideNotesHTML(slide.id, slide.notes),
