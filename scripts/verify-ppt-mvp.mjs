@@ -15382,7 +15382,10 @@ async function runExportScenario(page) {
     return {
       commentModelCount: elements.filter((element) =>
         element.kind === 'comment' &&
-        String(element.body ?? '').includes('PPTX Comment Probe')).length,
+        (
+          String(element.body ?? '').includes('PPTX Comment Probe') ||
+          String(element.body ?? '').includes('PPTX Modern Comment Probe')
+        )).length,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
     }
   })()`)
@@ -15408,7 +15411,11 @@ async function runExportScenario(page) {
   const commentsPPTXImportState = await page.eval(`(() => {
     const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
     const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
-    const activeComment = document.querySelector('.ppt-slide [data-ppt-element-name="PPTX Comment 1"][data-kind="comment"]')
+    const activeComments = Array.from(document.querySelectorAll('.ppt-slide [data-kind="comment"]'))
+    const activeComment = activeComments.find((element) =>
+      element.querySelector('[data-ppt-comment-body]')?.textContent === 'PPTX Comment Probe: review KPI label')
+    const activeModernComment = activeComments.find((element) =>
+      element.querySelector('[data-ppt-comment-body]')?.textContent === 'PPTX Modern Comment Probe: assign follow-up')
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const readPPTExportDeckFromHTML = (html) => {
       try {
@@ -15427,13 +15434,23 @@ async function runExportScenario(page) {
       slide.elements ?? [])
     const comments = exportImportedElements.filter((element) =>
       element.kind === 'comment' &&
-      String(element.body ?? '').includes('PPTX Comment Probe'))
-    const comment = comments[0] ?? null
+      (
+        String(element.body ?? '').includes('PPTX Comment Probe') ||
+        String(element.body ?? '').includes('PPTX Modern Comment Probe')
+      ))
+    const comment = comments.find((element) =>
+      String(element.body ?? '').includes('PPTX Comment Probe')) ?? null
+    const modernComment = comments.find((element) =>
+      String(element.body ?? '').includes('PPTX Modern Comment Probe')) ?? null
 
     return {
       activeAuthor: activeComment?.querySelector('[data-ppt-comment-author]')?.textContent ?? '',
       activeBody: activeComment?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
       activeCreatedAt: activeComment?.querySelector('[data-ppt-comment-created]')?.textContent ?? '',
+      activeModernAuthor: activeModernComment?.querySelector('[data-ppt-comment-author]')?.textContent ?? '',
+      activeModernBody: activeModernComment?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
+      activeModernCreatedAt: activeModernComment?.querySelector('[data-ppt-comment-created]')?.textContent ?? '',
+      activeModernThreadCount: activeModernComment?.getAttribute('data-ppt-comment-thread-count') ?? '',
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeThreadCount: activeComment?.getAttribute('data-ppt-comment-thread-count') ?? '',
       commentAuthorName: comment?.authorName ?? '',
@@ -15447,6 +15464,14 @@ async function runExportScenario(page) {
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      modernCommentAuthorName: modernComment?.authorName ?? '',
+      modernCommentBody: modernComment?.body ?? '',
+      modernCommentCreatedAt: modernComment?.createdAt ?? '',
+      modernCommentGeometry: modernComment?.geometry ?? null,
+      modernCommentReplyAuthorName: modernComment?.thread?.[1]?.authorName ?? '',
+      modernCommentReplyBody: modernComment?.thread?.[1]?.body ?? '',
+      modernCommentReplyCreatedAt: modernComment?.thread?.[1]?.createdAt ?? '',
+      modernCommentThreadCount: modernComment?.thread?.length ?? 0,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
     }
@@ -15463,7 +15488,7 @@ async function runExportScenario(page) {
       commentsPPTXImportState.activeName.includes('Copy') &&
       commentsPPTXImportState.commentModelCount >
         beforeCommentsPPTXDrop.commentModelCount &&
-      commentsPPTXImportState.commentModelCount === 1 &&
+      commentsPPTXImportState.commentModelCount === 2 &&
       commentsPPTXImportState.commentAuthorName === 'PPT Reviewer' &&
       commentsPPTXImportState.commentBody === 'PPTX Comment Probe: review KPI label' &&
       commentsPPTXImportState.commentCreatedAt === '2026-07-09T12:00:00Z' &&
@@ -15476,7 +15501,22 @@ async function runExportScenario(page) {
       commentsPPTXImportState.activeAuthor === 'PPT Reviewer' &&
       commentsPPTXImportState.activeBody === 'PPTX Comment Probe: review KPI label' &&
       commentsPPTXImportState.activeCreatedAt === '2026-07-09T12:00:00Z' &&
-      commentsPPTXImportState.activeThreadCount === '1',
+      commentsPPTXImportState.activeThreadCount === '1' &&
+      commentsPPTXImportState.modernCommentAuthorName === 'PPT Modern Reviewer' &&
+      commentsPPTXImportState.modernCommentBody === 'PPTX Modern Comment Probe: assign follow-up' &&
+      commentsPPTXImportState.modernCommentCreatedAt === '2026-07-09T12:01:00Z' &&
+      commentsPPTXImportState.modernCommentThreadCount === 2 &&
+      commentsPPTXImportState.modernCommentReplyAuthorName === 'PPT Modern Reply' &&
+      commentsPPTXImportState.modernCommentReplyBody === 'PPTX Modern Reply Probe: acknowledged' &&
+      commentsPPTXImportState.modernCommentReplyCreatedAt === '2026-07-09T12:02:00Z' &&
+      commentsPPTXImportState.modernCommentGeometry?.x === 192 &&
+      commentsPPTXImportState.modernCommentGeometry?.y === 144 &&
+      commentsPPTXImportState.modernCommentGeometry?.w === 220 &&
+      commentsPPTXImportState.modernCommentGeometry?.h === 96 &&
+      commentsPPTXImportState.activeModernAuthor === 'PPT Modern Reviewer' &&
+      commentsPPTXImportState.activeModernBody === 'PPTX Modern Comment Probe: assign follow-up' &&
+      commentsPPTXImportState.activeModernCreatedAt === '2026-07-09T12:01:00Z' &&
+      commentsPPTXImportState.activeModernThreadCount === '2',
     {
       beforeCommentsPPTXDrop,
       commentsPPTXImportState,
@@ -35458,17 +35498,36 @@ async function addPPTXCommentsProbe(base64) {
   })
   zip.file(commentAuthorsPath, [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-    '<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">',
+    '<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main">',
     '<p:cmAuthor id="7" name="PPT Reviewer" initials="PR" lastIdx="1" clrIdx="0"/>',
+    '<p188:author id="modern-reviewer" name="PPT Modern Reviewer" initials="MR"/>',
+    '<p188:author id="modern-reply" name="PPT Modern Reply" initials="MP"/>',
     '</p:cmAuthorLst>',
   ].join(''))
   zip.file(commentsPath, [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-    '<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">',
+    '<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">',
     '<p:cm authorId="7" dt="2026-07-09T12:00:00Z" idx="1">',
     '<p:pos x="1219200" y="914400"/>',
     '<p:text>PPTX Comment Probe: review KPI label</p:text>',
     '</p:cm>',
+    '<p188:cm id="modern-comment-probe" authorId="modern-reviewer" created="2026-07-09T12:01:00Z" status="active">',
+    '<p188:pos x="1828800" y="1371600"/>',
+    '<p188:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>PPTX Modern Comment Probe: assign follow-up</a:t></a:r></a:p>',
+    '</p188:txBody>',
+    '<p188:replyLst>',
+    '<p188:reply id="modern-comment-reply-probe" authorId="modern-reply" created="2026-07-09T12:02:00Z">',
+    '<p188:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>PPTX Modern Reply Probe: acknowledged</a:t></a:r></a:p>',
+    '</p188:txBody>',
+    '</p188:reply>',
+    '</p188:replyLst>',
+    '</p188:cm>',
     '</p:cmLst>',
   ].join(''))
 

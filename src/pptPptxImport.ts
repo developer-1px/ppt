@@ -986,7 +986,10 @@ async function readPPTXOpenXmlCommentAuthors(
       continue
     }
 
-    for (const author of getPPTXDescendantsByLocalName(doc, 'cmAuthor')) {
+    for (const author of [
+      ...getPPTXDescendantsByLocalName(doc, 'cmAuthor'),
+      ...getPPTXDescendantsByLocalName(doc, 'author'),
+    ]) {
       const id = author.getAttribute('id')?.trim()
       const name = author.getAttribute('name')?.trim() ??
         author.getAttribute('initials')?.trim()
@@ -1006,7 +1009,11 @@ async function readPPTXOpenXmlCommentAuthorPaths(zip: JSZip) {
   const relatedPaths = Array.from(relationships.values())
     .filter((relationship) =>
       relationship.targetMode !== 'External' &&
-      relationship.type.endsWith('/commentAuthors'))
+      (
+        relationship.type.endsWith('/commentAuthors') ||
+        relationship.type.endsWith('/powerPointAuthors') ||
+        relationship.type.endsWith('/authors')
+      ))
     .map((relationship) =>
       resolvePPTXRelationshipTarget(presentationPath, relationship.target))
 
@@ -3314,11 +3321,8 @@ async function readPPTXSlideComments({
       const position = getDirectPPTXChildByLocalName(comment, 'pos')
       const rawX = toPPTXNumber(position?.getAttribute('x'))
       const rawY = toPPTXNumber(position?.getAttribute('y'))
-      const authorId = comment.getAttribute('authorId')?.trim()
-      const authorName = authorId
-        ? authors.get(authorId) ?? `Author ${authorId}`
-        : 'PowerPoint'
-      const createdAt = comment.getAttribute('dt')?.trim() || 'Imported'
+      const authorName = readPPTXCommentAuthorName(comment, authors)
+      const createdAt = readPPTXCommentCreatedAt(comment)
       const id = `pptx-slide-${slideIndex + 1}-comment-${commentIndex + 1}`
 
       return {
@@ -3334,23 +3338,90 @@ async function readPPTXSlideComments({
         id,
         kind: 'comment',
         name: `PPTX Comment ${commentIndex + 1}`,
-        thread: [{
-          authorName,
+        thread: readPPTXCommentThread({
+          authors,
           body,
+          comment,
           createdAt,
-          id: `${id}:message-1`,
-        }],
+          id,
+        }),
       }
     })
     .filter((comment): comment is PPTComment => comment !== null)
 }
 
 function readPPTXCommentBody(comment: Element) {
-  const text = getDirectPPTXChildByLocalName(comment, 'text')?.textContent ??
-    getFirstPPTXDescendantByLocalName(comment, 'text')?.textContent ??
-    ''
+  const classicText = getDirectPPTXChildByLocalName(comment, 'text')?.textContent
+
+  if (classicText !== undefined) {
+    return classicText.replace(/\r\n?/g, '\n').trim()
+  }
+
+  const textBody = getDirectPPTXChildByLocalName(comment, 'txBody')
+  const fallbackText =
+    getFirstPPTXDescendantByLocalName(comment, 'text')?.textContent ?? ''
+  const text = textBody ? readPPTXPlainTextBody(textBody) : fallbackText
 
   return text.replace(/\r\n?/g, '\n').trim()
+}
+
+function readPPTXCommentAuthorName(
+  comment: Element,
+  authors: PPTXCommentAuthorMap,
+) {
+  const authorId = comment.getAttribute('authorId')?.trim()
+
+  return authorId
+    ? authors.get(authorId) ?? `Author ${authorId}`
+    : 'PowerPoint'
+}
+
+function readPPTXCommentCreatedAt(comment: Element) {
+  return comment.getAttribute('dt')?.trim() ||
+    comment.getAttribute('created')?.trim() ||
+    'Imported'
+}
+
+function readPPTXCommentThread({
+  authors,
+  body,
+  comment,
+  createdAt,
+  id,
+}: {
+  authors: PPTXCommentAuthorMap
+  body: string
+  comment: Element
+  createdAt: string
+  id: string
+}): NonNullable<PPTComment['thread']> {
+  const messages: NonNullable<PPTComment['thread']> = [{
+    authorName: readPPTXCommentAuthorName(comment, authors),
+    body,
+    createdAt,
+    id: `${id}:message-1`,
+  }]
+  const replyList = getDirectPPTXChildByLocalName(comment, 'replyLst')
+
+  for (const [replyIndex, reply] of getDirectPPTXChildrenByLocalName(
+    replyList,
+    'reply',
+  ).entries()) {
+    const replyBody = readPPTXCommentBody(reply)
+
+    if (!replyBody) {
+      continue
+    }
+
+    messages.push({
+      authorName: readPPTXCommentAuthorName(reply, authors),
+      body: replyBody,
+      createdAt: readPPTXCommentCreatedAt(reply),
+      id: `${id}:message-${replyIndex + 2}`,
+    })
+  }
+
+  return messages
 }
 
 function readPPTXLineElement(
