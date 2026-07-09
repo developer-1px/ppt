@@ -92,6 +92,7 @@ type PPTXPlaceholderRef = {
 }
 type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
 type PPTXPlaceholderTextBodyMap = Map<string, Element>
+type PPTXInheritedElementSource = 'layout' | 'master'
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -564,9 +565,17 @@ async function readPPTXOpenXmlSlide({
     zip,
   })
   const transition = readPPTXSlideTransition(doc, xml)
-  const elements: PPTElement[] = []
   const elementIdByPptxObjectId = new Map<string, string>()
   const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
+  const inheritedElements = await readPPTXInheritedLayoutElements({
+    index,
+    relationships,
+    slidePath: path,
+    themeColors,
+    themeFonts,
+    zip,
+  })
+  const elements: PPTElement[] = [...inheritedElements]
   const backgroundImage = await readPPTXSlideBackgroundImage({
     cSld,
     index,
@@ -1078,6 +1087,195 @@ async function readPPTXSlideLayoutPlaceholderTextBodies({
   const layoutTextBodies = await readPPTXPartPlaceholderTextBodies(zip, layoutPath)
 
   return new Map([...masterTextBodies, ...layoutTextBodies])
+}
+
+async function readPPTXInheritedLayoutElements({
+  index,
+  relationships,
+  slidePath,
+  themeColors,
+  themeFonts,
+  zip,
+}: {
+  index: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  zip: JSZip
+}): Promise<PPTElement[]> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return []
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterElements = masterPath
+    ? await readPPTXPartInheritedElements({
+        index,
+        path: masterPath,
+        relationships: await readPPTXRelationships(zip, masterPath),
+        source: 'master',
+        themeColors,
+        themeFonts,
+        zip,
+      })
+    : []
+  const layoutElements = await readPPTXPartInheritedElements({
+    index,
+    path: layoutPath,
+    relationships: layoutRelationships,
+    source: 'layout',
+    themeColors,
+    themeFonts,
+    zip,
+  })
+
+  return [...masterElements, ...layoutElements]
+}
+
+async function readPPTXPartInheritedElements({
+  index,
+  path,
+  relationships,
+  source,
+  themeColors,
+  themeFonts,
+  zip,
+}: {
+  index: number
+  path: string
+  relationships: PPTXRelationshipMap
+  source: PPTXInheritedElementSource
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  zip: JSZip
+}): Promise<PPTElement[]> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+  const spTree = cSld
+    ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
+    : null
+  const inheritedElements: PPTElement[] = []
+  let objectIndex = 1
+
+  for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
+    const child = objectNode.element
+
+    if (readPPTXPlaceholderRef(child)) {
+      continue
+    }
+
+    const element = await readPPTXInheritedElement({
+      child,
+      index,
+      objectIndex,
+      path,
+      relationships,
+      themeColors,
+      themeFonts,
+      zip,
+    })
+
+    if (!element) {
+      continue
+    }
+
+    inheritedElements.push(
+      applyPPTXInheritedElementSource(
+        applyPPTXGroupObjectNode(element, objectNode),
+        index,
+        objectIndex,
+        source,
+      ),
+    )
+    objectIndex += 1
+  }
+
+  return inheritedElements
+}
+
+async function readPPTXInheritedElement({
+  child,
+  index,
+  objectIndex,
+  path,
+  relationships,
+  themeColors,
+  themeFonts,
+  zip,
+}: {
+  child: Element
+  index: number
+  objectIndex: number
+  path: string
+  relationships: PPTXRelationshipMap
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  if (child.localName === 'sp') {
+    return isPPTXLineShape(child)
+      ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+      : readPPTXShapeElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        themeColors,
+        themeFonts,
+        new Map(),
+        new Map(),
+      )
+  }
+
+  if (child.localName === 'cxnSp') {
+    return readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
+  }
+
+  if (child.localName === 'pic') {
+    return await readPPTXPictureElement({
+      index,
+      objectIndex,
+      pic: child,
+      relationships,
+      slidePath: path,
+      themeColors,
+      zip,
+    })
+  }
+
+  if (child.localName === 'graphicFrame') {
+    return readPPTXTableElement(child, index, objectIndex, relationships, themeColors)
+  }
+
+  return null
+}
+
+function applyPPTXInheritedElementSource(
+  element: PPTElement,
+  slideIndex: number,
+  objectIndex: number,
+  source: PPTXInheritedElementSource,
+): PPTElement {
+  return {
+    ...element,
+    id: `pptx-slide-${slideIndex + 1}-${source}-object-${objectIndex}`,
+    locked: true,
+  }
 }
 
 async function readPPTXPartPlaceholderGeometries(

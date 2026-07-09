@@ -11011,23 +11011,25 @@ async function runExportScenario(page) {
       await addPPTXListStyleBulletProbe(
         await addPPTXParagraphDefaultRunStyleProbe(
           await addPPTXLayoutPlaceholderGeometryProbe(
-            await addPPTXLayoutBackgroundProbe(
-              await addPPTXBackgroundImageProbe(
-                await addPPTXBackgroundRefProbe(
-                  await addPPTXThemeTypefaceProbe(
-                    await addPPTXHyperlinkProbe(
-                      await addPPTXImageOpacityProbe(
-                        await addPPTXElbowConnectorProbe(
-                          await addPPTXConnectedConnectorProbe(
-                            await addPPTXHiddenObjectProbe(
-                              await addPPTXNoFillShapeProbe(
-                                await addPPTXGradientPatternFillProbe(
-                                  await addPPTXThemeColorProbe(
-                                    await addPPTXPresetSystemColorProbe(
-                                      await addPPTXUnevenTableProbe(
-                                        await addPPTXGroupedObjectProbe(
-                                          await reversePPTXPresentationSlideOrder(
-                                            await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+            await addPPTXLayoutObjectProbe(
+              await addPPTXLayoutBackgroundProbe(
+                await addPPTXBackgroundImageProbe(
+                  await addPPTXBackgroundRefProbe(
+                    await addPPTXThemeTypefaceProbe(
+                      await addPPTXHyperlinkProbe(
+                        await addPPTXImageOpacityProbe(
+                          await addPPTXElbowConnectorProbe(
+                            await addPPTXConnectedConnectorProbe(
+                              await addPPTXHiddenObjectProbe(
+                                await addPPTXNoFillShapeProbe(
+                                  await addPPTXGradientPatternFillProbe(
+                                    await addPPTXThemeColorProbe(
+                                      await addPPTXPresetSystemColorProbe(
+                                        await addPPTXUnevenTableProbe(
+                                          await addPPTXGroupedObjectProbe(
+                                            await reversePPTXPresentationSlideOrder(
+                                              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -11099,6 +11101,15 @@ async function runExportScenario(page) {
         slide.background?.color === '#e6fffa').length,
       layoutBackgroundSlideModelCount: slides.filter((slide) =>
         slide.background?.color === '#d9f99d').length,
+      layoutObjectProbeModelCount: elements.filter((element) =>
+        element.name === 'Layout Object Probe' &&
+        element.kind === 'shape' &&
+        element.locked === true &&
+        element.fill?.color === '#c7d2fe' &&
+        element.geometry?.x === 720 &&
+        element.geometry?.y === 80 &&
+        element.geometry?.w === 180 &&
+        element.geometry?.h === 60).length,
       backgroundImageModelCount: elements.filter((element) =>
         element.name === 'Background Image' &&
         element.kind === 'image' &&
@@ -11308,6 +11319,15 @@ async function runExportScenario(page) {
       slide.background?.color === '#e6fffa')
     const exportLayoutBackgroundSlides = exportImportedSlides.filter((slide) =>
       slide.background?.color === '#d9f99d')
+    const exportLayoutObjectProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Layout Object Probe' &&
+      element.kind === 'shape' &&
+      element.locked === true &&
+      element.fill?.color === '#c7d2fe' &&
+      element.geometry?.x === 720 &&
+      element.geometry?.y === 80 &&
+      element.geometry?.w === 180 &&
+      element.geometry?.h === 60)
     const exportGradientFillProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Gradient Fill Probe' &&
       element.kind === 'shape' &&
@@ -11566,6 +11586,10 @@ async function runExportScenario(page) {
       exportHasLayoutBackgroundSlide: exportLayoutBackgroundSlides.length > 0,
       exportLayoutBackgroundSlideColors: exportLayoutBackgroundSlides.map((slide) => slide.background?.color ?? '').join(' | '),
       exportLayoutBackgroundSlideModelCount: exportLayoutBackgroundSlides.length,
+      exportHasLayoutObjectProbe: exportLayoutObjectProbeObjects.length > 0,
+      exportLayoutObjectProbeBounds: exportLayoutObjectProbeObjects.map((element) =>
+        [element.geometry?.x, element.geometry?.y, element.geometry?.w, element.geometry?.h].join(' ')).join(' | '),
+      exportLayoutObjectProbeModelCount: exportLayoutObjectProbeObjects.length,
       exportHasBackgroundImage: exportBackgroundImageObjects.length > 0,
       exportBackgroundImageFits: exportBackgroundImageObjects.map((element) => element.fit ?? '').join(' | '),
       exportBackgroundImageModelCount: exportBackgroundImageObjects.length,
@@ -11780,6 +11804,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportBackgroundRefSlideModelCount > beforeOpenXmlPPTXDrop.backgroundRefSlideModelCount &&
       openXmlPPTXImportState.exportHasLayoutBackgroundSlide &&
       openXmlPPTXImportState.exportLayoutBackgroundSlideModelCount > beforeOpenXmlPPTXDrop.layoutBackgroundSlideModelCount &&
+      openXmlPPTXImportState.exportHasLayoutObjectProbe &&
+      openXmlPPTXImportState.exportLayoutObjectProbeModelCount > beforeOpenXmlPPTXDrop.layoutObjectProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundImage &&
       openXmlPPTXImportState.exportBackgroundImageModelCount > beforeOpenXmlPPTXDrop.backgroundImageModelCount &&
       openXmlPPTXImportState.exportHasGradientFillProbe &&
@@ -28913,6 +28939,68 @@ async function addPPTXLayoutBackgroundProbe(base64) {
   const nextLayoutXml = /<p:bg>[\s\S]*?<\/p:bg>/.test(layoutXml)
     ? layoutXml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, `${markerComment}${backgroundXml}`)
     : layoutXml.replace(/(<p:cSld\b[^>]*>)/, `$1${markerComment}${backgroundXml}`)
+
+  if (nextLayoutXml === layoutXml) {
+    return base64
+  }
+
+  zip.file(layoutPath, nextLayoutXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXLayoutObjectProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const slidePath = slidePaths[1] ?? slidePaths[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const layoutPath = await ensurePPTXSlideLayoutPath(zip, slidePath)
+
+  if (!layoutPath) {
+    return base64
+  }
+
+  const layoutXml = await readPPTXZipText(zip, layoutPath)
+
+  if (
+    layoutXml.includes('Layout Object Probe') ||
+    !layoutXml.includes('</p:spTree>')
+  ) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9967" name="Layout Object Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="6858000" y="762000"/>',
+    '<a:ext cx="1714500" cy="571500"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="C7D2FE"/></a:solidFill>',
+    '<a:ln><a:noFill/></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextLayoutXml = layoutXml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
 
   if (nextLayoutXml === layoutXml) {
     return base64
