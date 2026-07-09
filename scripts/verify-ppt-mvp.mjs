@@ -12251,7 +12251,11 @@ async function runExportScenario(page) {
 
       return groupedTextProbe?.geometry?.x > 700 &&
         groupedTextProbe?.geometry?.y > 500 &&
-        groupedShapeProbe?.geometry?.x > groupedTextProbe.geometry.x
+        groupedTextProbe?.geometry?.rotation === 15 &&
+        groupedTextProbe.flipH === true &&
+        groupedShapeProbe?.geometry?.rotation === 15 &&
+        groupedShapeProbe.flipH === true &&
+        groupedShapeProbe.geometry.x < groupedTextProbe.geometry.x
     })
     const exportUnevenTableProbeObjects = exportElements.filter((element) =>
       element.name === 'Uneven Table Probe' &&
@@ -12589,6 +12593,10 @@ async function runExportScenario(page) {
       exportGroupedProbeNames: exportGroupedProbeObjects.map((element) => element.name).join(' | '),
       exportGroupedProbePositions: exportGroupedProbeObjects.map((element) =>
         [element.name, element.geometry?.x, element.geometry?.y].join(':')).join(' | '),
+      exportGroupedProbeRotations: exportGroupedProbeObjects.map((element) =>
+        [element.name, element.geometry?.rotation ?? ''].join(':')).join(' | '),
+      exportGroupedProbeFlips: exportGroupedProbeObjects.map((element) =>
+        [element.name, element.flipH === true ? 'flipH' : '', element.flipV === true ? 'flipV' : ''].join(':')).join(' | '),
       exportHasUnevenTableProbe: Boolean(exportUnevenTableProbe),
       exportUnevenTableProbeNames: exportUnevenTableProbeObjects.map((element) => element.name).join(' | '),
       exportUnevenTableProbeColumnWidths: (exportUnevenTableProbe?.columnWidths ?? []).join(' '),
@@ -31379,7 +31387,7 @@ async function addPPTXGroupedObjectProbe(base64) {
       '<p:nvPr/>',
       '</p:nvGrpSpPr>',
       '<p:grpSpPr>',
-      '<a:xfrm>',
+      '<a:xfrm rot="900000" flipH="1">',
       '<a:off x="7315200" y="5029200"/>',
       '<a:ext cx="2743200" cy="914400"/>',
       '<a:chOff x="0" y="0"/>',

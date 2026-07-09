@@ -71,10 +71,19 @@ type PPTXImportedAnimation = {
   objectId: string
 }
 type PPTXGroupTransform = {
+  a: number
+  b: number
+  c: number
   childOffsetX: number
   childOffsetY: number
+  d: number
+  e: number
+  f: number
+  flipH: boolean
+  flipV: boolean
   offsetX: number
   offsetY: number
+  rotation: number
   scaleX: number
   scaleY: number
 }
@@ -166,10 +175,19 @@ const PPTX_DEFAULT_PARAGRAPH_LINE_HEIGHT = 1.14
 const PPTX_DEFAULT_FILL_COLOR = '#ffffff'
 const PPTX_DEFAULT_STROKE_COLOR = '#111827'
 const PPTX_IDENTITY_GROUP_TRANSFORM: PPTXGroupTransform = {
+  a: 1,
+  b: 0,
+  c: 0,
   childOffsetX: 0,
   childOffsetY: 0,
+  d: 1,
+  e: 0,
+  f: 0,
+  flipH: false,
+  flipV: false,
   offsetX: 0,
   offsetY: 0,
+  rotation: 0,
   scaleX: 1,
   scaleY: 1,
 }
@@ -5947,18 +5965,46 @@ function readPPTXGroupTransform(group: Element): PPTXGroupTransform {
   const rawHeight = toPPTXPositiveNumber(ext?.getAttribute('cy'))
   const rawChildWidth = toPPTXPositiveNumber(childExt?.getAttribute('cx'))
   const rawChildHeight = toPPTXPositiveNumber(childExt?.getAttribute('cy'))
+  const childOffsetX = emuToPx(toPPTXNumber(childOff?.getAttribute('x')) ?? 0)
+  const childOffsetY = emuToPx(toPPTXNumber(childOff?.getAttribute('y')) ?? 0)
+  const offsetX = emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0)
+  const offsetY = emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0)
+  const width = emuToPx(rawWidth ?? rawChildWidth ?? 0)
+  const height = emuToPx(rawHeight ?? rawChildHeight ?? 0)
+  const scaleX = rawWidth !== null && rawChildWidth !== null && rawChildWidth > 0
+    ? rawWidth / rawChildWidth
+    : 1
+  const scaleY = rawHeight !== null && rawChildHeight !== null && rawChildHeight > 0
+    ? rawHeight / rawChildHeight
+    : 1
+  const rotation = readPPTXRotation(xfrm)?.rotation ?? 0
+  const flipH = isPPTXTrue(xfrm?.getAttribute('flipH'))
+  const flipV = isPPTXTrue(xfrm?.getAttribute('flipV'))
+  const matrix = createPPTXGroupTransformMatrix({
+    childOffsetX,
+    childOffsetY,
+    flipH,
+    flipV,
+    height,
+    offsetX,
+    offsetY,
+    rotation,
+    scaleX,
+    scaleY,
+    width,
+  })
 
   return {
-    childOffsetX: emuToPx(toPPTXNumber(childOff?.getAttribute('x')) ?? 0),
-    childOffsetY: emuToPx(toPPTXNumber(childOff?.getAttribute('y')) ?? 0),
-    offsetX: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
-    offsetY: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
-    scaleX: rawWidth !== null && rawChildWidth !== null && rawChildWidth > 0
-      ? rawWidth / rawChildWidth
-      : 1,
-    scaleY: rawHeight !== null && rawChildHeight !== null && rawChildHeight > 0
-      ? rawHeight / rawChildHeight
-      : 1,
+    ...matrix,
+    childOffsetX,
+    childOffsetY,
+    flipH,
+    flipV,
+    offsetX,
+    offsetY,
+    rotation,
+    scaleX,
+    scaleY,
   }
 }
 
@@ -5966,23 +6012,121 @@ function composePPTXGroupTransforms(
   parent: PPTXGroupTransform,
   child: PPTXGroupTransform,
 ): PPTXGroupTransform {
+  const matrix = multiplyPPTXGroupMatrices(parent, child)
+
   return {
+    ...matrix,
     childOffsetX: child.childOffsetX,
     childOffsetY: child.childOffsetY,
-    offsetX: transformPPTXGroupCoordinate(
-      child.offsetX,
-      parent.offsetX,
-      parent.childOffsetX,
-      parent.scaleX,
-    ),
-    offsetY: transformPPTXGroupCoordinate(
-      child.offsetY,
-      parent.offsetY,
-      parent.childOffsetY,
-      parent.scaleY,
-    ),
+    flipH: parent.flipH !== child.flipH,
+    flipV: parent.flipV !== child.flipV,
+    offsetX: matrix.e,
+    offsetY: matrix.f,
+    rotation: normalizePPTXAngle(parent.rotation + child.rotation),
     scaleX: parent.scaleX * child.scaleX,
     scaleY: parent.scaleY * child.scaleY,
+  }
+}
+
+function createPPTXGroupTransformMatrix({
+  childOffsetX,
+  childOffsetY,
+  flipH,
+  flipV,
+  height,
+  offsetX,
+  offsetY,
+  rotation,
+  scaleX,
+  scaleY,
+  width,
+}: Pick<PPTXGroupTransform,
+  | 'childOffsetX'
+  | 'childOffsetY'
+  | 'flipH'
+  | 'flipV'
+  | 'offsetX'
+  | 'offsetY'
+  | 'rotation'
+  | 'scaleX'
+  | 'scaleY'
+> & {
+  height: number
+  width: number
+}): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  const centerX = width / 2
+  const centerY = height / 2
+
+  return [
+    createPPTXTranslationMatrix(offsetX, offsetY),
+    createPPTXTranslationMatrix(centerX, centerY),
+    createPPTXRotationMatrix(rotation),
+    createPPTXScaleMatrix(flipH ? -1 : 1, flipV ? -1 : 1),
+    createPPTXTranslationMatrix(-centerX, -centerY),
+    createPPTXScaleMatrix(scaleX, scaleY),
+    createPPTXTranslationMatrix(-childOffsetX, -childOffsetY),
+  ].reduce(multiplyPPTXGroupMatrices)
+}
+
+function createPPTXTranslationMatrix(
+  x: number,
+  y: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: 1,
+    b: 0,
+    c: 0,
+    d: 1,
+    e: x,
+    f: y,
+  }
+}
+
+function createPPTXRotationMatrix(
+  angle: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  const radians = angle * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+
+  return {
+    a: cos,
+    b: sin,
+    c: -sin,
+    d: cos,
+    e: 0,
+    f: 0,
+  }
+}
+
+function createPPTXScaleMatrix(
+  x: number,
+  y: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: x,
+    b: 0,
+    c: 0,
+    d: y,
+    e: 0,
+    f: 0,
+  }
+}
+
+function multiplyPPTXGroupMatrices<
+  TLeft extends Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>,
+  TRight extends Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>,
+>(
+  left: TLeft,
+  right: TRight,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: left.a * right.a + left.c * right.b,
+    b: left.b * right.a + left.d * right.b,
+    c: left.a * right.c + left.c * right.d,
+    d: left.b * right.c + left.d * right.d,
+    e: left.a * right.e + left.c * right.f + left.e,
+    f: left.b * right.e + left.d * right.f + left.f,
   }
 }
 
@@ -5993,17 +6137,21 @@ function transformPPTXElement(
   const geometry = transformPPTXGeometry(element.geometry, transform)
 
   if (element.kind === 'line') {
+    const transformedElement = transformPPTXElementFlip(element, transform)
+
     return {
-      ...element,
-      end: transformPPTXLinePoint(element.end, transform),
+      ...transformedElement,
+      end: transformPPTXLinePoint(element.end, geometry, transform),
       geometry,
-      start: transformPPTXLinePoint(element.start, transform),
+      start: transformPPTXLinePoint(element.start, geometry, transform),
     }
   }
 
   if (element.kind === 'table') {
+    const transformedElement = transformPPTXElementFlip(element, transform)
+
     return {
-      ...element,
+      ...transformedElement,
       ...(element.columnWidths
         ? { columnWidths: transformPPTXTableTrackSizes(element.columnWidths, transform.scaleX) }
         : {}),
@@ -6014,9 +6162,29 @@ function transformPPTXElement(
     }
   }
 
+  const transformedElement = transformPPTXElementFlip(element, transform)
+
+  return {
+    ...transformedElement,
+    geometry,
+  }
+}
+
+function transformPPTXElementFlip<TElement extends PPTElement>(
+  element: TElement,
+  transform: PPTXGroupTransform,
+): TElement {
+  const flipH = element.flipH === true
+    ? !transform.flipH
+    : transform.flipH
+  const flipV = element.flipV === true
+    ? !transform.flipV
+    : transform.flipV
+
   return {
     ...element,
-    geometry,
+    flipH: flipH ? true : undefined,
+    flipV: flipV ? true : undefined,
   }
 }
 
@@ -6031,49 +6199,63 @@ function transformPPTXGeometry(
   geometry: PPTGeometry,
   transform: PPTXGroupTransform,
 ): PPTGeometry {
+  const center = transformPPTXGroupPoint({
+    x: geometry.x + geometry.w / 2,
+    y: geometry.y + geometry.h / 2,
+  }, transform)
+  const width = Math.max(1, Math.round(geometry.w * transform.scaleX))
+  const height = Math.max(1, Math.round(geometry.h * transform.scaleY))
+  const rotation = normalizePPTXAngle(
+    (geometry.rotation ?? 0) + transform.rotation,
+  )
+
   return {
-    ...geometry,
-    h: Math.max(1, Math.round(geometry.h * transform.scaleY)),
-    w: Math.max(1, Math.round(geometry.w * transform.scaleX)),
-    x: transformPPTXGroupCoordinate(
-      geometry.x,
-      transform.offsetX,
-      transform.childOffsetX,
-      transform.scaleX,
-    ),
-    y: transformPPTXGroupCoordinate(
-      geometry.y,
-      transform.offsetY,
-      transform.childOffsetY,
-      transform.scaleY,
-    ),
+    h: height,
+    ...(rotation === 0 ? {} : { rotation }),
+    w: width,
+    x: Math.round(center.x - width / 2),
+    y: Math.round(center.y - height / 2),
   }
 }
 
 function transformPPTXLinePoint(
   point: PPTLine['start'],
+  nextGeometry: PPTGeometry,
   transform: PPTXGroupTransform,
 ) {
+  const x = point.x * transform.scaleX
+  const y = point.y * transform.scaleY
+
   return {
-    x: Math.round(point.x * transform.scaleX),
-    y: Math.round(point.y * transform.scaleY),
+    x: Math.round(transform.flipH ? nextGeometry.w - x : x),
+    y: Math.round(transform.flipV ? nextGeometry.h - y : y),
   }
 }
 
-function transformPPTXGroupCoordinate(
-  value: number,
-  offset: number,
-  childOffset: number,
-  scale: number,
+function transformPPTXGroupPoint(
+  point: PPTLine['start'],
+  transform: PPTXGroupTransform,
 ) {
-  return Math.round(offset + (value - childOffset) * scale)
+  return {
+    x: transform.a * point.x + transform.c * point.y + transform.e,
+    y: transform.b * point.x + transform.d * point.y + transform.f,
+  }
 }
 
 function isPPTXIdentityGroupTransform(transform: PPTXGroupTransform) {
-  return transform.offsetX === 0 &&
-    transform.offsetY === 0 &&
+  return transform.a === 1 &&
+    transform.b === 0 &&
+    transform.c === 0 &&
+    transform.d === 1 &&
+    transform.e === 0 &&
+    transform.f === 0 &&
     transform.childOffsetX === 0 &&
     transform.childOffsetY === 0 &&
+    transform.flipH === false &&
+    transform.flipV === false &&
+    transform.offsetX === 0 &&
+    transform.offsetY === 0 &&
+    transform.rotation === 0 &&
     transform.scaleX === 1 &&
     transform.scaleY === 1
 }
