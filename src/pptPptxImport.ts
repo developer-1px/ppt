@@ -2815,7 +2815,7 @@ async function readPPTXPictureElement({
   slidePath: string
   themeColors: PPTXThemeColorMap
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTElement | null> {
   const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
   const geometry = readPPTXElementGeometry(spPr)
   const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
@@ -2826,8 +2826,21 @@ async function readPPTXPictureElement({
     zip,
   })
 
-  if (!geometry || !source) {
+  if (!geometry) {
     return null
+  }
+
+  if (!source) {
+    return readPPTXPictureMediaPlaceholderElement({
+      geometry,
+      index,
+      objectIndex,
+      pic,
+      relationships,
+      slidePath,
+      spPr,
+      themeColors,
+    })
   }
 
   const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
@@ -2854,6 +2867,159 @@ async function readPPTXPictureElement({
     ...(shadow ? { shadow } : {}),
     src: source.src,
   }
+}
+
+function readPPTXPictureMediaPlaceholderElement({
+  geometry,
+  index,
+  objectIndex,
+  pic,
+  relationships,
+  slidePath,
+  spPr,
+  themeColors,
+}: {
+  geometry: PPTGeometry
+  index: number
+  objectIndex: number
+  pic: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  spPr: Element | null
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const media = readPPTXPictureMediaInfo({
+    pic,
+    relationships,
+    slidePath,
+  })
+
+  if (!media) {
+    return null
+  }
+
+  const name = readPPTXObjectName(pic, `${media.type} ${objectIndex}`)
+  const shadow = readPPTXElementShadow(spPr, themeColors)
+  const details = [media.type, media.fileName]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(pic) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(pic) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXPictureMediaInfo({
+  pic,
+  relationships,
+  slidePath,
+}: {
+  pic: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}): { fileName: string; type: 'Audio' | 'Media' | 'Video' } | null {
+  const candidates: Array<{
+    element: Element | null
+    type: 'Audio' | 'Media' | 'Video'
+  }> = [
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'videoFile'),
+      type: 'Video',
+    },
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'audioFile'),
+      type: 'Audio',
+    },
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'media'),
+      type: 'Media',
+    },
+  ]
+  const candidate = candidates.find((item) => item.element)
+
+  if (!candidate?.element) {
+    return null
+  }
+
+  const relationshipId = readPPTXEmbedRelationshipId(candidate.element) ??
+    readPPTXLinkRelationshipId(candidate.element) ??
+    readPPTXRelationshipAttributeId(candidate.element)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : ''
+  const inferredType = candidate.type === 'Media'
+    ? readPPTXMediaTypeFromTarget(target) ?? 'Media'
+    : candidate.type
+
+  return {
+    fileName: target.split('/').at(-1)?.trim() ?? '',
+    type: inferredType,
+  }
+}
+
+function readPPTXMediaTypeFromTarget(target: string) {
+  const extension = target.split(/[?#]/)[0]?.split('.').at(-1)?.toLowerCase()
+
+  if (!extension) {
+    return null
+  }
+
+  if ([
+    'm4v',
+    'mov',
+    'mp4',
+    'mpeg',
+    'mpg',
+    'webm',
+    'wmv',
+  ].includes(extension)) {
+    return 'Video'
+  }
+
+  if ([
+    'aac',
+    'm4a',
+    'mp3',
+    'wav',
+    'wma',
+  ].includes(extension)) {
+    return 'Audio'
+  }
+
+  return null
 }
 
 async function readPPTXImageSource({

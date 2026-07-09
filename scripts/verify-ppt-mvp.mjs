@@ -13053,6 +13053,152 @@ async function runExportScenario(page) {
     },
   )
 
+  const mediaObjectPPTXBase64 = await addPPTXMediaObjectProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeMediaObjectPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      mediaObjectModelCount: elements.filter((element) =>
+        element.name === 'Video Media Probe' &&
+        element.kind === 'shape').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-video-media.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(mediaObjectPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const mediaObjectPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="Video Media Probe"][data-kind="shape"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const mediaObjects = exportImportedElements.filter((element) =>
+      element.name === 'Video Media Probe' &&
+      element.kind === 'shape')
+    const mediaObject = mediaObjects[0] ?? null
+    const paragraphs = mediaObject?.textBody?.paragraphs ?? []
+    const paragraphTexts = paragraphs.map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeShape: activeShape?.getAttribute('data-shape') ?? '',
+      activeText: activeShape?.textContent ?? '',
+      activeTextAutofit: activeShape?.getAttribute('data-ppt-text-autofit') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      mediaObjectFill: mediaObject?.fill?.color ?? '',
+      mediaObjectGeometry: mediaObject?.geometry ?? null,
+      mediaObjectModelCount: mediaObjects.length,
+      mediaObjectShape: mediaObject?.shape ?? '',
+      mediaObjectStrokeDash: mediaObject?.stroke?.dash ?? '',
+      mediaObjectTextAutofit: mediaObject?.textAutoFit ?? '',
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      paragraphTexts,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX video media object as editable placeholder shape through OpenXML import',
+    mediaObjectPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      mediaObjectPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      mediaObjectPPTXImportState.fileName === 'external-openxml-video-media.pptx' &&
+      mediaObjectPPTXImportState.importedCount === beforeMediaObjectPPTXDrop.slideCount &&
+      mediaObjectPPTXImportState.sourceSlideCount === beforeMediaObjectPPTXDrop.slideCount &&
+      mediaObjectPPTXImportState.slideCount === beforeMediaObjectPPTXDrop.slideCount * 2 &&
+      mediaObjectPPTXImportState.activeName.includes('Copy') &&
+      mediaObjectPPTXImportState.mediaObjectModelCount >
+        beforeMediaObjectPPTXDrop.mediaObjectModelCount &&
+      mediaObjectPPTXImportState.mediaObjectModelCount === 1 &&
+      mediaObjectPPTXImportState.mediaObjectShape === 'rect' &&
+      mediaObjectPPTXImportState.activeShape === 'rect' &&
+      mediaObjectPPTXImportState.mediaObjectTextAutofit === 'resizeShapeToFitText' &&
+      mediaObjectPPTXImportState.activeTextAutofit === 'resizeShapeToFitText' &&
+      mediaObjectPPTXImportState.mediaObjectFill === '#f8fafc' &&
+      mediaObjectPPTXImportState.mediaObjectStrokeDash === 'dash' &&
+      JSON.stringify(mediaObjectPPTXImportState.paragraphTexts) === JSON.stringify([
+        'Video Media Probe',
+        'Video',
+        'pptx-media-probe.mp4',
+      ]) &&
+      mediaObjectPPTXImportState.activeText.includes('Video Media Probe') &&
+      mediaObjectPPTXImportState.activeText.includes('pptx-media-probe.mp4') &&
+      mediaObjectPPTXImportState.mediaObjectGeometry?.x === 980 &&
+      mediaObjectPPTXImportState.mediaObjectGeometry?.y === 500 &&
+      mediaObjectPPTXImportState.mediaObjectGeometry?.w === 220 &&
+      mediaObjectPPTXImportState.mediaObjectGeometry?.h === 120,
+    {
+      beforeMediaObjectPPTXDrop,
+      mediaObjectPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterMediaObjectPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes video media PPTX drop probes before export scenario continues',
+    afterMediaObjectPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterMediaObjectPPTXDropCleanup.slideCount === beforeMediaObjectPPTXDrop.slideCount,
+    {
+      afterMediaObjectPPTXDropCleanup,
+      beforeMediaObjectPPTXDrop,
+    },
+  )
+
   const commentsPPTXBase64 = await addPPTXCommentsProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -30811,6 +30957,67 @@ async function addPPTXOleObjectProbe(base64) {
     '</p:graphicFrame>',
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${oleFrameXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXMediaObjectProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Video Media Probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXExternalRelationship({
+    sourcePath: slidePath,
+    target: 'https://example.com/pptx-media-probe.mp4',
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/video',
+    zip,
+  })
+  const mediaPictureXml = [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9989" name="Video Media Probe" descr="Video media alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr>',
+    `<a:videoFile r:link="${relationshipId}"/>`,
+    '</p:nvPr>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9334500" y="4762500"/>',
+    '<a:ext cx="2095500" cy="1143000"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '</p:pic>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${mediaPictureXml}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64
