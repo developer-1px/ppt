@@ -641,6 +641,7 @@ import {
   createPPTCanvasCssBoundsTransform,
   createPPTCanvasSvgFreehandPathData,
   createPPTCanvasSvgPathData,
+  createPPTCanvasSvgPathSegmentData,
   escapePPTCanvasXmlAttribute,
 } from './pptCanvasRendererAdapter'
 import {
@@ -36749,9 +36750,11 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
 }
 
 function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
-  const pathData = element.pointMode === 'polyline'
-    ? createPPTCanvasSvgPathData(element.points)
-    : createPPTCanvasSvgFreehandPathData(element.points)
+  const pathData = element.segments && element.segments.length > 0
+    ? createPPTCanvasSvgPathSegmentData(element.segments)
+    : element.pointMode === 'polyline'
+      ? createPPTCanvasSvgPathData(element.points)
+      : createPPTCanvasSvgFreehandPathData(element.points)
 
   return (
     <svg

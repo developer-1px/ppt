@@ -172,6 +172,22 @@ const PPTLinePointSchema = z.object({
   x: z.number(),
   y: z.number(),
 })
+const PPTFreeformPathSegmentSchema = z.discriminatedUnion('type', [
+  z.object({
+    point: PPTLinePointSchema,
+    type: z.literal('move'),
+  }),
+  z.object({
+    point: PPTLinePointSchema,
+    type: z.literal('line'),
+  }),
+  z.object({
+    control1: PPTLinePointSchema,
+    control2: PPTLinePointSchema,
+    point: PPTLinePointSchema,
+    type: z.literal('cubic'),
+  }),
+])
 
 const PPTLineConnectionSchema = z.object({
   anchor: z.enum(['bottom', 'center', 'left', 'right', 'top']),
@@ -196,6 +212,7 @@ const PPTFreeformSchema = PPTElementBaseSchema.extend({
   kind: z.literal('freeform'),
   pointMode: z.enum(['freehand', 'polyline']).optional(),
   points: z.array(PPTLinePointSchema).min(1),
+  segments: z.array(PPTFreeformPathSegmentSchema).optional(),
   style: PPTTextStyleSchema.optional(),
   stroke: PPTStrokeSchema,
   textAutoFit: PPTTextAutoFitSchema.optional(),
@@ -286,6 +303,8 @@ export type PPTLineMarker = z.infer<typeof PPTLineMarkerSchema>
 export type PPTLinePoint = z.infer<typeof PPTLinePointSchema>
 export type PPTLineRoute = z.infer<typeof PPTLineRouteSchema>
 export type PPTFreeform = z.infer<typeof PPTFreeformSchema>
+export type PPTFreeformPathSegment =
+  z.infer<typeof PPTFreeformPathSegmentSchema>
 export type PPTTable = z.infer<typeof PPTTableSchema>
 export type PPTTableCellBorders = z.infer<typeof PPTTableCellBordersSchema>
 export type PPTTableCellStyle = z.infer<typeof PPTTableCellStyleSchema>

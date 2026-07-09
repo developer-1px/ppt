@@ -60,6 +60,7 @@ import {
   createPPTCanvasSvgBoundsTransform,
   createPPTCanvasSvgFreehandPathData,
   createPPTCanvasSvgPathData,
+  createPPTCanvasSvgPathSegmentData,
   escapePPTCanvasXmlAttribute,
   formatPPTCanvasSvgNumber,
 } from './pptCanvasRendererAdapter'
@@ -1555,6 +1556,35 @@ function getPPTLineSVGPath(element: PPTLine) {
 }
 
 function getPPTFreeformWorldPathData(element: PPTFreeform) {
+  if (element.segments && element.segments.length > 0) {
+    return createPPTCanvasSvgPathSegmentData(element.segments.map((segment) => {
+      const point = {
+        x: element.geometry.x + segment.point.x,
+        y: element.geometry.y + segment.point.y,
+      }
+
+      if (segment.type !== 'cubic') {
+        return {
+          point,
+          type: segment.type,
+        }
+      }
+
+      return {
+        control1: {
+          x: element.geometry.x + segment.control1.x,
+          y: element.geometry.y + segment.control1.y,
+        },
+        control2: {
+          x: element.geometry.x + segment.control2.x,
+          y: element.geometry.y + segment.control2.y,
+        },
+        point,
+        type: segment.type,
+      }
+    }))
+  }
+
   const points = element.points.map((point) => ({
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
@@ -1566,6 +1596,10 @@ function getPPTFreeformWorldPathData(element: PPTFreeform) {
 }
 
 function getPPTFreeformPathData(element: PPTFreeform) {
+  if (element.segments && element.segments.length > 0) {
+    return createPPTCanvasSvgPathSegmentData(element.segments)
+  }
+
   return element.pointMode === 'polyline'
     ? createPPTCanvasSvgPathData(element.points)
     : createPPTCanvasSvgFreehandPathData(element.points)

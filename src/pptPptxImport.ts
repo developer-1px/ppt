@@ -11,6 +11,7 @@ import {
   type PPTElementShadow,
   type PPTFill,
   type PPTFreeform,
+  type PPTFreeformPathSegment,
   type PPTGeometry,
   type PPTImage,
   type PPTLine,
@@ -135,6 +136,10 @@ type PPTXSpreadsheetCellRef = {
 type PPTXRatioPoint = {
   x: number
   y: number
+}
+type PPTXCustomGeometryPathData = {
+  points: PPTLine['start'][]
+  segments: PPTFreeformPathSegment[]
 }
 
 function createPPTXRegularPolygonRatios(
@@ -3797,9 +3802,9 @@ function readPPTXCustomGeometryFreeformElement({
   textBody: PPTTextBody | null
   textStyle: PPTTextStyle | undefined
 }): PPTFreeform | null {
-  const points = readPPTXCustomGeometryPoints(spPr, geometry)
+  const pathData = readPPTXCustomGeometryData(spPr, geometry)
 
-  if (points.length < 2) {
+  if (!pathData || pathData.points.length < 2) {
     return null
   }
 
@@ -3808,8 +3813,9 @@ function readPPTXCustomGeometryFreeformElement({
     geometry,
     id,
     name,
-    points,
+    points: pathData.points,
     relationships,
+    segments: pathData.segments,
     shadow,
     sp,
     spPr,
@@ -3877,6 +3883,7 @@ function createPPTXShapeFreeformElement({
   name,
   points,
   relationships,
+  segments,
   shadow,
   sp,
   spPr,
@@ -3891,6 +3898,7 @@ function createPPTXShapeFreeformElement({
   name: string
   points: readonly PPTLine['start'][]
   relationships: PPTXRelationshipMap
+  segments?: readonly PPTFreeformPathSegment[]
   shadow: PPTElementShadow | null
   sp: Element
   spPr: Element | null
@@ -3916,6 +3924,8 @@ function createPPTXShapeFreeformElement({
     name,
     pointMode: 'polyline',
     points: points.map((point) => ({ ...point })),
+    ...(segments && segments.length > 0 ? { segments: segments.map((segment) =>
+      copyPPTFreeformPathSegment(segment)) } : {}),
     ...(shadow ? { shadow } : {}),
     stroke: stroke ?? fallbackStroke,
     ...(textBody ? {
@@ -3941,24 +3951,28 @@ function readPPTXPresetGeometryFreeformPoints(
     : []
 }
 
-function readPPTXCustomGeometryPoints(
+function readPPTXCustomGeometryData(
   spPr: Element | null,
   geometry: PPTGeometry,
-) {
+): PPTXCustomGeometryPathData | null {
   const customGeometry = getDirectPPTXChildByLocalName(spPr, 'custGeom')
   const pathList = getDirectPPTXChildByLocalName(customGeometry, 'pathLst')
-  const path = getDirectPPTXChildByLocalName(pathList, 'path')
+  const paths = getDirectPPTXChildrenByLocalName(pathList, 'path')
 
-  if (!path) {
-    return []
+  if (paths.length === 0) {
+    return null
   }
 
-  const rawPoints = readPPTXCustomGeometryPathPoints(path)
+  const rawPathData = paths
+    .map(readPPTXCustomGeometryPathData)
+    .filter((pathData) => pathData.points.length >= 2)
 
-  if (rawPoints.length < 2) {
-    return []
+  if (rawPathData.length === 0) {
+    return null
   }
 
+  const rawPoints = rawPathData.flatMap((pathData) => pathData.points)
+  const rawSegments = rawPathData.flatMap((pathData) => pathData.segments)
   const bounds = rawPoints.reduce(
     (acc, point) => ({
       maxX: Math.max(acc.maxX, point.x),
@@ -3973,19 +3987,28 @@ function readPPTXCustomGeometryPoints(
       minY: rawPoints[0]?.y ?? 0,
     },
   )
-  const rawPathWidth = toPPTXPositiveNumber(path.getAttribute('w'))
-  const rawPathHeight = toPPTXPositiveNumber(path.getAttribute('h'))
-  const pathWidth = rawPathWidth && rawPathWidth > 0 ? rawPathWidth : null
-  const pathHeight = rawPathHeight && rawPathHeight > 0 ? rawPathHeight : null
+  const pathWidths = paths
+    .map((path) => toPPTXPositiveNumber(path.getAttribute('w')))
+    .filter((value): value is number => value !== null && value > 0)
+  const pathHeights = paths
+    .map((path) => toPPTXPositiveNumber(path.getAttribute('h')))
+    .filter((value): value is number => value !== null && value > 0)
+  const pathWidth = pathWidths.length > 0 ? Math.max(...pathWidths) : null
+  const pathHeight = pathHeights.length > 0 ? Math.max(...pathHeights) : null
   const sourceWidth = pathWidth ?? Math.max(1, bounds.maxX - bounds.minX)
   const sourceHeight = pathHeight ?? Math.max(1, bounds.maxY - bounds.minY)
   const originX = pathWidth === null ? bounds.minX : 0
   const originY = pathHeight === null ? bounds.minY : 0
-
-  return rawPoints.map((point) => ({
+  const scalePoint = (point: PPTLine['start']) => ({
     x: ((point.x - originX) / sourceWidth) * geometry.w,
     y: ((point.y - originY) / sourceHeight) * geometry.h,
-  }))
+  })
+
+  return {
+    points: rawPoints.map(scalePoint),
+    segments: rawSegments.map((segment) =>
+      scalePPTXCustomGeometryPathSegment(segment, scalePoint)),
+  }
 }
 
 const PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS = 4
@@ -3993,14 +4016,16 @@ const PPTX_CUSTOM_GEOMETRY_ARC_SAMPLE_DEGREES = 15
 const PPTX_CUSTOM_GEOMETRY_ARC_MAX_SAMPLE_STEPS = 32
 const PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE = 60_000
 
-function readPPTXCustomGeometryPathPoints(path: Element) {
+function readPPTXCustomGeometryPathData(path: Element): PPTXCustomGeometryPathData {
   const points: PPTLine['start'][] = []
+  const segments: PPTFreeformPathSegment[] = []
   let firstPoint: PPTLine['start'] | null = null
   let currentPoint: PPTLine['start'] | null = null
 
   for (const command of Array.from(path.children)) {
     if (command.localName === 'close' && firstPoint) {
       points.push(firstPoint)
+      segments.push({ point: firstPoint, type: 'line' })
       currentPoint = firstPoint
       continue
     }
@@ -4013,6 +4038,12 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
 
       if (arcPoints.length > 0) {
         points.push(...arcPoints)
+        segments.push(
+          ...arcPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
+        )
         currentPoint = arcPoints.at(-1) ?? currentPoint
         continue
       }
@@ -4029,6 +4060,7 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
       firstPoint = endpoint
       currentPoint = endpoint
       points.push(endpoint)
+      segments.push({ point: endpoint, type: 'move' })
       continue
     }
 
@@ -4036,12 +4068,19 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
       const controlPoint = commandPoints.at(0) ?? null
 
       if (controlPoint) {
-        points.push(
-          ...approximatePPTXCustomGeometryQuadraticBezierPoints(
+        const sampledPoints =
+          approximatePPTXCustomGeometryQuadraticBezierPoints(
             currentPoint,
             controlPoint,
             endpoint,
-          ),
+          )
+
+        points.push(...sampledPoints)
+        segments.push(
+          ...sampledPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
         )
         currentPoint = endpoint
         continue
@@ -4053,13 +4092,19 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
       const secondControlPoint = commandPoints.at(1) ?? null
 
       if (firstControlPoint && secondControlPoint) {
-        points.push(
-          ...approximatePPTXCustomGeometryCubicBezierPoints(
-            currentPoint,
-            firstControlPoint,
-            secondControlPoint,
-            endpoint,
-          ),
+        const sampledPoints = approximatePPTXCustomGeometryCubicBezierPoints(
+          currentPoint,
+          firstControlPoint,
+          secondControlPoint,
+          endpoint,
+        )
+
+        points.push(...sampledPoints)
+        segments.push(
+          ...sampledPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
         )
         currentPoint = endpoint
         continue
@@ -4067,10 +4112,11 @@ function readPPTXCustomGeometryPathPoints(path: Element) {
     }
 
     points.push(endpoint)
+    segments.push({ point: endpoint, type: 'line' })
     currentPoint = endpoint
   }
 
-  return points
+  return { points, segments }
 }
 
 function readPPTXCustomGeometryCommandPoints(command: Element) {
@@ -4089,6 +4135,43 @@ function readPPTXCustomGeometryCommandPoints(command: Element) {
 
     return x === null || y === null ? [] : [{ x, y }]
   })
+}
+
+function scalePPTXCustomGeometryPathSegment(
+  segment: PPTFreeformPathSegment,
+  scalePoint: (point: PPTLine['start']) => PPTLine['start'],
+): PPTFreeformPathSegment {
+  if (segment.type !== 'cubic') {
+    return {
+      point: scalePoint(segment.point),
+      type: segment.type,
+    }
+  }
+
+  return {
+    control1: scalePoint(segment.control1),
+    control2: scalePoint(segment.control2),
+    point: scalePoint(segment.point),
+    type: segment.type,
+  }
+}
+
+function copyPPTFreeformPathSegment(
+  segment: PPTFreeformPathSegment,
+): PPTFreeformPathSegment {
+  if (segment.type !== 'cubic') {
+    return {
+      point: { ...segment.point },
+      type: segment.type,
+    }
+  }
+
+  return {
+    control1: { ...segment.control1 },
+    control2: { ...segment.control2 },
+    point: { ...segment.point },
+    type: segment.type,
+  }
 }
 
 function approximatePPTXCustomGeometryQuadraticBezierPoints(

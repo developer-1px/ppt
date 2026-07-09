@@ -13136,6 +13136,7 @@ async function runExportScenario(page) {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activePathFill: activeFreeformPath?.getAttribute('fill') ?? '',
       activePathD: activeFreeformPath?.getAttribute('d') ?? '',
+      activePathMoveCount: (activeFreeformPath?.getAttribute('d') ?? '').match(/M /g)?.length ?? 0,
       activePointCount: Number(activeFreeform?.getAttribute('data-ppt-freeform-points') ?? 0),
       activePointMode: activeFreeform?.getAttribute('data-ppt-freeform-point-mode') ?? '',
       activeFillOpacity: activeFreeform?.getAttribute('data-ppt-fill-opacity') ?? '',
@@ -13149,6 +13150,7 @@ async function runExportScenario(page) {
       probeModelCount: freeformObjects.length,
       probePointMode: probe?.pointMode ?? '',
       probePointCount: probe?.points?.length ?? 0,
+      probeSegmentCount: probe?.segments?.length ?? 0,
       probeStrokeColor: probe?.stroke?.color ?? '',
       probeStrokeWidth: probe?.stroke?.width ?? null,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
@@ -13167,11 +13169,13 @@ async function runExportScenario(page) {
       customGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       customGeometryFreeformPPTXImportState.probeModelCount >
         beforeCustomGeometryFreeformPPTXDrop.customGeometryFreeformModelCount &&
-      customGeometryFreeformPPTXImportState.probePointCount >= 16 &&
-      customGeometryFreeformPPTXImportState.activePointCount >= 16 &&
+      customGeometryFreeformPPTXImportState.probePointCount >= 22 &&
+      customGeometryFreeformPPTXImportState.activePointCount >= 22 &&
+      customGeometryFreeformPPTXImportState.probeSegmentCount >= 22 &&
       customGeometryFreeformPPTXImportState.probePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePointMode === 'polyline' &&
       customGeometryFreeformPPTXImportState.activePathD.includes('M ') &&
+      customGeometryFreeformPPTXImportState.activePathMoveCount >= 2 &&
       customGeometryFreeformPPTXImportState.activePathD.includes('L ') &&
       !customGeometryFreeformPPTXImportState.activePathD.includes('Q ') &&
       customGeometryFreeformPPTXImportState.activePathFill !== 'none' &&
@@ -33662,6 +33666,13 @@ async function addPPTXCustomGeometryFreeformProbe(base64) {
     '</a:cubicBezTo>',
     '<a:arcTo wR="5400" hR="5400" stAng="5400000" swAng="5400000"/>',
     '<a:lnTo><a:pt x="0" y="10800"/></a:lnTo>',
+    '<a:close/>',
+    '</a:path>',
+    '<a:path w="21600" h="21600">',
+    '<a:moveTo><a:pt x="3600" y="3600"/></a:moveTo>',
+    '<a:lnTo><a:pt x="7200" y="3600"/></a:lnTo>',
+    '<a:lnTo><a:pt x="7200" y="7200"/></a:lnTo>',
+    '<a:lnTo><a:pt x="3600" y="7200"/></a:lnTo>',
     '<a:close/>',
     '</a:path>',
     '</a:pathLst>',
