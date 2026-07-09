@@ -95,13 +95,14 @@ type PPTXThemeLineStyle = Partial<PPTStroke>
 type PPTXThemeStyleMap = {
   effectStyles: ReadonlyMap<number, Element>
   fillStyles: ReadonlyMap<number, Element>
-  lineStyles: ReadonlyMap<number, PPTXThemeLineStyle>
+  lineStyles: ReadonlyMap<number, Element>
 }
 type PPTXThemeContext = {
   colors: PPTXThemeColorMap
   fonts: PPTXThemeFontMap
   styles: PPTXThemeStyleMap
 }
+type PPTXThemeColorMapping = Readonly<Record<string, string>>
 type PPTXPlaceholderRef = {
   idx?: string
   type?: string
@@ -874,7 +875,6 @@ function readPPTXThemeTypeface(
 async function readPPTXOpenXmlThemeStyles(
   zip: JSZip,
   themePath: string | null,
-  themeColors: PPTXThemeColorMap,
 ): Promise<PPTXThemeStyleMap> {
   const xml = themePath ? await zip.file(themePath)?.async('string') : null
   const doc = xml ? parsePPTXXmlDocument(xml) : null
@@ -891,7 +891,7 @@ async function readPPTXOpenXmlThemeStyles(
   )
   const effectStyles = new Map<number, Element>()
   const fillStyles = readPPTXThemeFillStyles(formatScheme)
-  const lineStyles = new Map<number, PPTXThemeLineStyle>()
+  const lineStyles = new Map<number, Element>()
 
   readPPTXThemeEffectStyles(effectStyleList)
     .forEach((effectStyle, index) => {
@@ -900,11 +900,7 @@ async function readPPTXOpenXmlThemeStyles(
 
   getDirectPPTXChildrenByLocalName(lineStyleList, 'ln')
     .forEach((line, index) => {
-      const lineStyle = readPPTXThemeLineStyle(line, themeColors)
-
-      if (lineStyle) {
-        lineStyles.set(index + 1, lineStyle)
-      }
+      lineStyles.set(index + 1, line)
     })
 
   return { effectStyles, fillStyles, lineStyles }
@@ -916,7 +912,7 @@ async function readPPTXOpenXmlThemeContext(
 ): Promise<PPTXThemeContext> {
   const colors = await readPPTXOpenXmlThemeColors(zip, themePath)
   const fonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
-  const styles = await readPPTXOpenXmlThemeStyles(zip, themePath, colors)
+  const styles = await readPPTXOpenXmlThemeStyles(zip, themePath)
 
   return { colors, fonts, styles }
 }
@@ -1091,6 +1087,106 @@ async function readPPTXSlideThemePath({
   })
 }
 
+async function readPPTXSlideColorMapping({
+  doc,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  doc: Document | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXThemeColorMapping | null> {
+  const slideMapping = readPPTXColorMappingOverride(doc)
+
+  if (slideMapping) {
+    return slideMapping
+  }
+
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutXml = await zip.file(layoutPath)?.async('string') ?? ''
+  const layoutDoc = layoutXml ? parsePPTXXmlDocument(layoutXml) : null
+  const layoutMapping = readPPTXColorMappingOverride(layoutDoc)
+
+  if (layoutMapping) {
+    return layoutMapping
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (!masterPath) {
+    return null
+  }
+
+  const masterXml = await zip.file(masterPath)?.async('string') ?? ''
+  const masterDoc = masterXml ? parsePPTXXmlDocument(masterXml) : null
+
+  return readPPTXColorMappingElement(
+    masterDoc ? getFirstPPTXDescendantByLocalName(masterDoc, 'clrMap') : null,
+  )
+}
+
+function readPPTXColorMappingOverride(
+  doc: Document | null,
+): PPTXThemeColorMapping | null {
+  const colorMapOverride = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'clrMapOvr')
+    : null
+  const overrideMapping = getDirectPPTXChildByLocalName(
+    colorMapOverride,
+    'overrideClrMapping',
+  )
+
+  return readPPTXColorMappingElement(overrideMapping)
+}
+
+function readPPTXColorMappingElement(
+  element: Element | null,
+): PPTXThemeColorMapping | null {
+  const entries = Array.from(element?.attributes ?? [])
+    .map((attribute) => [
+      attribute.localName,
+      attribute.value.trim(),
+    ])
+    .filter((entry) => entry[0] && entry[1])
+
+  return entries.length > 0 ? Object.fromEntries(entries) : null
+}
+
+function applyPPTXThemeColorMapping(
+  themeColors: PPTXThemeColorMap,
+  mapping: PPTXThemeColorMapping | null,
+): PPTXThemeColorMap {
+  if (!mapping) {
+    return themeColors
+  }
+
+  const colors = { ...themeColors }
+
+  for (const [alias, source] of Object.entries(mapping)) {
+    colors[alias] = themeColors[source] ?? themeColors[alias] ?? colors[alias]
+  }
+
+  return colors
+}
+
 function readPPTXThemeColorNode(colorNode: Element) {
   const srgbColor = getDirectPPTXChildByLocalName(colorNode, 'srgbClr')
   const scrgbColor = getDirectPPTXChildByLocalName(colorNode, 'scrgbClr')
@@ -1171,7 +1267,16 @@ async function readPPTXOpenXmlSlide({
     themeContextByPath,
     zip,
   })
-  const themeColors = themeContext.colors
+  const themeColorMapping = await readPPTXSlideColorMapping({
+    doc,
+    relationships,
+    slidePath: path,
+    zip,
+  })
+  const themeColors = applyPPTXThemeColorMapping(
+    themeContext.colors,
+    themeColorMapping,
+  )
   const themeFonts = themeContext.fonts
   const themeStyles = themeContext.styles
   const placeholderGeometries = await readPPTXSlideLayoutPlaceholderGeometries({
@@ -5856,7 +5961,11 @@ function readPPTXStyleStroke(
   }
 
   const fill = readPPTXColorFill(lineRef, themeColors)
-  const styleStroke = readPPTXStyleReferenceLineStyle(lineRef, themeStyles)
+  const styleStroke = readPPTXStyleReferenceLineStyle(
+    lineRef,
+    themeColors,
+    themeStyles,
+  )
   const color = fill?.color ?? styleStroke?.color
 
   return color || styleStroke
@@ -5892,11 +6001,13 @@ function readPPTXStyleShadow(
 
 function readPPTXStyleReferenceLineStyle(
   lineRef: Element | null,
+  themeColors: PPTXThemeColorMap,
   themeStyles: PPTXThemeStyleMap,
 ): PPTXThemeLineStyle | undefined {
   const index = toPPTXPositiveNumber(lineRef?.getAttribute('idx'))
+  const line = index === null ? null : themeStyles.lineStyles.get(index)
 
-  return index === null ? undefined : themeStyles.lineStyles.get(index)
+  return line ? readPPTXThemeLineStyle(line, themeColors) ?? undefined : undefined
 }
 
 function readPPTXStrokeLine(

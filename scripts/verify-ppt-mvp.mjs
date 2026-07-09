@@ -332,6 +332,10 @@ async function runPPTXRenderScenario(page) {
     await readPPTXThemeColorSpaceProbeState(page)
   const openXmlPPTXSlideSpecificThemeState =
     await readPPTXSlideSpecificThemeProbeState(page)
+  const openXmlPPTXColorMapState =
+    await readPPTXColorMapProbeState(page)
+  const openXmlPPTXColorMapStyleState =
+    await readPPTXColorMapStyleProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -572,6 +576,38 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXSlideSpecificThemeState.activeStroke.includes('68'),
     {
       openXmlPPTXSlideSpecificThemeState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX color map overrides for viewer rendering',
+    openXmlPPTXColorMapState.modelCount === 1 &&
+      openXmlPPTXColorMapState.fill === '#118833' &&
+      openXmlPPTXColorMapState.stroke === '#cc3344' &&
+      openXmlPPTXColorMapState.activeExists &&
+      openXmlPPTXColorMapState.activeFill.includes('17') &&
+      openXmlPPTXColorMapState.activeFill.includes('136') &&
+      openXmlPPTXColorMapState.activeFill.includes('51') &&
+      openXmlPPTXColorMapState.activeStroke.includes('204') &&
+      openXmlPPTXColorMapState.activeStroke.includes('51') &&
+      openXmlPPTXColorMapState.activeStroke.includes('68'),
+    {
+      openXmlPPTXColorMapState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX color mapped theme line styles for viewer rendering',
+    openXmlPPTXColorMapStyleState.modelCount === 1 &&
+      openXmlPPTXColorMapStyleState.fill === '#cc3344' &&
+      openXmlPPTXColorMapStyleState.stroke === '#118833' &&
+      openXmlPPTXColorMapStyleState.activeExists &&
+      openXmlPPTXColorMapStyleState.activeFill.includes('204') &&
+      openXmlPPTXColorMapStyleState.activeFill.includes('51') &&
+      openXmlPPTXColorMapStyleState.activeFill.includes('68') &&
+      openXmlPPTXColorMapStyleState.activeStroke.includes('17') &&
+      openXmlPPTXColorMapStyleState.activeStroke.includes('136') &&
+      openXmlPPTXColorMapStyleState.activeStroke.includes('51'),
+    {
+      openXmlPPTXColorMapStyleState,
     },
   )
 
@@ -11598,6 +11634,16 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#118833' &&
         element.stroke?.color === '#cc3344').length,
+      colorMapProbeModelCount: elements.filter((element) =>
+        element.name === 'Color Map Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#118833' &&
+        element.stroke?.color === '#cc3344').length,
+      colorMapStyleProbeModelCount: elements.filter((element) =>
+        element.name === 'Color Map Style Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#cc3344' &&
+        element.stroke?.color === '#118833').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11881,6 +11927,16 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#118833' &&
       element.stroke?.color === '#cc3344')
+    const exportColorMapProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Color Map Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#118833' &&
+      element.stroke?.color === '#cc3344')
+    const exportColorMapStyleProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Color Map Style Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#cc3344' &&
+      element.stroke?.color === '#118833')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12242,6 +12298,14 @@ async function runExportScenario(page) {
       exportSlideSpecificThemeProbeFill: exportSlideSpecificThemeProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportSlideSpecificThemeProbeModelCount: exportSlideSpecificThemeProbeObjects.length,
       exportSlideSpecificThemeProbeStroke: exportSlideSpecificThemeProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasColorMapProbe: exportColorMapProbeObjects.length > 0,
+      exportColorMapProbeFill: exportColorMapProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportColorMapProbeModelCount: exportColorMapProbeObjects.length,
+      exportColorMapProbeStroke: exportColorMapProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasColorMapStyleProbe: exportColorMapStyleProbeObjects.length > 0,
+      exportColorMapStyleProbeFill: exportColorMapStyleProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportColorMapStyleProbeModelCount: exportColorMapStyleProbeObjects.length,
+      exportColorMapStyleProbeStroke: exportColorMapStyleProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12530,6 +12594,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportThemeColorSpaceProbeModelCount > beforeOpenXmlPPTXDrop.themeColorSpaceProbeModelCount &&
       openXmlPPTXImportState.exportHasSlideSpecificThemeProbe &&
       openXmlPPTXImportState.exportSlideSpecificThemeProbeModelCount > beforeOpenXmlPPTXDrop.slideSpecificThemeProbeModelCount &&
+      openXmlPPTXImportState.exportHasColorMapProbe &&
+      openXmlPPTXImportState.exportColorMapProbeModelCount > beforeOpenXmlPPTXDrop.colorMapProbeModelCount &&
+      openXmlPPTXImportState.exportHasColorMapStyleProbe &&
+      openXmlPPTXImportState.exportColorMapStyleProbeModelCount > beforeOpenXmlPPTXDrop.colorMapStyleProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -32069,7 +32137,23 @@ async function addPPTXSlideSpecificThemeProbe(base64) {
     '.xml',
   )
   const layoutXml = await readPPTXZipText(zip, layoutPath)
-  const masterXml = await readPPTXZipText(zip, masterPath)
+  const masterXml = setPPTXMasterColorMapXml(
+    await readPPTXZipText(zip, masterPath),
+    [
+      ['bg1', 'accent1'],
+      ['tx1', 'dk1'],
+      ['bg2', 'lt2'],
+      ['tx2', 'accent2'],
+      ['accent1', 'accent1'],
+      ['accent2', 'accent2'],
+      ['accent3', 'accent3'],
+      ['accent4', 'accent4'],
+      ['accent5', 'accent5'],
+      ['accent6', 'accent6'],
+      ['hlink', 'hlink'],
+      ['folHlink', 'folHlink'],
+    ],
+  )
   const themeXml = await readPPTXZipText(zip, themePath)
   const layoutRelsXml = await readPPTXZipText(
     zip,
@@ -32079,12 +32163,27 @@ async function addPPTXSlideSpecificThemeProbe(base64) {
     zip,
     getPPTXRelationshipsPath(masterPath),
   )
-  const nextThemeXml = setPPTXThemeFontXml(
+  const nextThemeColorsXml = setPPTXThemeSchemeColorXml(
     setPPTXThemeSchemeColorXml(
-      setPPTXThemeSchemeColorXml(themeXml, 'accent1', '118833'),
-      'accent2',
-      'CC3344',
+      themeXml,
+      'accent1',
+      '118833',
     ),
+    'accent2',
+    'CC3344',
+  )
+  const nextThemeStyleXml = setPPTXThemeLineStyleXml(
+    nextThemeColorsXml,
+    1,
+    [
+      '<a:ln w="19050">',
+      '<a:solidFill><a:schemeClr val="bg1"/></a:solidFill>',
+      '<a:prstDash val="solid"/>',
+      '</a:ln>',
+    ].join(''),
+  )
+  const nextThemeXml = setPPTXThemeFontXml(
+    nextThemeStyleXml,
     'minorFont',
     'latin',
     'Slide Theme Probe Font',
@@ -32115,7 +32214,51 @@ async function addPPTXSlideSpecificThemeProbe(base64) {
     '</p:txBody>',
     '</p:sp>',
   ].join('')
-  const nextSlideXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+  const colorMapProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9997" name="Color Map Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9601200" y="5715000"/>',
+    '<a:ext cx="1828800" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:schemeClr val="bg1"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:schemeClr val="tx2"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const colorMapStyleProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9996" name="Color Map Style Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9601200" y="6477000"/>',
+    '<a:ext cx="1828800" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:schemeClr val="tx2"/></a:solidFill>',
+    '</p:spPr>',
+    '<p:style>',
+    '<a:lnRef idx="1"><a:schemeClr val="phClr"/></a:lnRef>',
+    '<a:fillRef idx="0"><a:schemeClr val="phClr"/></a:fillRef>',
+    '<a:effectRef idx="0"><a:schemeClr val="phClr"/></a:effectRef>',
+    '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>',
+    '</p:style>',
+    '</p:sp>',
+  ].join('')
+  const nextSlideXml = xml.replace(
+    '</p:spTree>',
+    `${probeXml}${colorMapProbeXml}${colorMapStyleProbeXml}</p:spTree>`,
+  )
 
   zip.file(nextLayoutPath, layoutXml)
   zip.file(nextMasterPath, masterXml)
@@ -32510,6 +32653,20 @@ function setPPTXThemeSchemeColorRawXml(xml, localName, colorXml) {
   }
 
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
+}
+
+function setPPTXMasterColorMapXml(xml, entries) {
+  const attributes = entries
+    .map(([name, value]) =>
+      `${name}="${escapePPTXXmlAttribute(value)}"`)
+    .join(' ')
+  const colorMapXml = `<p:clrMap ${attributes}/>`
+
+  if (/<p:clrMap\b[^>]*\/>/.test(xml)) {
+    return xml.replace(/<p:clrMap\b[^>]*\/>/, colorMapXml)
+  }
+
+  return xml.replace(/(<p:sldMaster\b[^>]*>)/, `$1${colorMapXml}`)
 }
 
 function setPPTXThemeLineStyleXml(xml, index, lineXml) {
@@ -35929,6 +36086,17 @@ async function readPPTXSlideSpecificThemeProbeState(page) {
   return await readPPTXColorModifierShapeProbeState(
     page,
     'Slide Specific Theme Probe',
+  )
+}
+
+async function readPPTXColorMapProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(page, 'Color Map Probe')
+}
+
+async function readPPTXColorMapStyleProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(
+    page,
+    'Color Map Style Probe',
   )
 }
 
