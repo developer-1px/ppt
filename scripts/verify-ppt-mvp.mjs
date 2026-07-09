@@ -560,6 +560,26 @@ async function runPPTXRenderScenario(page) {
   )
 
   record(
+    'imports OpenXML PPTX picture outline for viewer rendering',
+    openXmlPPTXPictureClipShapeState.outlineStrokeColor === '#f97316' &&
+      openXmlPPTXPictureClipShapeState.outlineStrokeDash === 'dot' &&
+      openXmlPPTXPictureClipShapeState.outlineStrokeWidth === 4 &&
+      openXmlPPTXPictureClipShapeState.activeOutlineHasImage &&
+      openXmlPPTXPictureClipShapeState.activeOutlineStrokeDash === 'dot' &&
+      openXmlPPTXPictureClipShapeState.activeOutlineBorderColor.includes('249') &&
+      openXmlPPTXPictureClipShapeState.activeOutlineBorderColor.includes('115') &&
+      openXmlPPTXPictureClipShapeState.activeOutlineBorderColor.includes('22') &&
+      openXmlPPTXPictureClipShapeState.activeOutlineBorderStyle === 'dotted' &&
+      openXmlPPTXPictureClipShapeState.activeOutlineBorderWidth === '4px' &&
+      openXmlPPTXPictureClipShapeState.exportHasOutlineMarkup &&
+      openXmlPPTXPictureClipShapeState.exportHasOutlineModel,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXPictureClipShapeState,
+    },
+  )
+
+  record(
     'imports OpenXML PPTX background reference theme fill for viewer rendering',
     openXmlPPTXBackgroundRefState.modelCount === 1 &&
       openXmlPPTXBackgroundRefState.backgroundFill === '#e6fffa' &&
@@ -35234,6 +35254,19 @@ async function addPPTXPictureClipShapeProbe(base64) {
       preset: 'diamond',
       relationshipId,
     }),
+    createPPTXPictureClipShapeProbeXml({
+      geometry: {
+        cx: 1143000,
+        cy: 1143000,
+        x: 3505200,
+        y: 4953000,
+      },
+      id: 10999,
+      lineXml: '<a:ln w="38100"><a:solidFill><a:srgbClr val="F97316"/></a:solidFill><a:prstDash val="sysDot"/></a:ln>',
+      name: 'Picture Outline Probe',
+      preset: 'rect',
+      relationshipId,
+    }),
   ].join('')
   const nextXml = xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
 
@@ -35252,6 +35285,7 @@ async function addPPTXPictureClipShapeProbe(base64) {
 function createPPTXPictureClipShapeProbeXml({
   geometry,
   id,
+  lineXml = '',
   name,
   preset,
   relationshipId,
@@ -35273,6 +35307,7 @@ function createPPTXPictureClipShapeProbeXml({
     `<a:ext cx="${geometry.cx}" cy="${geometry.cy}"/>`,
     '</a:xfrm>',
     `<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>`,
+    lineXml,
     '</p:spPr>',
     '</p:pic>',
   ].join('')
@@ -37896,16 +37931,20 @@ function readPPTXPictureClipShapeProbeState(page) {
       String(slide.name ?? '').includes('Copy'))
     const exportImportedElements = exportImportedSlides.flatMap((slide) =>
       slide.elements ?? [])
-    const images = exportImportedElements.filter((element) =>
+    const clipImages = exportImportedElements.filter((element) =>
       (element.name === 'Picture Clip Ellipse Probe' ||
         element.name === 'Picture Clip Diamond Probe') &&
       element.kind === 'image')
-    const ellipse = images.find((element) =>
+    const ellipse = clipImages.find((element) =>
       element.name === 'Picture Clip Ellipse Probe')
-    const diamond = images.find((element) =>
+    const diamond = clipImages.find((element) =>
       element.name === 'Picture Clip Diamond Probe')
+    const outline = exportImportedElements.find((element) =>
+      element.name === 'Picture Outline Probe' && element.kind === 'image')
     const activeEllipse = document.querySelector('.ppt-slide [data-ppt-element-name="Picture Clip Ellipse Probe"][data-kind="image"]')
     const activeDiamond = document.querySelector('.ppt-slide [data-ppt-element-name="Picture Clip Diamond Probe"][data-kind="image"]')
+    const activeOutline = document.querySelector('.ppt-slide [data-ppt-element-name="Picture Outline Probe"][data-kind="image"]')
+    const activeOutlineStyle = activeOutline ? getComputedStyle(activeOutline) : null
 
     return {
       activeDiamondClipPath: activeDiamond?.style.clipPath ?? '',
@@ -37914,6 +37953,11 @@ function readPPTXPictureClipShapeProbeState(page) {
       activeEllipseBorderRadius: activeEllipse?.style.borderRadius ?? '',
       activeEllipseClipShape: activeEllipse?.getAttribute('data-ppt-image-clip-shape') ?? '',
       activeEllipseHasImage: !!activeEllipse?.querySelector('img'),
+      activeOutlineBorderColor: activeOutlineStyle?.borderTopColor ?? '',
+      activeOutlineBorderStyle: activeOutlineStyle?.borderTopStyle ?? '',
+      activeOutlineBorderWidth: activeOutlineStyle?.borderTopWidth ?? '',
+      activeOutlineHasImage: !!activeOutline?.querySelector('img'),
+      activeOutlineStrokeDash: activeOutline?.getAttribute('data-ppt-stroke-dash') ?? '',
       diamondClipShape: diamond?.clipShape ?? '',
       ellipseClipShape: ellipse?.clipShape ?? '',
       exportHasClipShapeMarkup: exportCode.includes('data-ppt-image-clip-shape="ellipse"') &&
@@ -37922,7 +37966,18 @@ function readPPTXPictureClipShapeProbeState(page) {
         exportCode.includes('clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)'),
       exportHasClipShapeModel: exportCode.includes('"clipShape": "ellipse"') &&
         exportCode.includes('"clipShape": "diamond"'),
-      modelCount: images.length,
+      exportHasOutlineMarkup: exportCode.includes('data-ppt-stroke-dash="dot"') &&
+        exportCode.includes('border:4px solid #f97316') &&
+        exportCode.includes('border-style:dotted'),
+      exportHasOutlineModel: exportCode.includes('"name": "Picture Outline Probe"') &&
+        exportCode.includes('"stroke": {') &&
+        exportCode.includes('"color": "#f97316"') &&
+        exportCode.includes('"dash": "dot"') &&
+        exportCode.includes('"width": 4'),
+      modelCount: clipImages.length,
+      outlineStrokeColor: outline?.stroke?.color ?? '',
+      outlineStrokeDash: outline?.stroke?.dash ?? '',
+      outlineStrokeWidth: Number(outline?.stroke?.width ?? 0),
     }
   })()`)
 }

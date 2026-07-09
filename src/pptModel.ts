@@ -176,6 +176,7 @@ const PPTImageSchema = PPTElementBaseSchema.extend({
   fit: z.enum(['cover', 'contain']).optional(),
   kind: z.literal('image'),
   src: z.string(),
+  stroke: PPTStrokeSchema.optional(),
 })
 
 const PPTLineMarkerSchema = z.enum(['none', 'arrow'])

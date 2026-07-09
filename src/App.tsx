@@ -36042,12 +36042,7 @@ function SlideThumb({
                         : element.kind === 'textBox'
                           ? '#cbd5e1'
                           : undefined,
-              border: element.kind === 'shape' && element.stroke
-                ? `${element.stroke.width}px solid ${element.stroke.color}`
-                : undefined,
-              borderStyle: element.kind === 'shape' && element.stroke
-                ? getPPTStrokeDashBorderStyle(element.stroke)
-                : undefined,
+              ...getPPTElementBorderStyle(element),
               borderRadius: element.kind === 'shape' && element.shape === 'rect'
                 ? getSlideEditObjectCornerRadiusPreviewCSS({
                     h: element.geometry.h,
@@ -39836,6 +39831,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
   if (element.kind === 'image') {
     return {
       ...base,
+      ...getPPTElementBorderStyle(element),
       ...getPPTImageClipShapeStyle(element),
     }
   }
@@ -39845,12 +39841,7 @@ function pptElementStyle(element: PPTElement): CSSProperties {
     ...pptTextStyle(element.style),
     alignItems: getPPTTextVerticalAlignCSS(getPPTTextElementVerticalAlign(element)),
     background: element.kind === 'shape' ? getPPTFillColorCSS(element.fill) : 'transparent',
-        border: element.kind === 'shape' && element.stroke
-      ? `${element.stroke.width}px solid ${element.stroke.color}`
-      : undefined,
-    borderStyle: element.kind === 'shape' && element.stroke
-      ? getPPTStrokeDashBorderStyle(element.stroke)
-      : undefined,
+    ...getPPTElementBorderStyle(element),
     borderRadius: element.kind === 'shape' && element.shape === 'rect'
       ? getSlideEditObjectCornerRadiusCSS(getPPTShapeCornerRadius(element))
       : undefined,
@@ -40766,6 +40757,23 @@ function getPPTThumbImageClipShapeStyle(element: PPTElement): CSSProperties {
   return element.kind === 'image' ? getPPTImageClipShapeStyle(element) : {}
 }
 
+function getPPTElementBorderStyle(element: PPTElement): CSSProperties {
+  const stroke = getPPTElementStroke(element)
+
+  if (!stroke || (element.kind !== 'shape' && element.kind !== 'image')) {
+    return {}
+  }
+
+  return {
+    border: getPPTStrokeBorderCSS(stroke),
+    borderStyle: getPPTStrokeDashBorderStyle(stroke),
+  }
+}
+
+function getPPTStrokeBorderCSS(stroke: PPTStroke) {
+  return `${stroke.width}px solid ${stroke.color}`
+}
+
 function getPPTImageAdjustmentsFilter(element: PPTImage) {
   const adjustments = element.adjustments
 
@@ -41191,7 +41199,7 @@ function normalizePPTSwatchColor(color: string) {
 }
 
 function getPPTElementStroke(element: PPTElement): PPTStroke | null {
-  if (element.kind === 'shape') {
+  if (element.kind === 'shape' || element.kind === 'image') {
     return element.stroke ? normalizePPTStroke(element.stroke) : null
   }
 

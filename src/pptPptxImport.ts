@@ -3569,6 +3569,7 @@ async function readPPTXShapeElement(
         slidePath,
         sp,
         spPr,
+        stroke,
         zip,
       })
     : null
@@ -3732,6 +3733,7 @@ async function readPPTXShapeImageFillElement({
   slidePath,
   sp,
   spPr,
+  stroke,
   zip,
 }: {
   geometry: PPTGeometry
@@ -3742,6 +3744,7 @@ async function readPPTXShapeImageFillElement({
   slidePath: string
   sp: Element
   spPr: Element | null
+  stroke: PPTStroke | undefined
   zip: JSZip
 }): Promise<PPTImage | PPTShape | null> {
   const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
@@ -3795,6 +3798,7 @@ async function readPPTXShapeImageFillElement({
     name,
     ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
+    ...(stroke ? { stroke } : {}),
     src: source.src,
   }
 }
@@ -4350,6 +4354,7 @@ async function readPPTXPictureElement({
   const opacity = readPPTXImageOpacity(blip)
   const adjustments = readPPTXImageAdjustments(blip)
   const clipShape = readPPTXImageClipShape(spPr)
+  const stroke = readPPTXStroke(spPr, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors) ??
     readPPTXStyleShadow(style, themeColors, themeStyles)
 
@@ -4383,6 +4388,7 @@ async function readPPTXPictureElement({
     name,
     ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
+    ...(stroke ? { stroke } : {}),
     src: source.src,
   }
 }
