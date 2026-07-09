@@ -226,6 +226,57 @@ async function runPPTXRenderScenario(page) {
     await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
     await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
     await delay(80)
+
+    await openPPTXFileFromInput(page, externalPPTXFixture)
+    await waitForPPTXDeckImport(page, {
+      fileName: externalPPTXFixture.fileName,
+      mode: 'replace',
+    })
+    await waitForPPTXActiveSlideFrameFit(page)
+
+    const externalPPTXOpenImportState = await readPPTXDeckImportState(page)
+    const externalPPTXOpenStatusState = await readPPTXOpenStatusState(page)
+    const externalPPTXOpenedSlideState =
+      await readPPTXImportedSlideRenderState(page, {
+        requireElements: false,
+        slideNameIncludes: '',
+      })
+
+    record(
+      'opens provided PPTX_RENDER_FILE as a page-by-page viewer deck',
+      externalPPTXFixture.signature === 'PK' &&
+        externalPPTXOpenImportState.model === 'ppt-deck-pptx-import' &&
+        externalPPTXOpenImportState.fileName === externalPPTXFixture.fileName &&
+        externalPPTXOpenImportState.fileSize === externalPPTXFixture.byteLength &&
+        externalPPTXOpenImportState.mode === 'replace' &&
+        [
+          'pptx-custom-xml-ppt-deck',
+          'pptx-open-xml-ppt-deck',
+        ].includes(externalPPTXOpenImportState.format) &&
+        externalPPTXOpenImportState.importedCount > 0 &&
+        externalPPTXOpenImportState.sourceSlideCount === externalPPTXOpenImportState.importedCount &&
+        externalPPTXOpenImportState.slideCount === externalPPTXOpenImportState.importedCount &&
+        externalPPTXOpenedSlideState.importedSlideCount === externalPPTXOpenImportState.importedCount &&
+        externalPPTXOpenedSlideState.firstSlideId === externalPPTXOpenImportState.firstImportedSlideId &&
+        externalPPTXOpenedSlideState.allSlidesRendered &&
+        externalPPTXOpenStatusState.kind === 'success' &&
+        externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
+        externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
+        externalPPTXOpenStatusState.slideCount === externalPPTXOpenImportState.importedCount,
+      {
+        externalPPTXFixture: {
+          byteLength: externalPPTXFixture.byteLength,
+          fileName: externalPPTXFixture.fileName,
+          path: externalPPTXFixture.path,
+          signature: externalPPTXFixture.signature,
+        },
+        externalPPTXOpenImportState,
+        externalPPTXOpenedSlideState,
+        externalPPTXOpenStatusState,
+      },
+    )
+
+    await reloadPPTApp(page)
   }
 
   await installPPTDownloadCapture(page)
@@ -36173,15 +36224,30 @@ function readPPTXDeckImportState(page) {
   })()`)
 }
 
-function waitForPPTXDeckImport(page, { fileName, format = '' }) {
+function readPPTXOpenStatusState(page) {
+  return page.eval(`(() => {
+    const status = document.querySelector('.ppt-pptx-open-status')
+
+    return {
+      fileName: status?.getAttribute('data-ppt-open-pptx-file-name') ?? '',
+      format: status?.getAttribute('data-ppt-open-pptx-format') ?? '',
+      kind: status?.getAttribute('data-ppt-open-pptx-status') ?? '',
+      slideCount: Number(status?.getAttribute('data-ppt-open-pptx-slide-count') ?? 0),
+      text: status?.textContent?.trim() ?? '',
+    }
+  })()`)
+}
+
+function waitForPPTXDeckImport(page, { fileName, format = '', mode = '' }) {
   return waitUntil(
     () => page.eval(`((input) => {
       const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
 
       return stage?.getAttribute('data-ppt-deck-pptx-import-file-name') === input.fileName &&
         (!input.format || stage?.getAttribute('data-ppt-deck-pptx-import-format') === input.format) &&
+        (!input.mode || stage?.getAttribute('data-ppt-deck-pptx-import-mode') === input.mode) &&
         Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0) > 0
-    })(${JSON.stringify({ fileName, format })})`),
+    })(${JSON.stringify({ fileName, format, mode })})`),
     `Timed out waiting for PPTX import: ${fileName}`,
     5000,
   )
@@ -37033,6 +37099,19 @@ function waitForPPTXActiveSlideFrameFit(page) {
     })()`),
     'Timed out waiting for PPTX slide frame fit',
     5000,
+  )
+}
+
+async function reloadPPTApp(page) {
+  await page.send('Page.reload', {
+    ignoreCache: true,
+  })
+  await waitUntil(
+    () => page.eval(`document.readyState === 'complete' &&
+      !!document.querySelector('[data-ppt-app]') &&
+      document.querySelectorAll('.ppt-thumb').length >= 2`),
+    'Timed out reloading PPT app',
+    PAGE_LOAD_TIMEOUT_MS,
   )
 }
 
