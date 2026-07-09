@@ -2901,6 +2901,7 @@ async function readPPTXShapeElement(
   const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
   const style = getDirectPPTXChildByLocalName(sp, 'style')
   const fallbackTextColor = readPPTXStyleTextColor(style, themeColors)
+  const fallbackFontFamily = readPPTXStyleFontFamily(style, themeFonts)
   const geometry = readPPTXElementGeometry(spPr) ??
     readPPTXPlaceholderGeometry(sp, placeholderGeometries)
   const textBody = readPPTXTextBody(
@@ -2918,7 +2919,13 @@ async function readPPTXShapeElement(
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
   const textStyle = textBody
-    ? readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody)
+    ? readPPTXTextStyle(
+        textBody,
+        txBody,
+        themeFonts,
+        fallbackTxBody,
+        fallbackFontFamily,
+      )
     : undefined
   const imageFill = !hasTextContent && geometry
     ? await readPPTXShapeImageFillElement({
@@ -3002,7 +3009,13 @@ async function readPPTXShapeElement(
       ...(readPPTXElementVisibility(sp) ?? {}),
       name,
       ...(shadow ? { shadow } : {}),
-      style: textStyle ?? readPPTXTextStyle(textBody, txBody, themeFonts, fallbackTxBody),
+      style: textStyle ?? readPPTXTextStyle(
+        textBody,
+        txBody,
+        themeFonts,
+        fallbackTxBody,
+        fallbackFontFamily,
+      ),
       ...(textAutoFit ? { textAutoFit } : {}),
       textBody: textBody ?? { paragraphs: [] },
     }
@@ -5049,13 +5062,15 @@ function readPPTXTextStyle(
   txBody: Element | null,
   themeFonts: PPTXThemeFontMap,
   fallbackTxBody: Element | null = null,
+  fallbackFontFamily?: string,
 ): PPTTextStyle {
   const firstRun = textBody?.paragraphs
     .flatMap((paragraph) => paragraph.runs)
     .find((run) => run.text.trim().length > 0) ??
     textBody?.paragraphs[0]?.runs[0]
   const fontFamily = readPPTXFirstTypeface(txBody, themeFonts) ??
-    readPPTXFirstTypeface(fallbackTxBody, themeFonts)
+    readPPTXFirstTypeface(fallbackTxBody, themeFonts) ??
+    fallbackFontFamily
 
   return {
     color: firstRun?.color ?? PPTX_DEFAULT_TEXT_COLOR,
@@ -5643,6 +5658,20 @@ function readPPTXStyleTextColor(
   const fontRef = getDirectPPTXChildByLocalName(style, 'fontRef')
 
   return fontRef ? readPPTXColor(fontRef, themeColors) : undefined
+}
+
+function readPPTXStyleFontFamily(
+  style: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
+  const fontRef = getDirectPPTXChildByLocalName(style, 'fontRef')
+  const index = fontRef?.getAttribute('idx')?.trim()
+
+  if (index === 'major') {
+    return themeFonts['+mj-lt']
+  }
+
+  return index === 'minor' ? themeFonts['+mn-lt'] : undefined
 }
 
 function readPPTXStyleStroke(

@@ -365,7 +365,9 @@ async function runPPTXRenderScenario(page) {
     openXmlPPTXStyleRefState.textCount === 1 &&
       openXmlPPTXStyleRefState.textRunColor === '#7c3aed' &&
       openXmlPPTXStyleRefState.textStyleColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.textFontFamily === 'Georgia' &&
       openXmlPPTXStyleRefState.activeTextExists &&
+      openXmlPPTXStyleRefState.activeTextFontFamily === 'Georgia' &&
       openXmlPPTXStyleRefState.activeTextRunColor === '#7c3aed',
     {
       openXmlPPTXImportState,
@@ -11427,6 +11429,7 @@ async function runExportScenario(page) {
         element.kind === 'line').length,
       fontRefTextProbeModelCount: elements.filter((element) =>
         element.name === 'Font Ref Text Probe' &&
+        element.style?.fontFamily === 'Georgia' &&
         element.textBody?.paragraphs?.some((paragraph) =>
           paragraph.runs?.some((run) =>
             run.text === 'Font Ref Text Probe' &&
@@ -11679,6 +11682,7 @@ async function runExportScenario(page) {
       element.name === 'Font Ref Text Probe' &&
       element.kind === 'textBox' &&
       element.style?.color === '#7c3aed' &&
+      element.style?.fontFamily === 'Georgia' &&
       element.textBody?.paragraphs?.some((paragraph) =>
         paragraph.runs?.some((run) =>
           run.text === 'Font Ref Text Probe' &&
@@ -11989,6 +11993,7 @@ async function runExportScenario(page) {
       exportFontRefTextProbeRunColor: exportFontRefTextProbeObjects.flatMap((element) =>
         element.textBody?.paragraphs?.flatMap((paragraph) =>
           paragraph.runs?.map((run) => run.color ?? '') ?? []) ?? []).join(' | '),
+      exportFontRefTextProbeFontFamily: exportFontRefTextProbeObjects.map((element) => element.style?.fontFamily ?? '').join(' | '),
       exportFontRefTextProbeStyleColor: exportFontRefTextProbeObjects.map((element) => element.style?.color ?? '').join(' | '),
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
@@ -31753,14 +31758,19 @@ async function addPPTXStyleRefProbe(base64) {
   const themeXml = await readPPTXZipText(zip, themePath)
   const nextThemeXml = setPPTXThemeLineStyleXml(
     setPPTXThemeFillStyleXml(
-      setPPTXThemeSchemeColorXml(
+      setPPTXThemeFontXml(
         setPPTXThemeSchemeColorXml(
-          setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+          setPPTXThemeSchemeColorXml(
+            setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+            'accent4',
+            '9A3412',
+          ),
           'accent5',
           '7C3AED',
         ),
-        'accent4',
-        '9A3412',
+        'majorFont',
+        'latin',
+        'Georgia',
       ),
       3,
       [
@@ -31862,7 +31872,7 @@ async function addPPTXStyleRefProbe(base64) {
         '<a:lnRef idx="0"><a:schemeClr val="accent5"/></a:lnRef>',
         '<a:fillRef idx="0"><a:schemeClr val="accent5"/></a:fillRef>',
         '<a:effectRef idx="0"><a:schemeClr val="accent5"/></a:effectRef>',
-        '<a:fontRef idx="minor"><a:schemeClr val="accent5"/></a:fontRef>',
+        '<a:fontRef idx="major"><a:schemeClr val="accent5"/></a:fontRef>',
         '</p:style>',
         '</p:sp>',
       ].join('')
@@ -34814,6 +34824,7 @@ async function readPPTXStyleRefProbeState(page) {
       shapeStrokeWidth: Number(shape?.stroke?.width ?? 0),
       slideId: probeSlide?.id ?? '',
       textCount: texts.length,
+      textFontFamily: text?.style?.fontFamily ?? '',
       textRunColor: textRun?.color ?? '',
       textStyleColor: text?.style?.color ?? '',
     }
@@ -34853,6 +34864,7 @@ async function readPPTXStyleRefProbeState(page) {
       activeShapeStrokeWidth: Number.parseFloat(shapeStyle?.borderTopWidth ?? '0') || 0,
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
       activeTextExists: Boolean(textElement),
+      activeTextFontFamily: textElement?.getAttribute('data-ppt-font-family') ?? '',
       activeTextRunColor: textRun?.getAttribute('data-ppt-run-color') ?? '',
     }
   })()`)
