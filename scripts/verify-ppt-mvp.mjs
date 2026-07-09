@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import net from 'node:net'
 import JSZip from 'jszip'
 
@@ -22,6 +22,7 @@ const PPT_TEST_IMAGE_HEIGHT = 360
 const PPT_TIDY_GAP = 24
 const PPT_OBJECT_ALT_TEXT = 'Revenue trend chart with highlighted AI cleanup'
 const PPT_VERIFY_SCENARIO = process.env.PPT_VERIFY_SCENARIO ?? 'mvp'
+const PPTX_RENDER_FILE = process.env.PPTX_RENDER_FILE ?? ''
 const SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE =
   'application/vnd.interactive-os.slide-edit.object-accessibility+json'
 const SLIDE_EDIT_OBJECT_CORNER_RADIUS_JSON_MIME_TYPE =
@@ -176,6 +177,57 @@ async function runFirstScreenScenario(page) {
 
 async function runPPTXRenderScenario(page) {
   await runFirstScreenScenario(page)
+
+  const externalPPTXFixture = await readExternalPPTXRenderFixture()
+
+  if (externalPPTXFixture) {
+    const beforeExternalPPTXDrop = await readPPTSlideCountState(page)
+
+    await dropPPTXFile(page, externalPPTXFixture)
+    await waitForPPTXDeckImport(page, {
+      fileName: externalPPTXFixture.fileName,
+    })
+
+    const externalPPTXImportState = await readPPTXDeckImportState(page)
+    const externalPPTXRenderedSlideState =
+      await readPPTXImportedSlideRenderState(page, { requireElements: false })
+
+    record(
+      'renders every provided PPTX page from PPTX_RENDER_FILE',
+      externalPPTXFixture.signature === 'PK' &&
+        externalPPTXImportState.model === 'ppt-deck-pptx-import' &&
+        externalPPTXImportState.fileName === externalPPTXFixture.fileName &&
+        externalPPTXImportState.fileSize === externalPPTXFixture.byteLength &&
+        externalPPTXImportState.dropAction === 'pptx-deck-file' &&
+        [
+          'pptx-custom-xml-ppt-deck',
+          'pptx-open-xml-ppt-deck',
+        ].includes(externalPPTXImportState.format) &&
+        externalPPTXImportState.importedCount > 0 &&
+        externalPPTXImportState.sourceSlideCount === externalPPTXImportState.importedCount &&
+        externalPPTXImportState.slideCount ===
+          beforeExternalPPTXDrop.slideCount + externalPPTXImportState.importedCount &&
+        externalPPTXRenderedSlideState.importedSlideCount === externalPPTXImportState.importedCount &&
+        externalPPTXRenderedSlideState.firstSlideId === externalPPTXImportState.firstImportedSlideId &&
+        externalPPTXRenderedSlideState.allSlidesRendered,
+      {
+        beforeExternalPPTXDrop,
+        externalPPTXFixture: {
+          byteLength: externalPPTXFixture.byteLength,
+          fileName: externalPPTXFixture.fileName,
+          path: externalPPTXFixture.path,
+          signature: externalPPTXFixture.signature,
+        },
+        externalPPTXImportState,
+        externalPPTXRenderedSlideState,
+      },
+    )
+
+    await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+    await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+    await delay(80)
+  }
+
   await installPPTDownloadCapture(page)
   await page.eval(`document.querySelector('[data-ppt-export-pptx]')?.click()`)
   await waitForPPTXDownloadBlob(page)
@@ -33987,6 +34039,24 @@ function readPPTXDownloadBlobState(page) {
   })()`)
 }
 
+async function readExternalPPTXRenderFixture() {
+  const path = PPTX_RENDER_FILE.trim()
+
+  if (!path) {
+    return null
+  }
+
+  const bytes = await readFile(path)
+
+  return {
+    base64: Buffer.from(bytes).toString('base64'),
+    byteLength: bytes.byteLength,
+    fileName: basename(path),
+    path,
+    signature: String.fromCharCode(...bytes.subarray(0, 2)),
+  }
+}
+
 function waitForPPTXDownloadBlob(page) {
   return waitUntil(
     () => page.eval(`(() => {
@@ -34035,13 +34105,13 @@ function readPPTXDeckImportState(page) {
   })()`)
 }
 
-function waitForPPTXDeckImport(page, { fileName, format }) {
+function waitForPPTXDeckImport(page, { fileName, format = '' }) {
   return waitUntil(
     () => page.eval(`((input) => {
       const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
 
       return stage?.getAttribute('data-ppt-deck-pptx-import-file-name') === input.fileName &&
-        stage?.getAttribute('data-ppt-deck-pptx-import-format') === input.format &&
+        (!input.format || stage?.getAttribute('data-ppt-deck-pptx-import-format') === input.format) &&
         Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0) > 0
     })(${JSON.stringify({ fileName, format })})`),
     `Timed out waiting for PPTX import: ${fileName}`,
@@ -34070,7 +34140,10 @@ function dropPPTXFile(page, { base64, fileName }) {
   })(${JSON.stringify({ base64, fileName })})`)
 }
 
-async function readPPTXImportedSlideRenderState(page) {
+async function readPPTXImportedSlideRenderState(
+  page,
+  { requireElements = true } = {},
+) {
   const importedThumbs = await page.eval(`(() => {
     return [...document.querySelectorAll('.ppt-thumb')]
       .map((thumb, index) => {
@@ -34103,7 +34176,8 @@ async function readPPTXImportedSlideRenderState(page) {
     })(${JSON.stringify(thumb.id)})`)
     await delay(120)
 
-    const rendered = await page.eval(`((expectedSlideId) => {
+    const rendered = await page.eval(`((input) => {
+      const expectedSlideId = input.expectedSlideId
       const activeSlide = document.querySelector('.ppt-stage-shell .ppt-slide[data-ppt-slide]')
       const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
       const elements = [...(activeSlide?.querySelectorAll('[data-ppt-element]') ?? [])]
@@ -34113,6 +34187,10 @@ async function readPPTXImportedSlideRenderState(page) {
         return rect.width > 0 && rect.height > 0
       })
       const slideRect = activeSlide?.getBoundingClientRect()
+      const frameRendered = activeSlide?.getAttribute('data-ppt-slide') === expectedSlideId &&
+        activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId &&
+        (slideRect?.width ?? 0) > 300 &&
+        (slideRect?.height ?? 0) > 160
 
       return {
         activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent?.trim() ?? '',
@@ -34124,17 +34202,20 @@ async function readPPTXImportedSlideRenderState(page) {
           .map((element) => element.getAttribute('data-kind') ?? '')
           .sort()
           .join(' | '),
-        rendered: activeSlide?.getAttribute('data-ppt-slide') === expectedSlideId &&
-          activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId &&
-          (slideRect?.width ?? 0) > 300 &&
-          (slideRect?.height ?? 0) > 160 &&
-          elements.length > 0 &&
-          visibleElements.length > 0,
+        frameRendered,
+        rendered: frameRendered &&
+          (!input.requireElements || (
+            elements.length > 0 &&
+            visibleElements.length > 0
+          )),
         slideHeight: slideRect?.height ?? 0,
         slideWidth: slideRect?.width ?? 0,
         visibleElementCount: visibleElements.length,
       }
-    })(${JSON.stringify(thumb.id)})`)
+    })(${JSON.stringify({
+      expectedSlideId: thumb.id,
+      requireElements,
+    })})`)
 
     slides.push({
       ...thumb,
@@ -34146,12 +34227,13 @@ async function readPPTXImportedSlideRenderState(page) {
     allSlidesRendered: importedThumbs.length > 0 &&
       slides.every((slide) =>
         slide.rendered &&
-        slide.thumbElementCount > 0 &&
+        (!requireElements || slide.thumbElementCount > 0) &&
         slide.thumbPreviewWidth > 0 &&
         slide.thumbPreviewHeight > 0 &&
         slide.thumbVisible),
     firstSlideId: slides[0]?.id ?? '',
     importedSlideCount: importedThumbs.length,
+    requireElements,
     slideIds: slides.map((slide) => slide.id).join(' | '),
     slideNames: slides.map((slide) => slide.name).join(' | '),
     slides,
