@@ -286,9 +286,11 @@ async function runPPTXRenderScenario(page) {
   await delay(80)
 
   const openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(
-    await addPPTXStyleRefProbe(
-      await addPPTXGradientPatternFillProbe(
-        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    await addPPTXPictureEffectRefProbe(
+      await addPPTXStyleRefProbe(
+        await addPPTXGradientPatternFillProbe(
+          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+        ),
       ),
     ),
   )
@@ -393,6 +395,29 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXStyleRefState.activeEffectShadowBlur === 6 &&
       openXmlPPTXStyleRefState.activeEffectShadowDistance === 4 &&
       openXmlPPTXStyleRefState.activeEffectShadowAngle === 45,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXStyleRefState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX picture style effect reference shadow for viewer rendering',
+    openXmlPPTXStyleRefState.pictureEffectCount === 1 &&
+      openXmlPPTXStyleRefState.pictureEffectShadowColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.pictureEffectShadowOpacity > 0.54 &&
+      openXmlPPTXStyleRefState.pictureEffectShadowOpacity < 0.56 &&
+      openXmlPPTXStyleRefState.pictureEffectShadowBlur === 6 &&
+      openXmlPPTXStyleRefState.pictureEffectShadowDistance === 4 &&
+      openXmlPPTXStyleRefState.pictureEffectShadowAngle === 45 &&
+      openXmlPPTXStyleRefState.activePictureEffectExists &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowState === 'true' &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowColor === '#7c3aed' &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowOpacity > 0.54 &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowOpacity < 0.56 &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowBlur === 6 &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowDistance === 4 &&
+      openXmlPPTXStyleRefState.activePictureEffectShadowAngle === 45,
     {
       openXmlPPTXImportState,
       openXmlPPTXStyleRefState,
@@ -11368,13 +11393,15 @@ async function runExportScenario(page) {
                                 await addPPTXHiddenObjectProbe(
                                   await addPPTXNoFillShapeProbe(
                                     await addPPTXGradientPatternFillProbe(
-                                      await addPPTXStyleRefProbe(
-                                        await addPPTXThemeColorProbe(
-                                          await addPPTXPresetSystemColorProbe(
-                                            await addPPTXUnevenTableProbe(
-                                              await addPPTXGroupedObjectProbe(
-                                                await reversePPTXPresentationSlideOrder(
-                                                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                      await addPPTXPictureEffectRefProbe(
+                                        await addPPTXStyleRefProbe(
+                                          await addPPTXThemeColorProbe(
+                                            await addPPTXPresetSystemColorProbe(
+                                              await addPPTXUnevenTableProbe(
+                                                await addPPTXGroupedObjectProbe(
+                                                  await reversePPTXPresentationSlideOrder(
+                                                    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -11454,6 +11481,9 @@ async function runExportScenario(page) {
       effectRefProbeModelCount: elements.filter((element) =>
         element.name === 'Effect Ref Probe' &&
         element.kind === 'shape').length,
+      pictureEffectRefProbeModelCount: elements.filter((element) =>
+        element.name === 'Picture Effect Ref Probe' &&
+        element.kind === 'image').length,
       fontRefTextProbeModelCount: elements.filter((element) =>
         element.name === 'Font Ref Text Probe' &&
         element.style?.fontFamily === 'Georgia' &&
@@ -11708,6 +11738,15 @@ async function runExportScenario(page) {
     const exportEffectRefProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Effect Ref Probe' &&
       element.kind === 'shape' &&
+      element.shadow?.color === '#7c3aed' &&
+      Number(element.shadow?.opacity ?? 0) > 0.54 &&
+      Number(element.shadow?.opacity ?? 0) < 0.56 &&
+      element.shadow?.blur === 6 &&
+      element.shadow?.distance === 4 &&
+      element.shadow?.angle === 45)
+    const exportPictureEffectRefProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Picture Effect Ref Probe' &&
+      element.kind === 'image' &&
       element.shadow?.color === '#7c3aed' &&
       Number(element.shadow?.opacity ?? 0) > 0.54 &&
       Number(element.shadow?.opacity ?? 0) < 0.56 &&
@@ -12031,6 +12070,13 @@ async function runExportScenario(page) {
       exportEffectRefProbeShadowColors: exportEffectRefProbeObjects.map((element) => element.shadow?.color ?? '').join(' | '),
       exportEffectRefProbeShadowDistances: exportEffectRefProbeObjects.map((element) => element.shadow?.distance ?? '').join(' | '),
       exportEffectRefProbeShadowOpacities: exportEffectRefProbeObjects.map((element) => element.shadow?.opacity ?? '').join(' | '),
+      exportHasPictureEffectRefProbe: exportPictureEffectRefProbeObjects.length > 0,
+      exportPictureEffectRefProbeModelCount: exportPictureEffectRefProbeObjects.length,
+      exportPictureEffectRefProbeShadowAngles: exportPictureEffectRefProbeObjects.map((element) => element.shadow?.angle ?? '').join(' | '),
+      exportPictureEffectRefProbeShadowBlurs: exportPictureEffectRefProbeObjects.map((element) => element.shadow?.blur ?? '').join(' | '),
+      exportPictureEffectRefProbeShadowColors: exportPictureEffectRefProbeObjects.map((element) => element.shadow?.color ?? '').join(' | '),
+      exportPictureEffectRefProbeShadowDistances: exportPictureEffectRefProbeObjects.map((element) => element.shadow?.distance ?? '').join(' | '),
+      exportPictureEffectRefProbeShadowOpacities: exportPictureEffectRefProbeObjects.map((element) => element.shadow?.opacity ?? '').join(' | '),
       exportHasFontRefTextProbe: exportFontRefTextProbeObjects.length > 0,
       exportFontRefTextProbeModelCount: exportFontRefTextProbeObjects.length,
       exportFontRefTextProbeRunColor: exportFontRefTextProbeObjects.flatMap((element) =>
@@ -12281,6 +12327,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportStyleRefLineProbeModelCount > beforeOpenXmlPPTXDrop.styleRefLineProbeModelCount &&
       openXmlPPTXImportState.exportHasEffectRefProbe &&
       openXmlPPTXImportState.exportEffectRefProbeModelCount > beforeOpenXmlPPTXDrop.effectRefProbeModelCount &&
+      openXmlPPTXImportState.exportHasPictureEffectRefProbe &&
+      openXmlPPTXImportState.exportPictureEffectRefProbeModelCount > beforeOpenXmlPPTXDrop.pictureEffectRefProbeModelCount &&
       openXmlPPTXImportState.exportHasFontRefTextProbe &&
       openXmlPPTXImportState.exportFontRefTextProbeModelCount > beforeOpenXmlPPTXDrop.fontRefTextProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundRefSlide &&
@@ -32008,6 +32056,105 @@ async function addPPTXStyleRefProbe(base64) {
   })
 }
 
+async function addPPTXPictureEffectRefProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const themePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/pptx-picture-effect-ref-probe.png'
+
+  if (!slidePath || !themePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+  const themeXml = await readPPTXZipText(zip, themePath)
+  const nextThemeXml = setPPTXThemeEffectStyleXml(
+    setPPTXThemeSchemeColorXml(themeXml, 'accent5', '7C3AED'),
+    1,
+    [
+      '<a:effectStyle>',
+      '<a:effectLst>',
+      '<a:outerShdw blurRad="57150" dist="38100" dir="2700000" algn="ctr" rotWithShape="0">',
+      '<a:schemeClr val="phClr"><a:alpha val="55000"/></a:schemeClr>',
+      '</a:outerShdw>',
+      '</a:effectLst>',
+      '</a:effectStyle>',
+    ].join(''),
+  )
+
+  if (xml.includes('Picture Effect Ref Probe') && nextThemeXml === themeXml) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const pictureXml = [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9988" name="Picture Effect Ref Probe" descr="Picture effect reference alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr/>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8686800" y="6309360"/>',
+    '<a:ext cx="1219200" cy="365760"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:ln><a:noFill/></a:ln>',
+    '</p:spPr>',
+    '<p:style>',
+    '<a:lnRef idx="0"><a:schemeClr val="accent5"/></a:lnRef>',
+    '<a:fillRef idx="0"><a:schemeClr val="accent5"/></a:fillRef>',
+    '<a:effectRef idx="1"><a:schemeClr val="accent5"/></a:effectRef>',
+    '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>',
+    '</p:style>',
+    '</p:pic>',
+  ].join('')
+  const nextXml = xml.includes('Picture Effect Ref Probe')
+    ? xml
+    : xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
+
+  if (nextXml === xml && nextThemeXml === themeXml) {
+    return base64
+  }
+
+  zip.file(themePath, nextThemeXml)
+  if (nextXml !== xml) {
+    zip.file(slidePath, nextXml)
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXBackgroundRefProbe(base64) {
   if (!base64) {
     return ''
@@ -34906,7 +35053,8 @@ async function readPPTXStyleRefProbeState(page) {
       (slide.elements ?? []).some((element) =>
         element.name === 'Style Ref Probe' ||
         element.name === 'Style Ref Line Probe' ||
-        element.name === 'Effect Ref Probe'))
+        element.name === 'Effect Ref Probe' ||
+        element.name === 'Picture Effect Ref Probe'))
     const elements = slides.flatMap((slide) => slide.elements ?? [])
     const shapes = elements.filter((element) =>
       element.name === 'Style Ref Probe' &&
@@ -34914,6 +35062,9 @@ async function readPPTXStyleRefProbeState(page) {
     const effects = elements.filter((element) =>
       element.name === 'Effect Ref Probe' &&
       element.kind === 'shape')
+    const pictureEffects = elements.filter((element) =>
+      element.name === 'Picture Effect Ref Probe' &&
+      element.kind === 'image')
     const lines = elements.filter((element) =>
       element.name === 'Style Ref Line Probe' &&
       element.kind === 'line')
@@ -34922,6 +35073,7 @@ async function readPPTXStyleRefProbeState(page) {
       element.kind === 'textBox')
     const shape = shapes[0] ?? null
     const effect = effects[0] ?? null
+    const pictureEffect = pictureEffects[0] ?? null
     const line = lines[0] ?? null
     const text = texts[0] ?? null
     const textRun = text?.textBody?.paragraphs
@@ -34939,6 +35091,12 @@ async function readPPTXStyleRefProbeState(page) {
       lineStrokeDash: line?.stroke?.dash ?? '',
       lineStroke: line?.stroke?.color ?? '',
       lineStrokeWidth: Number(line?.stroke?.width ?? 0),
+      pictureEffectCount: pictureEffects.length,
+      pictureEffectShadowAngle: Number(pictureEffect?.shadow?.angle ?? 0),
+      pictureEffectShadowBlur: Number(pictureEffect?.shadow?.blur ?? 0),
+      pictureEffectShadowColor: pictureEffect?.shadow?.color ?? '',
+      pictureEffectShadowDistance: Number(pictureEffect?.shadow?.distance ?? 0),
+      pictureEffectShadowOpacity: Number(pictureEffect?.shadow?.opacity ?? 0),
       shapeCount: shapes.length,
       shapeFill: shape?.fill?.color ?? '',
       shapeFillOpacity: Number(shape?.fill?.opacity ?? 0),
@@ -34975,6 +35133,9 @@ async function readPPTXStyleRefProbeState(page) {
     const effectElement = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Effect Ref Probe"]',
     )
+    const pictureEffectElement = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Picture Effect Ref Probe"]',
+    )
     const textElement = document.querySelector(
       '.ppt-slide [data-ppt-element-name="Font Ref Text Probe"]',
     )
@@ -34991,6 +35152,13 @@ async function readPPTXStyleRefProbeState(page) {
       activeLineExists: Boolean(lineElement),
       activeLineStrokeDasharray: lineStrokeElement?.getAttribute('stroke-dasharray') ?? '',
       activeLineStrokeWidth: Number(lineStrokeElement?.getAttribute('stroke-width') ?? 0),
+      activePictureEffectExists: Boolean(pictureEffectElement),
+      activePictureEffectShadowAngle: Number(pictureEffectElement?.getAttribute('data-ppt-shadow-angle') ?? 0),
+      activePictureEffectShadowBlur: Number(pictureEffectElement?.getAttribute('data-ppt-shadow-blur') ?? 0),
+      activePictureEffectShadowColor: pictureEffectElement?.getAttribute('data-ppt-shadow-color') ?? '',
+      activePictureEffectShadowDistance: Number(pictureEffectElement?.getAttribute('data-ppt-shadow-distance') ?? 0),
+      activePictureEffectShadowOpacity: Number(pictureEffectElement?.getAttribute('data-ppt-shadow-opacity') ?? 0),
+      activePictureEffectShadowState: pictureEffectElement?.getAttribute('data-ppt-shadow') ?? '',
       activeShapeExists: Boolean(shapeElement),
       activeShapeFillOpacity: Number(shapeElement?.getAttribute('data-ppt-fill-opacity') ?? 0),
       activeShapeStrokeDash: shapeElement?.getAttribute('data-ppt-stroke-dash') ?? '',

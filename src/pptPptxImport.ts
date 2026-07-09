@@ -1143,6 +1143,7 @@ async function readPPTXOpenXmlSlide({
         relationships,
         slidePath: path,
         themeColors,
+        themeStyles,
         zip,
       })
     } else if (child.localName === 'graphicFrame') {
@@ -2029,6 +2030,7 @@ async function readPPTXInheritedElement({
       relationships,
       slidePath: path,
       themeColors,
+      themeStyles,
       zip,
     })
   }
@@ -2953,11 +2955,11 @@ async function readPPTXShapeElement(
         geometry,
         objectIndex,
         relationships,
+        shadow,
         slideIndex,
         slidePath,
         sp,
         spPr,
-        themeColors,
         zip,
       })
     : null
@@ -3069,21 +3071,21 @@ async function readPPTXShapeImageFillElement({
   geometry,
   objectIndex,
   relationships,
+  shadow,
   slideIndex,
   slidePath,
   sp,
   spPr,
-  themeColors,
   zip,
 }: {
   geometry: PPTGeometry
   objectIndex: number
   relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
   slideIndex: number
   slidePath: string
   sp: Element
   spPr: Element | null
-  themeColors: PPTXThemeColorMap
   zip: JSZip
 }): Promise<PPTImage | null> {
   const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
@@ -3104,7 +3106,6 @@ async function readPPTXShapeImageFillElement({
   const accessibility = readPPTXElementAccessibility(sp)
   const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
   const opacity = readPPTXImageOpacity(blip)
-  const shadow = readPPTXElementShadow(spPr, themeColors)
 
   return {
     ...(accessibility ?? {}),
@@ -3393,6 +3394,7 @@ async function readPPTXPictureElement({
   relationships,
   slidePath,
   themeColors,
+  themeStyles,
   zip,
 }: {
   index: number
@@ -3401,9 +3403,11 @@ async function readPPTXPictureElement({
   relationships: PPTXRelationshipMap
   slidePath: string
   themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
   zip: JSZip
 }): Promise<PPTElement | null> {
   const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
+  const style = getDirectPPTXChildByLocalName(pic, 'style')
   const geometry = readPPTXElementGeometry(spPr)
   const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
   const source = await readPPTXImageSource({
@@ -3427,6 +3431,7 @@ async function readPPTXPictureElement({
       slidePath,
       spPr,
       themeColors,
+      themeStyles,
     })
   }
 
@@ -3435,7 +3440,8 @@ async function readPPTXPictureElement({
   const accessibility = readPPTXElementAccessibility(pic)
   const crop = readPPTXImageCrop(pic)
   const opacity = readPPTXImageOpacity(blip)
-  const shadow = readPPTXElementShadow(spPr, themeColors)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
 
   return {
     ...(accessibility ?? {}),
@@ -3465,6 +3471,7 @@ function readPPTXPictureMediaPlaceholderElement({
   slidePath,
   spPr,
   themeColors,
+  themeStyles,
 }: {
   geometry: PPTGeometry
   index: number
@@ -3474,6 +3481,7 @@ function readPPTXPictureMediaPlaceholderElement({
   slidePath: string
   spPr: Element | null
   themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
 }): PPTElement | null {
   const media = readPPTXPictureMediaInfo({
     pic,
@@ -3486,7 +3494,9 @@ function readPPTXPictureMediaPlaceholderElement({
   }
 
   const name = readPPTXObjectName(pic, `${media.type} ${objectIndex}`)
-  const shadow = readPPTXElementShadow(spPr, themeColors)
+  const style = getDirectPPTXChildByLocalName(pic, 'style')
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
   const details = [media.type, media.fileName]
     .filter((detail) => detail.length > 0)
 
