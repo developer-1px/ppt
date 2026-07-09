@@ -11007,33 +11007,34 @@ async function runExportScenario(page) {
   )
 
   const openXmlPPTXBase64 = await addPPTXLineSpacingPointsProbe(
-    await addPPTXTextAutoFitProbe(
-      await addPPTXListStyleBulletProbe(
-        await addPPTXParagraphDefaultRunStyleProbe(
-          await addPPTXLayoutPlaceholderGeometryProbe(
-            await addPPTXLayoutObjectProbe(
-              await addPPTXLayoutBackgroundProbe(
-                await addPPTXBackgroundImageProbe(
-                  await addPPTXBackgroundRefProbe(
-                    await addPPTXThemeTypefaceProbe(
-                      await addPPTXHyperlinkProbe(
-                        await addPPTXImageOpacityProbe(
-                          await addPPTXElbowConnectorProbe(
-                            await addPPTXConnectedConnectorProbe(
-                              await addPPTXHiddenObjectProbe(
-                                await addPPTXNoFillShapeProbe(
-                                  await addPPTXGradientPatternFillProbe(
-                                    await addPPTXThemeColorProbe(
-                                      await addPPTXPresetSystemColorProbe(
-                                        await addPPTXUnevenTableProbe(
-                                          await addPPTXGroupedObjectProbe(
-                                            await reversePPTXPresentationSlideOrder(
-                                              await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    await addPPTXTextTabProbe(
+      await addPPTXTextAutoFitProbe(
+        await addPPTXListStyleBulletProbe(
+          await addPPTXParagraphDefaultRunStyleProbe(
+            await addPPTXLayoutPlaceholderGeometryProbe(
+              await addPPTXLayoutObjectProbe(
+                await addPPTXLayoutBackgroundProbe(
+                  await addPPTXBackgroundImageProbe(
+                    await addPPTXBackgroundRefProbe(
+                      await addPPTXThemeTypefaceProbe(
+                        await addPPTXHyperlinkProbe(
+                          await addPPTXImageOpacityProbe(
+                            await addPPTXElbowConnectorProbe(
+                              await addPPTXConnectedConnectorProbe(
+                                await addPPTXHiddenObjectProbe(
+                                  await addPPTXNoFillShapeProbe(
+                                    await addPPTXGradientPatternFillProbe(
+                                      await addPPTXThemeColorProbe(
+                                        await addPPTXPresetSystemColorProbe(
+                                          await addPPTXUnevenTableProbe(
+                                            await addPPTXGroupedObjectProbe(
+                                              await reversePPTXPresentationSlideOrder(
+                                                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
                                   ),
                                 ),
                               ),
@@ -11050,6 +11051,7 @@ async function runExportScenario(page) {
         ),
       ),
     ),
+  )
   )
   const beforeOpenXmlPPTXDrop = await page.eval(`(() => {
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
@@ -11206,6 +11208,8 @@ async function runExportScenario(page) {
         element.style?.fontFamily === 'Theme Minor Probe').length,
       listStyleBulletProbeModelCount: elements.filter((element) =>
         element.name === 'List Style Bullet Probe').length,
+      textTabProbeModelCount: elements.filter((element) =>
+        element.name === 'PPTX Tab Text Probe').length,
       lineSpacingPointsProbeModelCount: elements.filter((element) =>
         element.name === 'Line Spacing Points Probe').length,
       layoutPlaceholderGeometryProbeModelCount: elements.filter((element) =>
@@ -11505,6 +11509,12 @@ async function runExportScenario(page) {
           run.text === 'List style bullet probe' &&
           run.color === '#1d4ed8' &&
           run.size === 28)) === true)
+    const tabText = ['PPTX', 'Tab', 'Probe'].join(String.fromCharCode(9))
+    const exportTextTabProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'PPTX Tab Text Probe' &&
+      element.kind === 'textBox' &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.map((run) => run.text).join('') === tabText) === true)
     const exportLineSpacingPointsProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Line Spacing Points Probe' &&
       element.kind === 'textBox' &&
@@ -11733,6 +11743,11 @@ async function runExportScenario(page) {
       exportThemeTypefaceProbeModelCount: exportThemeTypefaceProbeObjects.length,
       exportHasListStyleBulletProbe: exportListStyleBulletProbeObjects.length > 0,
       exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
+      exportHasTextTabProbe: exportTextTabProbeObjects.length > 0,
+      exportTextTabProbeModelCount: exportTextTabProbeObjects.length,
+      exportTextTabProbeText: exportTextTabProbeObjects.map((element) =>
+        element.textBody?.paragraphs?.map((paragraph) =>
+          paragraph.runs?.map((run) => run.text).join('')).join('\\n') ?? '').join(' | '),
       exportHasLineSpacingPointsProbe: exportLineSpacingPointsProbeObjects.length > 0,
       exportLineSpacingPointsProbeSpacing: exportLineSpacingPointsProbeObjects.map((element) =>
         element.textBody?.paragraphs?.map((paragraph) =>
@@ -11859,6 +11874,9 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportThemeTypefaceProbeModelCount > beforeOpenXmlPPTXDrop.themeTypefaceProbeModelCount &&
       openXmlPPTXImportState.exportHasListStyleBulletProbe &&
       openXmlPPTXImportState.exportListStyleBulletProbeModelCount > beforeOpenXmlPPTXDrop.listStyleBulletProbeModelCount &&
+      openXmlPPTXImportState.exportHasTextTabProbe &&
+      openXmlPPTXImportState.exportTextTabProbeModelCount > beforeOpenXmlPPTXDrop.textTabProbeModelCount &&
+      openXmlPPTXImportState.exportTextTabProbeText === 'PPTX\tTab\tProbe' &&
       openXmlPPTXImportState.exportHasLineSpacingPointsProbe &&
       openXmlPPTXImportState.exportLineSpacingPointsProbeModelCount > beforeOpenXmlPPTXDrop.lineSpacingPointsProbeModelCount &&
       openXmlPPTXImportState.exportHasLayoutPlaceholderGeometryProbe &&
@@ -32595,6 +32613,68 @@ async function addPPTXListStyleBulletProbe(base64) {
     '<a:p>',
     '<a:pPr lvl="1"/>',
     '<a:r><a:t>List style bullet probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXTextTabProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('PPTX Tab Text Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9974" name="PPTX Tab Text Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="5486400" y="6979920"/>',
+    '<a:ext cx="3200400" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr><a:defRPr sz="2100"/></a:pPr>',
+    '<a:r><a:t>PPTX</a:t></a:r>',
+    '<a:tab/>',
+    '<a:r><a:t>Tab</a:t></a:r>',
+    '<a:tab/>',
+    '<a:r><a:t>Probe</a:t></a:r>',
     '</a:p>',
     '</p:txBody>',
     '</p:sp>',

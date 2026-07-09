@@ -4446,6 +4446,10 @@ function readPPTXPlainParagraphText(paragraph: Element) {
         return '\n'
       }
 
+      if (child.localName === 'tab') {
+        return '\t'
+      }
+
       if (child.localName === 'r' || child.localName === 'fld') {
         return getFirstPPTXDescendantByLocalName(child, 't')?.textContent ?? ''
       }
@@ -4527,7 +4531,12 @@ function readPPTXTextRun(
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
 ): PPTRun[] {
-  if (node.localName !== 'r' && node.localName !== 'fld' && node.localName !== 'br') {
+  if (
+    node.localName !== 'r' &&
+    node.localName !== 'fld' &&
+    node.localName !== 'br' &&
+    node.localName !== 'tab'
+  ) {
     return []
   }
 
@@ -4536,6 +4545,10 @@ function readPPTXTextRun(
 
   if (node.localName === 'br') {
     return [{ ...style, text: '\n' }]
+  }
+
+  if (node.localName === 'tab') {
+    return [{ ...style, text: '\t' }]
   }
 
   const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
