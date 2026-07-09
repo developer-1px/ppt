@@ -86,6 +86,11 @@ type PPTXLineConnectionRefs = {
 }
 type PPTXThemeColorMap = Readonly<Record<string, string>>
 type PPTXThemeFontMap = Readonly<Record<string, string>>
+type PPTXPlaceholderRef = {
+  idx?: string
+  type?: string
+}
+type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
 
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
@@ -542,6 +547,11 @@ async function readPPTXOpenXmlSlide({
     ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
     : null
   const relationships = await readPPTXSlideRelationships(zip, path)
+  const placeholderGeometries = await readPPTXSlideLayoutPlaceholderGeometries({
+    relationships,
+    slidePath: path,
+    zip,
+  })
   const notes = await readPPTXSlideNotes({
     relationships,
     slidePath: path,
@@ -568,7 +578,15 @@ async function readPPTXOpenXmlSlide({
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
         ? readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
-        : readPPTXShapeElement(child, index, objectIndex, relationships, themeColors, themeFonts)
+        : readPPTXShapeElement(
+          child,
+          index,
+          objectIndex,
+          relationships,
+          themeColors,
+          themeFonts,
+          placeholderGeometries,
+        )
     } else if (child.localName === 'cxnSp') {
       element = readPPTXLineElement(child, index, objectIndex, relationships, themeColors)
     } else if (child.localName === 'pic') {
@@ -925,6 +943,169 @@ async function readPPTXSlideBackgroundImage({
     ...(opacity === null ? {} : { opacity }),
     src: `data:${mimeType};base64,${base64}`,
   }
+}
+
+async function readPPTXSlideLayoutPlaceholderGeometries({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXPlaceholderGeometryMap> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return new Map()
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterGeometries = masterPath
+    ? await readPPTXPartPlaceholderGeometries(zip, masterPath)
+    : new Map()
+  const layoutGeometries = await readPPTXPartPlaceholderGeometries(zip, layoutPath)
+
+  return new Map([...masterGeometries, ...layoutGeometries])
+}
+
+async function readPPTXPartPlaceholderGeometries(
+  zip: JSZip,
+  path: string,
+): Promise<PPTXPlaceholderGeometryMap> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const geometries: PPTXPlaceholderGeometryMap = new Map()
+
+  if (!doc) {
+    return geometries
+  }
+
+  for (const shape of getPPTXDescendantsByLocalName(doc, 'sp')) {
+    const placeholder = readPPTXPlaceholderRef(shape)
+    const geometry = readPPTXElementGeometry(
+      getDirectPPTXChildByLocalName(shape, 'spPr'),
+    )
+
+    if (!placeholder || !geometry) {
+      continue
+    }
+
+    for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+      if (!geometries.has(key)) {
+        geometries.set(key, geometry)
+      }
+    }
+  }
+
+  return geometries
+}
+
+function readPPTXPlaceholderGeometry(
+  element: Element,
+  geometries: PPTXPlaceholderGeometryMap,
+): PPTGeometry | null {
+  const placeholder = readPPTXPlaceholderRef(element)
+
+  if (!placeholder) {
+    return null
+  }
+
+  for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+    const geometry = geometries.get(key)
+
+    if (geometry) {
+      return { ...geometry }
+    }
+  }
+
+  return null
+}
+
+function readPPTXPlaceholderRef(element: Element): PPTXPlaceholderRef | null {
+  const placeholder = getFirstPPTXDescendantByLocalName(element, 'ph')
+  const type = placeholder?.getAttribute('type')?.trim() || undefined
+  const idx = placeholder?.getAttribute('idx')?.trim() || undefined
+
+  return type || idx ? {
+    ...(idx ? { idx } : {}),
+    ...(type ? { type } : {}),
+  } : null
+}
+
+function getPPTXPlaceholderLookupKeys(placeholder: PPTXPlaceholderRef) {
+  const keys: string[] = []
+  const types = getPPTXPlaceholderTypeCandidates(placeholder.type)
+
+  if (placeholder.idx) {
+    for (const type of types) {
+      keys.push(`type:${type}:idx:${placeholder.idx}`)
+    }
+    keys.push(`idx:${placeholder.idx}`)
+  }
+
+  for (const type of types) {
+    keys.push(`type:${type}`)
+  }
+
+  return [...new Set(keys)]
+}
+
+function getPPTXPlaceholderTypeCandidates(type: string | undefined) {
+  if (!type) {
+    return []
+  }
+
+  if (type === 'title') {
+    return ['title', 'ctrTitle']
+  }
+
+  if (type === 'ctrTitle') {
+    return ['ctrTitle', 'title']
+  }
+
+  if (type === 'body') {
+    return ['body', 'obj']
+  }
+
+  if (type === 'obj') {
+    return ['obj', 'body']
+  }
+
+  return [type]
+}
+
+function readPPTXRelatedPartPath({
+  relationshipTypeSuffix,
+  relationships,
+  sourcePath,
+  zip,
+}: {
+  relationshipTypeSuffix: string
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+  zip: JSZip
+}) {
+  const relationship = Array.from(relationships.values())
+    .find((candidate) =>
+      candidate.targetMode !== 'External' &&
+      candidate.type.endsWith(relationshipTypeSuffix))
+  const path = relationship
+    ? resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
 }
 
 function readPPTXSlideTransition(
@@ -1481,10 +1662,12 @@ function readPPTXShapeElement(
   relationships: PPTXRelationshipMap,
   themeColors: PPTXThemeColorMap,
   themeFonts: PPTXThemeFontMap,
+  placeholderGeometries: PPTXPlaceholderGeometryMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
-  const geometry = readPPTXElementGeometry(spPr)
+  const geometry = readPPTXElementGeometry(spPr) ??
+    readPPTXPlaceholderGeometry(sp, placeholderGeometries)
   const textBody = readPPTXTextBody(txBody, themeColors)
   const stroke = readPPTXStroke(spPr, themeColors)
   const fill = readPPTXShapeFill(spPr, stroke, themeColors)

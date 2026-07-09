@@ -11010,22 +11010,24 @@ async function runExportScenario(page) {
     await addPPTXTextAutoFitProbe(
       await addPPTXListStyleBulletProbe(
         await addPPTXParagraphDefaultRunStyleProbe(
-          await addPPTXBackgroundImageProbe(
-            await addPPTXBackgroundRefProbe(
-              await addPPTXThemeTypefaceProbe(
-                await addPPTXHyperlinkProbe(
-                  await addPPTXImageOpacityProbe(
-                    await addPPTXElbowConnectorProbe(
-                      await addPPTXConnectedConnectorProbe(
-                        await addPPTXHiddenObjectProbe(
-                          await addPPTXNoFillShapeProbe(
-                            await addPPTXGradientPatternFillProbe(
-                              await addPPTXThemeColorProbe(
-                                await addPPTXPresetSystemColorProbe(
-                                  await addPPTXUnevenTableProbe(
-                                    await addPPTXGroupedObjectProbe(
-                                      await reversePPTXPresentationSlideOrder(
-                                        await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+          await addPPTXLayoutPlaceholderGeometryProbe(
+            await addPPTXBackgroundImageProbe(
+              await addPPTXBackgroundRefProbe(
+                await addPPTXThemeTypefaceProbe(
+                  await addPPTXHyperlinkProbe(
+                    await addPPTXImageOpacityProbe(
+                      await addPPTXElbowConnectorProbe(
+                        await addPPTXConnectedConnectorProbe(
+                          await addPPTXHiddenObjectProbe(
+                            await addPPTXNoFillShapeProbe(
+                              await addPPTXGradientPatternFillProbe(
+                                await addPPTXThemeColorProbe(
+                                  await addPPTXPresetSystemColorProbe(
+                                    await addPPTXUnevenTableProbe(
+                                      await addPPTXGroupedObjectProbe(
+                                        await reversePPTXPresentationSlideOrder(
+                                          await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -11191,6 +11193,13 @@ async function runExportScenario(page) {
         element.name === 'List Style Bullet Probe').length,
       lineSpacingPointsProbeModelCount: elements.filter((element) =>
         element.name === 'Line Spacing Points Probe').length,
+      layoutPlaceholderGeometryProbeModelCount: elements.filter((element) =>
+        element.name === 'Layout Placeholder Geometry Probe' &&
+        element.kind === 'textBox' &&
+        element.geometry?.x === 64 &&
+        element.geometry?.y === 144 &&
+        element.geometry?.w === 400 &&
+        element.geometry?.h === 88).length,
       paragraphSpacingModelCount: paragraphs.filter((paragraph) =>
         paragraph.lineHeight !== undefined ||
         paragraph.spacingAfter !== undefined ||
@@ -11478,6 +11487,16 @@ async function runExportScenario(page) {
         paragraph.runs?.some((run) =>
           run.text === 'Line spacing points probe' &&
           run.size === 28)) === true)
+    const exportLayoutPlaceholderGeometryProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Layout Placeholder Geometry Probe' &&
+      element.kind === 'textBox' &&
+      element.geometry?.x === 64 &&
+      element.geometry?.y === 144 &&
+      element.geometry?.w === 400 &&
+      element.geometry?.h === 88 &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'Layout placeholder geometry probe')) === true)
     const exportHighlightedRuns = exportRuns.filter((run) => run.highlight)
     const exportStrikethroughRuns = exportRuns.filter((run) =>
       run.strikethrough === true)
@@ -11671,6 +11690,10 @@ async function runExportScenario(page) {
       exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
       exportHasLineSpacingPointsProbe: exportLineSpacingPointsProbeObjects.length > 0,
       exportLineSpacingPointsProbeModelCount: exportLineSpacingPointsProbeObjects.length,
+      exportHasLayoutPlaceholderGeometryProbe: exportLayoutPlaceholderGeometryProbeObjects.length > 0,
+      exportLayoutPlaceholderGeometryProbeBounds: exportLayoutPlaceholderGeometryProbeObjects.map((element) =>
+        [element.geometry?.x, element.geometry?.y, element.geometry?.w, element.geometry?.h].join(' ')).join(' | '),
+      exportLayoutPlaceholderGeometryProbeModelCount: exportLayoutPlaceholderGeometryProbeObjects.length,
       exportParagraphDefaultRunStyleNames: exportParagraphDefaultRunStyleObjects.map((element) => element.name).join(' | '),
       exportParagraphDefaultRunStyleModelCount: exportParagraphDefaultRunStyleObjects.length,
       exportParagraphSpacingModelCount: exportSpacedParagraphs.length,
@@ -11784,6 +11807,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportListStyleBulletProbeModelCount > beforeOpenXmlPPTXDrop.listStyleBulletProbeModelCount &&
       openXmlPPTXImportState.exportHasLineSpacingPointsProbe &&
       openXmlPPTXImportState.exportLineSpacingPointsProbeModelCount > beforeOpenXmlPPTXDrop.lineSpacingPointsProbeModelCount &&
+      openXmlPPTXImportState.exportHasLayoutPlaceholderGeometryProbe &&
+      openXmlPPTXImportState.exportLayoutPlaceholderGeometryProbeModelCount > beforeOpenXmlPPTXDrop.layoutPlaceholderGeometryProbeModelCount &&
       openXmlPPTXImportState.exportHasParagraphSpacing &&
       openXmlPPTXImportState.exportParagraphSpacingModelCount > beforeOpenXmlPPTXDrop.paragraphSpacingModelCount &&
       openXmlPPTXImportState.exportHasTableText &&
@@ -28154,6 +28179,48 @@ function getPPTXRelativeTarget(sourcePath, targetPath) {
   ].join('/')
 }
 
+function resolvePPTXRelationshipTarget(sourcePath, target) {
+  if (target.startsWith('/')) {
+    return target.slice(1)
+  }
+
+  const sourceParts = sourcePath.split('/')
+  sourceParts.pop()
+  const normalized = []
+
+  for (const part of [...sourceParts, ...target.split('/')]) {
+    if (!part || part === '.') {
+      continue
+    }
+
+    if (part === '..') {
+      normalized.pop()
+      continue
+    }
+
+    normalized.push(part)
+  }
+
+  return normalized.join('/')
+}
+
+async function getPPTXRelatedPartPath(zip, sourcePath, relationshipTypeSuffix) {
+  const relsXml = await readPPTXZipText(zip, getPPTXRelationshipsPath(sourcePath))
+  const relationship = [...relsXml.matchAll(/<Relationship\b[^>]*\/>/g)]
+    .map((match) => match[0])
+    .find((relationshipXml) =>
+      readPPTXXmlAttribute(relationshipXml, 'TargetMode') !== 'External' &&
+      readPPTXXmlAttribute(relationshipXml, 'Type').endsWith(relationshipTypeSuffix))
+  const target = relationship
+    ? readPPTXXmlAttribute(relationship, 'Target')
+    : ''
+  const path = target
+    ? resolvePPTXRelationshipTarget(sourcePath, target)
+    : ''
+
+  return path && zip.file(path) ? path : ''
+}
+
 function getNextPPTXRelationshipId(xml) {
   const ids = [...xml.matchAll(/\bId="rId(\d+)"/g)]
     .map((match) => Number(match[1]))
@@ -28175,6 +28242,10 @@ function escapePPTXXmlText(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+}
+
+function readPPTXXmlAttribute(xml, name) {
+  return xml.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? ''
 }
 
 async function ensurePPTXDefaultContentType(zip, extension, contentType) {
@@ -28747,6 +28818,105 @@ async function addPPTXBackgroundImageProbe(base64) {
   }
 
   zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXLayoutPlaceholderGeometryProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const slidePath = slidePaths[1] ?? slidePaths[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  let layoutPath = await getPPTXRelatedPartPath(zip, slidePath, '/slideLayout')
+
+  if (!layoutPath) {
+    layoutPath = Object.keys(zip.files)
+      .filter((path) => /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(path))
+      .sort(comparePPTXNumberedPaths)[0] ?? ''
+
+    if (layoutPath) {
+      await addPPTXInternalRelationship({
+        sourcePath: slidePath,
+        target: getPPTXRelativeTarget(slidePath, layoutPath),
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout',
+        zip,
+      })
+    }
+  }
+
+  if (!layoutPath) {
+    return base64
+  }
+
+  const slideXml = await readPPTXZipText(zip, slidePath)
+  const layoutXml = await readPPTXZipText(zip, layoutPath)
+
+  if (
+    slideXml.includes('Layout Placeholder Geometry Probe') ||
+    !slideXml.includes('</p:spTree>') ||
+    !layoutXml.includes('</p:spTree>')
+  ) {
+    return base64
+  }
+
+  const layoutShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9968" name="Layout Placeholder Geometry Source"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr><p:ph type="body" idx="42"/></p:nvPr>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="609600" y="1371600"/>',
+    '<a:ext cx="3810000" cy="838200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const slideShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9968" name="Layout Placeholder Geometry Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr><p:ph type="body" idx="42"/></p:nvPr>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:t>Layout placeholder geometry probe</a:t></a:r></a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextLayoutXml = layoutXml.includes('Layout Placeholder Geometry Source')
+    ? layoutXml
+    : layoutXml.replace('</p:spTree>', `${layoutShapeXml}</p:spTree>`)
+  const nextSlideXml = slideXml.replace('</p:spTree>', `${slideShapeXml}</p:spTree>`)
+
+  if (nextLayoutXml === layoutXml && nextSlideXml === slideXml) {
+    return base64
+  }
+
+  zip.file(layoutPath, nextLayoutXml)
+  zip.file(slidePath, nextSlideXml)
 
   return await zip.generateAsync({
     compression: 'DEFLATE',
