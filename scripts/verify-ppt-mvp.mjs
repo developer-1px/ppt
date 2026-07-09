@@ -12035,6 +12035,152 @@ async function runExportScenario(page) {
     },
   )
 
+  const customGeometryFreeformPPTXBase64 = await addPPTXCustomGeometryFreeformProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeCustomGeometryFreeformPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      customGeometryFreeformModelCount: elements.filter((element) =>
+        element.name === 'Custom Geometry Probe' &&
+        element.kind === 'freeform').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-custom-geometry-freeform.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(customGeometryFreeformPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const customGeometryFreeformPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeFreeform = document.querySelector('.ppt-slide [data-ppt-element-name="Custom Geometry Probe"][data-kind="freeform"]')
+    const activeFreeformPath = activeFreeform?.querySelector('[data-ppt-freeform-path]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const freeformObjects = exportImportedElements.filter((element) =>
+      element.name === 'Custom Geometry Probe' &&
+      element.kind === 'freeform')
+    const probe = freeformObjects[0] ?? null
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activePathFill: activeFreeformPath?.getAttribute('fill') ?? '',
+      activePathD: activeFreeformPath?.getAttribute('d') ?? '',
+      activePointCount: Number(activeFreeform?.getAttribute('data-ppt-freeform-points') ?? 0),
+      activePointMode: activeFreeform?.getAttribute('data-ppt-freeform-point-mode') ?? '',
+      activeFillOpacity: activeFreeform?.getAttribute('data-ppt-fill-opacity') ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      probeFillColor: probe?.fill?.color ?? '',
+      probeFillOpacity: probe?.fill?.opacity ?? null,
+      probeGeometry: probe?.geometry ?? null,
+      probeModelCount: freeformObjects.length,
+      probePointMode: probe?.pointMode ?? '',
+      probePointCount: probe?.points?.length ?? 0,
+      probeStrokeColor: probe?.stroke?.color ?? '',
+      probeStrokeWidth: probe?.stroke?.width ?? null,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX custom geometry as editable freeform through OpenXML fallback import',
+    customGeometryFreeformPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      customGeometryFreeformPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      customGeometryFreeformPPTXImportState.fileName === 'external-openxml-custom-geometry-freeform.pptx' &&
+      customGeometryFreeformPPTXImportState.importedCount === beforeCustomGeometryFreeformPPTXDrop.slideCount &&
+      customGeometryFreeformPPTXImportState.sourceSlideCount === beforeCustomGeometryFreeformPPTXDrop.slideCount &&
+      customGeometryFreeformPPTXImportState.slideCount === beforeCustomGeometryFreeformPPTXDrop.slideCount * 2 &&
+      customGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
+      customGeometryFreeformPPTXImportState.probeModelCount >
+        beforeCustomGeometryFreeformPPTXDrop.customGeometryFreeformModelCount &&
+      customGeometryFreeformPPTXImportState.probePointCount >= 5 &&
+      customGeometryFreeformPPTXImportState.activePointCount >= 5 &&
+      customGeometryFreeformPPTXImportState.probePointMode === 'polyline' &&
+      customGeometryFreeformPPTXImportState.activePointMode === 'polyline' &&
+      customGeometryFreeformPPTXImportState.activePathD.includes('M ') &&
+      customGeometryFreeformPPTXImportState.activePathD.includes('L ') &&
+      !customGeometryFreeformPPTXImportState.activePathD.includes('Q ') &&
+      customGeometryFreeformPPTXImportState.activePathFill !== 'none' &&
+      customGeometryFreeformPPTXImportState.activeFillOpacity === '0.82' &&
+      customGeometryFreeformPPTXImportState.probeFillColor === '#e0f2fe' &&
+      customGeometryFreeformPPTXImportState.probeFillOpacity === 0.82 &&
+      customGeometryFreeformPPTXImportState.probeStrokeColor === '#0284c7' &&
+      customGeometryFreeformPPTXImportState.probeStrokeWidth === 3 &&
+      customGeometryFreeformPPTXImportState.probeGeometry?.x === 816 &&
+      customGeometryFreeformPPTXImportState.probeGeometry?.y === 336 &&
+      customGeometryFreeformPPTXImportState.probeGeometry?.w === 128 &&
+      customGeometryFreeformPPTXImportState.probeGeometry?.h === 96,
+    {
+      beforeCustomGeometryFreeformPPTXDrop,
+      customGeometryFreeformPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterCustomGeometryFreeformPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes custom geometry freeform PPTX drop probes before export scenario continues',
+    afterCustomGeometryFreeformPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterCustomGeometryFreeformPPTXDropCleanup.slideCount === beforeCustomGeometryFreeformPPTXDrop.slideCount,
+    {
+      afterCustomGeometryFreeformPPTXDropCleanup,
+      beforeCustomGeometryFreeformPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -29161,6 +29307,73 @@ async function addPPTXLayoutBackgroundImageOnlyProbe(base64) {
   }
 
   zip.file(layoutPath, nextLayoutXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXCustomGeometryFreeformProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Custom Geometry Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9977" name="Custom Geometry Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="3200400"/>',
+    '<a:ext cx="1219200" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:custGeom>',
+    '<a:avLst/>',
+    '<a:gdLst/>',
+    '<a:ahLst/>',
+    '<a:cxnLst/>',
+    '<a:rect l="0" t="0" r="21600" b="21600"/>',
+    '<a:pathLst>',
+    '<a:path w="21600" h="21600">',
+    '<a:moveTo><a:pt x="10800" y="0"/></a:moveTo>',
+    '<a:lnTo><a:pt x="21600" y="10800"/></a:lnTo>',
+    '<a:lnTo><a:pt x="10800" y="21600"/></a:lnTo>',
+    '<a:lnTo><a:pt x="0" y="10800"/></a:lnTo>',
+    '<a:close/>',
+    '</a:path>',
+    '</a:pathLst>',
+    '</a:custGeom>',
+    '<a:solidFill><a:srgbClr val="E0F2FE"><a:alpha val="82000"/></a:srgbClr></a:solidFill>',
+    '<a:ln w="28575"><a:solidFill><a:srgbClr val="0284C7"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
 
   return await zip.generateAsync({
     compression: 'DEFLATE',

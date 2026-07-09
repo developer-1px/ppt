@@ -192,7 +192,9 @@ const PPTLineSchema = PPTElementBaseSchema.extend({
 })
 
 const PPTFreeformSchema = PPTElementBaseSchema.extend({
+  fill: PPTFillSchema.optional(),
   kind: z.literal('freeform'),
+  pointMode: z.enum(['freehand', 'polyline']).optional(),
   points: z.array(PPTLinePointSchema).min(1),
   stroke: PPTStrokeSchema,
 })

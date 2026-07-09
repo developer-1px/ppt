@@ -9,6 +9,7 @@ import {
   type PPTElementAnimation,
   type PPTElementShadow,
   type PPTFill,
+  type PPTFreeform,
   type PPTGeometry,
   type PPTImage,
   type PPTLine,
@@ -2160,6 +2161,24 @@ function readPPTXShapeElement(
   const name = readPPTXObjectName(sp, `Object ${objectIndex}`)
   const isTextBox = isPPTXTextBoxShape(sp) || (textBody !== null && !hasPaint)
 
+  if (!textBody) {
+    const freeform = readPPTXCustomGeometryFreeformElement({
+      fill,
+      geometry,
+      id,
+      name,
+      relationships,
+      shadow,
+      sp,
+      spPr,
+      stroke,
+    })
+
+    if (freeform) {
+      return freeform
+    }
+  }
+
   if (isTextBox) {
     return {
       ...(readPPTXElementAccessibility(sp) ?? {}),
@@ -2199,6 +2218,145 @@ function readPPTXShapeElement(
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
   }
+}
+
+function readPPTXCustomGeometryFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+}): PPTFreeform | null {
+  const points = readPPTXCustomGeometryPoints(spPr, geometry)
+
+  if (points.length < 2) {
+    return null
+  }
+
+  const fallbackStroke = fill
+    ? { color: fill.color, width: 0 }
+    : { color: PPTX_DEFAULT_STROKE_COLOR, width: 1 }
+
+  return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
+    ...(fill ? { fill } : {}),
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id,
+    kind: 'freeform',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    pointMode: 'polyline',
+    points,
+    ...(shadow ? { shadow } : {}),
+    stroke: stroke ?? fallbackStroke,
+  }
+}
+
+function readPPTXCustomGeometryPoints(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+) {
+  const customGeometry = getDirectPPTXChildByLocalName(spPr, 'custGeom')
+  const pathList = getDirectPPTXChildByLocalName(customGeometry, 'pathLst')
+  const path = getDirectPPTXChildByLocalName(pathList, 'path')
+
+  if (!path) {
+    return []
+  }
+
+  const rawPoints = readPPTXCustomGeometryPathPoints(path)
+
+  if (rawPoints.length < 2) {
+    return []
+  }
+
+  const bounds = rawPoints.reduce(
+    (acc, point) => ({
+      maxX: Math.max(acc.maxX, point.x),
+      maxY: Math.max(acc.maxY, point.y),
+      minX: Math.min(acc.minX, point.x),
+      minY: Math.min(acc.minY, point.y),
+    }),
+    {
+      maxX: rawPoints[0]?.x ?? 0,
+      maxY: rawPoints[0]?.y ?? 0,
+      minX: rawPoints[0]?.x ?? 0,
+      minY: rawPoints[0]?.y ?? 0,
+    },
+  )
+  const rawPathWidth = toPPTXPositiveNumber(path.getAttribute('w'))
+  const rawPathHeight = toPPTXPositiveNumber(path.getAttribute('h'))
+  const pathWidth = rawPathWidth && rawPathWidth > 0 ? rawPathWidth : null
+  const pathHeight = rawPathHeight && rawPathHeight > 0 ? rawPathHeight : null
+  const sourceWidth = pathWidth ?? Math.max(1, bounds.maxX - bounds.minX)
+  const sourceHeight = pathHeight ?? Math.max(1, bounds.maxY - bounds.minY)
+  const originX = pathWidth === null ? bounds.minX : 0
+  const originY = pathHeight === null ? bounds.minY : 0
+
+  return rawPoints.map((point) => ({
+    x: ((point.x - originX) / sourceWidth) * geometry.w,
+    y: ((point.y - originY) / sourceHeight) * geometry.h,
+  }))
+}
+
+function readPPTXCustomGeometryPathPoints(path: Element) {
+  const points: PPTLine['start'][] = []
+  let firstPoint: PPTLine['start'] | null = null
+
+  for (const command of Array.from(path.children)) {
+    if (command.localName === 'close' && firstPoint) {
+      points.push(firstPoint)
+      continue
+    }
+
+    const point = readPPTXCustomGeometryCommandPoint(command)
+
+    if (!point) {
+      continue
+    }
+
+    if (command.localName === 'moveTo') {
+      firstPoint = point
+    }
+
+    points.push(point)
+  }
+
+  return points
+}
+
+function readPPTXCustomGeometryCommandPoint(command: Element) {
+  if (![
+    'cubicBezTo',
+    'lnTo',
+    'moveTo',
+    'quadBezTo',
+  ].includes(command.localName)) {
+    return null
+  }
+
+  const point = getDirectPPTXChildrenByLocalName(command, 'pt').at(-1)
+  const x = toPPTXNumber(point?.getAttribute('x'))
+  const y = toPPTXNumber(point?.getAttribute('y'))
+
+  return x === null || y === null ? null : { x, y }
 }
 
 async function readPPTXPictureElement({

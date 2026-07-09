@@ -723,10 +723,14 @@ function renderPPTLineHTML(element: PPTLine, style: string[]) {
 }
 
 function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
+  const fill = element.fill ? element.fill.color : 'none'
+  const fillOpacity = element.fill ? getPPTFillOpacitySvgAttr(element.fill) : ''
   const attrs = [
     `data-ppt-element="${escapeHtml(element.id)}"`,
     `data-ppt-kind="freeform"`,
+    `data-ppt-freeform-point-mode="${element.pointMode ?? 'freehand'}"`,
     `data-ppt-freeform-points="${element.points.length}"`,
+    element.fill ? getPPTElementFillOpacityDataAttr(element.fill) : '',
     getPPTElementAltTextHTMLAttr(element).trim(),
     getPPTElementHyperlinkHTMLAttr(element).trim(),
     getPPTElementStrokeDashHTMLAttr(element).trim(),
@@ -734,16 +738,18 @@ function renderPPTFreeformHTML(element: PPTFreeform, style: string[]) {
     getPPTElementShadowHTMLAttrs(element).trim(),
   ].join(' ')
 
-  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element.points))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></svg>`
+  return `    <svg class="ppt-element ppt-freeform" ${attrs} style="${style.filter(Boolean).join(';')}" viewBox="0 0 ${formatNumber(element.geometry.w)} ${formatNumber(element.geometry.h)}" preserveAspectRatio="none" aria-hidden="true"><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></svg>`
 }
 
 function renderPPTFreeformSVG(element: PPTFreeform) {
+  const fill = element.fill ? element.fill.color : 'none'
+  const fillOpacity = element.fill ? getPPTFillOpacitySvgAttr(element.fill) : ''
   const attrs = [
     getPPTElementSVGAttrs(element),
     `data-ppt-freeform-points="${element.points.length}"`,
   ].join(' ')
 
-  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="none" stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></g>`
+  return `<g ${attrs}><path data-ppt-freeform-path d="${escapeHtml(getPPTFreeformWorldPathData(element))}" fill="${escapeHtml(fill)}"${fillOpacity} stroke="${escapeHtml(element.stroke.color)}" stroke-width="${formatNumber(element.stroke.width)}"${getPPTStrokeDashArraySvgAttr(element.stroke)} stroke-linecap="round" stroke-linejoin="round"></path></g>`
 }
 
 function renderPPTCommentHTML(
@@ -1312,7 +1318,7 @@ function getPPTElementFillOpacityHTMLAttr(element: PPTElement) {
     return ''
   }
 
-  return ` data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(element.fill)))}"`
+  return ` ${getPPTElementFillOpacityDataAttr(element.fill)}`
 }
 
 function getPPTElementFillOpacitySvgAttr(element: PPTElement) {
@@ -1320,7 +1326,11 @@ function getPPTElementFillOpacitySvgAttr(element: PPTElement) {
     return ''
   }
 
-  return `data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(element.fill)))}"`
+  return getPPTElementFillOpacityDataAttr(element.fill)
+}
+
+function getPPTElementFillOpacityDataAttr(fill: PPTFill) {
+  return `data-ppt-fill-opacity="${escapeHtml(formatPPTFillOpacity(getPPTFillOpacity(fill)))}"`
 }
 
 function getPPTElementCornerRadiusSvgAttr(element: PPTElement) {
@@ -1515,14 +1525,20 @@ function getPPTLineSVGPath(element: PPTLine) {
 }
 
 function getPPTFreeformWorldPathData(element: PPTFreeform) {
-  return createPPTCanvasSvgFreehandPathData(element.points.map((point) => ({
+  const points = element.points.map((point) => ({
     x: element.geometry.x + point.x,
     y: element.geometry.y + point.y,
-  })))
+  }))
+
+  return element.pointMode === 'polyline'
+    ? createPPTCanvasSvgPathData(points)
+    : createPPTCanvasSvgFreehandPathData(points)
 }
 
-function getPPTFreeformPathData(points: readonly PPTLinePoint[]) {
-  return createPPTCanvasSvgFreehandPathData(points)
+function getPPTFreeformPathData(element: PPTFreeform) {
+  return element.pointMode === 'polyline'
+    ? createPPTCanvasSvgPathData(element.points)
+    : createPPTCanvasSvgFreehandPathData(element.points)
 }
 
 function getPPTLineWorldPoint(line: PPTLine, point: PPTLinePoint) {

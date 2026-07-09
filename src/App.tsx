@@ -35892,6 +35892,9 @@ function SlideThumb({
             data-ppt-freeform-points={element.kind === 'freeform'
               ? element.points.length
               : undefined}
+            data-ppt-freeform-point-mode={element.kind === 'freeform'
+              ? element.pointMode ?? 'freehand'
+              : undefined}
             data-ppt-thumb-comment-resolved={element.kind === 'comment' && element.resolved === true
               ? 'true'
               : undefined}
@@ -35915,7 +35918,9 @@ function SlideThumb({
               : undefined}
             data-ppt-thumb-fill-opacity={element.kind === 'shape'
               ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
-              : undefined}
+              : element.kind === 'freeform' && element.fill
+                ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
+                : undefined}
             data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
             data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
             data-ppt-thumb-alt-text={getPPTElementAltText(element)}
@@ -35958,15 +35963,17 @@ function SlideThumb({
             style={{
               background: element.kind === 'shape'
                 ? getPPTFillColorCSS(element.fill)
-                : element.kind === 'image'
-                  ? undefined
-                  : element.kind === 'table'
-                    ? '#f8fafc'
-                    : element.kind === 'comment'
-                      ? '#fef3c7'
-                      : element.kind === 'textBox'
-                        ? '#cbd5e1'
-                      : undefined,
+                : element.kind === 'freeform' && element.fill
+                  ? getPPTFillColorCSS(element.fill)
+                  : element.kind === 'image'
+                    ? undefined
+                    : element.kind === 'table'
+                      ? '#f8fafc'
+                      : element.kind === 'comment'
+                        ? '#fef3c7'
+                        : element.kind === 'textBox'
+                          ? '#cbd5e1'
+                          : undefined,
               border: element.kind === 'shape' && element.stroke
                 ? `${element.stroke.width}px solid ${element.stroke.color}`
                 : undefined,
@@ -36249,6 +36256,9 @@ function PPTElementView({
       data-ppt-freeform-points={element.kind === 'freeform'
         ? element.points.length
         : undefined}
+      data-ppt-freeform-point-mode={element.kind === 'freeform'
+        ? element.pointMode ?? 'freehand'
+        : undefined}
       data-ppt-find-active={findActive ? 'true' : undefined}
       data-ppt-flip-h={element.flipH === true ? 'true' : undefined}
       data-ppt-flip-v={element.flipV === true ? 'true' : undefined}
@@ -36263,7 +36273,9 @@ function PPTElementView({
         : undefined}
       data-ppt-fill-opacity={element.kind === 'shape'
         ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
-        : undefined}
+        : element.kind === 'freeform' && element.fill
+          ? formatPPTFillOpacity(getPPTFillOpacity(element.fill))
+          : undefined}
       data-ppt-hyperlink-url={getPPTElementHyperlink(element)?.url}
       data-ppt-opacity={formatPPTElementOpacity(getPPTElementOpacity(element))}
       data-ppt-stroke-dash={getPPTElementStrokeDash(element)}
@@ -36684,6 +36696,10 @@ function PPTLineSvg({ element }: { element: PPTLine }) {
 }
 
 function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
+  const pathData = element.pointMode === 'polyline'
+    ? createPPTCanvasSvgPathData(element.points)
+    : createPPTCanvasSvgFreehandPathData(element.points)
+
   return (
     <svg
       aria-hidden="true"
@@ -36693,8 +36709,8 @@ function PPTFreeformSvg({ element }: { element: PPTFreeform }) {
     >
       <path
         data-ppt-freeform-path
-        d={createPPTCanvasSvgFreehandPathData(element.points)}
-        fill="none"
+        d={pathData}
+        fill={element.fill ? getPPTFillColorCSS(element.fill) : 'none'}
         stroke={element.stroke.color}
         strokeDasharray={getPPTStrokeDashArray(element.stroke)}
         strokeLinecap="round"
