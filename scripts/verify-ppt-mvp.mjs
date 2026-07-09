@@ -354,6 +354,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXHyperlinkProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXSlideMetadataProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
@@ -414,6 +415,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXShapeImageFillProbeState(page)
   const openXmlPPTXRunHyperlinkState =
     await readPPTXRunHyperlinkProbeState(page)
+  const openXmlPPTXSlideMetadataState =
+    await readPPTXSlideMetadataProbeState(page)
   const openXmlPPTXUnsupportedImageState =
     await readPPTXUnsupportedImageProbeState(page)
 
@@ -620,6 +623,25 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXRunHyperlinkState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX p14 section and hidden slide metadata for viewer rendering',
+    openXmlPPTXSlideMetadataState.modelCount === 1 &&
+      openXmlPPTXSlideMetadataState.hiddenModelCount === 1 &&
+      openXmlPPTXSlideMetadataState.probeHidden === 'true' &&
+      openXmlPPTXSlideMetadataState.probeSectionName ===
+        'PPTX Metadata Probe Section' &&
+      openXmlPPTXSlideMetadataState.activeHidden === 'true' &&
+      openXmlPPTXSlideMetadataState.activeSectionName ===
+        'PPTX Metadata Probe Section' &&
+      openXmlPPTXSlideMetadataState.activeThumbHidden === 'true' &&
+      openXmlPPTXSlideMetadataState.activeThumbSectionName ===
+        'PPTX Metadata Probe Section',
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXSlideMetadataState,
     },
   )
 
@@ -31254,18 +31276,25 @@ async function addPPTXSlideMetadataProbe(base64) {
 
   const sectionName = 'PPTX Metadata Probe Section'
   const sectionXml = [
-    `<p:section name="${escapePPTXXmlAttribute(sectionName)}"`,
+    `<p14:section name="${escapePPTXXmlAttribute(sectionName)}"`,
     ' id="{11111111-2222-3333-4444-555555555555}">',
-    `<p:sldIdLst><p:sldId id="${escapePPTXXmlAttribute(slideId)}"/></p:sldIdLst>`,
-    '</p:section>',
+    `<p14:sldIdLst><p14:sldId id="${escapePPTXXmlAttribute(slideId)}"/></p14:sldIdLst>`,
+    '</p14:section>',
+  ].join('')
+  const sectionExtensionXml = [
+    '<p:ext uri="{521415D9-36F7-43E2-AB2F-B90AF26B5E84}">',
+    '<p14:sectionLst xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">',
+    sectionXml,
+    '</p14:sectionLst>',
+    '</p:ext>',
   ].join('')
   const nextPresentationXml = presentationXml.includes(sectionName)
     ? presentationXml
-    : /<p:sectionLst\b/.test(presentationXml)
-      ? presentationXml.replace('</p:sectionLst>', `${sectionXml}</p:sectionLst>`)
+    : /<p:extLst\b/.test(presentationXml)
+      ? presentationXml.replace('</p:extLst>', `${sectionExtensionXml}</p:extLst>`)
       : presentationXml.replace(
           '</p:presentation>',
-          `<p:sectionLst>${sectionXml}</p:sectionLst></p:presentation>`,
+          `<p:extLst>${sectionExtensionXml}</p:extLst></p:presentation>`,
         )
 
   if (nextPresentationXml !== presentationXml) {
@@ -38155,6 +38184,43 @@ function readPPTXRunHyperlinkProbeState(page) {
       modelCount: elements.length,
       runHyperlinkUrl: linkRun?.hyperlink?.url ?? '',
       runText: linkRun?.text ?? '',
+    }
+  })()`)
+}
+
+function readPPTXSlideMetadataProbeState(page) {
+  return page.eval(`(() => {
+    const sectionName = 'PPTX Metadata Probe Section'
+    const activeSlide = document.querySelector('.ppt-slide')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const importedSlides = slides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const probeSlides = importedSlides.filter((slide) =>
+      slide.sectionName === sectionName)
+    const hiddenProbeSlides = probeSlides.filter((slide) => slide.hidden === true)
+    const probeSlide = probeSlides[0] ?? null
+
+    return {
+      activeHidden: activeSlide?.getAttribute('data-ppt-slide-hidden') ?? '',
+      activeSectionName: activeSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
+      activeThumbHidden: activeThumb?.getAttribute('data-ppt-slide-hidden') ?? '',
+      activeThumbSectionName: activeThumb?.getAttribute('data-ppt-slide-section-name') ?? '',
+      hiddenModelCount: hiddenProbeSlides.length,
+      modelCount: probeSlides.length,
+      probeHidden: probeSlide?.hidden === true ? 'true' : '',
+      probeSectionName: probeSlide?.sectionName ?? '',
     }
   })()`)
 }

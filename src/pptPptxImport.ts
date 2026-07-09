@@ -905,31 +905,31 @@ async function readPPTXPresentationSectionNamesBySlidePath(zip: JSZip) {
     }
   }
 
-  const sectionList = getDirectPPTXChildByLocalName(
+  for (const sectionList of getPPTXDescendantsByLocalName(
     doc.documentElement,
     'sectionLst',
-  )
-
-  for (const section of getDirectPPTXChildrenByLocalName(
-    sectionList,
-    'section',
   )) {
-    const sectionName = section.getAttribute('name')?.trim()
-    const sectionSlideList = getDirectPPTXChildByLocalName(section, 'sldIdLst')
-
-    if (!sectionName) {
-      continue
-    }
-
-    for (const slideId of getDirectPPTXChildrenByLocalName(
-      sectionSlideList,
-      'sldId',
+    for (const section of getDirectPPTXChildrenByLocalName(
+      sectionList,
+      'section',
     )) {
-      const id = slideId.getAttribute('id')?.trim()
-      const path = id ? slidePathByPresentationSlideId.get(id) : undefined
+      const sectionName = section.getAttribute('name')?.trim()
+      const sectionSlideList = getDirectPPTXChildByLocalName(section, 'sldIdLst')
 
-      if (path) {
-        sectionNameBySlidePath.set(path, sectionName)
+      if (!sectionName) {
+        continue
+      }
+
+      for (const slideId of getDirectPPTXChildrenByLocalName(
+        sectionSlideList,
+        'sldId',
+      )) {
+        const id = slideId.getAttribute('id')?.trim()
+        const path = id ? slidePathByPresentationSlideId.get(id) : undefined
+
+        if (path) {
+          sectionNameBySlidePath.set(path, sectionName)
+        }
       }
     }
   }
