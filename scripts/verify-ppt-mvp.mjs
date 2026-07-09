@@ -11902,6 +11902,139 @@ async function runExportScenario(page) {
     },
   )
 
+  const layoutBackgroundImagePPTXBase64 = await addPPTXLayoutBackgroundImageOnlyProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeLayoutBackgroundImagePPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      layoutBackgroundImageModelCount: elements.filter((element) =>
+        element.name === 'Layout Background Image' &&
+        element.kind === 'image' &&
+        element.locked === true &&
+        element.fit === 'cover' &&
+        element.geometry?.x === 0 &&
+        element.geometry?.y === 0 &&
+        element.geometry?.w === 1280 &&
+        element.geometry?.h === 720 &&
+        typeof element.src === 'string' &&
+        element.src.startsWith('data:image/')).length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-layout-background-image.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(layoutBackgroundImagePPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const layoutBackgroundImagePPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const layoutBackgroundImages = exportImportedElements.filter((element) =>
+      element.name === 'Layout Background Image' &&
+      element.kind === 'image' &&
+      element.locked === true &&
+      element.fit === 'cover' &&
+      element.geometry?.x === 0 &&
+      element.geometry?.y === 0 &&
+      element.geometry?.w === 1280 &&
+      element.geometry?.h === 720 &&
+      typeof element.src === 'string' &&
+      element.src.startsWith('data:image/'))
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      hasLayoutBackgroundImage: layoutBackgroundImages.length > 0,
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      layoutBackgroundImageModelCount: layoutBackgroundImages.length,
+      layoutBackgroundImageNames: layoutBackgroundImages.map((element) => element.name).join(' | '),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX layout background image through OpenXML fallback import',
+    layoutBackgroundImagePPTXImportState.model === 'ppt-deck-pptx-import' &&
+      layoutBackgroundImagePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      layoutBackgroundImagePPTXImportState.fileName === 'external-openxml-layout-background-image.pptx' &&
+      layoutBackgroundImagePPTXImportState.importedCount === beforeLayoutBackgroundImagePPTXDrop.slideCount &&
+      layoutBackgroundImagePPTXImportState.sourceSlideCount === beforeLayoutBackgroundImagePPTXDrop.slideCount &&
+      layoutBackgroundImagePPTXImportState.slideCount === beforeLayoutBackgroundImagePPTXDrop.slideCount * 2 &&
+      layoutBackgroundImagePPTXImportState.activeName.includes('Copy') &&
+      layoutBackgroundImagePPTXImportState.hasLayoutBackgroundImage &&
+      layoutBackgroundImagePPTXImportState.layoutBackgroundImageModelCount >
+        beforeLayoutBackgroundImagePPTXDrop.layoutBackgroundImageModelCount,
+    {
+      beforeLayoutBackgroundImagePPTXDrop,
+      layoutBackgroundImagePPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterLayoutBackgroundImagePPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes layout background image PPTX drop probes before export scenario continues',
+    afterLayoutBackgroundImagePPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterLayoutBackgroundImagePPTXDropCleanup.slideCount === beforeLayoutBackgroundImagePPTXDrop.slideCount,
+    {
+      afterLayoutBackgroundImagePPTXDropCleanup,
+      beforeLayoutBackgroundImagePPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -28939,6 +29072,89 @@ async function addPPTXLayoutBackgroundProbe(base64) {
   const nextLayoutXml = /<p:bg>[\s\S]*?<\/p:bg>/.test(layoutXml)
     ? layoutXml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, `${markerComment}${backgroundXml}`)
     : layoutXml.replace(/(<p:cSld\b[^>]*>)/, `$1${markerComment}${backgroundXml}`)
+
+  if (nextLayoutXml === layoutXml) {
+    return base64
+  }
+
+  zip.file(layoutPath, nextLayoutXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXLayoutBackgroundImageOnlyProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const slidePath = slidePaths[0]
+  const mediaPath = 'ppt/media/pptx-layout-background-image-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const layoutPath = await ensurePPTXSlideLayoutPath(zip, slidePath)
+
+  if (!layoutPath) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  for (const path of slidePaths) {
+    const xml = await readPPTXZipText(zip, path)
+    const nextXml = xml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, '')
+
+    if (nextXml !== xml) {
+      zip.file(path, nextXml)
+    }
+  }
+
+  const layoutXml = await readPPTXZipText(zip, layoutPath)
+
+  if (
+    layoutXml.includes('pptx-layout-background-image-probe') ||
+    !layoutXml.includes('<p:cSld')
+  ) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: layoutPath,
+    target: getPPTXRelativeTarget(layoutPath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const markerComment = '<!-- pptx-layout-background-image-probe -->'
+  const backgroundImageXml = [
+    '<p:bg>',
+    '<p:bgPr>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="77000"/></a:blip>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '<a:effectLst/>',
+    '</p:bgPr>',
+    '</p:bg>',
+  ].join('')
+  const nextLayoutXml = /<p:bg>[\s\S]*?<\/p:bg>/.test(layoutXml)
+    ? layoutXml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, `${markerComment}${backgroundImageXml}`)
+    : layoutXml.replace(/(<p:cSld\b[^>]*>)/, `$1${markerComment}${backgroundImageXml}`)
 
   if (nextLayoutXml === layoutXml) {
     return base64

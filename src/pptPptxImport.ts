@@ -576,7 +576,7 @@ async function readPPTXOpenXmlSlide({
     zip,
   })
   const elements: PPTElement[] = [...inheritedElements]
-  const backgroundImage = await readPPTXSlideBackgroundImage({
+  const slideBackgroundImage = await readPPTXSlideBackgroundImage({
     cSld,
     index,
     relationships,
@@ -584,6 +584,16 @@ async function readPPTXOpenXmlSlide({
     size,
     zip,
   })
+  const layoutBackgroundImage = slideBackgroundImage
+    ? null
+    : await readPPTXSlideLayoutBackgroundImage({
+        index,
+        relationships,
+        slidePath: path,
+        size,
+        zip,
+      })
+  const backgroundImage = slideBackgroundImage ?? layoutBackgroundImage
   const layoutBackground = await readPPTXSlideLayoutBackground({
     relationships,
     slidePath: path,
@@ -975,6 +985,122 @@ async function readPPTXSlideBackgroundImage({
   size: PPTDeck['size']
   zip: JSZip
 }): Promise<PPTImage | null> {
+  return await readPPTXBackgroundImage({
+    alt: 'Slide background image',
+    cSld,
+    id: `pptx-slide-${index + 1}-background-image`,
+    name: 'Background Image',
+    relationships,
+    slidePath,
+    size,
+    zip,
+  })
+}
+
+async function readPPTXSlideLayoutBackgroundImage({
+  index,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  index: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTImage | null> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterBackgroundImage = masterPath
+    ? await readPPTXPartBackgroundImage({
+        index,
+        path: masterPath,
+        relationships: await readPPTXRelationships(zip, masterPath),
+        source: 'master',
+        size,
+        zip,
+      })
+    : null
+  const layoutBackgroundImage = await readPPTXPartBackgroundImage({
+    index,
+    path: layoutPath,
+    relationships: layoutRelationships,
+    source: 'layout',
+    size,
+    zip,
+  })
+
+  return layoutBackgroundImage ?? masterBackgroundImage
+}
+
+async function readPPTXPartBackgroundImage({
+  index,
+  path,
+  relationships,
+  source,
+  size,
+  zip,
+}: {
+  index: number
+  path: string
+  relationships: PPTXRelationshipMap
+  source: PPTXInheritedElementSource
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTImage | null> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+  const label = source === 'layout' ? 'Layout' : 'Master'
+
+  return await readPPTXBackgroundImage({
+    alt: `${label} background image`,
+    cSld,
+    id: `pptx-slide-${index + 1}-${source}-background-image`,
+    name: `${label} Background Image`,
+    relationships,
+    slidePath: path,
+    size,
+    zip,
+  })
+}
+
+async function readPPTXBackgroundImage({
+  alt,
+  cSld,
+  id,
+  name,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  alt: string
+  cSld: Element | null
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTImage | null> {
   const background = cSld
     ? getDirectPPTXChildByLocalName(cSld, 'bg')
     : null
@@ -1001,7 +1127,7 @@ async function readPPTXSlideBackgroundImage({
   const opacity = readPPTXImageOpacity(blip)
 
   return {
-    alt: 'Slide background image',
+    alt,
     ...(crop ? { crop } : {}),
     fit: 'cover',
     geometry: {
@@ -1010,10 +1136,10 @@ async function readPPTXSlideBackgroundImage({
       x: 0,
       y: 0,
     },
-    id: `pptx-slide-${index + 1}-background-image`,
+    id,
     kind: 'image',
     locked: true,
-    name: 'Background Image',
+    name,
     ...(opacity === null ? {} : { opacity }),
     src: `data:${mimeType};base64,${base64}`,
   }
