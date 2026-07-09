@@ -4795,15 +4795,29 @@ function readPPTXChartSeries(ser: Element, index: number) {
 }
 
 function readPPTXChartTextValue(root: Element | null) {
-  return readPPTXChartCachedValues(root)[0] ??
-    getDirectPPTXChildByLocalName(root, 'v')?.textContent?.trim() ??
-    ''
+  const cachedValue = readPPTXChartCachedValues(root)[0]
+
+  if (cachedValue) {
+    return cachedValue
+  }
+
+  const directValue = getDirectPPTXChildByLocalName(root, 'v')
+    ?.textContent
+    ?.trim()
+
+  if (directValue) {
+    return directValue
+  }
+
+  return root ? readPPTXPlainTextBody(root).trim() : ''
 }
 
 function readPPTXChartCachedValues(root: Element | null) {
   const cache = getFirstPPTXDescendantByLocalName(root, 'strCache') ??
     getFirstPPTXDescendantByLocalName(root, 'numCache') ??
-    getFirstPPTXDescendantByLocalName(root, 'multiLvlStrCache')
+    getFirstPPTXDescendantByLocalName(root, 'multiLvlStrCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'strLit') ??
+    getFirstPPTXDescendantByLocalName(root, 'numLit')
 
   return cache
     ? getPPTXDescendantsByLocalName(cache, 'pt')

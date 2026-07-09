@@ -289,7 +289,9 @@ async function runPPTXRenderScenario(page) {
 
   record(
     'creates a real PPTX file blob for render verification',
-    pptxDownloadState.download === 'ai-retouch-demo.pptx' &&
+    (externalPPTXFixture
+      ? pptxDownloadState.download.endsWith('.pptx')
+      : pptxDownloadState.download === 'ai-retouch-demo.pptx') &&
       pptxDownloadState.type.includes('presentationml.presentation') &&
       pptxDownloadState.signature === 'PK' &&
       pptxDownloadState.size > 5000 &&
@@ -13653,6 +13655,18 @@ async function runExportScenario(page) {
       chartTablePPTXImportState.rowHeights === '60,60,60,60',
     {
       beforeChartTablePPTXDrop,
+      chartTablePPTXImportState,
+    },
+  )
+
+  record(
+    'imports PPTX chart literal caches and rich series text into table fallback',
+    chartTablePPTXImportState.rows?.[0]?.[2] === 'Margin' &&
+      chartTablePPTXImportState.rows?.[1]?.[2] === '5' &&
+      chartTablePPTXImportState.rows?.[2]?.[2] === '7' &&
+      chartTablePPTXImportState.rows?.[3]?.[2] === '4' &&
+      chartTablePPTXImportState.activeText.includes('Margin'),
+    {
       chartTablePPTXImportState,
     },
   )
@@ -34135,6 +34149,8 @@ function createPPTXChartTableProbeChartXml() {
       categories: ['North', 'South', 'West'],
       index: 1,
       name: 'Margin',
+      useLiteralData: true,
+      useRichTextName: true,
       values: [5, 7, 4],
     }),
     '<c:axId val="1001"/>',
@@ -34150,41 +34166,88 @@ function createPPTXChartTableProbeChartXml() {
   ].join('')
 }
 
-function createPPTXChartSeriesXml({ categories, index, name, values }) {
+function createPPTXChartSeriesXml({
+  categories,
+  index,
+  name,
+  useLiteralData = false,
+  useRichTextName = false,
+  values,
+}) {
+  const textXml = useRichTextName
+    ? [
+      '<c:tx>',
+      '<c:rich>',
+      '<a:bodyPr/><a:lstStyle/>',
+      `<a:p><a:r><a:t>${escapePPTXXmlText(name)}</a:t></a:r></a:p>`,
+      '</c:rich>',
+      '</c:tx>',
+    ].join('')
+    : [
+      '<c:tx>',
+      '<c:strRef>',
+      `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$1</c:f>`,
+      '<c:strCache>',
+      '<c:ptCount val="1"/>',
+      `<c:pt idx="0"><c:v>${escapePPTXXmlText(name)}</c:v></c:pt>`,
+      '</c:strCache>',
+      '</c:strRef>',
+      '</c:tx>',
+    ].join('')
+  const categoriesXml = useLiteralData
+    ? [
+      '<c:cat>',
+      '<c:strLit>',
+      `<c:ptCount val="${categories.length}"/>`,
+      categories.map((category, categoryIndex) =>
+        `<c:pt idx="${categoryIndex}"><c:v>${escapePPTXXmlText(category)}</c:v></c:pt>`).join(''),
+      '</c:strLit>',
+      '</c:cat>',
+    ].join('')
+    : [
+      '<c:cat>',
+      '<c:strRef>',
+      '<c:f>Sheet1!$A$2:$A$4</c:f>',
+      '<c:strCache>',
+      `<c:ptCount val="${categories.length}"/>`,
+      categories.map((category, categoryIndex) =>
+        `<c:pt idx="${categoryIndex}"><c:v>${escapePPTXXmlText(category)}</c:v></c:pt>`).join(''),
+      '</c:strCache>',
+      '</c:strRef>',
+      '</c:cat>',
+    ].join('')
+  const valuesXml = useLiteralData
+    ? [
+      '<c:val>',
+      '<c:numLit>',
+      '<c:formatCode>General</c:formatCode>',
+      `<c:ptCount val="${values.length}"/>`,
+      values.map((value, valueIndex) =>
+        `<c:pt idx="${valueIndex}"><c:v>${value}</c:v></c:pt>`).join(''),
+      '</c:numLit>',
+      '</c:val>',
+    ].join('')
+    : [
+      '<c:val>',
+      '<c:numRef>',
+      `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$2:$${String.fromCharCode(66 + index)}$4</c:f>`,
+      '<c:numCache>',
+      '<c:formatCode>General</c:formatCode>',
+      `<c:ptCount val="${values.length}"/>`,
+      values.map((value, valueIndex) =>
+        `<c:pt idx="${valueIndex}"><c:v>${value}</c:v></c:pt>`).join(''),
+      '</c:numCache>',
+      '</c:numRef>',
+      '</c:val>',
+    ].join('')
+
   return [
     '<c:ser>',
     `<c:idx val="${index}"/>`,
     `<c:order val="${index}"/>`,
-    '<c:tx>',
-    '<c:strRef>',
-    `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$1</c:f>`,
-    '<c:strCache>',
-    '<c:ptCount val="1"/>',
-    `<c:pt idx="0"><c:v>${escapePPTXXmlText(name)}</c:v></c:pt>`,
-    '</c:strCache>',
-    '</c:strRef>',
-    '</c:tx>',
-    '<c:cat>',
-    '<c:strRef>',
-    '<c:f>Sheet1!$A$2:$A$4</c:f>',
-    '<c:strCache>',
-    `<c:ptCount val="${categories.length}"/>`,
-    categories.map((category, categoryIndex) =>
-      `<c:pt idx="${categoryIndex}"><c:v>${escapePPTXXmlText(category)}</c:v></c:pt>`).join(''),
-    '</c:strCache>',
-    '</c:strRef>',
-    '</c:cat>',
-    '<c:val>',
-    '<c:numRef>',
-    `<c:f>Sheet1!$${String.fromCharCode(66 + index)}$2:$${String.fromCharCode(66 + index)}$4</c:f>`,
-    '<c:numCache>',
-    '<c:formatCode>General</c:formatCode>',
-    `<c:ptCount val="${values.length}"/>`,
-    values.map((value, valueIndex) =>
-      `<c:pt idx="${valueIndex}"><c:v>${value}</c:v></c:pt>`).join(''),
-    '</c:numCache>',
-    '</c:numRef>',
-    '</c:val>',
+    textXml,
+    categoriesXml,
+    valuesXml,
     '</c:ser>',
   ].join('')
 }
@@ -36287,8 +36350,9 @@ function focusPPTSlideThumb(page, slideId) {
 
 function readPPTXDownloadBlobState(page) {
   return page.eval(`(() => {
-    const download = (window.__pptDownloads ?? [])
-      .find((entry) => entry.download === 'ai-retouch-demo.pptx') ?? {}
+    const downloads = (window.__pptDownloads ?? [])
+      .filter((entry) => String(entry.download ?? '').endsWith('.pptx'))
+    const download = downloads.at(-1) ?? {}
 
     return {
       base64: download.base64 ?? '',
@@ -36323,8 +36387,9 @@ async function readExternalPPTXRenderFixture() {
 function waitForPPTXDownloadBlob(page) {
   return waitUntil(
     () => page.eval(`(() => {
-      const download = (window.__pptDownloads ?? [])
-        .find((entry) => entry.download === 'ai-retouch-demo.pptx')
+      const downloads = (window.__pptDownloads ?? [])
+        .filter((entry) => String(entry.download ?? '').endsWith('.pptx'))
+      const download = downloads.at(-1)
 
       return !!download &&
         download.signature === 'PK' &&
