@@ -297,6 +297,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXMasterVisibilityProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 =
     await addPPTXInheritedFooterPlaceholderProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXTextAutoFitProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
@@ -343,6 +344,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXMasterVisibilityProbeState(page)
   const openXmlPPTXInheritedFooterPlaceholderState =
     await readPPTXInheritedFooterPlaceholderProbeState(page)
+  const openXmlPPTXNormalAutoFitState =
+    await readPPTXNormalAutoFitProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -648,6 +651,19 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideNumberActiveText.includes('42'),
     {
       openXmlPPTXInheritedFooterPlaceholderState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX normAutofit font scale for viewer rendering',
+    openXmlPPTXNormalAutoFitState.modelCount === 1 &&
+      openXmlPPTXNormalAutoFitState.textAutoFit === '' &&
+      openXmlPPTXNormalAutoFitState.runSizes === '20' &&
+      openXmlPPTXNormalAutoFitState.styleFontSize === 20 &&
+      openXmlPPTXNormalAutoFitState.activeExists &&
+      openXmlPPTXNormalAutoFitState.activeRunSize === '20' &&
+      openXmlPPTXNormalAutoFitState.activeFontSize === '20px',
+    {
+      openXmlPPTXNormalAutoFitState,
     },
   )
 
@@ -12074,7 +12090,11 @@ async function runExportScenario(page) {
     const exportNormalAutoFitProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Normal Autofit Probe' &&
       element.kind === 'textBox' &&
-      element.textAutoFit === undefined)
+      element.textAutoFit === undefined &&
+      element.textBody?.paragraphs?.some((paragraph) =>
+        paragraph.runs?.some((run) =>
+          run.text === 'Normal autofit probe' &&
+          run.size === 20)) === true)
     const exportSvgImages = exportElements.filter((element) =>
       element.kind === 'image' &&
       typeof element.src === 'string' &&
@@ -36624,6 +36644,69 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
     visibleSlideNumberActiveText: visibleSlideNumberActiveState.text,
     visibleSlideActiveExists: visibleSlideActiveState.exists,
     visibleSlideActiveText: visibleSlideActiveState.text,
+  }
+}
+
+async function readPPTXNormalAutoFitProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === 'Normal Autofit Probe' &&
+        element.kind === 'textBox'))
+    const probes = (probeSlide?.elements ?? []).filter((element) =>
+      element.name === 'Normal Autofit Probe' &&
+      element.kind === 'textBox')
+    const probe = probes[0] ?? null
+    const runs = probe?.textBody?.paragraphs
+      ?.flatMap((paragraph) => paragraph.runs ?? []) ?? []
+
+    return {
+      modelCount: probes.length,
+      runSizes: runs.map((run) => String(run.size ?? '')).join(' | '),
+      slideId: probeSlide?.id ?? '',
+      styleFontSize: Number(probe?.style?.fontSize ?? 0),
+      textAutoFit: probe?.textAutoFit ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const active = document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Normal Autofit Probe"]',
+    )
+    const activeRun = active?.querySelector('[data-ppt-run-size]') ?? null
+
+    return {
+      activeExists: Boolean(active),
+      activeFontSize: activeRun ? getComputedStyle(activeRun).fontSize : '',
+      activeRunSize: activeRun?.getAttribute('data-ppt-run-size') ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
   }
 }
 

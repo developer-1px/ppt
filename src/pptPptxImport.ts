@@ -5274,10 +5274,45 @@ function readPPTXTextBody(
         fallbackTextColor,
         textFieldContext,
       ))
+  const fontScale = readPPTXNormalAutoFitFontScale(txBody)
+  const scaledParagraphs = fontScale === null
+    ? paragraphs
+    : scalePPTXTextBodyParagraphs(paragraphs, fontScale)
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
 
-  return hasText || paragraphs.length > 0 ? { paragraphs } : null
+  return hasText || paragraphs.length > 0 ? { paragraphs: scaledParagraphs } : null
+}
+
+function readPPTXNormalAutoFitFontScale(txBody: Element | null) {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const normalAutoFit = getDirectPPTXChildByLocalName(bodyPr, 'normAutofit')
+  const fontScale = toPPTXPositiveNumber(normalAutoFit?.getAttribute('fontScale'))
+
+  return fontScale === null ? null : fontScale / 100_000
+}
+
+function scalePPTXTextBodyParagraphs(
+  paragraphs: readonly PPTParagraph[],
+  fontScale: number,
+): PPTParagraph[] {
+  if (fontScale <= 0 || fontScale === 1) {
+    return paragraphs.map((paragraph) => ({
+      ...paragraph,
+      runs: paragraph.runs.map((run) => ({ ...run })),
+    }))
+  }
+
+  return paragraphs.map((paragraph) => ({
+    ...paragraph,
+    runs: paragraph.runs.map((run) => ({
+      ...run,
+      size: Math.max(
+        1,
+        Math.round((run.size ?? PPTX_DEFAULT_TEXT_SIZE) * fontScale),
+      ),
+    })),
+  }))
 }
 
 function hasPPTXTextBodyText(textBody: PPTTextBody | null) {
