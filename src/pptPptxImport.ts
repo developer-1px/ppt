@@ -17,6 +17,7 @@ import {
   type PPTLineConnection,
   type PPTParagraph,
   type PPTRun,
+  type PPTShape,
   type PPTShapeKind,
   type PPTSlide,
   type PPTSlideTransition,
@@ -116,6 +117,12 @@ type PPTXHeaderFooterVisibility = Readonly<
 >
 type PPTXTextFieldContext = {
   slideNumber: number
+}
+type PPTXImageSource = {
+  fileName: string
+  mimeType: string
+  renderable: boolean
+  src: string
 }
 type PPTXRatioPoint = {
   x: number
@@ -2081,7 +2088,7 @@ async function readPPTXBackgroundImage({
     zip,
   })
 
-  if (!source) {
+  if (!source || !source.renderable) {
     return null
   }
 
@@ -3571,7 +3578,7 @@ async function readPPTXShapeImageFillElement({
   sp: Element
   spPr: Element | null
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTImage | PPTShape | null> {
   const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
   const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
   const source = await readPPTXImageSource({
@@ -3590,6 +3597,19 @@ async function readPPTXShapeImageFillElement({
   const accessibility = readPPTXElementAccessibility(sp)
   const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
   const opacity = readPPTXImageOpacity(blip)
+
+  if (!source.renderable) {
+    return createPPTXUnsupportedImagePlaceholderElement({
+      element: sp,
+      geometry,
+      id: createPPTXImportedElementId(slideIndex, objectIndex),
+      name,
+      relationships,
+      shadow,
+      source,
+      spPr,
+    })
+  }
 
   return {
     ...(accessibility ?? {}),
@@ -3927,6 +3947,19 @@ async function readPPTXPictureElement({
   const shadow = readPPTXElementShadow(spPr, themeColors) ??
     readPPTXStyleShadow(style, themeColors, themeStyles)
 
+  if (!source.renderable) {
+    return createPPTXUnsupportedImagePlaceholderElement({
+      element: pic,
+      geometry,
+      id: createPPTXImportedElementId(index, objectIndex),
+      name,
+      relationships,
+      shadow,
+      source,
+      spPr,
+    })
+  }
+
   return {
     ...(accessibility ?? {}),
     alt: altText || name,
@@ -4184,7 +4217,7 @@ async function readPPTXImageSource({
   relationships: PPTXRelationshipMap
   slidePath: string
   zip: JSZip
-}): Promise<{ src: string } | null> {
+}): Promise<PPTXImageSource | null> {
   const mediaPath = readPPTXPictureMediaPath({
     blip,
     relationships,
@@ -4204,6 +4237,9 @@ async function readPPTXImageSource({
   const mimeType = getPPTXMediaMimeType(mediaPath)
 
   return {
+    fileName: mediaPath.split('/').at(-1)?.trim() ?? '',
+    mimeType,
+    renderable: isPPTXRenderableImageMediaPath(mediaPath),
     src: `data:${mimeType};base64,${base64}`,
   }
 }
@@ -4221,7 +4257,72 @@ function readPPTXExternalImageSource({
     ? relationship.target.trim()
     : ''
 
-  return url ? { src: url } : null
+  return url
+    ? {
+        fileName: url.split(/[?#]/)[0]?.split('/').at(-1)?.trim() ?? '',
+        mimeType: '',
+        renderable: true,
+        src: url,
+      }
+    : null
+}
+
+function createPPTXUnsupportedImagePlaceholderElement({
+  element,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  source,
+  spPr,
+}: {
+  element: Element
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  source: PPTXImageSource
+  spPr: Element | null
+}): PPTShape {
+  const details = ['Unsupported image', source.fileName, source.mimeType]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(element) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(element, relationships) ?? {}),
+    id,
+    kind: 'shape',
+    ...(readPPTXElementLocked(element) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(element) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
 }
 
 function readPPTXPictureMediaPath({
@@ -6891,7 +6992,15 @@ function createPPTXImportedElementId(slideIndex: number, objectIndex: number) {
 }
 
 function getPPTXMediaMimeType(path: string) {
-  const extension = path.split('.').at(-1)?.toLowerCase()
+  return readPPTXRenderableImageMimeType(path) ?? 'application/octet-stream'
+}
+
+function isPPTXRenderableImageMediaPath(path: string) {
+  return readPPTXRenderableImageMimeType(path) !== null
+}
+
+function readPPTXRenderableImageMimeType(path: string) {
+  const extension = path.split(/[?#]/)[0]?.split('.').at(-1)?.toLowerCase()
 
   if (extension === 'svg') {
     return 'image/svg+xml'
@@ -6909,7 +7018,15 @@ function getPPTXMediaMimeType(path: string) {
     return 'image/webp'
   }
 
-  return 'image/png'
+  if (extension === 'bmp') {
+    return 'image/bmp'
+  }
+
+  if (extension === 'avif') {
+    return 'image/avif'
+  }
+
+  return extension === 'png' ? 'image/png' : null
 }
 
 function parsePPTXXmlDocument(xml: string) {

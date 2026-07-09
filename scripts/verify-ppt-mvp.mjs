@@ -355,6 +355,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXUnsupportedImageProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
@@ -402,6 +403,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXNormalAutoFitProbeState(page)
   const openXmlPPTXPresetGeometryFreeformState =
     await readPPTXPresetGeometryFreeformProbeState(page)
+  const openXmlPPTXUnsupportedImageState =
+    await readPPTXUnsupportedImageProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -508,6 +511,27 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXStyleRefState,
+    },
+  )
+
+  record(
+    'renders unsupported OpenXML PPTX image media as a placeholder shape',
+    openXmlPPTXUnsupportedImageState.modelCount === 1 &&
+      openXmlPPTXUnsupportedImageState.imageModelCount === 0 &&
+      openXmlPPTXUnsupportedImageState.kind === 'shape' &&
+      openXmlPPTXUnsupportedImageState.geometry?.x === 816 &&
+      openXmlPPTXUnsupportedImageState.geometry?.y === 520 &&
+      openXmlPPTXUnsupportedImageState.geometry?.w === 176 &&
+      openXmlPPTXUnsupportedImageState.geometry?.h === 96 &&
+      openXmlPPTXUnsupportedImageState.text.includes('Unsupported image') &&
+      openXmlPPTXUnsupportedImageState.text.includes('unsupported-image-probe.emf') &&
+      openXmlPPTXUnsupportedImageState.text.includes('application/octet-stream') &&
+      openXmlPPTXUnsupportedImageState.activeExists &&
+      openXmlPPTXUnsupportedImageState.activeKind === 'shape' &&
+      !openXmlPPTXUnsupportedImageState.activeHasImage,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXUnsupportedImageState,
     },
   )
 
@@ -34749,6 +34773,70 @@ async function addPPTXExternalImageProbe(base64) {
   })
 }
 
+async function addPPTXUnsupportedImageProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/unsupported-image-probe.emf'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Unsupported Image Media Probe')) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'emf', 'image/x-emf')
+  zip.file(mediaPath, Buffer.from('EMF probe bytes that should not render as PNG'))
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const pictureXml = [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9987" name="Unsupported Image Media Probe" descr="Unsupported image media alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr/>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="4953000"/>',
+    '<a:ext cx="1676400" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '</p:pic>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLayoutObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -37075,6 +37163,48 @@ function readPPTXPresetGeometryFreeformProbeState(page) {
       expectedNamesLength: expectedNames.length,
       pointModes: freeformObjects.map((element) => element.pointMode ?? '').sort().join(' | '),
       presetModelCount: freeformObjects.length,
+    }
+  })()`)
+}
+
+function readPPTXUnsupportedImageProbeState(page) {
+  return page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const readElementText = (element) => (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+      .map((run) => run.text ?? '')
+      .join('\\n')
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const elements = slides.flatMap((slide) => slide.elements ?? [])
+    const placeholders = elements.filter((element) =>
+      element.name === 'Unsupported Image Media Probe' &&
+      element.kind === 'shape')
+    const images = elements.filter((element) =>
+      element.name === 'Unsupported Image Media Probe' &&
+      element.kind === 'image')
+    const placeholder = placeholders[0] ?? null
+    const activeElement = document.querySelector('.ppt-slide [data-ppt-element-name="Unsupported Image Media Probe"]')
+
+    return {
+      activeExists: !!activeElement,
+      activeHasImage: !!activeElement?.querySelector('img'),
+      activeKind: activeElement?.getAttribute('data-kind') ?? '',
+      activeText: activeElement?.textContent ?? '',
+      geometry: placeholder?.geometry ?? null,
+      imageModelCount: images.length,
+      kind: placeholder?.kind ?? '',
+      modelCount: placeholders.length,
+      text: readElementText(placeholder),
     }
   })()`)
 }
