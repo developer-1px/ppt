@@ -12631,6 +12631,146 @@ async function runExportScenario(page) {
     },
   )
 
+  const commentsPPTXBase64 = await addPPTXCommentsProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeCommentsPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      commentModelCount: elements.filter((element) =>
+        element.kind === 'comment' &&
+        String(element.body ?? '').includes('PPTX Comment Probe')).length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-comments.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(commentsPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const commentsPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeComment = document.querySelector('.ppt-slide [data-ppt-element-name="PPTX Comment 1"][data-kind="comment"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const comments = exportImportedElements.filter((element) =>
+      element.kind === 'comment' &&
+      String(element.body ?? '').includes('PPTX Comment Probe'))
+    const comment = comments[0] ?? null
+
+    return {
+      activeAuthor: activeComment?.querySelector('[data-ppt-comment-author]')?.textContent ?? '',
+      activeBody: activeComment?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
+      activeCreatedAt: activeComment?.querySelector('[data-ppt-comment-created]')?.textContent ?? '',
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeThreadCount: activeComment?.getAttribute('data-ppt-comment-thread-count') ?? '',
+      commentAuthorName: comment?.authorName ?? '',
+      commentBody: comment?.body ?? '',
+      commentCreatedAt: comment?.createdAt ?? '',
+      commentGeometry: comment?.geometry ?? null,
+      commentModelCount: comments.length,
+      commentThreadBody: comment?.thread?.[0]?.body ?? '',
+      commentThreadCount: comment?.thread?.length ?? 0,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX review comments as editable comment cards through OpenXML import',
+    commentsPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      commentsPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      commentsPPTXImportState.fileName === 'external-openxml-comments.pptx' &&
+      commentsPPTXImportState.importedCount === beforeCommentsPPTXDrop.slideCount &&
+      commentsPPTXImportState.sourceSlideCount === beforeCommentsPPTXDrop.slideCount &&
+      commentsPPTXImportState.slideCount === beforeCommentsPPTXDrop.slideCount * 2 &&
+      commentsPPTXImportState.activeName.includes('Copy') &&
+      commentsPPTXImportState.commentModelCount >
+        beforeCommentsPPTXDrop.commentModelCount &&
+      commentsPPTXImportState.commentModelCount === 1 &&
+      commentsPPTXImportState.commentAuthorName === 'PPT Reviewer' &&
+      commentsPPTXImportState.commentBody === 'PPTX Comment Probe: review KPI label' &&
+      commentsPPTXImportState.commentCreatedAt === '2026-07-09T12:00:00Z' &&
+      commentsPPTXImportState.commentThreadCount === 1 &&
+      commentsPPTXImportState.commentThreadBody === 'PPTX Comment Probe: review KPI label' &&
+      commentsPPTXImportState.commentGeometry?.x === 128 &&
+      commentsPPTXImportState.commentGeometry?.y === 96 &&
+      commentsPPTXImportState.commentGeometry?.w === 220 &&
+      commentsPPTXImportState.commentGeometry?.h === 96 &&
+      commentsPPTXImportState.activeAuthor === 'PPT Reviewer' &&
+      commentsPPTXImportState.activeBody === 'PPTX Comment Probe: review KPI label' &&
+      commentsPPTXImportState.activeCreatedAt === '2026-07-09T12:00:00Z' &&
+      commentsPPTXImportState.activeThreadCount === '1',
+    {
+      beforeCommentsPPTXDrop,
+      commentsPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterCommentsPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes comments PPTX drop probes before export scenario continues',
+    afterCommentsPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterCommentsPPTXDropCleanup.slideCount === beforeCommentsPPTXDrop.slideCount,
+    {
+      afterCommentsPPTXDropCleanup,
+      beforeCommentsPPTXDrop,
+    },
+  )
+
   const beforeDeckHTMLPaste = await page.eval(`(() => ({
     slideCount: document.querySelectorAll('.ppt-thumb').length,
   }))()`)
@@ -30163,6 +30303,72 @@ async function addPPTXShapeImageFillProbe(base64) {
   }
 
   zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXCommentsProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const commentsPath = 'ppt/comments/comment-pptx-review-probe.xml'
+  const commentAuthorsPath = 'ppt/commentAuthors.xml'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const existingCommentsXml = await readPPTXZipText(zip, commentsPath)
+
+  if (existingCommentsXml.includes('PPTX Comment Probe')) {
+    return base64
+  }
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    commentsPath,
+    'application/vnd.openxmlformats-officedocument.presentationml.comments+xml',
+  )
+  await ensurePPTXOverrideContentType(
+    zip,
+    commentAuthorsPath,
+    'application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml',
+  )
+  await addPPTXInternalRelationship({
+    sourcePath: 'ppt/presentation.xml',
+    target: getPPTXRelativeTarget('ppt/presentation.xml', commentAuthorsPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors',
+    zip,
+  })
+  await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, commentsPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments',
+    zip,
+  })
+  zip.file(commentAuthorsPath, [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">',
+    '<p:cmAuthor id="7" name="PPT Reviewer" initials="PR" lastIdx="1" clrIdx="0"/>',
+    '</p:cmAuthorLst>',
+  ].join(''))
+  zip.file(commentsPath, [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">',
+    '<p:cm authorId="7" dt="2026-07-09T12:00:00Z" idx="1">',
+    '<p:pos x="1219200" y="914400"/>',
+    '<p:text>PPTX Comment Probe: review KPI label</p:text>',
+    '</p:cm>',
+    '</p:cmLst>',
+  ].join(''))
 
   return await zip.generateAsync({
     compression: 'DEFLATE',

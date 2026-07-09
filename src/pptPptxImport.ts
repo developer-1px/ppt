@@ -5,6 +5,7 @@ import {
   PPT_SLIDE_WIDTH,
   PPTDeckSchema,
   type PPTDeck,
+  type PPTComment,
   type PPTElement,
   type PPTElementAnimation,
   type PPTElementShadow,
@@ -40,6 +41,8 @@ export const PPTX_DECK_MODEL_IMPORT_FORMAT = 'pptx-custom-xml-ppt-deck' as const
 export const PPTX_OPEN_XML_IMPORT_FORMAT = 'pptx-open-xml-ppt-deck' as const
 const PPTX_RELATIONSHIP_ATTRIBUTE_NS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PPTX_COMMENT_DEFAULT_WIDTH = 220
+const PPTX_COMMENT_DEFAULT_HEIGHT = 96
 const PPTX_ROUND_RECT_DEFAULT_ADJUST = 16_667
 const PPTX_ROUND_RECT_MAX_ADJUST = 50_000
 
@@ -59,6 +62,7 @@ type PPTXRelationship = {
   type: string
 }
 type PPTXRelationshipMap = Map<string, PPTXRelationship>
+type PPTXCommentAuthorMap = Map<string, string>
 type PPTXImportedAnimation = {
   animation: PPTElementAnimation
   objectName?: string
@@ -347,8 +351,10 @@ async function importPPTDeckFromOpenXmlZip(
   const themeColors = await readPPTXOpenXmlThemeColors(zip, themePath)
   const themeFonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
   const title = await readPPTXOpenXmlDeckTitle(zip)
+  const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
   const slides = await Promise.all(slidePaths.map((path, index) =>
     readPPTXOpenXmlSlide({
+      commentAuthors,
       index,
       path,
       size,
@@ -476,6 +482,48 @@ async function readPPTXOpenXmlDeckTitle(zip: JSZip) {
     : ''
 
   return title || 'Imported PPTX Deck'
+}
+
+async function readPPTXOpenXmlCommentAuthors(
+  zip: JSZip,
+): Promise<PPTXCommentAuthorMap> {
+  const authors: PPTXCommentAuthorMap = new Map()
+  const paths = await readPPTXOpenXmlCommentAuthorPaths(zip)
+
+  for (const path of paths) {
+    const xml = await zip.file(path)?.async('string')
+    const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+    if (!doc) {
+      continue
+    }
+
+    for (const author of getPPTXDescendantsByLocalName(doc, 'cmAuthor')) {
+      const id = author.getAttribute('id')?.trim()
+      const name = author.getAttribute('name')?.trim() ??
+        author.getAttribute('initials')?.trim()
+
+      if (id && name) {
+        authors.set(id, name)
+      }
+    }
+  }
+
+  return authors
+}
+
+async function readPPTXOpenXmlCommentAuthorPaths(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const relatedPaths = Array.from(relationships.values())
+    .filter((relationship) =>
+      relationship.targetMode !== 'External' &&
+      relationship.type.endsWith('/commentAuthors'))
+    .map((relationship) =>
+      resolvePPTXRelationshipTarget(presentationPath, relationship.target))
+
+  return [...new Set([...relatedPaths, 'ppt/commentAuthors.xml'])]
+    .filter((path) => zip.file(path))
 }
 
 async function readPPTXOpenXmlThemeColors(
@@ -606,6 +654,7 @@ function resolvePPTXThemeSchemeColors(
 }
 
 async function readPPTXOpenXmlSlide({
+  commentAuthors,
   index,
   path,
   size,
@@ -613,6 +662,7 @@ async function readPPTXOpenXmlSlide({
   themeFonts,
   zip,
 }: {
+  commentAuthors: PPTXCommentAuthorMap
   index: number
   path: string
   size: PPTDeck['size']
@@ -639,6 +689,13 @@ async function readPPTXOpenXmlSlide({
   })
   const notes = await readPPTXSlideNotes({
     relationships,
+    slidePath: path,
+    zip,
+  })
+  const comments = await readPPTXSlideComments({
+    authors: commentAuthors,
+    relationships,
+    slideIndex: index,
     slidePath: path,
     zip,
   })
@@ -758,7 +815,9 @@ async function readPPTXOpenXmlSlide({
 
   return {
     ...slideBackground,
-    elements: backgroundImage ? [backgroundImage, ...animatedElements] : animatedElements,
+    elements: backgroundImage
+      ? [backgroundImage, ...animatedElements, ...comments]
+      : [...animatedElements, ...comments],
     id: `pptx-slide-${index + 1}`,
     name: readPPTXSlideName(cSld, index, xml),
     ...(notes ? { notes } : {}),
@@ -2037,6 +2096,82 @@ async function readPPTXSlideNotes({
     : readPPTXPlainTextBody(doc)
 
   return text.trim() || undefined
+}
+
+async function readPPTXSlideComments({
+  authors,
+  relationships,
+  slideIndex,
+  slidePath,
+  zip,
+}: {
+  authors: PPTXCommentAuthorMap
+  relationships: PPTXRelationshipMap
+  slideIndex: number
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTComment[]> {
+  const commentsPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/comments',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+  const xml = commentsPath ? await zip.file(commentsPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+  if (!doc) {
+    return []
+  }
+
+  return getPPTXDescendantsByLocalName(doc, 'cm')
+    .map((comment, commentIndex): PPTComment | null => {
+      const body = readPPTXCommentBody(comment)
+
+      if (!body) {
+        return null
+      }
+
+      const position = getDirectPPTXChildByLocalName(comment, 'pos')
+      const rawX = toPPTXNumber(position?.getAttribute('x'))
+      const rawY = toPPTXNumber(position?.getAttribute('y'))
+      const authorId = comment.getAttribute('authorId')?.trim()
+      const authorName = authorId
+        ? authors.get(authorId) ?? `Author ${authorId}`
+        : 'PowerPoint'
+      const createdAt = comment.getAttribute('dt')?.trim() || 'Imported'
+      const id = `pptx-slide-${slideIndex + 1}-comment-${commentIndex + 1}`
+
+      return {
+        authorName,
+        body,
+        createdAt,
+        geometry: {
+          h: PPTX_COMMENT_DEFAULT_HEIGHT,
+          w: PPTX_COMMENT_DEFAULT_WIDTH,
+          x: rawX === null ? 40 : Math.max(0, emuToPx(rawX)),
+          y: rawY === null ? 40 : Math.max(0, emuToPx(rawY)),
+        },
+        id,
+        kind: 'comment',
+        name: `PPTX Comment ${commentIndex + 1}`,
+        thread: [{
+          authorName,
+          body,
+          createdAt,
+          id: `${id}:message-1`,
+        }],
+      }
+    })
+    .filter((comment): comment is PPTComment => comment !== null)
+}
+
+function readPPTXCommentBody(comment: Element) {
+  const text = getDirectPPTXChildByLocalName(comment, 'text')?.textContent ??
+    getFirstPPTXDescendantByLocalName(comment, 'text')?.textContent ??
+    ''
+
+  return text.replace(/\r\n?/g, '\n').trim()
 }
 
 function readPPTXLineElement(
