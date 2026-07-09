@@ -352,6 +352,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
@@ -397,6 +398,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXInheritedFooterPlaceholderProbeState(page)
   const openXmlPPTXNormalAutoFitState =
     await readPPTXNormalAutoFitProbeState(page)
+  const openXmlPPTXPresetGeometryFreeformState =
+    await readPPTXPresetGeometryFreeformProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -717,6 +720,23 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXNormalAutoFitState.activeFontSize === '20px',
     {
       openXmlPPTXNormalAutoFitState,
+    },
+  )
+
+  record(
+    'imports additional OpenXML PPTX preset geometries as rendered freeforms',
+    openXmlPPTXPresetGeometryFreeformState.presetModelCount ===
+      openXmlPPTXPresetGeometryFreeformState.expectedNamesLength &&
+      openXmlPPTXPresetGeometryFreeformState.expectedNameCount ===
+        openXmlPPTXPresetGeometryFreeformState.expectedNamesLength &&
+      openXmlPPTXPresetGeometryFreeformState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24' &&
+      openXmlPPTXPresetGeometryFreeformState.activeAddedRenderedCount === 7 &&
+      openXmlPPTXPresetGeometryFreeformState.pointModes
+        .split(' | ')
+        .every((mode) => mode === 'polyline'),
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXPresetGeometryFreeformState,
     },
   )
 
@@ -13149,6 +13169,13 @@ async function runExportScenario(page) {
     const deck = readPPTExportDeckFromHTML(exportCode)
     const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
     const names = new Set([
+      'Preset Block Arc Probe',
+      'Preset Corner Probe',
+      'Preset Decagon Probe',
+      'Preset Diag Stripe Probe',
+      'Preset Dodecagon Probe',
+      'Preset Folded Corner Probe',
+      'Preset Pie Probe',
       'Preset Triangle Probe',
       'Preset Hexagon Probe',
       'Preset Chevron Probe',
@@ -13217,6 +13244,13 @@ async function runExportScenario(page) {
     const exportImportedElements = exportImportedSlides.flatMap((slide) =>
       slide.elements ?? [])
     const expectedNames = [
+      'Preset Block Arc Probe',
+      'Preset Corner Probe',
+      'Preset Decagon Probe',
+      'Preset Diag Stripe Probe',
+      'Preset Dodecagon Probe',
+      'Preset Folded Corner Probe',
+      'Preset Pie Probe',
       'Preset Triangle Probe',
       'Preset Hexagon Probe',
       'Preset Chevron Probe',
@@ -13240,6 +13274,15 @@ async function runExportScenario(page) {
       expectedNames.includes(element.name) &&
       element.kind === 'freeform')
     const byName = Object.fromEntries(freeformObjects.map((element) => [element.name, element]))
+    const addedPresetNames = [
+      'Preset Block Arc Probe',
+      'Preset Corner Probe',
+      'Preset Decagon Probe',
+      'Preset Diag Stripe Probe',
+      'Preset Dodecagon Probe',
+      'Preset Folded Corner Probe',
+      'Preset Pie Probe',
+    ]
     const triangle = byName['Preset Triangle Probe'] ?? null
     const hexagon = byName['Preset Hexagon Probe'] ?? null
     const chevron = byName['Preset Chevron Probe'] ?? null
@@ -13276,7 +13319,20 @@ async function runExportScenario(page) {
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      addedPresetSummary: addedPresetNames.map((name) => {
+        const element = byName[name]
+
+        return [
+          name,
+          element?.points?.length ?? 0,
+          element?.fill?.color ?? '',
+          element?.geometry?.x ?? '',
+          element?.geometry?.y ?? '',
+        ].join(':')
+      }).join(' | '),
       names: freeformObjects.map((element) => element.name).sort().join(' | '),
+      expectedNameCount: expectedNames.filter((name) => byName[name]).length,
+      expectedNamesLength: expectedNames.length,
       presetModelCount: freeformObjects.length,
       pointModes: freeformObjects.map((element) => element.pointMode ?? '').sort().join(' | '),
       triangleFill: triangle?.fill ?? null,
@@ -13353,9 +13409,14 @@ async function runExportScenario(page) {
       presetGeometryFreeformPPTXImportState.activeName.includes('Copy') &&
       presetGeometryFreeformPPTXImportState.presetModelCount >
         beforePresetGeometryFreeformPPTXDrop.presetGeometryFreeformModelCount &&
-      presetGeometryFreeformPPTXImportState.presetModelCount === 18 &&
-      presetGeometryFreeformPPTXImportState.names === 'Preset Chevron Probe | Preset Down Arrow Probe | Preset Heart Probe | Preset Hexagon Probe | Preset Left Arrow Probe | Preset Left Right Arrow Probe | Preset Lightning Probe | Preset Math Multiply Probe | Preset Math Plus Probe | Preset Moon Probe | Preset Plus Probe | Preset Quad Arrow Probe | Preset Right Arrow Probe | Preset Star Probe | Preset Text Right Arrow Probe | Preset Triangle Probe | Preset Up Arrow Probe | Preset Up Down Arrow Probe' &&
-      presetGeometryFreeformPPTXImportState.pointModes === 'polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline | polyline' &&
+      presetGeometryFreeformPPTXImportState.presetModelCount ===
+        presetGeometryFreeformPPTXImportState.expectedNamesLength &&
+      presetGeometryFreeformPPTXImportState.expectedNameCount ===
+        presetGeometryFreeformPPTXImportState.expectedNamesLength &&
+      presetGeometryFreeformPPTXImportState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24' &&
+      presetGeometryFreeformPPTXImportState.pointModes
+        .split(' | ')
+        .every((mode) => mode === 'polyline') &&
       presetGeometryFreeformPPTXImportState.activeTrianglePointMode === 'polyline' &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('M ') &&
       presetGeometryFreeformPPTXImportState.activeTrianglePathD.includes('L ') &&
@@ -33545,6 +33606,90 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
 
   const probeXml = [
     createPPTXPresetGeometryShapeProbeXml({
+      fill: 'CFFAFE',
+      h: 762000,
+      id: 10001,
+      name: 'Preset Block Arc Probe',
+      preset: 'blockArc',
+      stroke: '0891B2',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 762000,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DCFCE7',
+      h: 762000,
+      id: 10002,
+      name: 'Preset Corner Probe',
+      preset: 'corner',
+      stroke: '16A34A',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 2362200,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'E0F2FE',
+      h: 762000,
+      id: 10003,
+      name: 'Preset Decagon Probe',
+      preset: 'decagon',
+      stroke: '0284C7',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 3962400,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEF3C7',
+      h: 762000,
+      id: 10004,
+      name: 'Preset Diag Stripe Probe',
+      preset: 'diagStripe',
+      stroke: 'D97706',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 5562600,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'F5F3FF',
+      h: 762000,
+      id: 10005,
+      name: 'Preset Dodecagon Probe',
+      preset: 'dodecagon',
+      stroke: '7C3AED',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 7162800,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEE2E2',
+      h: 762000,
+      id: 10006,
+      name: 'Preset Folded Corner Probe',
+      preset: 'foldedCorner',
+      stroke: 'DC2626',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 8763000,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FFEDD5',
+      h: 762000,
+      id: 10007,
+      name: 'Preset Pie Probe',
+      preset: 'pie',
+      stroke: 'EA580C',
+      strokeWidth: 19050,
+      w: 1143000,
+      x: 10363200,
+      y: 228600,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
       fill: 'DCFCE7',
       fillOpacity: 0.7,
       h: 1143000,
@@ -36782,6 +36927,91 @@ async function readPPTXNormalAutoFitProbeState(page) {
     ...modelState,
     ...activeState,
   }
+}
+
+function readPPTXPresetGeometryFreeformProbeState(page) {
+  return page.eval(`(() => {
+    const expectedNames = [
+      'Preset Block Arc Probe',
+      'Preset Corner Probe',
+      'Preset Decagon Probe',
+      'Preset Diag Stripe Probe',
+      'Preset Dodecagon Probe',
+      'Preset Folded Corner Probe',
+      'Preset Pie Probe',
+      'Preset Triangle Probe',
+      'Preset Hexagon Probe',
+      'Preset Chevron Probe',
+      'Preset Right Arrow Probe',
+      'Preset Left Arrow Probe',
+      'Preset Up Arrow Probe',
+      'Preset Down Arrow Probe',
+      'Preset Left Right Arrow Probe',
+      'Preset Up Down Arrow Probe',
+      'Preset Quad Arrow Probe',
+      'Preset Plus Probe',
+      'Preset Star Probe',
+      'Preset Math Multiply Probe',
+      'Preset Math Plus Probe',
+      'Preset Heart Probe',
+      'Preset Lightning Probe',
+      'Preset Moon Probe',
+      'Preset Text Right Arrow Probe',
+    ]
+    const addedPresetNames = [
+      'Preset Block Arc Probe',
+      'Preset Corner Probe',
+      'Preset Decagon Probe',
+      'Preset Diag Stripe Probe',
+      'Preset Dodecagon Probe',
+      'Preset Folded Corner Probe',
+      'Preset Pie Probe',
+    ]
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const freeformObjects = exportImportedElements.filter((element) =>
+      expectedNames.includes(element.name) &&
+      element.kind === 'freeform')
+    const byName = Object.fromEntries(freeformObjects.map((element) => [element.name, element]))
+    const activeFreeforms = [...document.querySelectorAll('.ppt-slide [data-kind="freeform"]')]
+    const activeAddedRenderedCount = addedPresetNames.filter((name) =>
+      activeFreeforms.some((element) =>
+        element.getAttribute('data-ppt-element-name') === name &&
+        element.querySelector('[data-ppt-freeform-path]')?.getAttribute('d')?.includes('L '))).length
+
+    return {
+      activeAddedRenderedCount,
+      addedPresetSummary: addedPresetNames.map((name) => {
+        const element = byName[name]
+
+        return [
+          name,
+          element?.points?.length ?? 0,
+          element?.fill?.color ?? '',
+          element?.geometry?.x ?? '',
+          element?.geometry?.y ?? '',
+        ].join(':')
+      }).join(' | '),
+      expectedNameCount: expectedNames.filter((name) => byName[name]).length,
+      expectedNamesLength: expectedNames.length,
+      pointModes: freeformObjects.map((element) => element.pointMode ?? '').sort().join(' | '),
+      presetModelCount: freeformObjects.length,
+    }
+  })()`)
 }
 
 async function readPPTXSlideProbeActiveState(page, slideId, probeName) {

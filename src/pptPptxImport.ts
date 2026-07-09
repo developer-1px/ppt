@@ -122,6 +122,21 @@ type PPTXRatioPoint = {
   y: number
 }
 
+function createPPTXRegularPolygonRatios(
+  sides: number,
+): readonly PPTXRatioPoint[] {
+  const points = Array.from({ length: sides }, (_, index) => {
+    const angle = (-90 + (index * 360) / sides) * Math.PI / 180
+
+    return {
+      x: 0.5 + Math.cos(angle) * 0.5,
+      y: 0.5 + Math.sin(angle) * 0.5,
+    }
+  })
+
+  return [...points, points[0] ?? { x: 0.5, y: 0 }]
+}
+
 const PPTX_EMUS_PER_PIXEL = 9_525
 const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
 const PPTX_POINTS_PER_PIXEL = 0.75
@@ -235,6 +250,23 @@ const PPTX_THEME_SCHEME_ALIASES: Record<string, string> = {
   tx2: 'dk2',
 }
 const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRatioPoint[]>> = {
+  blockArc: [
+    { x: 0.86, y: 0.16 },
+    { x: 1, y: 0.5 },
+    { x: 0.86, y: 0.84 },
+    { x: 0.5, y: 1 },
+    { x: 0.16, y: 0.84 },
+    { x: 0, y: 0.5 },
+    { x: 0.16, y: 0.16 },
+    { x: 0.36, y: 0.36 },
+    { x: 0.28, y: 0.5 },
+    { x: 0.36, y: 0.64 },
+    { x: 0.5, y: 0.72 },
+    { x: 0.64, y: 0.64 },
+    { x: 0.72, y: 0.5 },
+    { x: 0.64, y: 0.36 },
+    { x: 0.86, y: 0.16 },
+  ],
   chevron: [
     { x: 0, y: 0 },
     { x: 0.65, y: 0 },
@@ -243,6 +275,23 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0, y: 1 },
     { x: 0.35, y: 0.5 },
     { x: 0, y: 0 },
+  ],
+  corner: [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 0.28 },
+    { x: 0.28, y: 0.28 },
+    { x: 0.28, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  decagon: createPPTXRegularPolygonRatios(10),
+  diagStripe: [
+    { x: 0.28, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0.72, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.28, y: 0 },
   ],
   downArrow: [
     { x: 0.25, y: 0 },
@@ -253,6 +302,15 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0, y: 0.65 },
     { x: 0.25, y: 0.65 },
     { x: 0.25, y: 0 },
+  ],
+  dodecagon: createPPTXRegularPolygonRatios(12),
+  foldedCorner: [
+    { x: 0, y: 0 },
+    { x: 0.78, y: 0 },
+    { x: 1, y: 0.22 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
   ],
   hexagon: [
     { x: 0.25, y: 0 },
@@ -386,6 +444,17 @@ const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRa
     { x: 0.18, y: 1 },
     { x: 0, y: 0.38 },
     { x: 0.5, y: 0 },
+  ],
+  pie: [
+    { x: 0.5, y: 0.5 },
+    { x: 0.5, y: 0 },
+    { x: 0.72, y: 0.05 },
+    { x: 0.9, y: 0.2 },
+    { x: 1, y: 0.5 },
+    { x: 0.9, y: 0.8 },
+    { x: 0.72, y: 0.95 },
+    { x: 0.5, y: 1 },
+    { x: 0.5, y: 0.5 },
   ],
   plus: [
     { x: 0.35, y: 0 },
