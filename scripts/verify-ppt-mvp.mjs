@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import net from 'node:net'
@@ -233,10 +233,21 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedKinds(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedKindIncludes,
+        ) &&
+        hasExpectedPPTXRenderedGroups(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedGroupedSlideIndexes,
+        ) &&
+        hasExpectedPPTXRenderedHyperlinks(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedHyperlinks,
         ),
       {
         beforeExternalPPTXDrop,
         externalPPTXFixture: {
+          expectedGroupedSlideIndexes:
+            externalPPTXFixture.expectedGroupedSlideIndexes,
+          expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -300,12 +311,23 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedKindIncludes,
         ) &&
+        hasExpectedPPTXRenderedGroups(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedGroupedSlideIndexes,
+        ) &&
+        hasExpectedPPTXRenderedHyperlinks(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedHyperlinks,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
         externalPPTXOpenStatusState.slideCount === externalPPTXOpenImportState.importedCount,
       {
         externalPPTXFixture: {
+          expectedGroupedSlideIndexes:
+            externalPPTXFixture.expectedGroupedSlideIndexes,
+          expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -37789,6 +37811,8 @@ async function readExternalPPTXRenderFixture() {
   const fixture = providedPath
     ? {
         expectedKindIncludes: [],
+        expectedGroupedSlideIndexes: [],
+        expectedHyperlinks: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -37818,9 +37842,23 @@ async function createGeneratedPPTXRenderFixture() {
   const fileName = 'real-file-page-render-fixture.pptx'
   const path = join(generatedPPTXFixtureDir, fileName)
   const expectedTextIncludes = [
-    'PPTX Fixture Page 1',
-    'PPTX Fixture Page 2',
-    'PPTX Fixture Page 3',
+    [
+      'PPTX Fixture Page 1',
+      'Grouped PPTX fixture',
+      'Hyperlink Probe',
+      'Run Hyperlink Probe',
+    ],
+    ['PPTX Fixture Page 2'],
+    ['PPTX Fixture Page 3'],
+  ]
+  const expectedGroupedSlideIndexes = [0]
+  const expectedHyperlinks = [
+    {
+      absentObjectUrls: ['https://example.com/openxml-run-hyperlink-probe'],
+      objectUrls: ['https://example.com/openxml-hyperlink-probe'],
+      runUrls: ['https://example.com/openxml-run-hyperlink-probe'],
+      slideIndex: 0,
+    },
   ]
   const expectedKindIncludes = [
     ['line', 'shape'],
@@ -37838,20 +37876,20 @@ async function createGeneratedPPTXRenderFixture() {
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: '2563EB',
     body: 'Loaded from a generated disk file and rendered as page one.',
-    heading: expectedTextIncludes[0],
+    heading: expectedTextIncludes[0][0],
     index: 1,
   })
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: '059669',
     body: 'Second page proves thumbnail navigation switches the active slide.',
-    heading: expectedTextIncludes[1],
+    heading: expectedTextIncludes[1][0],
     index: 2,
     table: true,
   })
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: 'D97706',
     body: 'Third page keeps the verifier honest about full deck coverage.',
-    heading: expectedTextIncludes[2],
+    heading: expectedTextIncludes[2][0],
     image: true,
     index: 3,
   })
@@ -37860,8 +37898,12 @@ async function createGeneratedPPTXRenderFixture() {
     compression: true,
     fileName: path,
   })
+  await addPPTXRenderFixtureGroupProbe(path)
+  await addPPTXRenderFixtureHyperlinkProbe(path)
 
   return {
+    expectedGroupedSlideIndexes,
+    expectedHyperlinks,
     expectedKindIncludes,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
@@ -38001,13 +38043,114 @@ function addPPTXRenderFixtureSlide(
   }
 }
 
+async function addPPTXRenderFixtureGroupProbe(path) {
+  const bytes = await readFile(path)
+  const zip = await JSZip.loadAsync(bytes)
+  const slidePath = Object.keys(zip.files)
+    .filter((candidate) => /^ppt\/slides\/slide\d+\.xml$/.test(candidate))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Fixture Group Text')) {
+    return
+  }
+
+  const groupXml = [
+    '<p:grpSp>',
+    '<p:nvGrpSpPr>',
+    '<p:cNvPr id="99701" name="Fixture Group Probe"/>',
+    '<p:cNvGrpSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvGrpSpPr>',
+    '<p:grpSpPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="4038600"/>',
+    '<a:ext cx="2590800" cy="838200"/>',
+    '<a:chOff x="0" y="0"/>',
+    '<a:chExt cx="2590800" cy="838200"/>',
+    '</a:xfrm>',
+    '</p:grpSpPr>',
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="99702" name="Fixture Group Text"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="0" y="0"/>',
+    '<a:ext cx="1524000" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:noFill/>',
+    '<a:ln><a:noFill/></a:ln>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p><a:r><a:rPr sz="1500"/><a:t>Grouped PPTX fixture</a:t></a:r></a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="99703" name="Fixture Group Shape"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="1676400" y="76200"/>',
+    '<a:ext cx="762000" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill><a:srgbClr val="DBEAFE"/></a:solidFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="2563EB"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+    '</p:grpSp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${groupXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return
+  }
+
+  zip.file(slidePath, nextXml)
+  await writeFile(
+    path,
+    await zip.generateAsync({
+      compression: 'DEFLATE',
+      type: 'nodebuffer',
+    }),
+  )
+}
+
+async function addPPTXRenderFixtureHyperlinkProbe(path) {
+  const bytes = await readFile(path)
+  const nextBase64 = await addPPTXHyperlinkProbe(
+    Buffer.from(bytes).toString('base64'),
+  )
+
+  if (nextBase64) {
+    await writeFile(path, Buffer.from(nextBase64, 'base64'))
+  }
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
   }
 
-  return expectedTextIncludes.every((text, index) =>
-    state.slides[index]?.textSample.includes(text))
+  return expectedTextIncludes.every((expected, index) => {
+    const texts = Array.isArray(expected) ? expected : [expected]
+
+    return texts.every((text) => state.slides[index]?.textSample.includes(text))
+  })
 }
 
 function hasExpectedPPTXRenderedKinds(state, expectedKindIncludes) {
@@ -38019,6 +38162,35 @@ function hasExpectedPPTXRenderedKinds(state, expectedKindIncludes) {
     const renderedKinds = state.slides[index]?.elementKinds ?? []
 
     return kinds.every((kind) => renderedKinds.includes(kind))
+  })
+}
+
+function hasExpectedPPTXRenderedGroups(state, expectedGroupedSlideIndexes) {
+  if (!expectedGroupedSlideIndexes.length) {
+    return true
+  }
+
+  return expectedGroupedSlideIndexes.every((index) =>
+    (state.slides[index]?.groupIds ?? []).length > 0)
+}
+
+function hasExpectedPPTXRenderedHyperlinks(state, expectedHyperlinks) {
+  if (!expectedHyperlinks.length) {
+    return true
+  }
+
+  return expectedHyperlinks.every((expected) => {
+    const slide = state.slides[expected.slideIndex]
+
+    if (!slide) {
+      return false
+    }
+
+    return expected.objectUrls.every((url) =>
+      slide.objectHyperlinkUrls.includes(url)) &&
+      (expected.absentObjectUrls ?? []).every((url) =>
+        !slide.objectHyperlinkUrls.includes(url)) &&
+      expected.runUrls.every((url) => slide.runHyperlinkUrls.includes(url))
   })
 }
 
@@ -39745,6 +39917,16 @@ async function readPPTXImportedSlideRenderState(
           .sort()
           .join(' | '),
         frameRendered,
+        groupIds: [
+          ...new Set(elements
+            .map((element) => element.getAttribute('data-group-id') ?? '')
+            .filter(Boolean)),
+        ].sort(),
+        objectHyperlinkUrls: [
+          ...new Set(elements
+            .map((element) => element.getAttribute('data-ppt-hyperlink-url') ?? '')
+            .filter(Boolean)),
+        ].sort(),
         rendered: frameRendered &&
           (!input.requireElements || (
             elements.length > 0 &&
@@ -39756,6 +39938,12 @@ async function readPPTXImportedSlideRenderState(
           .replace(/\\s+/g, ' ')
           .trim()
           .slice(0, 240),
+        runHyperlinkUrls: [
+          ...new Set(elements
+            .flatMap((element) => [...element.querySelectorAll('[data-ppt-run-hyperlink-url]')])
+            .map((element) => element.getAttribute('data-ppt-run-hyperlink-url') ?? '')
+            .filter(Boolean)),
+        ].sort(),
         visibleElementCount: visibleElements.length,
       }
     })(${JSON.stringify({

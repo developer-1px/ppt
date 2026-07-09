@@ -8178,8 +8178,10 @@ function readPPTXElementHyperlink(
   element: Element,
   relationships: PPTXRelationshipMap,
 ) {
+  const nonVisualProperties =
+    getFirstPPTXDescendantByLocalName(element, 'cNvPr')
   const relationshipId = readPPTXRelationshipAttributeId(
-    getFirstPPTXDescendantByLocalName(element, 'hlinkClick'),
+    getDirectPPTXChildByLocalName(nonVisualProperties, 'hlinkClick'),
   )
   const relationship = relationshipId
     ? relationships.get(relationshipId)
