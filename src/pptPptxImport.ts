@@ -5834,6 +5834,8 @@ function readPPTXColor(
   placeholderColor?: string,
 ) {
   const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
+  const scrgbColor = getDirectPPTXChildByLocalName(solidFill, 'scrgbClr')
+  const hslColor = getDirectPPTXChildByLocalName(solidFill, 'hslClr')
   const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
   const presetColor = getDirectPPTXChildByLocalName(solidFill, 'prstClr')
   const systemColor = getDirectPPTXChildByLocalName(solidFill, 'sysClr')
@@ -5841,6 +5843,14 @@ function readPPTXColor(
     {
       color: readPPTXHexColor(srgbColor?.getAttribute('val')),
       element: srgbColor,
+    },
+    {
+      color: readPPTXScrgbColor(scrgbColor),
+      element: scrgbColor,
+    },
+    {
+      color: readPPTXHslColor(hslColor),
+      element: hslColor,
     },
     {
       color: readPPTXSchemeColor(
@@ -5870,6 +5880,50 @@ function readPPTXHexColor(value: string | null | undefined) {
   return value && /^[\da-f]{6}$/i.test(value)
     ? `#${value.toLowerCase()}`
     : undefined
+}
+
+function readPPTXScrgbColor(element: Element | null) {
+  if (!element) {
+    return undefined
+  }
+
+  const red = readPPTXPercentageColorChannel(element.getAttribute('r'))
+  const green = readPPTXPercentageColorChannel(element.getAttribute('g'))
+  const blue = readPPTXPercentageColorChannel(element.getAttribute('b'))
+
+  return red === null || green === null || blue === null
+    ? undefined
+    : formatPPTXHexColor([red, green, blue])
+}
+
+function readPPTXPercentageColorChannel(value: string | null | undefined) {
+  const percentage = toPPTXPositiveNumber(value)
+
+  return percentage === null
+    ? null
+    : Math.max(0, Math.min(255, (percentage / 100_000) * 255))
+}
+
+function readPPTXHslColor(element: Element | null) {
+  if (!element) {
+    return undefined
+  }
+
+  const hue = toPPTXPositiveNumber(element.getAttribute('hue'))
+  const saturation = toPPTXPositiveNumber(element.getAttribute('sat'))
+  const lightness = toPPTXPositiveNumber(element.getAttribute('lum'))
+
+  if (hue === null || saturation === null || lightness === null) {
+    return undefined
+  }
+
+  return formatPPTXHexColor(
+    hslToPPTXRgb({
+      h: hue / 60_000,
+      l: Math.max(0, Math.min(1, lightness / 100_000)),
+      s: Math.max(0, Math.min(1, saturation / 100_000)),
+    }),
+  )
 }
 
 function readPPTXSchemeColor(

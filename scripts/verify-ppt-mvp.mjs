@@ -285,23 +285,16 @@ async function runPPTXRenderScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
-  const openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(
-    await addPPTXPictureEffectRefProbe(
-      await addPPTXStyleRefProbe(
-        await addPPTXRGBChannelModifierProbe(
-          await addPPTXHueModifierProbe(
-            await addPPTXZeroValueColorModifierProbe(
-              await addPPTXSaturationModifierProbe(
-                await addPPTXGradientPatternFillProbe(
-                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  )
+  let openXmlPPTXBase64 = await removePPTXEmbeddedPPTModel(pptxDownloadBase64)
+  openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXSaturationModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXColorSpaceProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXZeroValueColorModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
 
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
@@ -331,6 +324,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXHueModifierProbeState(page)
   const openXmlPPTXZeroValueColorModifierState =
     await readPPTXZeroValueColorModifierProbeState(page)
+  const openXmlPPTXColorSpaceState =
+    await readPPTXColorSpaceProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -525,6 +520,21 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXZeroValueColorModifierState.activeStroke.includes('204'),
     {
       openXmlPPTXZeroValueColorModifierState,
+    },
+  )
+  record(
+    'imports OpenXML PPTX scRGB and HSL colors for viewer rendering',
+    openXmlPPTXColorSpaceState.modelCount === 1 &&
+      openXmlPPTXColorSpaceState.fill === '#3366cc' &&
+      openXmlPPTXColorSpaceState.stroke === '#40bf40' &&
+      openXmlPPTXColorSpaceState.activeExists &&
+      openXmlPPTXColorSpaceState.activeFill.includes('51') &&
+      openXmlPPTXColorSpaceState.activeFill.includes('102') &&
+      openXmlPPTXColorSpaceState.activeFill.includes('204') &&
+      openXmlPPTXColorSpaceState.activeStroke.includes('64') &&
+      openXmlPPTXColorSpaceState.activeStroke.includes('191'),
+    {
+      openXmlPPTXColorSpaceState,
     },
   )
 
@@ -11457,6 +11467,7 @@ async function runExportScenario(page) {
   openXmlPPTXBase64 = await addPPTXRGBChannelModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXHueModifierProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXZeroValueColorModifierProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXColorSpaceProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXStyleRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureEffectRefProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(openXmlPPTXBase64)
@@ -11533,6 +11544,11 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#5f5f5f' &&
         element.stroke?.color === '#6699cc').length,
+      colorSpaceProbeModelCount: elements.filter((element) =>
+        element.name === 'Color Space Probe' &&
+        element.kind === 'shape' &&
+        element.fill?.color === '#3366cc' &&
+        element.stroke?.color === '#40bf40').length,
       presetSystemColorProbeModelCount: elements.filter((element) =>
         element.name === 'Preset/System Color Probe' &&
         element.kind === 'shape' &&
@@ -11801,6 +11817,11 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#5f5f5f' &&
       element.stroke?.color === '#6699cc')
+    const exportColorSpaceProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Color Space Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#3366cc' &&
+      element.stroke?.color === '#40bf40')
     const exportPresetSystemColorProbeObjects = exportImportedElements.filter((element) =>
       element.name === 'Preset/System Color Probe' &&
       element.kind === 'shape' &&
@@ -12150,6 +12171,10 @@ async function runExportScenario(page) {
       exportZeroValueColorModifierProbeFill: exportZeroValueColorModifierProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportZeroValueColorModifierProbeModelCount: exportZeroValueColorModifierProbeObjects.length,
       exportZeroValueColorModifierProbeStroke: exportZeroValueColorModifierProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasColorSpaceProbe: exportColorSpaceProbeObjects.length > 0,
+      exportColorSpaceProbeFill: exportColorSpaceProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportColorSpaceProbeModelCount: exportColorSpaceProbeObjects.length,
+      exportColorSpaceProbeStroke: exportColorSpaceProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasPresetSystemColorProbe: exportPresetSystemColorProbeObjects.length > 0,
       exportPresetSystemColorProbeFill: exportPresetSystemColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportPresetSystemColorProbeModelCount: exportPresetSystemColorProbeObjects.length,
@@ -12432,6 +12457,8 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportHueModifierProbeModelCount > beforeOpenXmlPPTXDrop.hueModifierProbeModelCount &&
       openXmlPPTXImportState.exportHasZeroValueColorModifierProbe &&
       openXmlPPTXImportState.exportZeroValueColorModifierProbeModelCount > beforeOpenXmlPPTXDrop.zeroValueColorModifierProbeModelCount &&
+      openXmlPPTXImportState.exportHasColorSpaceProbe &&
+      openXmlPPTXImportState.exportColorSpaceProbeModelCount > beforeOpenXmlPPTXDrop.colorSpaceProbeModelCount &&
       openXmlPPTXImportState.exportHasPresetSystemColorProbe &&
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
@@ -31762,6 +31789,64 @@ async function addPPTXZeroValueColorModifierProbe(base64) {
   })
 }
 
+async function addPPTXColorSpaceProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Color Space Probe')) {
+    return base64
+  }
+
+  const probeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9994" name="Color Space Probe"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7772400" y="5029200"/>',
+    '<a:ext cx="1371600" cy="548640"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:solidFill>',
+    '<a:scrgbClr r="20000" g="40000" b="80000"/>',
+    '</a:solidFill>',
+    '<a:ln w="19050">',
+    '<a:solidFill>',
+    '<a:hslClr hue="7200000" sat="50000" lum="50000"/>',
+    '</a:solidFill>',
+    '</a:ln>',
+    '</p:spPr>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXHiddenObjectProbe(base64) {
   if (!base64) {
     return ''
@@ -35517,6 +35602,10 @@ async function readPPTXZeroValueColorModifierProbeState(page) {
     page,
     'Zero Value Color Modifier Probe',
   )
+}
+
+async function readPPTXColorSpaceProbeState(page) {
+  return await readPPTXColorModifierShapeProbeState(page, 'Color Space Probe')
 }
 
 async function readPPTXColorModifierShapeProbeState(page, probeName) {
