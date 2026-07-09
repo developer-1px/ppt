@@ -750,6 +750,10 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXGraphicFallbackState.mediaActiveKind === 'shape' &&
       openXmlPPTXGraphicFallbackState.mediaText.includes('Video Media Probe') &&
       openXmlPPTXGraphicFallbackState.mediaText.includes('pptx-media-probe.mp4') &&
+      openXmlPPTXGraphicFallbackState.audioShapeModelCount === 1 &&
+      openXmlPPTXGraphicFallbackState.audioActiveKind === 'shape' &&
+      openXmlPPTXGraphicFallbackState.audioText.includes('Audio Media Probe') &&
+      openXmlPPTXGraphicFallbackState.audioText.includes('pptx-audio-probe.mp3') &&
       openXmlPPTXGraphicFallbackState.contentPartModelCount === 1 &&
       openXmlPPTXGraphicFallbackState.contentPartActiveKind === 'shape' &&
       openXmlPPTXGraphicFallbackState.contentPartText.includes('Content Part Probe') &&
@@ -14955,6 +14959,9 @@ async function runExportScenario(page) {
     const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
 
     return {
+      audioObjectModelCount: elements.filter((element) =>
+        element.name === 'Audio Media Probe' &&
+        element.kind === 'shape').length,
       mediaObjectModelCount: elements.filter((element) =>
         element.name === 'Video Media Probe' &&
         element.kind === 'shape').length,
@@ -14984,6 +14991,7 @@ async function runExportScenario(page) {
     const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
     const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
     const activeShape = document.querySelector('.ppt-slide [data-ppt-element-name="Video Media Probe"][data-kind="shape"]')
+    const activeAudioShape = document.querySelector('.ppt-slide [data-ppt-element-name="Audio Media Probe"][data-kind="shape"]')
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const readPPTExportDeckFromHTML = (html) => {
       try {
@@ -15003,16 +15011,32 @@ async function runExportScenario(page) {
     const mediaObjects = exportImportedElements.filter((element) =>
       element.name === 'Video Media Probe' &&
       element.kind === 'shape')
+    const audioObjects = exportImportedElements.filter((element) =>
+      element.name === 'Audio Media Probe' &&
+      element.kind === 'shape')
     const mediaObject = mediaObjects[0] ?? null
+    const audioObject = audioObjects[0] ?? null
     const paragraphs = mediaObject?.textBody?.paragraphs ?? []
     const paragraphTexts = paragraphs.map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
+    const audioParagraphs = audioObject?.textBody?.paragraphs ?? []
+    const audioParagraphTexts = audioParagraphs.map((paragraph) =>
       (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
 
     return {
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeAudioShape: activeAudioShape?.getAttribute('data-shape') ?? '',
+      activeAudioText: activeAudioShape?.textContent ?? '',
+      activeAudioTextAutofit: activeAudioShape?.getAttribute('data-ppt-text-autofit') ?? '',
       activeShape: activeShape?.getAttribute('data-shape') ?? '',
       activeText: activeShape?.textContent ?? '',
       activeTextAutofit: activeShape?.getAttribute('data-ppt-text-autofit') ?? '',
+      audioObjectFill: audioObject?.fill?.color ?? '',
+      audioObjectGeometry: audioObject?.geometry ?? null,
+      audioObjectModelCount: audioObjects.length,
+      audioObjectShape: audioObject?.shape ?? '',
+      audioObjectStrokeDash: audioObject?.stroke?.dash ?? '',
+      audioObjectTextAutofit: audioObject?.textAutoFit ?? '',
       fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
       format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
       importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
@@ -15023,6 +15047,7 @@ async function runExportScenario(page) {
       mediaObjectStrokeDash: mediaObject?.stroke?.dash ?? '',
       mediaObjectTextAutofit: mediaObject?.textAutoFit ?? '',
       model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      audioParagraphTexts,
       paragraphTexts,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
@@ -15057,7 +15082,27 @@ async function runExportScenario(page) {
       mediaObjectPPTXImportState.mediaObjectGeometry?.x === 980 &&
       mediaObjectPPTXImportState.mediaObjectGeometry?.y === 500 &&
       mediaObjectPPTXImportState.mediaObjectGeometry?.w === 220 &&
-      mediaObjectPPTXImportState.mediaObjectGeometry?.h === 120,
+      mediaObjectPPTXImportState.mediaObjectGeometry?.h === 120 &&
+      mediaObjectPPTXImportState.audioObjectModelCount >
+        beforeMediaObjectPPTXDrop.audioObjectModelCount &&
+      mediaObjectPPTXImportState.audioObjectModelCount === 1 &&
+      mediaObjectPPTXImportState.audioObjectShape === 'rect' &&
+      mediaObjectPPTXImportState.activeAudioShape === 'rect' &&
+      mediaObjectPPTXImportState.audioObjectTextAutofit === 'resizeShapeToFitText' &&
+      mediaObjectPPTXImportState.activeAudioTextAutofit === 'resizeShapeToFitText' &&
+      mediaObjectPPTXImportState.audioObjectFill === '#f8fafc' &&
+      mediaObjectPPTXImportState.audioObjectStrokeDash === 'dash' &&
+      JSON.stringify(mediaObjectPPTXImportState.audioParagraphTexts) === JSON.stringify([
+        'Audio Media Probe',
+        'Audio',
+        'pptx-audio-probe.mp3',
+      ]) &&
+      mediaObjectPPTXImportState.activeAudioText.includes('Audio Media Probe') &&
+      mediaObjectPPTXImportState.activeAudioText.includes('pptx-audio-probe.mp3') &&
+      mediaObjectPPTXImportState.audioObjectGeometry?.x === 720 &&
+      mediaObjectPPTXImportState.audioObjectGeometry?.y === 500 &&
+      mediaObjectPPTXImportState.audioObjectGeometry?.w === 220 &&
+      mediaObjectPPTXImportState.audioObjectGeometry?.h === 120,
     {
       beforeMediaObjectPPTXDrop,
       mediaObjectPPTXImportState,
@@ -35284,23 +35329,30 @@ async function addPPTXMediaObjectProbe(base64) {
 
   const xml = await readPPTXZipText(zip, slidePath)
 
-  if (xml.includes('Video Media Probe')) {
+  const hasVideoProbe = xml.includes('Video Media Probe')
+  const hasAudioProbe = xml.includes('Audio Media Probe')
+
+  if (hasVideoProbe && hasAudioProbe) {
     return base64
   }
 
-  const relationshipId = await addPPTXExternalRelationship({
-    sourcePath: slidePath,
-    target: 'https://example.com/pptx-media-probe.mp4',
-    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/video',
-    zip,
-  })
-  const mediaPictureXml = [
+  const mediaPictureXml = []
+
+  if (!hasVideoProbe) {
+    const videoRelationshipId = await addPPTXExternalRelationship({
+      sourcePath: slidePath,
+      target: 'https://example.com/pptx-media-probe.mp4',
+      type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/video',
+      zip,
+    })
+
+    mediaPictureXml.push([
     '<p:pic>',
     '<p:nvPicPr>',
     '<p:cNvPr id="9989" name="Video Media Probe" descr="Video media alt"/>',
     '<p:cNvPicPr/>',
     '<p:nvPr>',
-    `<a:videoFile r:link="${relationshipId}"/>`,
+    `<a:videoFile r:link="${videoRelationshipId}"/>`,
     '</p:nvPr>',
     '</p:nvPicPr>',
     '<p:blipFill>',
@@ -35314,8 +35366,49 @@ async function addPPTXMediaObjectProbe(base64) {
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
     '</p:spPr>',
     '</p:pic>',
-  ].join('')
-  const nextXml = xml.replace('</p:spTree>', `${mediaPictureXml}</p:spTree>`)
+    ].join(''))
+  }
+
+  if (!hasAudioProbe) {
+    const audioPath = 'ppt/media/pptx-audio-probe.mp3'
+
+    await ensurePPTXDefaultContentType(zip, 'mp3', 'audio/mpeg')
+    zip.file(
+      audioPath,
+      Buffer.from('SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjMuMTAwAAAAAAAAAAAA', 'base64'),
+    )
+
+    const audioRelationshipId = await addPPTXInternalRelationship({
+      sourcePath: slidePath,
+      target: getPPTXRelativeTarget(slidePath, audioPath),
+      type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio',
+      zip,
+    })
+
+    mediaPictureXml.push([
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9988" name="Audio Media Probe" descr="Audio media alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr>',
+    `<a:audioFile r:embed="${audioRelationshipId}"/>`,
+    '</p:nvPr>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="6858000" y="4762500"/>',
+    '<a:ext cx="2095500" cy="1143000"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '</p:pic>',
+    ].join(''))
+  }
+
+  const nextXml = xml.replace('</p:spTree>', `${mediaPictureXml.join('')}</p:spTree>`)
 
   if (nextXml === xml) {
     return base64
@@ -38766,6 +38859,7 @@ function readPPTXGraphicFallbackProbeState(page) {
     const diagramText = byName('SmartArt Text Probe', 'textBox')
     const oleImage = byName('OLE Object Probe', 'image')
     const mediaShape = byName('Video Media Probe', 'shape')
+    const audioShape = byName('Audio Media Probe', 'shape')
     const contentPartShape = byName('Content Part Probe', 'shape')
     const unsupportedGraphicFrameShape =
       byName('Unsupported Graphic Frame Probe', 'shape')
@@ -38773,6 +38867,7 @@ function readPPTXGraphicFallbackProbeState(page) {
     const activeDiagram = activeElement('SmartArt Text Probe')
     const activeOle = activeElement('OLE Object Probe')
     const activeMedia = activeElement('Video Media Probe')
+    const activeAudio = activeElement('Audio Media Probe')
     const activeContentPart = activeElement('Content Part Probe')
     const activeUnsupportedGraphicFrame =
       activeElement('Unsupported Graphic Frame Probe')
@@ -38780,6 +38875,9 @@ function readPPTXGraphicFallbackProbeState(page) {
       activeOle?.querySelector('img')?.getAttribute('src') ?? ''
 
     return {
+      audioActiveKind: activeAudio?.getAttribute('data-kind') ?? '',
+      audioShapeModelCount: audioShape.length,
+      audioText: activeAudio?.textContent ?? '',
       chartTableActiveKind: activeChartTable?.getAttribute('data-kind') ?? '',
       chartTableModelCount: chartTable.length,
       chartTableText: activeChartTable?.textContent ?? '',
