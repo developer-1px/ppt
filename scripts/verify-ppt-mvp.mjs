@@ -631,6 +631,7 @@ async function runPPTXRenderScenario(page) {
   record(
     'imports OpenXML PPTX inherited footer placeholders for viewer rendering',
     openXmlPPTXInheritedFooterPlaceholderState.totalProbeCount === 1 &&
+      openXmlPPTXInheritedFooterPlaceholderState.hiddenDateProbeCount === 0 &&
       openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideProbeCount === 0 &&
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideProbeCount === 1 &&
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideActiveExists &&
@@ -32703,6 +32704,25 @@ function setPPTXFirstElementAttributeXml(xml, localName, attributeName, value) {
   })
 }
 
+function setPPTXHeaderFooterXml(xml, attributes) {
+  const attributeText = Object.entries(attributes)
+    .map(([name, value]) => `${name}="${escapePPTXXmlAttribute(value)}"`)
+    .join(' ')
+  const headerFooterXml = `<p:hf ${attributeText}/>`
+  const existingPattern =
+    /<(?:[\w.-]+:)?hf\b[^>]*(?:\/>|><\/(?:[\w.-]+:)?hf>)/
+
+  if (existingPattern.test(xml)) {
+    return xml.replace(existingPattern, headerFooterXml)
+  }
+
+  if (/<\/(?:[\w.-]+:)?cSld>/.test(xml)) {
+    return xml.replace(/(<\/(?:[\w.-]+:)?cSld>)/, `$1${headerFooterXml}`)
+  }
+
+  return xml.replace(/(<(?:[\w.-]+:)?sld\b[^>]*>)/, `$1${headerFooterXml}`)
+}
+
 function setPPTXMasterColorMapXml(xml, entries) {
   const attributes = entries
     .map(([name, value]) =>
@@ -34669,6 +34689,32 @@ async function addPPTXInheritedFooterPlaceholderProbe(base64) {
     '</p:txBody>',
     '</p:sp>',
   ].join('')
+  const hiddenProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9957" name="Hidden Inherited Date Placeholder Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr><p:ph type="dt" idx="13"/></p:nvPr>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="8001000" y="6743700"/>',
+    '<a:ext cx="3200400" cy="365760"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr anchor="ctr" lIns="0" rIns="0" tIns="0" bIns="0"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr algn="r"><a:defRPr sz="1800">',
+    '<a:solidFill><a:srgbClr val="991B1B"/></a:solidFill>',
+    '</a:defRPr></a:pPr>',
+    '<a:r><a:t>Hidden inherited date probe</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
 
   for (const masterPath of uniqueMasterPaths) {
     const masterXml = await readPPTXZipText(zip, masterPath)
@@ -34677,8 +34723,43 @@ async function addPPTXInheritedFooterPlaceholderProbe(base64) {
       !masterXml.includes('Inherited Footer Placeholder Probe') &&
       masterXml.includes('</p:spTree>')
     ) {
-      zip.file(masterPath, masterXml.replace('</p:spTree>', `${probeXml}</p:spTree>`))
+      zip.file(
+        masterPath,
+        masterXml.replace(
+          '</p:spTree>',
+          `${probeXml}${hiddenProbeXml}</p:spTree>`,
+        ),
+      )
     }
+  }
+
+  const hiddenSlidePath = slidePaths[0]
+  const visibleSlidePath = slidePaths[1]
+
+  if (hiddenSlidePath) {
+    const hiddenSlideXml = await readPPTXZipText(zip, hiddenSlidePath)
+
+    zip.file(
+      hiddenSlidePath,
+      setPPTXHeaderFooterXml(hiddenSlideXml, {
+        dt: '1',
+        ftr: '1',
+        sldNum: '0',
+      }),
+    )
+  }
+
+  if (visibleSlidePath) {
+    const visibleSlideXml = await readPPTXZipText(zip, visibleSlidePath)
+
+    zip.file(
+      visibleSlidePath,
+      setPPTXHeaderFooterXml(visibleSlideXml, {
+        dt: '0',
+        ftr: '1',
+        sldNum: '0',
+      }),
+    )
   }
 
   return await zip.generateAsync({
@@ -36412,6 +36493,11 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
         element.name === 'Inherited Footer Placeholder Probe' &&
         element.kind === 'textBox' &&
         element.locked === true)
+    const hiddenDateProbes = slides
+      .flatMap((slide) => slide.elements ?? [])
+      .filter((element) =>
+        element.name === 'Hidden Inherited Date Placeholder Probe' &&
+        element.kind === 'textBox')
     const hiddenSlide = slides.find((slide) =>
       (slide.name ?? '').includes('Master Hidden Source'))
     const visibleSlide = slides.find((slide) =>
@@ -36420,6 +36506,8 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
     const visibleProbes = probesForSlide(visibleSlide)
 
     return {
+      hiddenDateProbeCount: hiddenDateProbes.length,
+      hiddenDateProbeText: hiddenDateProbes.map(readProbeText).join(' | '),
       hiddenSlideId: hiddenSlide?.id ?? '',
       hiddenSlideProbeCount: hiddenProbes.length,
       hiddenSlideText: hiddenProbes.map(readProbeText).join(' | '),

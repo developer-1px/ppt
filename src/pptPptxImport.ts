@@ -110,6 +110,10 @@ type PPTXPlaceholderRef = {
 type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
 type PPTXPlaceholderTextBodyMap = Map<string, Element>
 type PPTXInheritedElementSource = 'layout' | 'master'
+type PPTXHeaderFooterPlaceholderType = 'dt' | 'ftr' | 'hdr' | 'sldNum'
+type PPTXHeaderFooterVisibility = Readonly<
+  Partial<Record<PPTXHeaderFooterPlaceholderType, boolean>>
+>
 type PPTXRatioPoint = {
   x: number
   y: number
@@ -2117,10 +2121,18 @@ async function readPPTXInheritedLayoutElements({
   }
 
   const slideShowsMasterShapes = readPPTXPartShowsMasterShapes(slideDoc, slideXml)
+  const slideHeaderFooterVisibility = readPPTXHeaderFooterVisibility(
+    slideDoc,
+    slideXml,
+  )
   const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
   const layoutXml = await zip.file(layoutPath)?.async('string') ?? ''
   const layoutDoc = layoutXml ? parsePPTXXmlDocument(layoutXml) : null
   const layoutShowsMasterShapes = readPPTXPartShowsMasterShapes(
+    layoutDoc,
+    layoutXml,
+  )
+  const layoutHeaderFooterVisibility = readPPTXHeaderFooterVisibility(
     layoutDoc,
     layoutXml,
   )
@@ -2133,6 +2145,10 @@ async function readPPTXInheritedLayoutElements({
   const showsMasterShapes = slideShowsMasterShapes && layoutShowsMasterShapes
   const masterElements = masterPath && showsMasterShapes
     ? await readPPTXPartInheritedElements({
+        headerFooterVisibility: resolvePPTXHeaderFooterVisibility(
+          slideHeaderFooterVisibility,
+          layoutHeaderFooterVisibility,
+        ),
         index,
         path: masterPath,
         relationships: await readPPTXRelationships(zip, masterPath),
@@ -2144,6 +2160,7 @@ async function readPPTXInheritedLayoutElements({
       })
     : []
   const layoutElements = await readPPTXPartInheritedElements({
+    headerFooterVisibility: slideHeaderFooterVisibility,
     index,
     path: layoutPath,
     relationships: layoutRelationships,
@@ -2170,7 +2187,61 @@ function readPPTXPartShowsMasterShapes(
   return !isPPTXFalse(rootValue ?? xmlValue)
 }
 
+function readPPTXHeaderFooterVisibility(
+  doc: Document | null,
+  xml: string,
+): PPTXHeaderFooterVisibility {
+  const headerFooter = doc ? getFirstPPTXDescendantByLocalName(doc, 'hf') : null
+  const xmlHeaderFooter = xml.match(/<[\w.-]+:hf\b[^>]*\/?>/)?.[0] ??
+    xml.match(/<hf\b[^>]*\/?>/)?.[0] ??
+    ''
+
+  return {
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'dt'),
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'ftr'),
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'hdr'),
+    ...readPPTXHeaderFooterVisibilityAttribute(
+      headerFooter,
+      xmlHeaderFooter,
+      'sldNum',
+    ),
+  }
+}
+
+function readPPTXHeaderFooterVisibilityAttribute(
+  headerFooter: Element | null,
+  xml: string,
+  attribute: PPTXHeaderFooterPlaceholderType,
+): PPTXHeaderFooterVisibility {
+  const value = headerFooter?.getAttribute(attribute) ??
+    xml.match(new RegExp(`\\b${attribute}="([^"]*)"`))?.[1]
+
+  if (isPPTXTrue(value)) {
+    return { [attribute]: true }
+  }
+
+  return isPPTXFalse(value) ? { [attribute]: false } : {}
+}
+
+function resolvePPTXHeaderFooterVisibility(
+  ...items: PPTXHeaderFooterVisibility[]
+): PPTXHeaderFooterVisibility {
+  const next: Partial<Record<PPTXHeaderFooterPlaceholderType, boolean>> = {}
+
+  for (const key of ['dt', 'ftr', 'hdr', 'sldNum'] as const) {
+    const values = items.map((item) => item[key])
+    const explicitValue = values.find((value) => value !== undefined)
+
+    if (explicitValue !== undefined) {
+      next[key] = explicitValue
+    }
+  }
+
+  return next
+}
+
 async function readPPTXPartInheritedElements({
+  headerFooterVisibility,
   index,
   path,
   relationships,
@@ -2180,6 +2251,7 @@ async function readPPTXPartInheritedElements({
   themeStyles,
   zip,
 }: {
+  headerFooterVisibility: PPTXHeaderFooterVisibility
   index: number
   path: string
   relationships: PPTXRelationshipMap
@@ -2195,6 +2267,10 @@ async function readPPTXPartInheritedElements({
   const spTree = cSld
     ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
     : null
+  const effectiveHeaderFooterVisibility = resolvePPTXHeaderFooterVisibility(
+    headerFooterVisibility,
+    readPPTXHeaderFooterVisibility(doc, xml),
+  )
   const inheritedElements: PPTElement[] = []
   let objectIndex = 1
 
@@ -2202,7 +2278,14 @@ async function readPPTXPartInheritedElements({
     const child = objectNode.element
     const placeholder = readPPTXPlaceholderRef(child)
 
-    if (placeholder && !isPPTXRenderableInheritedPlaceholder(child, placeholder)) {
+    if (
+      placeholder &&
+      !isPPTXRenderableInheritedPlaceholder(
+        child,
+        placeholder,
+        effectiveHeaderFooterVisibility,
+      )
+    ) {
       continue
     }
 
@@ -2239,16 +2322,30 @@ async function readPPTXPartInheritedElements({
 function isPPTXRenderableInheritedPlaceholder(
   element: Element,
   placeholder: PPTXPlaceholderRef,
+  headerFooterVisibility: PPTXHeaderFooterVisibility,
 ) {
-  const type = placeholder.type ?? ''
+  const type = placeholder.type
 
-  if (!['dt', 'ftr', 'hdr', 'sldNum'].includes(type)) {
+  if (!isPPTXHeaderFooterPlaceholderType(type)) {
+    return false
+  }
+
+  if (headerFooterVisibility[type] === false) {
     return false
   }
 
   const txBody = getDirectPPTXChildByLocalName(element, 'txBody')
 
   return txBody ? readPPTXPlainTextBody(txBody).trim().length > 0 : false
+}
+
+function isPPTXHeaderFooterPlaceholderType(
+  type: string | undefined,
+): type is PPTXHeaderFooterPlaceholderType {
+  return type === 'dt' ||
+    type === 'ftr' ||
+    type === 'hdr' ||
+    type === 'sldNum'
 }
 
 async function readPPTXInheritedElement({
