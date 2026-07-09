@@ -114,6 +114,9 @@ type PPTXHeaderFooterPlaceholderType = 'dt' | 'ftr' | 'hdr' | 'sldNum'
 type PPTXHeaderFooterVisibility = Readonly<
   Partial<Record<PPTXHeaderFooterPlaceholderType, boolean>>
 >
+type PPTXTextFieldContext = {
+  slideNumber: number
+}
 type PPTXRatioPoint = {
   x: number
   y: number
@@ -555,6 +558,7 @@ async function importPPTDeckFromOpenXmlZip(
   const defaultThemeContext = await readPPTXOpenXmlThemeContext(zip, themePath)
   const themeContextByPath = new Map<string, Promise<PPTXThemeContext>>()
   const title = await readPPTXOpenXmlDeckTitle(zip)
+  const firstSlideNumber = await readPPTXOpenXmlFirstSlideNumber(zip)
   const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
   const sectionNameBySlidePath =
     await readPPTXPresentationSectionNamesBySlidePath(zip)
@@ -566,6 +570,7 @@ async function importPPTDeckFromOpenXmlZip(
       path,
       sectionName: sectionNameBySlidePath.get(path),
       size,
+      slideNumber: firstSlideNumber + index,
       themeContextByPath,
       zip,
     }),
@@ -752,6 +757,16 @@ async function readPPTXOpenXmlDeckSize(zip: JSZip) {
     h: height === null ? PPT_SLIDE_HEIGHT : emuToPx(height),
     w: width === null ? PPT_SLIDE_WIDTH : emuToPx(width),
   }
+}
+
+async function readPPTXOpenXmlFirstSlideNumber(zip: JSZip) {
+  const presentationXml = await zip.file('ppt/presentation.xml')?.async('string')
+  const doc = presentationXml ? parsePPTXXmlDocument(presentationXml) : null
+  const value = toPPTXPositiveNumber(
+    doc?.documentElement?.getAttribute('firstSlideNum'),
+  )
+
+  return value === null || value < 1 ? 1 : Math.floor(value)
 }
 
 async function readPPTXOpenXmlDeckTitle(zip: JSZip) {
@@ -1245,6 +1260,7 @@ async function readPPTXOpenXmlSlide({
   path,
   sectionName,
   size,
+  slideNumber,
   themeContextByPath,
   zip,
 }: {
@@ -1254,6 +1270,7 @@ async function readPPTXOpenXmlSlide({
   path: string
   sectionName?: string
   size: PPTDeck['size']
+  slideNumber: number
   themeContextByPath: Map<string, Promise<PPTXThemeContext>>
   zip: JSZip
 }): Promise<PPTSlide> {
@@ -1318,6 +1335,7 @@ async function readPPTXOpenXmlSlide({
     themeColors,
     themeFonts,
     themeStyles,
+    textFieldContext: { slideNumber },
     zip,
   })
   const elements: PPTElement[] = [...inheritedElements]
@@ -1373,6 +1391,7 @@ async function readPPTXOpenXmlSlide({
           themeStyles,
           placeholderGeometries,
           placeholderTextBodies,
+          { slideNumber },
           zip,
         )
     } else if (child.localName === 'cxnSp') {
@@ -2097,6 +2116,7 @@ async function readPPTXInheritedLayoutElements({
   themeColors,
   themeFonts,
   themeStyles,
+  textFieldContext,
   zip,
 }: {
   index: number
@@ -2107,6 +2127,7 @@ async function readPPTXInheritedLayoutElements({
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
   themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
   zip: JSZip
 }): Promise<PPTElement[]> {
   const layoutPath = readPPTXRelatedPartPath({
@@ -2156,6 +2177,7 @@ async function readPPTXInheritedLayoutElements({
         themeColors,
         themeFonts,
         themeStyles,
+        textFieldContext,
         zip,
       })
     : []
@@ -2168,6 +2190,7 @@ async function readPPTXInheritedLayoutElements({
     themeColors,
     themeFonts,
     themeStyles,
+    textFieldContext,
     zip,
   })
 
@@ -2249,6 +2272,7 @@ async function readPPTXPartInheritedElements({
   themeColors,
   themeFonts,
   themeStyles,
+  textFieldContext,
   zip,
 }: {
   headerFooterVisibility: PPTXHeaderFooterVisibility
@@ -2259,6 +2283,7 @@ async function readPPTXPartInheritedElements({
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
   themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
   zip: JSZip
 }): Promise<PPTElement[]> {
   const xml = await zip.file(path)?.async('string') ?? ''
@@ -2298,6 +2323,7 @@ async function readPPTXPartInheritedElements({
       themeColors,
       themeFonts,
       themeStyles,
+      textFieldContext,
       zip,
     })
 
@@ -2357,6 +2383,7 @@ async function readPPTXInheritedElement({
   themeColors,
   themeFonts,
   themeStyles,
+  textFieldContext,
   zip,
 }: {
   child: Element
@@ -2367,6 +2394,7 @@ async function readPPTXInheritedElement({
   themeColors: PPTXThemeColorMap
   themeFonts: PPTXThemeFontMap
   themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
   zip: JSZip
 }): Promise<PPTElement | null> {
   if (child.localName === 'sp') {
@@ -2390,6 +2418,7 @@ async function readPPTXInheritedElement({
         themeStyles,
         new Map(),
         new Map(),
+        textFieldContext,
         zip,
       )
   }
@@ -3299,6 +3328,7 @@ async function readPPTXShapeElement(
   themeStyles: PPTXThemeStyleMap,
   placeholderGeometries: PPTXPlaceholderGeometryMap,
   placeholderTextBodies: PPTXPlaceholderTextBodyMap,
+  textFieldContext: PPTXTextFieldContext,
   zip: JSZip,
 ): Promise<PPTElement | null> {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
@@ -3314,6 +3344,7 @@ async function readPPTXShapeElement(
     themeColors,
     fallbackTxBody,
     fallbackTextColor,
+    textFieldContext,
   )
   const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors) ??
@@ -5225,6 +5256,7 @@ function readPPTXTextBody(
   themeColors: PPTXThemeColorMap,
   fallbackTxBody: Element | null = null,
   fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
 ): PPTTextBody | null {
   if (!txBody) {
     return null
@@ -5240,6 +5272,7 @@ function readPPTXTextBody(
         fallbackListStyle,
         themeColors,
         fallbackTextColor,
+        textFieldContext,
       ))
   const hasText = paragraphs.some((paragraph) =>
     paragraph.runs.some((run) => run.text.length > 0))
@@ -5285,6 +5318,7 @@ function readPPTXParagraph(
   fallbackListStyle: Element | null,
   themeColors: PPTXThemeColorMap,
   fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
 ): PPTParagraph {
   const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
   const level = readPPTXParagraphLevel(pPr)
@@ -5317,6 +5351,7 @@ function readPPTXParagraph(
         defaultRunProperties,
         themeColors,
         fallbackTextColor,
+        textFieldContext,
       ))
 
   return {
@@ -5357,6 +5392,7 @@ function readPPTXTextRun(
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
   fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
 ): PPTRun[] {
   if (
     node.localName !== 'r' &&
@@ -5384,8 +5420,25 @@ function readPPTXTextRun(
   }
 
   const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
+  const resolvedText = node.localName === 'fld'
+    ? readPPTXTextFieldText(node, text, textFieldContext)
+    : text
 
-  return [{ ...style, text }]
+  return [{ ...style, text: resolvedText }]
+}
+
+function readPPTXTextFieldText(
+  field: Element,
+  fallbackText: string,
+  context?: PPTXTextFieldContext,
+) {
+  const type = field.getAttribute('type')?.trim().toLowerCase() ?? ''
+
+  if (type === 'slidenum' && context) {
+    return String(context.slideNumber)
+  }
+
+  return fallbackText
 }
 
 function readPPTXTextRunStyle(

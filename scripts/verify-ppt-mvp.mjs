@@ -632,13 +632,20 @@ async function runPPTXRenderScenario(page) {
     'imports OpenXML PPTX inherited footer placeholders for viewer rendering',
     openXmlPPTXInheritedFooterPlaceholderState.totalProbeCount === 1 &&
       openXmlPPTXInheritedFooterPlaceholderState.hiddenDateProbeCount === 0 &&
+      openXmlPPTXInheritedFooterPlaceholderState.totalSlideNumberProbeCount === 1 &&
       openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideProbeCount === 0 &&
+      openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideNumberProbeCount === 0 &&
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideProbeCount === 1 &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideNumberProbeCount === 1 &&
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideActiveExists &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideNumberActiveExists &&
       !openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideActiveExists &&
+      !openXmlPPTXInheritedFooterPlaceholderState.hiddenSlideNumberActiveExists &&
       openXmlPPTXInheritedFooterPlaceholderState.visibleSlideText.includes(
         'Inherited footer probe',
-      ),
+      ) &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideNumberText === '42' &&
+      openXmlPPTXInheritedFooterPlaceholderState.visibleSlideNumberActiveText.includes('42'),
     {
       openXmlPPTXInheritedFooterPlaceholderState,
     },
@@ -34715,6 +34722,35 @@ async function addPPTXInheritedFooterPlaceholderProbe(base64) {
     '</p:txBody>',
     '</p:sp>',
   ].join('')
+  const slideNumberProbeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9956" name="Inherited Slide Number Placeholder Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr><p:ph type="sldNum" idx="14"/></p:nvPr>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="11811000" y="6355080"/>',
+    '<a:ext cx="609600" cy="365760"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr anchor="ctr" lIns="0" rIns="0" tIns="0" bIns="0"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr algn="r"><a:defRPr sz="1800">',
+    '<a:solidFill><a:srgbClr val="0F766E"/></a:solidFill>',
+    '</a:defRPr></a:pPr>',
+    '<a:fld id="{9956C0DE-0000-4000-8000-000000000001}" type="slidenum">',
+    '<a:rPr lang="en-US" sz="1800"/>',
+    '<a:t>&lt;#&gt;</a:t>',
+    '</a:fld>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
 
   for (const masterPath of uniqueMasterPaths) {
     const masterXml = await readPPTXZipText(zip, masterPath)
@@ -34727,10 +34763,24 @@ async function addPPTXInheritedFooterPlaceholderProbe(base64) {
         masterPath,
         masterXml.replace(
           '</p:spTree>',
-          `${probeXml}${hiddenProbeXml}</p:spTree>`,
+          `${probeXml}${hiddenProbeXml}${slideNumberProbeXml}</p:spTree>`,
         ),
       )
     }
+  }
+
+  const presentationXml = await readPPTXZipText(zip, 'ppt/presentation.xml')
+
+  if (presentationXml) {
+    zip.file(
+      'ppt/presentation.xml',
+      setPPTXFirstElementAttributeXml(
+        presentationXml,
+        'presentation',
+        'firstSlideNum',
+        '41',
+      ),
+    )
   }
 
   const hiddenSlidePath = slidePaths[0]
@@ -34757,7 +34807,7 @@ async function addPPTXInheritedFooterPlaceholderProbe(base64) {
       setPPTXHeaderFooterXml(visibleSlideXml, {
         dt: '0',
         ftr: '1',
-        sldNum: '0',
+        sldNum: '1',
       }),
     )
   }
@@ -36493,6 +36543,11 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
         element.name === 'Inherited Footer Placeholder Probe' &&
         element.kind === 'textBox' &&
         element.locked === true)
+    const slideNumberProbesForSlide = (slide) => (slide?.elements ?? [])
+      .filter((element) =>
+        element.name === 'Inherited Slide Number Placeholder Probe' &&
+        element.kind === 'textBox' &&
+        element.locked === true)
     const hiddenDateProbes = slides
       .flatMap((slide) => slide.elements ?? [])
       .filter((element) =>
@@ -36504,18 +36559,28 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
       (slide.name ?? '').includes('Master Visible Source'))
     const hiddenProbes = probesForSlide(hiddenSlide)
     const visibleProbes = probesForSlide(visibleSlide)
+    const hiddenSlideNumberProbes = slideNumberProbesForSlide(hiddenSlide)
+    const visibleSlideNumberProbes = slideNumberProbesForSlide(visibleSlide)
 
     return {
       hiddenDateProbeCount: hiddenDateProbes.length,
       hiddenDateProbeText: hiddenDateProbes.map(readProbeText).join(' | '),
       hiddenSlideId: hiddenSlide?.id ?? '',
+      hiddenSlideNumberProbeCount: hiddenSlideNumberProbes.length,
+      hiddenSlideNumberText: hiddenSlideNumberProbes.map(readProbeText).join(' | '),
       hiddenSlideProbeCount: hiddenProbes.length,
       hiddenSlideText: hiddenProbes.map(readProbeText).join(' | '),
+      totalSlideNumberProbeCount: slides.reduce(
+        (total, slide) => total + slideNumberProbesForSlide(slide).length,
+        0,
+      ),
       totalProbeCount: slides.reduce(
         (total, slide) => total + probesForSlide(slide).length,
         0,
       ),
       visibleSlideId: visibleSlide?.id ?? '',
+      visibleSlideNumberProbeCount: visibleSlideNumberProbes.length,
+      visibleSlideNumberText: visibleSlideNumberProbes.map(readProbeText).join(' | '),
       visibleSlideProbeCount: visibleProbes.length,
       visibleSlideText: visibleProbes.map(readProbeText).join(' | '),
     }
@@ -36534,11 +36599,29 @@ async function readPPTXInheritedFooterPlaceholderProbeState(page) {
         'Inherited Footer Placeholder Probe',
       )
     : { exists: false, text: '' }
+  const hiddenSlideNumberActiveState = modelState.hiddenSlideId
+    ? await readPPTXSlideProbeActiveState(
+        page,
+        modelState.hiddenSlideId,
+        'Inherited Slide Number Placeholder Probe',
+      )
+    : { exists: false, text: '' }
+  const visibleSlideNumberActiveState = modelState.visibleSlideId
+    ? await readPPTXSlideProbeActiveState(
+        page,
+        modelState.visibleSlideId,
+        'Inherited Slide Number Placeholder Probe',
+      )
+    : { exists: false, text: '' }
 
   return {
     ...modelState,
+    hiddenSlideNumberActiveExists: hiddenSlideNumberActiveState.exists,
+    hiddenSlideNumberActiveText: hiddenSlideNumberActiveState.text,
     hiddenSlideActiveExists: hiddenSlideActiveState.exists,
     hiddenSlideActiveText: hiddenSlideActiveState.text,
+    visibleSlideNumberActiveExists: visibleSlideNumberActiveState.exists,
+    visibleSlideNumberActiveText: visibleSlideNumberActiveState.text,
     visibleSlideActiveExists: visibleSlideActiveState.exists,
     visibleSlideActiveText: visibleSlideActiveState.text,
   }
