@@ -1737,6 +1737,25 @@ function readPPTXRelatedPartPath({
   return path && zip.file(path) ? path : null
 }
 
+function readPPTXRelationshipPartPath({
+  relationshipId,
+  relationships,
+  sourcePath,
+  zip,
+}: {
+  relationshipId: string
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+  zip: JSZip
+}) {
+  const relationship = relationships.get(relationshipId)
+  const path = relationship && relationship.targetMode !== 'External'
+    ? resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
+}
+
 function readPPTXSlideTransition(
   doc: Document | null,
   xml: string,
@@ -2985,7 +3004,117 @@ async function readPPTXGraphicFrameElement({
     slidePath,
     themeColors,
     zip,
+  }) ?? await readPPTXDiagramTextElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    zip,
   })
+}
+
+async function readPPTXDiagramTextElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const geometry = readPPTXElementGeometry(graphicFrame)
+  const diagramPath = readPPTXDiagramDataPartPath({
+    graphicFrame,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const xml = diagramPath ? await zip.file(diagramPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const items = doc ? readPPTXDiagramTextItems(doc) : []
+
+  if (!geometry || items.length === 0) {
+    return null
+  }
+
+  const bullet = items.length > 1 ? 'bullet' : undefined
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'textBox',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Diagram ${objectIndex}`),
+    style: {
+      color: '#111827',
+      fontSize: 24,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 16,
+        right: 16,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: items.map((text) => ({
+        ...(bullet ? { bullet } : {}),
+        runs: [{ text }],
+      })),
+    },
+  }
+}
+
+function readPPTXDiagramDataPartPath({
+  graphicFrame,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const relIds = getFirstPPTXDescendantByLocalName(graphicFrame, 'relIds')
+  const relationshipId = relIds?.getAttribute('r:dm') ??
+    relIds?.getAttributeNS(PPTX_RELATIONSHIP_ATTRIBUTE_NS, 'dm') ??
+    relIds?.getAttribute('dm') ??
+    null
+
+  return relationshipId
+    ? readPPTXRelationshipPartPath({
+        relationshipId,
+        relationships,
+        sourcePath: slidePath,
+        zip,
+      })
+    : null
+}
+
+function readPPTXDiagramTextItems(doc: Document) {
+  return getPPTXDescendantsByLocalName(doc, 'pt')
+    .flatMap((point) => {
+      const textNode = getDirectPPTXChildByLocalName(point, 't')
+      const text = textNode ? readPPTXPlainTextBody(textNode) : ''
+
+      return text.split('\n')
+    })
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
 }
 
 async function readPPTXChartTableElement({

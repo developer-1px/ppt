@@ -12487,6 +12487,147 @@ async function runExportScenario(page) {
     },
   )
 
+  const diagramTextPPTXBase64 = await addPPTXDiagramTextProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeDiagramTextPPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      diagramTextModelCount: elements.filter((element) =>
+        element.name === 'SmartArt Text Probe' &&
+        element.kind === 'textBox').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-smartart-text.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(diagramTextPPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const diagramTextPPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeTextBox = document.querySelector('.ppt-slide [data-ppt-element-name="SmartArt Text Probe"][data-kind="textBox"]')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const diagramTextBoxes = exportImportedElements.filter((element) =>
+      element.name === 'SmartArt Text Probe' &&
+      element.kind === 'textBox')
+    const diagramTextBox = diagramTextBoxes[0] ?? null
+    const paragraphs = diagramTextBox?.textBody?.paragraphs ?? []
+    const paragraphTexts = paragraphs.map((paragraph) =>
+      (paragraph.runs ?? []).map((run) => run.text ?? '').join(''))
+
+    return {
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeText: activeTextBox?.textContent ?? '',
+      activeTextAutofit: activeTextBox?.getAttribute('data-ppt-text-autofit') ?? '',
+      diagramTextAutofit: diagramTextBox?.textAutoFit ?? '',
+      diagramTextGeometry: diagramTextBox?.geometry ?? null,
+      diagramTextModelCount: diagramTextBoxes.length,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      paragraphBullets: paragraphs.map((paragraph) => paragraph.bullet ?? '').join(','),
+      paragraphTexts,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX SmartArt diagram text as editable text fallback through OpenXML import',
+    diagramTextPPTXImportState.model === 'ppt-deck-pptx-import' &&
+      diagramTextPPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      diagramTextPPTXImportState.fileName === 'external-openxml-smartart-text.pptx' &&
+      diagramTextPPTXImportState.importedCount === beforeDiagramTextPPTXDrop.slideCount &&
+      diagramTextPPTXImportState.sourceSlideCount === beforeDiagramTextPPTXDrop.slideCount &&
+      diagramTextPPTXImportState.slideCount === beforeDiagramTextPPTXDrop.slideCount * 2 &&
+      diagramTextPPTXImportState.activeName.includes('Copy') &&
+      diagramTextPPTXImportState.diagramTextModelCount >
+        beforeDiagramTextPPTXDrop.diagramTextModelCount &&
+      diagramTextPPTXImportState.diagramTextModelCount === 1 &&
+      diagramTextPPTXImportState.diagramTextAutofit === 'resizeShapeToFitText' &&
+      diagramTextPPTXImportState.activeTextAutofit === 'resizeShapeToFitText' &&
+      diagramTextPPTXImportState.activeText.includes('Discover') &&
+      diagramTextPPTXImportState.activeText.includes('Design') &&
+      diagramTextPPTXImportState.activeText.includes('Deliver') &&
+      JSON.stringify(diagramTextPPTXImportState.paragraphTexts) === JSON.stringify([
+        'Discover',
+        'Design',
+        'Deliver',
+      ]) &&
+      diagramTextPPTXImportState.paragraphBullets === 'bullet,bullet,bullet' &&
+      diagramTextPPTXImportState.diagramTextGeometry?.x === 220 &&
+      diagramTextPPTXImportState.diagramTextGeometry?.y === 340 &&
+      diagramTextPPTXImportState.diagramTextGeometry?.w === 460 &&
+      diagramTextPPTXImportState.diagramTextGeometry?.h === 160,
+    {
+      beforeDiagramTextPPTXDrop,
+      diagramTextPPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterDiagramTextPPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes SmartArt text PPTX drop probes before export scenario continues',
+    afterDiagramTextPPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterDiagramTextPPTXDropCleanup.slideCount === beforeDiagramTextPPTXDrop.slideCount,
+    {
+      afterDiagramTextPPTXDropCleanup,
+      beforeDiagramTextPPTXDrop,
+    },
+  )
+
   const shapeImageFillPPTXBase64 = await addPPTXShapeImageFillProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -30371,6 +30512,103 @@ function createPPTXChartSeriesXml({ categories, index, name, values }) {
     '</c:numRef>',
     '</c:val>',
     '</c:ser>',
+  ].join('')
+}
+
+async function addPPTXDiagramTextProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const diagramDataPath = 'ppt/diagrams/data-pptx-smartart-text-probe.xml'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('SmartArt Text Probe')) {
+    return base64
+  }
+
+  await ensurePPTXOverrideContentType(
+    zip,
+    diagramDataPath,
+    'application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml',
+  )
+  zip.file(diagramDataPath, createPPTXDiagramTextProbeDataXml())
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, diagramDataPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData',
+    zip,
+  })
+  const diagramFrameXml = [
+    '<p:graphicFrame>',
+    '<p:nvGraphicFramePr>',
+    '<p:cNvPr id="9987" name="SmartArt Text Probe"/>',
+    '<p:cNvGraphicFramePr/>',
+    '<p:nvPr/>',
+    '</p:nvGraphicFramePr>',
+    '<p:xfrm>',
+    '<a:off x="2095500" y="3238500"/>',
+    '<a:ext cx="4381500" cy="1524000"/>',
+    '</p:xfrm>',
+    '<a:graphic>',
+    '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram">',
+    `<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:dm="${relationshipId}"/>`,
+    '</a:graphicData>',
+    '</a:graphic>',
+    '</p:graphicFrame>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${diagramFrameXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+function createPPTXDiagramTextProbeDataXml() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">',
+    '<dgm:ptLst>',
+    createPPTXDiagramTextPointXml('pptx-smartart-1', 'Discover'),
+    createPPTXDiagramTextPointXml('pptx-smartart-2', 'Design'),
+    createPPTXDiagramTextPointXml('pptx-smartart-3', 'Deliver'),
+    '</dgm:ptLst>',
+    '<dgm:cxnLst/>',
+    '<dgm:bg/>',
+    '<dgm:whole/>',
+    '</dgm:dataModel>',
+  ].join('')
+}
+
+function createPPTXDiagramTextPointXml(id, text) {
+  return [
+    `<dgm:pt modelId="${escapePPTXXmlAttribute(id)}">`,
+    '<dgm:prSet/>',
+    '<dgm:t>',
+    '<a:p>',
+    '<a:r>',
+    `<a:t>${escapePPTXXmlText(text)}</a:t>`,
+    '</a:r>',
+    '</a:p>',
+    '</dgm:t>',
+    '</dgm:pt>',
   ].join('')
 }
 
