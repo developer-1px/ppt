@@ -1256,21 +1256,18 @@ async function readPPTXBackgroundImage({
   const blipFill = getDirectPPTXChildByLocalName(bgPr, 'blipFill') ??
     getFirstPPTXDescendantByLocalName(bgPr, 'blipFill')
   const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
-  const mediaPath = readPPTXPictureMediaPath({
+  const source = await readPPTXImageSource({
     blip,
     relationships,
     slidePath,
     zip,
   })
-  const media = mediaPath ? zip.file(mediaPath) : null
 
-  if (!mediaPath || !media) {
+  if (!source) {
     return null
   }
 
-  const base64 = await media.async('base64')
   const crop = readPPTXImageCrop(blipFill ?? bgPr ?? background ?? cSld)
-  const mimeType = getPPTXMediaMimeType(mediaPath)
   const opacity = readPPTXImageOpacity(blip)
 
   return {
@@ -1288,7 +1285,7 @@ async function readPPTXBackgroundImage({
     locked: true,
     name,
     ...(opacity === null ? {} : { opacity }),
-    src: `data:${mimeType};base64,${base64}`,
+    src: source.src,
   }
 }
 
@@ -2514,20 +2511,17 @@ async function readPPTXShapeImageFillElement({
 }): Promise<PPTImage | null> {
   const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
   const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
-  const mediaPath = readPPTXPictureMediaPath({
+  const source = await readPPTXImageSource({
     blip,
     relationships,
     slidePath,
     zip,
   })
-  const media = mediaPath ? zip.file(mediaPath) : null
 
-  if (!mediaPath || !media) {
+  if (!source) {
     return null
   }
 
-  const base64 = await media.async('base64')
-  const mimeType = getPPTXMediaMimeType(mediaPath)
   const name = readPPTXObjectName(sp, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(sp)
   const accessibility = readPPTXElementAccessibility(sp)
@@ -2550,7 +2544,7 @@ async function readPPTXShapeImageFillElement({
     name,
     ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
-    src: `data:${mimeType};base64,${base64}`,
+    src: source.src,
   }
 }
 
@@ -2806,20 +2800,17 @@ async function readPPTXPictureElement({
   const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
   const geometry = readPPTXElementGeometry(spPr)
   const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
-  const mediaPath = readPPTXPictureMediaPath({
+  const source = await readPPTXImageSource({
     blip,
     relationships,
     slidePath,
     zip,
   })
-  const media = mediaPath ? zip.file(mediaPath) : null
 
-  if (!geometry || !mediaPath || !media) {
+  if (!geometry || !source) {
     return null
   }
 
-  const base64 = await media.async('base64')
-  const mimeType = getPPTXMediaMimeType(mediaPath)
   const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
   const altText = readPPTXObjectDescription(pic)
   const accessibility = readPPTXElementAccessibility(pic)
@@ -2842,8 +2833,58 @@ async function readPPTXPictureElement({
     name,
     ...(opacity === null ? {} : { opacity }),
     ...(shadow ? { shadow } : {}),
+    src: source.src,
+  }
+}
+
+async function readPPTXImageSource({
+  blip,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<{ src: string } | null> {
+  const mediaPath = readPPTXPictureMediaPath({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const media = mediaPath ? zip.file(mediaPath) : null
+
+  if (!mediaPath || !media) {
+    return readPPTXExternalImageSource({
+      blip,
+      relationships,
+    })
+  }
+
+  const base64 = await media.async('base64')
+  const mimeType = getPPTXMediaMimeType(mediaPath)
+
+  return {
     src: `data:${mimeType};base64,${base64}`,
   }
+}
+
+function readPPTXExternalImageSource({
+  blip,
+  relationships,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+}) {
+  const relationshipId = readPPTXLinkRelationshipId(blip)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target.trim()
+    : ''
+
+  return url ? { src: url } : null
 }
 
 function readPPTXPictureMediaPath({
@@ -2887,6 +2928,12 @@ function readPPTXPictureMediaPath({
 function readPPTXEmbedRelationshipId(element: Element | null) {
   return element?.getAttribute('r:embed') ??
     element?.getAttribute('embed') ??
+    null
+}
+
+function readPPTXLinkRelationshipId(element: Element | null) {
+  return element?.getAttribute('r:link') ??
+    element?.getAttribute('link') ??
     null
 }
 

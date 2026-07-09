@@ -12631,6 +12631,141 @@ async function runExportScenario(page) {
     },
   )
 
+  const externalImagePPTXBase64 = await addPPTXExternalImageProbe(
+    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  )
+  const beforeExternalImagePPTXDrop = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const elements = deck?.slides?.flatMap((slide) => slide.elements ?? []) ?? []
+
+    return {
+      externalImageModelCount: elements.filter((element) =>
+        element.name === 'External Image Link Probe' &&
+        element.kind === 'image').length,
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+    }
+  })()`)
+
+  await page.eval(`((base64, type) => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    const file = new File([bytes], 'external-openxml-linked-image.pptx', { type })
+    const dataTransfer = new DataTransfer()
+    const rect = stage.getBoundingClientRect()
+
+    dataTransfer.items.add(file)
+    stage.dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer,
+    }))
+  })(${JSON.stringify(externalImagePPTXBase64)}, ${JSON.stringify('application/vnd.openxmlformats-officedocument.presentationml.presentation')})`)
+  await delay(700)
+
+  const externalImagePPTXImportState = await page.eval(`(() => {
+    const stage = document.querySelector('[data-ppt-app] .ppt-stage-shell')
+    const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+    const activeImage = document.querySelector('.ppt-slide [data-ppt-element-name="External Image Link Probe"][data-kind="image"]')
+    const img = activeImage?.querySelector('img')
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const exportSlides = deck?.slides ?? []
+    const exportImportedSlides = exportSlides.filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const exportImportedElements = exportImportedSlides.flatMap((slide) =>
+      slide.elements ?? [])
+    const externalImages = exportImportedElements.filter((element) =>
+      element.name === 'External Image Link Probe' &&
+      element.kind === 'image')
+    const externalImage = externalImages[0] ?? null
+
+    return {
+      activeAlt: img?.getAttribute('alt') ?? '',
+      activeFit: activeImage?.getAttribute('data-ppt-image-fit') ?? '',
+      activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
+      activeSrcDataUri: img?.getAttribute('src')?.startsWith('data:image/svg+xml,') === true,
+      externalImageAlt: externalImage?.alt ?? '',
+      externalImageFit: externalImage?.fit ?? '',
+      externalImageGeometry: externalImage?.geometry ?? null,
+      externalImageModelCount: externalImages.length,
+      externalImageSrcDataUri: externalImage?.src?.startsWith('data:image/svg+xml,') === true,
+      fileName: stage?.getAttribute('data-ppt-deck-pptx-import-file-name') ?? '',
+      format: stage?.getAttribute('data-ppt-deck-pptx-import-format') ?? '',
+      importedCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-imported-count') ?? 0),
+      model: stage?.getAttribute('data-ppt-deck-pptx-import-model') ?? '',
+      slideCount: document.querySelectorAll('.ppt-thumb').length,
+      sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
+    }
+  })()`)
+
+  record(
+    'drops PPTX linked external image through OpenXML import',
+    externalImagePPTXImportState.model === 'ppt-deck-pptx-import' &&
+      externalImagePPTXImportState.format === 'pptx-open-xml-ppt-deck' &&
+      externalImagePPTXImportState.fileName === 'external-openxml-linked-image.pptx' &&
+      externalImagePPTXImportState.importedCount === beforeExternalImagePPTXDrop.slideCount &&
+      externalImagePPTXImportState.sourceSlideCount === beforeExternalImagePPTXDrop.slideCount &&
+      externalImagePPTXImportState.slideCount === beforeExternalImagePPTXDrop.slideCount * 2 &&
+      externalImagePPTXImportState.activeName.includes('Copy') &&
+      externalImagePPTXImportState.externalImageModelCount >
+        beforeExternalImagePPTXDrop.externalImageModelCount &&
+      externalImagePPTXImportState.externalImageModelCount === 1 &&
+      externalImagePPTXImportState.externalImageFit === 'contain' &&
+      externalImagePPTXImportState.externalImageGeometry?.x === 960 &&
+      externalImagePPTXImportState.externalImageGeometry?.y === 96 &&
+      externalImagePPTXImportState.externalImageGeometry?.w === 160 &&
+      externalImagePPTXImportState.externalImageGeometry?.h === 100 &&
+      externalImagePPTXImportState.externalImageSrcDataUri &&
+      externalImagePPTXImportState.externalImageAlt === 'External image link alt' &&
+      externalImagePPTXImportState.activeFit === 'contain' &&
+      externalImagePPTXImportState.activeSrcDataUri &&
+      externalImagePPTXImportState.activeAlt === 'External image link alt',
+    {
+      beforeExternalImagePPTXDrop,
+      externalImagePPTXImportState,
+    },
+  )
+
+  await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(80)
+
+  const afterExternalImagePPTXDropCleanup = await page.eval(`(() => ({
+    activeSlide: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+    slideCount: document.querySelectorAll('.ppt-thumb').length,
+  }))()`)
+
+  record(
+    'removes linked external image PPTX drop probes before export scenario continues',
+    afterExternalImagePPTXDropCleanup.activeSlide === 'slide-1' &&
+      afterExternalImagePPTXDropCleanup.slideCount === beforeExternalImagePPTXDrop.slideCount,
+    {
+      afterExternalImagePPTXDropCleanup,
+      beforeExternalImagePPTXDrop,
+    },
+  )
+
   const commentsPPTXBase64 = await addPPTXCommentsProbe(
     await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
   )
@@ -30369,6 +30504,73 @@ async function addPPTXCommentsProbe(base64) {
     '</p:cm>',
     '</p:cmLst>',
   ].join(''))
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
+async function addPPTXExternalImageProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('External Image Link Probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXExternalRelationship({
+    sourcePath: slidePath,
+    target: [
+      'data:image/svg+xml,',
+      '%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20160%20100%22%3E',
+      '%3Crect%20width%3D%22160%22%20height%3D%22100%22%20fill%3D%22%23dbeafe%22%2F%3E',
+      '%3Cpath%20d%3D%22M16%2072L60%2028L96%2060L122%2038L146%2072Z%22%20fill%3D%22%232563eb%22%2F%3E',
+      '%3Ccircle%20cx%3D%22122%22%20cy%3D%2230%22%20r%3D%2210%22%20fill%3D%22%23f59e0b%22%2F%3E',
+      '%3C%2Fsvg%3E',
+    ].join(''),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const pictureXml = [
+    '<p:pic>',
+    '<p:nvPicPr>',
+    '<p:cNvPr id="9986" name="External Image Link Probe" descr="External image link alt"/>',
+    '<p:cNvPicPr/>',
+    '<p:nvPr/>',
+    '</p:nvPicPr>',
+    '<p:blipFill>',
+    `<a:blip r:link="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</p:blipFill>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="9144000" y="914400"/>',
+    '<a:ext cx="1524000" cy="952500"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '</p:spPr>',
+    '</p:pic>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${pictureXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
 
   return await zip.generateAsync({
     compression: 'DEFLATE',
