@@ -2559,8 +2559,10 @@ function readPPTXLineElement(
   themeColors: PPTXThemeColorMap,
 ): PPTElement | null {
   const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
+  const style = getDirectPPTXChildByLocalName(element, 'style')
   const line = getDirectPPTXChildByLocalName(spPr, 'ln')
-  const stroke = readPPTXStroke(spPr, themeColors)
+  const stroke = readPPTXStroke(spPr, themeColors) ??
+    readPPTXStyleStroke(style, themeColors)
   const opacity = readPPTXLineOpacity(line)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const lineGeometry = readPPTXLineGeometry(spPr)
@@ -2761,12 +2763,15 @@ async function readPPTXShapeElement(
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
+  const style = getDirectPPTXChildByLocalName(sp, 'style')
   const geometry = readPPTXElementGeometry(spPr) ??
     readPPTXPlaceholderGeometry(sp, placeholderGeometries)
   const textBody = readPPTXTextBody(txBody, themeColors, fallbackTxBody)
   const hasTextContent = hasPPTXTextBodyText(textBody)
-  const stroke = readPPTXStroke(spPr, themeColors)
-  const fill = readPPTXShapeFill(spPr, stroke, themeColors)
+  const stroke = readPPTXStroke(spPr, themeColors) ??
+    readPPTXStyleStroke(style, themeColors)
+  const fill = readPPTXShapeFill(spPr, stroke, themeColors) ??
+    readPPTXStyleFill(style, themeColors)
   const shadow = readPPTXElementShadow(spPr, themeColors)
   const hasPaint = fill !== null || stroke !== undefined
   const textAutoFit = readPPTXTextAutoFit(txBody)
@@ -5367,6 +5372,39 @@ function readPPTXStroke(
   const line = spPr ? getDirectPPTXChildByLocalName(spPr, 'ln') : null
 
   return readPPTXStrokeLine(line, themeColors)
+}
+
+function readPPTXStyleFill(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  const fillRef = getDirectPPTXChildByLocalName(style, 'fillRef')
+
+  if (fillRef?.getAttribute('idx') === '0') {
+    return null
+  }
+
+  return readPPTXColorFill(fillRef, themeColors)
+}
+
+function readPPTXStyleStroke(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTStroke | undefined {
+  const lineRef = getDirectPPTXChildByLocalName(style, 'lnRef')
+
+  if (lineRef?.getAttribute('idx') === '0') {
+    return undefined
+  }
+
+  const fill = readPPTXColorFill(lineRef, themeColors)
+
+  return fill
+    ? {
+        color: fill.color,
+        width: 1,
+      }
+    : undefined
 }
 
 function readPPTXStrokeLine(

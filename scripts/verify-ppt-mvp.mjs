@@ -285,8 +285,10 @@ async function runPPTXRenderScenario(page) {
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
 
-  const openXmlPPTXBase64 = await addPPTXGradientPatternFillProbe(
-    await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+  const openXmlPPTXBase64 = await addPPTXStyleRefProbe(
+    await addPPTXGradientPatternFillProbe(
+      await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+    ),
   )
   const beforeOpenXmlPPTXDrop = await readPPTSlideCountState(page)
 
@@ -302,6 +304,8 @@ async function runPPTXRenderScenario(page) {
   const openXmlPPTXImportState = await readPPTXDeckImportState(page)
   const openXmlPPTXRenderedSlideState =
     await readPPTXImportedSlideRenderState(page)
+  const openXmlPPTXStyleRefState =
+    await readPPTXStyleRefProbeState(page)
   const openXmlPPTXAlphaModifierFillState =
     await readPPTXAlphaModifierFillProbeState(page)
 
@@ -322,6 +326,21 @@ async function runPPTXRenderScenario(page) {
       beforeOpenXmlPPTXDrop,
       openXmlPPTXImportState,
       openXmlPPTXRenderedSlideState,
+    },
+  )
+
+  record(
+    'imports OpenXML PPTX style reference fill and line colors for viewer rendering',
+    openXmlPPTXStyleRefState.shapeCount === 1 &&
+      openXmlPPTXStyleRefState.lineCount === 1 &&
+      openXmlPPTXStyleRefState.shapeFill === '#14b8a6' &&
+      openXmlPPTXStyleRefState.shapeStroke === '#9a3412' &&
+      openXmlPPTXStyleRefState.lineStroke === '#9a3412' &&
+      openXmlPPTXStyleRefState.activeShapeExists &&
+      openXmlPPTXStyleRefState.activeLineExists,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXStyleRefState,
     },
   )
 
@@ -11276,12 +11295,14 @@ async function runExportScenario(page) {
                                 await addPPTXHiddenObjectProbe(
                                   await addPPTXNoFillShapeProbe(
                                     await addPPTXGradientPatternFillProbe(
-                                      await addPPTXThemeColorProbe(
-                                        await addPPTXPresetSystemColorProbe(
-                                          await addPPTXUnevenTableProbe(
-                                            await addPPTXGroupedObjectProbe(
-                                              await reversePPTXPresentationSlideOrder(
-                                                await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                      await addPPTXStyleRefProbe(
+                                        await addPPTXThemeColorProbe(
+                                          await addPPTXPresetSystemColorProbe(
+                                            await addPPTXUnevenTableProbe(
+                                              await addPPTXGroupedObjectProbe(
+                                                await reversePPTXPresentationSlideOrder(
+                                                  await removePPTXEmbeddedPPTModel(pptxDownloadBase64),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -11351,6 +11372,12 @@ async function runExportScenario(page) {
         element.kind === 'shape' &&
         element.fill?.color === '#cc3366' &&
         element.stroke?.color === '#203040').length,
+      styleRefProbeModelCount: elements.filter((element) =>
+        element.name === 'Style Ref Probe' &&
+        element.kind === 'shape').length,
+      styleRefLineProbeModelCount: elements.filter((element) =>
+        element.name === 'Style Ref Line Probe' &&
+        element.kind === 'line').length,
       backgroundRefSlideModelCount: slides.filter((slide) =>
         slide.background?.color === '#e6fffa').length,
       layoutBackgroundSlideModelCount: slides.filter((slide) =>
@@ -11578,6 +11605,15 @@ async function runExportScenario(page) {
       element.kind === 'shape' &&
       element.fill?.color === '#cc3366' &&
       element.stroke?.color === '#203040')
+    const exportStyleRefProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Style Ref Probe' &&
+      element.kind === 'shape' &&
+      element.fill?.color === '#14b8a6' &&
+      element.stroke?.color === '#9a3412')
+    const exportStyleRefLineProbeObjects = exportImportedElements.filter((element) =>
+      element.name === 'Style Ref Line Probe' &&
+      element.kind === 'line' &&
+      element.stroke?.color === '#9a3412')
     const exportBackgroundRefSlides = exportImportedSlides.filter((slide) =>
       slide.background?.color === '#e6fffa')
     const exportLayoutBackgroundSlides = exportImportedSlides.filter((slide) =>
@@ -11865,6 +11901,13 @@ async function runExportScenario(page) {
       exportThemeColorProbeFill: exportThemeColorProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
       exportThemeColorProbeModelCount: exportThemeColorProbeObjects.length,
       exportThemeColorProbeStroke: exportThemeColorProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasStyleRefProbe: exportStyleRefProbeObjects.length > 0,
+      exportStyleRefProbeFill: exportStyleRefProbeObjects.map((element) => element.fill?.color ?? '').join(' | '),
+      exportStyleRefProbeModelCount: exportStyleRefProbeObjects.length,
+      exportStyleRefProbeStroke: exportStyleRefProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
+      exportHasStyleRefLineProbe: exportStyleRefLineProbeObjects.length > 0,
+      exportStyleRefLineProbeModelCount: exportStyleRefLineProbeObjects.length,
+      exportStyleRefLineProbeStroke: exportStyleRefLineProbeObjects.map((element) => element.stroke?.color ?? '').join(' | '),
       exportHasBackgroundRefSlide: exportBackgroundRefSlides.length > 0,
       exportBackgroundRefSlideColors: exportBackgroundRefSlides.map((slide) => slide.background?.color ?? '').join(' | '),
       exportBackgroundRefSlideModelCount: exportBackgroundRefSlides.length,
@@ -12101,6 +12144,10 @@ async function runExportScenario(page) {
       openXmlPPTXImportState.exportPresetSystemColorProbeModelCount > beforeOpenXmlPPTXDrop.presetSystemColorProbeModelCount &&
       openXmlPPTXImportState.exportHasThemeColorProbe &&
       openXmlPPTXImportState.exportThemeColorProbeModelCount > beforeOpenXmlPPTXDrop.themeColorProbeModelCount &&
+      openXmlPPTXImportState.exportHasStyleRefProbe &&
+      openXmlPPTXImportState.exportStyleRefProbeModelCount > beforeOpenXmlPPTXDrop.styleRefProbeModelCount &&
+      openXmlPPTXImportState.exportHasStyleRefLineProbe &&
+      openXmlPPTXImportState.exportStyleRefLineProbeModelCount > beforeOpenXmlPPTXDrop.styleRefLineProbeModelCount &&
       openXmlPPTXImportState.exportHasBackgroundRefSlide &&
       openXmlPPTXImportState.exportBackgroundRefSlideModelCount > beforeOpenXmlPPTXDrop.backgroundRefSlideModelCount &&
       openXmlPPTXImportState.exportHasLayoutBackgroundSlide &&
@@ -31540,6 +31587,107 @@ function setPPTXThemeSchemeColorXml(xml, localName, color) {
   return xml.replace('</a:clrScheme>', `${colorXml}</a:clrScheme>`)
 }
 
+async function addPPTXStyleRefProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const themePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath || !themePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+  const themeXml = await readPPTXZipText(zip, themePath)
+  const nextThemeXml = setPPTXThemeSchemeColorXml(
+    setPPTXThemeSchemeColorXml(themeXml, 'accent3', '14B8A6'),
+    'accent4',
+    '9A3412',
+  )
+
+  if (
+    xml.includes('Style Ref Probe') &&
+    xml.includes('Style Ref Line Probe') &&
+    nextThemeXml === themeXml
+  ) {
+    return base64
+  }
+
+  const styleRefShapeXml = xml.includes('Style Ref Probe')
+    ? ''
+    : [
+        '<p:sp>',
+        '<p:nvSpPr>',
+        '<p:cNvPr id="9984" name="Style Ref Probe"/>',
+        '<p:cNvSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="10058400" y="5845800"/>',
+        '<a:ext cx="1219200" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+        '</p:spPr>',
+        '<p:style>',
+        '<a:lnRef idx="2"><a:schemeClr val="accent4"/></a:lnRef>',
+        '<a:fillRef idx="3"><a:schemeClr val="accent3"/></a:fillRef>',
+        '<a:effectRef idx="0"><a:schemeClr val="accent3"/></a:effectRef>',
+        '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>',
+        '</p:style>',
+        '</p:sp>',
+      ].join('')
+  const styleRefLineXml = xml.includes('Style Ref Line Probe')
+    ? ''
+    : [
+        '<p:cxnSp>',
+        '<p:nvCxnSpPr>',
+        '<p:cNvPr id="9985" name="Style Ref Line Probe"/>',
+        '<p:cNvCxnSpPr/>',
+        '<p:nvPr/>',
+        '</p:nvCxnSpPr>',
+        '<p:spPr>',
+        '<a:xfrm>',
+        '<a:off x="10058400" y="5486400"/>',
+        '<a:ext cx="1219200" cy="457200"/>',
+        '</a:xfrm>',
+        '<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>',
+        '</p:spPr>',
+        '<p:style>',
+        '<a:lnRef idx="2"><a:schemeClr val="accent4"/></a:lnRef>',
+        '<a:fillRef idx="0"><a:schemeClr val="accent3"/></a:fillRef>',
+        '<a:effectRef idx="0"><a:schemeClr val="accent3"/></a:effectRef>',
+        '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>',
+        '</p:style>',
+        '</p:cxnSp>',
+      ].join('')
+  const nextXml = xml.replace(
+    '</p:spTree>',
+    `${styleRefShapeXml}${styleRefLineXml}</p:spTree>`,
+  )
+
+  if (nextXml === xml && nextThemeXml === themeXml) {
+    return base64
+  }
+
+  zip.file(themePath, nextThemeXml)
+  if (nextXml !== xml) {
+    zip.file(slidePath, nextXml)
+  }
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXBackgroundRefProbe(base64) {
   if (!base64) {
     return ''
@@ -34405,6 +34553,70 @@ async function readPPTXAlphaModifierFillProbeState(page) {
       activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
     }
   })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
+}
+
+async function readPPTXStyleRefProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const slides = deck?.slides ?? []
+    const probeSlide = slides.find((slide) =>
+      (slide.elements ?? []).some((element) =>
+        element.name === 'Style Ref Probe' ||
+        element.name === 'Style Ref Line Probe'))
+    const elements = slides.flatMap((slide) => slide.elements ?? [])
+    const shapes = elements.filter((element) =>
+      element.name === 'Style Ref Probe' &&
+      element.kind === 'shape')
+    const lines = elements.filter((element) =>
+      element.name === 'Style Ref Line Probe' &&
+      element.kind === 'line')
+    const shape = shapes[0] ?? null
+    const line = lines[0] ?? null
+
+    return {
+      lineCount: lines.length,
+      lineStroke: line?.stroke?.color ?? '',
+      shapeCount: shapes.length,
+      shapeFill: shape?.fill?.color ?? '',
+      shapeStroke: shape?.stroke?.color ?? '',
+      slideId: probeSlide?.id ?? '',
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => ({
+    activeLineExists: Boolean(document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Style Ref Line Probe"]',
+    )),
+    activeShapeExists: Boolean(document.querySelector(
+      '.ppt-slide [data-ppt-element-name="Style Ref Probe"]',
+    )),
+    activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+  }))()`)
 
   return {
     ...modelState,
