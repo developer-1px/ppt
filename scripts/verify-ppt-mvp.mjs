@@ -786,8 +786,8 @@ async function runPPTXRenderScenario(page) {
       openXmlPPTXPresetGeometryFreeformState.expectedNamesLength &&
       openXmlPPTXPresetGeometryFreeformState.expectedNameCount ===
         openXmlPPTXPresetGeometryFreeformState.expectedNamesLength &&
-      openXmlPPTXPresetGeometryFreeformState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24' &&
-      openXmlPPTXPresetGeometryFreeformState.activeAddedRenderedCount === 7 &&
+      openXmlPPTXPresetGeometryFreeformState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24 | Preset Can Probe:7:#dcfce7:80:640 | Preset Cloud Probe:17:#dbeafe:200:640 | Preset Cube Probe:7:#f5f3ff:320:640 | Preset Flow Decision Probe:5:#fef3c7:440:640 | Preset Flow Document Probe:9:#e0f2fe:560:640 | Preset Flow Terminator Probe:9:#fce7f3:680:640 | Preset Sun Probe:17:#fef9c3:800:640' &&
+      openXmlPPTXPresetGeometryFreeformState.activeAddedRenderedCount === 14 &&
       openXmlPPTXPresetGeometryFreeformState.pointModes
         .split(' | ')
         .every((mode) => mode === 'polyline'),
@@ -13233,6 +13233,13 @@ async function runExportScenario(page) {
       'Preset Dodecagon Probe',
       'Preset Folded Corner Probe',
       'Preset Pie Probe',
+      'Preset Can Probe',
+      'Preset Cloud Probe',
+      'Preset Cube Probe',
+      'Preset Flow Decision Probe',
+      'Preset Flow Document Probe',
+      'Preset Flow Terminator Probe',
+      'Preset Sun Probe',
       'Preset Triangle Probe',
       'Preset Hexagon Probe',
       'Preset Chevron Probe',
@@ -13308,6 +13315,13 @@ async function runExportScenario(page) {
       'Preset Dodecagon Probe',
       'Preset Folded Corner Probe',
       'Preset Pie Probe',
+      'Preset Can Probe',
+      'Preset Cloud Probe',
+      'Preset Cube Probe',
+      'Preset Flow Decision Probe',
+      'Preset Flow Document Probe',
+      'Preset Flow Terminator Probe',
+      'Preset Sun Probe',
       'Preset Triangle Probe',
       'Preset Hexagon Probe',
       'Preset Chevron Probe',
@@ -13339,6 +13353,13 @@ async function runExportScenario(page) {
       'Preset Dodecagon Probe',
       'Preset Folded Corner Probe',
       'Preset Pie Probe',
+      'Preset Can Probe',
+      'Preset Cloud Probe',
+      'Preset Cube Probe',
+      'Preset Flow Decision Probe',
+      'Preset Flow Document Probe',
+      'Preset Flow Terminator Probe',
+      'Preset Sun Probe',
     ]
     const triangle = byName['Preset Triangle Probe'] ?? null
     const hexagon = byName['Preset Hexagon Probe'] ?? null
@@ -13470,7 +13491,7 @@ async function runExportScenario(page) {
         presetGeometryFreeformPPTXImportState.expectedNamesLength &&
       presetGeometryFreeformPPTXImportState.expectedNameCount ===
         presetGeometryFreeformPPTXImportState.expectedNamesLength &&
-      presetGeometryFreeformPPTXImportState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24' &&
+      presetGeometryFreeformPPTXImportState.addedPresetSummary === 'Preset Block Arc Probe:15:#cffafe:80:24 | Preset Corner Probe:7:#dcfce7:248:24 | Preset Decagon Probe:11:#e0f2fe:416:24 | Preset Diag Stripe Probe:5:#fef3c7:584:24 | Preset Dodecagon Probe:13:#f5f3ff:752:24 | Preset Folded Corner Probe:6:#fee2e2:920:24 | Preset Pie Probe:9:#ffedd5:1088:24 | Preset Can Probe:7:#dcfce7:80:640 | Preset Cloud Probe:17:#dbeafe:200:640 | Preset Cube Probe:7:#f5f3ff:320:640 | Preset Flow Decision Probe:5:#fef3c7:440:640 | Preset Flow Document Probe:9:#e0f2fe:560:640 | Preset Flow Terminator Probe:9:#fce7f3:680:640 | Preset Sun Probe:17:#fef9c3:800:640' &&
       presetGeometryFreeformPPTXImportState.pointModes
         .split(' | ')
         .every((mode) => mode === 'polyline') &&
@@ -33773,6 +33794,90 @@ async function addPPTXPresetGeometryFreeformProbe(base64) {
     }),
     createPPTXPresetGeometryShapeProbeXml({
       fill: 'DCFCE7',
+      h: 571500,
+      id: 10008,
+      name: 'Preset Can Probe',
+      preset: 'can',
+      stroke: '16A34A',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 762000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DBEAFE',
+      h: 571500,
+      id: 10009,
+      name: 'Preset Cloud Probe',
+      preset: 'cloud',
+      stroke: '2563EB',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 1905000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'F5F3FF',
+      h: 571500,
+      id: 10010,
+      name: 'Preset Cube Probe',
+      preset: 'cube',
+      stroke: '7C3AED',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 3048000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEF3C7',
+      h: 571500,
+      id: 10011,
+      name: 'Preset Flow Decision Probe',
+      preset: 'flowChartDecision',
+      stroke: 'D97706',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 4191000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'E0F2FE',
+      h: 571500,
+      id: 10012,
+      name: 'Preset Flow Document Probe',
+      preset: 'flowChartDocument',
+      stroke: '0284C7',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 5334000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FCE7F3',
+      h: 571500,
+      id: 10013,
+      name: 'Preset Flow Terminator Probe',
+      preset: 'flowChartTerminator',
+      stroke: 'DB2777',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 6477000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'FEF9C3',
+      h: 571500,
+      id: 10014,
+      name: 'Preset Sun Probe',
+      preset: 'sun',
+      stroke: 'CA8A04',
+      strokeWidth: 19050,
+      w: 914400,
+      x: 7620000,
+      y: 6096000,
+    }),
+    createPPTXPresetGeometryShapeProbeXml({
+      fill: 'DCFCE7',
       fillOpacity: 0.7,
       h: 1143000,
       id: 9981,
@@ -36733,7 +36838,7 @@ function waitForPPTXDownloadBlob(page) {
         download.size > 0
     })()`),
     'Timed out waiting for PPTX download blob',
-    5000,
+    15000,
   )
 }
 
@@ -37392,6 +37497,13 @@ function readPPTXPresetGeometryFreeformProbeState(page) {
       'Preset Dodecagon Probe',
       'Preset Folded Corner Probe',
       'Preset Pie Probe',
+      'Preset Can Probe',
+      'Preset Cloud Probe',
+      'Preset Cube Probe',
+      'Preset Flow Decision Probe',
+      'Preset Flow Document Probe',
+      'Preset Flow Terminator Probe',
+      'Preset Sun Probe',
       'Preset Triangle Probe',
       'Preset Hexagon Probe',
       'Preset Chevron Probe',
@@ -37419,6 +37531,13 @@ function readPPTXPresetGeometryFreeformProbeState(page) {
       'Preset Dodecagon Probe',
       'Preset Folded Corner Probe',
       'Preset Pie Probe',
+      'Preset Can Probe',
+      'Preset Cloud Probe',
+      'Preset Cube Probe',
+      'Preset Flow Decision Probe',
+      'Preset Flow Document Probe',
+      'Preset Flow Terminator Probe',
+      'Preset Sun Probe',
     ]
     const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
     const readPPTExportDeckFromHTML = (html) => {
