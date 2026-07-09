@@ -4790,10 +4790,24 @@ function readPPTXParagraphSpacing(
 ): Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> {
   const lineHeight = readPPTXParagraphLineHeight(pPr, defaultRunProperties) ??
     readPPTXParagraphLineHeight(fallbackPPr, defaultRunProperties)
-  const spacingBefore = readPPTXParagraphSpacingPixels(pPr, 'spcBef') ??
-    readPPTXParagraphSpacingPixels(fallbackPPr, 'spcBef')
-  const spacingAfter = readPPTXParagraphSpacingPixels(pPr, 'spcAft') ??
-    readPPTXParagraphSpacingPixels(fallbackPPr, 'spcAft')
+  const spacingBefore = readPPTXParagraphSpacingPixels(
+    pPr,
+    'spcBef',
+    defaultRunProperties,
+  ) ?? readPPTXParagraphSpacingPixels(
+    fallbackPPr,
+    'spcBef',
+    defaultRunProperties,
+  )
+  const spacingAfter = readPPTXParagraphSpacingPixels(
+    pPr,
+    'spcAft',
+    defaultRunProperties,
+  ) ?? readPPTXParagraphSpacingPixels(
+    fallbackPPr,
+    'spcAft',
+    defaultRunProperties,
+  )
 
   return {
     ...(lineHeight === undefined ? {} : { lineHeight }),
@@ -4835,12 +4849,35 @@ function readPPTXParagraphLineHeight(
 function readPPTXParagraphSpacingPixels(
   pPr: Element | null,
   localName: 'spcAft' | 'spcBef',
+  defaultRunProperties: Element | null,
 ) {
   const spacing = getDirectPPTXChildByLocalName(pPr, localName)
   const points = getDirectPPTXChildByLocalName(spacing, 'spcPts')
-  const value = toPPTXPositiveNumber(points?.getAttribute('val'))
+  const pointValue = toPPTXPositiveNumber(points?.getAttribute('val'))
 
-  return value === null ? undefined : pointToPx(value / 100)
+  if (pointValue !== null) {
+    return pointToPx(pointValue / 100)
+  }
+
+  const percent = getDirectPPTXChildByLocalName(spacing, 'spcPct')
+  const percentValue = toPPTXPositiveNumber(percent?.getAttribute('val'))
+
+  return percentValue === null
+    ? undefined
+    : Math.round(
+      readPPTXDefaultRunFontSizePx(defaultRunProperties) *
+        (percentValue / 100_000),
+    )
+}
+
+function readPPTXDefaultRunFontSizePx(
+  defaultRunProperties: Element | null,
+) {
+  const fontSizeUnits = readPPTXRunSize(defaultRunProperties, null)
+
+  return fontSizeUnits === null
+    ? PPTX_DEFAULT_TEXT_SIZE
+    : textSizeToPx(fontSizeUnits)
 }
 
 function readPPTXUnderline(rPr: Element | null) {

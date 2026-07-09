@@ -11510,6 +11510,8 @@ async function runExportScenario(page) {
       element.kind === 'textBox' &&
       element.textBody?.paragraphs?.some((paragraph) =>
         paragraph.lineHeight === 1.5 &&
+        paragraph.spacingBefore === 21 &&
+        paragraph.spacingAfter === 14 &&
         paragraph.runs?.some((run) =>
           run.text === 'Line spacing points probe' &&
           run.size === 28)) === true)
@@ -11732,6 +11734,9 @@ async function runExportScenario(page) {
       exportHasListStyleBulletProbe: exportListStyleBulletProbeObjects.length > 0,
       exportListStyleBulletProbeModelCount: exportListStyleBulletProbeObjects.length,
       exportHasLineSpacingPointsProbe: exportLineSpacingPointsProbeObjects.length > 0,
+      exportLineSpacingPointsProbeSpacing: exportLineSpacingPointsProbeObjects.map((element) =>
+        element.textBody?.paragraphs?.map((paragraph) =>
+          [paragraph.lineHeight, paragraph.spacingBefore, paragraph.spacingAfter].join(' ')).join(' | ') ?? '').join(' | '),
       exportLineSpacingPointsProbeModelCount: exportLineSpacingPointsProbeObjects.length,
       exportHasLayoutPlaceholderGeometryProbe: exportLayoutPlaceholderGeometryProbeObjects.length > 0,
       exportLayoutPlaceholderGeometryProbeBounds: exportLayoutPlaceholderGeometryProbeObjects.map((element) =>
@@ -32757,6 +32762,8 @@ async function addPPTXLineSpacingPointsProbe(base64) {
     '<a:p>',
     '<a:pPr>',
     '<a:lnSpc><a:spcPts val="3150"/></a:lnSpc>',
+    '<a:spcBef><a:spcPct val="75000"/></a:spcBef>',
+    '<a:spcAft><a:spcPct val="50000"/></a:spcAft>',
     '<a:defRPr sz="2100"/>',
     '</a:pPr>',
     '<a:r><a:t>Line spacing points probe</a:t></a:r>',
