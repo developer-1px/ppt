@@ -3323,6 +3323,7 @@ async function readPPTXSlideComments({
       const rawY = toPPTXNumber(position?.getAttribute('y'))
       const authorName = readPPTXCommentAuthorName(comment, authors)
       const createdAt = readPPTXCommentCreatedAt(comment)
+      const resolved = readPPTXCommentResolved(comment)
       const id = `pptx-slide-${slideIndex + 1}-comment-${commentIndex + 1}`
 
       return {
@@ -3338,6 +3339,7 @@ async function readPPTXSlideComments({
         id,
         kind: 'comment',
         name: `PPTX Comment ${commentIndex + 1}`,
+        ...(resolved === true ? { resolved } : {}),
         thread: readPPTXCommentThread({
           authors,
           body,
@@ -3380,6 +3382,12 @@ function readPPTXCommentCreatedAt(comment: Element) {
   return comment.getAttribute('dt')?.trim() ||
     comment.getAttribute('created')?.trim() ||
     'Imported'
+}
+
+function readPPTXCommentResolved(comment: Element): PPTComment['resolved'] {
+  const status = comment.getAttribute('status')?.trim().toLowerCase()
+
+  return status === 'resolved' || status === 'closed' ? true : undefined
 }
 
 function readPPTXCommentThread({

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import net from 'node:net'
 import JSZip from 'jszip'
+import PptxGenJS from 'pptxgenjs'
 
 const DEFAULT_APP_URL = 'http://127.0.0.1:5173/'
 const EXTERNAL_APP_URL = process.env.APP_URL ?? null
@@ -59,6 +60,7 @@ const browserErrors = []
 let devServer = null
 let chrome = null
 let chromeProfile = null
+let generatedPPTXFixtureDir = null
 
 try {
   await ensureAppServer()
@@ -148,6 +150,14 @@ try {
       retryDelay: 100,
     })
   }
+  if (generatedPPTXFixtureDir) {
+    await rm(generatedPPTXFixtureDir, {
+      force: true,
+      maxRetries: 5,
+      recursive: true,
+      retryDelay: 100,
+    })
+  }
 }
 
 async function runFirstScreenScenario(page) {
@@ -190,10 +200,15 @@ async function runPPTXRenderScenario(page) {
 
     const externalPPTXImportState = await readPPTXDeckImportState(page)
     const externalPPTXRenderedSlideState =
-      await readPPTXImportedSlideRenderState(page, { requireElements: false })
+      await readPPTXImportedSlideRenderState(page, {
+        requireElements: externalPPTXFixture.requireElements,
+      })
+    const externalPPTXExpectedSlideCount =
+      externalPPTXFixture.expectedSlideCount ??
+      externalPPTXImportState.importedCount
 
     record(
-      'renders every provided PPTX page from PPTX_RENDER_FILE',
+      'renders every real PPTX fixture page from file path',
       externalPPTXFixture.signature === 'PK' &&
         externalPPTXImportState.model === 'ppt-deck-pptx-import' &&
         externalPPTXImportState.fileName === externalPPTXFixture.fileName &&
@@ -204,19 +219,28 @@ async function runPPTXRenderScenario(page) {
           'pptx-open-xml-ppt-deck',
         ].includes(externalPPTXImportState.format) &&
         externalPPTXImportState.importedCount > 0 &&
+        externalPPTXImportState.importedCount === externalPPTXExpectedSlideCount &&
         externalPPTXImportState.sourceSlideCount === externalPPTXImportState.importedCount &&
         externalPPTXImportState.slideCount ===
           beforeExternalPPTXDrop.slideCount + externalPPTXImportState.importedCount &&
         externalPPTXRenderedSlideState.importedSlideCount === externalPPTXImportState.importedCount &&
         externalPPTXRenderedSlideState.firstSlideId === externalPPTXImportState.firstImportedSlideId &&
-        externalPPTXRenderedSlideState.allSlidesRendered,
+        externalPPTXRenderedSlideState.allSlidesRendered &&
+        hasExpectedPPTXRenderedText(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedTextIncludes,
+        ),
       {
         beforeExternalPPTXDrop,
         externalPPTXFixture: {
           byteLength: externalPPTXFixture.byteLength,
+          expectedSlideCount: externalPPTXFixture.expectedSlideCount,
           fileName: externalPPTXFixture.fileName,
+          generated: externalPPTXFixture.generated,
           path: externalPPTXFixture.path,
+          requireElements: externalPPTXFixture.requireElements,
           signature: externalPPTXFixture.signature,
+          source: externalPPTXFixture.source,
         },
         externalPPTXImportState,
         externalPPTXRenderedSlideState,
@@ -238,12 +262,15 @@ async function runPPTXRenderScenario(page) {
     const externalPPTXOpenStatusState = await readPPTXOpenStatusState(page)
     const externalPPTXOpenedSlideState =
       await readPPTXImportedSlideRenderState(page, {
-        requireElements: false,
+        requireElements: externalPPTXFixture.requireElements,
         slideNameIncludes: '',
       })
+    const externalPPTXOpenExpectedSlideCount =
+      externalPPTXFixture.expectedSlideCount ??
+      externalPPTXOpenImportState.importedCount
 
     record(
-      'opens provided PPTX_RENDER_FILE as a page-by-page viewer deck',
+      'opens real PPTX fixture as a page-by-page viewer deck',
       externalPPTXFixture.signature === 'PK' &&
         externalPPTXOpenImportState.model === 'ppt-deck-pptx-import' &&
         externalPPTXOpenImportState.fileName === externalPPTXFixture.fileName &&
@@ -254,11 +281,16 @@ async function runPPTXRenderScenario(page) {
           'pptx-open-xml-ppt-deck',
         ].includes(externalPPTXOpenImportState.format) &&
         externalPPTXOpenImportState.importedCount > 0 &&
+        externalPPTXOpenImportState.importedCount === externalPPTXOpenExpectedSlideCount &&
         externalPPTXOpenImportState.sourceSlideCount === externalPPTXOpenImportState.importedCount &&
         externalPPTXOpenImportState.slideCount === externalPPTXOpenImportState.importedCount &&
         externalPPTXOpenedSlideState.importedSlideCount === externalPPTXOpenImportState.importedCount &&
         externalPPTXOpenedSlideState.firstSlideId === externalPPTXOpenImportState.firstImportedSlideId &&
         externalPPTXOpenedSlideState.allSlidesRendered &&
+        hasExpectedPPTXRenderedText(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedTextIncludes,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -266,9 +298,13 @@ async function runPPTXRenderScenario(page) {
       {
         externalPPTXFixture: {
           byteLength: externalPPTXFixture.byteLength,
+          expectedSlideCount: externalPPTXFixture.expectedSlideCount,
           fileName: externalPPTXFixture.fileName,
+          generated: externalPPTXFixture.generated,
           path: externalPPTXFixture.path,
+          requireElements: externalPPTXFixture.requireElements,
           signature: externalPPTXFixture.signature,
+          source: externalPPTXFixture.source,
         },
         externalPPTXOpenImportState,
         externalPPTXOpenedSlideState,
@@ -15513,6 +15549,7 @@ async function runExportScenario(page) {
       activeModernAuthor: activeModernComment?.querySelector('[data-ppt-comment-author]')?.textContent ?? '',
       activeModernBody: activeModernComment?.querySelector('[data-ppt-comment-body]')?.textContent ?? '',
       activeModernCreatedAt: activeModernComment?.querySelector('[data-ppt-comment-created]')?.textContent ?? '',
+      activeModernResolved: activeModernComment?.getAttribute('data-ppt-comment-resolved') ?? '',
       activeModernThreadCount: activeModernComment?.getAttribute('data-ppt-comment-thread-count') ?? '',
       activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent ?? '',
       activeThreadCount: activeComment?.getAttribute('data-ppt-comment-thread-count') ?? '',
@@ -15534,6 +15571,7 @@ async function runExportScenario(page) {
       modernCommentReplyAuthorName: modernComment?.thread?.[1]?.authorName ?? '',
       modernCommentReplyBody: modernComment?.thread?.[1]?.body ?? '',
       modernCommentReplyCreatedAt: modernComment?.thread?.[1]?.createdAt ?? '',
+      modernCommentResolved: modernComment?.resolved === true ? 'true' : '',
       modernCommentThreadCount: modernComment?.thread?.length ?? 0,
       slideCount: document.querySelectorAll('.ppt-thumb').length,
       sourceSlideCount: Number(stage?.getAttribute('data-ppt-deck-pptx-import-source-slide-count') ?? 0),
@@ -15568,6 +15606,7 @@ async function runExportScenario(page) {
       commentsPPTXImportState.modernCommentAuthorName === 'PPT Modern Reviewer' &&
       commentsPPTXImportState.modernCommentBody === 'PPTX Modern Comment Probe: assign follow-up' &&
       commentsPPTXImportState.modernCommentCreatedAt === '2026-07-09T12:01:00Z' &&
+      commentsPPTXImportState.modernCommentResolved === 'true' &&
       commentsPPTXImportState.modernCommentThreadCount === 2 &&
       commentsPPTXImportState.modernCommentReplyAuthorName === 'PPT Modern Reply' &&
       commentsPPTXImportState.modernCommentReplyBody === 'PPTX Modern Reply Probe: acknowledged' &&
@@ -15579,6 +15618,7 @@ async function runExportScenario(page) {
       commentsPPTXImportState.activeModernAuthor === 'PPT Modern Reviewer' &&
       commentsPPTXImportState.activeModernBody === 'PPTX Modern Comment Probe: assign follow-up' &&
       commentsPPTXImportState.activeModernCreatedAt === '2026-07-09T12:01:00Z' &&
+      commentsPPTXImportState.activeModernResolved === 'true' &&
       commentsPPTXImportState.activeModernThreadCount === '2',
     {
       beforeCommentsPPTXDrop,
@@ -35689,7 +35729,7 @@ async function addPPTXCommentsProbe(base64) {
     '<p:pos x="1219200" y="914400"/>',
     '<p:text>PPTX Comment Probe: review KPI label</p:text>',
     '</p:cm>',
-    '<p188:cm id="modern-comment-probe" authorId="modern-reviewer" created="2026-07-09T12:01:00Z" status="active">',
+    '<p188:cm id="modern-comment-probe" authorId="modern-reviewer" created="2026-07-09T12:01:00Z" status="resolved">',
     '<p188:pos x="1828800" y="1371600"/>',
     '<p188:txBody>',
     '<a:bodyPr/>',
@@ -37735,21 +37775,180 @@ function readPPTXDownloadBlobState(page) {
 }
 
 async function readExternalPPTXRenderFixture() {
-  const path = PPTX_RENDER_FILE.trim()
+  const providedPath = PPTX_RENDER_FILE.trim()
+  const fixture = providedPath
+    ? {
+        expectedSlideCount: null,
+        expectedTextIncludes: [],
+        fileName: basename(providedPath),
+        generated: false,
+        path: providedPath,
+        requireElements: false,
+        source: 'PPTX_RENDER_FILE',
+      }
+    : await createGeneratedPPTXRenderFixture()
 
-  if (!path) {
-    return null
-  }
-
-  const bytes = await readFile(path)
+  const bytes = await readFile(fixture.path)
 
   return {
+    ...fixture,
     base64: Buffer.from(bytes).toString('base64'),
     byteLength: bytes.byteLength,
-    fileName: basename(path),
-    path,
     signature: String.fromCharCode(...bytes.subarray(0, 2)),
   }
+}
+
+async function createGeneratedPPTXRenderFixture() {
+  if (!generatedPPTXFixtureDir) {
+    generatedPPTXFixtureDir =
+      await mkdtemp(join(tmpdir(), 'ppt-render-fixture-'))
+  }
+
+  const fileName = 'real-file-page-render-fixture.pptx'
+  const path = join(generatedPPTXFixtureDir, fileName)
+  const expectedTextIncludes = [
+    'PPTX Fixture Page 1',
+    'PPTX Fixture Page 2',
+    'PPTX Fixture Page 3',
+  ]
+  const pptx = new PptxGenJS()
+
+  pptx.author = 'Interactive OS'
+  pptx.company = 'Interactive OS'
+  pptx.subject = 'PPTX render verifier fixture'
+  pptx.title = 'PPTX Render Fixture'
+  pptx.layout = 'LAYOUT_WIDE'
+
+  addPPTXRenderFixtureSlide(pptx, {
+    accentColor: '2563EB',
+    body: 'Loaded from a generated disk file and rendered as page one.',
+    heading: expectedTextIncludes[0],
+    index: 1,
+  })
+  addPPTXRenderFixtureSlide(pptx, {
+    accentColor: '059669',
+    body: 'Second page proves thumbnail navigation switches the active slide.',
+    heading: expectedTextIncludes[1],
+    index: 2,
+  })
+  addPPTXRenderFixtureSlide(pptx, {
+    accentColor: 'D97706',
+    body: 'Third page keeps the verifier honest about full deck coverage.',
+    heading: expectedTextIncludes[2],
+    index: 3,
+  })
+
+  await pptx.writeFile({
+    compression: true,
+    fileName: path,
+  })
+
+  return {
+    expectedSlideCount: expectedTextIncludes.length,
+    expectedTextIncludes,
+    fileName,
+    generated: true,
+    path,
+    requireElements: true,
+    source: 'generated-real-file-fixture',
+  }
+}
+
+function addPPTXRenderFixtureSlide(
+  pptx,
+  { accentColor, body, heading, index },
+) {
+  const slide = pptx.addSlide()
+
+  slide.background = { color: 'F8FAFC' }
+  slide.addText(heading, {
+    bold: true,
+    color: '111827',
+    fontFace: 'Arial',
+    fontSize: 30,
+    h: 0.55,
+    w: 6.4,
+    x: 0.6,
+    y: 0.55,
+  })
+  slide.addShape(pptx.ShapeType.rect, {
+    fill: {
+      color: accentColor,
+      transparency: 8,
+    },
+    h: 0.9,
+    line: {
+      color: accentColor,
+      transparency: 0,
+      width: 1,
+    },
+    w: 2.25,
+    x: 0.6,
+    y: 1.55,
+  })
+  slide.addText(`Page ${index}`, {
+    bold: true,
+    color: 'FFFFFF',
+    fontFace: 'Arial',
+    fontSize: 22,
+    h: 0.35,
+    w: 1.4,
+    x: 0.85,
+    y: 1.82,
+  })
+  slide.addText(body, {
+    color: '334155',
+    fontFace: 'Arial',
+    fontSize: 18,
+    h: 0.8,
+    w: 6.6,
+    x: 0.6,
+    y: 2.85,
+  })
+  slide.addShape(pptx.ShapeType.line, {
+    h: 0,
+    line: {
+      color: accentColor,
+      width: 2,
+    },
+    w: 6,
+    x: 0.6,
+    y: 4.05,
+  })
+  slide.addShape(pptx.ShapeType.roundRect, {
+    fill: {
+      color: 'FFFFFF',
+      transparency: 0,
+    },
+    h: 1.15,
+    line: {
+      color: 'CBD5E1',
+      width: 1,
+    },
+    radius: 0.16,
+    w: 3.2,
+    x: 8.75,
+    y: 1.05,
+  })
+  slide.addText(`Render check ${index}`, {
+    bold: true,
+    color: accentColor,
+    fontFace: 'Arial',
+    fontSize: 18,
+    h: 0.35,
+    w: 2.5,
+    x: 9,
+    y: 1.32,
+  })
+}
+
+function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
+  if (!expectedTextIncludes.length) {
+    return true
+  }
+
+  return expectedTextIncludes.every((text, index) =>
+    state.slides[index]?.textSample.includes(text))
 }
 
 async function clickPPTXExportAndWaitForDownloadBlob(page) {
@@ -39466,6 +39665,10 @@ async function readPPTXImportedSlideRenderState(
           )),
         slideHeight: slideRect?.height ?? 0,
         slideWidth: slideRect?.width ?? 0,
+        textSample: (activeSlide?.textContent ?? '')
+          .replace(/\\s+/g, ' ')
+          .trim()
+          .slice(0, 240),
         visibleElementCount: visibleElements.length,
       }
     })(${JSON.stringify({
