@@ -2072,7 +2072,7 @@ async function readPPTXSlideBackgroundImage({
   slidePath: string
   size: PPTDeck['size']
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTElement | null> {
   return await readPPTXBackgroundImage({
     alt: 'Slide background image',
     cSld,
@@ -2097,7 +2097,7 @@ async function readPPTXSlideLayoutBackgroundImage({
   slidePath: string
   size: PPTDeck['size']
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTElement | null> {
   const layoutPath = readPPTXRelatedPartPath({
     relationshipTypeSuffix: '/slideLayout',
     relationships,
@@ -2152,7 +2152,7 @@ async function readPPTXPartBackgroundImage({
   source: PPTXInheritedElementSource
   size: PPTDeck['size']
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTElement | null> {
   const xml = await zip.file(path)?.async('string') ?? ''
   const doc = xml ? parsePPTXXmlDocument(xml) : null
   const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
@@ -2188,7 +2188,7 @@ async function readPPTXBackgroundImage({
   slidePath: string
   size: PPTDeck['size']
   zip: JSZip
-}): Promise<PPTImage | null> {
+}): Promise<PPTElement | null> {
   const background = cSld
     ? getDirectPPTXChildByLocalName(cSld, 'bg')
     : null
@@ -2203,9 +2203,54 @@ async function readPPTXBackgroundImage({
     slidePath,
     zip,
   })
+  const placeholderElement = bgPr ?? background ?? cSld
+  const geometry = {
+    h: size.h,
+    w: size.w,
+    x: 0,
+    y: 0,
+  }
 
-  if (!source || !source.renderable) {
-    return null
+  if (!source) {
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource && placeholderElement
+      ? {
+          ...createPPTXUnsupportedImagePlaceholderElement({
+            element: placeholderElement,
+            geometry,
+            id,
+            name,
+            relationships,
+            shadow: null,
+            source: missingSource,
+            spPr: bgPr,
+          }),
+          locked: true,
+        }
+      : null
+  }
+
+  if (!source.renderable) {
+    return placeholderElement
+      ? {
+          ...createPPTXUnsupportedImagePlaceholderElement({
+            element: placeholderElement,
+            geometry,
+            id,
+            name,
+            relationships,
+            shadow: null,
+            source,
+            spPr: bgPr,
+          }),
+          locked: true,
+        }
+      : null
   }
 
   const crop = readPPTXImageCrop(blipFill ?? bgPr ?? background ?? cSld)
@@ -2217,12 +2262,7 @@ async function readPPTXBackgroundImage({
     alt,
     ...(crop ? { crop } : {}),
     fit: 'cover',
-    geometry: {
-      h: size.h,
-      w: size.w,
-      x: 0,
-      y: 0,
-    },
+    geometry,
     id,
     kind: 'image',
     locked: true,

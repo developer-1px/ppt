@@ -362,6 +362,7 @@ async function runPPTXRenderScenario(page) {
   openXmlPPTXBase64 = await addPPTXContentPartProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXUnsupportedGraphicFrameProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXBackgroundRefProbe(openXmlPPTXBase64)
+  openXmlPPTXBase64 = await addPPTXMissingBackgroundImageProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPresetGeometryFreeformProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXPictureClipShapeProbe(openXmlPPTXBase64)
   openXmlPPTXBase64 = await addPPTXShapeImageFillProbe(openXmlPPTXBase64)
@@ -430,6 +431,8 @@ async function runPPTXRenderScenario(page) {
     await readPPTXUnsupportedImageProbeState(page)
   const openXmlPPTXMissingImageState =
     await readPPTXMissingImageProbeState(page)
+  const openXmlPPTXMissingBackgroundImageState =
+    await readPPTXMissingBackgroundImageProbeState(page)
 
   record(
     'renders every OpenXML PPTX page from a dropped real file',
@@ -578,6 +581,29 @@ async function runPPTXRenderScenario(page) {
     {
       openXmlPPTXImportState,
       openXmlPPTXMissingImageState,
+    },
+  )
+
+  record(
+    'renders missing OpenXML PPTX background image relationships as placeholder shapes',
+    openXmlPPTXMissingBackgroundImageState.modelCount === 1 &&
+      openXmlPPTXMissingBackgroundImageState.imageModelCount === 0 &&
+      openXmlPPTXMissingBackgroundImageState.kind === 'shape' &&
+      openXmlPPTXMissingBackgroundImageState.locked === true &&
+      openXmlPPTXMissingBackgroundImageState.geometry?.x === 0 &&
+      openXmlPPTXMissingBackgroundImageState.geometry?.y === 0 &&
+      openXmlPPTXMissingBackgroundImageState.geometry?.w === 1280 &&
+      openXmlPPTXMissingBackgroundImageState.geometry?.h === 720 &&
+      openXmlPPTXMissingBackgroundImageState.text.includes('Unsupported image') &&
+      openXmlPPTXMissingBackgroundImageState.text.includes('missing-background-image-probe.png') &&
+      openXmlPPTXMissingBackgroundImageState.text.includes('image/png') &&
+      openXmlPPTXMissingBackgroundImageState.activeExists &&
+      openXmlPPTXMissingBackgroundImageState.activeKind === 'shape' &&
+      openXmlPPTXMissingBackgroundImageState.activeLocked === 'true' &&
+      !openXmlPPTXMissingBackgroundImageState.activeHasImage,
+    {
+      openXmlPPTXImportState,
+      openXmlPPTXMissingBackgroundImageState,
     },
   )
 
@@ -33786,6 +33812,62 @@ async function addPPTXBackgroundImageProbe(base64) {
   })
 }
 
+async function addPPTXMissingBackgroundImageProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePaths = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+  const slidePath = slidePaths[1]
+  const mediaPath = 'ppt/media/missing-background-image-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('missing-background-image-probe')) {
+    return base64
+  }
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const backgroundImageXml = [
+    '<p:bg>',
+    '<p:bgPr>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"/>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '<a:effectLst/>',
+    '</p:bgPr>',
+    '</p:bg>',
+  ].join('')
+  const markerComment = '<!-- pptx-missing-background-image-probe -->'
+  const nextXml = /<p:bg>[\s\S]*?<\/p:bg>/.test(xml)
+    ? xml.replace(/<p:bg>[\s\S]*?<\/p:bg>/, `${markerComment}${backgroundImageXml}`)
+    : xml.replace(/(<p:cSld\b[^>]*>)/, `$1${markerComment}${backgroundImageXml}`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXLayoutBackgroundProbe(base64) {
   if (!base64) {
     return ''
@@ -38493,6 +38575,79 @@ function readPPTXMissingImageProbeState(page) {
       text: readElementText(placeholder),
     }
   })()`)
+}
+
+async function readPPTXMissingBackgroundImageProbeState(page) {
+  const modelState = await page.eval(`(() => {
+    const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+    const readPPTExportDeckFromHTML = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+      } catch {
+        return null
+      }
+    }
+    const readElementText = (element) => (element?.textBody?.paragraphs ?? [])
+      .flatMap((paragraph) => paragraph.runs ?? [])
+      .map((run) => run.text ?? '')
+      .join('\\n')
+    const deck = readPPTExportDeckFromHTML(exportCode)
+    const importedSlides = (deck?.slides ?? []).filter((slide) =>
+      String(slide.name ?? '').includes('Copy'))
+    const importedElements = importedSlides.flatMap((slide) =>
+      (slide.elements ?? []).map((element) => ({ element, slide })))
+    const placeholders = importedElements.filter(({ element }) =>
+      element.name === 'Background Image' &&
+      element.kind === 'shape' &&
+      readElementText(element).includes('missing-background-image-probe.png'))
+    const images = importedElements.filter(({ element }) =>
+      element.name === 'Background Image' &&
+      element.kind === 'image' &&
+      (element.src ?? '').includes('missing-background-image-probe'))
+    const placeholderEntry = placeholders[0] ?? null
+    const placeholder = placeholderEntry?.element ?? null
+    const slide = placeholderEntry?.slide ?? null
+
+    return {
+      geometry: placeholder?.geometry ?? null,
+      imageModelCount: images.length,
+      kind: placeholder?.kind ?? '',
+      locked: placeholder?.locked === true,
+      modelCount: placeholders.length,
+      slideId: slide?.id ?? '',
+      text: readElementText(placeholder),
+    }
+  })()`)
+
+  if (modelState.slideId) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(modelState.slideId)})`)
+    await delay(120)
+  }
+
+  const activeState = await page.eval(`(() => {
+    const activeElement = document.querySelector('.ppt-slide [data-ppt-element-name="Background Image"][data-kind="shape"]')
+
+    return {
+      activeExists: !!activeElement,
+      activeHasImage: !!activeElement?.querySelector('img'),
+      activeKind: activeElement?.getAttribute('data-kind') ?? '',
+      activeLocked: activeElement?.getAttribute('data-locked') ?? '',
+      activeSlideId: document.querySelector('.ppt-slide')?.getAttribute('data-ppt-slide') ?? '',
+      activeText: activeElement?.textContent ?? '',
+    }
+  })()`)
+
+  return {
+    ...modelState,
+    ...activeState,
+  }
 }
 
 async function readPPTXSlideProbeActiveState(page, slideId, probeName) {
