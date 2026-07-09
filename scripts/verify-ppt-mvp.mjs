@@ -10987,6 +10987,21 @@ async function runExportScenario(page) {
     },
   )
 
+  const deckPPTXRenderedSlideState = await readPPTXImportedSlideRenderState(page)
+
+  record(
+    'renders every imported embedded-model PPTX slide page after real file drop',
+    deckPPTXRenderedSlideState.importedSlideCount === deckPPTXImportState.importedCount &&
+      deckPPTXRenderedSlideState.importedSlideCount === beforeDeckPPTXDrop.slideCount &&
+      deckPPTXRenderedSlideState.firstSlideId === deckPPTXImportState.firstImportedSlideId &&
+      deckPPTXRenderedSlideState.allSlidesRendered,
+    {
+      beforeDeckPPTXDrop,
+      deckPPTXImportState,
+      deckPPTXRenderedSlideState,
+    },
+  )
+
   await deletePPTSlidesByThumbNameIncludes(page, ['Copy'])
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
@@ -11917,6 +11932,21 @@ async function runExportScenario(page) {
     {
       beforeOpenXmlPPTXDrop,
       openXmlPPTXImportState,
+    },
+  )
+
+  const openXmlPPTXRenderedSlideState = await readPPTXImportedSlideRenderState(page)
+
+  record(
+    'renders every imported OpenXML PPTX slide page after real file drop',
+    openXmlPPTXRenderedSlideState.importedSlideCount === openXmlPPTXImportState.importedCount &&
+      openXmlPPTXRenderedSlideState.importedSlideCount === beforeOpenXmlPPTXDrop.slideCount &&
+      openXmlPPTXRenderedSlideState.firstSlideId === openXmlPPTXImportState.firstImportedSlideId &&
+      openXmlPPTXRenderedSlideState.allSlidesRendered,
+    {
+      beforeOpenXmlPPTXDrop,
+      openXmlPPTXImportState,
+      openXmlPPTXRenderedSlideState,
     },
   )
 
@@ -33835,6 +33865,94 @@ function focusPPTSlideThumb(page, slideId) {
 
     thumb?.focus()
   })(${JSON.stringify(slideId)})`)
+}
+
+async function readPPTXImportedSlideRenderState(page) {
+  const importedThumbs = await page.eval(`(() => {
+    return [...document.querySelectorAll('.ppt-thumb')]
+      .map((thumb, index) => {
+        const preview = thumb.querySelector('.ppt-thumb-preview')
+        const thumbRect = thumb.getBoundingClientRect()
+        const previewRect = preview?.getBoundingClientRect()
+        const id = thumb.getAttribute('data-ppt-slide-id') ?? ''
+        const name = thumb.querySelector('.ppt-thumb-name')?.textContent?.trim() ?? ''
+
+        return {
+          id,
+          index,
+          name,
+          thumbElementCount: thumb.querySelectorAll('[data-ppt-thumb-element]').length,
+          thumbPreviewHeight: previewRect?.height ?? 0,
+          thumbPreviewWidth: previewRect?.width ?? 0,
+          thumbVisible: thumbRect.width > 0 && thumbRect.height > 0,
+        }
+      })
+      .filter((thumb) => thumb.id && thumb.name.includes('Copy'))
+  })()`)
+  const slides = []
+
+  for (const thumb of importedThumbs) {
+    await page.eval(`((slideId) => {
+      const thumb = [...document.querySelectorAll('.ppt-thumb')]
+        .find((candidate) => candidate.getAttribute('data-ppt-slide-id') === slideId)
+
+      thumb?.click()
+    })(${JSON.stringify(thumb.id)})`)
+    await delay(120)
+
+    const rendered = await page.eval(`((expectedSlideId) => {
+      const activeSlide = document.querySelector('.ppt-stage-shell .ppt-slide[data-ppt-slide]')
+      const activeThumb = document.querySelector('.ppt-thumb[aria-current="page"]')
+      const elements = [...(activeSlide?.querySelectorAll('[data-ppt-element]') ?? [])]
+      const visibleElements = elements.filter((element) => {
+        const rect = element.getBoundingClientRect()
+
+        return rect.width > 0 && rect.height > 0
+      })
+      const slideRect = activeSlide?.getBoundingClientRect()
+
+      return {
+        activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent?.trim() ?? '',
+        activeSlideId: activeSlide?.getAttribute('data-ppt-slide') ?? '',
+        activeThumbId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
+        activeThumbMatches: activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId,
+        domElementCount: elements.length,
+        elementKindSummary: elements
+          .map((element) => element.getAttribute('data-kind') ?? '')
+          .sort()
+          .join(' | '),
+        rendered: activeSlide?.getAttribute('data-ppt-slide') === expectedSlideId &&
+          activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId &&
+          (slideRect?.width ?? 0) > 300 &&
+          (slideRect?.height ?? 0) > 160 &&
+          elements.length > 0 &&
+          visibleElements.length > 0,
+        slideHeight: slideRect?.height ?? 0,
+        slideWidth: slideRect?.width ?? 0,
+        visibleElementCount: visibleElements.length,
+      }
+    })(${JSON.stringify(thumb.id)})`)
+
+    slides.push({
+      ...thumb,
+      ...rendered,
+    })
+  }
+
+  return {
+    allSlidesRendered: importedThumbs.length > 0 &&
+      slides.every((slide) =>
+        slide.rendered &&
+        slide.thumbElementCount > 0 &&
+        slide.thumbPreviewWidth > 0 &&
+        slide.thumbPreviewHeight > 0 &&
+        slide.thumbVisible),
+    firstSlideId: slides[0]?.id ?? '',
+    importedSlideCount: importedThumbs.length,
+    slideIds: slides.map((slide) => slide.id).join(' | '),
+    slideNames: slides.map((slide) => slide.name).join(' | '),
+    slides,
+  }
 }
 
 function getPPTPlaceholderVisibilityState(page, placeholderId = 'media') {

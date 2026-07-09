@@ -2,6 +2,13 @@
 
 Lightweight PPT subset editor for AI-generated decks and final retouching.
 
+## PPTX Viewer Goal
+
+- Open a real `.pptx` file through file input or drop.
+- Use the embedded PPT model when present; otherwise import from PPTX OpenXML.
+- Render every imported slide as both a selectable thumbnail and the active slide page.
+- Keep `pnpm verify:mvp` checking imported PPTX pages by iterating the rendered slides one by one.
+
 ## Architecture
 
 - Source of truth: `PPTDeck`, `PPTSlide`, `PPTElement`
