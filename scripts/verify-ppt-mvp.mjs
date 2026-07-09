@@ -229,11 +229,16 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedText(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedTextIncludes,
+        ) &&
+        hasExpectedPPTXRenderedKinds(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedKindIncludes,
         ),
       {
         beforeExternalPPTXDrop,
         externalPPTXFixture: {
           byteLength: externalPPTXFixture.byteLength,
+          expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
           fileName: externalPPTXFixture.fileName,
           generated: externalPPTXFixture.generated,
@@ -291,6 +296,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedTextIncludes,
         ) &&
+        hasExpectedPPTXRenderedKinds(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedKindIncludes,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -298,6 +307,7 @@ async function runPPTXRenderScenario(page) {
       {
         externalPPTXFixture: {
           byteLength: externalPPTXFixture.byteLength,
+          expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
           fileName: externalPPTXFixture.fileName,
           generated: externalPPTXFixture.generated,
@@ -37778,6 +37788,7 @@ async function readExternalPPTXRenderFixture() {
   const providedPath = PPTX_RENDER_FILE.trim()
   const fixture = providedPath
     ? {
+        expectedKindIncludes: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -37811,6 +37822,11 @@ async function createGeneratedPPTXRenderFixture() {
     'PPTX Fixture Page 2',
     'PPTX Fixture Page 3',
   ]
+  const expectedKindIncludes = [
+    ['line', 'shape'],
+    ['shape', 'table'],
+    ['image', 'shape'],
+  ]
   const pptx = new PptxGenJS()
 
   pptx.author = 'Interactive OS'
@@ -37830,11 +37846,13 @@ async function createGeneratedPPTXRenderFixture() {
     body: 'Second page proves thumbnail navigation switches the active slide.',
     heading: expectedTextIncludes[1],
     index: 2,
+    table: true,
   })
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: 'D97706',
     body: 'Third page keeps the verifier honest about full deck coverage.',
     heading: expectedTextIncludes[2],
+    image: true,
     index: 3,
   })
 
@@ -37844,6 +37862,7 @@ async function createGeneratedPPTXRenderFixture() {
   })
 
   return {
+    expectedKindIncludes,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
     fileName,
@@ -37856,7 +37875,7 @@ async function createGeneratedPPTXRenderFixture() {
 
 function addPPTXRenderFixtureSlide(
   pptx,
-  { accentColor, body, heading, index },
+  { accentColor, body, heading, image = false, index, table = false },
 ) {
   const slide = pptx.addSlide()
 
@@ -37940,6 +37959,46 @@ function addPPTXRenderFixtureSlide(
     x: 9,
     y: 1.32,
   })
+
+  if (table) {
+    slide.addTable(
+      [
+        [
+          { text: 'Metric', options: { bold: true, fill: { color: 'E2E8F0' } } },
+          { text: 'Value', options: { bold: true, fill: { color: 'E2E8F0' } } },
+        ],
+        [
+          { text: 'Slides' },
+          { text: '3' },
+        ],
+      ],
+      {
+        border: { color: 'CBD5E1', width: 1 },
+        color: '334155',
+        colW: [1.25, 1],
+        fontFace: 'Arial',
+        fontSize: 12,
+        h: 0.95,
+        margin: 0.05,
+        objectName: 'Fixture Table 2',
+        w: 2.25,
+        x: 8.75,
+        y: 2.55,
+      },
+    )
+  }
+
+  if (image) {
+    slide.addImage({
+      altText: 'Fixture SVG image',
+      data: createPPTXRenderFixtureImageData(accentColor),
+      h: 0.95,
+      objectName: 'Fixture Image 3',
+      w: 1.7,
+      x: 9,
+      y: 2.6,
+    })
+  }
 }
 
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
@@ -37949,6 +38008,30 @@ function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
 
   return expectedTextIncludes.every((text, index) =>
     state.slides[index]?.textSample.includes(text))
+}
+
+function hasExpectedPPTXRenderedKinds(state, expectedKindIncludes) {
+  if (!expectedKindIncludes.length) {
+    return true
+  }
+
+  return expectedKindIncludes.every((kinds, index) => {
+    const renderedKinds = state.slides[index]?.elementKinds ?? []
+
+    return kinds.every((kind) => renderedKinds.includes(kind))
+  })
+}
+
+function createPPTXRenderFixtureImageData(accentColor) {
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
+    `<rect width="160" height="90" rx="8" fill="#${accentColor}"/>`,
+    '<path d="M18 66L56 28L86 56L108 36L142 66Z" fill="#ffffff" opacity="0.88"/>',
+    '<circle cx="118" cy="28" r="10" fill="#fbbf24"/>',
+    '</svg>',
+  ].join('')
+
+  return `image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
 
 async function clickPPTXExportAndWaitForDownloadBlob(page) {
@@ -39653,6 +39736,10 @@ async function readPPTXImportedSlideRenderState(
         activeThumbId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
         activeThumbMatches: activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId,
         domElementCount: elements.length,
+        elementKinds: elements
+          .map((element) => element.getAttribute('data-kind') ?? '')
+          .filter(Boolean)
+          .sort(),
         elementKindSummary: elements
           .map((element) => element.getAttribute('data-kind') ?? '')
           .sort()
