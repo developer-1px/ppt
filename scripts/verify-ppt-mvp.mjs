@@ -201,8 +201,8 @@ async function runPPTXRenderScenario(page) {
     const externalPPTXImportState = await readPPTXDeckImportState(page)
     const externalPPTXRenderedSlideState =
       await readPPTXImportedSlideRenderState(page, {
-        namedElementNames: externalPPTXFixture.expectedNamedElements
-          .map((element) => element.name),
+        namedElementNames:
+          getExpectedPPTXNamedElementNames(externalPPTXFixture),
         requireElements: externalPPTXFixture.requireElements,
       })
     const externalPPTXExpectedSlideCount =
@@ -264,6 +264,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedNamedElements,
         ) &&
+        hasExpectedPPTXAbsentNamedElements(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedAbsentNamedElements,
+        ) &&
         hasExpectedPPTXRenderedSlideMetadata(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedSlideMetadata,
@@ -280,6 +284,8 @@ async function runPPTXRenderScenario(page) {
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
           expectedNamedElements: externalPPTXFixture.expectedNamedElements,
+          expectedAbsentNamedElements:
+            externalPPTXFixture.expectedAbsentNamedElements,
           expectedSlideMetadata:
             externalPPTXFixture.expectedSlideMetadata,
           byteLength: externalPPTXFixture.byteLength,
@@ -312,8 +318,8 @@ async function runPPTXRenderScenario(page) {
     const externalPPTXOpenStatusState = await readPPTXOpenStatusState(page)
     const externalPPTXOpenedSlideState =
       await readPPTXImportedSlideRenderState(page, {
-        namedElementNames: externalPPTXFixture.expectedNamedElements
-          .map((element) => element.name),
+        namedElementNames:
+          getExpectedPPTXNamedElementNames(externalPPTXFixture),
         requireElements: externalPPTXFixture.requireElements,
         slideNameIncludes: '',
       })
@@ -375,6 +381,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedNamedElements,
         ) &&
+        hasExpectedPPTXAbsentNamedElements(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedAbsentNamedElements,
+        ) &&
         hasExpectedPPTXRenderedSlideMetadata(
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedSlideMetadata,
@@ -394,6 +404,8 @@ async function runPPTXRenderScenario(page) {
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
           expectedNamedElements: externalPPTXFixture.expectedNamedElements,
+          expectedAbsentNamedElements:
+            externalPPTXFixture.expectedAbsentNamedElements,
           expectedSlideMetadata:
             externalPPTXFixture.expectedSlideMetadata,
           byteLength: externalPPTXFixture.byteLength,
@@ -37960,6 +37972,7 @@ async function readExternalPPTXRenderFixture() {
     ? {
         expectedBackgroundColors: [],
         expectedElementStyles: [],
+        expectedAbsentNamedElements: [],
         expectedKindIncludes: [],
         expectedGroupedSlideIndexes: [],
         expectedHyperlinks: [],
@@ -38074,8 +38087,27 @@ async function createGeneratedPPTXRenderFixture() {
       slideIndex: 0,
       stroke: 'rgb(32, 48, 64)',
     },
+    {
+      fill: 'rgb(204, 251, 241)',
+      name: 'Alternate Content Probe',
+      slideIndex: 0,
+      stroke: 'rgb(15, 118, 110)',
+    },
+  ]
+  const expectedAbsentNamedElements = [
+    {
+      kind: 'shape',
+      name: 'Alternate Fallback Probe',
+      slideIndex: 0,
+    },
   ]
   const expectedNamedElements = [
+    {
+      kind: 'shape',
+      name: 'Alternate Content Probe',
+      slideIndex: 0,
+      textIncludes: ['Alternate Content Probe'],
+    },
     {
       kind: 'table',
       name: 'Chart Table Probe',
@@ -38215,6 +38247,7 @@ async function createGeneratedPPTXRenderFixture() {
   return {
     expectedBackgroundColors,
     expectedElementStyles,
+    expectedAbsentNamedElements,
     expectedGroupedSlideIndexes,
     expectedHyperlinks,
     expectedImages,
@@ -38630,6 +38663,7 @@ async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
   let nextBase64 = Buffer.from(bytes).toString('base64')
 
   for (const addProbe of [
+    addPPTXAlternateContentProbe,
     addPPTXChartTableProbe,
     addPPTXDiagramTextProbe,
     addPPTXOleObjectProbe,
@@ -38812,6 +38846,13 @@ function hasExpectedPPTXRenderedElementStyles(state, expectedElementStyles) {
   })
 }
 
+function getExpectedPPTXNamedElementNames(fixture) {
+  return [
+    ...fixture.expectedNamedElements,
+    ...fixture.expectedAbsentNamedElements,
+  ].map((element) => element.name)
+}
+
 function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
   if (!expectedNamedElements.length) {
     return true
@@ -38836,6 +38877,20 @@ function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
         element.text.includes(text)) &&
       (!expected.imageSrcPrefix ||
         element.imageSrc.startsWith(expected.imageSrcPrefix))
+  })
+}
+
+function hasExpectedPPTXAbsentNamedElements(state, expectedAbsentNamedElements) {
+  if (!expectedAbsentNamedElements.length) {
+    return true
+  }
+
+  return expectedAbsentNamedElements.every((expected) => {
+    const elements = state.slides[expected.slideIndex]?.namedElements ?? []
+
+    return !elements.some((element) =>
+      element.name === expected.name &&
+      (!expected.kind || element.kind === expected.kind))
   })
 }
 
