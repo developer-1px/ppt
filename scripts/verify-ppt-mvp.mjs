@@ -263,6 +263,10 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedNamedElements(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedNamedElements,
+        ) &&
+        hasExpectedPPTXRenderedSlideMetadata(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedSlideMetadata,
         ),
       {
         beforeExternalPPTXDrop,
@@ -276,6 +280,8 @@ async function runPPTXRenderScenario(page) {
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
           expectedNamedElements: externalPPTXFixture.expectedNamedElements,
+          expectedSlideMetadata:
+            externalPPTXFixture.expectedSlideMetadata,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -369,6 +375,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedNamedElements,
         ) &&
+        hasExpectedPPTXRenderedSlideMetadata(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedSlideMetadata,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -384,6 +394,8 @@ async function runPPTXRenderScenario(page) {
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
           expectedNamedElements: externalPPTXFixture.expectedNamedElements,
+          expectedSlideMetadata:
+            externalPPTXFixture.expectedSlideMetadata,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -37874,6 +37886,7 @@ async function readExternalPPTXRenderFixture() {
         expectedImages: [],
         expectedInheritedTextIncludes: [],
         expectedNamedElements: [],
+        expectedSlideMetadata: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -38000,9 +38013,44 @@ async function createGeneratedPPTXRenderFixture() {
         'unsupported-graphic-frame-probe.xml',
       ],
     },
+    {
+      commentResolved: false,
+      commentThreadCount: 1,
+      kind: 'comment',
+      name: 'PPTX Comment 1',
+      slideIndex: 0,
+      textIncludes: [
+        'PPT Reviewer',
+        'PPTX Comment Probe: review KPI label',
+        '2026-07-09T12:00:00Z',
+      ],
+    },
+    {
+      commentResolved: true,
+      commentThreadCount: 2,
+      kind: 'comment',
+      name: 'PPTX Comment 2',
+      slideIndex: 0,
+      textIncludes: [
+        'PPT Modern Reviewer',
+        'PPTX Modern Comment Probe: assign follow-up',
+        '2026-07-09T12:01:00Z',
+      ],
+    },
+  ]
+  const expectedSlideMetadata = [
+    {
+      hidden: true,
+      notesIncludes: [
+        'PPTX Notes Probe: presenter cue',
+        'Keep final wording editable.',
+      ],
+      sectionName: 'PPTX Metadata Probe Section',
+      slideIndex: 0,
+    },
   ]
   const expectedKindIncludes = [
-    ['line', 'shape'],
+    ['comment', 'line', 'shape'],
     ['shape', 'table'],
     ['image', 'shape'],
   ]
@@ -38048,6 +38096,7 @@ async function createGeneratedPPTXRenderFixture() {
   await addPPTXRenderFixtureInheritedProbe(path)
   await addPPTXRenderFixtureThemeColorProbe(path)
   await addPPTXRenderFixtureGraphicFallbackProbes(path)
+  await addPPTXRenderFixtureMetadataProbes(path)
 
   return {
     expectedBackgroundColors,
@@ -38058,6 +38107,7 @@ async function createGeneratedPPTXRenderFixture() {
     expectedInheritedTextIncludes,
     expectedKindIncludes,
     expectedNamedElements,
+    expectedSlideMetadata,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
     fileName,
@@ -38481,6 +38531,18 @@ async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
   }
 }
 
+async function addPPTXRenderFixtureMetadataProbes(path) {
+  const bytes = await readFile(path)
+  let nextBase64 = Buffer.from(bytes).toString('base64')
+
+  nextBase64 = await addPPTXSlideMetadataProbe(nextBase64)
+  nextBase64 = await addPPTXCommentsProbe(nextBase64)
+
+  if (nextBase64) {
+    await writeFile(path, Buffer.from(nextBase64, 'base64'))
+  }
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
@@ -38623,10 +38685,42 @@ function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
     }
 
     return (!expected.kind || element.kind === expected.kind) &&
+      (expected.commentResolved === undefined ||
+        element.commentResolved === expected.commentResolved) &&
+      (expected.commentThreadCount === undefined ||
+        element.commentThreadCount === expected.commentThreadCount) &&
       (expected.textIncludes ?? []).every((text) =>
         element.text.includes(text)) &&
       (!expected.imageSrcPrefix ||
         element.imageSrc.startsWith(expected.imageSrcPrefix))
+  })
+}
+
+function hasExpectedPPTXRenderedSlideMetadata(state, expectedSlideMetadata) {
+  if (!expectedSlideMetadata.length) {
+    return true
+  }
+
+  return expectedSlideMetadata.every((expected) => {
+    const slide = state.slides[expected.slideIndex]
+
+    if (!slide) {
+      return false
+    }
+
+    return (expected.hidden === undefined ||
+      (
+        slide.activeHidden === String(expected.hidden) &&
+        slide.activeThumbHidden === String(expected.hidden) &&
+        slide.modelHidden === expected.hidden
+      )) &&
+      (!expected.sectionName || (
+        slide.activeSectionName === expected.sectionName &&
+        slide.activeThumbSectionName === expected.sectionName &&
+        slide.modelSectionName === expected.sectionName
+      )) &&
+      (expected.notesIncludes ?? []).every((text) =>
+        slide.modelNotes.includes(text))
   })
 }
 
@@ -40347,12 +40441,28 @@ async function readPPTXImportedSlideRenderState(
         .replace(/\\s+/g, ' ')
         .trim()
       const namedElementNames = new Set(input.namedElementNames)
+      const exportCode = document.querySelector('.ppt-export-code')?.value ?? ''
+      const readPPTExportDeckFromHTML = (html) => {
+        try {
+          const doc = new DOMParser().parseFromString(html, 'text/html')
+
+          return JSON.parse(doc.querySelector('[data-ppt-deck]')?.textContent ?? 'null')
+        } catch {
+          return null
+        }
+      }
+      const modelSlide = (readPPTExportDeckFromHTML(exportCode)?.slides ?? [])
+        .find((slide) => String(slide.id ?? '') === expectedSlideId) ?? null
 
       return {
         activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent?.trim() ?? '',
+        activeHidden: activeSlide?.getAttribute('data-ppt-slide-hidden') ?? 'false',
+        activeSectionName: activeSlide?.getAttribute('data-ppt-slide-section-name') ?? '',
         activeSlideId: activeSlide?.getAttribute('data-ppt-slide') ?? '',
+        activeThumbHidden: activeThumb?.getAttribute('data-ppt-slide-hidden') ?? 'false',
         activeThumbId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
         activeThumbMatches: activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId,
+        activeThumbSectionName: activeThumb?.getAttribute('data-ppt-slide-section-name') ?? '',
         backgroundColor: activeSlide ? getComputedStyle(activeSlide).backgroundColor : '',
         domElementCount: elements.length,
         elementKinds: elements
@@ -40388,6 +40498,8 @@ async function readPPTXImportedSlideRenderState(
         ].sort(),
         namedElements: elements
           .map((element) => ({
+            commentResolved: element.getAttribute('data-ppt-comment-resolved') === 'true',
+            commentThreadCount: Number(element.getAttribute('data-ppt-comment-thread-count') ?? 0),
             imageSrc: readElementImageSource(element).slice(0, 120),
             kind: element.getAttribute('data-kind') ?? '',
             name: element.getAttribute('data-ppt-element-name') ?? '',
@@ -40427,6 +40539,9 @@ async function readPPTXImportedSlideRenderState(
             elements.length > 0 &&
             visibleElements.length > 0
           )),
+        modelHidden: modelSlide?.hidden === true,
+        modelNotes: modelSlide?.notes ?? '',
+        modelSectionName: modelSlide?.sectionName ?? '',
         slideHeight: slideRect?.height ?? 0,
         slideWidth: slideRect?.width ?? 0,
         textSample: (activeSlide?.textContent ?? '')
