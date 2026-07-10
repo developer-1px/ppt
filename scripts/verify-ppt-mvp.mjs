@@ -35703,6 +35703,86 @@ async function addPPTXShapeImageFillProbe(base64) {
   })
 }
 
+async function addPPTXShapeImageFillTextProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+  const mediaPath = 'ppt/media/pptx-shape-image-fill-text-probe.png'
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Shape Image Fill Text Probe')) {
+    return base64
+  }
+
+  await ensurePPTXDefaultContentType(zip, 'png', 'image/png')
+  zip.file(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNkAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+
+  const relationshipId = await addPPTXInternalRelationship({
+    sourcePath: slidePath,
+    target: getPPTXRelativeTarget(slidePath, mediaPath),
+    type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+    zip,
+  })
+  const shapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="9986" name="Shape Image Fill Text Probe" descr="Shape image fill text alt"/>',
+    '<p:cNvSpPr/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="7429500" y="1905000"/>',
+    '<a:ext cx="2286000" cy="914400"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:blipFill>',
+    `<a:blip r:embed="${relationshipId}"><a:alphaModFix amt="72000"/></a:blip>`,
+    '<a:stretch><a:fillRect/></a:stretch>',
+    '</a:blipFill>',
+    '<a:ln w="19050"><a:solidFill><a:srgbClr val="334155"/></a:solidFill></a:ln>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr anchor="ctr" lIns="91440" tIns="45720" rIns="91440" bIns="45720"/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr algn="ctr"/>',
+    '<a:r><a:rPr sz="1500" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr>',
+    '<a:t>Image fill text remains editable</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${shapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 async function addPPTXMissingShapeImageFillProbe(base64) {
   if (!base64) {
     return ''
@@ -37963,6 +38043,12 @@ async function createGeneratedPPTXRenderFixture() {
       },
     },
     {
+      fit: 'contain',
+      name: 'Shape Image Fill Text Probe',
+      opacity: 0.72,
+      slideIndex: 0,
+    },
+    {
       crop: {
         bottom: 5,
         left: 10,
@@ -38058,6 +38144,12 @@ async function createGeneratedPPTXRenderFixture() {
         'PPTX Modern Comment Probe: assign follow-up',
         '2026-07-09T12:01:00Z',
       ],
+    },
+    {
+      kind: 'textBox',
+      name: 'Shape Image Fill Text Probe Text',
+      slideIndex: 0,
+      textIncludes: ['Image fill text remains editable'],
     },
   ]
   const expectedSlideMetadata = [
@@ -38545,6 +38637,7 @@ async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
     addPPTXContentPartProbe,
     addPPTXUnsupportedGraphicFrameProbe,
     addPPTXShapeImageFillProbe,
+    addPPTXShapeImageFillTextProbe,
   ]) {
     nextBase64 = await addProbe(nextBase64)
   }

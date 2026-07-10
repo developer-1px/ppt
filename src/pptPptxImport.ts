@@ -29,6 +29,7 @@ import {
   type PPTTableCellTextStyle,
   type PPTTextAutoFit,
   type PPTTextBody,
+  type PPTTextBox,
   type PPTTextStyle,
 } from './pptModel'
 import { getPPTTableColumnCount } from './pptTableLayout'
@@ -92,6 +93,7 @@ type PPTXSlideObjectNode = {
   groupId?: string
   transform: PPTXGroupTransform
 }
+type PPTXImportedElementResult = PPTElement | PPTElement[] | null
 type PPTXLineConnectionRef = {
   anchor: PPTLineConnection['anchor']
   objectId: string
@@ -1568,7 +1570,7 @@ async function readPPTXOpenXmlSlide({
 
   for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
     const child = objectNode.element
-    let element: PPTElement | null = null
+    let element: PPTXImportedElementResult = null
 
     if (child.localName === 'sp') {
       element = isPPTXLineShape(child)
@@ -1636,18 +1638,26 @@ async function readPPTXOpenXmlSlide({
     }
 
     if (element) {
-      const transformedElement = applyPPTXGroupObjectNode(element, objectNode)
+      const elementList = Array.isArray(element) ? element : [element]
+      const transformedElements = elementList.map((item) =>
+        applyPPTXGroupObjectNode(item, objectNode))
+      const firstTransformedElementId = transformedElements[0]?.id ?? ''
 
-      elements.push(transformedElement)
-      if (transformedElement.kind === 'line') {
+      elements.push(...transformedElements)
+      for (const transformedElement of transformedElements) {
+        if (transformedElement.kind !== 'line') {
+          continue
+        }
         const lineConnectionRefs = readPPTXLineConnectionRefs(child)
 
         if (lineConnectionRefs) {
           lineConnectionRefsByElementId.set(transformedElement.id, lineConnectionRefs)
         }
       }
-      for (const pptxObjectId of readPPTXObjectIds(child)) {
-        elementIdByPptxObjectId.set(pptxObjectId, transformedElement.id)
+      if (firstTransformedElementId) {
+        for (const pptxObjectId of readPPTXObjectIds(child)) {
+          elementIdByPptxObjectId.set(pptxObjectId, firstTransformedElementId)
+        }
       }
       objectIndex += 1
     }
@@ -2573,14 +2583,15 @@ async function readPPTXPartInheritedElements({
       continue
     }
 
-    inheritedElements.push(
+    const elementList = Array.isArray(element) ? element : [element]
+
+    inheritedElements.push(...elementList.map((item) =>
       applyPPTXInheritedElementSource(
-        applyPPTXGroupObjectNode(element, objectNode),
+        applyPPTXGroupObjectNode(item, objectNode),
         index,
         objectIndex,
         source,
-      ),
-    )
+      )))
     objectIndex += 1
   }
 
@@ -2638,7 +2649,7 @@ async function readPPTXInheritedElement({
   themeStyles: PPTXThemeStyleMap
   textFieldContext: PPTXTextFieldContext
   zip: JSZip
-}): Promise<PPTElement | null> {
+}): Promise<PPTXImportedElementResult> {
   if (child.localName === 'sp') {
     return isPPTXLineShape(child)
       ? readPPTXLineElement(
@@ -3644,7 +3655,7 @@ async function readPPTXShapeElement(
   placeholderTextBodies: PPTXPlaceholderTextBodyMap,
   textFieldContext: PPTXTextFieldContext,
   zip: JSZip,
-): Promise<PPTElement | null> {
+): Promise<PPTXImportedElementResult> {
   const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
   const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
   const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
@@ -3679,7 +3690,9 @@ async function readPPTXShapeElement(
         fallbackFontFamily,
       )
     : undefined
-  const imageFill = !hasTextContent && geometry
+  const id = createPPTXImportedElementId(slideIndex, objectIndex)
+  const name = readPPTXObjectName(sp, `Object ${objectIndex}`)
+  const imageFill = geometry
     ? await readPPTXShapeImageFillElement({
         geometry,
         objectIndex,
@@ -3698,9 +3711,31 @@ async function readPPTXShapeElement(
     return null
   }
 
-  const id = createPPTXImportedElementId(slideIndex, objectIndex)
-  const name = readPPTXObjectName(sp, `Object ${objectIndex}`)
   const isTextBox = isPPTXTextBoxShape(sp) || (textBody !== null && !hasPaint)
+
+  if (imageFill && textBody && hasTextContent) {
+    return [
+      {
+        ...imageFill,
+        id,
+        name,
+      },
+      readPPTXShapeImageFillTextOverlayElement({
+        fallbackFontFamily,
+        fallbackTxBody,
+        geometry,
+        id: `${id}-text`,
+        name: `${name} Text`,
+        relationships,
+        sp,
+        spPr,
+        textAutoFit,
+        textBody,
+        textStyle,
+        txBody,
+      }),
+    ]
+  }
 
   if (imageFill) {
     return {
@@ -3794,6 +3829,55 @@ async function readPPTXShapeElement(
     name,
     ...(shadow ? { shadow } : {}),
     shape: readPPTXShapeKind(spPr),
+  }
+}
+
+function readPPTXShapeImageFillTextOverlayElement({
+  fallbackFontFamily,
+  fallbackTxBody,
+  geometry,
+  id,
+  name,
+  relationships,
+  sp,
+  spPr,
+  textAutoFit,
+  textBody,
+  textStyle,
+  txBody,
+}: {
+  fallbackFontFamily: string | undefined
+  fallbackTxBody: Element | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  sp: Element
+  spPr: Element | null
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody
+  textStyle: PPTTextStyle | undefined
+  txBody: Element | null
+}): PPTTextBox {
+  return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
+    ...readPPTXElementFlip(spPr),
+    geometry: readPPTXTextBoxGeometry(geometry, txBody, fallbackTxBody),
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id,
+    kind: 'textBox',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    style: textStyle ?? readPPTXTextStyle(
+      textBody,
+      txBody,
+      {},
+      fallbackTxBody,
+      fallbackFontFamily,
+    ),
+    ...(textAutoFit ? { textAutoFit } : {}),
+    textBody,
   }
 }
 
