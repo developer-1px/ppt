@@ -241,13 +241,23 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedHyperlinks(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedHyperlinks,
+        ) &&
+        hasExpectedPPTXRenderedBackgrounds(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedBackgroundColors,
+        ) &&
+        hasExpectedPPTXRenderedImages(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedImages,
         ),
       {
         beforeExternalPPTXDrop,
         externalPPTXFixture: {
+          expectedBackgroundColors: externalPPTXFixture.expectedBackgroundColors,
           expectedGroupedSlideIndexes:
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
+          expectedImages: externalPPTXFixture.expectedImages,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -319,15 +329,25 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedHyperlinks,
         ) &&
+        hasExpectedPPTXRenderedBackgrounds(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedBackgroundColors,
+        ) &&
+        hasExpectedPPTXRenderedImages(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedImages,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
         externalPPTXOpenStatusState.slideCount === externalPPTXOpenImportState.importedCount,
       {
         externalPPTXFixture: {
+          expectedBackgroundColors: externalPPTXFixture.expectedBackgroundColors,
           expectedGroupedSlideIndexes:
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
+          expectedImages: externalPPTXFixture.expectedImages,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -37810,9 +37830,11 @@ async function readExternalPPTXRenderFixture() {
   const providedPath = PPTX_RENDER_FILE.trim()
   const fixture = providedPath
     ? {
+        expectedBackgroundColors: [],
         expectedKindIncludes: [],
         expectedGroupedSlideIndexes: [],
         expectedHyperlinks: [],
+        expectedImages: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -37860,6 +37882,26 @@ async function createGeneratedPPTXRenderFixture() {
       slideIndex: 0,
     },
   ]
+  const expectedBackgroundColors = [
+    'rgb(239, 246, 255)',
+    'rgb(236, 253, 245)',
+    'rgb(255, 247, 237)',
+  ]
+  const expectedImages = [
+    {
+      crop: {
+        bottom: 5,
+        left: 10,
+        right: 15,
+        top: 5,
+        x: 48,
+        y: 50,
+      },
+      fit: 'cover',
+      flipH: true,
+      slideIndex: 2,
+    },
+  ]
   const expectedKindIncludes = [
     ['line', 'shape'],
     ['shape', 'table'],
@@ -37875,12 +37917,14 @@ async function createGeneratedPPTXRenderFixture() {
 
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: '2563EB',
+    backgroundColor: 'EFF6FF',
     body: 'Loaded from a generated disk file and rendered as page one.',
     heading: expectedTextIncludes[0][0],
     index: 1,
   })
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: '059669',
+    backgroundColor: 'ECFDF5',
     body: 'Second page proves thumbnail navigation switches the active slide.',
     heading: expectedTextIncludes[1][0],
     index: 2,
@@ -37888,6 +37932,7 @@ async function createGeneratedPPTXRenderFixture() {
   })
   addPPTXRenderFixtureSlide(pptx, {
     accentColor: 'D97706',
+    backgroundColor: 'FFF7ED',
     body: 'Third page keeps the verifier honest about full deck coverage.',
     heading: expectedTextIncludes[2][0],
     image: true,
@@ -37900,10 +37945,13 @@ async function createGeneratedPPTXRenderFixture() {
   })
   await addPPTXRenderFixtureGroupProbe(path)
   await addPPTXRenderFixtureHyperlinkProbe(path)
+  await addPPTXRenderFixtureImageCropProbe(path)
 
   return {
+    expectedBackgroundColors,
     expectedGroupedSlideIndexes,
     expectedHyperlinks,
+    expectedImages,
     expectedKindIncludes,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
@@ -37917,11 +37965,19 @@ async function createGeneratedPPTXRenderFixture() {
 
 function addPPTXRenderFixtureSlide(
   pptx,
-  { accentColor, body, heading, image = false, index, table = false },
+  {
+    accentColor,
+    backgroundColor,
+    body,
+    heading,
+    image = false,
+    index,
+    table = false,
+  },
 ) {
   const slide = pptx.addSlide()
 
-  slide.background = { color: 'F8FAFC' }
+  slide.background = { color: backgroundColor }
   slide.addText(heading, {
     bold: true,
     color: '111827',
@@ -38141,6 +38197,56 @@ async function addPPTXRenderFixtureHyperlinkProbe(path) {
   }
 }
 
+async function addPPTXRenderFixtureImageCropProbe(path) {
+  const bytes = await readFile(path)
+  const zip = await JSZip.loadAsync(bytes)
+  const slidePath = Object.keys(zip.files)
+    .filter((candidate) => /^ppt\/slides\/slide\d+\.xml$/.test(candidate))
+    .sort(comparePPTXNumberedPaths)[2]
+
+  if (!slidePath) {
+    return
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('pptx-render-fixture-crop-probe')) {
+    return
+  }
+
+  const nextXml = xml.replace(/<p:pic\b[\s\S]*?<\/p:pic>/, (picXml) => {
+    let nextPicXml = picXml.replace(
+      /<a:xfrm\b([^>]*)>/,
+      (_match, attributes) =>
+        attributes.includes('flipH=')
+          ? `<a:xfrm${attributes}>`
+          : `<a:xfrm${attributes} flipH="1">`,
+    )
+
+    if (!/<a:srcRect\b/.test(nextPicXml)) {
+      nextPicXml = nextPicXml.replace(
+        '</p:blipFill>',
+        '<a:srcRect l="10000" t="5000" r="15000" b="5000"/></p:blipFill>',
+      )
+    }
+
+    return `${nextPicXml}<!-- pptx-render-fixture-crop-probe -->`
+  })
+
+  if (nextXml === xml) {
+    return
+  }
+
+  zip.file(slidePath, nextXml)
+  await writeFile(
+    path,
+    await zip.generateAsync({
+      compression: 'DEFLATE',
+      type: 'nodebuffer',
+    }),
+  )
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
@@ -38192,6 +38298,46 @@ function hasExpectedPPTXRenderedHyperlinks(state, expectedHyperlinks) {
         !slide.objectHyperlinkUrls.includes(url)) &&
       expected.runUrls.every((url) => slide.runHyperlinkUrls.includes(url))
   })
+}
+
+function hasExpectedPPTXRenderedBackgrounds(state, expectedBackgroundColors) {
+  if (!expectedBackgroundColors.length) {
+    return true
+  }
+
+  return expectedBackgroundColors.every((color, index) =>
+    state.slides[index]?.backgroundColor === color)
+}
+
+function hasExpectedPPTXRenderedImages(state, expectedImages) {
+  if (!expectedImages.length) {
+    return true
+  }
+
+  return expectedImages.every((expected) => {
+    const image = state.slides[expected.slideIndex]?.images[0]
+
+    if (!image) {
+      return false
+    }
+
+    const crop = expected.crop
+
+    return image.fit === expected.fit &&
+      image.flipH === expected.flipH &&
+      (!crop || (
+        isNearPPTXRenderedNumber(image.crop.x, crop.x) &&
+        isNearPPTXRenderedNumber(image.crop.y, crop.y) &&
+        isNearPPTXRenderedNumber(image.crop.left, crop.left) &&
+        isNearPPTXRenderedNumber(image.crop.right, crop.right) &&
+        isNearPPTXRenderedNumber(image.crop.top, crop.top) &&
+        isNearPPTXRenderedNumber(image.crop.bottom, crop.bottom)
+      ))
+  })
+}
+
+function isNearPPTXRenderedNumber(actual, expected) {
+  return Math.abs(Number(actual) - expected) < 0.01
 }
 
 function createPPTXRenderFixtureImageData(accentColor) {
@@ -39907,6 +40053,7 @@ async function readPPTXImportedSlideRenderState(
         activeSlideId: activeSlide?.getAttribute('data-ppt-slide') ?? '',
         activeThumbId: activeThumb?.getAttribute('data-ppt-slide-id') ?? '',
         activeThumbMatches: activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId,
+        backgroundColor: activeSlide ? getComputedStyle(activeSlide).backgroundColor : '',
         domElementCount: elements.length,
         elementKinds: elements
           .map((element) => element.getAttribute('data-kind') ?? '')
@@ -39927,6 +40074,22 @@ async function readPPTXImportedSlideRenderState(
             .map((element) => element.getAttribute('data-ppt-hyperlink-url') ?? '')
             .filter(Boolean)),
         ].sort(),
+        images: elements
+          .filter((element) => element.getAttribute('data-kind') === 'image')
+          .map((element) => ({
+            crop: {
+              bottom: Number(element.getAttribute('data-ppt-image-crop-bottom') ?? 0),
+              left: Number(element.getAttribute('data-ppt-image-crop-left') ?? 0),
+              right: Number(element.getAttribute('data-ppt-image-crop-right') ?? 0),
+              top: Number(element.getAttribute('data-ppt-image-crop-top') ?? 0),
+              x: Number(element.getAttribute('data-ppt-image-crop-x') ?? 0),
+              y: Number(element.getAttribute('data-ppt-image-crop-y') ?? 0),
+            },
+            fit: element.getAttribute('data-ppt-image-fit') ?? '',
+            flipH: element.getAttribute('data-ppt-flip-h') === 'true',
+            flipV: element.getAttribute('data-ppt-flip-v') === 'true',
+            name: element.getAttribute('data-ppt-element-name') ?? '',
+          })),
         rendered: frameRendered &&
           (!input.requireElements || (
             elements.length > 0 &&
