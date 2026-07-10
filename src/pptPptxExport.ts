@@ -2037,6 +2037,7 @@ function createPPTXTextRunOptions(
   return {
     bold: run.bold === true,
     color: run.color ? toPPTXColor(run.color, '111827') : undefined,
+    fontFace: run.fontFamily,
     fontSize: run.size === undefined ? undefined : pxToPt(run.size),
     highlight: run.highlight ? toPPTXColor(run.highlight, 'FEF08A') : undefined,
     italic: run.italic === true,

@@ -759,6 +759,9 @@ function renderPPTTextRunSVG(run: PPTRun) {
   const textDecoration = getPPTTextRunTextDecoration(run)
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true" font-style="italic"' : '',
+    run.fontFamily
+      ? `data-ppt-run-font-family="${escapeHtml(run.fontFamily)}" font-family="${escapeHtml(run.fontFamily)}"`
+      : '',
     run.hyperlink ? `data-ppt-run-hyperlink-url="${escapeHtml(run.hyperlink.url)}"` : '',
     run.underline === true ? 'data-ppt-run-underline="true"' : '',
     run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
@@ -840,6 +843,9 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
 function renderPPTTextRunHTML(run: PPTRun) {
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true"' : '',
+    run.fontFamily
+      ? `data-ppt-run-font-family="${escapeHtml(run.fontFamily)}"`
+      : '',
     run.highlight ? `data-ppt-run-highlight="${escapeHtml(run.highlight)}"` : '',
     run.hyperlink ? `data-ppt-run-hyperlink-url="${escapeHtml(run.hyperlink.url)}"` : '',
     run.strikethrough === true ? 'data-ppt-run-strikethrough="true"' : '',
@@ -857,6 +863,9 @@ function renderPPTTextRunStyleAttr(run: PPTRun) {
     run.bold === true ? 'font-weight:700' : '',
     run.highlight ? `background-color:${escapeHtml(run.highlight)}` : '',
     run.color ? `color:${escapeHtml(run.color)}` : '',
+    run.fontFamily
+      ? `font-family:${escapeHtml(formatPPTTextRunFontFamilyCSS(run.fontFamily))}`
+      : '',
     run.italic === true ? 'font-style:italic' : '',
     run.size ? `font-size:${run.size}px` : '',
     getPPTTextRunTextDecoration(run)
@@ -865,6 +874,14 @@ function renderPPTTextRunStyleAttr(run: PPTRun) {
   ].filter(Boolean).join(';')
 
   return styles ? `style="${styles}"` : ''
+}
+
+function formatPPTTextRunFontFamilyCSS(fontFamily: string) {
+  return `"${fontFamily
+    .trim()
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[\n\r\f]/g, ' ')}"`
 }
 
 function getPPTTextRunTextDecoration(

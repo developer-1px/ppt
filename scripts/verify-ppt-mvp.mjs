@@ -31960,6 +31960,66 @@ async function addPPTXAlternateContentProbe(base64) {
   })
 }
 
+async function addPPTXMixedRunFontProbe(base64) {
+  if (!base64) {
+    return ''
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  const slidePath = Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0]
+
+  if (!slidePath) {
+    return base64
+  }
+
+  const xml = await readPPTXZipText(zip, slidePath)
+
+  if (xml.includes('Mixed Run Font Probe')) {
+    return base64
+  }
+
+  const probeShapeXml = [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    '<p:cNvPr id="12001" name="Mixed Run Font Probe"/>',
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    '<a:off x="3657600" y="6248400"/>',
+    '<a:ext cx="3200400" cy="457200"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+    '<a:noFill/>',
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    '<a:p>',
+    '<a:pPr><a:defRPr lang="en-US" sz="1500"><a:latin typeface="Arial"/></a:defRPr></a:pPr>',
+    '<a:r><a:t>Arial Run</a:t></a:r>',
+    '<a:r><a:rPr lang="en-US" sz="1500"><a:latin typeface="Georgia"/></a:rPr><a:t> Georgia Run</a:t></a:r>',
+    '</a:p>',
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+  const nextXml = xml.replace('</p:spTree>', `${probeShapeXml}</p:spTree>`)
+
+  if (nextXml === xml) {
+    return base64
+  }
+
+  zip.file(slidePath, nextXml)
+
+  return await zip.generateAsync({
+    compression: 'DEFLATE',
+    type: 'base64',
+  })
+}
+
 function createPPTXAlternateContentShapeXml({
   fill,
   id,
@@ -38103,6 +38163,13 @@ async function createGeneratedPPTXRenderFixture() {
   ]
   const expectedNamedElements = [
     {
+      kind: 'textBox',
+      name: 'Mixed Run Font Probe',
+      runFontFamilies: ['Arial', 'Georgia'],
+      slideIndex: 0,
+      textIncludes: ['Arial Run', 'Georgia Run'],
+    },
+    {
       kind: 'shape',
       name: 'Alternate Content Probe',
       slideIndex: 0,
@@ -38664,6 +38731,7 @@ async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
 
   for (const addProbe of [
     addPPTXAlternateContentProbe,
+    addPPTXMixedRunFontProbe,
     addPPTXChartTableProbe,
     addPPTXDiagramTextProbe,
     addPPTXOleObjectProbe,
@@ -38873,6 +38941,9 @@ function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
         element.commentResolved === expected.commentResolved) &&
       (expected.commentThreadCount === undefined ||
         element.commentThreadCount === expected.commentThreadCount) &&
+      (expected.runFontFamilies ?? []).every((fontFamily, index) =>
+        element.runFontFamilies[index] === fontFamily &&
+        element.renderedRunFontFamilies[index]?.includes(fontFamily)) &&
       (expected.textIncludes ?? []).every((text) =>
         element.text.includes(text)) &&
       (!expected.imageSrcPrefix ||
@@ -40695,14 +40766,22 @@ async function readPPTXImportedSlideRenderState(
             .filter(Boolean)),
         ].sort(),
         namedElements: elements
-          .map((element) => ({
-            commentResolved: element.getAttribute('data-ppt-comment-resolved') === 'true',
-            commentThreadCount: Number(element.getAttribute('data-ppt-comment-thread-count') ?? 0),
-            imageSrc: readElementImageSource(element).slice(0, 120),
-            kind: element.getAttribute('data-kind') ?? '',
-            name: element.getAttribute('data-ppt-element-name') ?? '',
-            text: readElementText(element),
-          }))
+          .map((element) => {
+            const runs = [...element.querySelectorAll('[data-ppt-run-font-family]')]
+
+            return {
+              commentResolved: element.getAttribute('data-ppt-comment-resolved') === 'true',
+              commentThreadCount: Number(element.getAttribute('data-ppt-comment-thread-count') ?? 0),
+              imageSrc: readElementImageSource(element).slice(0, 120),
+              kind: element.getAttribute('data-kind') ?? '',
+              name: element.getAttribute('data-ppt-element-name') ?? '',
+              renderedRunFontFamilies: runs.map((run) =>
+                getComputedStyle(run).fontFamily),
+              runFontFamilies: runs.map((run) =>
+                run.getAttribute('data-ppt-run-font-family') ?? ''),
+              text: readElementText(element),
+            }
+          })
           .filter((element) =>
             element.name && namedElementNames.has(element.name)),
         images: elements

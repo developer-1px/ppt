@@ -2140,6 +2140,7 @@ type PPTTextStyleImportField =
   | 'paragraphSpacingBefore'
   | 'runBold'
   | 'runColor'
+  | 'runFontFamily'
   | 'runHighlight'
   | 'runItalic'
   | 'runSize'
@@ -2823,6 +2824,7 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingBefore: string
   runBold: string
   runColor: string
+  runFontFamily: string
   runHighlight: string
   runItalic: string
   runSize: string
@@ -16146,6 +16148,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           ? undefined
           : String(styleClipboard.runStyle.bold)}
         data-ppt-style-clipboard-run-color={styleClipboard?.runStyle?.color}
+        data-ppt-style-clipboard-run-font-family={styleClipboard?.runStyle?.fontFamily}
         data-ppt-style-clipboard-run-highlight={styleClipboard?.runStyle?.highlight}
         data-ppt-style-clipboard-run-italic={styleClipboard?.runStyle?.italic === undefined
           ? undefined
@@ -16217,6 +16220,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
         data-ppt-text-style-import-run-bold={lastTextStyleImportEffect?.runBold}
         data-ppt-text-style-import-run-color={lastTextStyleImportEffect?.runColor}
+        data-ppt-text-style-import-run-font-family={lastTextStyleImportEffect?.runFontFamily}
         data-ppt-text-style-import-run-highlight={lastTextStyleImportEffect?.runHighlight}
         data-ppt-text-style-import-run-italic={lastTextStyleImportEffect?.runItalic}
         data-ppt-text-style-import-run-size={lastTextStyleImportEffect?.runSize}
@@ -20470,6 +20474,7 @@ function createPPTTextStyleImportEffect({
       : String(paragraph.spacingBefore),
     runBold: runStyle?.bold === undefined ? '' : String(runStyle.bold),
     runColor: runStyle?.color ?? '',
+    runFontFamily: runStyle?.fontFamily ?? '',
     runHighlight: runStyle?.highlight ?? '',
     runItalic: runStyle?.italic === undefined ? '' : String(runStyle.italic),
     runSize: runStyle?.size === undefined ? '' : String(runStyle.size),
@@ -27361,6 +27366,10 @@ function getPPTTextStyleSourceFromJSONValue(
     fields.push('runColor')
   }
 
+  if (runStyle?.fontFamily !== undefined) {
+    fields.push('runFontFamily')
+  }
+
   if (runStyle?.highlight !== undefined) {
     fields.push('runHighlight')
   }
@@ -27430,6 +27439,13 @@ function getPPTTextStyleRunStyleFromJSONValue(
   const color = getPPTTextRunColorImportValueFromJSONValue(
     value.color ?? value.runColor ?? value.textRunColor,
   )
+  const fontFamily = getPPTTextFontFamilyImportValueFromJSONValue(
+    value.fontFamily ??
+      value.font ??
+      value.family ??
+      value.runFontFamily ??
+      value.textRunFontFamily,
+  )
   const highlight = getPPTTextRunHighlightImportValueFromJSONValue(
     value.highlight ??
       value.highlightColor ??
@@ -27464,6 +27480,10 @@ function getPPTTextStyleRunStyleFromJSONValue(
 
   if (color !== undefined) {
     runStyle.color = color
+  }
+
+  if (fontFamily !== undefined) {
+    runStyle.fontFamily = fontFamily
   }
 
   if (highlight !== undefined) {
@@ -33830,10 +33850,22 @@ function createPPTRunClipboardHTML(run: PPTRun) {
   const styleAttribute = createPPTClipboardStyleAttribute([
     ['background-color', run.highlight],
     ['color', run.color],
+    ['font-family', formatPPTTextRunFontFamilyCSS(run.fontFamily)],
     ['font-size', run.size === undefined ? undefined : `${run.size}px`],
   ])
 
   return styleAttribute ? `<span${styleAttribute}>${content}</span>` : content
+}
+
+function formatPPTTextRunFontFamilyCSS(fontFamily: string | undefined) {
+  const normalized = fontFamily?.trim()
+
+  return normalized
+    ? `"${normalized
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/[\n\r\f]/g, ' ')}"`
+    : undefined
 }
 
 function createPPTParagraphClipboardStyleAttribute(paragraph: PPTParagraph) {
@@ -36714,6 +36746,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
             <span
               data-ppt-run-bold={run.bold === true ? 'true' : undefined}
               data-ppt-run-color={run.color}
+              data-ppt-run-font-family={run.fontFamily}
               data-ppt-run-highlight={run.highlight}
               data-ppt-run-hyperlink-url={run.hyperlink?.url}
               data-ppt-run-italic={run.italic === true ? 'true' : undefined}
@@ -39894,6 +39927,7 @@ function pptTextRunStyle(run: PPTRun): CSSProperties {
   return {
     backgroundColor: run.highlight,
     color: run.color,
+    fontFamily: run.fontFamily,
     fontSize: run.size,
     fontStyle: run.italic === true ? 'italic' : undefined,
     fontWeight: run.bold === true ? 700 : undefined,
@@ -40553,6 +40587,7 @@ function clonePPTTextRunStyle(style: PPTTextRunStyle): PPTTextRunStyle {
   return {
     ...(style.bold === undefined ? {} : { bold: style.bold }),
     ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.fontFamily === undefined ? {} : { fontFamily: style.fontFamily }),
     ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
     ...(style.italic === undefined ? {} : { italic: style.italic }),
     ...(style.size === undefined ? {} : { size: style.size }),
@@ -40572,6 +40607,7 @@ function applyPPTTextRunStyle(
     ...(run.hyperlink ? { hyperlink: run.hyperlink } : {}),
     ...(style.bold === true ? { bold: true } : {}),
     ...(style.color === undefined ? {} : { color: style.color }),
+    ...(style.fontFamily === undefined ? {} : { fontFamily: style.fontFamily }),
     ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
     ...(style.italic === true ? { italic: true } : {}),
     ...(style.size === undefined ? {} : { size: style.size }),
@@ -42187,6 +42223,9 @@ function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunSty
   return {
     ...(firstRun.bold === undefined ? {} : { bold: firstRun.bold }),
     ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
+    ...(firstRun.fontFamily === undefined
+      ? {}
+      : { fontFamily: firstRun.fontFamily }),
     ...(firstRun.highlight === undefined ? {} : { highlight: firstRun.highlight }),
     ...(firstRun.italic === undefined ? {} : { italic: firstRun.italic }),
     ...(firstRun.size === undefined ? {} : { size: firstRun.size }),
@@ -42203,6 +42242,7 @@ function arePPTTextRunStylesEqual(
 ) {
   return left.bold === right.bold &&
     left.color === right.color &&
+    left.fontFamily === right.fontFamily &&
     left.highlight === right.highlight &&
     left.italic === right.italic &&
     left.size === right.size &&

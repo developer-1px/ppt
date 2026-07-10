@@ -1305,10 +1305,14 @@ function collectPPTFallbackHTMLRuns(
     getPPTFallbackHTMLStyleValue(style, 'background-color'),
     '',
   )
+  const fontFamily = parsePPTFallbackHTMLFontFamily(
+    getPPTFallbackHTMLStyleValue(style, 'font-family'),
+  )
   const size = parsePPTFallbackHTMLPositivePixelStyle(style, 'font-size')
   const styledRun = {
     ...nextRunStyle,
     ...(color ? { color } : {}),
+    ...(fontFamily ? { fontFamily } : {}),
     ...(highlight ? { highlight } : {}),
     ...(size === undefined ? {} : { size }),
   }
@@ -1320,6 +1324,13 @@ function collectPPTFallbackHTMLRuns(
       runs,
     )
   }
+}
+
+function parsePPTFallbackHTMLFontFamily(value: string) {
+  const family = value.split(',')[0]?.trim() ?? ''
+  const unquoted = family.replace(/^(['"])(.*)\1$/, '$2').trim()
+
+  return unquoted || undefined
 }
 
 function parsePPTFallbackHTMLTextAlign(

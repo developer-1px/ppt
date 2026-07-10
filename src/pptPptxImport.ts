@@ -3671,6 +3671,7 @@ async function readPPTXShapeElement(
     fallbackTextColor,
     textFieldContext,
     relationships,
+    themeFonts,
   )
   const hasTextContent = hasPPTXTextBodyText(textBody)
   const stroke = readPPTXStroke(spPr, themeColors) ??
@@ -6706,6 +6707,7 @@ function readPPTXTextBody(
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
   relationships?: PPTXRelationshipMap,
+  themeFonts: PPTXThemeFontMap = {},
 ): PPTTextBody | null {
   if (!txBody) {
     return null
@@ -6720,6 +6722,7 @@ function readPPTXTextBody(
         listStyle,
         fallbackListStyle,
         themeColors,
+        themeFonts,
         fallbackTextColor,
         textFieldContext,
         relationships,
@@ -6825,6 +6828,7 @@ function readPPTXParagraph(
   listStyle: Element | null,
   fallbackListStyle: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
   relationships?: PPTXRelationshipMap,
@@ -6859,6 +6863,7 @@ function readPPTXParagraph(
         child,
         defaultRunProperties,
         themeColors,
+        themeFonts,
         fallbackTextColor,
         textFieldContext,
         relationships,
@@ -6901,6 +6906,7 @@ function readPPTXTextRun(
   node: Element,
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
   fallbackTextColor?: string,
   textFieldContext?: PPTXTextFieldContext,
   relationships?: PPTXRelationshipMap,
@@ -6919,6 +6925,7 @@ function readPPTXTextRun(
     rPr,
     defaultRunProperties,
     themeColors,
+    themeFonts,
     fallbackTextColor,
   )
   const hyperlink = readPPTXTextRunHyperlink(rPr, relationships)
@@ -6975,6 +6982,7 @@ function readPPTXTextRunStyle(
   rPr: Element | null,
   defaultRunProperties: Element | null,
   themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
   fallbackTextColor?: string,
 ): Omit<PPTRun, 'text'> {
   const color = readPPTXRunColor(
@@ -6985,6 +6993,8 @@ function readPPTXTextRunStyle(
   )
   const highlight = readPPTXRunHighlight(rPr, themeColors) ??
     readPPTXRunHighlight(defaultRunProperties, themeColors)
+  const fontFamily = readPPTXTypeface(rPr, themeFonts) ??
+    readPPTXTypeface(defaultRunProperties, themeFonts)
   const size = readPPTXRunSize(rPr, defaultRunProperties)
 
   return {
@@ -6992,6 +7002,7 @@ function readPPTXTextRunStyle(
       ? { bold: true }
       : {}),
     ...(color ? { color } : {}),
+    ...(fontFamily ? { fontFamily } : {}),
     ...(highlight ? { highlight } : {}),
     ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'i')
       ? { italic: true }

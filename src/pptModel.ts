@@ -60,6 +60,7 @@ const PPTElementHyperlinkSchema = z.object({
 const PPTRunSchema = z.object({
   bold: z.boolean().optional(),
   color: z.string().optional(),
+  fontFamily: z.string().optional(),
   highlight: z.string().optional(),
   hyperlink: PPTElementHyperlinkSchema.optional(),
   italic: z.boolean().optional(),
