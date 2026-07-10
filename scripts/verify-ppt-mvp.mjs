@@ -253,11 +253,16 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedInheritedTexts(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedInheritedTextIncludes,
+        ) &&
+        hasExpectedPPTXRenderedElementStyles(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedElementStyles,
         ),
       {
         beforeExternalPPTXDrop,
         externalPPTXFixture: {
           expectedBackgroundColors: externalPPTXFixture.expectedBackgroundColors,
+          expectedElementStyles: externalPPTXFixture.expectedElementStyles,
           expectedGroupedSlideIndexes:
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
@@ -347,6 +352,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedInheritedTextIncludes,
         ) &&
+        hasExpectedPPTXRenderedElementStyles(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedElementStyles,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -354,6 +363,7 @@ async function runPPTXRenderScenario(page) {
       {
         externalPPTXFixture: {
           expectedBackgroundColors: externalPPTXFixture.expectedBackgroundColors,
+          expectedElementStyles: externalPPTXFixture.expectedElementStyles,
           expectedGroupedSlideIndexes:
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
@@ -37843,6 +37853,7 @@ async function readExternalPPTXRenderFixture() {
   const fixture = providedPath
     ? {
         expectedBackgroundColors: [],
+        expectedElementStyles: [],
         expectedKindIncludes: [],
         expectedGroupedSlideIndexes: [],
         expectedHyperlinks: [],
@@ -37920,6 +37931,14 @@ async function createGeneratedPPTXRenderFixture() {
     ['Layout Mark', 'Master Mark'],
     ['Layout Mark', 'Master Mark'],
   ]
+  const expectedElementStyles = [
+    {
+      fill: 'rgb(204, 51, 102)',
+      name: 'Theme Color Probe',
+      slideIndex: 0,
+      stroke: 'rgb(32, 48, 64)',
+    },
+  ]
   const expectedKindIncludes = [
     ['line', 'shape'],
     ['shape', 'table'],
@@ -37965,9 +37984,11 @@ async function createGeneratedPPTXRenderFixture() {
   await addPPTXRenderFixtureHyperlinkProbe(path)
   await addPPTXRenderFixtureImageCropProbe(path)
   await addPPTXRenderFixtureInheritedProbe(path)
+  await addPPTXRenderFixtureThemeColorProbe(path)
 
   return {
     expectedBackgroundColors,
+    expectedElementStyles,
     expectedGroupedSlideIndexes,
     expectedHyperlinks,
     expectedImages,
@@ -38365,6 +38386,17 @@ function createPPTXRenderFixtureInheritedShapeXml({
   ].join('')
 }
 
+async function addPPTXRenderFixtureThemeColorProbe(path) {
+  const bytes = await readFile(path)
+  const nextBase64 = await addPPTXThemeColorProbe(
+    Buffer.from(bytes).toString('base64'),
+  )
+
+  if (nextBase64) {
+    await writeFile(path, Buffer.from(nextBase64, 'base64'))
+  }
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
@@ -38470,6 +38502,24 @@ function hasExpectedPPTXRenderedInheritedTexts(
     const inheritedText = state.slides[index]?.inheritedTextSample ?? ''
 
     return texts.every((text) => inheritedText.includes(text))
+  })
+}
+
+function hasExpectedPPTXRenderedElementStyles(state, expectedElementStyles) {
+  if (!expectedElementStyles.length) {
+    return true
+  }
+
+  return expectedElementStyles.every((expected) => {
+    const elementStyle = state.slides[expected.slideIndex]?.elementStyles
+      .find((style) => style.name === expected.name)
+
+    if (!elementStyle) {
+      return false
+    }
+
+    return (!expected.fill || elementStyle.fill === expected.fill) &&
+      (!expected.stroke || elementStyle.stroke === expected.stroke)
   })
 }
 
@@ -40196,6 +40246,18 @@ async function readPPTXImportedSlideRenderState(
           .map((element) => element.getAttribute('data-kind') ?? '')
           .sort()
           .join(' | '),
+        elementStyles: elements
+          .map((element) => {
+            const style = getComputedStyle(element)
+
+            return {
+              fill: style.backgroundColor,
+              kind: element.getAttribute('data-kind') ?? '',
+              name: element.getAttribute('data-ppt-element-name') ?? '',
+              stroke: style.borderTopColor,
+            }
+          })
+          .filter((element) => element.name),
         frameRendered,
         groupIds: [
           ...new Set(elements
