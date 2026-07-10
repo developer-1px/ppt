@@ -37941,6 +37941,28 @@ async function createGeneratedPPTXRenderFixture() {
   ]
   const expectedImages = [
     {
+      adjustments: {
+        brightness: 1.2,
+        contrast: 0.7,
+        grayscale: true,
+      },
+      crop: {
+        bottom: 20,
+        left: 10,
+        x: 55,
+        y: 40,
+      },
+      fit: 'cover',
+      name: 'Shape Image Fill Probe',
+      opacity: 0.66,
+      slideIndex: 0,
+      stroke: {
+        color: 'rgb(14, 165, 233)',
+        dash: 'dash',
+        width: 3,
+      },
+    },
+    {
       crop: {
         bottom: 5,
         left: 10,
@@ -38522,6 +38544,7 @@ async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
     addPPTXMediaObjectProbe,
     addPPTXContentPartProbe,
     addPPTXUnsupportedGraphicFrameProbe,
+    addPPTXShapeImageFillProbe,
   ]) {
     nextBase64 = await addProbe(nextBase64)
   }
@@ -38611,7 +38634,10 @@ function hasExpectedPPTXRenderedImages(state, expectedImages) {
   }
 
   return expectedImages.every((expected) => {
-    const image = state.slides[expected.slideIndex]?.images[0]
+    const images = state.slides[expected.slideIndex]?.images ?? []
+    const image = expected.name
+      ? images.find((candidate) => candidate.name === expected.name)
+      : images[0]
 
     if (!image) {
       return false
@@ -38619,15 +38645,39 @@ function hasExpectedPPTXRenderedImages(state, expectedImages) {
 
     const crop = expected.crop
 
-    return image.fit === expected.fit &&
-      image.flipH === expected.flipH &&
+    return (!expected.fit || image.fit === expected.fit) &&
+      (expected.flipH === undefined || image.flipH === expected.flipH) &&
+      (expected.opacity === undefined ||
+        isNearPPTXRenderedNumber(image.opacity, expected.opacity)) &&
+      (!expected.adjustments || (
+        (expected.adjustments.brightness === undefined ||
+          isNearPPTXRenderedNumber(
+            image.adjustments.brightness,
+            expected.adjustments.brightness,
+          )) &&
+        (expected.adjustments.contrast === undefined ||
+          isNearPPTXRenderedNumber(
+            image.adjustments.contrast,
+            expected.adjustments.contrast,
+          )) &&
+        (expected.adjustments.grayscale === undefined ||
+          image.adjustments.grayscale === expected.adjustments.grayscale)
+      )) &&
+      (!expected.stroke || (
+        (expected.stroke.color === undefined ||
+          image.stroke.color === expected.stroke.color) &&
+        (expected.stroke.dash === undefined ||
+          image.stroke.dash === expected.stroke.dash) &&
+        (expected.stroke.width === undefined ||
+          isNearPPTXRenderedNumber(image.stroke.width, expected.stroke.width))
+      )) &&
       (!crop || (
         isNearPPTXRenderedNumber(image.crop.x, crop.x) &&
         isNearPPTXRenderedNumber(image.crop.y, crop.y) &&
-        isNearPPTXRenderedNumber(image.crop.left, crop.left) &&
-        isNearPPTXRenderedNumber(image.crop.right, crop.right) &&
-        isNearPPTXRenderedNumber(image.crop.top, crop.top) &&
-        isNearPPTXRenderedNumber(image.crop.bottom, crop.bottom)
+        isNearPPTXRenderedNumber(image.crop.left, crop.left ?? 0) &&
+        isNearPPTXRenderedNumber(image.crop.right, crop.right ?? 0) &&
+        isNearPPTXRenderedNumber(image.crop.top, crop.top ?? 0) &&
+        isNearPPTXRenderedNumber(image.crop.bottom, crop.bottom ?? 0)
       ))
   })
 }
@@ -40509,20 +40559,35 @@ async function readPPTXImportedSlideRenderState(
             element.name && namedElementNames.has(element.name)),
         images: elements
           .filter((element) => element.getAttribute('data-kind') === 'image')
-          .map((element) => ({
-            crop: {
-              bottom: Number(element.getAttribute('data-ppt-image-crop-bottom') ?? 0),
-              left: Number(element.getAttribute('data-ppt-image-crop-left') ?? 0),
-              right: Number(element.getAttribute('data-ppt-image-crop-right') ?? 0),
-              top: Number(element.getAttribute('data-ppt-image-crop-top') ?? 0),
-              x: Number(element.getAttribute('data-ppt-image-crop-x') ?? 0),
-              y: Number(element.getAttribute('data-ppt-image-crop-y') ?? 0),
-            },
-            fit: element.getAttribute('data-ppt-image-fit') ?? '',
-            flipH: element.getAttribute('data-ppt-flip-h') === 'true',
-            flipV: element.getAttribute('data-ppt-flip-v') === 'true',
-            name: element.getAttribute('data-ppt-element-name') ?? '',
-          })),
+          .map((element) => {
+            const style = getComputedStyle(element)
+
+            return {
+              adjustments: {
+                brightness: Number(element.getAttribute('data-ppt-image-adjustment-brightness') ?? 0),
+                contrast: Number(element.getAttribute('data-ppt-image-adjustment-contrast') ?? 0),
+                grayscale: element.getAttribute('data-ppt-image-adjustment-grayscale') === 'true',
+              },
+              crop: {
+                bottom: Number(element.getAttribute('data-ppt-image-crop-bottom') ?? 0),
+                left: Number(element.getAttribute('data-ppt-image-crop-left') ?? 0),
+                right: Number(element.getAttribute('data-ppt-image-crop-right') ?? 0),
+                top: Number(element.getAttribute('data-ppt-image-crop-top') ?? 0),
+                x: Number(element.getAttribute('data-ppt-image-crop-x') ?? 0),
+                y: Number(element.getAttribute('data-ppt-image-crop-y') ?? 0),
+              },
+              fit: element.getAttribute('data-ppt-image-fit') ?? '',
+              flipH: element.getAttribute('data-ppt-flip-h') === 'true',
+              flipV: element.getAttribute('data-ppt-flip-v') === 'true',
+              name: element.getAttribute('data-ppt-element-name') ?? '',
+              opacity: Number(element.getAttribute('data-ppt-opacity') ?? 1),
+              stroke: {
+                color: style.borderTopColor,
+                dash: element.getAttribute('data-ppt-stroke-dash') ?? '',
+                width: Number(style.borderTopWidth.replace('px', '') || 0),
+              },
+            }
+          }),
         inheritedElementNames: elements
           .filter((element) => element.getAttribute('data-locked') === 'true')
           .map((element) => element.getAttribute('data-ppt-element-name') ?? '')
