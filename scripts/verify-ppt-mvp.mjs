@@ -249,6 +249,10 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedImages(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedImages,
+        ) &&
+        hasExpectedPPTXRenderedInheritedTexts(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedInheritedTextIncludes,
         ),
       {
         beforeExternalPPTXDrop,
@@ -258,6 +262,8 @@ async function runPPTXRenderScenario(page) {
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
           expectedImages: externalPPTXFixture.expectedImages,
+          expectedInheritedTextIncludes:
+            externalPPTXFixture.expectedInheritedTextIncludes,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -337,6 +343,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedImages,
         ) &&
+        hasExpectedPPTXRenderedInheritedTexts(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedInheritedTextIncludes,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -348,6 +358,8 @@ async function runPPTXRenderScenario(page) {
             externalPPTXFixture.expectedGroupedSlideIndexes,
           expectedHyperlinks: externalPPTXFixture.expectedHyperlinks,
           expectedImages: externalPPTXFixture.expectedImages,
+          expectedInheritedTextIncludes:
+            externalPPTXFixture.expectedInheritedTextIncludes,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -37835,6 +37847,7 @@ async function readExternalPPTXRenderFixture() {
         expectedGroupedSlideIndexes: [],
         expectedHyperlinks: [],
         expectedImages: [],
+        expectedInheritedTextIncludes: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -37902,6 +37915,11 @@ async function createGeneratedPPTXRenderFixture() {
       slideIndex: 2,
     },
   ]
+  const expectedInheritedTextIncludes = [
+    ['Layout Mark', 'Master Mark'],
+    ['Layout Mark', 'Master Mark'],
+    ['Layout Mark', 'Master Mark'],
+  ]
   const expectedKindIncludes = [
     ['line', 'shape'],
     ['shape', 'table'],
@@ -37946,12 +37964,14 @@ async function createGeneratedPPTXRenderFixture() {
   await addPPTXRenderFixtureGroupProbe(path)
   await addPPTXRenderFixtureHyperlinkProbe(path)
   await addPPTXRenderFixtureImageCropProbe(path)
+  await addPPTXRenderFixtureInheritedProbe(path)
 
   return {
     expectedBackgroundColors,
     expectedGroupedSlideIndexes,
     expectedHyperlinks,
     expectedImages,
+    expectedInheritedTextIncludes,
     expectedKindIncludes,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
@@ -38247,6 +38267,104 @@ async function addPPTXRenderFixtureImageCropProbe(path) {
   )
 }
 
+async function addPPTXRenderFixtureInheritedProbe(path) {
+  const bytes = await readFile(path)
+  const zip = await JSZip.loadAsync(bytes)
+  const patches = [
+    {
+      fill: 'DBEAFE',
+      id: 99740,
+      line: '2563EB',
+      name: 'Fixture Layout Inherited Mark',
+      paths: Object.keys(zip.files)
+        .filter((candidate) => /^ppt\/slideLayouts\/slideLayout\d+\.xml$/.test(candidate)),
+      text: 'Layout Mark',
+      x: 548640,
+      y: 6096000,
+    },
+    {
+      fill: 'FEF3C7',
+      id: 99760,
+      line: 'D97706',
+      name: 'Fixture Master Inherited Mark',
+      paths: Object.keys(zip.files)
+        .filter((candidate) => /^ppt\/slideMasters\/slideMaster\d+\.xml$/.test(candidate)),
+      text: 'Master Mark',
+      x: 7772400,
+      y: 6096000,
+    },
+  ]
+  let updated = false
+
+  for (const patch of patches) {
+    for (const partPath of patch.paths.sort(comparePPTXNumberedPaths)) {
+      const xml = await readPPTXZipText(zip, partPath)
+
+      if (!xml || xml.includes(patch.name)) {
+        continue
+      }
+
+      const nextXml = xml.replace(
+        '</p:spTree>',
+        `${createPPTXRenderFixtureInheritedShapeXml(patch)}</p:spTree>`,
+      )
+
+      if (nextXml === xml) {
+        continue
+      }
+
+      zip.file(partPath, nextXml)
+      updated = true
+    }
+  }
+
+  if (!updated) {
+    return
+  }
+
+  await writeFile(
+    path,
+    await zip.generateAsync({
+      compression: 'DEFLATE',
+      type: 'nodebuffer',
+    }),
+  )
+}
+
+function createPPTXRenderFixtureInheritedShapeXml({
+  fill,
+  id,
+  line,
+  name,
+  text,
+  x,
+  y,
+}) {
+  return [
+    '<p:sp>',
+    '<p:nvSpPr>',
+    `<p:cNvPr id="${id}" name="${name}"/>`,
+    '<p:cNvSpPr txBox="1"/>',
+    '<p:nvPr/>',
+    '</p:nvSpPr>',
+    '<p:spPr>',
+    '<a:xfrm>',
+    `<a:off x="${x}" y="${y}"/>`,
+    '<a:ext cx="1676400" cy="342900"/>',
+    '</a:xfrm>',
+    '<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>',
+    `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>`,
+    `<a:ln w="12700"><a:solidFill><a:srgbClr val="${line}"/></a:solidFill></a:ln>`,
+    '</p:spPr>',
+    '<p:txBody>',
+    '<a:bodyPr/>',
+    '<a:lstStyle/>',
+    `<a:p><a:r><a:rPr sz="1200"/><a:t>${text}</a:t></a:r></a:p>`,
+    '</p:txBody>',
+    '</p:sp>',
+  ].join('')
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
@@ -38338,6 +38456,21 @@ function hasExpectedPPTXRenderedImages(state, expectedImages) {
 
 function isNearPPTXRenderedNumber(actual, expected) {
   return Math.abs(Number(actual) - expected) < 0.01
+}
+
+function hasExpectedPPTXRenderedInheritedTexts(
+  state,
+  expectedInheritedTextIncludes,
+) {
+  if (!expectedInheritedTextIncludes.length) {
+    return true
+  }
+
+  return expectedInheritedTextIncludes.every((texts, index) => {
+    const inheritedText = state.slides[index]?.inheritedTextSample ?? ''
+
+    return texts.every((text) => inheritedText.includes(text))
+  })
 }
 
 function createPPTXRenderFixtureImageData(accentColor) {
@@ -40090,6 +40223,17 @@ async function readPPTXImportedSlideRenderState(
             flipV: element.getAttribute('data-ppt-flip-v') === 'true',
             name: element.getAttribute('data-ppt-element-name') ?? '',
           })),
+        inheritedElementNames: elements
+          .filter((element) => element.getAttribute('data-locked') === 'true')
+          .map((element) => element.getAttribute('data-ppt-element-name') ?? '')
+          .filter(Boolean)
+          .sort(),
+        inheritedTextSample: elements
+          .filter((element) => element.getAttribute('data-locked') === 'true')
+          .map((element) => element.textContent?.trim() ?? '')
+          .filter(Boolean)
+          .join(' | ')
+          .slice(0, 240),
         rendered: frameRendered &&
           (!input.requireElements || (
             elements.length > 0 &&
