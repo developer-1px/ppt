@@ -201,6 +201,8 @@ async function runPPTXRenderScenario(page) {
     const externalPPTXImportState = await readPPTXDeckImportState(page)
     const externalPPTXRenderedSlideState =
       await readPPTXImportedSlideRenderState(page, {
+        namedElementNames: externalPPTXFixture.expectedNamedElements
+          .map((element) => element.name),
         requireElements: externalPPTXFixture.requireElements,
       })
     const externalPPTXExpectedSlideCount =
@@ -257,6 +259,10 @@ async function runPPTXRenderScenario(page) {
         hasExpectedPPTXRenderedElementStyles(
           externalPPTXRenderedSlideState,
           externalPPTXFixture.expectedElementStyles,
+        ) &&
+        hasExpectedPPTXRenderedNamedElements(
+          externalPPTXRenderedSlideState,
+          externalPPTXFixture.expectedNamedElements,
         ),
       {
         beforeExternalPPTXDrop,
@@ -269,6 +275,7 @@ async function runPPTXRenderScenario(page) {
           expectedImages: externalPPTXFixture.expectedImages,
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
+          expectedNamedElements: externalPPTXFixture.expectedNamedElements,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -299,6 +306,8 @@ async function runPPTXRenderScenario(page) {
     const externalPPTXOpenStatusState = await readPPTXOpenStatusState(page)
     const externalPPTXOpenedSlideState =
       await readPPTXImportedSlideRenderState(page, {
+        namedElementNames: externalPPTXFixture.expectedNamedElements
+          .map((element) => element.name),
         requireElements: externalPPTXFixture.requireElements,
         slideNameIncludes: '',
       })
@@ -356,6 +365,10 @@ async function runPPTXRenderScenario(page) {
           externalPPTXOpenedSlideState,
           externalPPTXFixture.expectedElementStyles,
         ) &&
+        hasExpectedPPTXRenderedNamedElements(
+          externalPPTXOpenedSlideState,
+          externalPPTXFixture.expectedNamedElements,
+        ) &&
         externalPPTXOpenStatusState.kind === 'success' &&
         externalPPTXOpenStatusState.fileName === externalPPTXFixture.fileName &&
         externalPPTXOpenStatusState.format === externalPPTXOpenImportState.format &&
@@ -370,6 +383,7 @@ async function runPPTXRenderScenario(page) {
           expectedImages: externalPPTXFixture.expectedImages,
           expectedInheritedTextIncludes:
             externalPPTXFixture.expectedInheritedTextIncludes,
+          expectedNamedElements: externalPPTXFixture.expectedNamedElements,
           byteLength: externalPPTXFixture.byteLength,
           expectedKindIncludes: externalPPTXFixture.expectedKindIncludes,
           expectedSlideCount: externalPPTXFixture.expectedSlideCount,
@@ -37859,6 +37873,7 @@ async function readExternalPPTXRenderFixture() {
         expectedHyperlinks: [],
         expectedImages: [],
         expectedInheritedTextIncludes: [],
+        expectedNamedElements: [],
         expectedSlideCount: null,
         expectedTextIncludes: [],
         fileName: basename(providedPath),
@@ -37939,6 +37954,53 @@ async function createGeneratedPPTXRenderFixture() {
       stroke: 'rgb(32, 48, 64)',
     },
   ]
+  const expectedNamedElements = [
+    {
+      kind: 'table',
+      name: 'Chart Table Probe',
+      slideIndex: 0,
+      textIncludes: ['Revenue', 'North'],
+    },
+    {
+      kind: 'textBox',
+      name: 'SmartArt Text Probe',
+      slideIndex: 0,
+      textIncludes: ['Discover', 'Deliver'],
+    },
+    {
+      imageSrcPrefix: 'data:image/png',
+      kind: 'image',
+      name: 'OLE Object Probe',
+      slideIndex: 0,
+    },
+    {
+      kind: 'shape',
+      name: 'Video Media Probe',
+      slideIndex: 0,
+      textIncludes: ['Video Media Probe', 'pptx-media-probe.mp4'],
+    },
+    {
+      kind: 'shape',
+      name: 'Audio Media Probe',
+      slideIndex: 0,
+      textIncludes: ['Audio Media Probe', 'pptx-audio-probe.mp3'],
+    },
+    {
+      kind: 'shape',
+      name: 'Content Part Probe',
+      slideIndex: 0,
+      textIncludes: ['Content Part Probe', 'content-part-probe.xml'],
+    },
+    {
+      kind: 'shape',
+      name: 'Unsupported Graphic Frame Probe',
+      slideIndex: 0,
+      textIncludes: [
+        'Unsupported Graphic Frame Probe',
+        'unsupported-graphic-frame-probe.xml',
+      ],
+    },
+  ]
   const expectedKindIncludes = [
     ['line', 'shape'],
     ['shape', 'table'],
@@ -37985,6 +38047,7 @@ async function createGeneratedPPTXRenderFixture() {
   await addPPTXRenderFixtureImageCropProbe(path)
   await addPPTXRenderFixtureInheritedProbe(path)
   await addPPTXRenderFixtureThemeColorProbe(path)
+  await addPPTXRenderFixtureGraphicFallbackProbes(path)
 
   return {
     expectedBackgroundColors,
@@ -37994,6 +38057,7 @@ async function createGeneratedPPTXRenderFixture() {
     expectedImages,
     expectedInheritedTextIncludes,
     expectedKindIncludes,
+    expectedNamedElements,
     expectedSlideCount: expectedTextIncludes.length,
     expectedTextIncludes,
     fileName,
@@ -38397,6 +38461,26 @@ async function addPPTXRenderFixtureThemeColorProbe(path) {
   }
 }
 
+async function addPPTXRenderFixtureGraphicFallbackProbes(path) {
+  const bytes = await readFile(path)
+  let nextBase64 = Buffer.from(bytes).toString('base64')
+
+  for (const addProbe of [
+    addPPTXChartTableProbe,
+    addPPTXDiagramTextProbe,
+    addPPTXOleObjectProbe,
+    addPPTXMediaObjectProbe,
+    addPPTXContentPartProbe,
+    addPPTXUnsupportedGraphicFrameProbe,
+  ]) {
+    nextBase64 = await addProbe(nextBase64)
+  }
+
+  if (nextBase64) {
+    await writeFile(path, Buffer.from(nextBase64, 'base64'))
+  }
+}
+
 function hasExpectedPPTXRenderedText(state, expectedTextIncludes) {
   if (!expectedTextIncludes.length) {
     return true
@@ -38520,6 +38604,29 @@ function hasExpectedPPTXRenderedElementStyles(state, expectedElementStyles) {
 
     return (!expected.fill || elementStyle.fill === expected.fill) &&
       (!expected.stroke || elementStyle.stroke === expected.stroke)
+  })
+}
+
+function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
+  if (!expectedNamedElements.length) {
+    return true
+  }
+
+  return expectedNamedElements.every((expected) => {
+    const element = state.slides[expected.slideIndex]?.namedElements
+      .find((candidate) =>
+        candidate.name === expected.name &&
+        (!expected.kind || candidate.kind === expected.kind))
+
+    if (!element) {
+      return false
+    }
+
+    return (!expected.kind || element.kind === expected.kind) &&
+      (expected.textIncludes ?? []).every((text) =>
+        element.text.includes(text)) &&
+      (!expected.imageSrcPrefix ||
+        element.imageSrc.startsWith(expected.imageSrcPrefix))
   })
 }
 
@@ -40181,7 +40288,11 @@ async function reloadPPTApp(page) {
 
 async function readPPTXImportedSlideRenderState(
   page,
-  { requireElements = true, slideNameIncludes = 'Copy' } = {},
+  {
+    namedElementNames = [],
+    requireElements = true,
+    slideNameIncludes = 'Copy',
+  } = {},
 ) {
   const importedThumbs = await page.eval(`((input) => {
     return [...document.querySelectorAll('.ppt-thumb')]
@@ -40230,6 +40341,12 @@ async function readPPTXImportedSlideRenderState(
         activeThumb?.getAttribute('data-ppt-slide-id') === expectedSlideId &&
         (slideRect?.width ?? 0) > 300 &&
         (slideRect?.height ?? 0) > 160
+      const readElementImageSource = (element) =>
+        element.querySelector('img')?.getAttribute('src') ?? ''
+      const readElementText = (element) => (element.textContent ?? '')
+        .replace(/\\s+/g, ' ')
+        .trim()
+      const namedElementNames = new Set(input.namedElementNames)
 
       return {
         activeName: activeThumb?.querySelector('.ppt-thumb-name')?.textContent?.trim() ?? '',
@@ -40269,6 +40386,15 @@ async function readPPTXImportedSlideRenderState(
             .map((element) => element.getAttribute('data-ppt-hyperlink-url') ?? '')
             .filter(Boolean)),
         ].sort(),
+        namedElements: elements
+          .map((element) => ({
+            imageSrc: readElementImageSource(element).slice(0, 120),
+            kind: element.getAttribute('data-kind') ?? '',
+            name: element.getAttribute('data-ppt-element-name') ?? '',
+            text: readElementText(element),
+          }))
+          .filter((element) =>
+            element.name && namedElementNames.has(element.name)),
         images: elements
           .filter((element) => element.getAttribute('data-kind') === 'image')
           .map((element) => ({
@@ -40317,6 +40443,7 @@ async function readPPTXImportedSlideRenderState(
       }
     })(${JSON.stringify({
       expectedSlideId: thumb.id,
+      namedElementNames,
       requireElements,
     })})`)
 
