@@ -6995,12 +6995,17 @@ function readPPTXTextRunStyle(
     readPPTXRunHighlight(defaultRunProperties, themeColors)
   const fontFamily = readPPTXTypeface(rPr, themeFonts) ??
     readPPTXTypeface(defaultRunProperties, themeFonts)
+  const characterSpacing = readPPTXRunCharacterSpacing(
+    rPr,
+    defaultRunProperties,
+  )
   const size = readPPTXRunSize(rPr, defaultRunProperties)
 
   return {
     ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'b')
       ? { bold: true }
       : {}),
+    ...(characterSpacing === undefined ? {} : { characterSpacing }),
     ...(color ? { color } : {}),
     ...(fontFamily ? { fontFamily } : {}),
     ...(highlight ? { highlight } : {}),
@@ -7015,6 +7020,19 @@ function readPPTXTextRunStyle(
       ? { underline: true }
       : {}),
   }
+}
+
+function readPPTXRunCharacterSpacing(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  const own = toPPTXNumber(rPr?.getAttribute('spc'))
+  const inherited = toPPTXNumber(defaultRunProperties?.getAttribute('spc'))
+  const value = own ?? inherited
+
+  return value === null || value === 0
+    ? undefined
+    : textSpacingToPx(value)
 }
 
 function readPPTXRunColor(
@@ -8479,6 +8497,15 @@ function textSizeToPx(value: number) {
   return Math.round(
     value / PPTX_TEXT_SIZE_UNITS_PER_POINT / PPTX_POINTS_PER_PIXEL,
   )
+}
+
+function textSpacingToPx(value: number) {
+  return Math.round(
+    value /
+      PPTX_TEXT_SIZE_UNITS_PER_POINT /
+      PPTX_POINTS_PER_PIXEL *
+      100,
+  ) / 100
 }
 
 function getPPTDeckModelPayloadFromCustomXml(xml: string) {

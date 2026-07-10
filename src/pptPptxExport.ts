@@ -2036,6 +2036,9 @@ function createPPTXTextRunOptions(
 
   return {
     bold: run.bold === true,
+    charSpacing: run.characterSpacing === undefined
+      ? undefined
+      : pxToPt(run.characterSpacing),
     color: run.color ? toPPTXColor(run.color, '111827') : undefined,
     fontFace: run.fontFamily,
     fontSize: run.size === undefined ? undefined : pxToPt(run.size),

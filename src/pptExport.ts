@@ -759,6 +759,9 @@ function renderPPTTextRunSVG(run: PPTRun) {
   const textDecoration = getPPTTextRunTextDecoration(run)
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true" font-style="italic"' : '',
+    run.characterSpacing === undefined
+      ? ''
+      : `data-ppt-run-character-spacing="${formatNumber(run.characterSpacing)}" letter-spacing="${formatNumber(run.characterSpacing)}"`,
     run.fontFamily
       ? `data-ppt-run-font-family="${escapeHtml(run.fontFamily)}" font-family="${escapeHtml(run.fontFamily)}"`
       : '',
@@ -843,6 +846,9 @@ function renderPPTTextBodyHTML(body: PPTTextBody | undefined) {
 function renderPPTTextRunHTML(run: PPTRun) {
   const attrs = [
     run.italic === true ? 'data-ppt-run-italic="true"' : '',
+    run.characterSpacing === undefined
+      ? ''
+      : `data-ppt-run-character-spacing="${formatNumber(run.characterSpacing)}"`,
     run.fontFamily
       ? `data-ppt-run-font-family="${escapeHtml(run.fontFamily)}"`
       : '',
@@ -867,6 +873,9 @@ function renderPPTTextRunStyleAttr(run: PPTRun) {
       ? `font-family:${escapeHtml(formatPPTTextRunFontFamilyCSS(run.fontFamily))}`
       : '',
     run.italic === true ? 'font-style:italic' : '',
+    run.characterSpacing === undefined
+      ? ''
+      : `letter-spacing:${formatNumber(run.characterSpacing)}px`,
     run.size ? `font-size:${run.size}px` : '',
     getPPTTextRunTextDecoration(run)
       ? `text-decoration:${getPPTTextRunTextDecoration(run)}`

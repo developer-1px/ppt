@@ -1301,6 +1301,10 @@ function collectPPTFallbackHTMLRuns(
     getPPTFallbackHTMLStyleValue(style, 'color'),
     '',
   )
+  const characterSpacing = parsePPTFallbackHTMLPixelStyle(
+    style,
+    'letter-spacing',
+  )
   const highlight = parsePPTFallbackHTMLColor(
     getPPTFallbackHTMLStyleValue(style, 'background-color'),
     '',
@@ -1311,6 +1315,7 @@ function collectPPTFallbackHTMLRuns(
   const size = parsePPTFallbackHTMLPositivePixelStyle(style, 'font-size')
   const styledRun = {
     ...nextRunStyle,
+    ...(characterSpacing === undefined ? {} : { characterSpacing }),
     ...(color ? { color } : {}),
     ...(fontFamily ? { fontFamily } : {}),
     ...(highlight ? { highlight } : {}),

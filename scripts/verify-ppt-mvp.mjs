@@ -31999,9 +31999,9 @@ async function addPPTXMixedRunFontProbe(base64) {
     '<a:bodyPr/>',
     '<a:lstStyle/>',
     '<a:p>',
-    '<a:pPr><a:defRPr lang="en-US" sz="1500"><a:latin typeface="Arial"/></a:defRPr></a:pPr>',
+    '<a:pPr><a:defRPr lang="en-US" sz="1500" spc="150"><a:latin typeface="Arial"/></a:defRPr></a:pPr>',
     '<a:r><a:t>Arial Run</a:t></a:r>',
-    '<a:r><a:rPr lang="en-US" sz="1500"><a:latin typeface="Georgia"/></a:rPr><a:t> Georgia Run</a:t></a:r>',
+    '<a:r><a:rPr lang="en-US" sz="1500" spc="-75"><a:latin typeface="Georgia"/></a:rPr><a:t> Georgia Run</a:t></a:r>',
     '</a:p>',
     '</p:txBody>',
     '</p:sp>',
@@ -38165,6 +38165,7 @@ async function createGeneratedPPTXRenderFixture() {
     {
       kind: 'textBox',
       name: 'Mixed Run Font Probe',
+      runCharacterSpacings: [2, -1],
       runFontFamilies: ['Arial', 'Georgia'],
       slideIndex: 0,
       textIncludes: ['Arial Run', 'Georgia Run'],
@@ -38941,6 +38942,9 @@ function hasExpectedPPTXRenderedNamedElements(state, expectedNamedElements) {
         element.commentResolved === expected.commentResolved) &&
       (expected.commentThreadCount === undefined ||
         element.commentThreadCount === expected.commentThreadCount) &&
+      (expected.runCharacterSpacings ?? []).every((spacing, index) =>
+        Math.abs(element.runCharacterSpacings[index] - spacing) < 0.01 &&
+        Math.abs(element.renderedRunCharacterSpacings[index] - spacing) < 0.01) &&
       (expected.runFontFamilies ?? []).every((fontFamily, index) =>
         element.runFontFamilies[index] === fontFamily &&
         element.renderedRunFontFamilies[index]?.includes(fontFamily)) &&
@@ -40767,7 +40771,9 @@ async function readPPTXImportedSlideRenderState(
         ].sort(),
         namedElements: elements
           .map((element) => {
-            const runs = [...element.querySelectorAll('[data-ppt-run-font-family]')]
+            const runs = [...element.querySelectorAll(
+              '[data-ppt-run-character-spacing], [data-ppt-run-font-family]',
+            )]
 
             return {
               commentResolved: element.getAttribute('data-ppt-comment-resolved') === 'true',
@@ -40775,8 +40781,12 @@ async function readPPTXImportedSlideRenderState(
               imageSrc: readElementImageSource(element).slice(0, 120),
               kind: element.getAttribute('data-kind') ?? '',
               name: element.getAttribute('data-ppt-element-name') ?? '',
+              renderedRunCharacterSpacings: runs.map((run) =>
+                Number.parseFloat(getComputedStyle(run).letterSpacing)),
               renderedRunFontFamilies: runs.map((run) =>
                 getComputedStyle(run).fontFamily),
+              runCharacterSpacings: runs.map((run) =>
+                Number(run.getAttribute('data-ppt-run-character-spacing'))),
               runFontFamilies: runs.map((run) =>
                 run.getAttribute('data-ppt-run-font-family') ?? ''),
               text: readElementText(element),

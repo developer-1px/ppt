@@ -2139,6 +2139,7 @@ type PPTTextStyleImportField =
   | 'paragraphSpacingAfter'
   | 'paragraphSpacingBefore'
   | 'runBold'
+  | 'runCharacterSpacing'
   | 'runColor'
   | 'runFontFamily'
   | 'runHighlight'
@@ -2823,6 +2824,7 @@ type PPTTextStyleImportEffect = {
   paragraphSpacingAfter: string
   paragraphSpacingBefore: string
   runBold: string
+  runCharacterSpacing: string
   runColor: string
   runFontFamily: string
   runHighlight: string
@@ -3958,6 +3960,8 @@ const PPT_DEFAULT_TEXT_BOUNDS = {
 }
 const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
+const PPT_TEXT_RUN_CHARACTER_SPACING_MIN = -100
+const PPT_TEXT_RUN_CHARACTER_SPACING_MAX = 100
 const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
 const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
   { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
@@ -16147,6 +16151,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-style-clipboard-run-bold={styleClipboard?.runStyle?.bold === undefined
           ? undefined
           : String(styleClipboard.runStyle.bold)}
+        data-ppt-style-clipboard-run-character-spacing={styleClipboard?.runStyle?.characterSpacing}
         data-ppt-style-clipboard-run-color={styleClipboard?.runStyle?.color}
         data-ppt-style-clipboard-run-font-family={styleClipboard?.runStyle?.fontFamily}
         data-ppt-style-clipboard-run-highlight={styleClipboard?.runStyle?.highlight}
@@ -16219,6 +16224,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-text-style-import-paragraph-spacing-after={lastTextStyleImportEffect?.paragraphSpacingAfter}
         data-ppt-text-style-import-paragraph-spacing-before={lastTextStyleImportEffect?.paragraphSpacingBefore}
         data-ppt-text-style-import-run-bold={lastTextStyleImportEffect?.runBold}
+        data-ppt-text-style-import-run-character-spacing={lastTextStyleImportEffect?.runCharacterSpacing}
         data-ppt-text-style-import-run-color={lastTextStyleImportEffect?.runColor}
         data-ppt-text-style-import-run-font-family={lastTextStyleImportEffect?.runFontFamily}
         data-ppt-text-style-import-run-highlight={lastTextStyleImportEffect?.runHighlight}
@@ -20473,6 +20479,9 @@ function createPPTTextStyleImportEffect({
       ? ''
       : String(paragraph.spacingBefore),
     runBold: runStyle?.bold === undefined ? '' : String(runStyle.bold),
+    runCharacterSpacing: runStyle?.characterSpacing === undefined
+      ? ''
+      : String(runStyle.characterSpacing),
     runColor: runStyle?.color ?? '',
     runFontFamily: runStyle?.fontFamily ?? '',
     runHighlight: runStyle?.highlight ?? '',
@@ -27362,6 +27371,10 @@ function getPPTTextStyleSourceFromJSONValue(
     fields.push('runBold')
   }
 
+  if (runStyle?.characterSpacing !== undefined) {
+    fields.push('runCharacterSpacing')
+  }
+
   if (runStyle?.color !== undefined) {
     fields.push('runColor')
   }
@@ -27436,6 +27449,13 @@ function getPPTTextStyleRunStyleFromJSONValue(
   const bold = getPPTTextRunBoldImportValueFromJSONValue(
     value.bold ?? value.runBold ?? value.textRunBold,
   )
+  const characterSpacing = getPPTTextRunCharacterSpacingFromJSONValue(
+    value.characterSpacing ??
+      value.charSpacing ??
+      value.letterSpacing ??
+      value.runCharacterSpacing ??
+      value.textRunCharacterSpacing,
+  )
   const color = getPPTTextRunColorImportValueFromJSONValue(
     value.color ?? value.runColor ?? value.textRunColor,
   )
@@ -27476,6 +27496,10 @@ function getPPTTextStyleRunStyleFromJSONValue(
 
   if (bold !== undefined) {
     runStyle.bold = bold
+  }
+
+  if (characterSpacing !== undefined) {
+    runStyle.characterSpacing = characterSpacing
   }
 
   if (color !== undefined) {
@@ -27526,6 +27550,18 @@ function getPPTTextStyleFontSizeFromJSONValue(value: unknown) {
     value,
     PPT_TEXT_FONT_SIZE_MIN,
     PPT_TEXT_FONT_SIZE_MAX,
+  )
+}
+
+function getPPTTextRunCharacterSpacingFromJSONValue(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  return clampPPTCanvasValue(
+    value,
+    PPT_TEXT_RUN_CHARACTER_SPACING_MIN,
+    PPT_TEXT_RUN_CHARACTER_SPACING_MAX,
   )
 }
 
@@ -33852,6 +33888,9 @@ function createPPTRunClipboardHTML(run: PPTRun) {
     ['color', run.color],
     ['font-family', formatPPTTextRunFontFamilyCSS(run.fontFamily)],
     ['font-size', run.size === undefined ? undefined : `${run.size}px`],
+    ['letter-spacing', run.characterSpacing === undefined
+      ? undefined
+      : `${run.characterSpacing}px`],
   ])
 
   return styleAttribute ? `<span${styleAttribute}>${content}</span>` : content
@@ -36745,6 +36784,7 @@ function PPTTextBodyView({ body }: { body: PPTTextBody }) {
           {paragraph.runs.map((run, runIndex) => (
             <span
               data-ppt-run-bold={run.bold === true ? 'true' : undefined}
+              data-ppt-run-character-spacing={run.characterSpacing}
               data-ppt-run-color={run.color}
               data-ppt-run-font-family={run.fontFamily}
               data-ppt-run-highlight={run.highlight}
@@ -39931,6 +39971,7 @@ function pptTextRunStyle(run: PPTRun): CSSProperties {
     fontSize: run.size,
     fontStyle: run.italic === true ? 'italic' : undefined,
     fontWeight: run.bold === true ? 700 : undefined,
+    letterSpacing: run.characterSpacing,
     textDecoration: getPPTTextRunTextDecoration(run),
   }
 }
@@ -40586,6 +40627,9 @@ function clonePPTTextStyle(style: PPTTextStyle): PPTTextStyle {
 function clonePPTTextRunStyle(style: PPTTextRunStyle): PPTTextRunStyle {
   return {
     ...(style.bold === undefined ? {} : { bold: style.bold }),
+    ...(style.characterSpacing === undefined
+      ? {}
+      : { characterSpacing: style.characterSpacing }),
     ...(style.color === undefined ? {} : { color: style.color }),
     ...(style.fontFamily === undefined ? {} : { fontFamily: style.fontFamily }),
     ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
@@ -40606,6 +40650,9 @@ function applyPPTTextRunStyle(
     text: run.text,
     ...(run.hyperlink ? { hyperlink: run.hyperlink } : {}),
     ...(style.bold === true ? { bold: true } : {}),
+    ...(style.characterSpacing === undefined
+      ? {}
+      : { characterSpacing: style.characterSpacing }),
     ...(style.color === undefined ? {} : { color: style.color }),
     ...(style.fontFamily === undefined ? {} : { fontFamily: style.fontFamily }),
     ...(style.highlight === undefined ? {} : { highlight: style.highlight }),
@@ -42222,6 +42269,9 @@ function getPPTParagraphFallbackRunStyle(paragraph: PPTParagraph): PPTTextRunSty
 
   return {
     ...(firstRun.bold === undefined ? {} : { bold: firstRun.bold }),
+    ...(firstRun.characterSpacing === undefined
+      ? {}
+      : { characterSpacing: firstRun.characterSpacing }),
     ...(firstRun.color === undefined ? {} : { color: firstRun.color }),
     ...(firstRun.fontFamily === undefined
       ? {}
@@ -42241,6 +42291,7 @@ function arePPTTextRunStylesEqual(
   right: PPTTextRunStyle,
 ) {
   return left.bold === right.bold &&
+    left.characterSpacing === right.characterSpacing &&
     left.color === right.color &&
     left.fontFamily === right.fontFamily &&
     left.highlight === right.highlight &&
