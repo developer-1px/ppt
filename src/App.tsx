@@ -52,10 +52,12 @@ import {
   MessageSquare,
   Minus,
   Moon,
+  MoreHorizontal,
   MousePointer2,
   MoveDown,
   MoveUp,
   Paintbrush,
+  PanelRight,
   PencilLine,
   PenLine,
   Play,
@@ -66,6 +68,7 @@ import {
   Scissors,
   Search,
   SendToBack,
+  SlidersHorizontal,
   Square,
   StickyNote,
   Strikethrough,
@@ -78,6 +81,7 @@ import {
   Unlock,
   Underline,
   X,
+  Wrench,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -938,6 +942,15 @@ import {
   type PPTTableImportSource,
   type PPTTextPasteImportResult,
 } from './pptImportExtension'
+import {
+  Button,
+  DisclosurePanel,
+  IconButton,
+  Tab,
+  TabList,
+  ToolbarGroup,
+  useExclusiveDisclosure,
+} from './ui/core'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createPPTCanvasAffordanceConfig({
@@ -4464,9 +4477,16 @@ function App() {
   const [replaceQuery, setReplaceQuery] = useState('')
   const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [presentationSlideId, setPresentationSlideId] = useState<string | null>(null)
-  const [showGrid, setShowGrid] = useState(true)
-  const [showFrameGuides, setShowFrameGuides] = useState(true)
-  const [showMinimap, setShowMinimap] = useState(true)
+  const [showGrid, setShowGrid] = useState(false)
+  const [showFrameGuides, setShowFrameGuides] = useState(false)
+  const [showMinimap, setShowMinimap] = useState(false)
+  const toolbarDisclosure = useExclusiveDisclosure<
+    'tools' | 'view' | 'export'
+  >()
+  const toolShelfOpen = toolbarDisclosure.isOpen('tools')
+  const viewOptionsOpen = toolbarDisclosure.isOpen('view')
+  const exportOptionsOpen = toolbarDisclosure.isOpen('export')
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [recentColors, setRecentColors] = useState<string[]>([])
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
@@ -13800,6 +13820,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       return
     }
 
+    toolbarDisclosure.close()
     focusStageShell()
     capturePPTCanvasPointerFromEvent(event)
     const additive = isAdditivePPTPointerInput(event)
@@ -15410,7 +15431,12 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
   const shortcutHelpItems = getPPTShortcutHelpItems(commandPaletteItems)
 
   return (
-    <main className="ppt-app" data-ppt-app data-theme={theme}>
+    <main
+      className="ppt-app"
+      data-ppt-app
+      data-ppt-inspector-open={inspectorOpen ? 'true' : 'false'}
+      data-theme={theme}
+    >
       <header
         aria-label="PPT editor toolbar"
         aria-orientation="horizontal"
@@ -15419,6 +15445,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-toolbar-focus-model={PPT_TOOLBAR_FOCUS_MODEL}
         data-ppt-toolbar-keyboard-model={PPT_TOOLBAR_KEYBOARD_MODEL}
         data-ppt-toolbar-model={PPT_TOOLBAR_ROVING_FOCUS_MODEL}
+        data-ppt-tool-shelf-open={toolShelfOpen ? 'true' : 'false'}
+        data-ppt-view-options-open={viewOptionsOpen ? 'true' : 'false'}
+        data-ppt-export-options-open={exportOptionsOpen ? 'true' : 'false'}
         ref={setTopbarToolbarRoot}
         role="toolbar"
         onFocus={handleTopbarToolbarFocus}
@@ -15428,29 +15457,41 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
           <strong>PPT</strong>
           <span>{deck.title}</span>
         </div>
-        <div className="ppt-toolbar-group">
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.undo} onClick={undo} title={PPT_COMMAND_AFFORDANCES.undo.title} type="button">
+        <ToolbarGroup className="ppt-toolbar-history">
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} disabled={!commandAvailability.undo} label={PPT_COMMAND_AFFORDANCES.undo.title} onClick={undo}>
             <Undo2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.redo} onClick={redo} title={PPT_COMMAND_AFFORDANCES.redo.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} disabled={!commandAvailability.redo} label={PPT_COMMAND_AFFORDANCES.redo.title} onClick={redo}>
             <Redo2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-find-open onClick={openFindStrip} title="Find text" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-find-open label="Find text" onClick={openFindStrip}>
             <Search size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command-palette-open onClick={openCommandPalette} title="Command palette" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command-palette-open label="Command palette" onClick={openCommandPalette}>
             <Command size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={styleClipboardPaintSession ? 'true' : undefined} className="ppt-icon-button" data-ppt-command="copy-formatting" data-ppt-format-painter-active={styleClipboardPaintSession ? 'true' : 'false'} disabled={!commandAvailability.copyFormatting} onClick={(event) => copyFormatting({ detail: event.detail })} title="Copy formatting" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={styleClipboardPaintSession ? 'true' : undefined} className="ppt-toolbar-secondary-command" data-ppt-command="copy-formatting" data-ppt-format-painter-active={styleClipboardPaintSession ? 'true' : 'false'} disabled={!commandAvailability.copyFormatting} label="Copy formatting" onClick={(event) => copyFormatting({ detail: event.detail })}>
             <Paintbrush size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} onClick={pasteFormatting} title="Paste formatting" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-toolbar-secondary-command" data-ppt-command="paste-formatting" disabled={!commandAvailability.pasteFormatting} label="Paste formatting" onClick={pasteFormatting}>
             <Paintbrush size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-shortcut-help-open onClick={openShortcutHelp} title="Keyboard shortcuts" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-toolbar-secondary-command" data-ppt-shortcut-help-open label="Keyboard shortcuts" onClick={openShortcutHelp}>
             <Keyboard size={17} />
-          </button>
-        </div>
+          </IconButton>
+        </ToolbarGroup>
+        <ToolbarGroup className="ppt-toolbar-reveal">
+          <Button
+            {...PPT_TOOLBAR_ITEM_PROPS}
+            aria-expanded={toolShelfOpen}
+            aria-label="Toggle tools"
+            className="ppt-tool-shelf-trigger"
+            data-ppt-tool-shelf-trigger
+            onClick={() => toolbarDisclosure.toggle('tools')}
+          >
+            <Wrench size={16} /> Tools
+          </Button>
+        </ToolbarGroup>
         {findOpen ? (
           <FindReplaceStrip
             activeIndex={clampedFindIndex}
@@ -15468,215 +15509,189 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             onReplaceQueryChange={setReplaceQuery}
           />
         ) : null}
-        <div className="ppt-toolbar-group">
-          <button
+        <DisclosurePanel
+          aria-label="Editing tools"
+          className="ppt-tool-shelf"
+          data-ppt-tool-shelf
+          open={toolShelfOpen}
+        >
+        <ToolbarGroup>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.pan.ariaLabel}
             aria-pressed={isPanToolActive}
-            className="ppt-icon-button"
             data-ppt-pan-tool
             data-ppt-tool="pan"
+            label={PPT_TOOL_AFFORDANCES.pan.ariaLabel}
             onClick={activatePanTool}
-            title={PPT_TOOL_AFFORDANCES.pan.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.pan.title}
           >
             <Hand size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.laser.ariaLabel}
             aria-pressed={isLaserToolActive}
-            className="ppt-icon-button"
             data-ppt-laser-tool
             data-ppt-tool="laser"
+            label={PPT_TOOL_AFFORDANCES.laser.ariaLabel}
             onClick={activateLaserTool}
-            title={PPT_TOOL_AFFORDANCES.laser.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.laser.title}
           >
             <MousePointer2 size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.text.ariaLabel}
             aria-pressed={creationTool?.kind === 'text'}
-            className="ppt-icon-button"
             data-ppt-insert-tool="text"
+            label={PPT_TOOL_AFFORDANCES.text.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'text' })}
-            title={PPT_TOOL_AFFORDANCES.text.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.text.title}
           >
             <Type size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.sticky.ariaLabel}
             aria-pressed={creationTool?.kind === 'sticky'}
-            className="ppt-icon-button"
             data-ppt-insert-tool="sticky"
+            label={PPT_TOOL_AFFORDANCES.sticky.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'sticky' })}
-            title={PPT_TOOL_AFFORDANCES.sticky.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.sticky.title}
           >
             <StickyNote size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.section.ariaLabel}
             aria-pressed={creationTool?.kind === 'section'}
-            className="ppt-icon-button"
             data-ppt-insert-tool="section"
+            label={PPT_TOOL_AFFORDANCES.section.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'section' })}
-            title={PPT_TOOL_AFFORDANCES.section.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.section.title}
           >
             <Frame size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.rect.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'rect')}
-            className="ppt-icon-button"
             data-ppt-insert-shape="rect"
             data-ppt-insert-tool="rect"
+            label={PPT_TOOL_AFFORDANCES.rect.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'rect' })}
-            title={PPT_TOOL_AFFORDANCES.rect.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.rect.title}
           >
             <Square size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.ellipse.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'ellipse')}
-            className="ppt-icon-button"
             data-ppt-insert-shape="ellipse"
             data-ppt-insert-tool="ellipse"
+            label={PPT_TOOL_AFFORDANCES.ellipse.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'ellipse' })}
-            title={PPT_TOOL_AFFORDANCES.ellipse.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.ellipse.title}
           >
             <Circle size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.diamond.ariaLabel}
             aria-pressed={isPPTShapeCreationTool(creationTool, 'diamond')}
-            className="ppt-icon-button"
             data-ppt-insert-shape="diamond"
             data-ppt-insert-tool="diamond"
+            label={PPT_TOOL_AFFORDANCES.diamond.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'shape', shape: 'diamond' })}
-            title={PPT_TOOL_AFFORDANCES.diamond.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.diamond.title}
           >
             <Diamond size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={lineCreationMode === 'line'} className="ppt-icon-button" data-ppt-insert-line="line" onClick={() => activateLineCreationMode('line')} title="Draw line" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={lineCreationMode === 'line'} data-ppt-insert-line="line" label="Draw line" onClick={() => activateLineCreationMode('line')}>
             <Minus size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.arrow.ariaLabel}
             aria-pressed={lineCreationMode === 'arrow'}
-            className="ppt-icon-button"
             data-ppt-insert-line="arrow"
             data-ppt-insert-tool="arrow"
+            label={PPT_TOOL_AFFORDANCES.arrow.ariaLabel}
             onClick={() => activateLineCreationMode('arrow')}
-            title={PPT_TOOL_AFFORDANCES.arrow.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.arrow.title}
           >
             <ArrowRight size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.pen.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'pen')}
-            className="ppt-icon-button"
             data-ppt-insert-tool="pen"
+            label={PPT_TOOL_AFFORDANCES.pen.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'pen' })}
-            title={PPT_TOOL_AFFORDANCES.pen.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.pen.title}
           >
             <PenLine size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.marker.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'marker')}
-            className="ppt-icon-button"
             data-ppt-insert-tool="marker"
+            label={PPT_TOOL_AFFORDANCES.marker.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'marker' })}
-            title={PPT_TOOL_AFFORDANCES.marker.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.marker.title}
           >
             <PencilLine size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.highlight.ariaLabel}
             aria-pressed={isPPTFreeformCreationTool(creationTool, 'highlight')}
-            className="ppt-icon-button"
             data-ppt-insert-tool="highlight"
+            label={PPT_TOOL_AFFORDANCES.highlight.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'freeform', tool: 'highlight' })}
-            title={PPT_TOOL_AFFORDANCES.highlight.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.highlight.title}
           >
             <Highlighter size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.eraser.ariaLabel}
             aria-pressed={isEraserToolActive}
-            className="ppt-icon-button"
             data-ppt-eraser-tool
             data-ppt-tool="eraser"
+            label={PPT_TOOL_AFFORDANCES.eraser.ariaLabel}
             onClick={activateEraserTool}
-            title={PPT_TOOL_AFFORDANCES.eraser.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.eraser.title}
           >
             <Eraser size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={PPT_TOOL_AFFORDANCES.comment.ariaLabel}
             aria-pressed={creationTool?.kind === 'comment'}
-            className="ppt-icon-button"
             data-ppt-insert-comment
             data-ppt-insert-tool="comment"
+            label={PPT_TOOL_AFFORDANCES.comment.ariaLabel}
             onClick={() => activatePPTCreationTool({ kind: 'comment' })}
-            title={PPT_TOOL_AFFORDANCES.comment.title}
-            type="button"
+            tooltip={PPT_TOOL_AFFORDANCES.comment.title}
           >
             <MessageSquare size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-image onClick={() => imageInputRef.current?.click()} title="Add image" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-insert-image label="Add image" onClick={() => imageInputRef.current?.click()}>
             <ImagePlus size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            className="ppt-icon-button"
             data-ppt-paste-image
+            label="Paste image"
             onClick={() => {
               void pastePPTClipboardImage()
             }}
-            title="Paste image"
-            type="button"
           >
             <ClipboardPaste size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-insert-table onClick={() => insertPPTTableSource()} title="Add table" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-insert-table label="Add table" onClick={() => insertPPTTableSource()}>
             <Table2 size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            className="ppt-icon-button"
             data-ppt-copy-table
             disabled={!selectedTableElement}
+            label="Copy table"
             onClick={copySelectedTable}
-            title="Copy table"
-            type="button"
           >
             <Copy size={17} />
-          </button>
+          </IconButton>
           <input
             accept="image/*"
             className="ppt-file-input"
@@ -15686,113 +15701,120 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             type="file"
             onChange={handleImageInputChange}
           />
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" disabled={!commandAvailability.delete} onClick={deleteSelection} title={PPT_COMMAND_AFFORDANCES.delete.title} type="button">
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} disabled={!commandAvailability.delete} label={PPT_COMMAND_AFFORDANCES.delete.title} onClick={deleteSelection}>
             <Trash2 size={17} />
-          </button>
-        </div>
-        <div className="ppt-toolbar-group">
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} onClick={() => alignSelection('alignLeft')} title={PPT_COMMAND_AFFORDANCES.alignLeft.title} type="button">
+          </IconButton>
+        </ToolbarGroup>
+        <ToolbarGroup>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-left" disabled={!commandAvailability.alignLeft} label={PPT_COMMAND_AFFORDANCES.alignLeft.title} onClick={() => alignSelection('alignLeft')}>
             <AlignStartVertical size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} onClick={() => alignSelection('alignCenter')} title={PPT_COMMAND_AFFORDANCES.alignCenter.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-center-x" disabled={!commandAvailability.alignCenter} label={PPT_COMMAND_AFFORDANCES.alignCenter.title} onClick={() => alignSelection('alignCenter')}>
             <AlignCenterVertical size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-right" disabled={!commandAvailability.alignRight} onClick={() => alignSelection('alignRight')} title={PPT_COMMAND_AFFORDANCES.alignRight.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-right" disabled={!commandAvailability.alignRight} label={PPT_COMMAND_AFFORDANCES.alignRight.title} onClick={() => alignSelection('alignRight')}>
             <AlignEndVertical size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-top" disabled={!commandAvailability.alignTop} onClick={() => alignSelection('alignTop')} title={PPT_COMMAND_AFFORDANCES.alignTop.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-top" disabled={!commandAvailability.alignTop} label={PPT_COMMAND_AFFORDANCES.alignTop.title} onClick={() => alignSelection('alignTop')}>
             <AlignStartHorizontal size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} onClick={() => alignSelection('alignMiddle')} title={PPT_COMMAND_AFFORDANCES.alignMiddle.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-middle" disabled={!commandAvailability.alignMiddle} label={PPT_COMMAND_AFFORDANCES.alignMiddle.title} onClick={() => alignSelection('alignMiddle')}>
             <AlignCenterHorizontal size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} onClick={() => alignSelection('alignBottom')} title={PPT_COMMAND_AFFORDANCES.alignBottom.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="align-bottom" disabled={!commandAvailability.alignBottom} label={PPT_COMMAND_AFFORDANCES.alignBottom.title} onClick={() => alignSelection('alignBottom')}>
             <AlignEndHorizontal size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} onClick={() => distributeSelection('distributeHorizontal')} title={PPT_COMMAND_AFFORDANCES.distributeHorizontal.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="distribute-horizontal" disabled={!commandAvailability.distributeHorizontal} label={PPT_COMMAND_AFFORDANCES.distributeHorizontal.title} onClick={() => distributeSelection('distributeHorizontal')}>
             <AlignHorizontalDistributeCenter size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} onClick={() => distributeSelection('distributeVertical')} title={PPT_COMMAND_AFFORDANCES.distributeVertical.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="distribute-vertical" disabled={!commandAvailability.distributeVertical} label={PPT_COMMAND_AFFORDANCES.distributeVertical.title} onClick={() => distributeSelection('distributeVertical')}>
             <AlignVerticalDistributeCenter size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} onClick={tidySelection} title="Tidy selection" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="tidy-selection" disabled={!commandAvailability.tidySelection} label="Tidy selection" onClick={tidySelection}>
             <Grid2X2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-horizontal" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('horizontal')} title="Flip horizontal" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="flip-horizontal" disabled={!commandAvailability.flipSelection} label="Flip horizontal" onClick={() => flipSelection('horizontal')}>
             <FlipHorizontal2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="flip-vertical" disabled={!commandAvailability.flipSelection} onClick={() => flipSelection('vertical')} title="Flip vertical" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="flip-vertical" disabled={!commandAvailability.flipSelection} label="Flip vertical" onClick={() => flipSelection('vertical')}>
             <FlipVertical2 size={17} />
-          </button>
-        </div>
-        <div className="ppt-toolbar-group">
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} onClick={() => reorderSelection('bringForward')} title={PPT_COMMAND_AFFORDANCES.bringForward.title} type="button">
+          </IconButton>
+        </ToolbarGroup>
+        <ToolbarGroup>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="bring-forward" disabled={!commandAvailability.bringForward} label={PPT_COMMAND_AFFORDANCES.bringForward.title} onClick={() => reorderSelection('bringForward')}>
             <MoveUp size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} onClick={() => reorderSelection('bringToFront')} title={PPT_COMMAND_AFFORDANCES.bringToFront.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="bring-to-front" disabled={!commandAvailability.bringToFront} label={PPT_COMMAND_AFFORDANCES.bringToFront.title} onClick={() => reorderSelection('bringToFront')}>
             <BringToFront size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} onClick={() => reorderSelection('sendBackward')} title={PPT_COMMAND_AFFORDANCES.sendBackward.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="send-backward" disabled={!commandAvailability.sendBackward} label={PPT_COMMAND_AFFORDANCES.sendBackward.title} onClick={() => reorderSelection('sendBackward')}>
             <MoveDown size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} onClick={() => reorderSelection('sendToBack')} title={PPT_COMMAND_AFFORDANCES.sendToBack.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="send-to-back" disabled={!commandAvailability.sendToBack} label={PPT_COMMAND_AFFORDANCES.sendToBack.title} onClick={() => reorderSelection('sendToBack')}>
             <SendToBack size={17} />
-          </button>
-        </div>
-        <div className="ppt-toolbar-group">
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="group" disabled={!commandAvailability.group} onClick={groupSelection} title={PPT_COMMAND_AFFORDANCES.group.title} type="button">
+          </IconButton>
+        </ToolbarGroup>
+        <ToolbarGroup>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="group" disabled={!commandAvailability.group} label={PPT_COMMAND_AFFORDANCES.group.title} onClick={groupSelection}>
             <Group size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} onClick={ungroupSelection} title={PPT_COMMAND_AFFORDANCES.ungroup.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="ungroup" disabled={!commandAvailability.ungroup} label={PPT_COMMAND_AFFORDANCES.ungroup.title} onClick={ungroupSelection}>
             <Ungroup size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} onClick={lockSelectedElements} title={PPT_COMMAND_AFFORDANCES.lockSelection.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="lock-selection" disabled={!commandAvailability.lockSelection} label={PPT_COMMAND_AFFORDANCES.lockSelection.title} onClick={lockSelectedElements}>
             <Lock size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} onClick={unlockAllElements} title={PPT_COMMAND_AFFORDANCES.unlockAll.title} type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-command="unlock-all" disabled={!commandAvailability.unlockAll} label={PPT_COMMAND_AFFORDANCES.unlockAll.title} onClick={unlockAllElements}>
             <Unlock size={17} />
-          </button>
-        </div>
-        <div className="ppt-toolbar-group">
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-present-start onClick={() => startPresentation()} title="Start presentation" type="button">
+          </IconButton>
+        </ToolbarGroup>
+        </DisclosurePanel>
+        <ToolbarGroup className="ppt-toolbar-view">
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-present-start label="Start presentation" onClick={() => startPresentation()}>
             <Play size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('out')} title="Zoom out" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} label="Zoom out" onClick={() => zoom('out')}>
             <ZoomOut size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-slide onClick={fitSlide} title="Fit slide" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-view-fit-slide label="Fit slide" onClick={fitSlide}>
             <Maximize2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" data-ppt-view-fit-selection disabled={!canFitSelection} onClick={fitSelection} title="Fit selection" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} data-ppt-view-fit-selection disabled={!canFitSelection} label="Fit selection" onClick={fitSelection}>
             <Maximize2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} className="ppt-icon-button" onClick={() => zoom('in')} title="Zoom in" type="button">
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} label="Zoom in" onClick={() => zoom('in')}>
             <ZoomIn size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} className="ppt-icon-button" data-ppt-view-grid onClick={() => setShowGrid((current) => !current)} title="Toggle grid" type="button">
-            <Grid2X2 size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} className="ppt-icon-button" data-ppt-view-minimap onClick={() => setShowMinimap((current) => !current)} title="Toggle minimap" type="button">
-            <MapIcon size={17} />
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} className="ppt-icon-button" data-ppt-view-frame-guides onClick={() => setShowFrameGuides((current) => !current)} title="Toggle frame guides" type="button">
-            <Ruler size={17} />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             {...PPT_TOOLBAR_ITEM_PROPS}
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-expanded={viewOptionsOpen}
+            data-ppt-view-options-trigger
+            label="More view options"
+            onClick={() => toolbarDisclosure.toggle('view')}
+          >
+            <MoreHorizontal size={17} />
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} data-ppt-view-grid label="Toggle grid" onClick={() => setShowGrid((current) => !current)}>
+            <Grid2X2 size={17} />
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} data-ppt-view-minimap label="Toggle minimap" onClick={() => setShowMinimap((current) => !current)}>
+            <MapIcon size={17} />
+          </IconButton>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} data-ppt-view-frame-guides label="Toggle frame guides" onClick={() => setShowFrameGuides((current) => !current)}>
+            <Ruler size={17} />
+          </IconButton>
+          <IconButton
+            {...PPT_TOOLBAR_ITEM_PROPS}
             aria-pressed={theme === 'dark'}
-            className="ppt-icon-button"
             data-ppt-theme-toggle
+            label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            type="button"
           >
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
+          </IconButton>
           <span className="ppt-zoom-label">{Math.round(viewport.scale * 100)}%</span>
-        </div>
-        <div className="ppt-toolbar-group">
+        </ToolbarGroup>
+        <ToolbarGroup className="ppt-toolbar-document">
           <input
             accept={`${PPTX_MIME_TYPE},.pptx`}
             className="ppt-file-input"
@@ -15802,9 +15824,9 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             type="file"
             onChange={handlePPTXInputChange}
           />
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Open PPTX" className="ppt-button" data-ppt-open-pptx onClick={() => pptxInputRef.current?.click()} type="button">
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Open PPTX" data-ppt-open-pptx onClick={() => pptxInputRef.current?.click()}>
             <FilePlus2 size={16} /> PPTX
-          </button>
+          </Button>
           {pptxOpenStatus ? (
             <span
               aria-live="polite"
@@ -15819,28 +15841,46 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
               {pptxOpenStatusText}
             </span>
           ) : null}
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-button" onClick={copyHTML} type="button">
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy HTML" className="ppt-toolbar-export-secondary" onClick={copyHTML}>
             <Copy size={16} /> HTML
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-button" onClick={downloadHTML} type="button">
+          </Button>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download HTML" className="ppt-toolbar-export-secondary" onClick={downloadHTML}>
             <Download size={16} /> HTML
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download PPTX" className="ppt-button" data-ppt-export-pptx onClick={() => { void downloadPPTX() }} type="button">
+          </Button>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download PPTX" data-ppt-export-pptx onClick={() => { void downloadPPTX() }}>
             <Download size={16} /> PPTX
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy slide SVG" className="ppt-button" data-ppt-copy-slide-svg onClick={copySlideSVG} type="button">
+          </Button>
+          <IconButton
+            {...PPT_TOOLBAR_ITEM_PROPS}
+            aria-expanded={exportOptionsOpen}
+            data-ppt-export-options-trigger
+            label="More export options"
+            onClick={() => toolbarDisclosure.toggle('export')}
+          >
+            <MoreHorizontal size={17} />
+          </IconButton>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy slide SVG" className="ppt-toolbar-export-secondary" data-ppt-copy-slide-svg onClick={copySlideSVG}>
             <Copy size={16} /> SVG
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-button" data-ppt-export-svg onClick={downloadSlideSVG} type="button">
+          </Button>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download slide SVG" className="ppt-toolbar-export-secondary" data-ppt-export-svg onClick={downloadSlideSVG}>
             <Download size={16} /> SVG
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy selection SVG" className="ppt-button" data-ppt-copy-selection-svg disabled={!canExportSelectionSVG} onClick={copySelectionSVG} type="button">
+          </Button>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Copy selection SVG" className="ppt-toolbar-export-secondary" data-ppt-copy-selection-svg disabled={!canExportSelectionSVG} onClick={copySelectionSVG}>
             <Copy size={16} /> Sel SVG
-          </button>
-          <button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download selection SVG" className="ppt-button" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG} type="button">
+          </Button>
+          <Button {...PPT_TOOLBAR_ITEM_PROPS} aria-label="Download selection SVG" className="ppt-toolbar-export-secondary" data-ppt-export-selection-svg disabled={!canExportSelectionSVG} onClick={downloadSelectionSVG}>
             <Download size={16} /> Sel SVG
-          </button>
-        </div>
+          </Button>
+          <IconButton
+            {...PPT_TOOLBAR_ITEM_PROPS}
+            aria-pressed={inspectorOpen}
+            data-ppt-inspector-toggle
+            label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+            onClick={() => setInspectorOpen((current) => !current)}
+          >
+            <PanelRight size={17} />
+          </IconButton>
+        </ToolbarGroup>
         <span className="ppt-selection-label">
           {selection.length > 0 ? `${selection.length} selected` : 'No selection'}
         </span>
@@ -15850,30 +15890,42 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         <div className="ppt-rail-header">
           <h2>Slides</h2>
           <div className="ppt-slide-actions">
-            <button className="ppt-slide-action" data-ppt-slide-action="add" onClick={addSlide} title="Add slide" type="button">
+            <IconButton data-ppt-slide-action="add" label="Add slide" onClick={addSlide} variant="slide-action">
               <FilePlus2 size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="duplicate" onClick={duplicateActiveSlide} title="Duplicate slide" type="button">
+            </IconButton>
+            <IconButton
+              data-ppt-slide-actions-menu
+              label="Slide actions"
+              variant="slide-action"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect()
+
+                openPPTSlideContextMenu(activeSlide.id, rect.right, rect.bottom + 4)
+              }}
+            >
+              <MoreHorizontal size={16} />
+            </IconButton>
+            <IconButton data-ppt-slide-action="duplicate" label="Duplicate slide" onClick={duplicateActiveSlide} variant="slide-action">
               <CopyPlus size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="copy" onClick={copyActiveSlide} title="Copy slide" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="copy" label="Copy slide" onClick={copyActiveSlide} variant="slide-action">
               <Copy size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="cut" disabled={!canDeleteSlide} onClick={cutActiveSlide} title="Cut slide" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="cut" disabled={!canDeleteSlide} label="Cut slide" onClick={cutActiveSlide} variant="slide-action">
               <Scissors size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="paste" disabled={!canPasteSlide} onClick={pasteCopiedSlide} title="Paste slide" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="paste" disabled={!canPasteSlide} label="Paste slide" onClick={pasteCopiedSlide} variant="slide-action">
               <ClipboardPaste size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="move-up" disabled={!canMoveActiveSlideUp} onClick={() => moveActiveSlide(-1)} title="Move slide up" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="move-up" disabled={!canMoveActiveSlideUp} label="Move slide up" onClick={() => moveActiveSlide(-1)} variant="slide-action">
               <ChevronUp size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="move-down" disabled={!canMoveActiveSlideDown} onClick={() => moveActiveSlide(1)} title="Move slide down" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="move-down" disabled={!canMoveActiveSlideDown} label="Move slide down" onClick={() => moveActiveSlide(1)} variant="slide-action">
               <ChevronDown size={16} />
-            </button>
-            <button className="ppt-slide-action" data-ppt-slide-action="delete" disabled={!canDeleteSlide} onClick={deleteActiveSlide} title="Delete slide" type="button">
+            </IconButton>
+            <IconButton data-ppt-slide-action="delete" disabled={!canDeleteSlide} label="Delete slide" onClick={deleteActiveSlide} variant="slide-action">
               <Trash2 size={16} />
-            </button>
+            </IconButton>
           </div>
         </div>
         <div
@@ -17224,6 +17276,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
 
       <Inspector
         exportCode={exportCode}
+        hidden={!inspectorOpen}
         inspectorSurface={inspectorSurface}
         layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
         layoutPlaceholderVisibilityDescriptors={activeLayoutPlaceholderVisibilityDescriptors}
@@ -17517,17 +17570,15 @@ function PPTShortcutHelpDialog({
       >
         <header className="ppt-shortcut-help-header">
           <h2>Keyboard shortcuts</h2>
-          <button
-            aria-label="Close keyboard shortcuts"
-            className="ppt-icon-button"
+          <IconButton
             data-ppt-shortcut-help-close
+            label="Close keyboard shortcuts"
             ref={closeButtonRef}
-            title="Close"
-            type="button"
+            tooltip="Close"
             onClick={onClose}
           >
             <X size={16} />
-          </button>
+          </IconButton>
         </header>
         <div className="ppt-shortcut-help-sections">
           {groups.map((group) => (
@@ -17611,15 +17662,13 @@ function PPTPresentationOverlay({
       <div className="ppt-presentation-header">
         <span data-ppt-presentation-title>{slide.name}</span>
         <span data-ppt-presentation-count>{readableIndex}/{slideCount}</span>
-        <button
-          className="ppt-icon-button"
+        <IconButton
           data-ppt-present-exit
-          title="Exit presentation"
-          type="button"
+          label="Exit presentation"
           onClick={onExit}
         >
           <X size={17} />
-        </button>
+        </IconButton>
       </div>
       <div className="ppt-presentation-stage">
         <div
@@ -17674,22 +17723,18 @@ function PPTPresentationOverlay({
         </div>
       </div>
       <div className="ppt-presentation-controls" role="toolbar" aria-label="Presentation controls">
-        <button
-          className="ppt-button"
+        <Button
           data-ppt-present-prev
-          type="button"
           onClick={onPrevious}
         >
           <ChevronLeft size={16} /> Previous
-        </button>
-        <button
-          className="ppt-button"
+        </Button>
+        <Button
           data-ppt-present-next
-          type="button"
           onClick={onNext}
         >
           Next <ChevronRight size={16} />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -34810,28 +34855,22 @@ function FindReplaceStrip({
       <span className="ppt-find-count" data-ppt-find-count>
         {hasQuery && hasMatches ? `${activeIndex + 1}/${matchCount}` : '0/0'}
       </span>
-      <button
-        aria-label="Previous match"
-        className="ppt-icon-button"
+      <IconButton
         data-ppt-find-prev
         disabled={!hasMatches}
-        title="Previous match"
-        type="button"
+        label="Previous match"
         onClick={onPrevious}
       >
         <ChevronUp size={16} />
-      </button>
-      <button
-        aria-label="Next match"
-        className="ppt-icon-button"
+      </IconButton>
+      <IconButton
         data-ppt-find-next
         disabled={!hasMatches}
-        title="Next match"
-        type="button"
+        label="Next match"
         onClick={onNext}
       >
         <ChevronDown size={16} />
-      </button>
+      </IconButton>
       <input
         aria-label="Replace text"
         className="ppt-find-input"
@@ -34840,34 +34879,27 @@ function FindReplaceStrip({
         value={replaceQuery}
         onChange={(event) => onReplaceQueryChange(event.target.value)}
       />
-      <button
-        className="ppt-button"
+      <Button
         data-ppt-find-replace
         disabled={!hasMatches}
-        type="button"
         onClick={onReplace}
       >
         Replace
-      </button>
-      <button
-        className="ppt-button"
+      </Button>
+      <Button
         data-ppt-find-replace-all
         disabled={!hasMatches}
-        type="button"
         onClick={onReplaceAll}
       >
         All
-      </button>
-      <button
-        aria-label="Close find"
-        className="ppt-icon-button"
+      </Button>
+      <IconButton
         data-ppt-find-close
-        title="Close find"
-        type="button"
+        label="Close find"
         onClick={onClose}
       >
         <X size={16} />
-      </button>
+      </IconButton>
     </div>
   )
 }
@@ -34917,6 +34949,8 @@ function PPTSelectionFloatingBar({
   shapeMenu: PPTShapeQuickMenuState | null
   textFormat: PPTTextQuickFormatState | null
 }) {
+  const [expanded, setExpanded] = useState(false)
+
   if (!anchor || (groups.length === 0 && !shapeMenu && !textFormat)) {
     return null
   }
@@ -34927,6 +34961,7 @@ function PPTSelectionFloatingBar({
       className="ppt-selection-floating-bar"
       data-placement={anchor.placement}
       data-ppt-selection-floating-bar
+      data-ppt-selection-floating-expanded={expanded ? 'true' : 'false'}
       role="toolbar"
       style={{
         '--ppt-command-scale': String(1 / scale),
@@ -34937,6 +34972,7 @@ function PPTSelectionFloatingBar({
     >
       {textFormat ? (
         <PPTTextQuickFormatControls
+          expanded={expanded}
           state={textFormat}
           onFontSizeStep={onFontSizeStep}
           onParagraphAlign={onParagraphAlign}
@@ -34962,6 +34998,7 @@ function PPTSelectionFloatingBar({
           <span className="ppt-command-divider" />
         </>
       ) : null}
+      <span className="ppt-selection-floating-details" hidden={!expanded}>
       <PPTAlignmentPopover
         availability={commandAvailability}
         onCommand={onCommand}
@@ -34981,6 +35018,21 @@ function PPTSelectionFloatingBar({
           ))}
         </Fragment>
       ))}
+      </span>
+      <IconButton
+        aria-pressed={expanded}
+        data-ppt-selection-floating-more
+        label={expanded ? 'Fewer selection actions' : 'More selection actions'}
+        tooltip={expanded ? 'Fewer actions' : 'More actions'}
+        variant="floating"
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          setExpanded((current) => !current)
+        }}
+      >
+        <MoreHorizontal size={16} />
+      </IconButton>
     </div>
   )
 }
@@ -35054,16 +35106,14 @@ function PPTShapeKindMenu({
       className="ppt-floating-menu-wrap"
       data-ppt-shape-menu-open={open ? 'true' : 'false'}
     >
-      <button
+      <IconButton
         aria-controls="ppt-shape-kind-menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Shape"
-        className="ppt-floating-command"
         data-ppt-shape-menu-trigger
+        label="Shape"
         ref={triggerRef}
-        title="Shape"
-        type="button"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35076,7 +35126,7 @@ function PPTShapeKindMenu({
         onKeyDown={handleTriggerKeyDown}
       >
         {renderPPTShapeMenuIcon(state.shape, 16)}
-      </button>
+      </IconButton>
       {open ? (
         <div
           aria-label="Shape"
@@ -35212,17 +35262,15 @@ function PPTAlignmentPopover({
       className="ppt-alignment-popover-wrap"
       data-ppt-alignment-popover-open={open ? 'true' : 'false'}
     >
-      <button
+      <IconButton
         aria-controls="ppt-alignment-popover-menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Alignment editor"
-        className="ppt-floating-command"
         data-ppt-alignment-popover-trigger
         disabled={triggerDisabled}
+        label="Alignment editor"
         ref={triggerRef}
-        title="Alignment editor"
-        type="button"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35235,7 +35283,7 @@ function PPTAlignmentPopover({
         onKeyDown={handleTriggerKeyDown}
       >
         <AlignCenterHorizontal size={16} />
-      </button>
+      </IconButton>
       {open ? (
         <div
           aria-label="Alignment editor"
@@ -35314,6 +35362,7 @@ function renderPPTAlignmentPopoverIcon(command: PPTAlignmentPopoverCommand) {
 }
 
 function PPTTextQuickFormatControls({
+  expanded,
   onFontSizeStep,
   onParagraphAlign,
   onParagraphBulletToggle,
@@ -35328,6 +35377,7 @@ function PPTTextQuickFormatControls({
   onTextUnderlineToggle,
   state,
 }: {
+  expanded: boolean
   onFontSizeStep: (delta: number) => void
   onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
   onParagraphBulletToggle: () => void
@@ -35343,14 +35393,16 @@ function PPTTextQuickFormatControls({
   state: PPTTextQuickFormatState
 }) {
   return (
-    <span className="ppt-text-quick-format" data-ppt-text-quick-bar>
-      <button
-        aria-label="Bold text"
+    <span
+      className="ppt-text-quick-format"
+      data-ppt-text-quick-bar
+      data-ppt-text-quick-expanded={expanded ? 'true' : 'false'}
+    >
+      <IconButton
         aria-pressed={state.isBold}
-        className="ppt-floating-command"
         data-ppt-text-quick="bold"
-        title="Bold text"
-        type="button"
+        label="Bold text"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35358,14 +35410,12 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Bold size={16} />
-      </button>
-      <button
-        aria-label="Italic text"
+      </IconButton>
+      <IconButton
         aria-pressed={state.isItalic}
-        className="ppt-floating-command"
         data-ppt-text-quick="italic"
-        title="Italic text"
-        type="button"
+        label="Italic text"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35373,14 +35423,12 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Italic size={16} />
-      </button>
-      <button
-        aria-label="Underline text"
+      </IconButton>
+      <IconButton
         aria-pressed={state.isUnderline}
-        className="ppt-floating-command"
         data-ppt-text-quick="underline"
-        title="Underline text"
-        type="button"
+        label="Underline text"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35388,14 +35436,12 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Underline size={16} />
-      </button>
-      <button
-        aria-label="Strikethrough text"
+      </IconButton>
+      <IconButton
         aria-pressed={state.isStrikethrough}
-        className="ppt-floating-command"
         data-ppt-text-quick="strikethrough"
-        title="Strikethrough text"
-        type="button"
+        label="Strikethrough text"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35403,13 +35449,11 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Strikethrough size={16} />
-      </button>
-      <button
-        aria-label="Clear formatting"
-        className="ppt-floating-command"
+      </IconButton>
+      <IconButton
         data-ppt-text-quick="clear-formatting"
-        title="Clear formatting"
-        type="button"
+        label="Clear formatting"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35417,13 +35461,11 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Eraser size={16} />
-      </button>
-      <button
-        aria-label="Decrease font size"
-        className="ppt-floating-command"
+      </IconButton>
+      <IconButton
         data-ppt-text-quick="font-size-down"
-        title="Decrease font size"
-        type="button"
+        label="Decrease font size"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35431,17 +35473,15 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Minus size={16} />
-      </button>
+      </IconButton>
       <span className="ppt-font-size-chip" data-ppt-text-quick-size>
         <ALargeSmall size={15} />
         {state.fontSize}
       </span>
-      <button
-        aria-label="Increase font size"
-        className="ppt-floating-command"
+      <IconButton
         data-ppt-text-quick="font-size-up"
-        title="Increase font size"
-        type="button"
+        label="Increase font size"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35449,7 +35489,7 @@ function PPTTextQuickFormatControls({
         }}
       >
         <Plus size={16} />
-      </button>
+      </IconButton>
       <label className="ppt-floating-color" title="Text color">
         <Baseline size={15} />
         <input
@@ -35472,13 +35512,11 @@ function PPTTextQuickFormatControls({
           onPointerDown={(event) => event.stopPropagation()}
         />
       </label>
-      <button
-        aria-label="Toggle bullet list"
+      <IconButton
         aria-pressed={state.bullet}
-        className="ppt-floating-command"
         data-ppt-text-quick="bullet"
-        title="Toggle bullet list"
-        type="button"
+        label="Toggle bullet list"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35486,14 +35524,12 @@ function PPTTextQuickFormatControls({
         }}
       >
         <List size={16} />
-      </button>
-      <button
-        aria-label="Toggle numbered list"
+      </IconButton>
+      <IconButton
         aria-pressed={state.numbered}
-        className="ppt-floating-command"
         data-ppt-text-quick="numbered"
-        title="Toggle numbered list"
-        type="button"
+        label="Toggle numbered list"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35501,10 +35537,8 @@ function PPTTextQuickFormatControls({
         }}
       >
         <ListOrdered size={16} />
-      </button>
-      <button
-        aria-label="Decrease list level"
-        className="ppt-floating-command"
+      </IconButton>
+      <IconButton
         data-ppt-text-quick="list-level-down"
         data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.decrease}
         data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
@@ -35514,8 +35548,8 @@ function PPTTextQuickFormatControls({
         data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
         data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
         disabled={!state.canDecreaseListLevel}
-        title="Decrease list level"
-        type="button"
+        label="Decrease list level"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35523,10 +35557,8 @@ function PPTTextQuickFormatControls({
         }}
       >
         <ListIndentDecrease size={16} />
-      </button>
-      <button
-        aria-label="Increase list level"
-        className="ppt-floating-command"
+      </IconButton>
+      <IconButton
         data-ppt-text-quick="list-level-up"
         data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.increase}
         data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
@@ -35536,8 +35568,8 @@ function PPTTextQuickFormatControls({
         data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
         data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
         disabled={!state.canIncreaseListLevel}
-        title="Increase list level"
-        type="button"
+        label="Increase list level"
+        variant="floating"
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -35545,7 +35577,7 @@ function PPTTextQuickFormatControls({
         }}
       >
         <ListIndentIncrease size={16} />
-      </button>
+      </IconButton>
       <PPTParagraphAlignRadioGroup
         align={state.align}
         surface="quick"
@@ -37301,6 +37333,7 @@ function PPTColorSwatchStrip({
 
 function Inspector({
   exportCode,
+  hidden,
   inspectorSurface,
   layoutDescriptors,
   layoutPlaceholderVisibilityDescriptors,
@@ -37363,6 +37396,7 @@ function Inspector({
   themeColorTokens,
 }: {
   exportCode: string
+  hidden: boolean
   inspectorSurface: PPTInspectorSurfaceId
   layoutDescriptors: readonly SlideEditLayoutDescriptor[]
   layoutPlaceholderVisibilityDescriptors: readonly SlideEditPlaceholderDescriptor<string, string>[]
@@ -37670,6 +37704,7 @@ function Inspector({
   const [activeInspectorTabId, setActiveInspectorTabId] = useState<PPTInspectorTabId>(
     hasSelectedElement ? 'selection' : 'slide',
   )
+  const [advancedInspectorOpen, setAdvancedInspectorOpen] = useState(false)
   const previousInspectorSelectionStateRef = useRef(hasSelectedElement)
   const inspectorTabsDescriptor = createPPTCanvasTabsDescriptor({
     activation: 'automatic',
@@ -38171,32 +38206,43 @@ function Inspector({
       aria-label="Inspector"
       className="ppt-inspector"
       data-ppt-inspector-active-tab={activeInspectorTabId}
+      data-ppt-inspector-advanced-open={advancedInspectorOpen ? 'true' : 'false'}
+      hidden={hidden}
     >
-      <div
+      <div className="ppt-inspector-head">
+      <TabList
         aria-label="Inspector panels"
         className="ppt-inspector-tabs"
         data-ppt-inspector-tabs
         data-ppt-inspector-tabs-activation={inspectorTabsDescriptor.activation}
         data-ppt-inspector-tabs-keyboard={inspectorTabsDescriptor.keyboardModel}
         data-ppt-inspector-tabs-model={PPT_TABS_ROVING_FOCUS_MODEL}
-        role="tablist"
       >
         {inspectorTabsDescriptor.tabs.map((tab) => {
           return (
-            <button
+            <Tab
               {...tab.attributes}
               className="ppt-inspector-tab"
               data-ppt-inspector-tab={tab.id}
               data-ppt-inspector-tab-active={tab.isActive ? 'true' : 'false'}
               key={tab.id}
-              type="button"
               onClick={() => selectPPTInspectorTab(tab.id)}
               onKeyDown={(event) => handlePPTInspectorTabKeyDown(tab.id, event)}
             >
               {tab.label}
-            </button>
+            </Tab>
           )
         })}
+      </TabList>
+        <IconButton
+          aria-pressed={advancedInspectorOpen}
+          className="ppt-inspector-advanced-toggle"
+          data-ppt-inspector-advanced-toggle
+          label={advancedInspectorOpen ? 'Hide advanced properties' : 'Show advanced properties'}
+          onClick={() => setAdvancedInspectorOpen((current) => !current)}
+        >
+          <SlidersHorizontal size={15} />
+        </IconButton>
       </div>
       <section
         {...slideInspectorPanelAttributes}
@@ -39109,15 +39155,13 @@ function Inspector({
                   data-ppt-text-overflow-inspector
                 >
                   <span>{selectedTextOverflow ? 'Overflow' : 'Fits'}</span>
-                  <button
-                    className="ppt-button"
+                  <Button
                     data-ppt-style-action="text-auto-fit"
                     disabled={!selectedTextOverflow}
-                    type="button"
                     onClick={() => onTextAutoFit(selectedElement.id)}
                   >
                     <Maximize2 size={15} /> Auto fit
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : null}
@@ -39345,8 +39389,7 @@ function Inspector({
                     )
                   })}
                 </div>
-                <button
-                  className="ppt-button"
+                <Button
                   data-ppt-image-crop-command={imageCropDescriptor?.fields.reset.commandId}
                   data-ppt-image-crop-control={imageCropDescriptor?.fields.reset.control}
                   data-ppt-image-crop-field="reset"
@@ -39354,11 +39397,10 @@ function Inspector({
                   data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
                   data-ppt-image-crop-surface={imageCropDescriptor?.surface}
                   disabled={imageCropDescriptor?.isSupported === false}
-                  type="button"
                   onClick={() => onImageCropReset(selectedElement.id)}
                 >
                   <Undo2 size={15} /> Reset
-                </button>
+                </Button>
                 <input
                   accept={imageReplaceDescriptor?.field.accept ?? 'image/*'}
                   className="ppt-file-input"
@@ -39384,8 +39426,7 @@ function Inspector({
                     event.target.value = ''
                   }}
                 />
-                <button
-                  className="ppt-button"
+                <Button
                   data-ppt-image-replace-action
                   data-ppt-image-replace-command={imageReplaceDescriptor?.field.commandId}
                   data-ppt-image-replace-control={imageReplaceDescriptor?.field.control}
@@ -39393,11 +39434,10 @@ function Inspector({
                   data-ppt-image-replace-supported={imageReplaceDescriptor?.isSupported ? 'true' : 'false'}
                   data-ppt-image-replace-surface={imageReplaceDescriptor?.surface}
                   disabled={imageReplaceDescriptor?.isSupported === false}
-                  type="button"
                   onClick={() => imageReplaceInputRef.current?.click()}
                 >
                   <ImagePlus size={15} /> Change
-                </button>
+                </Button>
               </>
             ) : null}
             {selectedElement.kind === 'table' ? (
@@ -39480,15 +39520,13 @@ function Inspector({
                           updateCommentReplyDraft(selectedElement.id, event.target.value)}
                       />
                     </label>
-                    <button
-                      className="ppt-button"
+                    <Button
                       data-ppt-comment-reply-add
                       disabled={commentReplyDraft.trim().length === 0}
-                      type="button"
                       onClick={() => commitCommentReplyDraft(selectedElement.id)}
                     >
                       <MessageSquare size={15} /> Add
-                    </button>
+                    </Button>
                   </div>
                 </section>
               </>
@@ -39631,7 +39669,7 @@ function Inspector({
         )}
       </section>
 
-      <div className="ppt-panel-header">
+      <div className="ppt-panel-header ppt-inspector-advanced-only">
         <h2>Objects</h2>
       </div>
       <section
@@ -39863,18 +39901,18 @@ function Inspector({
         </div>
       </section>
 
-      <div className="ppt-panel-header">
+      <div className="ppt-panel-header ppt-inspector-advanced-only">
         <h2>Export</h2>
       </div>
-      <section className="ppt-panel-section">
-        <div className="ppt-toolbar-group">
-          <button className="ppt-button" onClick={onCopyHTML} type="button">
+      <section className="ppt-panel-section ppt-inspector-advanced-only">
+        <ToolbarGroup>
+          <Button onClick={onCopyHTML}>
             <Copy size={16} /> Copy
-          </button>
-          <button className="ppt-button" onClick={onDownloadHTML} type="button">
+          </Button>
+          <Button onClick={onDownloadHTML}>
             <Download size={16} /> Download
-          </button>
-        </div>
+          </Button>
+        </ToolbarGroup>
         <textarea className="ppt-export-code" readOnly value={exportCode} />
       </section>
     </aside>

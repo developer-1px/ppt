@@ -77,6 +77,7 @@ try {
     await runPPTXRenderScenario(page)
   } else if (PPT_VERIFY_SCENARIO === 'mvp') {
     await runFirstScreenScenario(page)
+    await runProgressiveDisclosureScenario(page)
     await runTopToolbarRovingFocusScenario(page)
     await runTextEditingScenario(page)
     await runFindReplaceScenario(page)
@@ -185,8 +186,226 @@ async function runFirstScreenScenario(page) {
   record('does not expose CanvasItem as product text', !state.hasCanvasItemLeak, state)
 }
 
+async function runProgressiveDisclosureScenario(page) {
+  const initial = await readPPTProgressiveDisclosureState(page)
+
+  record(
+    'starts with quiet PPT editing chrome',
+    initial.inspectorOpen === false &&
+      initial.inspectorVisible === false &&
+      initial.toolShelfOpen === false &&
+      initial.toolShelfVisible === false &&
+      initial.viewOptionsOpen === false &&
+      initial.exportOptionsOpen === false &&
+      initial.gridVisible === false &&
+      initial.frameGuidesVisible === false &&
+      initial.minimapVisible === false &&
+      initial.visibleSecondaryExportCount === 0 &&
+      initial.visibleSlideActionCount === 2 &&
+      initial.visibleTopbarControlCount < initial.topbarControlCount,
+    initial,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-tool-shelf-trigger]')?.click()`)
+  await delay(60)
+  const toolsOpen = await readPPTProgressiveDisclosureState(page)
+
+  record(
+    'reveals editing tools only on request',
+    toolsOpen.toolShelfOpen === true &&
+      toolsOpen.toolShelfVisible === true &&
+      toolsOpen.visibleTopbarControlCount > initial.visibleTopbarControlCount,
+    { initial, toolsOpen },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-tool-shelf-trigger]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-view-options-trigger]')?.click()`)
+  await delay(60)
+  const viewOpen = await readPPTProgressiveDisclosureState(page)
+
+  record(
+    'reveals secondary view controls only on request',
+    viewOpen.viewOptionsOpen === true &&
+      viewOpen.viewGridControlVisible === true &&
+      viewOpen.viewMinimapControlVisible === true &&
+      viewOpen.viewFrameGuidesControlVisible === true,
+    viewOpen,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-view-options-trigger]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-export-options-trigger]')?.click()`)
+  await delay(60)
+  const exportOpen = await readPPTProgressiveDisclosureState(page)
+
+  record(
+    'reveals secondary export controls only on request',
+    exportOpen.exportOptionsOpen === true &&
+      exportOpen.visibleSecondaryExportCount > 0,
+    exportOpen,
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-export-options-trigger]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-inspector-toggle]')?.click()`)
+  await delay(60)
+  const inspectorOpen = await readPPTProgressiveDisclosureState(page)
+
+  await page.eval(`document.querySelector('[data-ppt-inspector-advanced-toggle]')?.click()`)
+  await delay(60)
+  const inspectorAdvanced = await readPPTProgressiveDisclosureState(page)
+
+  record(
+    'reveals properties and advanced controls in two steps',
+    inspectorOpen.inspectorOpen === true &&
+      inspectorOpen.inspectorVisible === true &&
+      inspectorOpen.inspectorAdvancedOpen === false &&
+      inspectorAdvanced.inspectorAdvancedOpen === true &&
+      inspectorAdvanced.layerPaneVisible === true,
+    { inspectorAdvanced, inspectorOpen },
+  )
+
+  await page.eval(`document.querySelector('[data-ppt-inspector-toggle]')?.click()`)
+
+  const hasSelectionMore = await page.eval(`(() => {
+    const trigger = document.querySelector('[data-ppt-selection-floating-more]')
+
+    if (!trigger) {
+      return false
+    }
+
+    trigger.click()
+    return true
+  })()`)
+
+  if (hasSelectionMore) {
+    await delay(60)
+    const selectionExpanded = await readPPTProgressiveDisclosureState(page)
+
+    record(
+      'expands selection actions only on request',
+      selectionExpanded.selectionFloatingExpanded === true &&
+        selectionExpanded.selectionFloatingDetailsVisible === true,
+      selectionExpanded,
+    )
+    await page.eval(`document.querySelector('[data-ppt-selection-floating-more]')?.click()`)
+  }
+}
+
+function readPPTProgressiveDisclosureState(page) {
+  return page.eval(`(() => {
+    const isVisible = (element) => {
+      if (!element) return false
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+
+      return style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.width > 0 &&
+        rect.height > 0
+    }
+    const app = document.querySelector('[data-ppt-app]')
+    const toolbar = document.querySelector('[data-ppt-toolbar]')
+    const inspector = document.querySelector('.ppt-inspector')
+    const toolShelf = document.querySelector('[data-ppt-tool-shelf]')
+    const topbarControls = [...document.querySelectorAll(
+      '[data-ppt-toolbar] button, [data-ppt-toolbar] select, [data-ppt-toolbar] input:not([type="file"])',
+    )]
+    const slideActions = [...document.querySelectorAll('.ppt-slide-actions button')]
+    const selectionDetails = document.querySelector('.ppt-selection-floating-details')
+
+    return {
+      exportOptionsOpen: toolbar?.getAttribute('data-ppt-export-options-open') === 'true',
+      frameGuidesVisible: document.querySelector('[data-ppt-view-frame-guides]')?.getAttribute('aria-pressed') === 'true',
+      gridVisible: document.querySelector('.ppt-stage-shell')?.getAttribute('data-grid') === 'true',
+      inspectorAdvancedOpen: inspector?.getAttribute('data-ppt-inspector-advanced-open') === 'true',
+      inspectorOpen: app?.getAttribute('data-ppt-inspector-open') === 'true',
+      inspectorVisible: isVisible(inspector),
+      layerPaneVisible: isVisible(document.querySelector('[data-ppt-layer-pane]')),
+      minimapVisible: isVisible(document.querySelector('[data-ppt-minimap]')),
+      selectionFloatingDetailsVisible: isVisible(selectionDetails),
+      selectionFloatingExpanded: document.querySelector('[data-ppt-selection-floating-bar]')
+        ?.getAttribute('data-ppt-selection-floating-expanded') === 'true',
+      toolShelfOpen: toolbar?.getAttribute('data-ppt-tool-shelf-open') === 'true',
+      toolShelfVisible: isVisible(toolShelf),
+      topbarControlCount: topbarControls.length,
+      viewFrameGuidesControlVisible: isVisible(document.querySelector('[data-ppt-view-frame-guides]')),
+      viewGridControlVisible: isVisible(document.querySelector('[data-ppt-view-grid]')),
+      viewMinimapControlVisible: isVisible(document.querySelector('[data-ppt-view-minimap]')),
+      viewOptionsOpen: toolbar?.getAttribute('data-ppt-view-options-open') === 'true',
+      visibleSecondaryExportCount: [...document.querySelectorAll('.ppt-toolbar-export-secondary')]
+        .filter(isVisible).length,
+      visibleSlideActionCount: slideActions.filter(isVisible).length,
+      visibleTopbarControlCount: topbarControls.filter(isVisible).length,
+    }
+  })()`)
+}
+
+async function revealPPTInspector(page, { advanced = false } = {}) {
+  await page.eval(`(() => {
+    const app = document.querySelector('[data-ppt-app]')
+
+    if (app?.getAttribute('data-ppt-inspector-open') !== 'true') {
+      document.querySelector('[data-ppt-inspector-toggle]')?.click()
+    }
+  })()`)
+  await delay(60)
+
+  if (!advanced) {
+    return
+  }
+
+  await page.eval(`(() => {
+    const inspector = document.querySelector('.ppt-inspector')
+
+    if (inspector?.getAttribute('data-ppt-inspector-advanced-open') !== 'true') {
+      document.querySelector('[data-ppt-inspector-advanced-toggle]')?.click()
+    }
+  })()`)
+  await delay(60)
+}
+
+async function hidePPTInspector(page) {
+  await page.eval(`(() => {
+    const app = document.querySelector('[data-ppt-app]')
+
+    if (app?.getAttribute('data-ppt-inspector-open') === 'true') {
+      document.querySelector('[data-ppt-inspector-toggle]')?.click()
+    }
+  })()`)
+  await delay(60)
+}
+
+async function revealPPTSelectionDetails(page) {
+  await page.eval(`(() => {
+    const bar = document.querySelector('[data-ppt-selection-floating-bar]')
+
+    if (bar?.getAttribute('data-ppt-selection-floating-expanded') !== 'true') {
+      document.querySelector('[data-ppt-selection-floating-more]')?.click()
+    }
+  })()`)
+  await delay(60)
+}
+
+async function enablePPTFrameGuides(page) {
+  await page.eval(`(() => {
+    const toolbar = document.querySelector('[data-ppt-toolbar]')
+    const openedViewOptions = toolbar?.getAttribute('data-ppt-view-options-open') !== 'true'
+
+    if (openedViewOptions) {
+      document.querySelector('[data-ppt-view-options-trigger]')?.click()
+    }
+    if (document.querySelector('[data-ppt-view-frame-guides]')?.getAttribute('aria-pressed') !== 'true') {
+      document.querySelector('[data-ppt-view-frame-guides]')?.click()
+    }
+    if (openedViewOptions) {
+      document.querySelector('[data-ppt-view-options-trigger]')?.click()
+    }
+  })()`)
+  await delay(60)
+}
+
 async function runPPTXRenderScenario(page) {
   await runFirstScreenScenario(page)
+  await runProgressiveDisclosureScenario(page)
 
   const externalPPTXFixture = await readExternalPPTXRenderFixture()
 
@@ -2972,6 +3191,8 @@ async function runFindReplaceScenario(page) {
 }
 
 async function runAffordanceScenario(page) {
+  await enablePPTFrameGuides(page)
+
   const initial = await page.eval(`(() => {
     const element = document.querySelector('[data-ppt-element="s1-card-1"]')
     const frameGuides = document.querySelector('[data-ppt-frame-guides]')
@@ -3962,6 +4183,7 @@ async function runAffordanceScenario(page) {
     afterKeyboardUngroup,
   )
 
+  await revealPPTInspector(page, { advanced: true })
   await page.eval(`document.querySelector('[data-ppt-command="group"]')?.click()`)
   await delay(50)
 
@@ -4111,6 +4333,8 @@ async function runAffordanceScenario(page) {
       afterGroupFocusParent,
     },
   )
+
+  await hidePPTInspector(page)
 
   await pressKey(page, {
     code: 'Escape',
@@ -6505,6 +6729,8 @@ async function runShortcutHelpScenario(page) {
 }
 
 async function runSlideMetadataScenario(page) {
+  await revealPPTInspector(page)
+
   const titlePoint = await getElementCenter(page, 's1-title')
   await clickMouse(page, titlePoint.x, titlePoint.y, 1)
   await delay(50)
@@ -7350,6 +7576,25 @@ async function runMinimapScenario(page) {
   await page.eval(`document.querySelector('[data-ppt-view-fit-slide]')?.click()`)
   await delay(100)
 
+  await page.eval(`(() => {
+    const toolbar = document.querySelector('[data-ppt-toolbar]')
+
+    if (toolbar?.getAttribute('data-ppt-view-options-open') !== 'true') {
+      document.querySelector('[data-ppt-view-options-trigger]')?.click()
+    }
+  })()`)
+  await delay(40)
+  await page.eval(`(() => {
+    const minimap = document.querySelector('[data-ppt-view-minimap]')
+
+    if (minimap?.getAttribute('aria-pressed') !== 'true') {
+      minimap?.click()
+    }
+
+    document.querySelector('[data-ppt-view-options-trigger]')?.click()
+  })()`)
+  await delay(100)
+
   const initial = await readPPTMinimapState(page)
 
   record('renders PPT minimap viewport overview', initial.open && initial.model === 'canvas-minimap-read-model' && initial.itemCount >= 5 && initial.hasWorld && initial.hasViewport && initial.togglePressed === 'true', initial)
@@ -7389,7 +7634,12 @@ async function runMinimapScenario(page) {
     afterMinimapClick,
   })
 
-  await page.eval(`document.querySelector('[data-ppt-view-minimap]')?.click()`)
+  await page.eval(`document.querySelector('[data-ppt-view-options-trigger]')?.click()`)
+  await delay(40)
+  await page.eval(`(() => {
+    document.querySelector('[data-ppt-view-minimap]')?.click()
+    document.querySelector('[data-ppt-view-options-trigger]')?.click()
+  })()`)
   await delay(80)
 
   const afterToolbarHide = await readPPTMinimapState(page)
@@ -8354,6 +8604,7 @@ async function runTextQuickFormatScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+  await revealPPTInspector(page)
 
   let titlePoint = await getElementCenter(page, 's1-title')
   await clickMouse(page, titlePoint.x, titlePoint.y, 1)
@@ -8763,6 +9014,7 @@ async function runTextQuickFormatScenario(page) {
     },
   )
 
+  await revealPPTSelectionDetails(page)
   const initialAlignRadio = await readPPTParagraphAlignRadioGroupState(page)
 
   record(
@@ -16763,6 +17015,7 @@ async function runAlignmentPopoverScenario(page) {
 
   await clickMouse(page, point.x, point.y, 1)
   await delay(80)
+  await revealPPTSelectionDetails(page)
 
   await page.eval(`document.querySelector('[data-ppt-alignment-popover-trigger]')?.click()`)
   await delay(50)
@@ -17013,6 +17266,22 @@ async function runViewAndShapeScenario(page) {
   })
   await delay(50)
 
+  await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
+  await delay(60)
+  const frameGuideTarget = await getElementCenter(page, 's1-card-1')
+  await clickMouse(page, frameGuideTarget.x, frameGuideTarget.y, 1)
+  await delay(60)
+
+  await page.eval(`document.querySelector('[data-ppt-view-options-trigger]')?.click()`)
+  await delay(40)
+  await page.eval(`(() => {
+    const frameGuides = document.querySelector('[data-ppt-view-frame-guides]')
+
+    if (frameGuides?.getAttribute('aria-pressed') === 'true') {
+      frameGuides.click()
+    }
+  })()`)
+  await delay(40)
   await page.eval(`document.querySelector('[data-ppt-view-grid]')?.click()`)
   await delay(50)
 
@@ -17022,7 +17291,7 @@ async function runViewAndShapeScenario(page) {
     zoomLabel: document.querySelector('.ppt-zoom-label')?.textContent ?? '',
   }))()`)
 
-  record('toggles PPT editing grid visibility', afterGridToggle.grid === 'false' && afterGridToggle.pressed === 'false', afterGridToggle)
+  record('reveals and enables PPT editing grid on request', afterGridToggle.grid === 'true' && afterGridToggle.pressed === 'true', afterGridToggle)
   record('shows PPT zoom percentage', /\d+%/.test(afterGridToggle.zoomLabel), afterGridToggle)
 
   await page.eval(`document.querySelector('[data-ppt-view-frame-guides]')?.click()`)
@@ -17034,11 +17303,17 @@ async function runViewAndShapeScenario(page) {
     pressed: document.querySelector('[data-ppt-view-frame-guides]')?.getAttribute('aria-pressed'),
   }))()`)
 
-  record('toggles PPT frame guide visibility from toolbar', afterFrameGuideToggle.frameGuides === 'false' && afterFrameGuideToggle.pressed === 'false' && afterFrameGuideToggle.guideLayerCount === 0, afterFrameGuideToggle)
+  record('reveals and enables PPT frame guides on request', afterFrameGuideToggle.frameGuides === 'true' && afterFrameGuideToggle.pressed === 'true' && afterFrameGuideToggle.guideLayerCount > 0, afterFrameGuideToggle)
 
-  await page.eval(`document.querySelector('[data-ppt-view-frame-guides]')?.click()`)
+  await page.eval(`(() => {
+    document.querySelector('[data-ppt-view-grid]')?.click()
+    document.querySelector('[data-ppt-view-frame-guides]')?.click()
+    document.querySelector('[data-ppt-view-options-trigger]')?.click()
+  })()`)
   await delay(50)
 
+  await page.eval(`document.querySelector('[data-ppt-tool-shelf-trigger]')?.click()`)
+  await delay(40)
   await page.eval(`document.querySelector('[data-ppt-insert-shape="ellipse"]')?.click()`)
   await delay(20)
   await waitUntil(
@@ -20627,6 +20902,7 @@ async function runObjectHyperlinkScenario(page) {
   await delay(50)
   await page.eval(`document.querySelector('.ppt-thumb[aria-label="Open Overview"]')?.click()`)
   await delay(80)
+  await revealPPTInspector(page)
 
   const cardPoint = await getElementCenter(page, 's1-card-1')
   await clickMouse(page, cardPoint.x, cardPoint.y, 1)
@@ -25131,6 +25407,7 @@ async function runLineAffordanceScenario(page) {
     windowsVirtualKeyCode: 27,
   })
   await delay(50)
+  await revealPPTInspector(page, { advanced: true })
 
   const before = await getPPTLineState(page)
 
@@ -26547,6 +26824,8 @@ async function runFlipSelectionScenario(page) {
 }
 
 async function runSelectionPaneScenario(page) {
+  await revealPPTInspector(page, { advanced: true })
+
   const initial = await page.eval(`(() => {
     const pane = document.querySelector('[data-ppt-layer-pane]')
     const tree = document.querySelector('.ppt-layer-list')
@@ -41207,11 +41486,45 @@ async function runMobileScenario(cdpPort) {
   })
   const state = await page.eval(`(() => ({
     app: !!document.querySelector('[data-ppt-app]'),
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+    inspectorOpen: document.querySelector('[data-ppt-app]')
+      ?.getAttribute('data-ppt-inspector-open') === 'true',
     railWidth: Math.round(document.querySelector('.ppt-rail')?.getBoundingClientRect().width ?? 0),
     stageVisible: (document.querySelector('.ppt-stage-shell')?.getBoundingClientRect().width ?? 0) > 120,
+    stageWidth: Math.round(document.querySelector('.ppt-stage-shell')?.getBoundingClientRect().width ?? 0),
+    visibleTopbarControlCount: [...document.querySelectorAll('[data-ppt-toolbar] button')]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect()
+        return getComputedStyle(element).display !== 'none' && rect.width > 0 && rect.height > 0
+      }).length,
   }))()`)
 
-  record('mobile shell renders', state.app && state.stageVisible && state.railWidth > 0, state)
+  await page.eval(`document.querySelector('[data-ppt-inspector-toggle]')?.click()`)
+  await delay(60)
+  const inspectorState = await page.eval(`(() => ({
+    inspectorOpen: document.querySelector('[data-ppt-app]')
+      ?.getAttribute('data-ppt-inspector-open') === 'true',
+    inspectorVisible: (() => {
+      const inspector = document.querySelector('.ppt-inspector')
+      const rect = inspector?.getBoundingClientRect()
+      return (rect?.width ?? 0) > 0 && (rect?.height ?? 0) > 0
+    })(),
+    stageWidth: Math.round(document.querySelector('.ppt-stage-shell')?.getBoundingClientRect().width ?? 0),
+  }))()`)
+
+  record(
+    'mobile shell renders quiet chrome without overlap',
+    state.app &&
+      state.stageVisible &&
+      state.railWidth > 0 &&
+      !state.horizontalOverflow &&
+      !state.inspectorOpen &&
+      state.visibleTopbarControlCount <= 12 &&
+      inspectorState.inspectorOpen &&
+      inspectorState.inspectorVisible &&
+      inspectorState.stageWidth === state.stageWidth,
+    { inspectorState, state },
+  )
   await page.close()
 }
 
