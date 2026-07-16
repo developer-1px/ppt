@@ -15,6 +15,7 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 - `pptLayerPaneAdapter.ts`: PPT 요소와 그룹을 canvas Layer Pane descriptor, 선택, 재정렬 명령으로 변환한다. 앱의 도메인 명령과 Inspector UI가 함께 쓰는 PPT 경계다.
 - `pptCommentThreadAdapter.ts`: comment 본문과 reply를 정규화하고 저장된 thread가 없을 때 표시할 fallback thread를 만든다.
 - `pptImageAdapter.ts`: 이미지 fit/crop 기본값을 정규화하고 canvas Image Crop/Replace descriptor로 변환한다. 캔버스 렌더링과 Inspector가 같은 PPT 이미지 값을 사용하게 하는 경계다.
+- `pptObjectAdapter.ts`: 모든 PPT 객체에 공통인 opacity, hyperlink, accessibility, shadow 값을 정규화하고 canvas descriptor로 변환한다. 렌더링·명령 처리·Inspector가 같은 객체 의미를 사용하게 하는 경계다.
 
 ## Extension rules
 
@@ -32,5 +33,6 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 12. Inspector 탭, 선택 변화에 따른 활성 탭, 고급 속성 공개 상태와 Slide/Objects/Export 조합은 `PPTInspectorShell`이 소유한다.
 13. Comment reply draft와 commit interaction은 `PPTCommentInspectorFields`가 소유하며, comment 저장 모델 정규화는 `pptCommentThreadAdapter.ts`를 함께 사용한다.
 14. Image Inspector의 crop/fit/replace 필드와 파일 input ref는 `PPTImageInspectorFields`가 소유하며, 이미지 값과 descriptor 변환은 `pptImageAdapter.ts`를 함께 사용한다.
+15. 공통 Object Properties의 name, opacity, hyperlink, accessibility, shadow, geometry 필드는 `PPTObjectPropertiesInspectorFields`가 소유하며, 객체 값과 descriptor 변환은 `pptObjectAdapter.ts`를 함께 사용한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.

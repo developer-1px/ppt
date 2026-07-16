@@ -93,14 +93,10 @@ import {
   createSlideEditColorSwatchPaletteDescriptor,
   createSlideEditClipboardPasteCommandEffect,
   createSlideEditClipboardPayload,
-  createSlideEditObjectAccessibilityDescriptor,
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
-  createSlideEditObjectHyperlinkDescriptor,
   createSlideEditObjectAnimationDescriptor,
-  createSlideEditObjectOpacityDescriptor,
-  createSlideEditObjectShadowDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditStyleClipboardDescriptor,
   createSlideEditStyleClipboardPasteCommandEffect,
@@ -158,12 +154,9 @@ import {
   getSlideEditObjectOpacityJSONPasteValueFromText,
   getSlideEditObjectOpacityPasteCommand,
   getSlideEditObjectShadowCommandEffect,
-  getSlideEditObjectShadowFilter,
   getSlideEditObjectShadowJSONPasteValueFromText,
   getSlideEditObjectShadowJSONPasteValueFromValue,
   getSlideEditObjectShadowPasteCommands,
-  normalizeSlideEditObjectAltTextStorageValue,
-  normalizeSlideEditObjectHyperlinkStorageUrl,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
   getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
@@ -245,7 +238,6 @@ import {
   normalizeSlideEditColorSwatchValue,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectImageCropValue,
-  normalizeSlideEditObjectOpacity,
   normalizeSlideEditObjectShadow,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
@@ -344,7 +336,6 @@ import {
   SLIDE_EDIT_RAIL_REORDER_MOVE_UP_SHORTCUT as PPT_SLIDE_MOVE_UP_SHORTCUT,
   toSlideEditObjectCornerRadiusAttributeValue,
   toSlideEditObjectFillOpacityAttributeValue,
-  toSlideEditObjectOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
   toSlideEditSlideNotesPasteCommandEffect,
   toSlideEditSlideMetadataHostCommandEffect,
@@ -360,14 +351,12 @@ import {
   type SlideEditLayoutJSONPasteValue,
   type SlideEditLayoutPlaceholderVisibilityHostCommandEffect,
   type SlideEditMasterDescriptor,
-  type SlideEditObjectAccessibilityDescriptor,
   type SlideEditObjectAccessibilityHostCommandEffect,
   type SlideEditObjectAccessibilityJSONPasteValue,
   type SlideEditObjectCornerRadiusDescriptor,
   type SlideEditObjectCornerRadiusHostCommandEffect,
   type SlideEditObjectFillOpacityDescriptor,
   type SlideEditObjectFillOpacityHostCommandEffect,
-  type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectImageCropHostCommandEffect,
   type SlideEditObjectImageCropJSONPasteValue,
@@ -389,9 +378,7 @@ import {
   type SlideEditObjectAnimationDescriptor,
   type SlideEditObjectAnimationHostCommandEffect,
   type SlideEditObjectAnimationUpdateCommand,
-  type SlideEditObjectOpacityDescriptor,
   type SlideEditObjectOpacityHostCommandEffect,
-  type SlideEditObjectShadowDescriptor,
   type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectShadowJSONPasteValue,
   type SlideEditObjectShadowPasteFieldValue,
@@ -519,9 +506,7 @@ import {
   type PPTComment,
   type PPTCommentThreadMessage,
   type PPTElement,
-  type PPTElementAccessibility,
   type PPTElementAnimation,
-  type PPTElementHyperlink,
   type PPTElementShadow,
   type PPTFill,
   type PPTFreeform,
@@ -576,6 +561,30 @@ import {
   getPPTImageFit,
   normalizePPTImageFit,
 } from './pptImageAdapter'
+import {
+  formatPPTElementOpacity,
+  formatPPTElementShadowOpacity,
+  getPPTElementAltText,
+  getPPTElementHyperlink,
+  getPPTElementOpacity,
+  getPPTElementShadow,
+  getPPTElementShadowFilter,
+  hasPPTElementShadow,
+  normalizePPTAltText,
+  normalizePPTElementAccessibility,
+  normalizePPTElementHyperlink,
+  normalizePPTElementHyperlinkUrl,
+  normalizePPTElementOpacity,
+  normalizePPTElementShadow,
+  normalizePPTElementShadowAngle,
+  normalizePPTElementShadowBlur,
+  normalizePPTElementShadowColor,
+  normalizePPTElementShadowDistance,
+  normalizePPTElementShadowOpacity,
+  PPT_ALT_TEXT_MAX_LENGTH,
+  PPT_HYPERLINK_URL_MAX_LENGTH,
+  type PPTElementShadowUpdateField,
+} from './pptObjectAdapter'
 import {
   getPPTCommentThread,
   getPPTCommentThreadWithBody,
@@ -916,6 +925,7 @@ import {
   PPTCommentInspectorFields,
   PPTImageInspectorFields,
   PPTInspectorShell,
+  PPTObjectPropertiesInspectorFields,
   type PPTInspectorAction,
   type PPTInspectorProps,
 } from './ui/inspector'
@@ -3421,13 +3431,6 @@ type PPTElementAnimationUpdateField =
 type PPTElementAnimationCSSStyle = ReturnType<
   typeof getSlideEditObjectAnimationCSSStyle
 >
-type PPTElementShadowUpdateField =
-  | 'angle'
-  | 'blur'
-  | 'color'
-  | 'distance'
-  | 'enabled'
-  | 'opacity'
 type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
@@ -3630,24 +3633,6 @@ const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
 } as const satisfies PPTTextInset)
 const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
-const PPT_ELEMENT_OPACITY_MIN = 0
-const PPT_ELEMENT_OPACITY_MAX = 1
-const PPT_ELEMENT_OPACITY_STEP = 0.05
-const PPT_DEFAULT_ELEMENT_SHADOW = Object.freeze({
-  angle: 45,
-  blur: 14,
-  color: '#000000',
-  distance: 8,
-  opacity: 0.22,
-} as const satisfies PPTElementShadow)
-const PPT_ELEMENT_SHADOW_ANGLE_MIN = 0
-const PPT_ELEMENT_SHADOW_ANGLE_MAX = 359
-const PPT_ELEMENT_SHADOW_BLUR_MAX = 80
-const PPT_ELEMENT_SHADOW_DISTANCE_MAX = 120
-const PPT_ELEMENT_SHADOW_OPACITY_MIN = 0
-const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
-const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
-const PPT_ALT_TEXT_MAX_LENGTH = 1000
 const PPT_DRAG_DUPLICATE_THRESHOLD =
   SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD
 const PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE =
@@ -3671,7 +3656,6 @@ const PPT_SECTION_BOUNDS = Object.freeze({
   h: 240,
   w: 420,
 } as const)
-const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
 const PPT_STROKE_DASH_OPTIONS = Object.freeze(
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS.map((option) => ({
     id: option.id,
@@ -11535,7 +11519,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       id: 'update-object-opacity',
       objectId: elementId,
       slideId: activeSlide.id,
-      value: normalizeSlideEditObjectOpacity(opacity),
+      value: normalizePPTElementOpacity(opacity),
     })
 
     setLastObjectOpacityEffect(effect)
@@ -35864,14 +35848,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const {
     onColorSwatchApply,
     onCommitText,
-    onElementAltTextChange,
     onElementAnimationChange,
-    onElementGeometryChange,
-    onElementHyperlinkChange,
-    onElementNameChange,
-    onElementOpacityChange,
-    onElementRotationChange,
-    onElementShadowChange,
     onElementStrokeChange,
     onElementTextInsetChange,
     onElementTextStyleChange,
@@ -35934,46 +35911,9 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
-  const objectOpacityDescriptor = selectedElement
-    ? getPPTObjectOpacityDescriptor(slide.id, selectedElement)
-    : null
-  const objectHyperlinkDescriptor = selectedElement
-    ? getPPTObjectHyperlinkDescriptor(slide.id, selectedElement)
-    : null
-  const objectHyperlinkUrlField = objectHyperlinkDescriptor?.fields.find((field) =>
-    field.id === 'url'
-  )
-  const objectAccessibilityDescriptor = selectedElement
-    ? getPPTObjectAccessibilityDescriptor(slide.id, selectedElement)
-    : null
-  const objectAccessibilityAltTextField = objectAccessibilityDescriptor?.fields.find((field) =>
-    field.id === 'altText'
-  )
-  const objectShadowDescriptor = selectedElement
-    ? getPPTObjectShadowDescriptor(slide.id, selectedElement)
-    : null
-  const objectShadowEnabledField = getPPTObjectShadowField(objectShadowDescriptor, 'enabled')
-  const objectShadowColorField = getPPTObjectShadowField(objectShadowDescriptor, 'color')
-  const objectShadowOpacityField = getPPTObjectShadowField(objectShadowDescriptor, 'opacity')
-  const objectShadowBlurField = getPPTObjectShadowField(objectShadowDescriptor, 'blur')
-  const objectShadowDistanceField = getPPTObjectShadowField(objectShadowDescriptor, 'distance')
-  const objectShadowAngleField = getPPTObjectShadowField(objectShadowDescriptor, 'angle')
   const objectAnimationDescriptor = selectedElement
     ? getPPTObjectAnimationDescriptor(slide, selectedElement)
     : null
-  const elementHyperlink = selectedElement
-    ? getPPTElementHyperlink(selectedElement)
-    : null
-  const elementAltText = selectedElement
-    ? getPPTElementAltText(selectedElement) ?? ''
-    : ''
-  const elementShadow = selectedElement
-    ? getPPTElementShadow(selectedElement)
-    : PPT_DEFAULT_ELEMENT_SHADOW
-  const elementShadowEnabled = selectedElement
-    ? hasPPTElementShadow(selectedElement)
-    : false
-  const objectShadowEnabled = objectShadowDescriptor?.metadata.isEnabled ?? elementShadowEnabled
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
@@ -35993,259 +35933,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
       selectionPanel={
         selectedElement ? (
           <>
-            <label className="ppt-field">
-              <span>Name</span>
-              <input
-                data-ppt-style-field="name"
-                value={selectedElement.name}
-                onChange={(event) =>
-                  onElementNameChange(selectedElement.id, event.target.value)}
-              />
-            </label>
-            <label className="ppt-field">
-              <span>Opacity</span>
-              <input
-                data-ppt-style-field="opacity"
-                data-ppt-object-opacity-attribute={objectOpacityDescriptor?.metadata.attribute}
-                data-ppt-object-opacity-attribute-value={objectOpacityDescriptor?.metadata.attributeValue}
-                data-ppt-object-opacity-command={objectOpacityDescriptor?.field.commandId}
-                data-ppt-object-opacity-control={objectOpacityDescriptor?.field.control}
-                data-ppt-object-opacity-surface={objectOpacityDescriptor?.surface}
-                max={objectOpacityDescriptor?.field.max ?? PPT_ELEMENT_OPACITY_MAX}
-                min={objectOpacityDescriptor?.field.min ?? PPT_ELEMENT_OPACITY_MIN}
-                step={objectOpacityDescriptor?.field.step ?? PPT_ELEMENT_OPACITY_STEP}
-                type="number"
-                value={objectOpacityDescriptor?.value ?? getPPTElementOpacity(selectedElement)}
-                onChange={(event) =>
-                  onElementOpacityChange(
-                    selectedElement.id,
-                    parsePPTElementOpacity(event.target.value),
-                  )}
-              />
-            </label>
-            <label className="ppt-field">
-              <span>Link</span>
-              <input
-                data-ppt-style-field="hyperlink"
-                data-ppt-hyperlink-attribute={objectHyperlinkDescriptor?.metadata.attribute}
-                data-ppt-hyperlink-attribute-value={objectHyperlinkDescriptor?.metadata.attributeValue}
-                data-ppt-hyperlink-command={objectHyperlinkUrlField?.commandId}
-                data-ppt-hyperlink-control={objectHyperlinkUrlField?.control}
-                data-ppt-hyperlink-enabled={objectHyperlinkDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                data-ppt-hyperlink-surface={objectHyperlinkDescriptor?.surface}
-                data-ppt-hyperlink-validation={objectHyperlinkDescriptor?.metadata.validation.reason}
-                maxLength={PPT_HYPERLINK_URL_MAX_LENGTH}
-                placeholder="https://example.com"
-                value={objectHyperlinkDescriptor?.hyperlink.url ?? elementHyperlink?.url ?? ''}
-                onChange={(event) =>
-                  onElementHyperlinkChange(
-                    selectedElement.id,
-                    event.target.value,
-                  )}
-              />
-            </label>
-            <label className="ppt-field">
-              <span>Alt text</span>
-              <textarea
-                data-ppt-style-field="alt-text"
-                data-ppt-accessibility-attribute={objectAccessibilityDescriptor?.metadata.attribute}
-                data-ppt-accessibility-attribute-value={objectAccessibilityDescriptor?.metadata.attributeValue}
-                data-ppt-accessibility-command={objectAccessibilityAltTextField?.commandId}
-                data-ppt-accessibility-control={objectAccessibilityAltTextField?.control}
-                data-ppt-accessibility-described={objectAccessibilityDescriptor?.metadata.isDescribed ? 'true' : 'false'}
-                data-ppt-accessibility-surface={objectAccessibilityDescriptor?.surface}
-                maxLength={PPT_ALT_TEXT_MAX_LENGTH}
-                value={objectAccessibilityDescriptor?.value.altText ?? elementAltText}
-                onChange={(event) =>
-                  onElementAltTextChange(
-                    selectedElement.id,
-                    event.target.value,
-                  )}
-              />
-            </label>
-            <label className="ppt-checkbox-field">
-              <input
-                checked={objectShadowEnabled}
-                data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                data-ppt-shadow-command={objectShadowEnabledField?.commandId}
-                data-ppt-shadow-control={objectShadowEnabledField?.control}
-                data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                data-ppt-shadow-field="enabled"
-                data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                type="checkbox"
-                onChange={(event) =>
-                  onElementShadowChange(
-                    selectedElement.id,
-                    'enabled',
-                    event.target.checked,
-                  )}
-              />
-              <span>Shadow</span>
-            </label>
-            <div
-              className="ppt-geometry-grid"
-              data-ppt-shadow-angle={objectShadowDescriptor?.shadow.angle ?? elementShadow.angle}
-              data-ppt-shadow-blur={objectShadowDescriptor?.shadow.blur ?? elementShadow.blur}
-              data-ppt-shadow-color={objectShadowDescriptor?.shadow.color ?? elementShadow.color}
-              data-ppt-shadow-distance={objectShadowDescriptor?.shadow.distance ?? elementShadow.distance}
-              data-ppt-shadow-enabled={objectShadowEnabled ? 'true' : 'false'}
-              data-ppt-shadow-inspector
-              data-ppt-shadow-opacity={objectShadowDescriptor?.shadow.opacity ?? elementShadow.opacity}
-            >
-              <label className="ppt-field">
-                <span>Color</span>
-                <input
-                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                  data-ppt-shadow-command={objectShadowColorField?.commandId}
-                  data-ppt-shadow-control={objectShadowColorField?.control}
-                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                  data-ppt-shadow-field="color"
-                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                  disabled={!objectShadowEnabled}
-                  type="color"
-                  value={objectShadowDescriptor?.shadow.color ?? elementShadow.color}
-                  onChange={(event) =>
-                    onElementShadowChange(
-                      selectedElement.id,
-                      'color',
-                      event.target.value,
-                    )}
-                />
-              </label>
-              <label className="ppt-field">
-                <span>Shadow opacity</span>
-                <input
-                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                  data-ppt-shadow-command={objectShadowOpacityField?.commandId}
-                  data-ppt-shadow-control={objectShadowOpacityField?.control}
-                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                  data-ppt-shadow-field="opacity"
-                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                  data-ppt-shadow-unit={objectShadowOpacityField?.unit}
-                  disabled={!objectShadowEnabled}
-                  max={objectShadowOpacityField?.max ?? PPT_ELEMENT_SHADOW_OPACITY_MAX}
-                  min={objectShadowOpacityField?.min ?? PPT_ELEMENT_SHADOW_OPACITY_MIN}
-                  step={objectShadowOpacityField?.step ?? PPT_ELEMENT_SHADOW_OPACITY_STEP}
-                  type="number"
-                  value={objectShadowDescriptor?.shadow.opacity ?? elementShadow.opacity}
-                  onChange={(event) =>
-                    onElementShadowChange(
-                      selectedElement.id,
-                      'opacity',
-                      parsePPTElementShadowOpacity(event.target.value),
-                    )}
-                />
-              </label>
-              <label className="ppt-field">
-                <span>Blur</span>
-                <input
-                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                  data-ppt-shadow-command={objectShadowBlurField?.commandId}
-                  data-ppt-shadow-control={objectShadowBlurField?.control}
-                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                  data-ppt-shadow-field="blur"
-                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                  data-ppt-shadow-unit={objectShadowBlurField?.unit}
-                  disabled={!objectShadowEnabled}
-                  max={objectShadowBlurField?.max ?? PPT_ELEMENT_SHADOW_BLUR_MAX}
-                  min={objectShadowBlurField?.min ?? 0}
-                  step={objectShadowBlurField?.step ?? 1}
-                  type="number"
-                  value={objectShadowDescriptor?.shadow.blur ?? elementShadow.blur}
-                  onChange={(event) =>
-                    onElementShadowChange(
-                      selectedElement.id,
-                      'blur',
-                      parsePPTElementShadowBlur(event.target.value),
-                    )}
-                />
-              </label>
-              <label className="ppt-field">
-                <span>Distance</span>
-                <input
-                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                  data-ppt-shadow-command={objectShadowDistanceField?.commandId}
-                  data-ppt-shadow-control={objectShadowDistanceField?.control}
-                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                  data-ppt-shadow-field="distance"
-                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                  data-ppt-shadow-unit={objectShadowDistanceField?.unit}
-                  disabled={!objectShadowEnabled}
-                  max={objectShadowDistanceField?.max ?? PPT_ELEMENT_SHADOW_DISTANCE_MAX}
-                  min={objectShadowDistanceField?.min ?? 0}
-                  step={objectShadowDistanceField?.step ?? 1}
-                  type="number"
-                  value={objectShadowDescriptor?.shadow.distance ?? elementShadow.distance}
-                  onChange={(event) =>
-                    onElementShadowChange(
-                      selectedElement.id,
-                      'distance',
-                      parsePPTElementShadowDistance(event.target.value),
-                    )}
-                />
-              </label>
-              <label className="ppt-field">
-                <span>Angle</span>
-                <input
-                  data-ppt-shadow-attribute={objectShadowDescriptor?.metadata.attribute}
-                  data-ppt-shadow-attribute-value={objectShadowDescriptor?.metadata.attributeValue}
-                  data-ppt-shadow-command={objectShadowAngleField?.commandId}
-                  data-ppt-shadow-control={objectShadowAngleField?.control}
-                  data-ppt-shadow-descriptor-enabled={objectShadowDescriptor?.metadata.isEnabled ? 'true' : 'false'}
-                  data-ppt-shadow-field="angle"
-                  data-ppt-shadow-surface={objectShadowDescriptor?.surface}
-                  data-ppt-shadow-unit={objectShadowAngleField?.unit}
-                  disabled={!objectShadowEnabled}
-                  max={objectShadowAngleField?.max ?? PPT_ELEMENT_SHADOW_ANGLE_MAX}
-                  min={objectShadowAngleField?.min ?? PPT_ELEMENT_SHADOW_ANGLE_MIN}
-                  step={objectShadowAngleField?.step ?? 1}
-                  type="number"
-                  value={objectShadowDescriptor?.shadow.angle ?? elementShadow.angle}
-                  onChange={(event) =>
-                    onElementShadowChange(
-                      selectedElement.id,
-                      'angle',
-                      parsePPTElementShadowAngle(event.target.value),
-                    )}
-                />
-              </label>
-            </div>
-            <div className="ppt-geometry-grid">
-              {(['x', 'y', 'w', 'h'] as const).map((field) => (
-                <label className="ppt-field" key={field}>
-                  <span>{field.toUpperCase()}</span>
-                  <input
-                    data-ppt-geometry-field={field}
-                    type="number"
-                    value={Math.round(selectedElement.geometry[field])}
-                    onChange={(event) =>
-                      onElementGeometryChange(
-                        selectedElement.id,
-                        field,
-                        Number(event.target.value),
-                      )}
-                  />
-                </label>
-              ))}
-              <label className="ppt-field">
-                <span>ROT</span>
-                <input
-                  data-ppt-geometry-field="rotation"
-                  type="number"
-                  value={Math.round(selectedElement.geometry.rotation ?? 0)}
-                  onChange={(event) =>
-                    onElementRotationChange(
-                      selectedElement.id,
-                      Number(event.target.value),
-                    )}
-                />
-              </label>
-            </div>
+            <PPTObjectPropertiesInspectorFields model={model} onAction={onAction} />
             {selectedElementAnimation ? (
               <div
                 className="ppt-animation-grid"
@@ -38121,76 +37809,6 @@ function formatPPTTextInsetData(inset: PPTTextInset) {
   return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
 }
 
-function getPPTElementOpacity(element: PPTElement) {
-  return normalizePPTElementOpacity(element.opacity ?? 1)
-}
-
-function parsePPTElementOpacity(value: string) {
-  return normalizePPTElementOpacity(Number(value))
-}
-
-function normalizePPTElementOpacity(value: number) {
-  return normalizeSlideEditObjectOpacity(value)
-}
-
-function formatPPTElementOpacity(value: number) {
-  return toSlideEditObjectOpacityAttributeValue(value)
-}
-
-function getPPTObjectOpacityDescriptor(
-  slideId: string,
-  element: PPTElement,
-): SlideEditObjectOpacityDescriptor<string, string> {
-  return createSlideEditObjectOpacityDescriptor({
-    objectId: element.id,
-    slideId,
-    value: getPPTElementOpacity(element),
-  })
-}
-
-function getPPTElementHyperlink(element: PPTElement) {
-  return element.hyperlink ? normalizePPTElementHyperlink(element.hyperlink) : null
-}
-
-function getPPTObjectHyperlinkDescriptor(
-  slideId: string,
-  element: PPTElement,
-): SlideEditObjectHyperlinkDescriptor<string, string> {
-  const hyperlink = getPPTElementHyperlink(element)
-
-  return createSlideEditObjectHyperlinkDescriptor({
-    hyperlink: hyperlink
-      ? {
-          target: 'same-context',
-          title: '',
-          url: hyperlink.url,
-        }
-      : null,
-    objectId: element.id,
-    slideId,
-  })
-}
-
-function getPPTElementAltText(element: PPTElement) {
-  return element.accessibility
-    ? normalizePPTElementAccessibility(element.accessibility)?.altText
-    : undefined
-}
-
-function getPPTObjectAccessibilityDescriptor(
-  slideId: string,
-  element: PPTElement,
-): SlideEditObjectAccessibilityDescriptor<string, string> {
-  return createSlideEditObjectAccessibilityDescriptor({
-    objectId: element.id,
-    slideId,
-    value: {
-      altText: getPPTElementAltText(element) ?? '',
-      decorative: false,
-    },
-  })
-}
-
 function getPPTElementStrokeDash(element: PPTElement) {
   const stroke = getPPTElementStroke(element)
 
@@ -38430,140 +38048,6 @@ function getPPTThumbLineDashStyle(element: PPTElement): CSSProperties {
 
 function getPPTImageAltText(element: PPTImage) {
   return getPPTElementAltText(element) ?? element.alt
-}
-
-function normalizePPTElementAccessibility(
-  accessibility: Partial<PPTElementAccessibility>,
-): PPTElementAccessibility | null {
-  const altText = normalizePPTAltText(accessibility.altText ?? '')
-
-  return altText ? { altText } : null
-}
-
-function normalizePPTAltText(value: string) {
-  return normalizeSlideEditObjectAltTextStorageValue(value, {
-    maxLength: PPT_ALT_TEXT_MAX_LENGTH,
-  }) ?? ''
-}
-
-function normalizePPTElementHyperlink(
-  hyperlink: Partial<PPTElementHyperlink>,
-): PPTElementHyperlink | null {
-  const url = normalizePPTElementHyperlinkUrl(hyperlink.url ?? '')
-
-  return url ? { url } : null
-}
-
-function normalizePPTElementHyperlinkUrl(url: string) {
-  return normalizeSlideEditObjectHyperlinkStorageUrl(url, {
-    blockedSchemes: ['javascript', 'data', 'vbscript'],
-    maxLength: PPT_HYPERLINK_URL_MAX_LENGTH,
-  }) ?? ''
-}
-
-function hasPPTElementShadow(element: PPTElement) {
-  return element.shadow !== undefined
-}
-
-function getPPTObjectShadowDescriptor(
-  slideId: string,
-  element: PPTElement,
-): SlideEditObjectShadowDescriptor<string, string> {
-  return createSlideEditObjectShadowDescriptor({
-    objectId: element.id,
-    shadow: {
-      ...getPPTElementShadow(element),
-      enabled: hasPPTElementShadow(element),
-    },
-    slideId,
-  })
-}
-
-function getPPTObjectShadowField(
-  descriptor: SlideEditObjectShadowDescriptor<string, string> | null,
-  fieldId: PPTElementShadowUpdateField,
-) {
-  return descriptor?.fields.find((field) => field.id === fieldId)
-}
-
-function getPPTElementShadow(element: PPTElement): PPTElementShadow {
-  return normalizePPTElementShadow(element.shadow ?? PPT_DEFAULT_ELEMENT_SHADOW)
-}
-
-function normalizePPTElementShadow(
-  shadow: Partial<PPTElementShadow>,
-): PPTElementShadow {
-  return {
-    angle: normalizePPTElementShadowAngle(shadow.angle ?? PPT_DEFAULT_ELEMENT_SHADOW.angle),
-    blur: normalizePPTElementShadowBlur(shadow.blur ?? PPT_DEFAULT_ELEMENT_SHADOW.blur),
-    color: normalizePPTElementShadowColor(shadow.color ?? PPT_DEFAULT_ELEMENT_SHADOW.color),
-    distance: normalizePPTElementShadowDistance(shadow.distance ?? PPT_DEFAULT_ELEMENT_SHADOW.distance),
-    opacity: normalizePPTElementShadowOpacity(shadow.opacity ?? PPT_DEFAULT_ELEMENT_SHADOW.opacity),
-  }
-}
-
-function parsePPTElementShadowAngle(value: string) {
-  return normalizePPTElementShadowAngle(Number(value))
-}
-
-function normalizePPTElementShadowAngle(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.angle
-
-  return clampPPTCanvasValue(
-    Math.round(finiteValue),
-    PPT_ELEMENT_SHADOW_ANGLE_MIN,
-    PPT_ELEMENT_SHADOW_ANGLE_MAX,
-  )
-}
-
-function parsePPTElementShadowBlur(value: string) {
-  return normalizePPTElementShadowBlur(Number(value))
-}
-
-function normalizePPTElementShadowBlur(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.blur
-
-  return clampPPTCanvasValue(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_BLUR_MAX)
-}
-
-function parsePPTElementShadowDistance(value: string) {
-  return normalizePPTElementShadowDistance(Number(value))
-}
-
-function normalizePPTElementShadowDistance(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.distance
-
-  return clampPPTCanvasValue(Math.round(finiteValue), 0, PPT_ELEMENT_SHADOW_DISTANCE_MAX)
-}
-
-function parsePPTElementShadowOpacity(value: string) {
-  return normalizePPTElementShadowOpacity(Number(value))
-}
-
-function normalizePPTElementShadowOpacity(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : PPT_DEFAULT_ELEMENT_SHADOW.opacity
-  const clamped = clampPPTCanvasValue(
-    finiteValue,
-    PPT_ELEMENT_SHADOW_OPACITY_MIN,
-    PPT_ELEMENT_SHADOW_OPACITY_MAX,
-  )
-
-  return Math.round(clamped * 100) / 100
-}
-
-function formatPPTElementShadowOpacity(value: number) {
-  return toSlideEditObjectOpacityAttributeValue(value)
-}
-
-function normalizePPTElementShadowColor(color: string) {
-  return /^#[\da-f]{6}$/i.test(color) ? color : PPT_DEFAULT_ELEMENT_SHADOW.color
-}
-
-function getPPTElementShadowFilter(element: PPTElement) {
-  return getSlideEditObjectShadowFilter({
-    ...getPPTElementShadow(element),
-    enabled: hasPPTElementShadow(element),
-  })
 }
 
 function getPPTElementParagraphAlign(element: PPTElement) {

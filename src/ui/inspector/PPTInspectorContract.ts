@@ -29,6 +29,7 @@ import type {
   PPTStroke,
   PPTTextStyle,
 } from '../../pptModel'
+import type { PPTElementShadowUpdateField } from '../../pptObjectAdapter'
 
 export type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 
@@ -53,13 +54,7 @@ export type PPTInspectorElementAnimationField =
   | 'trigger'
   | 'type'
 
-export type PPTInspectorElementShadowField =
-  | 'angle'
-  | 'blur'
-  | 'color'
-  | 'distance'
-  | 'enabled'
-  | 'opacity'
+export type PPTInspectorElementShadowField = PPTElementShadowUpdateField
 
 export type PPTInspectorParagraphSpacingField =
   | 'lineHeight'
