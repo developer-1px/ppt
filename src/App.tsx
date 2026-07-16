@@ -300,7 +300,6 @@ import {
   SLIDE_EDIT_TEXT_AUTO_FIT_IMPORT_MODEL as PPT_TEXT_AUTOFIT_IMPORT_MODEL,
   SLIDE_EDIT_TEXT_AUTO_FIT_JSON_IMPORT_FORMAT as PPT_TEXT_AUTOFIT_JSON_IMPORT_FORMAT,
   SLIDE_EDIT_TEXT_AUTO_FIT_JSON_MIME_TYPE,
-  SLIDE_EDIT_TRANSITION_TIMING_LIMITS,
   SLIDE_EDIT_TRANSITION_TYPES,
   SLIDE_EDIT_TEXT_BOX_SIZE_MODES,
   SLIDE_EDIT_TEXT_FONT_FAMILY_FIELD,
@@ -442,7 +441,6 @@ import {
   type SlideEditInspectorSurfaceId,
   type SlideEditSlideBackgroundDescriptor,
   type SlideEditSlideMetadataFieldDescriptor,
-  type SlideEditSlideMetadataFieldId,
   type SlideEditSlideMetadataHostCommandEffect,
   type SlideEditSlideMetadataInspectorDescriptor,
   type SlideEditSlideMetadataReadModel,
@@ -937,6 +935,7 @@ import {
 } from './ui/command-surface'
 import {
   createPPTInspectorActionDispatcher,
+  PPTSlideInspectorPanel,
   type PPTInspectorAction,
   type PPTInspectorProps,
 } from './ui/inspector'
@@ -3410,7 +3409,6 @@ type PPTSlideMetadataReadModel = SlideEditSlideMetadataReadModel<string> & {
   orientation: PPTSlideMetadataOrientation
   size: PPTSlideMetadataSizeDescriptor
 }
-type PPTSlideMetadataFieldId = SlideEditSlideMetadataFieldId
 type PPTSlideMetadataFieldDescriptor = SlideEditSlideMetadataFieldDescriptor
 type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 type PPTInspectorTabId =
@@ -3765,8 +3763,6 @@ const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
   durationMs: SLIDE_EDIT_DEFAULT_TRANSITION.durationMs,
   type: SLIDE_EDIT_DEFAULT_TRANSITION.type as PPTSlideTransitionType,
 } as const satisfies PPTSlideTransition)
-const PPT_SLIDE_TRANSITION_DURATION_MAX = SLIDE_EDIT_TRANSITION_TIMING_LIMITS.maxDurationMs
-const PPT_SLIDE_TRANSITION_ADVANCE_AFTER_MAX = SLIDE_EDIT_TRANSITION_TIMING_LIMITS.maxAdvanceAfterMs
 const PPT_ELEMENT_ANIMATION_TYPES = Object.freeze([
   'none',
   'fadeIn',
@@ -18031,10 +18027,6 @@ function clampPPTSlideTransitionDuration(value: number) {
   }).durationMs
 }
 
-function parsePPTSlideTransitionDuration(value: string) {
-  return clampPPTSlideTransitionDuration(Number(value))
-}
-
 function parsePPTSlideTransitionAdvanceAfter(value: string) {
   return value.trim() === ''
     ? null
@@ -18591,30 +18583,6 @@ function getPPTSlideMetadataBackground(
 
 function getPPTSlideMetadataOrientation(): PPTSlideMetadataOrientation {
   return PPT_SLIDE_WIDTH >= PPT_SLIDE_HEIGHT ? 'landscape' : 'portrait'
-}
-
-function getPPTSlideMetadataField(
-  descriptor: PPTSlideMetadataInspectorDescriptor,
-  fieldId: PPTSlideMetadataFieldId,
-): PPTSlideMetadataFieldDescriptor {
-  const field = descriptor.fields.find((field) => field.id === fieldId)
-
-  if (!field) {
-    throw new Error(`Missing PPT slide metadata field: ${fieldId}`)
-  }
-
-  return field
-}
-
-function getPPTSlideMetadataFieldData(field: PPTSlideMetadataFieldDescriptor) {
-  return {
-    'data-ppt-slide-metadata-adapter-slot': field.requiredAdapterSlot,
-    'data-ppt-slide-metadata-command': field.commandId,
-    'data-ppt-slide-metadata-control': field.control,
-    'data-ppt-slide-metadata-editable': String(field.isEditable),
-    'data-ppt-slide-metadata-field': field.id,
-    'data-ppt-slide-metadata-optional': String(field.isOptional),
-  }
 }
 
 function toPPTSlideMetadataHostCommandEffect(
@@ -36328,10 +36296,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     exportCode,
     hidden,
     inspectorSurface,
-    layoutDescriptors,
-    layoutPlaceholderVisibilityDescriptors,
-    layoutPlaceholders,
-    lastPlaceholderVisibilityEffect,
     lastTextAutoFitEffect,
     recentColors,
     selection,
@@ -36339,10 +36303,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     selectedElementAnimation,
     selectedTextOverflow,
     slide,
-    slideLayoutId,
     slideMetadataDescriptor,
-    slideThemeId,
-    slideTransition,
     textAutoFitIndicator,
     themeColorTokens,
   } = model
@@ -36371,7 +36332,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     onImageFitChange,
     onImageReplaceFile,
     onLayerPaneCommandEffect,
-    onLayoutPlaceholderVisibilityChange,
     onLineMarkerChange,
     onLineRouteChange,
     onObjectVisibilityCommandEffect,
@@ -36383,11 +36343,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     onShapeCornerRadiusChange,
     onShapeFillChange,
     onShapeKindChange,
-    onSlideBackgroundChange,
-    onSlideLayoutChange,
-    onSlideNameChange,
-    onSlideNotesChange,
-    onSlideTransitionChange,
     onTableRowsChange,
     onTextAutoFit,
   } = createPPTInspectorActionDispatcher(onAction)
@@ -36504,15 +36459,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const textVerticalAlignmentDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextVerticalAlignmentDescriptor(slide.id, selectedElement)
     : null
-  const nameMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'name')
-  const backgroundMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'background')
-  const notesMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'notes')
-  const sizeMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'size')
-  const orientationMetadataField = getPPTSlideMetadataField(slideMetadataDescriptor, 'orientation')
-  const slideTransitionDescriptor = getPPTSlideTransitionDescriptor(
-    slide.id,
-    slideTransition,
-  )
   const [layerPaneGroupState, setLayerPaneGroupState] =
     useState<PPTLayerPaneGroupState>({
       collapsedGroupIds: [],
@@ -36551,12 +36497,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     },
   )
   const layerPaneCommandIds = PPT_LAYER_PANE_COMMANDS.map((command) => command.id).join(' ')
-  const layoutPlaceholderById = new Map(layoutPlaceholders.map((placeholder) => [
-    placeholder.placeholderId,
-    placeholder,
-  ]))
-  const hiddenPlaceholderCount = layoutPlaceholderVisibilityDescriptors
-    .filter((placeholder) => !placeholder.isVisible).length
   const hasSelectedElement = selectedElement !== null
   const [activeInspectorTabId, setActiveInspectorTabId] = useState<PPTInspectorTabId>(
     hasSelectedElement ? 'selection' : 'slide',
@@ -37116,192 +37056,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
         data-ppt-slide-metadata-slide-id={slideMetadataDescriptor.activeSlide.slideId}
         data-ppt-slide-metadata-surface={slideMetadataDescriptor.surface}
       >
-        <label className="ppt-field" {...getPPTSlideMetadataFieldData(nameMetadataField)}>
-          <span>Name</span>
-          <input
-            data-ppt-slide-field="name"
-            value={slide.name}
-            onChange={(event) => onSlideNameChange(event.target.value)}
-          />
-        </label>
-        <label className="ppt-field" {...getPPTSlideMetadataFieldData(backgroundMetadataField)}>
-          <span>Background</span>
-          <input
-            data-ppt-slide-field="background"
-            type="color"
-            value={slide.background?.color ?? '#ffffff'}
-            onChange={(event) => onSlideBackgroundChange(event.target.value)}
-          />
-        </label>
-        <label className="ppt-field" {...getPPTSlideMetadataFieldData(notesMetadataField)}>
-          <span>Layout</span>
-          <select
-            data-ppt-slide-field="layout"
-            value={slideLayoutId}
-            onChange={(event) => onSlideLayoutChange(event.target.value)}
-          >
-            {layoutDescriptors.map((layout) => (
-              <option key={layout.layoutId} value={layout.layoutId}>
-                {layout.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div
-          className="ppt-theme-token-strip"
-          data-ppt-layout-id={slideLayoutId}
-          data-ppt-theme-id={slideThemeId}
-        >
-          {themeColorTokens.map((token) => (
-            <span
-              className="ppt-theme-token"
-              data-ppt-theme-token={token.tokenId}
-              data-ppt-theme-token-role={token.role}
-              key={token.tokenId}
-              style={{ background: token.value }}
-              title={token.label}
-            />
-          ))}
-        </div>
-        <div
-          className="ppt-layout-placeholder-list"
-          data-ppt-layout-placeholder-count={layoutPlaceholders.length}
-          data-ppt-layout-placeholder-hidden-count={hiddenPlaceholderCount}
-          data-ppt-placeholder-visibility-command={lastPlaceholderVisibilityEffect?.payload.id}
-          data-ppt-placeholder-visibility-command-placeholder={lastPlaceholderVisibilityEffect?.payload.placeholderId}
-          data-ppt-placeholder-visibility-command-slide={lastPlaceholderVisibilityEffect?.selection.slideId}
-          data-ppt-placeholder-visibility-command-type={lastPlaceholderVisibilityEffect?.type}
-          data-ppt-placeholder-visibility-command-visible={lastPlaceholderVisibilityEffect
-            ? String(lastPlaceholderVisibilityEffect.payload.isVisible)
-            : undefined}
-        >
-          {layoutPlaceholderVisibilityDescriptors.map((placeholder) => {
-            const resolvedPlaceholder = layoutPlaceholderById.get(placeholder.placeholderId)
-
-            return (
-              <div
-                className="ppt-layout-placeholder"
-                data-ppt-layout-placeholder={placeholder.placeholderId}
-                data-ppt-placeholder-bounds={`${placeholder.bounds.x},${placeholder.bounds.y},${placeholder.bounds.w},${placeholder.bounds.h}`}
-                data-ppt-placeholder-layout={resolvedPlaceholder?.layoutId}
-                data-ppt-placeholder-locked={placeholder.isLocked ? 'true' : 'false'}
-                data-ppt-placeholder-master={resolvedPlaceholder?.masterId}
-                data-ppt-placeholder-role={placeholder.role}
-                data-ppt-placeholder-slide={placeholder.slideId}
-                data-ppt-placeholder-visible={placeholder.isVisible ? 'true' : 'false'}
-                key={placeholder.placeholderId}
-              >
-                <span>{placeholder.title}</span>
-                <button
-                  aria-label={`${placeholder.isVisible ? 'Hide' : 'Show'} ${placeholder.title}`}
-                  className="ppt-placeholder-visibility-toggle"
-                  data-ppt-placeholder-visibility-toggle={placeholder.placeholderId}
-                  disabled={placeholder.isLocked}
-                  title={placeholder.isVisible ? 'Hide placeholder' : 'Show placeholder'}
-                  type="button"
-                  onClick={() => onLayoutPlaceholderVisibilityChange(
-                    placeholder.placeholderId,
-                    !placeholder.isVisible,
-                  )}
-                >
-                  {placeholder.isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-        <label className="ppt-field">
-          <span>Notes</span>
-          <textarea
-            data-ppt-slide-field="notes"
-            value={slide.notes ?? ''}
-            onChange={(event) => onSlideNotesChange(event.target.value)}
-          />
-        </label>
-        <div
-          className="ppt-slide-transition-fields"
-          data-ppt-slide-transition
-          data-ppt-transition-advance-after={slideTransitionDescriptor.advance.afterMs ?? ''}
-          data-ppt-transition-advance-on-click={slideTransitionDescriptor.advance.onClick ? 'true' : 'false'}
-          data-ppt-transition-duration={slideTransitionDescriptor.durationMs}
-          data-ppt-transition-model="slide-edit-slide-transition-timing"
-          data-ppt-transition-slide={slideTransitionDescriptor.slideId}
-          data-ppt-transition-type={slideTransitionDescriptor.type}
-          data-ppt-transition-types={SLIDE_EDIT_TRANSITION_TYPES.map((type) => type.id).join(' ')}
-        >
-          <label className="ppt-field">
-            <span>Transition</span>
-            <select
-              data-ppt-slide-transition-field="type"
-              value={slideTransition.type}
-              onChange={(event) =>
-                onSlideTransitionChange('type', event.target.value as PPTSlideTransitionType)}
-            >
-              {SLIDE_EDIT_TRANSITION_TYPES.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ppt-field">
-            <span>Duration</span>
-            <input
-              data-ppt-slide-transition-field="durationMs"
-              max={PPT_SLIDE_TRANSITION_DURATION_MAX}
-              min={0}
-              step={100}
-              type="number"
-              value={slideTransition.durationMs}
-              onChange={(event) =>
-                onSlideTransitionChange('durationMs', parsePPTSlideTransitionDuration(event.target.value))}
-            />
-          </label>
-          <label className="ppt-checkbox-field">
-            <input
-              checked={slideTransition.advanceOnClick}
-              data-ppt-slide-transition-field="advanceOnClick"
-              type="checkbox"
-              onChange={(event) =>
-                onSlideTransitionChange('advanceOnClick', event.target.checked)}
-            />
-            <span>On click</span>
-          </label>
-          <label className="ppt-field">
-            <span>After</span>
-            <input
-              data-ppt-slide-transition-field="advanceAfterMs"
-              max={PPT_SLIDE_TRANSITION_ADVANCE_AFTER_MAX}
-              min={0}
-              placeholder="none"
-              step={500}
-              type="number"
-              value={slideTransition.advanceAfterMs ?? ''}
-              onChange={(event) =>
-                onSlideTransitionChange('advanceAfterMs', parsePPTSlideTransitionAdvanceAfter(event.target.value))}
-            />
-          </label>
-        </div>
-        <div className="ppt-slide-metadata-readouts">
-          <span
-            className="ppt-slide-metadata-readout"
-            data-ppt-slide-field="size"
-            data-ppt-slide-metadata-value={`${slideMetadataDescriptor.metadata.size.w}x${slideMetadataDescriptor.metadata.size.h}`}
-            {...getPPTSlideMetadataFieldData(sizeMetadataField)}
-          >
-            <span>Size</span>
-            <strong>{slideMetadataDescriptor.metadata.size.w} x {slideMetadataDescriptor.metadata.size.h}</strong>
-          </span>
-          <span
-            className="ppt-slide-metadata-readout"
-            data-ppt-slide-field="orientation"
-            data-ppt-slide-metadata-value={slideMetadataDescriptor.metadata.orientation}
-            {...getPPTSlideMetadataFieldData(orientationMetadataField)}
-          >
-            <span>Orientation</span>
-            <strong>{slideMetadataDescriptor.metadata.orientation}</strong>
-          </span>
-        </div>
+        <PPTSlideInspectorPanel model={model} onAction={onAction} />
       </section>
 
       <section

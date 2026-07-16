@@ -1,6 +1,7 @@
 export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
+export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'
 export {
   type PPTInspectorAction,
   type PPTInspectorModel,
