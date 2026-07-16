@@ -98,8 +98,6 @@ import {
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
-  createSlideEditObjectImageCropDescriptor,
-  createSlideEditObjectImageReplaceDescriptor,
   createSlideEditObjectAnimationDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
@@ -246,7 +244,6 @@ import {
   normalizeSlideEditObjectAnimationOrder,
   normalizeSlideEditColorSwatchValue,
   normalizeSlideEditObjectFillOpacity,
-  normalizeSlideEditObjectImageCropFit,
   normalizeSlideEditObjectImageCropValue,
   normalizeSlideEditObjectOpacity,
   normalizeSlideEditObjectShadow,
@@ -372,10 +369,8 @@ import {
   type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectHyperlinkHostCommandEffect,
-  type SlideEditObjectImageCropDescriptor,
   type SlideEditObjectImageCropHostCommandEffect,
   type SlideEditObjectImageCropJSONPasteValue,
-  type SlideEditObjectImageReplaceDescriptor,
   type SlideEditObjectImageReplaceHostCommandEffect,
   type SlideEditObjectImageReplaceJSONPasteValue,
   type SlideEditBuiltInAnimationTrigger,
@@ -576,6 +571,11 @@ import {
   type PPTLayerPaneHostCommandEffect,
   type PPTObjectVisibilityHostCommandEffect,
 } from './pptLayerPaneAdapter'
+import {
+  getPPTImageCrop,
+  getPPTImageFit,
+  normalizePPTImageFit,
+} from './pptImageAdapter'
 import {
   getPPTCommentThread,
   getPPTCommentThreadWithBody,
@@ -914,6 +914,7 @@ import {
 import {
   createPPTInspectorActionDispatcher,
   PPTCommentInspectorFields,
+  PPTImageInspectorFields,
   PPTInspectorShell,
   type PPTInspectorAction,
   type PPTInspectorProps,
@@ -12230,7 +12231,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       id: 'update-object-image-crop',
       objectId: elementId,
       slideId: activeSlide.id,
-      value: normalizeSlideEditObjectImageCropFit(fit),
+      value: normalizePPTImageFit(fit),
     })
 
     setLastImageCropEffect(effect)
@@ -35874,10 +35875,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     onElementStrokeChange,
     onElementTextInsetChange,
     onElementTextStyleChange,
-    onImageCropChange,
-    onImageCropReset,
-    onImageFitChange,
-    onImageReplaceFile,
     onLineMarkerChange,
     onLineRouteChange,
     onParagraphAlignChange,
@@ -35937,12 +35934,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
-  const imageCropDescriptor = selectedElement?.kind === 'image'
-    ? getPPTImageCropDescriptor(slide.id, selectedElement)
-    : null
-  const imageReplaceDescriptor = selectedElement?.kind === 'image'
-    ? getPPTImageReplaceDescriptor(slide.id, selectedElement)
-    : null
   const objectOpacityDescriptor = selectedElement
     ? getPPTObjectOpacityDescriptor(slide.id, selectedElement)
     : null
@@ -35970,7 +35961,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const objectAnimationDescriptor = selectedElement
     ? getPPTObjectAnimationDescriptor(slide, selectedElement)
     : null
-  const imageReplaceInputRef = useRef<HTMLInputElement | null>(null)
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -36870,120 +36860,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
                 </label>
               </>
             ) : null}
-            {selectedElement.kind === 'image' ? (
-              <>
-                <label className="ppt-field">
-                  <span>Fit</span>
-                  <select
-                    data-ppt-image-crop-attribute={imageCropDescriptor?.metadata.attribute}
-                    data-ppt-image-crop-attribute-value={imageCropDescriptor?.metadata.attributeValue}
-                    data-ppt-image-crop-command={imageCropDescriptor?.fields.fit.commandId}
-                    data-ppt-image-crop-control={imageCropDescriptor?.fields.fit.control}
-                    data-ppt-image-crop-field="fit"
-                    data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
-                    data-ppt-image-crop-surface={imageCropDescriptor?.surface}
-                    data-ppt-style-field="image-fit"
-                    value={imageCropDescriptor?.fit ?? getPPTImageFit(selectedElement)}
-                    onChange={(event) => {
-                      if (isPPTImageFit(event.target.value)) {
-                        onImageFitChange(selectedElement.id, event.target.value)
-                      }
-                    }}
-                  >
-                    {(imageCropDescriptor?.fields.fit.options ?? [
-                      { id: 'cover', label: 'Fill' },
-                      { id: 'contain', label: 'Fit' },
-                    ]).map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="ppt-geometry-grid">
-                  {(['x', 'y'] as const).map((field) => {
-                    const imageCropField = imageCropDescriptor?.fields[field]
-
-                    return (
-                      <label className="ppt-field" key={field}>
-                        <span>Crop {field.toUpperCase()}</span>
-                        <input
-                          data-ppt-image-crop-attribute={imageCropDescriptor?.metadata.attribute}
-                          data-ppt-image-crop-attribute-value={imageCropDescriptor?.metadata.attributeValue}
-                          data-ppt-image-crop-command={imageCropField?.commandId}
-                          data-ppt-image-crop-control={imageCropField?.control}
-                          data-ppt-image-crop-field={field}
-                          data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
-                          data-ppt-image-crop-surface={imageCropDescriptor?.surface}
-                          data-ppt-image-crop-unit={imageCropField?.unit}
-                          data-ppt-style-field={`image-crop-${field}`}
-                          max={imageCropField?.max ?? 100}
-                          min={imageCropField?.min ?? 0}
-                          step={imageCropField?.step ?? 1}
-                          type="number"
-                          value={Math.round(imageCropDescriptor?.crop[field] ?? getPPTImageCrop(selectedElement)[field])}
-                          onChange={(event) =>
-                            onImageCropChange(
-                              selectedElement.id,
-                              field,
-                              Number(event.target.value),
-                            )}
-                        />
-                      </label>
-                    )
-                  })}
-                </div>
-                <Button
-                  data-ppt-image-crop-command={imageCropDescriptor?.fields.reset.commandId}
-                  data-ppt-image-crop-control={imageCropDescriptor?.fields.reset.control}
-                  data-ppt-image-crop-field="reset"
-                  data-ppt-image-crop-reset
-                  data-ppt-image-crop-supported={imageCropDescriptor?.isSupported ? 'true' : 'false'}
-                  data-ppt-image-crop-surface={imageCropDescriptor?.surface}
-                  disabled={imageCropDescriptor?.isSupported === false}
-                  onClick={() => onImageCropReset(selectedElement.id)}
-                >
-                  <Undo2 size={15} /> Reset
-                </Button>
-                <input
-                  accept={imageReplaceDescriptor?.field.accept ?? 'image/*'}
-                  className="ppt-file-input"
-                  data-ppt-image-replace-attribute={imageReplaceDescriptor?.metadata.attribute}
-                  data-ppt-image-replace-attribute-value={imageReplaceDescriptor?.metadata.attributeValue}
-                  data-ppt-image-replace-command={imageReplaceDescriptor?.field.commandId}
-                  data-ppt-image-replace-control={imageReplaceDescriptor?.field.control}
-                  data-ppt-image-replace-field={imageReplaceDescriptor?.field.id}
-                  data-ppt-image-replace-input
-                  data-ppt-image-replace-source-name={imageReplaceDescriptor?.sourceName}
-                  data-ppt-image-replace-supported={imageReplaceDescriptor?.isSupported ? 'true' : 'false'}
-                  data-ppt-image-replace-surface={imageReplaceDescriptor?.surface}
-                  ref={imageReplaceInputRef}
-                  tabIndex={-1}
-                  type="file"
-                  onChange={(event) => {
-                    const file = getPPTImageFileFromList(event.target.files)
-
-                    if (file) {
-                      void onImageReplaceFile(selectedElement.id, file)
-                    }
-
-                    event.target.value = ''
-                  }}
-                />
-                <Button
-                  data-ppt-image-replace-action
-                  data-ppt-image-replace-command={imageReplaceDescriptor?.field.commandId}
-                  data-ppt-image-replace-control={imageReplaceDescriptor?.field.control}
-                  data-ppt-image-replace-field={imageReplaceDescriptor?.field.id}
-                  data-ppt-image-replace-supported={imageReplaceDescriptor?.isSupported ? 'true' : 'false'}
-                  data-ppt-image-replace-surface={imageReplaceDescriptor?.surface}
-                  disabled={imageReplaceDescriptor?.isSupported === false}
-                  onClick={() => imageReplaceInputRef.current?.click()}
-                >
-                  <ImagePlus size={15} /> Change
-                </Button>
-              </>
-            ) : null}
+            <PPTImageInspectorFields model={model} onAction={onAction} />
             {selectedElement.kind === 'table' ? (
               <>
                 <label className="ppt-field">
@@ -37987,18 +37864,6 @@ function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
   }
 }
 
-function getPPTImageFit(element: PPTImage): PPTImageFit {
-  return element.fit ?? 'cover'
-}
-
-function normalizePPTImageFit(value: string | null | undefined): PPTImageFit {
-  return normalizeSlideEditObjectImageCropFit(value)
-}
-
-function getPPTImageCrop(element: PPTImage): PPTImageCrop {
-  return element.crop ?? { x: 50, y: 50 }
-}
-
 function getPPTImageCropRectData(element: PPTImage) {
   const crop = getPPTImageCrop(element)
   const left = crop.left ?? 0
@@ -38115,31 +37980,6 @@ function getPPTThumbElementFilter(element: PPTElement) {
   ].filter(Boolean)
 
   return filters.length > 0 ? filters.join(' ') : undefined
-}
-
-function getPPTImageCropDescriptor(
-  slideId: string,
-  element: PPTImage,
-): SlideEditObjectImageCropDescriptor<string, string> {
-  return createSlideEditObjectImageCropDescriptor({
-    crop: getPPTImageCrop(element),
-    fit: getPPTImageFit(element),
-    objectId: element.id,
-    slideId,
-  })
-}
-
-function getPPTImageReplaceDescriptor(
-  slideId: string,
-  element: PPTImage,
-): SlideEditObjectImageReplaceDescriptor<string, string> {
-  return createSlideEditObjectImageReplaceDescriptor({
-    isSupported: element.locked !== true && element.visible !== false,
-    objectId: element.id,
-    slideId,
-    sourceName: element.name,
-    unsupportedReason: element.locked === true ? 'locked-object' : 'unsupported-object',
-  })
 }
 
 function getDefaultPPTTextStyle(): PPTTextStyle {
@@ -40429,10 +40269,6 @@ function getPPTThumbElementClassName(element: PPTElement) {
 
 function isPPTShapeKind(value: string): value is PPTShapeKind {
   return value === 'rect' || value === 'ellipse' || value === 'diamond'
-}
-
-function isPPTImageFit(value: string): value is PPTImageFit {
-  return value === 'cover' || value === 'contain'
 }
 
 function isPPTLineMarker(value: string): value is PPTLineMarker {

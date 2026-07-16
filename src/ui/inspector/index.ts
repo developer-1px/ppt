@@ -4,6 +4,7 @@ export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
 export { PPTCommentInspectorFields } from './PPTCommentInspectorFields'
+export { PPTImageInspectorFields } from './PPTImageInspectorFields'
 export { PPTLayerPane } from './PPTLayerPane'
 export { PPTInspectorShell } from './PPTInspectorShell'
 export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'
