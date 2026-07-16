@@ -8,7 +8,7 @@
   background: var(--app-bg);
 }
 
-.ppt-app[data-ppt-inspector-open='true'] {
+.ppt-app[data-editor-inspector-open='true'] {
   grid-template-columns: 164px minmax(0, 1fr) 300px;
 }
 
@@ -96,16 +96,16 @@
   display: none;
 }
 
-.ppt-topbar[data-ppt-tool-shelf-open='true'] .ppt-toolbar-secondary-command,
-.ppt-topbar[data-ppt-export-options-open='true'] .ppt-toolbar-export-secondary,
-.ppt-topbar[data-ppt-view-options-open='true'] .ppt-toolbar-view [data-ppt-view-grid],
-.ppt-topbar[data-ppt-view-options-open='true'] .ppt-toolbar-view [data-ppt-view-minimap],
-.ppt-topbar[data-ppt-view-options-open='true'] .ppt-toolbar-view [data-ppt-view-frame-guides],
-.ppt-topbar[data-ppt-view-options-open='true'] .ppt-toolbar-view [data-ppt-theme-toggle] {
+.ppt-topbar[data-editor-transient-surface='tools'] .ppt-toolbar-secondary-command,
+.ppt-topbar[data-editor-transient-surface='export'] .ppt-toolbar-export-secondary,
+.ppt-topbar[data-editor-transient-surface='view'] .ppt-toolbar-view [data-ppt-view-grid],
+.ppt-topbar[data-editor-transient-surface='view'] .ppt-toolbar-view [data-ppt-view-minimap],
+.ppt-topbar[data-editor-transient-surface='view'] .ppt-toolbar-view [data-ppt-view-frame-guides],
+.ppt-topbar[data-editor-transient-surface='view'] .ppt-toolbar-view [data-ppt-theme-toggle] {
   display: inline-grid;
 }
 
-.ppt-topbar[data-ppt-export-options-open='true'] .ppt-toolbar-export-secondary {
+.ppt-topbar[data-editor-transient-surface='export'] .ppt-toolbar-export-secondary {
   display: inline-flex;
 }
 
@@ -258,7 +258,7 @@
 
 @media (max-width: 920px) {
   .ppt-app,
-  .ppt-app[data-ppt-inspector-open='true'] {
+  .ppt-app[data-editor-inspector-open='true'] {
     grid-template-columns: 124px minmax(0, 1fr);
   }
 

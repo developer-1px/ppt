@@ -949,8 +949,9 @@ import {
   Tab,
   TabList,
   ToolbarGroup,
-  useExclusiveDisclosure,
+  useEditorChrome,
 } from './ui/core'
+import { EditorShell, EditorToolbar } from './ui/shell'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createPPTCanvasAffordanceConfig({
@@ -4477,16 +4478,14 @@ function App() {
   const [replaceQuery, setReplaceQuery] = useState('')
   const [activeFindIndex, setActiveFindIndex] = useState(0)
   const [presentationSlideId, setPresentationSlideId] = useState<string | null>(null)
-  const [showGrid, setShowGrid] = useState(false)
-  const [showFrameGuides, setShowFrameGuides] = useState(false)
-  const [showMinimap, setShowMinimap] = useState(false)
-  const toolbarDisclosure = useExclusiveDisclosure<
-    'tools' | 'view' | 'export'
-  >()
-  const toolShelfOpen = toolbarDisclosure.isOpen('tools')
-  const viewOptionsOpen = toolbarDisclosure.isOpen('view')
-  const exportOptionsOpen = toolbarDisclosure.isOpen('export')
-  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const editorChrome = useEditorChrome()
+  const showGrid = editorChrome.isViewVisible('grid')
+  const showFrameGuides = editorChrome.isViewVisible('frameGuides')
+  const showMinimap = editorChrome.isViewVisible('minimap')
+  const toolShelfOpen = editorChrome.isTransientOpen('tools')
+  const viewOptionsOpen = editorChrome.isTransientOpen('view')
+  const exportOptionsOpen = editorChrome.isTransientOpen('export')
+  const inspectorOpen = editorChrome.inspectorOpen
   const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [recentColors, setRecentColors] = useState<string[]>([])
   const [textOverflowById, setTextOverflowById] = useState<Record<string, boolean>>({})
@@ -13820,7 +13819,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       return
     }
 
-    toolbarDisclosure.close()
+    editorChrome.closeTransient()
     focusStageShell()
     capturePPTCanvasPointerFromEvent(event)
     const additive = isAdditivePPTPointerInput(event)
@@ -15298,17 +15297,17 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     title: PPT_COMMAND_AFFORDANCES.zoomOut.title,
   }, {
     id: 'view:toggle-grid',
-    onSelect: () => setShowGrid((current) => !current),
+    onSelect: () => editorChrome.toggleView('grid'),
     section: 'View',
     title: showGrid ? 'Hide grid' : 'Show grid',
   }, {
     id: 'view:toggle-minimap',
-    onSelect: () => setShowMinimap((current) => !current),
+    onSelect: () => editorChrome.toggleView('minimap'),
     section: 'View',
     title: showMinimap ? 'Hide minimap' : 'Show minimap',
   }, {
     id: 'view:toggle-frame-guides',
-    onSelect: () => setShowFrameGuides((current) => !current),
+    onSelect: () => editorChrome.toggleView('frameGuides'),
     section: 'View',
     title: showFrameGuides ? 'Hide frame guides' : 'Show frame guides',
   }, {
@@ -15431,16 +15430,15 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
   const shortcutHelpItems = getPPTShortcutHelpItems(commandPaletteItems)
 
   return (
-    <main
-      className="ppt-app"
+    <EditorShell
       data-ppt-app
       data-ppt-inspector-open={inspectorOpen ? 'true' : 'false'}
-      data-theme={theme}
+      inspectorOpen={inspectorOpen}
+      theme={theme}
     >
-      <header
+      <EditorToolbar
+        activeTransientSurface={editorChrome.activeTransientSurface}
         aria-label="PPT editor toolbar"
-        aria-orientation="horizontal"
-        className="ppt-topbar"
         data-ppt-toolbar
         data-ppt-toolbar-focus-model={PPT_TOOLBAR_FOCUS_MODEL}
         data-ppt-toolbar-keyboard-model={PPT_TOOLBAR_KEYBOARD_MODEL}
@@ -15449,7 +15447,6 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         data-ppt-view-options-open={viewOptionsOpen ? 'true' : 'false'}
         data-ppt-export-options-open={exportOptionsOpen ? 'true' : 'false'}
         ref={setTopbarToolbarRoot}
-        role="toolbar"
         onFocus={handleTopbarToolbarFocus}
         onKeyDown={handleTopbarToolbarKeyDown}
       >
@@ -15487,7 +15484,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             aria-label="Toggle tools"
             className="ppt-tool-shelf-trigger"
             data-ppt-tool-shelf-trigger
-            onClick={() => toolbarDisclosure.toggle('tools')}
+            onClick={() => editorChrome.toggleTransient('tools')}
           >
             <Wrench size={16} /> Tools
           </Button>
@@ -15790,17 +15787,17 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             aria-expanded={viewOptionsOpen}
             data-ppt-view-options-trigger
             label="More view options"
-            onClick={() => toolbarDisclosure.toggle('view')}
+            onClick={() => editorChrome.toggleTransient('view')}
           >
             <MoreHorizontal size={17} />
           </IconButton>
-          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} data-ppt-view-grid label="Toggle grid" onClick={() => setShowGrid((current) => !current)}>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showGrid} data-ppt-view-grid label="Toggle grid" onClick={() => editorChrome.toggleView('grid')}>
             <Grid2X2 size={17} />
           </IconButton>
-          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} data-ppt-view-minimap label="Toggle minimap" onClick={() => setShowMinimap((current) => !current)}>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showMinimap} data-ppt-view-minimap label="Toggle minimap" onClick={() => editorChrome.toggleView('minimap')}>
             <MapIcon size={17} />
           </IconButton>
-          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} data-ppt-view-frame-guides label="Toggle frame guides" onClick={() => setShowFrameGuides((current) => !current)}>
+          <IconButton {...PPT_TOOLBAR_ITEM_PROPS} aria-pressed={showFrameGuides} data-ppt-view-frame-guides label="Toggle frame guides" onClick={() => editorChrome.toggleView('frameGuides')}>
             <Ruler size={17} />
           </IconButton>
           <IconButton
@@ -15855,7 +15852,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             aria-expanded={exportOptionsOpen}
             data-ppt-export-options-trigger
             label="More export options"
-            onClick={() => toolbarDisclosure.toggle('export')}
+            onClick={() => editorChrome.toggleTransient('export')}
           >
             <MoreHorizontal size={17} />
           </IconButton>
@@ -15876,7 +15873,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
             aria-pressed={inspectorOpen}
             data-ppt-inspector-toggle
             label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
-            onClick={() => setInspectorOpen((current) => !current)}
+            onClick={editorChrome.toggleInspector}
           >
             <PanelRight size={17} />
           </IconButton>
@@ -15884,7 +15881,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         <span className="ppt-selection-label">
           {selection.length > 0 ? `${selection.length} selected` : 'No selection'}
         </span>
-      </header>
+      </EditorToolbar>
 
       <aside className="ppt-rail" aria-label="Slides">
         <div className="ppt-rail-header">
@@ -17356,7 +17353,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         open={shortcutHelpOpen}
         onClose={closeShortcutHelp}
       />
-    </main>
+    </EditorShell>
   )
 }
 

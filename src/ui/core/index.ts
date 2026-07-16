@@ -13,4 +13,8 @@ export {
   type ToolbarGroupProps,
 } from './controls'
 export { classNames } from './classNames'
-export { useExclusiveDisclosure } from './useExclusiveDisclosure'
+export {
+  useEditorChrome,
+  type EditorTransientSurface,
+  type EditorViewFeature,
+} from './useEditorChrome'
