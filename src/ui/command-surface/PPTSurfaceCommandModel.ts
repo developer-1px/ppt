@@ -1,5 +1,8 @@
 import { PPT_COMMAND_AFFORDANCES } from '../../pptCanvasEngineAdapter'
+import type { PPTCommandPaletteItemBase } from '../../pptCanvasAppAffordanceAdapter'
 import { getPPTCanvasCommandAvailability } from '../../pptCommandAdapter'
+
+export type PPTCommandPaletteItem = PPTCommandPaletteItemBase
 
 export type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
 

@@ -667,7 +667,6 @@ import {
   PPT_MENU_ITEM_PROPS,
   PPT_MENU_KEYBOARD_KEYS,
   PPT_MENU_ROVING_FOCUS_MODEL,
-  PPT_MODAL_FOCUS_LIFECYCLE_MODEL,
   PPT_RESIZE_POINTER_MODIFIERS_MODEL,
   PPT_TOOLBAR_FOCUS_MODEL,
   PPT_TOOLBAR_ITEM_PROPS,
@@ -689,14 +688,12 @@ import {
   downloadPPTCanvasTextFile,
   executePPTCanvasClipboardCommand,
   executePPTCanvasStandardCommand,
-  filterPPTCommandPaletteItems,
   fitPPTCanvasViewportToBounds,
   focusPPTCanvasElement,
   focusPPTCanvasElementBySelectorOnNextFrame,
   focusPPTCanvasElementOnNextFrame,
   getPPTInlineEditHistoryDirectionFromInputType,
   getPPTCanvasClientViewportSize,
-  getPPTCanvasCommandPaletteKeyboardIntent,
   getPPTCanvasContextMenuKeyboardIntent,
   getPPTCanvasContextMenuPosition,
   getPPTCanvasDataTransferText,
@@ -718,7 +715,6 @@ import {
   getPPTMinimapPointFromViewportOffset,
   getPPTMinimapReadModel,
   getPPTMinimapWorldPoint,
-  getPPTCanvasModalBackdropPointerIntent,
   getPPTCanvasModalKeyboardIntent,
   getPPTCanvasPasteOffsetForBounds,
   getPPTCanvasPastePositionSession,
@@ -741,7 +737,6 @@ import {
   isPPTInlineEditLineBreakInput,
   measurePPTCanvasElementOverflow,
   measurePPTCanvasTextBlocks,
-  PPT_COMMAND_PALETTE_ITEMS_MODEL,
   PPT_INLINE_EDIT_DOM_MODEL,
   PPT_KEYBOARD_TEMPORARY_PAN_MODEL,
   PPT_KEYBOARD_TEMPORARY_PAN_SHORTCUT_LABEL,
@@ -772,9 +767,7 @@ import {
   shouldReleasePPTCanvasKeyboardTemporaryPan,
   stringifyPPTCanvasRichClipboardPayload,
   transformPPTCanvasAppItemsChange,
-  trapPPTCanvasModalTabFocus,
   usePPTCanvasMenuRovingFocus,
-  usePPTCanvasModalFocusLifecycle,
   usePPTCanvasToolbarRovingFocus,
   writePPTCanvasRichClipboardPayload,
   zoomPPTCanvasViewport,
@@ -802,7 +795,6 @@ import {
   type PPTCanvasTableImportSource,
   type PPTCanvasTextPasteReplaceTarget,
   type PPTCanvasTextPasteSource,
-  type PPTCommandPaletteItemBase,
   type PPTMinimapItemBounds as PPTMinimapItemBoundsBase,
   type PPTMinimapReadModel as PPTMinimapReadModelBase,
   type PPTMinimapSize as PPTMinimapSizeBase,
@@ -930,8 +922,11 @@ import {
 } from './ui/core'
 import {
   getPPTCommandSurfaceGroups,
+  PPTCommandPalette,
+  PPTShortcutHelp,
   PPTSurfaceCommandButton,
   type PPTCommandAvailability,
+  type PPTCommandPaletteItem,
   type PPTSurfaceCommand,
   type PPTSurfaceCommandViewGroup,
 } from './ui/command-surface'
@@ -3365,17 +3360,6 @@ const PPT_STYLE_CLIPBOARD_PACKAGE_CATEGORY_REGISTRY = [
     label: 'Text Run Style',
   },
 ] satisfies readonly SlideEditStyleClipboardCategoryDescriptor<PPTStyleClipboardPackageCategory>[]
-type PPTCommandPaletteItem = PPTCommandPaletteItemBase
-type PPTShortcutHelpItem = {
-  id: string
-  section: string
-  shortcut: string
-  title: string
-}
-type PPTShortcutHelpSectionGroup = {
-  items: PPTShortcutHelpItem[]
-  section: string
-}
 type PPTSlideMetadataOrientation = SlideEditSlideOrientation
 type PPTSlideMetadataBackgroundDescriptor = SlideEditSlideBackgroundDescriptor
 type PPTSlideMetadataSizeDescriptor = SlideEditSlideSizeDescriptor
@@ -3590,16 +3574,6 @@ const PPT_TEXT_RUN_HIGHLIGHT_DEFAULT = '#fde047'
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
   `${SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_KEYS} ${SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS}`
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
-const PPT_SHORTCUT_HELP_SECTION_ORDER = [
-  'Create',
-  'Edit',
-  'Arrange',
-  'Format',
-  'Slides',
-  'View',
-  'Export',
-  'System',
-]
 const PPT_MINIMAP_SIZE: PPTMinimapSize = {
   h: 112,
   w: 176,
@@ -15137,8 +15111,6 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     section: 'Format',
     title: 'Auto fit text',
   }]
-  const shortcutHelpItems = getPPTShortcutHelpItems(commandPaletteItems)
-
   return (
     <EditorShell
       data-ppt-app
@@ -17007,8 +16979,8 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         open={commandPaletteOpen}
         onClose={closeCommandPalette}
       />
-      <PPTShortcutHelpOverlay
-        items={shortcutHelpItems}
+      <PPTShortcutHelp
+        items={commandPaletteItems}
         open={shortcutHelpOpen}
         onClose={closeShortcutHelp}
       />
@@ -17140,131 +17112,6 @@ function PPTMinimap({
           y={readModel.viewportRect.y}
         />
       </svg>
-    </div>
-  )
-}
-
-function PPTShortcutHelpOverlay({
-  items,
-  onClose,
-  open,
-}: {
-  items: readonly PPTShortcutHelpItem[]
-  onClose: () => void
-  open: boolean
-}) {
-  if (!open) {
-    return null
-  }
-
-  return <PPTShortcutHelpDialog items={items} onClose={onClose} />
-}
-
-function PPTShortcutHelpDialog({
-  items,
-  onClose,
-}: {
-  items: readonly PPTShortcutHelpItem[]
-  onClose: () => void
-}) {
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
-  const dialogRef = useRef<HTMLElement | null>(null)
-  const groups = useMemo(() => groupPPTShortcutHelpItems(items), [items])
-
-  usePPTCanvasModalFocusLifecycle({
-    initialFocusRef: closeButtonRef,
-  })
-
-  function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    const backdropPointerIntent = getPPTCanvasModalBackdropPointerIntent({
-      currentTarget: event.currentTarget,
-      target: event.target,
-    })
-
-    if (backdropPointerIntent.kind === 'dismiss') {
-      onClose()
-    }
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    const modalKeyboardIntent = getPPTCanvasModalKeyboardIntent({ key: event.key })
-
-    if (modalKeyboardIntent.kind === 'close') {
-      if (modalKeyboardIntent.preventDefault) {
-        event.preventDefault()
-      }
-      if (modalKeyboardIntent.stopPropagation) {
-        event.stopPropagation()
-      }
-      onClose()
-      return
-    }
-
-    if (modalKeyboardIntent.kind === 'trap-focus') {
-      trapPPTCanvasModalTabFocus({
-        event,
-        root: dialogRef.current,
-      })
-    }
-  }
-
-  return (
-    <div
-      className="ppt-shortcut-help-backdrop"
-      data-ppt-shortcut-help-backdrop
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <section
-        aria-label="Keyboard shortcuts"
-        aria-modal="true"
-        className="ppt-shortcut-help"
-        data-ppt-shortcut-help
-        data-ppt-shortcut-help-focus-lifecycle={PPT_MODAL_FOCUS_LIFECYCLE_MODEL}
-        ref={dialogRef}
-        role="dialog"
-        onKeyDown={handleKeyDown}
-      >
-        <header className="ppt-shortcut-help-header">
-          <h2>Keyboard shortcuts</h2>
-          <IconButton
-            data-ppt-shortcut-help-close
-            label="Close keyboard shortcuts"
-            ref={closeButtonRef}
-            tooltip="Close"
-            onClick={onClose}
-          >
-            <X size={16} />
-          </IconButton>
-        </header>
-        <div className="ppt-shortcut-help-sections">
-          {groups.map((group) => (
-            <section
-              aria-label={group.section}
-              className="ppt-shortcut-help-section"
-              data-ppt-shortcut-help-section={group.section}
-              key={group.section}
-            >
-              <h3>{group.section}</h3>
-              <dl className="ppt-shortcut-help-list">
-                {group.items.map((item) => (
-                  <div
-                    className="ppt-shortcut-help-row"
-                    data-ppt-shortcut-help-item={item.id}
-                    key={item.id}
-                  >
-                    <dt>{item.title}</dt>
-                    <dd>
-                      <kbd data-ppt-shortcut-help-shortcut={item.shortcut}>
-                        {item.shortcut}
-                      </kbd>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }
@@ -17434,232 +17281,6 @@ function getPPTPresentationScale() {
     0.2,
     1.4,
   )
-}
-
-function PPTCommandPalette({
-  items,
-  onClose,
-  open,
-}: {
-  items: readonly PPTCommandPaletteItem[]
-  onClose: () => void
-  open: boolean
-}) {
-  if (!open) {
-    return null
-  }
-
-  return <PPTCommandPaletteDialog items={items} onClose={onClose} />
-}
-
-function PPTCommandPaletteDialog({
-  items,
-  onClose,
-}: {
-  items: readonly PPTCommandPaletteItem[]
-  onClose: () => void
-}) {
-  const [query, setQuery] = useState('')
-  const [activeIndex, setActiveIndex] = useState(0)
-  const dialogRef = useRef<HTMLElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const filteredItems = useMemo(
-    () => filterPPTCommandPaletteItems(items, query).slice(0, 10),
-    [items, query],
-  )
-  const maxActiveIndex = Math.max(0, filteredItems.length - 1)
-  const activeItemIndex = Math.min(activeIndex, maxActiveIndex)
-  const activeItem = filteredItems[activeItemIndex]
-  const listboxId = 'ppt-command-palette-listbox'
-  const activeOptionId = activeItem
-    ? getPPTCommandPaletteOptionId(activeItem.id)
-    : undefined
-
-  usePPTCanvasModalFocusLifecycle({
-    initialFocusRef: inputRef,
-  })
-
-  function runItem(item: PPTCommandPaletteItem | undefined) {
-    if (!item || item.disabled) {
-      return
-    }
-
-    item.onSelect()
-    onClose()
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    const modalKeyboardIntent = getPPTCanvasModalKeyboardIntent({ key: event.key })
-
-    if (modalKeyboardIntent.kind === 'close') {
-      if (modalKeyboardIntent.preventDefault) {
-        event.preventDefault()
-      }
-      if (modalKeyboardIntent.stopPropagation) {
-        event.stopPropagation()
-      }
-      onClose()
-      return
-    }
-
-    if (modalKeyboardIntent.kind === 'trap-focus') {
-      trapPPTCanvasModalTabFocus({
-        event,
-        root: dialogRef.current,
-      })
-      return
-    }
-
-    const keyboardIntent = getPPTCanvasCommandPaletteKeyboardIntent({
-      activeIndex: activeItemIndex,
-      itemCount: filteredItems.length,
-      key: event.key,
-    })
-
-    if (keyboardIntent.preventDefault) {
-      event.preventDefault()
-      event.stopPropagation()
-
-      if (keyboardIntent.kind === 'move-active') {
-        setActiveIndex(keyboardIntent.activeIndex)
-        return
-      }
-
-      if (keyboardIntent.kind === 'run-active') {
-        runItem(filteredItems[keyboardIntent.activeIndex])
-      }
-    }
-  }
-
-  function handleBackdropMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
-    const backdropPointerIntent = getPPTCanvasModalBackdropPointerIntent({
-      currentTarget: event.currentTarget,
-      target: event.target,
-    })
-
-    if (backdropPointerIntent.kind === 'dismiss') {
-      onClose()
-    }
-  }
-
-  return (
-    <div
-      className="ppt-command-palette-backdrop"
-      data-ppt-command-palette-backdrop
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <section
-        aria-label="Command palette"
-        aria-modal="true"
-        className="ppt-command-palette"
-        data-ppt-command-palette
-        data-ppt-command-palette-focus-lifecycle={PPT_MODAL_FOCUS_LIFECYCLE_MODEL}
-        data-ppt-command-palette-focus-trap="true"
-        data-ppt-command-palette-model={PPT_COMMAND_PALETTE_ITEMS_MODEL}
-        data-ppt-command-palette-restore-focus="true"
-        ref={dialogRef}
-        role="dialog"
-        onKeyDown={handleKeyDown}
-      >
-        <input
-          aria-activedescendant={activeOptionId}
-          aria-autocomplete="list"
-          aria-controls={listboxId}
-          aria-expanded="true"
-          aria-label="Search commands"
-          className="ppt-command-palette-input"
-          data-ppt-command-palette-active-option={activeOptionId}
-          data-ppt-command-palette-combobox="true"
-          data-ppt-command-palette-controls={listboxId}
-          data-ppt-command-palette-query
-          placeholder="Search commands"
-          ref={inputRef}
-          role="combobox"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value)
-            setActiveIndex(0)
-          }}
-        />
-        <div
-          aria-label="Command results"
-          className="ppt-command-palette-list"
-          data-ppt-command-palette-active-option={activeOptionId}
-          data-ppt-command-palette-listbox
-          id={listboxId}
-          role="listbox"
-        >
-          {filteredItems.length > 0 ? filteredItems.map((item, index) => (
-            <button
-              aria-disabled={item.disabled ? 'true' : undefined}
-              aria-selected={index === activeItemIndex}
-              className="ppt-command-palette-item"
-              data-ppt-command-palette-active={index === activeItemIndex ? 'true' : undefined}
-              data-ppt-command-palette-item={item.id}
-              data-ppt-command-palette-option-id={getPPTCommandPaletteOptionId(item.id)}
-              disabled={item.disabled}
-              id={getPPTCommandPaletteOptionId(item.id)}
-              key={item.id}
-              role="option"
-              type="button"
-              onClick={() => runItem(item)}
-              onMouseEnter={() => setActiveIndex(index)}
-            >
-              <span className="ppt-command-palette-item-main">
-                <span className="ppt-command-palette-item-title">{item.title}</span>
-                <span className="ppt-command-palette-item-section">{item.section}</span>
-              </span>
-              {item.shortcut ? (
-                <kbd className="ppt-command-palette-shortcut">{item.shortcut}</kbd>
-              ) : null}
-            </button>
-          )) : (
-            <div className="ppt-command-palette-empty" data-ppt-command-palette-empty>
-              No matches
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function getPPTCommandPaletteOptionId(itemId: string) {
-  return `ppt-command-palette-option-${itemId.replace(/[^A-Za-z0-9_-]/g, '-')}`
-}
-
-function getPPTShortcutHelpItems(
-  items: readonly PPTCommandPaletteItem[],
-): PPTShortcutHelpItem[] {
-  return items.flatMap((item) =>
-    item.shortcut
-      ? [{
-          id: item.id,
-          section: item.section,
-          shortcut: item.shortcut,
-          title: item.title,
-        }]
-      : [],
-  )
-}
-
-function groupPPTShortcutHelpItems(
-  items: readonly PPTShortcutHelpItem[],
-): PPTShortcutHelpSectionGroup[] {
-  const orderedSections = [
-    ...PPT_SHORTCUT_HELP_SECTION_ORDER,
-    ...items
-      .map((item) => item.section)
-      .filter((section) => !PPT_SHORTCUT_HELP_SECTION_ORDER.includes(section)),
-  ]
-
-  return orderedSections.flatMap((section) => {
-    const sectionItems = items.filter((item) => item.section === section)
-
-    return sectionItems.length > 0
-      ? [{ items: sectionItems, section }]
-      : []
-  })
 }
 
 function getPPTSlideTransition(slide: PPTSlide): PPTSlideTransition {

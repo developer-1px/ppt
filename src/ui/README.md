@@ -6,7 +6,7 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 
 - `core/`: 버튼, 탭, editor chrome 상태와 의미 토큰을 소유한다. PPT 모델이나 canvas 구현을 import하지 않는다.
 - `shell/`: `EditorShell`, `EditorToolbar`, 상단 툴바, 슬라이드 레일, 인스펙터 배치와 점진 공개 규칙을 소유한다.
-- `command-surface/`: PPT 명령 레지스트리, 표면별 명령 파생, 명령 버튼 표현을 소유한다.
+- `command-surface/`: PPT 명령 레지스트리, 표면별 명령 파생, 명령 버튼, command palette·shortcut help의 modal 상호작용과 스타일을 소유한다.
 - `inspector/`: Inspector가 소비하는 PPT 모델과 사용자 액션 계약, 탭·점진 공개·패널 조합, 패널별 편집 UI와 스타일을 소유한다. Objects 패널의 포커스, 이름 변경, 드래그, 키보드 상태도 이 경계 안에 둔다. 앱은 액션을 도메인 명령으로 번역한다.
 - `selection-toolbar/`: 선택 툴바의 조합, 점진 공개, 메뉴 상태, 빠른 텍스트 서식과 스타일을 소유한다. 외부에는 `model + onAction` 인터페이스만 노출한다.
 - `text-formatting/`: 선택 툴바와 인스펙터가 함께 쓰는 PPT 텍스트 서식 제어를 소유한다.
@@ -46,5 +46,6 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 20. Line/Freeform Inspector의 stroke/route/marker 필드는 `PPTLineInspectorFields`가 소유하며, stroke는 `pptObjectAdapter.ts`, line 값은 `pptLineAdapter.ts`를 사용한다.
 21. Table Inspector의 rows 편집과 size 표시는 `PPTTableInspectorFields`가 소유하며, 표시용 read model은 `pptTableAdapter.ts`를 사용한다.
 22. `PPTSelectionInspectorPanel`이 선택 객체별 패널 조합과 empty state를 소유한다. `App`은 `PPTInspector + PPTInspectorAction` 공개 인터페이스만 소비한다.
+23. Command palette와 shortcut help는 같은 command item 계약을 사용하며, modal focus·keyboard·backdrop 동작과 CSS는 `command-surface/`가 함께 소유한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.
