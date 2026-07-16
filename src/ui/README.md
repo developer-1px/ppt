@@ -13,6 +13,7 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 - `App.css`: 슬라이드 내용과 캔버스 편집 affordance처럼 PPT 장면에만 해당하는 표현을 소유한다.
 - `pptCanvas*Adapter.ts`: canvas 동작을 PPT 모델에 연결한다. UI core에 제품 동작을 밀어 넣지 않는다.
 - `pptLayerPaneAdapter.ts`: PPT 요소와 그룹을 canvas Layer Pane descriptor, 선택, 재정렬 명령으로 변환한다. 앱의 도메인 명령과 Inspector UI가 함께 쓰는 PPT 경계다.
+- `pptCommentThreadAdapter.ts`: comment 본문과 reply를 정규화하고 저장된 thread가 없을 때 표시할 fallback thread를 만든다.
 
 ## Extension rules
 
@@ -28,5 +29,6 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 10. 책임 폴더가 있는 UI 스타일은 해당 폴더에서 로드하며 `App.css`에 다시 모으지 않는다.
 11. Objects 패널의 이름 변경, 드래그, 포커스 같은 일시적 상태는 `PPTLayerPane`이 소유하고 `App`에는 `model + onAction`만 노출한다.
 12. Inspector 탭, 선택 변화에 따른 활성 탭, 고급 속성 공개 상태와 Slide/Objects/Export 조합은 `PPTInspectorShell`이 소유한다.
+13. Comment reply draft와 commit interaction은 `PPTCommentInspectorFields`가 소유하며, comment 저장 모델 정규화는 `pptCommentThreadAdapter.ts`를 함께 사용한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.

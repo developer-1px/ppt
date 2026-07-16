@@ -577,6 +577,20 @@ import {
   type PPTObjectVisibilityHostCommandEffect,
 } from './pptLayerPaneAdapter'
 import {
+  getPPTCommentThread,
+  getPPTCommentThreadWithBody,
+  normalizePPTCommentAuthorName,
+  normalizePPTCommentBody,
+  normalizePPTCommentCreatedAt,
+  normalizePPTCommentMessageId,
+  normalizePPTCommentReplyBody,
+  PPT_COMMENT_BODY_MAX_LENGTH,
+  PPT_COMMENT_DEFAULT_AUTHOR,
+  PPT_COMMENT_DEFAULT_BODY,
+  PPT_COMMENT_DEFAULT_CREATED_AT,
+  PPT_COMMENT_REPLY_MAX_LENGTH,
+} from './pptCommentThreadAdapter'
+import {
   createPPTCanvasAffordanceConfig,
   createPPTCanvasShape,
   createPPTCanvasText,
@@ -899,6 +913,7 @@ import {
 } from './ui/command-surface'
 import {
   createPPTInspectorActionDispatcher,
+  PPTCommentInspectorFields,
   PPTInspectorShell,
   type PPTInspectorAction,
   type PPTInspectorProps,
@@ -3577,11 +3592,6 @@ const PPT_SLIDE_CONTEXT_MENU_GROUPS: readonly PPTSlideContextCommandGroup[] = [{
 
 const PPT_LINE_CONNECTION_DISTANCE = 36
 const PPT_TIDY_GAP = 24
-const PPT_COMMENT_DEFAULT_BODY = 'Comment'
-const PPT_COMMENT_DEFAULT_AUTHOR = 'You'
-const PPT_COMMENT_DEFAULT_CREATED_AT = 'Just now'
-const PPT_COMMENT_BODY_MAX_LENGTH = 240
-const PPT_COMMENT_REPLY_MAX_LENGTH = 240
 const PPT_COMMENT_BOUNDS = {
   h: 132,
   w: 260,
@@ -35852,9 +35862,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
 
   const {
     onColorSwatchApply,
-    onCommentBodyChange,
-    onCommentReplyAdd,
-    onCommentResolvedChange,
     onCommitText,
     onElementAltTextChange,
     onElementAnimationChange,
@@ -35964,14 +35971,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     ? getPPTObjectAnimationDescriptor(slide, selectedElement)
     : null
   const imageReplaceInputRef = useRef<HTMLInputElement | null>(null)
-  const [commentReplyDraftById, setCommentReplyDraftById] =
-    useState<Record<string, string>>({})
-  const commentThread = selectedElement?.kind === 'comment'
-    ? getPPTCommentThread(selectedElement)
-    : []
-  const commentReplyDraft = selectedElement?.kind === 'comment'
-    ? commentReplyDraftById[selectedElement.id] ?? ''
-    : ''
   const elementHyperlink = selectedElement
     ? getPPTElementHyperlink(selectedElement)
     : null
@@ -35997,27 +35996,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const textVerticalAlignmentDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextVerticalAlignmentDescriptor(slide.id, selectedElement)
     : null
-  function updateCommentReplyDraft(elementId: string, value: string) {
-    setCommentReplyDraftById((current) => ({
-      ...current,
-      [elementId]: normalizePPTCommentReplyBody(value),
-    }))
-  }
-
-  function commitCommentReplyDraft(elementId: string) {
-    const value = commentReplyDraftById[elementId] ?? ''
-
-    if (value.trim().length === 0) {
-      return
-    }
-
-    onCommentReplyAdd(elementId, value)
-    setCommentReplyDraftById((current) => ({
-      ...current,
-      [elementId]: '',
-    }))
-  }
-
   return (
     <PPTInspectorShell
       model={model}
@@ -37025,78 +37003,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
                 </span>
               </>
             ) : null}
-            {selectedElement.kind === 'comment' ? (
-              <>
-                <label className="ppt-field">
-                  <span>Comment</span>
-                  <textarea
-                    data-ppt-style-field="comment-body"
-                    maxLength={PPT_COMMENT_BODY_MAX_LENGTH}
-                    value={selectedElement.body}
-                    onChange={(event) =>
-                      onCommentBodyChange(selectedElement.id, event.target.value)}
-                  />
-                </label>
-                <label className="ppt-checkbox-field">
-                  <input
-                    checked={selectedElement.resolved === true}
-                    data-ppt-style-field="comment-resolved"
-                    type="checkbox"
-                    onChange={(event) =>
-                      onCommentResolvedChange(selectedElement.id, event.target.checked)}
-                  />
-                  <span>Resolved</span>
-                </label>
-                <section
-                  className="ppt-comment-thread"
-                  data-ppt-comment-thread
-                  data-ppt-comment-thread-count={commentThread.length}
-                  data-ppt-comment-thread-model={PPT_COMMENT_THREAD_MODEL}
-                  data-ppt-comment-thread-resolved={selectedElement.resolved === true ? 'true' : 'false'}
-                >
-                  <div className="ppt-comment-thread-header">
-                    <span>Thread</span>
-                    <span data-ppt-comment-thread-count-label>{commentThread.length}</span>
-                  </div>
-                  <div className="ppt-comment-thread-list">
-                    {commentThread.map((message, index) => (
-                      <article
-                        className="ppt-comment-thread-message"
-                        data-ppt-comment-thread-message={message.id}
-                        data-ppt-comment-thread-message-index={index}
-                        key={message.id}
-                      >
-                        <div className="ppt-comment-thread-meta">
-                          <span data-ppt-comment-thread-author>{message.authorName}</span>
-                          <span data-ppt-comment-thread-created>{message.createdAt}</span>
-                        </div>
-                        <p data-ppt-comment-thread-body>{message.body}</p>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="ppt-comment-reply-row">
-                    <label className="ppt-field">
-                      <span>Reply</span>
-                      <textarea
-                        data-ppt-comment-reply-input
-                        data-ppt-style-field="comment-reply"
-                        maxLength={PPT_COMMENT_REPLY_MAX_LENGTH}
-                        value={commentReplyDraft}
-                        onChange={(event) =>
-                          updateCommentReplyDraft(selectedElement.id, event.target.value)}
-                      />
-                    </label>
-                    <Button
-                      data-ppt-comment-reply-add
-                      disabled={commentReplyDraft.trim().length === 0}
-                      onClick={() => commitCommentReplyDraft(selectedElement.id)}
-                    >
-                      <MessageSquare size={15} /> Add
-                    </Button>
-                  </div>
-                </section>
-              </>
-            ) : null}
+            <PPTCommentInspectorFields model={model} onAction={onAction} />
             {selectedElement.kind === 'line' || selectedElement.kind === 'freeform' ? (
               <>
                 <div className="ppt-geometry-grid">
@@ -40321,52 +40228,6 @@ function clonePPTDeckSlidesForImport(
   })
 
   return slides.map((slide) => clonePPTSlide(slide, createId('slide')))
-}
-
-function normalizePPTCommentBody(value: string) {
-  return value.slice(0, PPT_COMMENT_BODY_MAX_LENGTH)
-}
-
-function normalizePPTCommentReplyBody(value: string) {
-  return value.slice(0, PPT_COMMENT_REPLY_MAX_LENGTH)
-}
-
-function normalizePPTCommentAuthorName(value: string) {
-  return value.trim().slice(0, 80) || PPT_COMMENT_DEFAULT_AUTHOR
-}
-
-function normalizePPTCommentCreatedAt(value: string) {
-  return value.trim().slice(0, 80) || PPT_COMMENT_DEFAULT_CREATED_AT
-}
-
-function normalizePPTCommentMessageId(value: string) {
-  return value.trim().slice(0, 120) || 'json-comment:message'
-}
-
-function getPPTCommentThread(comment: PPTComment): PPTCommentThreadMessage[] {
-  if (comment.thread && comment.thread.length > 0) {
-    return comment.thread
-  }
-
-  return [{
-    authorName: comment.authorName ?? PPT_COMMENT_DEFAULT_AUTHOR,
-    body: comment.body,
-    createdAt: comment.createdAt ?? PPT_COMMENT_DEFAULT_CREATED_AT,
-    id: `${comment.id}:message-1`,
-  }]
-}
-
-function getPPTCommentThreadWithBody(
-  comment: PPTComment,
-  body: string,
-): PPTComment['thread'] {
-  const thread = getPPTCommentThread(comment)
-  const [first, ...rest] = thread
-
-  return [{
-    ...first,
-    body,
-  }, ...rest]
 }
 
 function applyPPTCommentImportSourceToElement(
