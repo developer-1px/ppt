@@ -34,6 +34,10 @@ import type {
   PPTColorSwatchChannel,
   PPTColorSwatchSelection,
 } from '../../pptColorSwatchAdapter'
+import type {
+  PPTParagraphSpacingField,
+  PPTTextInsetField,
+} from '../../pptTextAdapter'
 
 export type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 
@@ -51,10 +55,7 @@ export type PPTInspectorElementAnimationField = PPTElementAnimationUpdateField
 
 export type PPTInspectorElementShadowField = PPTElementShadowUpdateField
 
-export type PPTInspectorParagraphSpacingField =
-  | 'lineHeight'
-  | 'spacingAfter'
-  | 'spacingBefore'
+export type PPTInspectorParagraphSpacingField = PPTParagraphSpacingField
 
 export type PPTInspectorSlideTransitionField =
   | 'advanceAfterMs'
@@ -62,7 +63,7 @@ export type PPTInspectorSlideTransitionField =
   | 'durationMs'
   | 'type'
 
-export type PPTInspectorTextInsetField = keyof NonNullable<PPTTextStyle['textInset']>
+export type PPTInspectorTextInsetField = PPTTextInsetField
 
 export type PPTInspectorModel = {
   exportCode: string

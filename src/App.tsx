@@ -31,8 +31,6 @@ import {
   Highlighter,
   ImagePlus,
   Keyboard,
-  ListIndentDecrease,
-  ListIndentIncrease,
   Lock,
   Map as MapIcon,
   Maximize2,
@@ -101,10 +99,6 @@ import {
   createSlideEditThemeDescriptor,
   createSlideEditSlideClipboardPasteCommandEffect,
   createSlideEditSlideClipboardPayload,
-  createSlideEditTextFontFamilyDescriptor,
-  createSlideEditTextFrameInsetDescriptor,
-  createSlideEditTextParagraphSpacingDescriptor,
-  createSlideEditTextVerticalAlignmentDescriptor,
   createSlideEditTransitionDescriptor,
   createSlideEditSlideMetadataInspectorDescriptor,
   getSlideEditCommentThreadJSONPasteValueFromText,
@@ -190,7 +184,6 @@ import {
   getSlideEditTextAutoFitPasteCommandEffects,
   getSlideEditTextBodyPasteCommandEffect,
   getSlideEditTextOverflowIndicatorState,
-  getSlideEditTextFontFamilyCSS,
   getSlideEditTextFontFamilyCommandEffect,
   getSlideEditTextFontFamilyJSONPasteValueFromText,
   getSlideEditTextFontSizeCommandEffect,
@@ -216,11 +209,9 @@ import {
   getSlideEditTextParagraphBulletJSONPasteValueFromText,
   getSlideEditTextParagraphBulletKeyboardIntent,
   getSlideEditTextParagraphSpacingCommandEffect,
-  getSlideEditTextParagraphSpacingCSSStyle,
   getSlideEditTextParagraphSpacingJSONPasteValueFromText,
   getSlideEditTextParagraphSpacingPasteCommands,
   getSlideEditTextVerticalAlignmentCommandEffect,
-  getSlideEditTextVerticalAlignmentFlexAlignItems,
   getSlideEditTextVerticalAlignmentJSONPasteValueFromText,
   getSlideEditTextVerticalAlignmentPasteCommands,
   getSlideEditTransitionCSSStyle,
@@ -234,10 +225,6 @@ import {
   normalizeSlideEditObjectShadow,
   isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectStrokeLineStyle,
-  normalizeSlideEditTextFontFamily,
-  normalizeSlideEditTextFrameInsetValue,
-  normalizeSlideEditTextLineHeightRatio,
-  normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_COLOR_SWATCH_JSON_MIME_TYPE,
@@ -282,21 +269,15 @@ import {
   SLIDE_EDIT_TEXT_PARAGRAPH_BULLET_KEYBOARD_SHORTCUT,
   SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_NUMBERED_SHORTCUT_INTENT,
   SLIDE_EDIT_TEXT_PARAGRAPH_NUMBERED_KEYBOARD_SHORTCUT,
-  createSlideEditTextParagraphListLevelDescriptor,
-  getSlideEditTextParagraphListLevelIndentCSSValue,
   getSlideEditTextParagraphListLevelIndentEm,
   getSlideEditTextParagraphListLevelJSONPasteValueFromValue,
-  getSlideEditTextParagraphListLevelModelValue,
-  normalizeSlideEditTextParagraphListLevel,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_INTENT,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_KEYS as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_KEYS,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_MODEL as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_MODEL,
-  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS,
   SLIDE_EDIT_TEXT_PARAGRAPH_SPACING_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_RUN_FORMATTING_FIELDS,
   SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_JSON_MIME_TYPE,
-  SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS,
   SLIDE_EDIT_LAYER_PANE_OBJECT_METADATA_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_NAME_JSON_MIME_TYPE,
   SLIDE_EDIT_LAYER_PANE_OBJECT_LAYER_JSON_MIME_TYPE,
@@ -395,16 +376,13 @@ import {
   type SlideEditStyleClipboardStopPaintCommand,
   type SlideEditStyleClipboardStopPaintReason,
   type SlideEditStyleClipboardTargetInput,
-  type SlideEditTextFontFamilyDescriptor,
   type SlideEditTextFontFamilyHostCommandEffect,
   type SlideEditTextClearFormattingHostCommandEffect,
   type SlideEditTextFontSizeHostCommandEffect,
   type SlideEditTextFontWeightHostCommandEffect,
-  type SlideEditTextFrameInsetDescriptor,
   type SlideEditTextFrameInsetHostCommandEffect,
   type SlideEditTextParagraphAlignHostCommandEffect,
   type SlideEditTextParagraphBulletHostCommandEffect,
-  type SlideEditTextParagraphListLevelDescriptor,
   type SlideEditTextBodyJSONPasteValue,
   type SlideEditTextParagraphSpacingPasteFieldValue,
   type SlideEditTextRunFormattingBooleanFieldId,
@@ -414,14 +392,9 @@ import {
   type SlideEditTextAutoFitHostCommandEffect,
   type SlideEditTextBodyReplaceHostCommandEffect,
   type SlideEditTextBoxMeasurement,
-  type SlideEditTextBoxSizeMode,
   type SlideEditTextOverflowIndicatorState,
   type SlideEditTextResizeHandle,
-  type SlideEditTextParagraphSpacingDescriptor,
-  type SlideEditTextParagraphSpacingFieldId,
   type SlideEditTextParagraphSpacingHostCommandEffect,
-  type SlideEditTextParagraphSpacingUpdateCommand,
-  type SlideEditTextVerticalAlignmentDescriptor,
   type SlideEditTextVerticalAlignmentHostCommandEffect,
   type SlideEditSlideTransitionDescriptor,
   type SlideEditTransitionHostCommandEffect,
@@ -508,7 +481,6 @@ import {
   type PPTTableCellBorders,
   type PPTTableCellTextStyle,
   type PPTTextBody,
-  type PPTTextAutoFit,
   type PPTTextElement,
   type PPTTextStyle,
 } from './pptModel'
@@ -585,6 +557,43 @@ import {
   toSlideEditObjectAnimationCommand,
   type PPTElementAnimationUpdateField,
 } from './pptObjectAnimationAdapter'
+import {
+  formatPPTTextInsetData,
+  getDefaultPPTTextStyle,
+  getPPTParagraphLineHeight,
+  getPPTParagraphListLevel,
+  getPPTParagraphListLevelModelValue,
+  getPPTParagraphSpacingAfter,
+  getPPTParagraphSpacingBefore,
+  getPPTParagraphStyle,
+  getPPTTextAutoFitSizeMode,
+  getPPTTextElementInset,
+  getPPTTextElementStyle,
+  getPPTTextElementVerticalAlign,
+  getPPTTextFontFamilyDescriptorOptions,
+  getPPTTextFontFamilyCSS,
+  getPPTTextVerticalAlignCSS,
+  hasPPTTextBodyBullet,
+  hasPPTTextBodyNumbered,
+  normalizePPTParagraphLineHeight,
+  normalizePPTParagraphListLevel,
+  normalizePPTParagraphSpacing,
+  normalizePPTTextFontFamily,
+  normalizePPTTextInset,
+  normalizePPTTextVerticalAlign,
+  PPT_DEFAULT_TEXT_FONT_FAMILY,
+  PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
+  PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
+  PPT_PARAGRAPH_LIST_LEVEL_MAX,
+  PPT_PARAGRAPH_LIST_LEVEL_MIN,
+  PPT_TEXT_AUTOFIT,
+  toPPTParagraphSpacingUpdate,
+  toSlideEditParagraphSpacingCommand,
+  type PPTParagraphSpacingField,
+  type PPTTextInset,
+  type PPTTextInsetField,
+  type PPTTextVerticalAlign,
+} from './pptTextAdapter'
 import {
   getPPTCommentThread,
   getPPTCommentThreadWithBody,
@@ -928,6 +937,7 @@ import {
   PPTInspectorShell,
   PPTObjectAnimationInspectorFields,
   PPTObjectPropertiesInspectorFields,
+  PPTTextInspectorFields,
   type PPTInspectorAction,
   type PPTInspectorProps,
 } from './ui/inspector'
@@ -938,7 +948,6 @@ import {
   type PPTSelectionToolbarAction,
   type PPTTextQuickFormatState,
 } from './ui/selection-toolbar'
-import { PPTParagraphAlignRadioGroup } from './ui/text-formatting'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createPPTCanvasAffordanceConfig({
@@ -3397,27 +3406,6 @@ type PPTSlideTransitionHostCommandEffect =
   SlideEditTransitionHostCommandEffect<string, PPTSlideTransitionType>
 type PPTSlideTransitionUpdateCommand =
   SlideEditTransitionUpdateCommand<string, PPTSlideTransitionType>
-type PPTParagraphSpacingField =
-  | 'lineHeight'
-  | 'spacingAfter'
-  | 'spacingBefore'
-type PPTParagraphTextAlign =
-  | 'center'
-  | 'justify'
-  | 'left'
-  | 'right'
-  | 'start'
-  | 'end'
-  | 'match-parent'
-type PPTParagraphCSSStyle = CSSProperties & ReturnType<
-  typeof getSlideEditTextParagraphSpacingCSSStyle
-> & {
-  '--ppt-paragraph-list-level-indent'?: string
-  textAlign?: PPTParagraphTextAlign
-}
-type PPTTextInset = NonNullable<PPTTextStyle['textInset']>
-type PPTTextInsetField = keyof PPTTextInset
-type PPTTextVerticalAlign = NonNullable<PPTTextStyle['verticalAlign']>
 type PPTObjectStateVisibilityCommand = {
   id: 'hide-objects' | 'show-objects'
   objectIds: readonly string[]
@@ -3574,30 +3562,6 @@ const PPT_TEXT_FONT_SIZE_MIN = 8
 const PPT_TEXT_FONT_SIZE_MAX = 120
 const PPT_TEXT_RUN_CHARACTER_SPACING_MIN = -100
 const PPT_TEXT_RUN_CHARACTER_SPACING_MAX = 100
-const PPT_DEFAULT_TEXT_FONT_FAMILY = 'Inter'
-const PPT_TEXT_FONT_FAMILY_OPTIONS = Object.freeze([
-  { css: 'Inter, ui-sans-serif, system-ui, sans-serif', label: 'Inter', value: 'Inter' },
-  { css: 'Arial, Helvetica, sans-serif', label: 'Arial', value: 'Arial' },
-  { css: 'Georgia, serif', label: 'Georgia', value: 'Georgia' },
-  { css: '"Courier New", monospace', label: 'Courier New', value: 'Courier New' },
-] as const)
-const PPT_DEFAULT_TEXT_VERTICAL_ALIGN: PPTTextVerticalAlign = 'top'
-const PPT_TEXT_INSET_MIN = 0
-const PPT_TEXT_INSET_MAX = 120
-const PPT_TEXT_INSET_STEP = 2
-const PPT_DEFAULT_TEXT_BOX_INSET = Object.freeze({
-  bottom: 0,
-  left: 0,
-  right: 0,
-  top: 0,
-} as const satisfies PPTTextInset)
-const PPT_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
-  bottom: 18,
-  left: 18,
-  right: 18,
-  top: 18,
-} as const satisfies PPTTextInset)
-const PPT_TEXT_AUTOFIT: PPTTextAutoFit = 'resizeShapeToFitText'
 const PPT_TEXT_OVERFLOW_EPSILON = 1
 const PPT_DRAG_DUPLICATE_THRESHOLD =
   SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD
@@ -3642,15 +3606,7 @@ const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
   durationMs: SLIDE_EDIT_DEFAULT_TRANSITION.durationMs,
   type: SLIDE_EDIT_DEFAULT_TRANSITION.type as PPTSlideTransitionType,
 } as const satisfies PPTSlideTransition)
-const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_TEXT_RUN_HIGHLIGHT_DEFAULT = '#fde047'
-const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
-const PPT_PARAGRAPH_LINE_HEIGHT_MAX = 3
-const PPT_PARAGRAPH_SPACING_MAX = 240
-const PPT_PARAGRAPH_LIST_LEVEL_MIN =
-  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.min
-const PPT_PARAGRAPH_LIST_LEVEL_MAX =
-  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_LIMITS.max
 const PPT_SLIDE_RAIL_COMMAND_SHORTCUTS =
   `${SLIDE_EDIT_RAIL_COMMAND_KEYBOARD_SHORTCUT_KEYS} ${SLIDE_EDIT_RAIL_REORDER_KEYBOARD_SHORTCUT_KEYS}`
 const PPT_SHORTCUT_HELP_SHORTCUT = 'Shift+/'
@@ -17898,189 +17854,6 @@ function parsePPTSlideTransitionAdvanceAfter(value: string) {
         },
         slideId: 'ppt-transition-parser',
       }).advance.afterMs ?? null
-}
-
-function getDefaultPPTParagraphSpacing() {
-  return {
-    lineHeight: PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
-    spacingAfter: 0,
-    spacingBefore: 0,
-  }
-}
-
-function getPPTTextElementParagraphSpacing(element: PPTTextElement) {
-  const paragraph = element.textBody.paragraphs[0]
-
-  if (!paragraph) {
-    return getDefaultPPTParagraphSpacing()
-  }
-
-  return {
-    lineHeight: getPPTParagraphLineHeight(paragraph),
-    spacingAfter: getPPTParagraphSpacingAfter(paragraph),
-    spacingBefore: getPPTParagraphSpacingBefore(paragraph),
-  }
-}
-
-function getPPTTextParagraphSpacingDescriptor(
-  slideId: string,
-  element: PPTTextElement,
-): SlideEditTextParagraphSpacingDescriptor<string, string> {
-  const spacing = getPPTTextElementParagraphSpacing(element)
-
-  return createSlideEditTextParagraphSpacingDescriptor({
-    lineHeightRatio: spacing.lineHeight,
-    objectId: element.id,
-    paragraphAfter: {
-      unit: 'px',
-      value: spacing.spacingAfter,
-    },
-    paragraphBefore: {
-      unit: 'px',
-      value: spacing.spacingBefore,
-    },
-    slideId,
-  })
-}
-
-function getPPTTextParagraphListLevelDescriptor(
-  slideId: string,
-  element: PPTTextElement,
-): SlideEditTextParagraphListLevelDescriptor<string, string> {
-  return createSlideEditTextParagraphListLevelDescriptor({
-    level: getPPTParagraphListLevel(
-      element.textBody.paragraphs[0] ?? { runs: [] },
-    ),
-    objectId: element.id,
-    slideId,
-  })
-}
-
-function getPPTTextParagraphSpacingField(
-  descriptor: SlideEditTextParagraphSpacingDescriptor<string, string> | null,
-  fieldId: SlideEditTextParagraphSpacingFieldId,
-) {
-  return descriptor?.fields.find((field) => field.id === fieldId)
-}
-
-function toSlideEditParagraphSpacingCommand({
-  elementId,
-  field,
-  slideId,
-  value,
-}: {
-  elementId: string
-  field: PPTParagraphSpacingField
-  slideId: string
-  value: number
-}): SlideEditTextParagraphSpacingUpdateCommand<string, string> {
-  if (field === 'lineHeight') {
-    return {
-      fieldId: 'lineHeightRatio',
-      id: 'update-text-paragraph-spacing',
-      objectId: elementId,
-      slideId,
-      value,
-    }
-  }
-
-  return {
-    fieldId: field === 'spacingBefore' ? 'paragraphBefore' : 'paragraphAfter',
-    id: 'update-text-paragraph-spacing',
-    objectId: elementId,
-    slideId,
-    value: {
-      unit: 'px',
-      value,
-    },
-  }
-}
-
-function toPPTParagraphSpacingUpdate(
-  command: SlideEditTextParagraphSpacingUpdateCommand<string, string>,
-): {
-  field: PPTParagraphSpacingField
-  value: number
-} {
-  if (command.fieldId === 'lineHeightRatio') {
-    return {
-      field: 'lineHeight',
-      value: normalizePPTParagraphLineHeight(command.value),
-    }
-  }
-
-  return {
-    field: command.fieldId === 'paragraphBefore' ? 'spacingBefore' : 'spacingAfter',
-    value: normalizePPTParagraphSpacing(command.value.value),
-  }
-}
-
-function normalizePPTParagraphLineHeight(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT
-
-  return normalizeSlideEditTextLineHeightRatio(finiteValue)
-}
-
-function normalizePPTParagraphSpacing(value: number) {
-  return normalizeSlideEditTextParagraphSpacingAmount({
-    unit: 'px',
-    value: Number.isFinite(value) ? value : 0,
-  }).value
-}
-
-function parsePPTParagraphLineHeight(value: string) {
-  return normalizePPTParagraphLineHeight(Number(value))
-}
-
-function parsePPTParagraphSpacing(value: string) {
-  return normalizePPTParagraphSpacing(Number(value))
-}
-
-function normalizePPTParagraphListLevel(value: number | null | undefined) {
-  return normalizeSlideEditTextParagraphListLevel(value)
-}
-
-function getPPTParagraphListLevel(paragraph: PPTParagraph) {
-  return normalizePPTParagraphListLevel(paragraph.level)
-}
-
-function getPPTParagraphListLevelModelValue(value: number) {
-  return getSlideEditTextParagraphListLevelModelValue(value)
-}
-
-function getPPTParagraphLineHeight(paragraph: PPTParagraph) {
-  return normalizePPTParagraphLineHeight(
-    paragraph.lineHeight ?? PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
-  )
-}
-
-function getPPTParagraphSpacingAfter(paragraph: PPTParagraph) {
-  return normalizePPTParagraphSpacing(paragraph.spacingAfter ?? 0)
-}
-
-function getPPTParagraphSpacingBefore(paragraph: PPTParagraph) {
-  return normalizePPTParagraphSpacing(paragraph.spacingBefore ?? 0)
-}
-
-function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
-  const listLevel = getPPTParagraphListLevel(paragraph)
-
-  return {
-    ...getSlideEditTextParagraphSpacingCSSStyle({
-      lineHeightRatio: getPPTParagraphLineHeight(paragraph),
-      paragraphAfter: {
-        unit: 'px',
-        value: getPPTParagraphSpacingAfter(paragraph),
-      },
-      paragraphBefore: {
-        unit: 'px',
-        value: getPPTParagraphSpacingBefore(paragraph),
-      },
-    }),
-    '--ppt-paragraph-list-level-indent':
-      getSlideEditTextParagraphListLevelIndentCSSValue(listLevel),
-    textAlign: paragraph.align,
-  }
 }
 
 function createPPTSlideMetadataInspectorDescriptor({
@@ -35391,68 +35164,20 @@ function Guides({ guides, scale }: { guides: PPTCanvasSnapGuides; scale: number 
 
 function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const {
-    lastTextAutoFitEffect,
     selectedElement,
-    selectedTextOverflow,
     slide,
-    textAutoFitIndicator,
   } = model
 
   const {
-    onCommitText,
     onElementStrokeChange,
-    onElementTextInsetChange,
-    onElementTextStyleChange,
     onLineMarkerChange,
     onLineRouteChange,
-    onParagraphAlignChange,
-    onParagraphBulletChange,
-    onParagraphListLevelStep,
-    onParagraphNumberedChange,
-    onParagraphSpacingChange,
     onShapeCornerRadiusChange,
     onShapeFillChange,
     onShapeKindChange,
     onTableRowsChange,
-    onTextAutoFit,
   } = createPPTInspectorActionDispatcher(onAction)
 
-  const textStyle = selectedElement && isPPTTextElement(selectedElement)
-    ? selectedElement.style
-    : null
-  const paragraphAlign = selectedElement && isPPTTextElement(selectedElement)
-    ? selectedElement.textBody?.paragraphs[0]?.align ?? 'left'
-    : 'left'
-  const paragraphBullet = selectedElement && isPPTTextElement(selectedElement)
-    ? hasPPTTextBodyBullet(selectedElement.textBody)
-    : false
-  const paragraphNumbered = selectedElement && isPPTTextElement(selectedElement)
-    ? hasPPTTextBodyNumbered(selectedElement.textBody)
-    : false
-  const paragraphListLevel = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTParagraphListLevel(selectedElement.textBody.paragraphs[0] ?? { runs: [] })
-    : 0
-  const paragraphSpacing = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextElementParagraphSpacing(selectedElement)
-    : getDefaultPPTParagraphSpacing()
-  const paragraphSpacingDescriptor = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextParagraphSpacingDescriptor(slide.id, selectedElement)
-    : null
-  const paragraphListLevelDescriptor = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextParagraphListLevelDescriptor(slide.id, selectedElement)
-    : null
-  const paragraphLineHeightField = getPPTTextParagraphSpacingField(
-    paragraphSpacingDescriptor,
-    'lineHeightRatio',
-  )
-  const paragraphBeforeField = getPPTTextParagraphSpacingField(
-    paragraphSpacingDescriptor,
-    'paragraphBefore',
-  )
-  const paragraphAfterField = getPPTTextParagraphSpacingField(
-    paragraphSpacingDescriptor,
-    'paragraphAfter',
-  )
   const strokeLineStyleDescriptor = selectedElement
     ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
     : null
@@ -35461,18 +35186,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     : null
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
-    : null
-  const textInset = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextElementInset(selectedElement)
-    : PPT_DEFAULT_TEXT_BOX_INSET
-  const textFontFamilyDescriptor = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextFontFamilyDescriptor(slide.id, selectedElement)
-    : null
-  const textFrameInsetDescriptor = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextFrameInsetDescriptor(slide.id, selectedElement)
-    : null
-  const textVerticalAlignmentDescriptor = selectedElement && isPPTTextElement(selectedElement)
-    ? getPPTTextVerticalAlignmentDescriptor(slide.id, selectedElement)
     : null
   return (
     <PPTInspectorShell
@@ -35483,340 +35196,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
           <>
             <PPTObjectPropertiesInspectorFields model={model} onAction={onAction} />
             <PPTObjectAnimationInspectorFields model={model} onAction={onAction} />
-            {isPPTTextElement(selectedElement) ? (
-              <>
-                <label className="ppt-field">
-                  <span>Text</span>
-                  <textarea
-                    data-ppt-style-field="text"
-                    value={readPPTText(selectedElement.textBody)}
-                    onChange={(event) => onCommitText(selectedElement.id, event.target.value)}
-                  />
-                </label>
-                <div className="ppt-geometry-grid">
-                  <div className="ppt-color-control" data-ppt-color-control="text-color">
-                    <label className="ppt-field">
-                      <span>Text color</span>
-                      <input
-                        data-ppt-style-field="text-color"
-                        type="color"
-                        value={textStyle?.color ?? '#111827'}
-                        onChange={(event) =>
-                          onElementTextStyleChange(
-                            selectedElement.id,
-                            'color',
-                            event.target.value,
-                          )}
-                      />
-                    </label>
-                    <PPTColorSwatchStrip
-                      model={model}
-                      onAction={onAction}
-                      target={{
-                        channel: 'text-color',
-                        color: textStyle?.color ?? '#111827',
-                        elementId: selectedElement.id,
-                      }}
-                    />
-                  </div>
-                  <label className="ppt-field">
-                    <span>Font size</span>
-                    <input
-                      data-ppt-style-field="font-size"
-                      type="number"
-                      value={textStyle?.fontSize ?? 24}
-                      onChange={(event) =>
-                        onElementTextStyleChange(
-                          selectedElement.id,
-                          'fontSize',
-                          Number(event.target.value),
-                        )}
-                    />
-                  </label>
-                </div>
-                <label className="ppt-field">
-                  <span>Font</span>
-                  <select
-                    data-ppt-style-field="font-family"
-                    data-ppt-text-font-family-command={textFontFamilyDescriptor?.field.commandId}
-                    data-ppt-text-font-family-control={textFontFamilyDescriptor?.field.control}
-                    data-ppt-text-font-family-fallback={textFontFamilyDescriptor?.fallbackFontFamily}
-                    data-ppt-text-font-family-options={textFontFamilyDescriptor?.options
-                      .map((option) => option.family).join(' ')}
-                    data-ppt-text-font-family-surface={textFontFamilyDescriptor?.surface}
-                    value={textFontFamilyDescriptor?.fontFamily ?? normalizePPTTextFontFamily(textStyle?.fontFamily)}
-                    onChange={(event) =>
-                      onElementTextStyleChange(
-                        selectedElement.id,
-                        'fontFamily',
-                        event.target.value,
-                      )}
-                  >
-                    {PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ppt-field">
-                  <span>Vertical</span>
-                  <select
-                    data-ppt-style-field="vertical-align"
-                    data-ppt-text-vertical-align-attribute={textVerticalAlignmentDescriptor?.metadata.attribute}
-                    data-ppt-text-vertical-align-attribute-value={textVerticalAlignmentDescriptor?.metadata.value}
-                    data-ppt-text-vertical-align-command={textVerticalAlignmentDescriptor?.field.commandId}
-                    data-ppt-text-vertical-align-control={textVerticalAlignmentDescriptor?.field.control}
-                    data-ppt-text-vertical-align-default-value={textVerticalAlignmentDescriptor?.metadata.defaultValue}
-                    data-ppt-text-vertical-align-options={textVerticalAlignmentDescriptor?.field.options
-                      .map((option) => option.id).join(' ')}
-                    data-ppt-text-vertical-align-surface={textVerticalAlignmentDescriptor?.surface}
-                    value={textVerticalAlignmentDescriptor?.value ?? getPPTTextElementVerticalAlign(selectedElement)}
-                    onChange={(event) =>
-                      onElementTextStyleChange(
-                        selectedElement.id,
-                        'verticalAlign',
-                        event.target.value,
-                      )}
-                  >
-                    {SLIDE_EDIT_TEXT_VERTICAL_ALIGNMENT_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div
-                  className="ppt-paragraph-spacing-grid"
-                  data-ppt-text-inset-attribute={textFrameInsetDescriptor?.metadata.attribute}
-                  data-ppt-text-inset-attribute-value={textFrameInsetDescriptor?.metadata.value}
-                  data-ppt-text-inset-bottom={textFrameInsetDescriptor?.inset.bottom ?? textInset.bottom}
-                  data-ppt-text-inset-default-value={textFrameInsetDescriptor?.metadata.defaultValue}
-                  data-ppt-text-inset-inspector
-                  data-ppt-text-inset-left={textFrameInsetDescriptor?.inset.left ?? textInset.left}
-                  data-ppt-text-inset-right={textFrameInsetDescriptor?.inset.right ?? textInset.right}
-                  data-ppt-text-inset-surface={textFrameInsetDescriptor?.surface}
-                  data-ppt-text-inset-top={textFrameInsetDescriptor?.inset.top ?? textInset.top}
-                >
-                  {(['top', 'right', 'bottom', 'left'] as const).map((field) => {
-                    const textFrameInsetField = getPPTTextFrameInsetField(
-                      textFrameInsetDescriptor,
-                      field,
-                    )
-
-                    return (
-                      <label className="ppt-field" key={field}>
-                        <span>{field[0].toUpperCase() + field.slice(1)}</span>
-                        <input
-                          data-ppt-text-inset-command={textFrameInsetField?.commandId}
-                          data-ppt-text-inset-control={textFrameInsetField?.control}
-                          data-ppt-text-inset-field={field}
-                          data-ppt-text-inset-unit={textFrameInsetField?.unit}
-                          max={textFrameInsetField?.max ?? PPT_TEXT_INSET_MAX}
-                          min={textFrameInsetField?.min ?? PPT_TEXT_INSET_MIN}
-                          step={textFrameInsetField?.step ?? PPT_TEXT_INSET_STEP}
-                          type="number"
-                          value={textFrameInsetDescriptor?.inset[field] ?? textInset[field]}
-                          onChange={(event) =>
-                            onElementTextInsetChange(
-                              selectedElement.id,
-                              field,
-                              parsePPTTextInset(event.target.value),
-                            )}
-                        />
-                      </label>
-                    )
-                  })}
-                </div>
-                <label className="ppt-field">
-                  <span>Weight</span>
-                  <select
-                    data-ppt-style-field="font-weight"
-                    value={textStyle?.fontWeight ?? 'regular'}
-                    onChange={(event) =>
-                      onElementTextStyleChange(
-                        selectedElement.id,
-                        'fontWeight',
-                        event.target.value,
-                      )}
-                  >
-                    <option value="regular">Regular</option>
-                    <option value="semibold">Semibold</option>
-                    <option value="bold">Bold</option>
-                  </select>
-                </label>
-                <div className="ppt-field">
-                  <span>Paragraph</span>
-                  <div className="ppt-paragraph-control-row">
-                    <button
-                      aria-pressed={paragraphBullet}
-                      className="ppt-paragraph-bullet-button"
-                      data-ppt-paragraph-bullet
-                      type="button"
-                      onClick={() =>
-                        onParagraphBulletChange(selectedElement.id, !paragraphBullet)}
-                    >
-                      bullet
-                    </button>
-                    <button
-                      aria-pressed={paragraphNumbered}
-                      className="ppt-paragraph-bullet-button"
-                      data-ppt-paragraph-numbered
-                      type="button"
-                      onClick={() =>
-                        onParagraphNumberedChange(
-                          selectedElement.id,
-                          !paragraphNumbered,
-                        )}
-                    >
-                      numbered
-                    </button>
-                    <button
-                      aria-label="Decrease list level"
-                      className="ppt-paragraph-bullet-button"
-                      data-ppt-paragraph-list-level-command={paragraphListLevelDescriptor?.field.commandIds.decrease}
-                      data-ppt-paragraph-list-level-control={paragraphListLevelDescriptor?.field.control}
-                      data-ppt-paragraph-list-level-down
-                      data-ppt-paragraph-list-level={paragraphListLevel}
-                      data-ppt-paragraph-list-level-can-decrease={paragraphListLevelDescriptor?.canDecrease ? 'true' : 'false'}
-                      data-ppt-paragraph-list-level-can-increase={paragraphListLevelDescriptor?.canIncrease ? 'true' : 'false'}
-                      data-ppt-paragraph-list-level-indent={paragraphListLevelDescriptor?.indent.cssValue}
-                      data-ppt-paragraph-list-level-max={paragraphListLevelDescriptor?.field.max}
-                      data-ppt-paragraph-list-level-min={paragraphListLevelDescriptor?.field.min}
-                      data-ppt-paragraph-list-level-step={paragraphListLevelDescriptor?.field.step}
-                      data-ppt-paragraph-list-level-surface={paragraphListLevelDescriptor?.surface}
-                      disabled={paragraphListLevel <= PPT_PARAGRAPH_LIST_LEVEL_MIN}
-                      title="Decrease list level"
-                      type="button"
-                      onClick={() => onParagraphListLevelStep(selectedElement.id, -1)}
-                    >
-                      <ListIndentDecrease size={15} />
-                    </button>
-                    <button
-                      aria-label="Increase list level"
-                      className="ppt-paragraph-bullet-button"
-                      data-ppt-paragraph-list-level-command={paragraphListLevelDescriptor?.field.commandIds.increase}
-                      data-ppt-paragraph-list-level-control={paragraphListLevelDescriptor?.field.control}
-                      data-ppt-paragraph-list-level-up
-                      data-ppt-paragraph-list-level={paragraphListLevel}
-                      data-ppt-paragraph-list-level-can-decrease={paragraphListLevelDescriptor?.canDecrease ? 'true' : 'false'}
-                      data-ppt-paragraph-list-level-can-increase={paragraphListLevelDescriptor?.canIncrease ? 'true' : 'false'}
-                      data-ppt-paragraph-list-level-indent={paragraphListLevelDescriptor?.indent.cssValue}
-                      data-ppt-paragraph-list-level-max={paragraphListLevelDescriptor?.field.max}
-                      data-ppt-paragraph-list-level-min={paragraphListLevelDescriptor?.field.min}
-                      data-ppt-paragraph-list-level-step={paragraphListLevelDescriptor?.field.step}
-                      data-ppt-paragraph-list-level-surface={paragraphListLevelDescriptor?.surface}
-                      disabled={paragraphListLevel >= PPT_PARAGRAPH_LIST_LEVEL_MAX}
-                      title="Increase list level"
-                      type="button"
-                      onClick={() => onParagraphListLevelStep(selectedElement.id, 1)}
-                    >
-                      <ListIndentIncrease size={15} />
-                    </button>
-                    <PPTParagraphAlignRadioGroup
-                      align={paragraphAlign}
-                      surface="inspector"
-                      onAlignChange={(align) =>
-                        onParagraphAlignChange(selectedElement.id, align)}
-                    />
-                  </div>
-                </div>
-                <div
-                  className="ppt-paragraph-spacing-grid"
-                  data-ppt-paragraph-spacing-inspector
-                  data-ppt-paragraph-spacing-surface={paragraphSpacingDescriptor?.surface}
-                  data-ppt-paragraph-line-height={paragraphSpacingDescriptor?.values.lineHeightRatio ?? paragraphSpacing.lineHeight}
-                  data-ppt-paragraph-spacing-after={paragraphSpacingDescriptor?.values.paragraphAfter.value ?? paragraphSpacing.spacingAfter}
-                  data-ppt-paragraph-spacing-before={paragraphSpacingDescriptor?.values.paragraphBefore.value ?? paragraphSpacing.spacingBefore}
-                >
-                  <label className="ppt-field">
-                    <span>Line height</span>
-                    <input
-                      data-ppt-paragraph-control={paragraphLineHeightField?.control}
-                      data-ppt-paragraph-command={paragraphLineHeightField?.commandId}
-                      data-ppt-paragraph-field="lineHeight"
-                      max={paragraphLineHeightField?.max ?? PPT_PARAGRAPH_LINE_HEIGHT_MAX}
-                      min={paragraphLineHeightField?.min ?? PPT_PARAGRAPH_LINE_HEIGHT_MIN}
-                      step={paragraphLineHeightField?.step ?? 0.05}
-                      type="number"
-                      value={paragraphSpacingDescriptor?.values.lineHeightRatio ?? paragraphSpacing.lineHeight}
-                      onChange={(event) =>
-                        onParagraphSpacingChange(
-                          selectedElement.id,
-                          'lineHeight',
-                          parsePPTParagraphLineHeight(event.target.value),
-                        )}
-                    />
-                  </label>
-                  <label className="ppt-field">
-                    <span>Before</span>
-                    <input
-                      data-ppt-paragraph-command={paragraphBeforeField?.commandId}
-                      data-ppt-paragraph-control={paragraphBeforeField?.control}
-                      data-ppt-paragraph-field="spacingBefore"
-                      data-ppt-paragraph-unit={paragraphBeforeField?.unit}
-                      max={paragraphBeforeField?.max ?? PPT_PARAGRAPH_SPACING_MAX}
-                      min={paragraphBeforeField?.min ?? 0}
-                      step={paragraphBeforeField?.step ?? 2}
-                      type="number"
-                      value={paragraphSpacingDescriptor?.values.paragraphBefore.value ?? paragraphSpacing.spacingBefore}
-                      onChange={(event) =>
-                        onParagraphSpacingChange(
-                          selectedElement.id,
-                          'spacingBefore',
-                          parsePPTParagraphSpacing(event.target.value),
-                        )}
-                    />
-                  </label>
-                  <label className="ppt-field">
-                    <span>After</span>
-                    <input
-                      data-ppt-paragraph-command={paragraphAfterField?.commandId}
-                      data-ppt-paragraph-control={paragraphAfterField?.control}
-                      data-ppt-paragraph-field="spacingAfter"
-                      data-ppt-paragraph-unit={paragraphAfterField?.unit}
-                      max={paragraphAfterField?.max ?? PPT_PARAGRAPH_SPACING_MAX}
-                      min={paragraphAfterField?.min ?? 0}
-                      step={paragraphAfterField?.step ?? 2}
-                      type="number"
-                      value={paragraphSpacingDescriptor?.values.paragraphAfter.value ?? paragraphSpacing.spacingAfter}
-                      onChange={(event) =>
-                        onParagraphSpacingChange(
-                          selectedElement.id,
-                          'spacingAfter',
-                          parsePPTParagraphSpacing(event.target.value),
-                        )}
-                    />
-                  </label>
-                </div>
-                <div
-                  className="ppt-text-overflow-control"
-                  data-ppt-text-autofit={selectedElement.textAutoFit}
-                  data-ppt-text-autofit-command={lastTextAutoFitEffect?.payload.id}
-                  data-ppt-text-autofit-command-handle={lastTextAutoFitEffect?.payload.handle}
-                  data-ppt-text-autofit-command-object={lastTextAutoFitEffect?.payload.objectId}
-                  data-ppt-text-autofit-command-size-mode={lastTextAutoFitEffect?.payload.sizeMode}
-                  data-ppt-text-autofit-command-type={lastTextAutoFitEffect?.type}
-                  data-ppt-text-autofit-model="slide-edit-text-box-auto-fit"
-                  data-ppt-text-autofit-size-mode={textAutoFitIndicator?.sizeMode ?? getPPTTextAutoFitSizeMode(selectedElement)}
-                  data-ppt-text-overflow={selectedTextOverflow ? 'true' : 'false'}
-                  data-ppt-text-overflow-indicator-axis={textAutoFitIndicator?.overflowAxis.join(' ')}
-                  data-ppt-text-overflow-indicator-visible={textAutoFitIndicator
-                    ? String(textAutoFitIndicator.isVisible)
-                    : undefined}
-                  data-ppt-text-overflow-inspector
-                >
-                  <span>{selectedTextOverflow ? 'Overflow' : 'Fits'}</span>
-                  <Button
-                    data-ppt-style-action="text-auto-fit"
-                    disabled={!selectedTextOverflow}
-                    onClick={() => onTextAutoFit(selectedElement.id)}
-                  >
-                    <Maximize2 size={15} /> Auto fit
-                  </Button>
-                </div>
-              </>
-            ) : null}
+            <PPTTextInspectorFields model={model} onAction={onAction} />
             {selectedElement.kind === 'shape' ? (
               <>
                 <label className="ppt-field">
@@ -36952,14 +36332,6 @@ function areAllPPTTextElementsListed(
       element.textBody.paragraphs.every((paragraph) => paragraph.bullet === list))
 }
 
-function hasPPTTextBodyBullet(body: PPTTextBody) {
-  return body.paragraphs.some((paragraph) => paragraph.bullet === 'bullet')
-}
-
-function hasPPTTextBodyNumbered(body: PPTTextBody) {
-  return body.paragraphs.some((paragraph) => paragraph.bullet === 'numbered')
-}
-
 function areAllPPTTextRunsStyled(
   elements: readonly PPTTextElement[],
   field: 'italic' | 'strikethrough' | 'underline',
@@ -36970,13 +36342,6 @@ function areAllPPTTextRunsStyled(
       element.textBody.paragraphs.every((paragraph) =>
         paragraph.runs.length > 0 &&
         paragraph.runs.every((run) => run[field] === true)))
-}
-
-function getPPTTextElementStyle(element: PPTTextElement): PPTTextStyle {
-  return {
-    ...getDefaultPPTTextStyle(),
-    ...element.style,
-  }
 }
 
 function getPPTImageCropRectData(element: PPTImage) {
@@ -37095,145 +36460,6 @@ function getPPTThumbElementFilter(element: PPTElement) {
   ].filter(Boolean)
 
   return filters.length > 0 ? filters.join(' ') : undefined
-}
-
-function getDefaultPPTTextStyle(): PPTTextStyle {
-  return {
-    color: '#111827',
-    fontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-    fontSize: 24,
-    fontWeight: 'regular',
-    verticalAlign: PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
-  }
-}
-
-function getPPTTextFontFamilyDescriptorOptions() {
-  return PPT_TEXT_FONT_FAMILY_OPTIONS.map((option) => ({
-    cssFontFamily: option.css,
-    family: option.value,
-    isDefault: option.value === PPT_DEFAULT_TEXT_FONT_FAMILY,
-    label: option.label,
-    source: 'host' as const,
-  }))
-}
-
-function getPPTTextFontFamilyDescriptor(
-  slideId: string,
-  element: PPTTextElement,
-): SlideEditTextFontFamilyDescriptor<string, string> {
-  return createSlideEditTextFontFamilyDescriptor({
-    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-    fontFamily: getPPTTextElementStyle(element).fontFamily,
-    objectId: element.id,
-    options: getPPTTextFontFamilyDescriptorOptions(),
-    slideId,
-  })
-}
-
-function normalizePPTTextFontFamily(fontFamily: string | undefined) {
-  return normalizeSlideEditTextFontFamily({
-    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-    fontFamily,
-    options: getPPTTextFontFamilyDescriptorOptions(),
-  })
-}
-
-function getPPTTextFontFamilyCSS(fontFamily: string | undefined) {
-  return getSlideEditTextFontFamilyCSS({
-    fallbackFontFamily: PPT_DEFAULT_TEXT_FONT_FAMILY,
-    fontFamily,
-    options: getPPTTextFontFamilyDescriptorOptions(),
-  })
-}
-
-function getPPTTextElementVerticalAlign(element: PPTElement) {
-  const verticalAlign =
-    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
-    ? element.style?.verticalAlign
-    : undefined
-
-  return normalizePPTTextVerticalAlign(
-    verticalAlign,
-    element.kind === 'freeform' || element.kind === 'shape'
-      ? 'middle'
-      : PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
-  )
-}
-
-function getPPTTextVerticalAlignmentDescriptor(
-  slideId: string,
-  element: PPTTextElement,
-): SlideEditTextVerticalAlignmentDescriptor<string, string> {
-  return createSlideEditTextVerticalAlignmentDescriptor({
-    objectId: element.id,
-    slideId,
-    value: getPPTTextElementVerticalAlign(element),
-  })
-}
-
-function normalizePPTTextVerticalAlign(
-  verticalAlign: string | undefined,
-  fallback: PPTTextVerticalAlign = PPT_DEFAULT_TEXT_VERTICAL_ALIGN,
-) {
-  const normalizedFallback = normalizeSlideEditTextVerticalAlignment(fallback)
-  const normalizedValue = normalizeSlideEditTextVerticalAlignment(verticalAlign)
-
-  return verticalAlign === undefined ? normalizedFallback : normalizedValue
-}
-
-function getPPTTextVerticalAlignCSS(verticalAlign: string | undefined) {
-  return getSlideEditTextVerticalAlignmentFlexAlignItems(
-    normalizePPTTextVerticalAlign(verticalAlign),
-  )
-}
-
-function getPPTTextFrameInsetDescriptor(
-  slideId: string,
-  element: PPTTextElement,
-): SlideEditTextFrameInsetDescriptor<string, string> {
-  return createSlideEditTextFrameInsetDescriptor({
-    inset: getPPTTextElementInset(element),
-    objectId: element.id,
-    slideId,
-  })
-}
-
-function getPPTTextFrameInsetField(
-  descriptor: SlideEditTextFrameInsetDescriptor<string, string> | null,
-  fieldId: PPTTextInsetField,
-) {
-  return descriptor?.fields.find((field) => field.id === fieldId)
-}
-
-function getPPTTextElementInset(element: PPTElement): PPTTextInset {
-  const fallback = element.kind === 'freeform' || element.kind === 'shape'
-    ? PPT_DEFAULT_SHAPE_TEXT_INSET
-    : PPT_DEFAULT_TEXT_BOX_INSET
-  const inset =
-    element.kind === 'freeform' || element.kind === 'shape' || element.kind === 'textBox'
-    ? element.style?.textInset
-    : undefined
-
-  return {
-    bottom: normalizePPTTextInset(inset?.bottom ?? fallback.bottom),
-    left: normalizePPTTextInset(inset?.left ?? fallback.left),
-    right: normalizePPTTextInset(inset?.right ?? fallback.right),
-    top: normalizePPTTextInset(inset?.top ?? fallback.top),
-  }
-}
-
-function parsePPTTextInset(value: string) {
-  return normalizePPTTextInset(Number(value))
-}
-
-function normalizePPTTextInset(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : 0
-
-  return normalizeSlideEditTextFrameInsetValue(finiteValue)
-}
-
-function formatPPTTextInsetData(inset: PPTTextInset) {
-  return `${inset.top},${inset.right},${inset.bottom},${inset.left}`
 }
 
 function getPPTElementStrokeDash(element: PPTElement) {
@@ -38809,10 +38035,6 @@ function getPPTTextAutoFitMeasurement(
     hasOverflow,
     measuredSize: measurePPTTextAutoFitSize(element),
   }
-}
-
-function getPPTTextAutoFitSizeMode(element: PPTTextElement): SlideEditTextBoxSizeMode {
-  return element.textAutoFit === PPT_TEXT_AUTOFIT ? 'resize-to-fit' : 'fixed'
 }
 
 function measurePPTTextContentSize(
