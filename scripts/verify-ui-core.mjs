@@ -13,7 +13,9 @@ const editorChrome = read('src/ui/core/useEditorChrome.ts')
 const editorShell = read('src/ui/shell/EditorShell.tsx')
 const indexCSS = read('src/index.css')
 const packageJSON = read('package.json')
+const alignmentPopover = read('src/ui/selection-toolbar/PPTAlignmentPopover.tsx')
 const shellCSS = read('src/ui/shell/editor-shell.css')
+const shapeKindMenu = read('src/ui/selection-toolbar/PPTShapeKindMenu.tsx')
 const tokensCSS = read('src/ui/core/tokens.css')
 const viteConfig = read('vite.config.ts')
 
@@ -47,6 +49,11 @@ assert.doesNotMatch(appCSS, /\.ppt-topbar\s*\{/, 'App.css must not redefine the 
 assert.match(shellCSS, /\.ppt-topbar\s*\{/, 'Shell styles must own the editor toolbar')
 assert.match(app, /<EditorShell/, 'PPT must compose its root through the editor shell seam')
 assert.match(app, /<EditorToolbar/, 'PPT must compose its toolbar through the editor shell seam')
+assert.match(app, /<PPTAlignmentPopover/, 'PPT must compose the alignment popover through the selection toolbar seam')
+assert.match(app, /<PPTShapeKindMenu/, 'PPT must compose the shape menu through the selection toolbar seam')
+assert.doesNotMatch(app, /function PPTAlignmentPopover/, 'App must not own alignment menu implementation')
+assert.doesNotMatch(app, /function PPTShapeKindMenu/, 'App must not own shape menu implementation')
+assert.doesNotMatch(app, /PPT_ALIGNMENT_POPOVER_COMMANDS|PPT_SHAPE_MENU_OPTIONS/, 'App must not own selection toolbar menu registries')
 assert.match(app, /useEditorChrome/, 'PPT must use the shared editor chrome module')
 assert.doesNotMatch(app, /useExclusiveDisclosure/, 'PPT must not compose chrome from a shallow disclosure hook')
 assert.doesNotMatch(app, /setToolShelfOpen|setViewOptionsOpen|setExportOptionsOpen|setShowGrid|setShowFrameGuides|setShowMinimap|setInspectorOpen/, 'Editor chrome must not drift back to independent booleans')
@@ -61,6 +68,18 @@ assert.match(editorShell, /data-editor-transient-surface/, 'Editor toolbar must 
 assert.match(shellCSS, /data-editor-inspector-open/, 'Shell CSS must consume the generic inspector state')
 assert.match(shellCSS, /data-editor-transient-surface/, 'Shell CSS must consume the generic transient surface state')
 assert.doesNotMatch(shellCSS, /data-ppt-(?:inspector-open|tool-shelf-open|view-options-open|export-options-open)/, 'Shell layout must not depend on PPT diagnostic state')
+assert.match(alignmentPopover, /availability: Readonly<Record<PPTAlignmentPopoverCommand, boolean>>/, 'Alignment menu must receive availability through its public interface')
+assert.match(alignmentPopover, /onPreviewChange: \(command: PPTAlignmentPopoverCommand \| null\) => void/, 'Alignment menu must own preview lifecycle behind one callback')
+assert.match(shapeKindMenu, /state: PPTShapeQuickMenuState/, 'Shape menu must receive a cohesive state value')
+
+for (const [name, source] of [
+  ['alignment popover', alignmentPopover],
+  ['shape kind menu', shapeKindMenu],
+]) {
+  assert.match(source, /usePPTCanvasMenuRovingFocus/, `${name} must own roving menu focus`)
+  assert.match(source, /focusPPTCanvasElementOnNextFrame/, `${name} must restore trigger focus`)
+  assert.match(source, /getPPTCanvasMenuTriggerKeyboardIntent/, `${name} must reuse the Canvas menu trigger affordance`)
+}
 
 for (const [name, source] of [
   ['package.json', packageJSON],
