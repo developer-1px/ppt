@@ -3,6 +3,7 @@ import './inspector.css'
 export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
+export { PPTLayerPane } from './PPTLayerPane'
 export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'
 export {
   type PPTInspectorAction,
