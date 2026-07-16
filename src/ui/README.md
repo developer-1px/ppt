@@ -7,7 +7,7 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 - `core/`: 버튼, 탭, editor chrome 상태와 의미 토큰을 소유한다. PPT 모델이나 canvas 구현을 import하지 않는다.
 - `shell/`: `EditorShell`, `EditorToolbar`, 상단 툴바, 슬라이드 레일, 인스펙터 배치와 점진 공개 규칙을 소유한다.
 - `command-surface/`: PPT 명령 레지스트리, 표면별 명령 파생, 명령 버튼 표현을 소유한다.
-- `inspector/`: Inspector가 소비하는 PPT 모델과 사용자 액션 계약, 패널별 편집 UI와 스타일을 소유한다. Objects 패널의 포커스, 이름 변경, 드래그, 키보드 상태도 이 경계 안에 둔다. 앱은 탭 셸을 조합하고 액션을 도메인 명령으로 번역한다.
+- `inspector/`: Inspector가 소비하는 PPT 모델과 사용자 액션 계약, 탭·점진 공개·패널 조합, 패널별 편집 UI와 스타일을 소유한다. Objects 패널의 포커스, 이름 변경, 드래그, 키보드 상태도 이 경계 안에 둔다. 앱은 액션을 도메인 명령으로 번역한다.
 - `selection-toolbar/`: 선택 툴바의 조합, 점진 공개, 메뉴 상태, 빠른 텍스트 서식과 스타일을 소유한다. 외부에는 `model + onAction` 인터페이스만 노출한다.
 - `text-formatting/`: 선택 툴바와 인스펙터가 함께 쓰는 PPT 텍스트 서식 제어를 소유한다.
 - `App.css`: 슬라이드 내용과 캔버스 편집 affordance처럼 PPT 장면에만 해당하는 표현을 소유한다.
@@ -27,5 +27,6 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 9. Inspector 패널은 이 계약에서 필요한 모델만 읽고 같은 액션 스트림을 내보내며, 필드 계산과 이벤트 변환을 `App`으로 누출하지 않는다.
 10. 책임 폴더가 있는 UI 스타일은 해당 폴더에서 로드하며 `App.css`에 다시 모으지 않는다.
 11. Objects 패널의 이름 변경, 드래그, 포커스 같은 일시적 상태는 `PPTLayerPane`이 소유하고 `App`에는 `model + onAction`만 노출한다.
+12. Inspector 탭, 선택 변화에 따른 활성 탭, 고급 속성 공개 상태와 Slide/Objects/Export 조합은 `PPTInspectorShell`이 소유한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.

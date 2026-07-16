@@ -4,6 +4,7 @@ export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
 export { PPTLayerPane } from './PPTLayerPane'
+export { PPTInspectorShell } from './PPTInspectorShell'
 export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'
 export {
   type PPTInspectorAction,

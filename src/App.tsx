@@ -54,7 +54,6 @@ import {
   Scissors,
   Search,
   SendToBack,
-  SlidersHorizontal,
   Square,
   StickyNote,
   Sun,
@@ -632,7 +631,6 @@ import {
   PPT_MENU_ROVING_FOCUS_MODEL,
   PPT_MODAL_FOCUS_LIFECYCLE_MODEL,
   PPT_RESIZE_POINTER_MODIFIERS_MODEL,
-  PPT_TABS_ROVING_FOCUS_MODEL,
   PPT_TOOLBAR_FOCUS_MODEL,
   PPT_TOOLBAR_ITEM_PROPS,
   PPT_TOOLBAR_KEYBOARD_MODEL,
@@ -647,7 +645,6 @@ import {
   createPPTCanvasDataTransferImportActionPlan,
   createPPTCanvasPastePositionKey,
   createPPTCanvasRichClipboardHTML,
-  createPPTCanvasTabsDescriptor,
   cutPPTCanvasClipboardSelection,
   duplicatePPTCanvasClipboardSelection,
   downloadPPTCanvasBlobFile,
@@ -693,7 +690,6 @@ import {
   getPPTCanvasResizeHandleDoubleClickIntent,
   getPPTCanvasRichClipboardJSONFromHTML,
   getPPTCanvasTableInsertCenter,
-  getPPTCanvasTabsKeyboardIntent,
   getPPTCanvasTextPasteInsertPosition,
   getPPTCanvasTextPasteSourceText,
   getPPTCanvasWorldClientPoint,
@@ -764,7 +760,6 @@ import {
   type PPTCanvasStandardCommand,
   type PPTCanvasStandardCommandExecutionContext,
   type PPTCanvasStandardCommandItemsChange,
-  type PPTCanvasTabsDescriptor,
   type PPTCanvasTableImportTargetReplaceTarget,
   type PPTCanvasTableImportSource,
   type PPTCanvasTextPasteReplaceTarget,
@@ -892,8 +887,6 @@ import {
   Button,
   DisclosurePanel,
   IconButton,
-  Tab,
-  TabList,
   ToolbarGroup,
   useEditorChrome,
 } from './ui/core'
@@ -906,8 +899,7 @@ import {
 } from './ui/command-surface'
 import {
   createPPTInspectorActionDispatcher,
-  PPTLayerPane,
-  PPTSlideInspectorPanel,
+  PPTInspectorShell,
   type PPTInspectorAction,
   type PPTInspectorProps,
 } from './ui/inspector'
@@ -3383,28 +3375,6 @@ type PPTSlideMetadataReadModel = SlideEditSlideMetadataReadModel<string> & {
 }
 type PPTSlideMetadataFieldDescriptor = SlideEditSlideMetadataFieldDescriptor
 type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
-type PPTInspectorTabId =
-  | 'selection'
-  | 'slide'
-const PPT_INSPECTOR_TABS = [
-  {
-    id: 'slide',
-    label: 'Slide',
-    panelId: 'ppt-inspector-panel-slide',
-    tabId: 'ppt-inspector-tab-slide',
-  },
-  {
-    id: 'selection',
-    label: 'Selection',
-    panelId: 'ppt-inspector-panel-selection',
-    tabId: 'ppt-inspector-tab-selection',
-  },
-] as const satisfies readonly {
-  id: PPTInspectorTabId
-  label: string
-  panelId: string
-  tabId: string
-}[]
 type PPTSlideMetadataInspectorDescriptor =
   SlideEditSlideMetadataInspectorDescriptor<string> & {
     metadata: PPTSlideMetadataReadModel
@@ -35870,16 +35840,12 @@ function PPTColorSwatchStrip({
 
 function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const {
-    exportCode,
-    hidden,
-    inspectorSurface,
     lastTextAutoFitEffect,
     recentColors,
     selectedElement,
     selectedElementAnimation,
     selectedTextOverflow,
     slide,
-    slideMetadataDescriptor,
     textAutoFitIndicator,
     themeColorTokens,
   } = model
@@ -35890,8 +35856,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     onCommentReplyAdd,
     onCommentResolvedChange,
     onCommitText,
-    onCopyHTML,
-    onDownloadHTML,
     onElementAltTextChange,
     onElementAnimationChange,
     onElementGeometryChange,
@@ -36033,35 +35997,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const textVerticalAlignmentDescriptor = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextVerticalAlignmentDescriptor(slide.id, selectedElement)
     : null
-  const hasSelectedElement = selectedElement !== null
-  const [activeInspectorTabId, setActiveInspectorTabId] = useState<PPTInspectorTabId>(
-    hasSelectedElement ? 'selection' : 'slide',
-  )
-  const [advancedInspectorOpen, setAdvancedInspectorOpen] = useState(false)
-  const previousInspectorSelectionStateRef = useRef(hasSelectedElement)
-  const inspectorTabsDescriptor = createPPTCanvasTabsDescriptor({
-    activation: 'automatic',
-    activeId: activeInspectorTabId,
-    tabs: PPT_INSPECTOR_TABS,
-  })
-  const slideInspectorPanelAttributes = getPPTInspectorPanelAttributes(
-    inspectorTabsDescriptor,
-    'slide',
-  )
-  const selectionInspectorPanelAttributes = getPPTInspectorPanelAttributes(
-    inspectorTabsDescriptor,
-    'selection',
-  )
-
-  useEffect(() => {
-    if (previousInspectorSelectionStateRef.current === hasSelectedElement) {
-      return
-    }
-
-    previousInspectorSelectionStateRef.current = hasSelectedElement
-    setActiveInspectorTabId(hasSelectedElement ? 'selection' : 'slide')
-  }, [hasSelectedElement])
-
   function updateCommentReplyDraft(elementId: string, value: string) {
     setCommentReplyDraftById((current) => ({
       ...current,
@@ -36083,125 +36018,12 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     }))
   }
 
-  function focusPPTInspectorTab(tabId: PPTInspectorTabId) {
-    focusPPTCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
-      match: ({ element }) =>
-        element.getAttribute('data-ppt-inspector-tab') === tabId,
-      root: document,
-      selector: '[data-ppt-inspector-tab]',
-    })
-  }
-
-  function selectPPTInspectorTab(tabId: PPTInspectorTabId) {
-    setActiveInspectorTabId(tabId)
-  }
-
-  function handlePPTInspectorTabKeyDown(
-    tabId: PPTInspectorTabId,
-    event: ReactKeyboardEvent<HTMLButtonElement>,
-  ) {
-    if (
-      event.target !== event.currentTarget ||
-      event.ctrlKey ||
-      event.metaKey ||
-      (event.altKey && event.key !== 'ArrowDown' && event.key !== 'ArrowUp')
-    ) {
-      return
-    }
-
-    const intent = getPPTCanvasTabsKeyboardIntent({
-      activation: inspectorTabsDescriptor.activation,
-      currentId: tabId,
-      key: event.key,
-      tabs: PPT_INSPECTOR_TABS,
-    })
-
-    if (intent.kind === 'none') {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (intent.activate) {
-      setActiveInspectorTabId(intent.id)
-    }
-    focusPPTInspectorTab(intent.id)
-  }
-
-
   return (
-    <aside
-      aria-label="Inspector"
-      className="ppt-inspector"
-      data-ppt-inspector-active-tab={activeInspectorTabId}
-      data-ppt-inspector-advanced-open={advancedInspectorOpen ? 'true' : 'false'}
-      hidden={hidden}
-    >
-      <div className="ppt-inspector-head">
-      <TabList
-        aria-label="Inspector panels"
-        className="ppt-inspector-tabs"
-        data-ppt-inspector-tabs
-        data-ppt-inspector-tabs-activation={inspectorTabsDescriptor.activation}
-        data-ppt-inspector-tabs-keyboard={inspectorTabsDescriptor.keyboardModel}
-        data-ppt-inspector-tabs-model={PPT_TABS_ROVING_FOCUS_MODEL}
-      >
-        {inspectorTabsDescriptor.tabs.map((tab) => {
-          return (
-            <Tab
-              {...tab.attributes}
-              className="ppt-inspector-tab"
-              data-ppt-inspector-tab={tab.id}
-              data-ppt-inspector-tab-active={tab.isActive ? 'true' : 'false'}
-              key={tab.id}
-              onClick={() => selectPPTInspectorTab(tab.id)}
-              onKeyDown={(event) => handlePPTInspectorTabKeyDown(tab.id, event)}
-            >
-              {tab.label}
-            </Tab>
-          )
-        })}
-      </TabList>
-        <IconButton
-          aria-pressed={advancedInspectorOpen}
-          className="ppt-inspector-advanced-toggle"
-          data-ppt-inspector-advanced-toggle
-          label={advancedInspectorOpen ? 'Hide advanced properties' : 'Show advanced properties'}
-          onClick={() => setAdvancedInspectorOpen((current) => !current)}
-        >
-          <SlidersHorizontal size={15} />
-        </IconButton>
-      </div>
-      <section
-        {...slideInspectorPanelAttributes}
-        className="ppt-panel-section"
-        data-ppt-inspector-surface={inspectorSurface}
-        data-ppt-inspector-tabpanel="slide"
-        data-ppt-inspector-tabpanel-active={activeInspectorTabId === 'slide' ? 'true' : 'false'}
-        data-ppt-slide-inspector-priority={inspectorSurface === 'slide-metadata-inspector' ? 'active' : 'secondary'}
-        data-ppt-slide-metadata-active-index={slideMetadataDescriptor.activeSlide.index ?? ''}
-        data-ppt-slide-metadata-command-slot="command-effect"
-        data-ppt-slide-metadata-field-count={slideMetadataDescriptor.fields.length}
-        data-ppt-slide-metadata-inspector
-        data-ppt-slide-metadata-slide-count={slideMetadataDescriptor.activeSlide.slideCount}
-        data-ppt-slide-metadata-slide-id={slideMetadataDescriptor.activeSlide.slideId}
-        data-ppt-slide-metadata-surface={slideMetadataDescriptor.surface}
-      >
-        <PPTSlideInspectorPanel model={model} onAction={onAction} />
-      </section>
-
-      <section
-        {...selectionInspectorPanelAttributes}
-        className="ppt-panel-section"
-        data-ppt-inspector-surface={inspectorSurface}
-        data-ppt-inspector-tabpanel="selection"
-        data-ppt-inspector-tabpanel-active={activeInspectorTabId === 'selection' ? 'true' : 'false'}
-        data-ppt-object-inspector
-        data-ppt-object-inspector-active={selectedElement ? 'true' : 'false'}
-        data-ppt-object-inspector-priority={inspectorSurface === 'object-selection-inspector' ? '0' : '1'}
-      >
-        {selectedElement ? (
+    <PPTInspectorShell
+      model={model}
+      onAction={onAction}
+      selectionPanel={
+        selectedElement ? (
           <>
             <label className="ppt-field">
               <span>Name</span>
@@ -37410,25 +37232,9 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
           </>
         ) : (
           <span className="ppt-muted">None</span>
-        )}
-      </section>
-
-      <PPTLayerPane model={model} onAction={onAction} />
-      <div className="ppt-panel-header ppt-inspector-advanced-only">
-        <h2>Export</h2>
-      </div>
-      <section className="ppt-panel-section ppt-inspector-advanced-only">
-        <ToolbarGroup>
-          <Button onClick={onCopyHTML}>
-            <Copy size={16} /> Copy
-          </Button>
-          <Button onClick={onDownloadHTML}>
-            <Download size={16} /> Download
-          </Button>
-        </ToolbarGroup>
-        <textarea className="ppt-export-code" readOnly value={exportCode} />
-      </section>
-    </aside>
+        )
+      }
+    />
   )
 }
 
@@ -37564,19 +37370,6 @@ function isPPTWheelViewportPassthroughTarget(target: EventTarget | null) {
     extraSelectors: PPT_WHEEL_VIEWPORT_PASSTHROUGH_TARGET_SELECTORS,
     target,
   }) || isPPTCanvasWheelPassthroughTarget(target)
-}
-
-function getPPTInspectorPanelAttributes(
-  descriptor: PPTCanvasTabsDescriptor<PPTInspectorTabId>,
-  tabId: PPTInspectorTabId,
-) {
-  const panel = descriptor.panels.find((item) => item.id === tabId)
-
-  if (!panel) {
-    throw new Error(`Missing PPT inspector panel for tab ${tabId}`)
-  }
-
-  return panel.attributes
 }
 
 function isPPTCanvasStandardCommandIntentKind(kind: string) {
