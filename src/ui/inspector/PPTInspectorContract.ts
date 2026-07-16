@@ -30,6 +30,7 @@ import type {
   PPTTextStyle,
 } from '../../pptModel'
 import type { PPTElementShadowUpdateField } from '../../pptObjectAdapter'
+import type { PPTElementAnimationUpdateField } from '../../pptObjectAnimationAdapter'
 
 export type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 
@@ -47,12 +48,7 @@ export type PPTInspectorColorSwatchChannel =
   | 'shape-stroke'
   | 'text-color'
 
-export type PPTInspectorElementAnimationField =
-  | 'delayMs'
-  | 'durationMs'
-  | 'order'
-  | 'trigger'
-  | 'type'
+export type PPTInspectorElementAnimationField = PPTElementAnimationUpdateField
 
 export type PPTInspectorElementShadowField = PPTElementShadowUpdateField
 

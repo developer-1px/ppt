@@ -6,6 +6,7 @@ export {
 export { PPTCommentInspectorFields } from './PPTCommentInspectorFields'
 export { PPTImageInspectorFields } from './PPTImageInspectorFields'
 export { PPTLayerPane } from './PPTLayerPane'
+export { PPTObjectAnimationInspectorFields } from './PPTObjectAnimationInspectorFields'
 export { PPTObjectPropertiesInspectorFields } from './PPTObjectPropertiesInspectorFields'
 export { PPTInspectorShell } from './PPTInspectorShell'
 export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'

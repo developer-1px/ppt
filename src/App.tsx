@@ -96,7 +96,6 @@ import {
   createSlideEditLayoutPlaceholderDescriptor,
   createSlideEditObjectCornerRadiusDescriptor,
   createSlideEditObjectFillOpacityDescriptor,
-  createSlideEditObjectAnimationDescriptor,
   createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditStyleClipboardDescriptor,
   createSlideEditStyleClipboardPasteCommandEffect,
@@ -129,8 +128,6 @@ import {
   getSlideEditLayoutJSONPasteValueFromText,
   getSlideEditInspectorSurface,
   getSlideEditObjectAccessibilityCommandEffect,
-  getSlideEditObjectAnimationBuildOrder,
-  getSlideEditObjectAnimationCSSStyle,
   getSlideEditObjectCornerRadiusCommandEffect,
   getSlideEditObjectCornerRadiusCSS,
   getSlideEditObjectCornerRadiusJSONPasteValueFromText,
@@ -232,9 +229,6 @@ import {
   mapSlideEditClipboardPasteObjects,
   normalizeSlideEditClipboardSelectedObjectIds,
   normalizeSlideEditObjectCornerRadius,
-  normalizeSlideEditObjectAnimationDelayMs,
-  normalizeSlideEditObjectAnimationDurationMs,
-  normalizeSlideEditObjectAnimationOrder,
   normalizeSlideEditColorSwatchValue,
   normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectImageCropValue,
@@ -248,7 +242,6 @@ import {
   normalizeSlideEditTextParagraphSpacingAmount,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_DEFAULT_TRANSITION,
-  SLIDE_EDIT_OBJECT_ANIMATION_LIMITS,
   SLIDE_EDIT_COLOR_SWATCH_CHANNELS,
   SLIDE_EDIT_COLOR_SWATCH_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_ACCESSIBILITY_JSON_MIME_TYPE,
@@ -265,8 +258,6 @@ import {
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT as PPT_OBJECT_TRANSFORM_JSON_IMPORT_FORMAT,
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD,
-  SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS,
-  SLIDE_EDIT_OBJECT_ANIMATION_TYPES,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
@@ -362,12 +353,10 @@ import {
   type SlideEditObjectImageCropJSONPasteValue,
   type SlideEditObjectImageReplaceHostCommandEffect,
   type SlideEditObjectImageReplaceJSONPasteValue,
-  type SlideEditBuiltInAnimationTrigger,
   type SlideEditColorSwatchBuiltInChannelId,
   type SlideEditColorSwatchHostCommandEffect,
   type SlideEditColorSwatchPaletteDescriptor,
   type SlideEditColorSwatchSelection,
-  type SlideEditBuiltInAnimationType,
   type SlideEditClipboardObjectMetadata,
   type SlideEditClipboardOperation,
   type SlideEditClipboardPasteHostCommandEffect,
@@ -375,9 +364,7 @@ import {
   type SlideEditClipboardPasteTarget,
   type SlideEditClipboardPayload,
   type SlideEditClipboardRemapPolicy,
-  type SlideEditObjectAnimationDescriptor,
   type SlideEditObjectAnimationHostCommandEffect,
-  type SlideEditObjectAnimationUpdateCommand,
   type SlideEditObjectOpacityHostCommandEffect,
   type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectShadowJSONPasteValue,
@@ -585,6 +572,19 @@ import {
   PPT_HYPERLINK_URL_MAX_LENGTH,
   type PPTElementShadowUpdateField,
 } from './pptObjectAdapter'
+import {
+  getPPTElementAnimation,
+  getPPTElementAnimationOrderFromJSONValue,
+  getPPTElementAnimationStyle,
+  getPPTElementAnimationTimeFromJSONValue,
+  getPPTElementAnimationTriggerFromJSONValue,
+  getPPTElementAnimationTypeFromJSONValue,
+  getPPTSlideAnimationBuildOrder,
+  normalizePPTElementAnimation,
+  toPPTElementAnimationUpdate,
+  toSlideEditObjectAnimationCommand,
+  type PPTElementAnimationUpdateField,
+} from './pptObjectAnimationAdapter'
 import {
   getPPTCommentThread,
   getPPTCommentThreadWithBody,
@@ -925,6 +925,7 @@ import {
   PPTCommentInspectorFields,
   PPTImageInspectorFields,
   PPTInspectorShell,
+  PPTObjectAnimationInspectorFields,
   PPTObjectPropertiesInspectorFields,
   type PPTInspectorAction,
   type PPTInspectorProps,
@@ -3420,17 +3421,6 @@ type PPTSlideTransitionHostCommandEffect =
   SlideEditTransitionHostCommandEffect<string, PPTSlideTransitionType>
 type PPTSlideTransitionUpdateCommand =
   SlideEditTransitionUpdateCommand<string, PPTSlideTransitionType>
-type PPTElementAnimationType = PPTElementAnimation['type']
-type PPTElementAnimationTrigger = PPTElementAnimation['trigger']
-type PPTElementAnimationUpdateField =
-  | 'delayMs'
-  | 'durationMs'
-  | 'order'
-  | 'trigger'
-  | 'type'
-type PPTElementAnimationCSSStyle = ReturnType<
-  typeof getSlideEditObjectAnimationCSSStyle
->
 type PPTParagraphSpacingField =
   | 'lineHeight'
   | 'spacingAfter'
@@ -3676,22 +3666,6 @@ const PPT_DEFAULT_SLIDE_TRANSITION = Object.freeze({
   durationMs: SLIDE_EDIT_DEFAULT_TRANSITION.durationMs,
   type: SLIDE_EDIT_DEFAULT_TRANSITION.type as PPTSlideTransitionType,
 } as const satisfies PPTSlideTransition)
-const PPT_ELEMENT_ANIMATION_TYPES = Object.freeze([
-  'none',
-  'fadeIn',
-  'flyIn',
-] as const satisfies readonly PPTElementAnimationType[])
-const PPT_ELEMENT_ANIMATION_TRIGGERS = Object.freeze([
-  'onClick',
-  'withPrevious',
-] as const satisfies readonly PPTElementAnimationTrigger[])
-const PPT_DEFAULT_ELEMENT_ANIMATION = Object.freeze({
-  delayMs: 0,
-  durationMs: 400,
-  order: 1,
-  trigger: 'onClick',
-  type: 'none',
-} as const satisfies PPTElementAnimation)
 const PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT = 1.14
 const PPT_TEXT_RUN_HIGHLIGHT_DEFAULT = '#fde047'
 const PPT_PARAGRAPH_LINE_HEIGHT_MIN = 0.8
@@ -17950,248 +17924,6 @@ function parsePPTSlideTransitionAdvanceAfter(value: string) {
       }).advance.afterMs ?? null
 }
 
-function getPPTElementAnimation(
-  element: PPTElement,
-  slide?: PPTSlide,
-): PPTElementAnimation {
-  return normalizePPTElementAnimation(
-    element.animation ?? {
-      ...PPT_DEFAULT_ELEMENT_ANIMATION,
-      order: getPPTElementDefaultAnimationOrder(element.id, slide),
-    },
-    slide,
-    element.id,
-  )
-}
-
-function normalizePPTElementAnimation(
-  animation: PPTElementAnimation,
-  slide?: PPTSlide,
-  elementId?: string,
-): PPTElementAnimation {
-  return {
-    delayMs: clampPPTElementAnimationTime(animation.delayMs),
-    durationMs: clampPPTElementAnimationTime(animation.durationMs),
-    order: clampPPTElementAnimationOrder(
-      animation.order,
-      slide?.elements.length,
-      elementId ? getPPTElementDefaultAnimationOrder(elementId, slide) : undefined,
-    ),
-    trigger: PPT_ELEMENT_ANIMATION_TRIGGERS.includes(animation.trigger)
-      ? animation.trigger
-      : 'onClick',
-    type: PPT_ELEMENT_ANIMATION_TYPES.includes(animation.type)
-      ? animation.type
-      : 'none',
-  }
-}
-
-function getPPTObjectAnimationDescriptor(
-  slide: PPTSlide,
-  element: PPTElement,
-): SlideEditObjectAnimationDescriptor<
-  string,
-  string,
-  SlideEditBuiltInAnimationType,
-  SlideEditBuiltInAnimationTrigger
-> {
-  const animation = getPPTElementAnimation(element, slide)
-
-  return createSlideEditObjectAnimationDescriptor({
-    delayMs: animation.delayMs,
-    durationMs: animation.durationMs,
-    objectId: element.id,
-    order: animation.order,
-    slideId: slide.id,
-    trigger: toSlideEditObjectAnimationTrigger(animation.trigger),
-    type: toSlideEditObjectAnimationType(animation.type),
-  })
-}
-
-function getPPTSlideAnimationBuildOrder(
-  slide: PPTSlide,
-  options: { visibleOnly?: boolean } = {},
-) {
-  return getSlideEditObjectAnimationBuildOrder(
-    slide.elements
-      .filter((element) => !options.visibleOnly || element.visible !== false)
-      .map((element) => getPPTObjectAnimationDescriptor(slide, element)),
-  )
-}
-
-function toSlideEditObjectAnimationCommand({
-  elementId,
-  field,
-  slideId,
-  value,
-}: {
-  elementId: string
-  field: PPTElementAnimationUpdateField
-  slideId: string
-  value: PPTElementAnimation[PPTElementAnimationUpdateField]
-}): SlideEditObjectAnimationUpdateCommand<string, string> {
-  if (field === 'type') {
-    return {
-      fieldId: 'type',
-      id: 'update-object-animation',
-      objectId: elementId,
-      slideId,
-      value: toSlideEditObjectAnimationType(value as PPTElementAnimationType),
-    }
-  }
-
-  if (field === 'trigger') {
-    return {
-      fieldId: 'trigger',
-      id: 'update-object-animation',
-      objectId: elementId,
-      slideId,
-      value: toSlideEditObjectAnimationTrigger(value as PPTElementAnimationTrigger),
-    }
-  }
-
-  switch (field) {
-    case 'delayMs':
-      return {
-        fieldId: 'delayMs',
-        id: 'update-object-animation',
-        objectId: elementId,
-        slideId,
-        value: Number(value),
-      }
-    case 'durationMs':
-      return {
-        fieldId: 'durationMs',
-        id: 'update-object-animation',
-        objectId: elementId,
-        slideId,
-        value: Number(value),
-      }
-    case 'order':
-      return {
-        fieldId: 'order',
-        id: 'update-object-animation',
-        objectId: elementId,
-        slideId,
-        value: Number(value),
-      }
-  }
-}
-
-function toPPTElementAnimationUpdate(
-  command: SlideEditObjectAnimationUpdateCommand<string, string>,
-): {
-  field: PPTElementAnimationUpdateField
-  value: PPTElementAnimation[PPTElementAnimationUpdateField]
-} {
-  if (command.fieldId === 'type') {
-    return {
-      field: 'type',
-      value: toPPTElementAnimationType(command.value),
-    }
-  }
-
-  if (command.fieldId === 'trigger') {
-    return {
-      field: 'trigger',
-      value: toPPTElementAnimationTrigger(command.value),
-    }
-  }
-
-  switch (command.fieldId) {
-    case 'delayMs':
-      return {
-        field: 'delayMs',
-        value: normalizeSlideEditObjectAnimationDelayMs(command.value),
-      }
-    case 'durationMs':
-      return {
-        field: 'durationMs',
-        value: normalizeSlideEditObjectAnimationDurationMs(command.value),
-      }
-    case 'order':
-      return {
-        field: 'order',
-        value: normalizeSlideEditObjectAnimationOrder(command.value),
-      }
-  }
-}
-
-function toSlideEditObjectAnimationType(
-  type: PPTElementAnimationType,
-): SlideEditBuiltInAnimationType {
-  switch (type) {
-    case 'fadeIn':
-      return 'fade-in'
-    case 'flyIn':
-      return 'fly-in'
-    case 'none':
-      return 'none'
-  }
-}
-
-function toPPTElementAnimationType(type: string): PPTElementAnimationType {
-  switch (type) {
-    case 'fade-in':
-      return 'fadeIn'
-    case 'fly-in':
-      return 'flyIn'
-    default:
-      return 'none'
-  }
-}
-
-function toSlideEditObjectAnimationTrigger(
-  trigger: PPTElementAnimationTrigger,
-): SlideEditBuiltInAnimationTrigger {
-  switch (trigger) {
-    case 'onClick':
-      return 'on-click'
-    case 'withPrevious':
-      return 'with-previous'
-  }
-}
-
-function toPPTElementAnimationTrigger(trigger: string): PPTElementAnimationTrigger {
-  return trigger === 'with-previous' ? 'withPrevious' : 'onClick'
-}
-
-function getPPTElementDefaultAnimationOrder(
-  elementId: string,
-  slide?: PPTSlide,
-) {
-  const index = slide?.elements.findIndex((element) => element.id === elementId) ?? -1
-
-  return index >= 0 ? index + 1 : PPT_DEFAULT_ELEMENT_ANIMATION.order
-}
-
-function clampPPTElementAnimationTime(value: number) {
-  return normalizeSlideEditObjectAnimationDurationMs(value)
-}
-
-function clampPPTElementAnimationOrder(
-  value: number,
-  elementCount: number = Number.MAX_SAFE_INTEGER,
-  fallback: number = PPT_DEFAULT_ELEMENT_ANIMATION.order,
-) {
-  return clampPPTCanvasValue(
-    Number.isFinite(value) ? Math.round(value) : fallback,
-    1,
-    Math.max(1, elementCount),
-  )
-}
-
-function parsePPTElementAnimationTime(value: string) {
-  return clampPPTElementAnimationTime(Number(value))
-}
-
-function parsePPTElementAnimationOrder(value: string, elementCount: number) {
-  return clampPPTElementAnimationOrder(
-    normalizeSlideEditObjectAnimationOrder(Number(value)),
-    elementCount,
-  )
-}
-
 function getDefaultPPTParagraphSpacing() {
   return {
     lineHeight: PPT_PARAGRAPH_LINE_HEIGHT_DEFAULT,
@@ -18372,35 +18104,6 @@ function getPPTParagraphStyle(paragraph: PPTParagraph): PPTParagraphCSSStyle {
     '--ppt-paragraph-list-level-indent':
       getSlideEditTextParagraphListLevelIndentCSSValue(listLevel),
     textAlign: paragraph.align,
-  }
-}
-
-function getPPTElementAnimationStyle(
-  animation: PPTElementAnimation,
-): PPTElementAnimationCSSStyle {
-  return getSlideEditObjectAnimationCSSStyle({
-    delayMs: animation.delayMs,
-    durationMs: animation.durationMs,
-  })
-}
-
-function formatPPTElementAnimationType(type: PPTElementAnimationType) {
-  switch (type) {
-    case 'fadeIn':
-      return 'Fade in'
-    case 'flyIn':
-      return 'Fly in'
-    case 'none':
-      return 'None'
-  }
-}
-
-function formatPPTElementAnimationTrigger(trigger: PPTElementAnimationTrigger) {
-  switch (trigger) {
-    case 'onClick':
-      return 'On click'
-    case 'withPrevious':
-      return 'With previous'
   }
 }
 
@@ -22823,42 +22526,6 @@ function hasPPTObjectAnimationStandalonePayloadFields(
     getPPTElementAnimationTriggerFromJSONValue(value.trigger) !== undefined ||
     value.order !== undefined ||
     value.buildOrder !== undefined
-}
-
-function getPPTElementAnimationTypeFromJSONValue(
-  value: unknown,
-): PPTElementAnimationType | undefined {
-  const type = typeof value === 'string' ? value.trim() : ''
-
-  return (PPT_ELEMENT_ANIMATION_TYPES as readonly string[]).includes(type)
-    ? type as PPTElementAnimationType
-    : undefined
-}
-
-function getPPTElementAnimationTriggerFromJSONValue(
-  value: unknown,
-): PPTElementAnimationTrigger | undefined {
-  const trigger = typeof value === 'string' ? value.trim() : ''
-
-  return (PPT_ELEMENT_ANIMATION_TRIGGERS as readonly string[]).includes(trigger)
-    ? trigger as PPTElementAnimationTrigger
-    : undefined
-}
-
-function getPPTElementAnimationTimeFromJSONValue(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return undefined
-  }
-
-  return clampPPTElementAnimationTime(value)
-}
-
-function getPPTElementAnimationOrderFromJSONValue(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return undefined
-  }
-
-  return clampPPTElementAnimationOrder(value)
 }
 
 function getPPTObjectStyleSourceFromDataTransfer(
@@ -35838,7 +35505,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     lastTextAutoFitEffect,
     recentColors,
     selectedElement,
-    selectedElementAnimation,
     selectedTextOverflow,
     slide,
     textAutoFitIndicator,
@@ -35848,7 +35514,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const {
     onColorSwatchApply,
     onCommitText,
-    onElementAnimationChange,
     onElementStrokeChange,
     onElementTextInsetChange,
     onElementTextStyleChange,
@@ -35911,9 +35576,6 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
   const fillOpacityDescriptor = selectedElement?.kind === 'shape'
     ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
-  const objectAnimationDescriptor = selectedElement
-    ? getPPTObjectAnimationDescriptor(slide, selectedElement)
-    : null
   const textInset = selectedElement && isPPTTextElement(selectedElement)
     ? getPPTTextElementInset(selectedElement)
     : PPT_DEFAULT_TEXT_BOX_INSET
@@ -35934,124 +35596,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
         selectedElement ? (
           <>
             <PPTObjectPropertiesInspectorFields model={model} onAction={onAction} />
-            {selectedElementAnimation ? (
-              <div
-                className="ppt-animation-grid"
-                data-ppt-object-animation-inspector
-                data-ppt-animation-delay={objectAnimationDescriptor?.delayMs ?? selectedElementAnimation.delayMs}
-                data-ppt-animation-duration={objectAnimationDescriptor?.durationMs ?? selectedElementAnimation.durationMs}
-                data-ppt-animation-limit-delay-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDelayMs}
-                data-ppt-animation-limit-duration-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDurationMs}
-                data-ppt-animation-limit-order-max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxBuildOrder}
-                data-ppt-animation-model="slide-edit-object-animation"
-                data-ppt-animation-order={objectAnimationDescriptor?.order ?? selectedElementAnimation.order}
-                data-ppt-animation-package-trigger={objectAnimationDescriptor?.trigger}
-                data-ppt-animation-package-type={objectAnimationDescriptor?.type}
-                data-ppt-animation-trigger={selectedElementAnimation.trigger}
-                data-ppt-animation-trigger-options={SLIDE_EDIT_OBJECT_ANIMATION_TRIGGERS
-                  .map((trigger) => trigger.id).join(' ')}
-                data-ppt-animation-type={selectedElementAnimation.type}
-                data-ppt-animation-type-options={SLIDE_EDIT_OBJECT_ANIMATION_TYPES
-                  .map((type) => type.id).join(' ')}
-              >
-                <label className="ppt-field">
-                  <span>Animation</span>
-                  <select
-                    data-ppt-animation-command="update-object-animation"
-                    data-ppt-animation-field="type"
-                    data-ppt-animation-package-value={objectAnimationDescriptor?.type}
-                    value={selectedElementAnimation.type}
-                    onChange={(event) =>
-                      onElementAnimationChange(
-                        selectedElement.id,
-                        'type',
-                        event.target.value as PPTElementAnimationType,
-                      )}
-                  >
-                    {PPT_ELEMENT_ANIMATION_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {formatPPTElementAnimationType(type)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ppt-field">
-                  <span>Trigger</span>
-                  <select
-                    data-ppt-animation-command="update-object-animation"
-                    data-ppt-animation-field="trigger"
-                    data-ppt-animation-package-value={objectAnimationDescriptor?.trigger}
-                    value={selectedElementAnimation.trigger}
-                    onChange={(event) =>
-                      onElementAnimationChange(
-                        selectedElement.id,
-                        'trigger',
-                        event.target.value as PPTElementAnimationTrigger,
-                      )}
-                  >
-                    {PPT_ELEMENT_ANIMATION_TRIGGERS.map((trigger) => (
-                      <option key={trigger} value={trigger}>
-                        {formatPPTElementAnimationTrigger(trigger)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ppt-field">
-                  <span>Duration</span>
-                  <input
-                    data-ppt-animation-command="update-object-animation"
-                    data-ppt-animation-field="durationMs"
-                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDurationMs}
-                    min={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minDurationMs}
-                    step={100}
-                    type="number"
-                    value={objectAnimationDescriptor?.durationMs ?? selectedElementAnimation.durationMs}
-                    onChange={(event) =>
-                      onElementAnimationChange(
-                        selectedElement.id,
-                        'durationMs',
-                        parsePPTElementAnimationTime(event.target.value),
-                      )}
-                  />
-                </label>
-                <label className="ppt-field">
-                  <span>Delay</span>
-                  <input
-                    data-ppt-animation-command="update-object-animation"
-                    data-ppt-animation-field="delayMs"
-                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxDelayMs}
-                    min={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minDelayMs}
-                    step={100}
-                    type="number"
-                    value={objectAnimationDescriptor?.delayMs ?? selectedElementAnimation.delayMs}
-                    onChange={(event) =>
-                      onElementAnimationChange(
-                        selectedElement.id,
-                        'delayMs',
-                        parsePPTElementAnimationTime(event.target.value),
-                      )}
-                  />
-                </label>
-                <label className="ppt-field">
-                  <span>Order</span>
-                  <input
-                    data-ppt-animation-command="update-object-animation"
-                    data-ppt-animation-field="order"
-                    max={SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.maxBuildOrder}
-                    min={Math.max(1, SLIDE_EDIT_OBJECT_ANIMATION_LIMITS.minBuildOrder)}
-                    step={1}
-                    type="number"
-                    value={objectAnimationDescriptor?.order ?? selectedElementAnimation.order}
-                    onChange={(event) =>
-                      onElementAnimationChange(
-                        selectedElement.id,
-                        'order',
-                        parsePPTElementAnimationOrder(event.target.value, slide.elements.length),
-                      )}
-                  />
-                </label>
-              </div>
-            ) : null}
+            <PPTObjectAnimationInspectorFields model={model} onAction={onAction} />
             {isPPTTextElement(selectedElement) ? (
               <>
                 <label className="ppt-field">
