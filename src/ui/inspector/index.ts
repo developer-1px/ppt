@@ -11,6 +11,7 @@ export { PPTObjectAnimationInspectorFields } from './PPTObjectAnimationInspector
 export { PPTObjectPropertiesInspectorFields } from './PPTObjectPropertiesInspectorFields'
 export { PPTInspectorShell } from './PPTInspectorShell'
 export { PPTSlideInspectorPanel } from './PPTSlideInspectorPanel'
+export { PPTShapeInspectorFields } from './PPTShapeInspectorFields'
 export { PPTTextInspectorFields } from './PPTTextInspectorFields'
 export {
   type PPTInspectorAction,

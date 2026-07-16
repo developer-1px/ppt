@@ -1,17 +1,34 @@
+import type { CSSProperties } from 'react'
 import {
   createSlideEditObjectAccessibilityDescriptor,
+  createSlideEditObjectCornerRadiusDescriptor,
+  createSlideEditObjectFillOpacityDescriptor,
   createSlideEditObjectHyperlinkDescriptor,
   createSlideEditObjectOpacityDescriptor,
   createSlideEditObjectShadowDescriptor,
+  createSlideEditObjectStrokeLineStyleDescriptor,
+  getSlideEditColorWithAlphaCSS,
+  getSlideEditObjectStrokeLineStyleBorderStyle,
+  getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditObjectShadowFilter,
+  isSlideEditObjectStrokeLineStyleValue,
   normalizeSlideEditObjectAltTextStorageValue,
+  normalizeSlideEditObjectCornerRadius,
+  normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectHyperlinkStorageUrl,
   normalizeSlideEditObjectOpacity,
+  normalizeSlideEditObjectStrokeLineStyle,
+  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
+  toSlideEditObjectCornerRadiusAttributeValue,
+  toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditObjectOpacityAttributeValue,
   type SlideEditObjectAccessibilityDescriptor,
+  type SlideEditObjectCornerRadiusDescriptor,
+  type SlideEditObjectFillOpacityDescriptor,
   type SlideEditObjectHyperlinkDescriptor,
   type SlideEditObjectOpacityDescriptor,
   type SlideEditObjectShadowDescriptor,
+  type SlideEditObjectStrokeLineStyleDescriptor,
 } from './pptSlideEditAffordanceAdapter'
 import { clampPPTCanvasValue } from './pptCanvasCoreAdapter'
 import type {
@@ -19,6 +36,11 @@ import type {
   PPTElementAccessibility,
   PPTElementHyperlink,
   PPTElementShadow,
+  PPTFill,
+  PPTShape,
+  PPTShapeKind,
+  PPTStroke,
+  PPTStrokeDash,
 } from './pptModel'
 
 export type PPTElementShadowUpdateField = keyof PPTElementShadow | 'enabled'
@@ -42,6 +64,24 @@ export const PPT_ELEMENT_SHADOW_OPACITY_MAX = 1
 export const PPT_ELEMENT_SHADOW_OPACITY_STEP = 0.05
 export const PPT_ALT_TEXT_MAX_LENGTH = 1000
 export const PPT_HYPERLINK_URL_MAX_LENGTH = 2048
+export const PPT_FILL_OPACITY_MIN = 0
+export const PPT_FILL_OPACITY_MAX = 1
+export const PPT_FILL_OPACITY_STEP = 0.05
+export const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
+export const PPT_SHAPE_CORNER_RADIUS_MIN = 0
+export const PPT_SHAPE_CORNER_RADIUS_MAX = 120
+export const PPT_SHAPE_CORNER_RADIUS_STEP = 1
+export const PPT_STROKE_DASH_OPTIONS = Object.freeze(
+  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS.map((option) => ({
+    id: option.id,
+    label: option.label,
+    value: option.id,
+  })),
+) as readonly {
+  id: PPTStrokeDash
+  label: string
+  value: PPTStrokeDash
+}[]
 
 export function getPPTElementOpacity(element: PPTElement) {
   return normalizePPTElementOpacity(element.opacity ?? 1)
@@ -273,4 +313,229 @@ export function getPPTElementShadowFilter(element: PPTElement) {
     ...getPPTElementShadow(element),
     enabled: hasPPTElementShadow(element),
   })
+}
+
+export function getPPTElementBorderStyle(
+  element: PPTElement,
+): CSSProperties {
+  const stroke = getPPTElementStroke(element)
+
+  if (!stroke || (element.kind !== 'shape' && element.kind !== 'image')) {
+    return {}
+  }
+
+  return {
+    border: getPPTStrokeBorderCSS(stroke),
+    borderStyle: getPPTStrokeDashBorderStyle(stroke),
+  }
+}
+
+function getPPTStrokeBorderCSS(stroke: PPTStroke) {
+  return `${stroke.width}px solid ${stroke.color}`
+}
+
+export function getPPTElementStrokeDash(element: PPTElement) {
+  const stroke = getPPTElementStroke(element)
+
+  return stroke ? getPPTStrokeDash(stroke) : undefined
+}
+
+export function getPPTShapeCornerRadius(element: PPTShape) {
+  return element.shape === 'rect'
+    ? normalizePPTShapeCornerRadius(
+        element.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT,
+      )
+    : 0
+}
+
+export function getPPTShapeCornerRadiusModelValue(value: number) {
+  const normalized = normalizePPTShapeCornerRadius(value)
+
+  return normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
+    ? undefined
+    : normalized
+}
+
+export function parsePPTShapeCornerRadius(value: string) {
+  return normalizePPTShapeCornerRadius(Number(value))
+}
+
+export function normalizePPTShapeCornerRadius(value: number) {
+  return normalizeSlideEditObjectCornerRadius(value)
+}
+
+export function formatPPTShapeCornerRadius(value: number) {
+  return toSlideEditObjectCornerRadiusAttributeValue(value)
+}
+
+export function getPPTCornerRadiusDescriptor(
+  slideId: string,
+  element: PPTShape,
+): SlideEditObjectCornerRadiusDescriptor<string, string> {
+  const isSupported = element.shape === 'rect'
+
+  return createSlideEditObjectCornerRadiusDescriptor({
+    isSupported,
+    objectId: element.id,
+    slideId,
+    unsupportedReason: isSupported ? undefined : 'unsupported-shape',
+    value: getPPTShapeCornerRadius(element),
+  })
+}
+
+export function getPPTFillOpacityDescriptor(
+  slideId: string,
+  element: PPTShape,
+): SlideEditObjectFillOpacityDescriptor<string, string> {
+  return createSlideEditObjectFillOpacityDescriptor({
+    objectId: element.id,
+    slideId,
+    value: getPPTFillOpacity(element.fill),
+  })
+}
+
+export function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
+  const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
+  const normalized = {
+    color: typeof fill.color === 'string' && fill.color
+      ? fill.color
+      : '#ffffff',
+  }
+
+  return opacity === 1
+    ? normalized
+    : { ...normalized, opacity }
+}
+
+export function getPPTFillOpacity(fill: PPTFill) {
+  return normalizePPTFillOpacity(fill.opacity ?? 1)
+}
+
+export function parsePPTFillOpacity(value: string) {
+  return normalizePPTFillOpacity(Number(value))
+}
+
+export function normalizePPTFillOpacity(value: number) {
+  return normalizeSlideEditObjectFillOpacity(value)
+}
+
+export function formatPPTFillOpacity(value: number) {
+  return toSlideEditObjectFillOpacityAttributeValue(value)
+}
+
+export function getPPTFillColorCSS(fill: PPTFill) {
+  const opacity = getPPTFillOpacity(fill)
+
+  if (opacity === 1) {
+    return fill.color
+  }
+
+  return getSlideEditColorWithAlphaCSS({
+    color: fill.color,
+    opacity,
+  })
+}
+
+export function getPPTElementStroke(element: PPTElement): PPTStroke | null {
+  if (element.kind === 'shape' || element.kind === 'image') {
+    return element.stroke ? normalizePPTStroke(element.stroke) : null
+  }
+
+  if (element.kind === 'line' || element.kind === 'freeform') {
+    return normalizePPTStroke(element.stroke)
+  }
+
+  return null
+}
+
+export function getPPTStrokeLineStyleDescriptor(
+  slideId: string,
+  element: PPTElement,
+): SlideEditObjectStrokeLineStyleDescriptor<string, string> {
+  const stroke = getPPTElementStroke(element)
+
+  return createSlideEditObjectStrokeLineStyleDescriptor({
+    isSupported: Boolean(stroke),
+    objectId: element.id,
+    slideId,
+    unsupportedReason: stroke ? undefined : 'no-stroke',
+    value: getPPTStrokeDash(stroke ?? undefined),
+  })
+}
+
+export function normalizePPTStroke(stroke: Partial<PPTStroke>): PPTStroke {
+  const dash = normalizePPTStrokeDash(stroke.dash)
+  const normalized = {
+    color: typeof stroke.color === 'string' && stroke.color
+      ? stroke.color
+      : '#111827',
+    width: normalizePPTStrokeWidth(stroke.width ?? 2),
+  }
+
+  return dash === 'solid'
+    ? normalized
+    : { ...normalized, dash }
+}
+
+export function normalizePPTStrokeWidth(value: number) {
+  const finiteValue = Number.isFinite(value) ? value : 2
+
+  return Math.max(0, Math.min(40, finiteValue))
+}
+
+export function getPPTStrokeDash(
+  stroke: PPTStroke | undefined,
+): PPTStrokeDash {
+  return normalizePPTStrokeDash(stroke?.dash)
+}
+
+export function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
+  return normalizeSlideEditObjectStrokeLineStyle(
+    typeof value === 'string' ? value : null,
+  ) as PPTStrokeDash
+}
+
+export function isPPTStrokeDash(value: string): value is PPTStrokeDash {
+  return isSlideEditObjectStrokeLineStyleValue(value)
+}
+
+export function getPPTStrokeDashBorderStyle(
+  stroke: PPTStroke | undefined,
+) {
+  return getSlideEditObjectStrokeLineStyleBorderStyle(getPPTStrokeDash(stroke))
+}
+
+export function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
+  return getSlideEditObjectStrokeLineStyleDashArray({
+    strokeWidth: normalizePPTStrokeWidth(stroke?.width ?? 2),
+    value: getPPTStrokeDash(stroke),
+  })
+}
+
+export function getPPTThumbLineDashStyle(
+  element: PPTElement,
+): CSSProperties {
+  if (element.kind !== 'line') {
+    return {}
+  }
+
+  return {
+    '--ppt-thumb-line-dash': getPPTStrokeDashBorderStyle(element.stroke),
+  } as CSSProperties
+}
+
+export function getPPTShapeLabel(shape: PPTShapeKind) {
+  if (shape === 'ellipse') {
+    return 'Oval'
+  }
+
+  if (shape === 'diamond') {
+    return 'Diamond'
+  }
+
+  return 'Rectangle'
+}
+
+export function isPPTShapeKind(value: string): value is PPTShapeKind {
+  return value === 'rect' || value === 'ellipse' || value === 'diamond'
 }

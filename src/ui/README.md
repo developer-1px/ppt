@@ -15,7 +15,7 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 - `pptLayerPaneAdapter.ts`: PPT 요소와 그룹을 canvas Layer Pane descriptor, 선택, 재정렬 명령으로 변환한다. 앱의 도메인 명령과 Inspector UI가 함께 쓰는 PPT 경계다.
 - `pptCommentThreadAdapter.ts`: comment 본문과 reply를 정규화하고 저장된 thread가 없을 때 표시할 fallback thread를 만든다.
 - `pptImageAdapter.ts`: 이미지 fit/crop 기본값을 정규화하고 canvas Image Crop/Replace descriptor로 변환한다. 캔버스 렌더링과 Inspector가 같은 PPT 이미지 값을 사용하게 하는 경계다.
-- `pptObjectAdapter.ts`: 모든 PPT 객체에 공통인 opacity, hyperlink, accessibility, shadow 값을 정규화하고 canvas descriptor로 변환한다. 렌더링·명령 처리·Inspector가 같은 객체 의미를 사용하게 하는 경계다.
+- `pptObjectAdapter.ts`: 모든 PPT 객체에 공통인 opacity, hyperlink, accessibility, shadow와 fill, stroke, corner radius 값을 정규화하고 canvas descriptor·CSS로 변환한다. 렌더링·명령 처리·Inspector가 같은 객체 의미를 사용하게 하는 경계다.
 - `pptObjectAnimationAdapter.ts`: PPT 객체 애니메이션의 기본값, 정규화, JSON 판별, canvas 명령·descriptor·build order·CSS projection을 소유한다.
 - `pptColorSwatchAdapter.ts`: Inspector의 색상 target, PPT 채널과 canvas 채널 매핑, theme/recent palette descriptor를 소유한다.
 - `pptTextAdapter.ts`: PPT 텍스트 스타일, 문단, font/vertical/inset descriptor, autofit size mode와 canvas 명령·CSS projection을 소유한다.
@@ -40,5 +40,6 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 16. Object Animation 필드와 선택값 검증은 `PPTObjectAnimationInspectorFields`가 소유하며, 애니메이션 모델·명령·descriptor 변환은 `pptObjectAnimationAdapter.ts`를 함께 사용한다.
 17. Color Swatch Strip은 callback props 대신 `model + onAction + target` 계약을 사용하고, 채널·palette 변환은 `pptColorSwatchAdapter.ts`를 함께 사용한다.
 18. Text Inspector의 text/font/paragraph/inset/autofit 필드는 `PPTTextInspectorFields`가 소유하며, 텍스트 값·명령·descriptor 변환은 `pptTextAdapter.ts`를 함께 사용한다.
+19. Shape Inspector의 shape/fill/stroke/corner radius 필드는 `PPTShapeInspectorFields`가 소유하며, 객체 시각 값과 descriptor·CSS 변환은 `pptObjectAdapter.ts`를 함께 사용한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.

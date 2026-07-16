@@ -91,9 +91,6 @@ import {
   createSlideEditClipboardPasteCommandEffect,
   createSlideEditClipboardPayload,
   createSlideEditLayoutPlaceholderDescriptor,
-  createSlideEditObjectCornerRadiusDescriptor,
-  createSlideEditObjectFillOpacityDescriptor,
-  createSlideEditObjectStrokeLineStyleDescriptor,
   createSlideEditStyleClipboardDescriptor,
   createSlideEditStyleClipboardPasteCommandEffect,
   createSlideEditThemeDescriptor,
@@ -108,7 +105,6 @@ import {
   getSlideEditColorSwatchId,
   getSlideEditColorSwatchJSONPasteValueFromText,
   getSlideEditColorSwatchPasteCommandEffects,
-  getSlideEditColorWithAlphaCSS,
   getSlideEditDeckNavigationKeyboardIntent,
   getSlideEditLayoutApplyCommandEffect,
   getSlideEditLayerPaneObjectLayerJSONPasteValueFromText,
@@ -148,9 +144,7 @@ import {
   getSlideEditObjectShadowJSONPasteValueFromValue,
   getSlideEditObjectShadowPasteCommands,
   getSlideEditLayoutPlaceholderVisibilityDescriptor,
-  getSlideEditObjectStrokeLineStyleBorderStyle,
   getSlideEditObjectStrokeLineStyleCommandEffect,
-  getSlideEditObjectStrokeLineStyleDashArray,
   getSlideEditObjectStrokeLineStyleJSONPasteValueFromText,
   getSlideEditObjectStrokeLineStylePasteCommand,
   getSlideEditObjectTransformAxisLockedMoveDelta,
@@ -218,13 +212,9 @@ import {
   getSlideEditTransitionUpdateCommandEffect,
   mapSlideEditClipboardPasteObjects,
   normalizeSlideEditClipboardSelectedObjectIds,
-  normalizeSlideEditObjectCornerRadius,
   normalizeSlideEditColorSwatchValue,
-  normalizeSlideEditObjectFillOpacity,
   normalizeSlideEditObjectImageCropValue,
   normalizeSlideEditObjectShadow,
-  isSlideEditObjectStrokeLineStyleValue,
-  normalizeSlideEditObjectStrokeLineStyle,
   normalizeSlideEditTextVerticalAlignment,
   SLIDE_EDIT_DEFAULT_TRANSITION,
   SLIDE_EDIT_COLOR_SWATCH_JSON_MIME_TYPE,
@@ -243,7 +233,6 @@ import {
   SLIDE_EDIT_OBJECT_TRANSFORM_JSON_MIME_TYPE,
   SLIDE_EDIT_OBJECT_TRANSFORM_MOVE_DRAG_START_THRESHOLD,
   SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_JSON_MIME_TYPE,
-  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS,
   SLIDE_EDIT_STYLE_CLIPBOARD_COPY_FORMATTING_SHORTCUT,
   SLIDE_EDIT_STYLE_CLIPBOARD_PASTE_FORMATTING_SHORTCUT,
   SLIDE_EDIT_SLIDE_CLIPBOARD_HTML_SCRIPT_ATTRIBUTE,
@@ -303,8 +292,6 @@ import {
   SLIDE_EDIT_RAIL_REORDER_MOVE_TO_END_SHORTCUT as PPT_SLIDE_MOVE_TO_END_SHORTCUT,
   SLIDE_EDIT_RAIL_REORDER_MOVE_TO_START_SHORTCUT as PPT_SLIDE_MOVE_TO_START_SHORTCUT,
   SLIDE_EDIT_RAIL_REORDER_MOVE_UP_SHORTCUT as PPT_SLIDE_MOVE_UP_SHORTCUT,
-  toSlideEditObjectCornerRadiusAttributeValue,
-  toSlideEditObjectFillOpacityAttributeValue,
   toSlideEditRailHostCommandEffect,
   toSlideEditSlideNotesPasteCommandEffect,
   toSlideEditSlideMetadataHostCommandEffect,
@@ -322,9 +309,7 @@ import {
   type SlideEditMasterDescriptor,
   type SlideEditObjectAccessibilityHostCommandEffect,
   type SlideEditObjectAccessibilityJSONPasteValue,
-  type SlideEditObjectCornerRadiusDescriptor,
   type SlideEditObjectCornerRadiusHostCommandEffect,
-  type SlideEditObjectFillOpacityDescriptor,
   type SlideEditObjectFillOpacityHostCommandEffect,
   type SlideEditObjectHyperlinkHostCommandEffect,
   type SlideEditObjectImageCropHostCommandEffect,
@@ -343,7 +328,6 @@ import {
   type SlideEditObjectShadowHostCommandEffect,
   type SlideEditObjectShadowJSONPasteValue,
   type SlideEditObjectShadowPasteFieldValue,
-  type SlideEditObjectStrokeLineStyleDescriptor,
   type SlideEditObjectStrokeLineStyleHostCommandEffect,
   type SlideEditObjectTransformHostCommandEffect,
   type SlideEditObjectTransformJSONPasteValue,
@@ -521,14 +505,30 @@ import {
   type PPTColorSwatchSelection,
 } from './pptColorSwatchAdapter'
 import {
+  formatPPTFillOpacity,
+  formatPPTShapeCornerRadius,
   formatPPTElementOpacity,
   formatPPTElementShadowOpacity,
   getPPTElementAltText,
+  getPPTElementBorderStyle,
   getPPTElementHyperlink,
   getPPTElementOpacity,
   getPPTElementShadow,
   getPPTElementShadowFilter,
+  getPPTElementStroke,
+  getPPTElementStrokeDash,
+  getPPTFillColorCSS,
+  getPPTFillOpacity,
+  getPPTShapeCornerRadius,
+  getPPTShapeCornerRadiusModelValue,
+  getPPTShapeLabel,
+  getPPTStrokeDash,
+  getPPTStrokeDashArray,
+  getPPTStrokeDashBorderStyle,
+  getPPTStrokeLineStyleDescriptor,
+  getPPTThumbLineDashStyle,
   hasPPTElementShadow,
+  isPPTStrokeDash,
   normalizePPTAltText,
   normalizePPTElementAccessibility,
   normalizePPTElementHyperlink,
@@ -540,6 +540,14 @@ import {
   normalizePPTElementShadowColor,
   normalizePPTElementShadowDistance,
   normalizePPTElementShadowOpacity,
+  normalizePPTFill,
+  normalizePPTFillOpacity,
+  normalizePPTShapeCornerRadius,
+  normalizePPTStroke,
+  normalizePPTStrokeDash,
+  normalizePPTStrokeWidth,
+  PPT_SHAPE_CORNER_RADIUS_DEFAULT,
+  PPT_STROKE_DASH_OPTIONS,
   PPT_ALT_TEXT_MAX_LENGTH,
   PPT_HYPERLINK_URL_MAX_LENGTH,
   type PPTElementShadowUpdateField,
@@ -937,6 +945,7 @@ import {
   PPTInspectorShell,
   PPTObjectAnimationInspectorFields,
   PPTObjectPropertiesInspectorFields,
+  PPTShapeInspectorFields,
   PPTTextInspectorFields,
   type PPTInspectorAction,
   type PPTInspectorProps,
@@ -3571,13 +3580,6 @@ const PPT_OBJECT_MOVE_DRAG_MODIFIER_STATE =
       shiftKey: false,
     },
   })
-const PPT_FILL_OPACITY_MIN = 0
-const PPT_FILL_OPACITY_MAX = 1
-const PPT_FILL_OPACITY_STEP = 0.05
-const PPT_SHAPE_CORNER_RADIUS_DEFAULT = 24
-const PPT_SHAPE_CORNER_RADIUS_MIN = 0
-const PPT_SHAPE_CORNER_RADIUS_MAX = 120
-const PPT_SHAPE_CORNER_RADIUS_STEP = 1
 const PPT_STICKY_BOUNDS = Object.freeze({
   h: 168,
   w: 220,
@@ -3586,17 +3588,6 @@ const PPT_SECTION_BOUNDS = Object.freeze({
   h: 240,
   w: 420,
 } as const)
-const PPT_STROKE_DASH_OPTIONS = Object.freeze(
-  SLIDE_EDIT_OBJECT_STROKE_LINE_STYLE_OPTIONS.map((option) => ({
-    id: option.id,
-    label: option.label,
-    value: option.id,
-  })),
-) as readonly {
-  id: PPTStrokeDash
-  label: string
-  value: PPTStrokeDash
-}[]
 const PPT_SLIDE_TRANSITION_TYPES = Object.freeze(
   SLIDE_EDIT_TRANSITION_TYPES.map((option) => option.id),
 ) as readonly PPTSlideTransitionType[]
@@ -12006,7 +11997,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         id: 'update-object-fill-opacity',
         objectId: elementId,
         slideId: activeSlide.id,
-        value: normalizeSlideEditObjectFillOpacity(
+        value: normalizePPTFillOpacity(
           typeof value === 'number' ? value : Number(value),
         ),
       })
@@ -12049,7 +12040,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
       id: 'update-object-corner-radius',
       objectId: elementId,
       slideId: activeSlide.id,
-      value: normalizeSlideEditObjectCornerRadius(cornerRadius),
+      value: normalizePPTShapeCornerRadius(cornerRadius),
     })
 
     setLastCornerRadiusEffect(effect)
@@ -12408,7 +12399,7 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         id: 'update-object-stroke-line-style',
         objectId: elementId,
         slideId: activeSlide.id,
-        value: normalizeSlideEditObjectStrokeLineStyle(
+        value: normalizePPTStrokeDash(
           typeof value === 'string' ? value : null,
         ),
       })
@@ -35172,20 +35163,11 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
     onElementStrokeChange,
     onLineMarkerChange,
     onLineRouteChange,
-    onShapeCornerRadiusChange,
-    onShapeFillChange,
-    onShapeKindChange,
     onTableRowsChange,
   } = createPPTInspectorActionDispatcher(onAction)
 
   const strokeLineStyleDescriptor = selectedElement
     ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
-    : null
-  const cornerRadiusDescriptor = selectedElement?.kind === 'shape'
-    ? getPPTCornerRadiusDescriptor(slide.id, selectedElement)
-    : null
-  const fillOpacityDescriptor = selectedElement?.kind === 'shape'
-    ? getPPTFillOpacityDescriptor(slide.id, selectedElement)
     : null
   return (
     <PPTInspectorShell
@@ -35197,165 +35179,7 @@ function PPTInspector({ model, onAction }: PPTInspectorProps) {
             <PPTObjectPropertiesInspectorFields model={model} onAction={onAction} />
             <PPTObjectAnimationInspectorFields model={model} onAction={onAction} />
             <PPTTextInspectorFields model={model} onAction={onAction} />
-            {selectedElement.kind === 'shape' ? (
-              <>
-                <label className="ppt-field">
-                  <span>Shape</span>
-                  <select
-                    data-ppt-style-field="shape"
-                    value={selectedElement.shape}
-                    onChange={(event) => {
-                      if (isPPTShapeKind(event.target.value)) {
-                        onShapeKindChange(selectedElement.id, event.target.value)
-                      }
-                    }}
-                  >
-                    <option value="rect">Rectangle</option>
-                    <option value="ellipse">Oval</option>
-                    <option value="diamond">Diamond</option>
-                  </select>
-                </label>
-                {selectedElement.shape === 'rect' ? (
-                  <label className="ppt-field">
-                    <span>Corner radius</span>
-                    <input
-                      data-ppt-style-field="shape-corner-radius"
-                      data-ppt-corner-radius-attribute={cornerRadiusDescriptor?.metadata.attribute}
-                      data-ppt-corner-radius-attribute-value={cornerRadiusDescriptor?.metadata.attributeValue}
-                      data-ppt-corner-radius-command={cornerRadiusDescriptor?.field.commandId}
-                      data-ppt-corner-radius-control={cornerRadiusDescriptor?.field.control}
-                      data-ppt-corner-radius-supported={cornerRadiusDescriptor?.isSupported ? 'true' : 'false'}
-                      data-ppt-corner-radius-surface={cornerRadiusDescriptor?.surface}
-                      max={cornerRadiusDescriptor?.field.max ?? PPT_SHAPE_CORNER_RADIUS_MAX}
-                      min={cornerRadiusDescriptor?.field.min ?? PPT_SHAPE_CORNER_RADIUS_MIN}
-                      step={cornerRadiusDescriptor?.field.step ?? PPT_SHAPE_CORNER_RADIUS_STEP}
-                      type="number"
-                      value={cornerRadiusDescriptor?.value ?? getPPTShapeCornerRadius(selectedElement)}
-                      onChange={(event) =>
-                        onShapeCornerRadiusChange(
-                          selectedElement.id,
-                          parsePPTShapeCornerRadius(event.target.value),
-                        )}
-                    />
-                  </label>
-                ) : null}
-                <div className="ppt-geometry-grid">
-                  <div className="ppt-color-control" data-ppt-color-control="shape-fill">
-                    <label className="ppt-field">
-                      <span>Fill</span>
-                      <input
-                        data-ppt-style-field="fill"
-                        type="color"
-                        value={selectedElement.fill.color}
-                        onChange={(event) =>
-                          onShapeFillChange(
-                            selectedElement.id,
-                            'color',
-                            event.target.value,
-                          )}
-                      />
-                    </label>
-                    <PPTColorSwatchStrip
-                      model={model}
-                      onAction={onAction}
-                      target={{
-                        channel: 'shape-fill',
-                        color: selectedElement.fill.color,
-                        elementId: selectedElement.id,
-                      }}
-                    />
-                  </div>
-                  <div className="ppt-color-control" data-ppt-color-control="shape-stroke">
-                    <label className="ppt-field">
-                      <span>Stroke</span>
-                      <input
-                        data-ppt-style-field="stroke-color"
-                        type="color"
-                        value={selectedElement.stroke?.color ?? '#111827'}
-                        onChange={(event) =>
-                          onElementStrokeChange(
-                            selectedElement.id,
-                            'color',
-                            event.target.value,
-                          )}
-                      />
-                    </label>
-                    <PPTColorSwatchStrip
-                      model={model}
-                      onAction={onAction}
-                      target={{
-                        channel: 'shape-stroke',
-                        color: selectedElement.stroke?.color ?? '#111827',
-                        elementId: selectedElement.id,
-                      }}
-                    />
-                  </div>
-                </div>
-                <label className="ppt-field">
-                  <span>Fill opacity</span>
-                  <input
-                    data-ppt-style-field="fill-opacity"
-                    data-ppt-fill-opacity-attribute={fillOpacityDescriptor?.metadata.attribute}
-                    data-ppt-fill-opacity-attribute-value={fillOpacityDescriptor?.metadata.attributeValue}
-                    data-ppt-fill-opacity-command={fillOpacityDescriptor?.field.commandId}
-                    data-ppt-fill-opacity-control={fillOpacityDescriptor?.field.control}
-                    data-ppt-fill-opacity-surface={fillOpacityDescriptor?.surface}
-                    max={fillOpacityDescriptor?.field.max ?? PPT_FILL_OPACITY_MAX}
-                    min={fillOpacityDescriptor?.field.min ?? PPT_FILL_OPACITY_MIN}
-                    step={fillOpacityDescriptor?.field.step ?? PPT_FILL_OPACITY_STEP}
-                    type="number"
-                    value={fillOpacityDescriptor?.value ?? getPPTFillOpacity(selectedElement.fill)}
-                    onChange={(event) =>
-                      onShapeFillChange(
-                        selectedElement.id,
-                        'opacity',
-                        parsePPTFillOpacity(event.target.value),
-                      )}
-                  />
-                </label>
-                <label className="ppt-field">
-                  <span>Stroke width</span>
-                  <input
-                    data-ppt-style-field="stroke-width"
-                    type="number"
-                    value={selectedElement.stroke?.width ?? 0}
-                    onChange={(event) =>
-                      onElementStrokeChange(
-                        selectedElement.id,
-                        'width',
-                        Number(event.target.value),
-                      )}
-                  />
-                </label>
-                <label className="ppt-field">
-                  <span>Dash</span>
-                  <select
-                    data-ppt-style-field="stroke-dash"
-                    data-ppt-stroke-line-style-attribute={strokeLineStyleDescriptor?.metadata.attribute}
-                    data-ppt-stroke-line-style-attribute-value={strokeLineStyleDescriptor?.metadata.attributeValue}
-                    data-ppt-stroke-line-style-command={strokeLineStyleDescriptor?.field.commandId}
-                    data-ppt-stroke-line-style-control={strokeLineStyleDescriptor?.field.control}
-                    data-ppt-stroke-line-style-surface={strokeLineStyleDescriptor?.surface}
-                    value={strokeLineStyleDescriptor?.value ?? getPPTStrokeDash(selectedElement.stroke)}
-                    onChange={(event) => {
-                      if (isPPTStrokeDash(event.target.value)) {
-                        onElementStrokeChange(
-                          selectedElement.id,
-                          'dash',
-                          event.target.value,
-                        )
-                      }
-                    }}
-                  >
-                    {(strokeLineStyleDescriptor?.field.options ?? PPT_STROKE_DASH_OPTIONS).map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            ) : null}
+            <PPTShapeInspectorFields model={model} onAction={onAction} />
             <PPTImageInspectorFields model={model} onAction={onAction} />
             {selectedElement.kind === 'table' ? (
               <>
@@ -36414,23 +36238,6 @@ function getPPTThumbImageClipShapeStyle(element: PPTElement): CSSProperties {
   return element.kind === 'image' ? getPPTImageClipShapeStyle(element) : {}
 }
 
-function getPPTElementBorderStyle(element: PPTElement): CSSProperties {
-  const stroke = getPPTElementStroke(element)
-
-  if (!stroke || (element.kind !== 'shape' && element.kind !== 'image')) {
-    return {}
-  }
-
-  return {
-    border: getPPTStrokeBorderCSS(stroke),
-    borderStyle: getPPTStrokeDashBorderStyle(stroke),
-  }
-}
-
-function getPPTStrokeBorderCSS(stroke: PPTStroke) {
-  return `${stroke.width}px solid ${stroke.color}`
-}
-
 function getPPTImageAdjustmentsFilter(element: PPTImage) {
   const adjustments = element.adjustments
 
@@ -36460,184 +36267,6 @@ function getPPTThumbElementFilter(element: PPTElement) {
   ].filter(Boolean)
 
   return filters.length > 0 ? filters.join(' ') : undefined
-}
-
-function getPPTElementStrokeDash(element: PPTElement) {
-  const stroke = getPPTElementStroke(element)
-
-  return stroke ? getPPTStrokeDash(stroke) : undefined
-}
-
-function getPPTShapeCornerRadius(element: PPTShape) {
-  return element.shape === 'rect'
-    ? normalizePPTShapeCornerRadius(element.cornerRadius ?? PPT_SHAPE_CORNER_RADIUS_DEFAULT)
-    : 0
-}
-
-function getPPTShapeCornerRadiusModelValue(value: number) {
-  const normalized = normalizePPTShapeCornerRadius(value)
-
-  return normalized === PPT_SHAPE_CORNER_RADIUS_DEFAULT
-    ? undefined
-    : normalized
-}
-
-function parsePPTShapeCornerRadius(value: string) {
-  return normalizePPTShapeCornerRadius(Number(value))
-}
-
-function normalizePPTShapeCornerRadius(value: number) {
-  return normalizeSlideEditObjectCornerRadius(value)
-}
-
-function formatPPTShapeCornerRadius(value: number) {
-  return toSlideEditObjectCornerRadiusAttributeValue(value)
-}
-
-function getPPTCornerRadiusDescriptor(
-  slideId: string,
-  element: PPTShape,
-): SlideEditObjectCornerRadiusDescriptor<string, string> {
-  const isSupported = element.shape === 'rect'
-
-  return createSlideEditObjectCornerRadiusDescriptor({
-    isSupported,
-    objectId: element.id,
-    slideId,
-    unsupportedReason: isSupported ? undefined : 'unsupported-shape',
-    value: getPPTShapeCornerRadius(element),
-  })
-}
-
-function getPPTFillOpacityDescriptor(
-  slideId: string,
-  element: PPTShape,
-): SlideEditObjectFillOpacityDescriptor<string, string> {
-  return createSlideEditObjectFillOpacityDescriptor({
-    objectId: element.id,
-    slideId,
-    value: getPPTFillOpacity(element.fill),
-  })
-}
-
-function normalizePPTFill(fill: Partial<PPTFill>): PPTFill {
-  const opacity = normalizePPTFillOpacity(fill.opacity ?? 1)
-  const normalized = {
-    color: typeof fill.color === 'string' && fill.color
-      ? fill.color
-      : '#ffffff',
-  }
-
-  return opacity === 1
-    ? normalized
-    : { ...normalized, opacity }
-}
-
-function getPPTFillOpacity(fill: PPTFill) {
-  return normalizePPTFillOpacity(fill.opacity ?? 1)
-}
-
-function parsePPTFillOpacity(value: string) {
-  return normalizePPTFillOpacity(Number(value))
-}
-
-function normalizePPTFillOpacity(value: number) {
-  return normalizeSlideEditObjectFillOpacity(value)
-}
-
-function formatPPTFillOpacity(value: number) {
-  return toSlideEditObjectFillOpacityAttributeValue(value)
-}
-
-function getPPTFillColorCSS(fill: PPTFill) {
-  const opacity = getPPTFillOpacity(fill)
-
-  if (opacity === 1) {
-    return fill.color
-  }
-
-  return getSlideEditColorWithAlphaCSS({
-    color: fill.color,
-    opacity,
-  })
-}
-
-function getPPTElementStroke(element: PPTElement): PPTStroke | null {
-  if (element.kind === 'shape' || element.kind === 'image') {
-    return element.stroke ? normalizePPTStroke(element.stroke) : null
-  }
-
-  if (element.kind === 'line' || element.kind === 'freeform') {
-    return normalizePPTStroke(element.stroke)
-  }
-
-  return null
-}
-
-function getPPTStrokeLineStyleDescriptor(
-  slideId: string,
-  element: PPTElement,
-): SlideEditObjectStrokeLineStyleDescriptor<string, string> {
-  const stroke = getPPTElementStroke(element)
-
-  return createSlideEditObjectStrokeLineStyleDescriptor({
-    isSupported: Boolean(stroke),
-    objectId: element.id,
-    slideId,
-    unsupportedReason: stroke ? undefined : 'no-stroke',
-    value: getPPTStrokeDash(stroke ?? undefined),
-  })
-}
-
-function normalizePPTStroke(stroke: Partial<PPTStroke>): PPTStroke {
-  const dash = normalizePPTStrokeDash(stroke.dash)
-  const normalized = {
-    color: typeof stroke.color === 'string' && stroke.color
-      ? stroke.color
-      : '#111827',
-    width: normalizePPTStrokeWidth(stroke.width ?? 2),
-  }
-
-  return dash === 'solid'
-    ? normalized
-    : { ...normalized, dash }
-}
-
-function normalizePPTStrokeWidth(value: number) {
-  const finiteValue = Number.isFinite(value) ? value : 2
-
-  return Math.max(0, Math.min(40, finiteValue))
-}
-
-function getPPTStrokeDash(stroke: PPTStroke | undefined): PPTStrokeDash {
-  return normalizePPTStrokeDash(stroke?.dash)
-}
-
-function normalizePPTStrokeDash(value: unknown): PPTStrokeDash {
-  return normalizeSlideEditObjectStrokeLineStyle(
-    typeof value === 'string' ? value : null,
-  ) as PPTStrokeDash
-}
-
-function getPPTStrokeDashBorderStyle(stroke: PPTStroke | undefined) {
-  return getSlideEditObjectStrokeLineStyleBorderStyle(getPPTStrokeDash(stroke))
-}
-
-function getPPTStrokeDashArray(stroke: PPTStroke | undefined) {
-  return getSlideEditObjectStrokeLineStyleDashArray({
-    strokeWidth: normalizePPTStrokeWidth(stroke?.width ?? 2),
-    value: getPPTStrokeDash(stroke),
-  })
-}
-
-function getPPTThumbLineDashStyle(element: PPTElement): CSSProperties {
-  if (element.kind !== 'line') {
-    return {}
-  }
-
-  return {
-    '--ppt-thumb-line-dash': getPPTStrokeDashBorderStyle(element.stroke),
-  } as CSSProperties
 }
 
 function getPPTImageAltText(element: PPTImage) {
@@ -38301,18 +37930,6 @@ function createPPTSlideElementId(
   return `${slideId}-${suffix}-${index + 1}`
 }
 
-function getPPTShapeLabel(shape: PPTShapeKind) {
-  if (shape === 'ellipse') {
-    return 'Oval'
-  }
-
-  if (shape === 'diamond') {
-    return 'Diamond'
-  }
-
-  return 'Rectangle'
-}
-
 function getPPTThumbElementClassName(element: PPTElement) {
   if (element.kind === 'textBox') {
     return 'ppt-thumb-text'
@@ -38341,20 +37958,12 @@ function getPPTThumbElementClassName(element: PPTElement) {
   return 'ppt-thumb-shape'
 }
 
-function isPPTShapeKind(value: string): value is PPTShapeKind {
-  return value === 'rect' || value === 'ellipse' || value === 'diamond'
-}
-
 function isPPTLineMarker(value: string): value is PPTLineMarker {
   return value === 'none' || value === 'arrow'
 }
 
 function isPPTLineRoute(value: string): value is PPTLineRoute {
   return value === 'straight' || value === 'elbow'
-}
-
-function isPPTStrokeDash(value: string): value is PPTStrokeDash {
-  return isSlideEditObjectStrokeLineStyleValue(value)
 }
 
 function getPPTGroupPointerSelection({
