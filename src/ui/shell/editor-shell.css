@@ -1,4 +1,5 @@
 .ppt-app {
+  position: relative;
   display: grid;
   grid-template-columns: 164px minmax(0, 1fr);
   grid-template-rows: 48px minmax(0, 1fr);
@@ -263,12 +264,12 @@
   }
 
   .ppt-inspector {
-    position: fixed;
+    position: absolute;
     top: 48px;
     right: 0;
     bottom: 0;
     z-index: var(--ppt-ui-z-inspector);
-    width: min(300px, calc(100vw - 72px));
+    width: min(300px, calc(100% - 72px));
     box-shadow: -12px 0 28px rgb(15 23 42 / 14%);
   }
 

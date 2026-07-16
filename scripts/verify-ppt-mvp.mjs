@@ -41501,16 +41501,24 @@ async function runMobileScenario(cdpPort) {
 
   await page.eval(`document.querySelector('[data-ppt-inspector-toggle]')?.click()`)
   await delay(60)
-  const inspectorState = await page.eval(`(() => ({
-    inspectorOpen: document.querySelector('[data-ppt-app]')
-      ?.getAttribute('data-ppt-inspector-open') === 'true',
-    inspectorVisible: (() => {
-      const inspector = document.querySelector('.ppt-inspector')
-      const rect = inspector?.getBoundingClientRect()
-      return (rect?.width ?? 0) > 0 && (rect?.height ?? 0) > 0
-    })(),
-    stageWidth: Math.round(document.querySelector('.ppt-stage-shell')?.getBoundingClientRect().width ?? 0),
-  }))()`)
+  const inspectorState = await page.eval(`(() => {
+    const inspector = document.querySelector('.ppt-inspector')
+    const inspectorRect = inspector?.getBoundingClientRect()
+    const visualViewportLeft = window.visualViewport?.offsetLeft ?? 0
+    const visualViewportRight = visualViewportLeft +
+      (window.visualViewport?.width ?? window.innerWidth)
+
+    return {
+      inspectorFitsVisualViewport:
+        (inspectorRect?.left ?? -1) >= visualViewportLeft &&
+        (inspectorRect?.right ?? visualViewportRight + 1) <= visualViewportRight,
+      inspectorOpen: document.querySelector('[data-ppt-app]')
+        ?.getAttribute('data-ppt-inspector-open') === 'true',
+      inspectorVisible:
+        (inspectorRect?.width ?? 0) > 0 && (inspectorRect?.height ?? 0) > 0,
+      stageWidth: Math.round(document.querySelector('.ppt-stage-shell')?.getBoundingClientRect().width ?? 0),
+    }
+  })()`)
 
   record(
     'mobile shell renders quiet chrome without overlap',
@@ -41522,6 +41530,7 @@ async function runMobileScenario(cdpPort) {
       state.visibleTopbarControlCount <= 12 &&
       inspectorState.inspectorOpen &&
       inspectorState.inspectorVisible &&
+      inspectorState.inspectorFitsVisualViewport &&
       inspectorState.stageWidth === state.stageWidth,
     { inspectorState, state },
   )

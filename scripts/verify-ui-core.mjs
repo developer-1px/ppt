@@ -15,6 +15,8 @@ const editorChrome = read('src/ui/core/useEditorChrome.ts')
 const editorShell = read('src/ui/shell/EditorShell.tsx')
 const inspectorActionDispatcher = read('src/ui/inspector/PPTInspectorActionDispatcher.ts')
 const inspectorContract = read('src/ui/inspector/PPTInspectorContract.ts')
+const inspectorCSS = read('src/ui/inspector/inspector.css')
+const inspectorIndex = read('src/ui/inspector/index.ts')
 const slideInspectorPanel = read('src/ui/inspector/PPTSlideInspectorPanel.tsx')
 const indexCSS = read('src/index.css')
 const packageJSON = read('package.json')
@@ -79,6 +81,18 @@ assert.match(slideInspectorPanel, /type PPTSlideInspectorPanelProps = Pick<[\s\S
 assert.match(slideInspectorPanel, /createPPTInspectorActionDispatcher\(onAction\)/, 'Slide Inspector panel must translate controls through the Inspector action dispatcher')
 assert.match(slideInspectorPanel, /createSlideEditTransitionDescriptor/, 'Slide Inspector panel must reuse the Canvas-selected transition affordance')
 assert.match(slideInspectorPanel, /data-ppt-slide-metadata-field/, 'Slide Inspector panel must own slide metadata field rendering')
+assert.match(inspectorIndex, /import '\.\/inspector\.css'/, 'Inspector public module must load its co-located styles')
+for (const selector of [
+  '.ppt-panel-section',
+  '.ppt-field',
+  '.ppt-slide-transition-fields',
+  '.ppt-layer-list',
+  '.ppt-export-code',
+]) {
+  const escapedSelector = selector.replace('.', '\\.')
+  assert.match(inspectorCSS, new RegExp(`^${escapedSelector}(?:\\s|,|\\{)`, 'm'), `Inspector styles must own ${selector}`)
+  assert.doesNotMatch(appCSS, new RegExp(`^${escapedSelector}(?:\\s|,|\\{)`, 'm'), `App.css must not own ${selector}`)
+}
 assert.match(app, /<PPTSelectionToolbar[\s\S]*model=\{\{[\s\S]*onAction=\{handleSelectionToolbarAction\}/, 'App must cross the selection toolbar seam through model and action')
 assert.doesNotMatch(app, /<PPTAlignmentPopover(?:\s|\/)|<PPTShapeKindMenu(?:\s|\/)|<PPTTextQuickFormatControls(?:\s|\/)/, 'App must not compose selection toolbar internals')
 assert.doesNotMatch(app, /function PPTSelectionFloatingBar|function PPTTextQuickFormatControls|function PPTParagraphAlignRadioGroup/, 'App must not own selection toolbar or text control implementation')
@@ -98,6 +112,8 @@ assert.match(editorShell, /data-editor-inspector-open/, 'Editor shell must own i
 assert.match(editorShell, /data-editor-transient-surface/, 'Editor toolbar must expose one transient surface state')
 assert.match(shellCSS, /data-editor-inspector-open/, 'Shell CSS must consume the generic inspector state')
 assert.match(shellCSS, /data-editor-transient-surface/, 'Shell CSS must consume the generic transient surface state')
+assert.match(shellCSS, /\.ppt-app\s*\{[^}]*position: relative/, 'Editor shell must establish the mobile Inspector containing block')
+assert.match(shellCSS, /@media \(max-width: 920px\)[\s\S]*?\.ppt-inspector\s*\{[^}]*position: absolute/, 'Mobile Inspector must overlay the editor inside its shell')
 assert.doesNotMatch(shellCSS, /data-ppt-(?:inspector-open|tool-shelf-open|view-options-open|export-options-open)/, 'Shell layout must not depend on PPT diagnostic state')
 assert.match(selectionToolbar, /type PPTSelectionToolbarProps = \{[\s\S]*model: PPTSelectionToolbarModel[\s\S]*onAction: \(action: PPTSelectionToolbarAction\) => void[\s\S]*\}/, 'Selection toolbar must expose one model and one action interface')
 assert.match(selectionToolbar, /<PPTAlignmentPopover/, 'Selection toolbar must compose the alignment popover')

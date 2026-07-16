@@ -1,3 +1,5 @@
+import './inspector.css'
+
 export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
