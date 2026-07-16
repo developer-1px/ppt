@@ -1,20 +1,13 @@
 import {
-  ALargeSmall,
-  AlignCenter,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
   AlignEndVertical,
   AlignHorizontalDistributeCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
   ArrowRight,
-  Baseline,
-  Bold,
   BringToFront,
   ChevronDown,
   ChevronLeft,
@@ -39,13 +32,10 @@ import {
   Hand,
   Highlighter,
   ImagePlus,
-  Italic,
   Keyboard,
   Layers,
-  List,
   ListIndentDecrease,
   ListIndentIncrease,
-  ListOrdered,
   Lock,
   Map as MapIcon,
   Maximize2,
@@ -61,7 +51,6 @@ import {
   PencilLine,
   PenLine,
   Play,
-  Plus,
   Redo2,
   RotateCw,
   Ruler,
@@ -71,7 +60,6 @@ import {
   SlidersHorizontal,
   Square,
   StickyNote,
-  Strikethrough,
   Sun,
   Table2,
   Trash2,
@@ -79,7 +67,6 @@ import {
   Undo2,
   Ungroup,
   Unlock,
-  Underline,
   X,
   Wrench,
   ZoomIn,
@@ -337,7 +324,6 @@ import {
   getSlideEditTextParagraphListLevelJSONPasteValueFromValue,
   getSlideEditTextParagraphListLevelModelValue,
   normalizeSlideEditTextParagraphListLevel,
-  SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_JSON_MIME_TYPE,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_INTENT as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_INTENT,
   SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_KEYBOARD_KEYS as PPT_TEXT_PARAGRAPH_LIST_LEVEL_SHORTCUT_KEYS,
@@ -674,9 +660,6 @@ import {
   PPT_MENU_KEYBOARD_KEYS,
   PPT_MENU_ROVING_FOCUS_MODEL,
   PPT_MODAL_FOCUS_LIFECYCLE_MODEL,
-  PPT_RADIO_GROUP_FOCUS_MODEL,
-  PPT_RADIO_GROUP_KEYBOARD_MODEL,
-  PPT_RADIO_GROUP_MODEL,
   PPT_RESIZE_POINTER_MODIFIERS_MODEL,
   PPT_TABS_ROVING_FOCUS_MODEL,
   PPT_TOOLBAR_FOCUS_MODEL,
@@ -737,7 +720,6 @@ import {
   getPPTCanvasPointerLocalGeometry,
   getPPTCanvasPointerTransformModifierState,
   getPPTCanvasPresentationKeyboardIntent,
-  getPPTCanvasRadioTabIndex,
   getPPTCanvasResizeHandleDoubleClickIntent,
   getPPTCanvasRichClipboardJSONFromHTML,
   getPPTCanvasSelectionListModifierState,
@@ -746,7 +728,6 @@ import {
   getPPTCanvasTextPasteInsertPosition,
   getPPTCanvasTextPasteSourceText,
   getPPTCanvasWorldClientPoint,
-  handlePPTCanvasRadioGroupKeyDown,
   insertPPTInlineEditText,
   isPPTCanvasControlTarget,
   isPPTCanvasKeyboardCommandIntent,
@@ -799,7 +780,6 @@ import {
   PPT_CANVAS_MEDIA_SOURCE_JSON_MIME_TYPE,
   type PPTCanvasAppItemsChangeTransformer,
   type PPTCanvasClipboardCommand,
-  type PPTCanvasFloatingAnchor,
   type PPTCanvasImagePasteReplaceRoute,
   type PPTCanvasImagePasteReplaceTarget,
   type PPTCanvasKeyboardSelectionCycleDirection,
@@ -948,13 +928,21 @@ import {
   ToolbarGroup,
   useEditorChrome,
 } from './ui/core'
+import {
+  getPPTCommandSurfaceGroups,
+  PPTSurfaceCommandButton,
+  type PPTCommandAvailability,
+  type PPTSurfaceCommand,
+  type PPTSurfaceCommandViewGroup,
+} from './ui/command-surface'
 import { EditorShell, EditorToolbar } from './ui/shell'
 import {
-  PPTAlignmentPopover,
+  PPTSelectionToolbar,
   type PPTAlignmentPopoverCommand,
-  PPTShapeKindMenu,
-  type PPTShapeQuickMenuState,
+  type PPTSelectionToolbarAction,
+  type PPTTextQuickFormatState,
 } from './ui/selection-toolbar'
+import { PPTParagraphAlignRadioGroup } from './ui/text-formatting'
 import './App.css'
 
 const PPT_CANVAS_COMMAND_CONFIG = createPPTCanvasAffordanceConfig({
@@ -982,7 +970,6 @@ const PPT_CANVAS_STANDARD_COMMAND_INTENT_KINDS = new Set([
   'unlock-all',
 ])
 const PPT_RECENT_COLOR_LIMIT = 8
-const PPT_PARAGRAPH_ALIGN_OPTIONS = ['left', 'center', 'right', 'justify'] as const
 const PPT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS =
   `${SLIDE_EDIT_TEXT_PARAGRAPH_ALIGN_SHORTCUT_KEYS} Cmd/Ctrl+J`
 const PPT_SLIDE_RAIL_HIT_TARGET_PADDING = 6
@@ -1415,7 +1402,6 @@ const canvasReorderModeAvailabilityKey = {
   keyof ReturnType<typeof getPPTCanvasCommandAvailability>
 >
 
-type PPTCommandSurface = 'context-menu' | 'selection-floating-bar'
 type PPTClipboardOperation = SlideEditClipboardOperation
 type PPTClipboardObjectMetadata = SlideEditClipboardObjectMetadata<string, string, string>
 type PPTClipboardPayload = SlideEditClipboardPayload<string, string, PPTElement, string, string>
@@ -3401,60 +3387,6 @@ const PPT_COLOR_SWATCH_CHANNEL_MAP = {
   'shape-stroke': 'stroke',
   'text-color': 'text',
 } as const satisfies Record<PPTColorSwatchChannel, PPTColorSwatchPackageChannel>
-type PPTSurfaceCommand =
-  | 'alignBottom'
-  | 'alignCenter'
-  | 'alignLeft'
-  | 'alignMiddle'
-  | 'alignRight'
-  | 'alignTop'
-  | 'bringForward'
-  | 'bringToFront'
-  | 'clearTextFormatting'
-  | 'copyFormatting'
-  | 'delete'
-  | 'distributeHorizontal'
-  | 'distributeVertical'
-  | 'duplicate'
-  | 'flipHorizontal'
-  | 'flipVertical'
-  | 'group'
-  | 'lockSelection'
-  | 'pasteFormatting'
-  | 'selectSameType'
-  | 'sendBackward'
-  | 'sendToBack'
-  | 'tidySelection'
-  | 'ungroup'
-  | 'unlockAll'
-type PPTCommandAvailability = ReturnType<typeof getPPTCanvasCommandAvailability> & {
-  clearTextFormatting: boolean
-  copyFormatting: boolean
-  flipSelection: boolean
-  pasteFormatting: boolean
-  selectSameType: boolean
-  tidySelection: boolean
-}
-type PPTCommandAvailabilityKey = keyof PPTCommandAvailability
-type PPTSurfaceCommandDescriptor = {
-  availability: PPTCommandAvailabilityKey
-  command: PPTSurfaceCommand
-  dataCommand: string
-  label: string
-  surfaces: readonly PPTCommandSurface[]
-  title: string
-}
-type PPTSurfaceCommandGroup = {
-  commands: readonly PPTSurfaceCommandDescriptor[]
-  id: string
-}
-type PPTSurfaceCommandView = PPTSurfaceCommandDescriptor & {
-  disabled: boolean
-}
-type PPTSurfaceCommandViewGroup = {
-  commands: PPTSurfaceCommandView[]
-  id: string
-}
 type PPTCommandPaletteItem = PPTCommandPaletteItemBase
 type PPTShortcutHelpItem = {
   id: string
@@ -3662,22 +3594,6 @@ type PPTSlideDragState = {
   dropPlacement?: PPTSlideDropPlacement
   dropTargetSlideId?: string
 }
-type PPTSelectionCommandAnchor = PPTCanvasFloatingAnchor
-type PPTTextQuickFormatState = {
-  align: NonNullable<PPTParagraph['align']>
-  bullet: boolean
-  canDecreaseListLevel: boolean
-  canIncreaseListLevel: boolean
-  color: string
-  fontSize: number
-  highlight: string
-  isBold: boolean
-  isItalic: boolean
-  isStrikethrough: boolean
-  isUnderline: boolean
-  listLevel: number
-  numbered: boolean
-}
 type PPTSelectionCycleEffect = {
   direction: PPTCanvasKeyboardSelectionCycleDirection
   fromObjectId: string
@@ -3738,162 +3654,6 @@ const PPT_SLIDE_CONTEXT_MENU_GROUPS: readonly PPTSlideContextCommandGroup[] = [{
   id: 'delete',
 }]
 
-const PPT_COMMAND_SURFACE_GROUPS: readonly PPTSurfaceCommandGroup[] = [{
-  commands: [{
-    availability: 'duplicate',
-    command: 'duplicate',
-    dataCommand: 'duplicate',
-    label: 'Duplicate',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.duplicate.title,
-  }, {
-    availability: 'copyFormatting',
-    command: 'copyFormatting',
-    dataCommand: 'copy-formatting',
-    label: 'Copy formatting',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: 'Copy formatting',
-  }, {
-    availability: 'pasteFormatting',
-    command: 'pasteFormatting',
-    dataCommand: 'paste-formatting',
-    label: 'Paste formatting',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: 'Paste formatting',
-  }, {
-    availability: 'clearTextFormatting',
-    command: 'clearTextFormatting',
-    dataCommand: 'clear-text-formatting',
-    label: 'Clear formatting',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: 'Clear formatting',
-  }, {
-    availability: 'selectSameType',
-    command: 'selectSameType',
-    dataCommand: 'select-same-type',
-    label: 'Select same type',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: 'Select same type',
-  }, {
-    availability: 'tidySelection',
-    command: 'tidySelection',
-    dataCommand: 'tidy-selection',
-    label: 'Tidy selection',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: 'Tidy selection',
-  }, {
-    availability: 'flipSelection',
-    command: 'flipHorizontal',
-    dataCommand: 'flip-horizontal',
-    label: 'Flip horizontal',
-    surfaces: ['context-menu'],
-    title: 'Flip horizontal',
-  }, {
-    availability: 'flipSelection',
-    command: 'flipVertical',
-    dataCommand: 'flip-vertical',
-    label: 'Flip vertical',
-    surfaces: ['context-menu'],
-    title: 'Flip vertical',
-  }, {
-    availability: 'delete',
-    command: 'delete',
-    dataCommand: 'delete',
-    label: 'Delete',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.delete.title,
-  }],
-  id: 'edit',
-}, {
-  commands: [{
-    availability: 'alignLeft',
-    command: 'alignLeft',
-    dataCommand: 'align-left',
-    label: 'Align left',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.alignLeft.title,
-  }, {
-    availability: 'alignCenter',
-    command: 'alignCenter',
-    dataCommand: 'align-center-x',
-    label: 'Align center',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.alignCenter.title,
-  }, {
-    availability: 'alignRight',
-    command: 'alignRight',
-    dataCommand: 'align-right',
-    label: 'Align right',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.alignRight.title,
-  }],
-  id: 'align',
-}, {
-  commands: [{
-    availability: 'bringForward',
-    command: 'bringForward',
-    dataCommand: 'bring-forward',
-    label: 'Bring forward',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.bringForward.title,
-  }, {
-    availability: 'bringToFront',
-    command: 'bringToFront',
-    dataCommand: 'bring-to-front',
-    label: 'Bring to front',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.bringToFront.title,
-  }, {
-    availability: 'sendBackward',
-    command: 'sendBackward',
-    dataCommand: 'send-backward',
-    label: 'Send backward',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.sendBackward.title,
-  }, {
-    availability: 'sendToBack',
-    command: 'sendToBack',
-    dataCommand: 'send-to-back',
-    label: 'Send to back',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.sendToBack.title,
-  }],
-  id: 'order',
-}, {
-  commands: [{
-    availability: 'group',
-    command: 'group',
-    dataCommand: 'group',
-    label: 'Group',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.group.title,
-  }, {
-    availability: 'ungroup',
-    command: 'ungroup',
-    dataCommand: 'ungroup',
-    label: 'Ungroup',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.ungroup.title,
-  }],
-  id: 'group',
-}, {
-  commands: [{
-    availability: 'lockSelection',
-    command: 'lockSelection',
-    dataCommand: 'lock-selection',
-    label: 'Lock',
-    surfaces: ['context-menu', 'selection-floating-bar'],
-    title: PPT_COMMAND_AFFORDANCES.lockSelection.title,
-  }, {
-    availability: 'unlockAll',
-    command: 'unlockAll',
-    dataCommand: 'unlock-all',
-    label: 'Unlock all',
-    surfaces: ['context-menu'],
-    title: PPT_COMMAND_AFFORDANCES.unlockAll.title,
-  }],
-  id: 'lock',
-}]
 const PPT_LINE_CONNECTION_DISTANCE = 36
 const PPT_TIDY_GAP = 24
 const PPT_COMMENT_DEFAULT_BODY = 'Comment'
@@ -11549,6 +11309,66 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     }
   }
 
+  function handleSelectionToolbarAction(action: PPTSelectionToolbarAction) {
+    switch (action.type) {
+      case 'alignment-preview-change':
+        setAlignmentPreviewCommand(action.command)
+        break
+      case 'run-command':
+        runPPTSurfaceCommand(action.command)
+        break
+      case 'shape-kind-change':
+        updateShapeKind(action.elementId, action.shape)
+        break
+      case 'text-format':
+        runSelectionToolbarTextAction(action.action)
+        break
+    }
+  }
+
+  function runSelectionToolbarTextAction(
+    action: Extract<PPTSelectionToolbarAction, { type: 'text-format' }>['action'],
+  ) {
+    switch (action.type) {
+      case 'clear-formatting':
+        clearSelectedTextFormatting()
+        break
+      case 'set-color':
+        updateSelectedTextColor(action.color)
+        break
+      case 'set-highlight':
+        updateSelectedTextHighlight(action.color)
+        break
+      case 'set-paragraph-align':
+        updateSelectedParagraphAlign(action.align)
+        break
+      case 'step-font-size':
+        stepSelectedTextFontSize(action.delta)
+        break
+      case 'step-list-level':
+        stepSelectedParagraphListLevel(action.delta)
+        break
+      case 'toggle-bold':
+        toggleSelectedTextBold()
+        break
+      case 'toggle-bullet':
+        toggleSelectedParagraphBullet()
+        break
+      case 'toggle-italic':
+        toggleSelectedTextItalic()
+        break
+      case 'toggle-numbered':
+        toggleSelectedParagraphNumbered()
+        break
+      case 'toggle-strikethrough':
+        toggleSelectedTextStrikethrough()
+        break
+      case 'toggle-underline':
+        toggleSelectedTextUnderline()
+        break
+    }
+  }
+
   function commitText(elementId: string, text: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
@@ -17149,28 +16969,16 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
                 onResizePointerDown={handleResizePointerDown}
               />
             ) : null}
-            <PPTSelectionFloatingBar
-              anchor={selectionCommandAnchor}
-              commandAvailability={commandAvailability}
-              groups={selectionFloatingCommandGroups}
-              scale={viewport.scale}
-              shapeMenu={shapeQuickMenuState}
-              textFormat={textQuickFormatState}
-              onCommand={runPPTSurfaceCommand}
-              onAlignmentPreviewChange={setAlignmentPreviewCommand}
-              onFontSizeStep={stepSelectedTextFontSize}
-              onParagraphBulletToggle={toggleSelectedParagraphBullet}
-              onParagraphListLevelStep={stepSelectedParagraphListLevel}
-              onParagraphNumberedToggle={toggleSelectedParagraphNumbered}
-              onParagraphAlign={updateSelectedParagraphAlign}
-              onShapeKindChange={updateShapeKind}
-              onTextBoldToggle={toggleSelectedTextBold}
-              onTextClearFormatting={clearSelectedTextFormatting}
-              onTextColorChange={updateSelectedTextColor}
-              onTextHighlightChange={updateSelectedTextHighlight}
-              onTextItalicToggle={toggleSelectedTextItalic}
-              onTextStrikethroughToggle={toggleSelectedTextStrikethrough}
-              onTextUnderlineToggle={toggleSelectedTextUnderline}
+            <PPTSelectionToolbar
+              model={{
+                alignmentAvailability: commandAvailability,
+                anchor: selectionCommandAnchor,
+                commandGroups: selectionFloatingCommandGroups,
+                scale: viewport.scale,
+                shape: shapeQuickMenuState,
+                text: textQuickFormatState,
+              }}
+              onAction={handleSelectionToolbarAction}
             />
             {selectedLineElement && !editingId && canResizeSelection ? (
               <LineEndpointOverlay
@@ -34838,455 +34646,6 @@ function FindReplaceStrip({
   )
 }
 
-function PPTSelectionFloatingBar({
-  anchor,
-  commandAvailability,
-  groups,
-  onAlignmentPreviewChange,
-  onCommand,
-  onFontSizeStep,
-  onParagraphAlign,
-  onParagraphBulletToggle,
-  onParagraphListLevelStep,
-  onParagraphNumberedToggle,
-  onShapeKindChange,
-  onTextBoldToggle,
-  onTextClearFormatting,
-  onTextColorChange,
-  onTextHighlightChange,
-  onTextItalicToggle,
-  onTextStrikethroughToggle,
-  onTextUnderlineToggle,
-  scale,
-  shapeMenu,
-  textFormat,
-}: {
-  anchor: PPTSelectionCommandAnchor | null
-  commandAvailability: PPTCommandAvailability
-  groups: readonly PPTSurfaceCommandViewGroup[]
-  onAlignmentPreviewChange: (command: PPTAlignmentPopoverCommand | null) => void
-  onCommand: (command: PPTSurfaceCommand) => void
-  onFontSizeStep: (delta: number) => void
-  onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
-  onParagraphBulletToggle: () => void
-  onParagraphListLevelStep: (delta: number) => void
-  onParagraphNumberedToggle: () => void
-  onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
-  onTextBoldToggle: () => void
-  onTextClearFormatting: () => void
-  onTextColorChange: (color: string) => void
-  onTextHighlightChange: (color: string) => void
-  onTextItalicToggle: () => void
-  onTextStrikethroughToggle: () => void
-  onTextUnderlineToggle: () => void
-  scale: number
-  shapeMenu: PPTShapeQuickMenuState | null
-  textFormat: PPTTextQuickFormatState | null
-}) {
-  const [expanded, setExpanded] = useState(false)
-
-  if (!anchor || (groups.length === 0 && !shapeMenu && !textFormat)) {
-    return null
-  }
-
-  return (
-    <div
-      aria-label="Selection actions"
-      className="ppt-selection-floating-bar"
-      data-placement={anchor.placement}
-      data-ppt-selection-floating-bar
-      data-ppt-selection-floating-expanded={expanded ? 'true' : 'false'}
-      role="toolbar"
-      style={{
-        '--ppt-command-scale': String(1 / scale),
-        left: anchor.x,
-        top: anchor.y,
-      } as CSSProperties}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      {textFormat ? (
-        <PPTTextQuickFormatControls
-          expanded={expanded}
-          state={textFormat}
-          onFontSizeStep={onFontSizeStep}
-          onParagraphAlign={onParagraphAlign}
-          onParagraphBulletToggle={onParagraphBulletToggle}
-          onParagraphListLevelStep={onParagraphListLevelStep}
-          onParagraphNumberedToggle={onParagraphNumberedToggle}
-          onTextBoldToggle={onTextBoldToggle}
-          onTextClearFormatting={onTextClearFormatting}
-          onTextColorChange={onTextColorChange}
-          onTextHighlightChange={onTextHighlightChange}
-          onTextItalicToggle={onTextItalicToggle}
-          onTextStrikethroughToggle={onTextStrikethroughToggle}
-          onTextUnderlineToggle={onTextUnderlineToggle}
-        />
-      ) : null}
-      {textFormat ? <span className="ppt-command-divider" /> : null}
-      {shapeMenu ? (
-        <>
-          <PPTShapeKindMenu
-            state={shapeMenu}
-            onShapeKindChange={onShapeKindChange}
-          />
-          <span className="ppt-command-divider" />
-        </>
-      ) : null}
-      <span className="ppt-selection-floating-details" hidden={!expanded}>
-      <PPTAlignmentPopover
-        availability={commandAvailability}
-        onCommand={onCommand}
-        onPreviewChange={onAlignmentPreviewChange}
-      />
-      {groups.length > 0 ? <span className="ppt-command-divider" /> : null}
-      {groups.map((group, groupIndex) => (
-        <Fragment key={group.id}>
-          {groupIndex > 0 ? <span className="ppt-command-divider" /> : null}
-          {group.commands.map((command) => (
-            <PPTSurfaceCommandButton
-              command={command}
-              key={command.command}
-              surface="selection-floating-bar"
-              onCommand={onCommand}
-            />
-          ))}
-        </Fragment>
-      ))}
-      </span>
-      <IconButton
-        aria-pressed={expanded}
-        data-ppt-selection-floating-more
-        label={expanded ? 'Fewer selection actions' : 'More selection actions'}
-        tooltip={expanded ? 'Fewer actions' : 'More actions'}
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          setExpanded((current) => !current)
-        }}
-      >
-        <MoreHorizontal size={16} />
-      </IconButton>
-    </div>
-  )
-}
-
-function PPTTextQuickFormatControls({
-  expanded,
-  onFontSizeStep,
-  onParagraphAlign,
-  onParagraphBulletToggle,
-  onParagraphListLevelStep,
-  onParagraphNumberedToggle,
-  onTextBoldToggle,
-  onTextClearFormatting,
-  onTextColorChange,
-  onTextHighlightChange,
-  onTextItalicToggle,
-  onTextStrikethroughToggle,
-  onTextUnderlineToggle,
-  state,
-}: {
-  expanded: boolean
-  onFontSizeStep: (delta: number) => void
-  onParagraphAlign: (align: NonNullable<PPTParagraph['align']>) => void
-  onParagraphBulletToggle: () => void
-  onParagraphListLevelStep: (delta: number) => void
-  onParagraphNumberedToggle: () => void
-  onTextBoldToggle: () => void
-  onTextClearFormatting: () => void
-  onTextColorChange: (color: string) => void
-  onTextHighlightChange: (color: string) => void
-  onTextItalicToggle: () => void
-  onTextStrikethroughToggle: () => void
-  onTextUnderlineToggle: () => void
-  state: PPTTextQuickFormatState
-}) {
-  return (
-    <span
-      className="ppt-text-quick-format"
-      data-ppt-text-quick-bar
-      data-ppt-text-quick-expanded={expanded ? 'true' : 'false'}
-    >
-      <IconButton
-        aria-pressed={state.isBold}
-        data-ppt-text-quick="bold"
-        label="Bold text"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onTextBoldToggle()
-        }}
-      >
-        <Bold size={16} />
-      </IconButton>
-      <IconButton
-        aria-pressed={state.isItalic}
-        data-ppt-text-quick="italic"
-        label="Italic text"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onTextItalicToggle()
-        }}
-      >
-        <Italic size={16} />
-      </IconButton>
-      <IconButton
-        aria-pressed={state.isUnderline}
-        data-ppt-text-quick="underline"
-        label="Underline text"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onTextUnderlineToggle()
-        }}
-      >
-        <Underline size={16} />
-      </IconButton>
-      <IconButton
-        aria-pressed={state.isStrikethrough}
-        data-ppt-text-quick="strikethrough"
-        label="Strikethrough text"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onTextStrikethroughToggle()
-        }}
-      >
-        <Strikethrough size={16} />
-      </IconButton>
-      <IconButton
-        data-ppt-text-quick="clear-formatting"
-        label="Clear formatting"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onTextClearFormatting()
-        }}
-      >
-        <Eraser size={16} />
-      </IconButton>
-      <IconButton
-        data-ppt-text-quick="font-size-down"
-        label="Decrease font size"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onFontSizeStep(-PPT_TEXT_FONT_SIZE_STEP)
-        }}
-      >
-        <Minus size={16} />
-      </IconButton>
-      <span className="ppt-font-size-chip" data-ppt-text-quick-size>
-        <ALargeSmall size={15} />
-        {state.fontSize}
-      </span>
-      <IconButton
-        data-ppt-text-quick="font-size-up"
-        label="Increase font size"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onFontSizeStep(PPT_TEXT_FONT_SIZE_STEP)
-        }}
-      >
-        <Plus size={16} />
-      </IconButton>
-      <label className="ppt-floating-color" title="Text color">
-        <Baseline size={15} />
-        <input
-          aria-label="Text color"
-          data-ppt-text-quick="color"
-          type="color"
-          value={state.color}
-          onChange={(event) => onTextColorChange(event.target.value)}
-          onPointerDown={(event) => event.stopPropagation()}
-        />
-      </label>
-      <label className="ppt-floating-color" title="Highlight color">
-        <Highlighter size={15} />
-        <input
-          aria-label="Highlight color"
-          data-ppt-text-quick="highlight"
-          type="color"
-          value={state.highlight}
-          onChange={(event) => onTextHighlightChange(event.target.value)}
-          onPointerDown={(event) => event.stopPropagation()}
-        />
-      </label>
-      <IconButton
-        aria-pressed={state.bullet}
-        data-ppt-text-quick="bullet"
-        label="Toggle bullet list"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onParagraphBulletToggle()
-        }}
-      >
-        <List size={16} />
-      </IconButton>
-      <IconButton
-        aria-pressed={state.numbered}
-        data-ppt-text-quick="numbered"
-        label="Toggle numbered list"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onParagraphNumberedToggle()
-        }}
-      >
-        <ListOrdered size={16} />
-      </IconButton>
-      <IconButton
-        data-ppt-text-quick="list-level-down"
-        data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.decrease}
-        data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
-        data-ppt-text-quick-list-level={state.listLevel}
-        data-ppt-text-quick-list-level-max={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.max}
-        data-ppt-text-quick-list-level-min={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.min}
-        data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
-        data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
-        disabled={!state.canDecreaseListLevel}
-        label="Decrease list level"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onParagraphListLevelStep(-1)
-        }}
-      >
-        <ListIndentDecrease size={16} />
-      </IconButton>
-      <IconButton
-        data-ppt-text-quick="list-level-up"
-        data-ppt-text-quick-list-level-command={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.commandIds.increase}
-        data-ppt-text-quick-list-level-control={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.control}
-        data-ppt-text-quick-list-level={state.listLevel}
-        data-ppt-text-quick-list-level-max={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.max}
-        data-ppt-text-quick-list-level-min={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.min}
-        data-ppt-text-quick-list-level-step={SLIDE_EDIT_TEXT_PARAGRAPH_LIST_LEVEL_FIELD.step}
-        data-ppt-text-quick-list-level-surface="text-paragraph-list-level"
-        disabled={!state.canIncreaseListLevel}
-        label="Increase list level"
-        variant="floating"
-        onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          onParagraphListLevelStep(1)
-        }}
-      >
-        <ListIndentIncrease size={16} />
-      </IconButton>
-      <PPTParagraphAlignRadioGroup
-        align={state.align}
-        surface="quick"
-        onAlignChange={onParagraphAlign}
-      />
-    </span>
-  )
-}
-
-function PPTParagraphAlignRadioGroup({
-  align,
-  onAlignChange,
-  surface,
-}: {
-  align: NonNullable<PPTParagraph['align']>
-  onAlignChange: (align: NonNullable<PPTParagraph['align']>) => void
-  surface: 'inspector' | 'quick'
-}) {
-  function selectAlign(
-    nextAlign: NonNullable<PPTParagraph['align']>,
-    container: HTMLElement | null,
-  ) {
-    onAlignChange(nextAlign)
-    focusPPTCanvasElementBySelectorOnNextFrame<HTMLButtonElement>({
-      match: ({ element }) =>
-        element.getAttribute('data-ppt-paragraph-align') === nextAlign,
-      root: container,
-      selector: '[data-ppt-paragraph-align]',
-    })
-  }
-
-  return (
-    <span
-      aria-label="Paragraph align"
-      className={surface === 'quick'
-        ? 'ppt-paragraph-align-radio-group ppt-paragraph-align-radio-group--quick'
-        : 'ppt-segmented-control ppt-paragraph-align-radio-group'}
-      data-ppt-paragraph-align-focus-model={PPT_RADIO_GROUP_FOCUS_MODEL}
-      data-ppt-paragraph-align-keyboard-model={PPT_RADIO_GROUP_KEYBOARD_MODEL}
-      data-ppt-paragraph-align-model={PPT_RADIO_GROUP_MODEL}
-      data-ppt-paragraph-align-radiogroup={surface}
-      role="radiogroup"
-      onKeyDown={handlePPTCanvasRadioGroupKeyDown}
-    >
-      {PPT_PARAGRAPH_ALIGN_OPTIONS.map((option) => {
-        const selected = align === option
-
-        return (
-          <button
-            aria-checked={selected}
-            aria-label={`Align text ${option}`}
-            aria-pressed={selected}
-            className={surface === 'quick' ? 'ppt-floating-command' : undefined}
-            data-ppt-paragraph-align={option}
-            data-ppt-paragraph-align-surface={surface}
-            data-ppt-text-quick={surface === 'quick' ? `align-${option}` : undefined}
-            key={option}
-            role="radio"
-            tabIndex={getPPTCanvasRadioTabIndex({
-              checked: selected,
-              disabled: false,
-            })}
-            title={`Align text ${option}`}
-            type="button"
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              selectAlign(option, event.currentTarget.closest('[role="radiogroup"]'))
-            }}
-          >
-            {surface === 'quick'
-              ? <PPTTextAlignIcon align={option} size={16} />
-              : option}
-          </button>
-        )
-      })}
-    </span>
-  )
-}
-
-function PPTTextAlignIcon({
-  align,
-  size,
-}: {
-  align: NonNullable<PPTParagraph['align']>
-  size: number
-}) {
-  switch (align) {
-    case 'center':
-      return <AlignCenter size={size} />
-    case 'justify':
-      return <AlignJustify size={size} />
-    case 'right':
-      return <AlignRight size={size} />
-    case 'left':
-      return <AlignLeft size={size} />
-  }
-}
-
 function PPTSlideContextCommandMenu({
   canDelete,
   canPaste,
@@ -35452,104 +34811,6 @@ function PPTContextCommandMenu({
       ))}
     </div>
   )
-}
-
-function PPTSurfaceCommandButton({
-  command,
-  onAfterCommand,
-  onCommand,
-  surface,
-}: {
-  command: PPTSurfaceCommandView
-  onAfterCommand?: () => void
-  onCommand: (command: PPTSurfaceCommand) => void
-  surface: PPTCommandSurface
-}) {
-  const dataAttribute = surface === 'context-menu'
-    ? {
-        ...PPT_MENU_ITEM_PROPS,
-        'data-ppt-context-command': command.dataCommand,
-      }
-    : { 'data-ppt-floating-command': command.dataCommand }
-
-  return (
-    <button
-      aria-label={command.label}
-      className={surface === 'context-menu'
-        ? 'ppt-context-menu-item'
-        : 'ppt-floating-command'}
-      disabled={command.disabled}
-      role={surface === 'context-menu' ? 'menuitem' : undefined}
-      title={command.title}
-      type="button"
-      {...dataAttribute}
-      onClick={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        if (command.disabled) {
-          return
-        }
-
-        onCommand(command.command)
-        onAfterCommand?.()
-      }}
-    >
-      <PPTSurfaceCommandIcon command={command.command} size={16} />
-      {surface === 'context-menu' ? <span>{command.label}</span> : null}
-    </button>
-  )
-}
-
-function PPTSurfaceCommandIcon({
-  command,
-  size,
-}: {
-  command: PPTSurfaceCommand
-  size: number
-}) {
-  switch (command) {
-    case 'alignCenter':
-      return <AlignCenterVertical size={size} />
-    case 'alignLeft':
-      return <AlignStartVertical size={size} />
-    case 'alignRight':
-      return <AlignEndVertical size={size} />
-    case 'bringForward':
-      return <MoveUp size={size} />
-    case 'bringToFront':
-      return <BringToFront size={size} />
-    case 'clearTextFormatting':
-      return <Eraser size={size} />
-    case 'copyFormatting':
-      return <Paintbrush size={size} />
-    case 'delete':
-      return <Trash2 size={size} />
-    case 'duplicate':
-      return <CopyPlus size={size} />
-    case 'flipHorizontal':
-      return <FlipHorizontal2 size={size} />
-    case 'flipVertical':
-      return <FlipVertical2 size={size} />
-    case 'group':
-      return <Group size={size} />
-    case 'lockSelection':
-      return <Lock size={size} />
-    case 'pasteFormatting':
-      return <Paintbrush size={size} />
-    case 'selectSameType':
-      return <Layers size={size} />
-    case 'sendBackward':
-      return <MoveDown size={size} />
-    case 'sendToBack':
-      return <SendToBack size={size} />
-    case 'tidySelection':
-      return <Grid2X2 size={size} />
-    case 'ungroup':
-      return <Ungroup size={size} />
-    case 'unlockAll':
-      return <Unlock size={size} />
-  }
 }
 
 function SlideThumb({
@@ -39875,30 +39136,6 @@ function tidyPPTSelectionElements(
 
 function isPPTTidySelectionElement(element: PPTElement) {
   return isPPTFlipSelectionElement(element) && element.kind !== 'line'
-}
-
-function getPPTCommandSurfaceGroups({
-  availability,
-  surface,
-}: {
-  availability: PPTCommandAvailability
-  surface: PPTCommandSurface
-}): PPTSurfaceCommandViewGroup[] {
-  return PPT_COMMAND_SURFACE_GROUPS.flatMap((group) => {
-    const commands = group.commands
-      .filter((command) => command.surfaces.includes(surface))
-      .map((command) => ({
-        ...command,
-        disabled: !availability[command.availability],
-      }))
-
-    return commands.length > 0
-      ? [{
-          commands,
-          id: group.id,
-        }]
-      : []
-  })
 }
 
 function canCopyPPTElementFormatting(element: PPTElement | undefined) {

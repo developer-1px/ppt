@@ -7,6 +7,8 @@ const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
 const app = read('src/App.tsx')
 const appCSS = read('src/App.css')
+const commandSurface = read('src/ui/command-surface/PPTSurfaceCommands.tsx')
+const commandSurfaceModel = read('src/ui/command-surface/PPTSurfaceCommandModel.ts')
 const controls = read('src/ui/core/controls.tsx')
 const controlsCSS = read('src/ui/core/controls.css')
 const editorChrome = read('src/ui/core/useEditorChrome.ts')
@@ -14,8 +16,12 @@ const editorShell = read('src/ui/shell/EditorShell.tsx')
 const indexCSS = read('src/index.css')
 const packageJSON = read('package.json')
 const alignmentPopover = read('src/ui/selection-toolbar/PPTAlignmentPopover.tsx')
+const paragraphAlign = read('src/ui/text-formatting/PPTParagraphAlignRadioGroup.tsx')
+const selectionToolbar = read('src/ui/selection-toolbar/PPTSelectionToolbar.tsx')
+const selectionToolbarCSS = read('src/ui/selection-toolbar/selection-toolbar.css')
 const shellCSS = read('src/ui/shell/editor-shell.css')
 const shapeKindMenu = read('src/ui/selection-toolbar/PPTShapeKindMenu.tsx')
+const textQuickFormat = read('src/ui/selection-toolbar/PPTTextQuickFormatControls.tsx')
 const tokensCSS = read('src/ui/core/tokens.css')
 const viteConfig = read('vite.config.ts')
 
@@ -34,8 +40,10 @@ assert.deepEqual(
 for (const token of [
   '--ppt-ui-control-size',
   '--ppt-ui-control-size-compact',
+  '--ppt-ui-control-gap',
   '--ppt-ui-radius-md',
   '--ppt-ui-shadow-floating',
+  '--ppt-ui-z-selection-toolbar',
   '--ppt-ui-z-toolbar',
 ]) {
   assert.match(tokensCSS, new RegExp(token), `Missing UI token: ${token}`)
@@ -49,11 +57,12 @@ assert.doesNotMatch(appCSS, /\.ppt-topbar\s*\{/, 'App.css must not redefine the 
 assert.match(shellCSS, /\.ppt-topbar\s*\{/, 'Shell styles must own the editor toolbar')
 assert.match(app, /<EditorShell/, 'PPT must compose its root through the editor shell seam')
 assert.match(app, /<EditorToolbar/, 'PPT must compose its toolbar through the editor shell seam')
-assert.match(app, /<PPTAlignmentPopover/, 'PPT must compose the alignment popover through the selection toolbar seam')
-assert.match(app, /<PPTShapeKindMenu/, 'PPT must compose the shape menu through the selection toolbar seam')
+assert.match(app, /<PPTSelectionToolbar[\s\S]*model=\{\{[\s\S]*onAction=\{handleSelectionToolbarAction\}/, 'App must cross the selection toolbar seam through model and action')
+assert.doesNotMatch(app, /<PPTAlignmentPopover(?:\s|\/)|<PPTShapeKindMenu(?:\s|\/)|<PPTTextQuickFormatControls(?:\s|\/)/, 'App must not compose selection toolbar internals')
+assert.doesNotMatch(app, /function PPTSelectionFloatingBar|function PPTTextQuickFormatControls|function PPTParagraphAlignRadioGroup/, 'App must not own selection toolbar or text control implementation')
 assert.doesNotMatch(app, /function PPTAlignmentPopover/, 'App must not own alignment menu implementation')
 assert.doesNotMatch(app, /function PPTShapeKindMenu/, 'App must not own shape menu implementation')
-assert.doesNotMatch(app, /PPT_ALIGNMENT_POPOVER_COMMANDS|PPT_SHAPE_MENU_OPTIONS/, 'App must not own selection toolbar menu registries')
+assert.doesNotMatch(app, /PPT_ALIGNMENT_POPOVER_COMMANDS|PPT_SHAPE_MENU_OPTIONS|PPT_COMMAND_SURFACE_GROUPS/, 'App must not own UI command registries')
 assert.match(app, /useEditorChrome/, 'PPT must use the shared editor chrome module')
 assert.doesNotMatch(app, /useExclusiveDisclosure/, 'PPT must not compose chrome from a shallow disclosure hook')
 assert.doesNotMatch(app, /setToolShelfOpen|setViewOptionsOpen|setExportOptionsOpen|setShowGrid|setShowFrameGuides|setShowMinimap|setInspectorOpen/, 'Editor chrome must not drift back to independent booleans')
@@ -68,6 +77,21 @@ assert.match(editorShell, /data-editor-transient-surface/, 'Editor toolbar must 
 assert.match(shellCSS, /data-editor-inspector-open/, 'Shell CSS must consume the generic inspector state')
 assert.match(shellCSS, /data-editor-transient-surface/, 'Shell CSS must consume the generic transient surface state')
 assert.doesNotMatch(shellCSS, /data-ppt-(?:inspector-open|tool-shelf-open|view-options-open|export-options-open)/, 'Shell layout must not depend on PPT diagnostic state')
+assert.match(selectionToolbar, /type PPTSelectionToolbarProps = \{[\s\S]*model: PPTSelectionToolbarModel[\s\S]*onAction: \(action: PPTSelectionToolbarAction\) => void[\s\S]*\}/, 'Selection toolbar must expose one model and one action interface')
+assert.match(selectionToolbar, /<PPTAlignmentPopover/, 'Selection toolbar must compose the alignment popover')
+assert.match(selectionToolbar, /<PPTShapeKindMenu/, 'Selection toolbar must compose the shape menu')
+assert.match(selectionToolbar, /<PPTTextQuickFormatControls/, 'Selection toolbar must compose quick text formatting')
+assert.doesNotMatch(selectionToolbar, /onTextBoldToggle|onTextItalicToggle|onFontSizeStep|onParagraphAlign/, 'Selection toolbar must not regress to callback-per-control')
+assert.match(selectionToolbar, /import '\.\/selection-toolbar\.css'/, 'Selection toolbar must load its co-located styles')
+assert.match(selectionToolbarCSS, /\.ppt-selection-floating-bar\s*\{/, 'Selection toolbar styles must own the floating bar')
+assert.doesNotMatch(appCSS, /\.ppt-selection-floating-bar\s*\{/, 'App.css must not own selection toolbar styles')
+assert.match(commandSurfaceModel, /const COMMAND_GROUPS:/, 'Command surface model must own the command registry')
+assert.match(commandSurfaceModel, /export function getPPTCommandSurfaceGroups/, 'Command surface model must derive surface-specific command views')
+assert.match(commandSurface, /export function PPTSurfaceCommandButton/, 'Command surface must own command rendering')
+assert.doesNotMatch(app, /function PPTSurfaceCommandButton|function getPPTCommandSurfaceGroups/, 'App must consume the command surface module')
+assert.match(textQuickFormat, /onAction: \(action: PPTTextQuickFormatAction\) => void/, 'Quick text formatting must emit one action stream')
+assert.match(paragraphAlign, /PPT_RADIO_GROUP_FOCUS_MODEL/, 'Paragraph alignment must own its Canvas focus affordance')
+assert.match(paragraphAlign, /handlePPTCanvasRadioGroupKeyDown/, 'Paragraph alignment must own keyboard behavior')
 assert.match(alignmentPopover, /availability: Readonly<Record<PPTAlignmentPopoverCommand, boolean>>/, 'Alignment menu must receive availability through its public interface')
 assert.match(alignmentPopover, /onPreviewChange: \(command: PPTAlignmentPopoverCommand \| null\) => void/, 'Alignment menu must own preview lifecycle behind one callback')
 assert.match(shapeKindMenu, /state: PPTShapeQuickMenuState/, 'Shape menu must receive a cohesive state value')

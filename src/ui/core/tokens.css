@@ -20,6 +20,7 @@
   --accent-strong: #1d4ed8;
   --ppt-ui-control-size: 34px;
   --ppt-ui-control-size-compact: 30px;
+  --ppt-ui-control-gap: 3px;
   --ppt-ui-radius-sm: 4px;
   --ppt-ui-radius-md: 6px;
   --ppt-ui-space-1: 2px;
@@ -30,6 +31,7 @@
   --ppt-ui-space-6: 12px;
   --ppt-ui-shadow-floating: 0 12px 30px rgb(15 23 42 / 14%);
   --ppt-ui-shadow-overlay: 0 8px 24px rgb(15 23 42 / 14%);
+  --ppt-ui-z-selection-toolbar: 1;
   --ppt-ui-z-selection: 10;
   --ppt-ui-z-toolbar: 20;
   --ppt-ui-z-popover: 30;

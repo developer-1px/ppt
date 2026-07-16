@@ -86,6 +86,7 @@ export function PPTAlignmentPopover({
   const [activeCommand, setActiveCommand] =
     useState<PPTAlignmentPopoverCommand>('alignCenter')
   const [initialActiveCommandIndex, setInitialActiveCommandIndex] = useState(0)
+  const previewChangeRef = useRef(onPreviewChange)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const commands = ALIGNMENT_COMMANDS.map((command) => ({
     ...command,
@@ -109,7 +110,11 @@ export function PPTAlignmentPopover({
     },
   })
 
-  useEffect(() => () => onPreviewChange(null), [onPreviewChange])
+  useEffect(() => {
+    previewChangeRef.current = onPreviewChange
+  }, [onPreviewChange])
+
+  useEffect(() => () => previewChangeRef.current(null), [])
 
   function openPopover(command = activeEnabledCommand?.command) {
     if (!command) {
