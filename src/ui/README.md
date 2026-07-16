@@ -19,6 +19,8 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 - `pptObjectAnimationAdapter.ts`: PPT 객체 애니메이션의 기본값, 정규화, JSON 판별, canvas 명령·descriptor·build order·CSS projection을 소유한다.
 - `pptColorSwatchAdapter.ts`: Inspector의 색상 target, PPT 채널과 canvas 채널 매핑, theme/recent palette descriptor를 소유한다.
 - `pptTextAdapter.ts`: PPT 텍스트 스타일, 문단, font/vertical/inset descriptor, autofit size mode와 canvas 명령·CSS projection을 소유한다.
+- `pptLineAdapter.ts`: PPT line의 route·marker 기본값, option, 값 검증을 소유한다.
+- `pptTableAdapter.ts`: PPT table을 Inspector가 소비하는 rows text와 행·열 수 read model로 투영한다.
 
 ## Extension rules
 
@@ -41,5 +43,8 @@ PPT의 UI는 편집 엔진과 제품 셸을 분리한다.
 17. Color Swatch Strip은 callback props 대신 `model + onAction + target` 계약을 사용하고, 채널·palette 변환은 `pptColorSwatchAdapter.ts`를 함께 사용한다.
 18. Text Inspector의 text/font/paragraph/inset/autofit 필드는 `PPTTextInspectorFields`가 소유하며, 텍스트 값·명령·descriptor 변환은 `pptTextAdapter.ts`를 함께 사용한다.
 19. Shape Inspector의 shape/fill/stroke/corner radius 필드는 `PPTShapeInspectorFields`가 소유하며, 객체 시각 값과 descriptor·CSS 변환은 `pptObjectAdapter.ts`를 함께 사용한다.
+20. Line/Freeform Inspector의 stroke/route/marker 필드는 `PPTLineInspectorFields`가 소유하며, stroke는 `pptObjectAdapter.ts`, line 값은 `pptLineAdapter.ts`를 사용한다.
+21. Table Inspector의 rows 편집과 size 표시는 `PPTTableInspectorFields`가 소유하며, 표시용 read model은 `pptTableAdapter.ts`를 사용한다.
+22. `PPTSelectionInspectorPanel`이 선택 객체별 패널 조합과 empty state를 소유한다. `App`은 `PPTInspector + PPTInspectorAction` 공개 인터페이스만 소비한다.
 
 `pnpm verify:ui-core`가 이 경계의 정적 가드다.

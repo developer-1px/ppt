@@ -525,7 +525,6 @@ import {
   getPPTStrokeDash,
   getPPTStrokeDashArray,
   getPPTStrokeDashBorderStyle,
-  getPPTStrokeLineStyleDescriptor,
   getPPTThumbLineDashStyle,
   hasPPTElementShadow,
   isPPTStrokeDash,
@@ -547,7 +546,6 @@ import {
   normalizePPTStrokeDash,
   normalizePPTStrokeWidth,
   PPT_SHAPE_CORNER_RADIUS_DEFAULT,
-  PPT_STROKE_DASH_OPTIONS,
   PPT_ALT_TEXT_MAX_LENGTH,
   PPT_HYPERLINK_URL_MAX_LENGTH,
   type PPTElementShadowUpdateField,
@@ -938,17 +936,8 @@ import {
   type PPTSurfaceCommandViewGroup,
 } from './ui/command-surface'
 import {
-  createPPTInspectorActionDispatcher,
-  PPTColorSwatchStrip,
-  PPTCommentInspectorFields,
-  PPTImageInspectorFields,
-  PPTInspectorShell,
-  PPTObjectAnimationInspectorFields,
-  PPTObjectPropertiesInspectorFields,
-  PPTShapeInspectorFields,
-  PPTTextInspectorFields,
+  PPTInspector,
   type PPTInspectorAction,
-  type PPTInspectorProps,
 } from './ui/inspector'
 import { EditorShell, EditorToolbar } from './ui/shell'
 import {
@@ -35153,194 +35142,6 @@ function Guides({ guides, scale }: { guides: PPTCanvasSnapGuides; scale: number 
   )
 }
 
-function PPTInspector({ model, onAction }: PPTInspectorProps) {
-  const {
-    selectedElement,
-    slide,
-  } = model
-
-  const {
-    onElementStrokeChange,
-    onLineMarkerChange,
-    onLineRouteChange,
-    onTableRowsChange,
-  } = createPPTInspectorActionDispatcher(onAction)
-
-  const strokeLineStyleDescriptor = selectedElement
-    ? getPPTStrokeLineStyleDescriptor(slide.id, selectedElement)
-    : null
-  return (
-    <PPTInspectorShell
-      model={model}
-      onAction={onAction}
-      selectionPanel={
-        selectedElement ? (
-          <>
-            <PPTObjectPropertiesInspectorFields model={model} onAction={onAction} />
-            <PPTObjectAnimationInspectorFields model={model} onAction={onAction} />
-            <PPTTextInspectorFields model={model} onAction={onAction} />
-            <PPTShapeInspectorFields model={model} onAction={onAction} />
-            <PPTImageInspectorFields model={model} onAction={onAction} />
-            {selectedElement.kind === 'table' ? (
-              <>
-                <label className="ppt-field">
-                  <span>Rows</span>
-                  <textarea
-                    data-ppt-style-field="table-data"
-                    value={stringifyPPTTableRows(selectedElement.rows)}
-                    onChange={(event) =>
-                      onTableRowsChange(selectedElement.id, event.target.value)}
-                  />
-                </label>
-                <span
-                  className="ppt-muted"
-                  data-ppt-table-inspector-size
-                >
-                  {selectedElement.rows.length} x {getPPTTableColumnCount(selectedElement.rows)}
-                </span>
-              </>
-            ) : null}
-            <PPTCommentInspectorFields model={model} onAction={onAction} />
-            {selectedElement.kind === 'line' || selectedElement.kind === 'freeform' ? (
-              <>
-                <div className="ppt-geometry-grid">
-                  <div className="ppt-color-control" data-ppt-color-control="line-stroke">
-                    <label className="ppt-field">
-                      <span>Stroke</span>
-                      <input
-                        data-ppt-style-field="line-stroke-color"
-                        type="color"
-                        value={selectedElement.stroke.color}
-                        onChange={(event) =>
-                          onElementStrokeChange(
-                            selectedElement.id,
-                            'color',
-                            event.target.value,
-                          )}
-                      />
-                    </label>
-                    <PPTColorSwatchStrip
-                      model={model}
-                      onAction={onAction}
-                      target={{
-                        channel: 'line-stroke',
-                        color: selectedElement.stroke.color,
-                        elementId: selectedElement.id,
-                      }}
-                    />
-                  </div>
-                  <label className="ppt-field">
-                    <span>Width</span>
-                    <input
-                      data-ppt-style-field="line-stroke-width"
-                      type="number"
-                      value={selectedElement.stroke.width}
-                      onChange={(event) =>
-                        onElementStrokeChange(
-                          selectedElement.id,
-                          'width',
-                          Number(event.target.value),
-                        )}
-                    />
-                  </label>
-                </div>
-                <label className="ppt-field">
-                  <span>Dash</span>
-                  <select
-                    data-ppt-style-field="line-stroke-dash"
-                    data-ppt-stroke-line-style-attribute={strokeLineStyleDescriptor?.metadata.attribute}
-                    data-ppt-stroke-line-style-attribute-value={strokeLineStyleDescriptor?.metadata.attributeValue}
-                    data-ppt-stroke-line-style-command={strokeLineStyleDescriptor?.field.commandId}
-                    data-ppt-stroke-line-style-control={strokeLineStyleDescriptor?.field.control}
-                    data-ppt-stroke-line-style-surface={strokeLineStyleDescriptor?.surface}
-                    value={strokeLineStyleDescriptor?.value ?? getPPTStrokeDash(selectedElement.stroke)}
-                    onChange={(event) => {
-                      if (isPPTStrokeDash(event.target.value)) {
-                        onElementStrokeChange(
-                          selectedElement.id,
-                          'dash',
-                          event.target.value,
-                        )
-                      }
-                    }}
-                  >
-                    {(strokeLineStyleDescriptor?.field.options ?? PPT_STROKE_DASH_OPTIONS).map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedElement.kind === 'line' ? (
-                  <>
-                    <label className="ppt-field">
-                      <span>Route</span>
-                      <select
-                        data-ppt-style-field="line-route"
-                        value={selectedElement.route ?? 'straight'}
-                        onChange={(event) => {
-                          if (isPPTLineRoute(event.target.value)) {
-                            onLineRouteChange(selectedElement.id, event.target.value)
-                          }
-                        }}
-                      >
-                        <option value="straight">Straight</option>
-                        <option value="elbow">Elbow</option>
-                      </select>
-                    </label>
-                    <div className="ppt-geometry-grid">
-                      <label className="ppt-field">
-                        <span>Start</span>
-                        <select
-                          data-ppt-style-field="line-start-marker"
-                          value={selectedElement.startMarker ?? 'none'}
-                          onChange={(event) => {
-                            if (isPPTLineMarker(event.target.value)) {
-                              onLineMarkerChange(
-                                selectedElement.id,
-                                'startMarker',
-                                event.target.value,
-                              )
-                            }
-                          }}
-                        >
-                          <option value="none">None</option>
-                          <option value="arrow">Arrow</option>
-                        </select>
-                      </label>
-                      <label className="ppt-field">
-                        <span>End</span>
-                        <select
-                          data-ppt-style-field="line-end-marker"
-                          value={selectedElement.endMarker ?? 'none'}
-                          onChange={(event) => {
-                            if (isPPTLineMarker(event.target.value)) {
-                              onLineMarkerChange(
-                                selectedElement.id,
-                                'endMarker',
-                                event.target.value,
-                              )
-                            }
-                          }}
-                        >
-                          <option value="none">None</option>
-                          <option value="arrow">Arrow</option>
-                        </select>
-                      </label>
-                    </div>
-                  </>
-                ) : null}
-              </>
-            ) : null}
-          </>
-        ) : (
-          <span className="ppt-muted">None</span>
-        )
-      }
-    />
-  )
-}
-
 function pptElementStyle(element: PPTElement): CSSProperties {
   const base: CSSProperties = {
     filter: getPPTElementShadowFilter(element),
@@ -37956,14 +37757,6 @@ function getPPTThumbElementClassName(element: PPTElement) {
   }
 
   return 'ppt-thumb-shape'
-}
-
-function isPPTLineMarker(value: string): value is PPTLineMarker {
-  return value === 'none' || value === 'arrow'
-}
-
-function isPPTLineRoute(value: string): value is PPTLineRoute {
-  return value === 'straight' || value === 'elbow'
 }
 
 function getPPTGroupPointerSelection({
