@@ -935,6 +935,11 @@ import {
   type PPTSurfaceCommand,
   type PPTSurfaceCommandViewGroup,
 } from './ui/command-surface'
+import {
+  createPPTInspectorActionDispatcher,
+  type PPTInspectorAction,
+  type PPTInspectorProps,
+} from './ui/inspector'
 import { EditorShell, EditorToolbar } from './ui/shell'
 import {
   PPTSelectionToolbar,
@@ -11369,6 +11374,161 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
     }
   }
 
+  function handleInspectorAction(action: PPTInspectorAction) {
+    switch (action.type) {
+      case 'add-comment-reply':
+        addCommentReply(action.elementId, action.reply)
+        break
+      case 'apply-color-swatch':
+        applyColorSwatch(
+          action.elementId,
+          action.channel,
+          action.color,
+          action.swatch,
+        )
+        break
+      case 'auto-fit-text':
+        autoFitTextElement(action.elementId)
+        break
+      case 'commit-text':
+        commitText(action.elementId, action.text)
+        break
+      case 'copy-html':
+        copyHTML()
+        break
+      case 'download-html':
+        downloadHTML()
+        break
+      case 'replace-image-file':
+        void replacePPTImageFile(action.elementId, action.file)
+        break
+      case 'reset-image-crop':
+        resetImageCrop(action.elementId)
+        break
+      case 'run-layer-pane-command':
+        applyLayerPaneCommandEffect(action.effect)
+        break
+      case 'run-object-visibility-command':
+        applyObjectVisibilityCommandEffect(action.effect)
+        break
+      case 'set-comment-body':
+        updateCommentBody(action.elementId, action.body)
+        break
+      case 'set-comment-resolved':
+        updateCommentResolved(action.elementId, action.resolved)
+        break
+      case 'set-element-alt-text':
+        updateElementAltText(action.elementId, action.altText)
+        break
+      case 'set-element-animation':
+        updateElementAnimation(action.elementId, action.field, action.value)
+        break
+      case 'set-element-geometry':
+        updateElementGeometry(action.elementId, action.field, action.value)
+        break
+      case 'set-element-hyperlink':
+        updateElementHyperlink(action.elementId, action.url)
+        break
+      case 'set-element-name':
+        updateElementName(action.elementId, action.name)
+        break
+      case 'set-element-opacity':
+        updateElementOpacity(action.elementId, action.opacity)
+        break
+      case 'set-element-rotation':
+        updateElementRotation(action.elementId, action.rotation)
+        break
+      case 'set-element-shadow':
+        updateElementShadow(
+          action.elementId,
+          action.field,
+          action.value,
+        )
+        break
+      case 'set-element-stroke':
+        updateElementStroke(action.elementId, action.field, action.value)
+        break
+      case 'set-element-text-inset':
+        updateElementTextInset(action.elementId, action.field, action.value)
+        break
+      case 'set-element-text-style':
+        updateElementTextStyle(action.elementId, action.field, action.value)
+        break
+      case 'set-image-crop':
+        updateImageCrop(
+          action.elementId,
+          action.field,
+          action.value,
+        )
+        break
+      case 'set-image-fit':
+        updateImageFit(action.elementId, action.fit)
+        break
+      case 'set-line-marker':
+        updateLineMarker(
+          action.elementId,
+          action.field,
+          action.marker,
+        )
+        break
+      case 'set-line-route':
+        updateLineRoute(action.elementId, action.route)
+        break
+      case 'set-paragraph-align':
+        updateParagraphAlign(action.elementId, action.align)
+        break
+      case 'set-paragraph-bullet':
+        updateParagraphBullet(action.elementId, action.enabled)
+        break
+      case 'set-paragraph-numbered':
+        updateParagraphNumbered(action.elementId, action.enabled)
+        break
+      case 'set-paragraph-spacing':
+        updateParagraphSpacing(
+          action.elementId,
+          action.field,
+          action.value,
+        )
+        break
+      case 'set-placeholder-visibility':
+        updateLayoutPlaceholderVisibility(
+          action.placeholderId,
+          action.isVisible,
+        )
+        break
+      case 'set-shape-corner-radius':
+        updateShapeCornerRadius(action.elementId, action.cornerRadius)
+        break
+      case 'set-shape-fill':
+        updateShapeFill(action.elementId, action.field, action.value)
+        break
+      case 'set-shape-kind':
+        updateShapeKind(action.elementId, action.shape)
+        break
+      case 'set-slide-background':
+        updateSlideBackground(action.color)
+        break
+      case 'set-slide-layout':
+        applySlideLayout(action.layoutId)
+        break
+      case 'set-slide-name':
+        updateSlideName(action.name)
+        break
+      case 'set-slide-notes':
+        updateSlideNotes(action.notes)
+        break
+      case 'set-slide-transition':
+        updateSlideTransition(action.field, action.value)
+        break
+      case 'set-table-rows':
+        updateTableRows(action.elementId, action.rows)
+        break
+      case 'step-paragraph-list-level':
+        stepParagraphListLevel(action.elementId, action.delta)
+        break
+    }
+  }
+
   function commitText(elementId: string, text: string) {
     commitDeck((current) =>
       updatePPTDeckElement(current, activeSlide.id, elementId, (element) =>
@@ -17016,69 +17176,30 @@ function pastePPTTextRunColorSource(source: PPTTextRunColorImportSource) {
         />
       </section>
 
-      <Inspector
-        exportCode={exportCode}
-        hidden={!inspectorOpen}
-        inspectorSurface={inspectorSurface}
-        layoutDescriptors={PPT_LAYOUT_DESCRIPTORS}
-        layoutPlaceholderVisibilityDescriptors={activeLayoutPlaceholderVisibilityDescriptors}
-        layoutPlaceholders={activeLayoutPlaceholders}
-        lastPlaceholderVisibilityEffect={lastPlaceholderVisibilityEffect}
-        lastTextAutoFitEffect={lastTextAutoFitEffect}
-        recentColors={recentColors}
-        selection={selection}
-        selectedElement={selectedElement}
-        selectedElementAnimation={selectedElementAnimation}
-        slide={activeSlide}
-        slideMetadataDescriptor={slideMetadataDescriptor}
-        slideLayoutId={activeLayout.layoutId}
-        slideThemeId={activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId}
-        slideTransition={activeSlideTransition}
-        themeColorTokens={PPT_THEME_DESCRIPTOR.colorTokens}
-        onCommentBodyChange={updateCommentBody}
-        onCommentReplyAdd={addCommentReply}
-        onCommentResolvedChange={updateCommentResolved}
-        onCommitText={commitText}
-        onCopyHTML={copyHTML}
-        onColorSwatchApply={applyColorSwatch}
-        onDownloadHTML={downloadHTML}
-        onElementAltTextChange={updateElementAltText}
-        onElementAnimationChange={updateElementAnimation}
-        onElementGeometryChange={updateElementGeometry}
-        onElementHyperlinkChange={updateElementHyperlink}
-        onImageCropChange={updateImageCrop}
-        onImageCropReset={resetImageCrop}
-        onImageFitChange={updateImageFit}
-        onImageReplaceFile={replacePPTImageFile}
-        onElementNameChange={updateElementName}
-        onElementOpacityChange={updateElementOpacity}
-        onElementRotationChange={updateElementRotation}
-        onElementShadowChange={updateElementShadow}
-        onElementTextInsetChange={updateElementTextInset}
-        onObjectVisibilityCommandEffect={applyObjectVisibilityCommandEffect}
-        onLineMarkerChange={updateLineMarker}
-        onLineRouteChange={updateLineRoute}
-        onParagraphBulletChange={updateParagraphBullet}
-        onParagraphListLevelStep={stepParagraphListLevel}
-        onParagraphNumberedChange={updateParagraphNumbered}
-        onParagraphSpacingChange={updateParagraphSpacing}
-        onElementTextStyleChange={updateElementTextStyle}
-        onTextAutoFit={autoFitTextElement}
-        onLayerPaneCommandEffect={applyLayerPaneCommandEffect}
-        onLayoutPlaceholderVisibilityChange={updateLayoutPlaceholderVisibility}
-        onParagraphAlignChange={updateParagraphAlign}
-        onShapeCornerRadiusChange={updateShapeCornerRadius}
-        onShapeKindChange={updateShapeKind}
-        onSlideBackgroundChange={updateSlideBackground}
-        onSlideLayoutChange={applySlideLayout}
-        onShapeFillChange={updateShapeFill}
-        onElementStrokeChange={updateElementStroke}
-        onSlideNameChange={updateSlideName}
-        onSlideNotesChange={updateSlideNotes}
-        onSlideTransitionChange={updateSlideTransition}
-        onTableRowsChange={updateTableRows}
-        textAutoFitIndicator={selectedTextAutoFitIndicator}
-        selectedTextOverflow={selectedTextOverflow}
+      <PPTInspector
+        model={{
+          exportCode,
+          hidden: !inspectorOpen,
+          inspectorSurface,
+          layoutDescriptors: PPT_LAYOUT_DESCRIPTORS,
+          layoutPlaceholderVisibilityDescriptors: activeLayoutPlaceholderVisibilityDescriptors,
+          layoutPlaceholders: activeLayoutPlaceholders,
+          lastPlaceholderVisibilityEffect,
+          lastTextAutoFitEffect,
+          recentColors,
+          selection,
+          selectedElement,
+          selectedElementAnimation,
+          selectedTextOverflow,
+          slide: activeSlide,
+          slideLayoutId: activeLayout.layoutId,
+          slideMetadataDescriptor,
+          slideThemeId: activeSlide.themeId ?? PPT_THEME_DESCRIPTOR.themeId,
+          slideTransition: activeSlideTransition,
+          textAutoFitIndicator: selectedTextAutoFitIndicator,
+          themeColorTokens: PPT_THEME_DESCRIPTOR.colorTokens,
+        }}
+        onAction={handleInspectorAction}
       />
       <PPTPresentationOverlay
         slide={presentationSlide}
@@ -36202,210 +36323,75 @@ function PPTColorSwatchStrip({
   )
 }
 
-function Inspector({
-  exportCode,
-  hidden,
-  inspectorSurface,
-  layoutDescriptors,
-  layoutPlaceholderVisibilityDescriptors,
-  layoutPlaceholders,
-  lastPlaceholderVisibilityEffect,
-  lastTextAutoFitEffect,
-  onColorSwatchApply,
-  onCommentBodyChange,
-  onCommentReplyAdd,
-  onCommentResolvedChange,
-  onCommitText,
-  onCopyHTML,
-  onDownloadHTML,
-  onElementAltTextChange,
-  onElementAnimationChange,
-  onElementGeometryChange,
-  onElementHyperlinkChange,
-  onElementNameChange,
-  onElementOpacityChange,
-  onElementRotationChange,
-  onElementShadowChange,
-  onElementStrokeChange,
-  onElementTextInsetChange,
-  onElementTextStyleChange,
-  onImageCropChange,
-  onImageCropReset,
-  onImageFitChange,
-  onImageReplaceFile,
-  onLayerPaneCommandEffect,
-  onObjectVisibilityCommandEffect,
-  onLayoutPlaceholderVisibilityChange,
-  onLineMarkerChange,
-  onLineRouteChange,
-  onParagraphBulletChange,
-  onParagraphListLevelStep,
-  onParagraphNumberedChange,
-  onParagraphAlignChange,
-  onParagraphSpacingChange,
-  onShapeCornerRadiusChange,
-  onShapeFillChange,
-  onShapeKindChange,
-  onSlideBackgroundChange,
-  onSlideLayoutChange,
-  onSlideNameChange,
-  onSlideNotesChange,
-  onSlideTransitionChange,
-  onTableRowsChange,
-  onTextAutoFit,
-  recentColors,
-  selection,
-  selectedElement,
-  selectedElementAnimation,
-  selectedTextOverflow,
-  textAutoFitIndicator,
-  slide,
-  slideMetadataDescriptor,
-  slideLayoutId,
-  slideThemeId,
-  slideTransition,
-  themeColorTokens,
-}: {
-  exportCode: string
-  hidden: boolean
-  inspectorSurface: PPTInspectorSurfaceId
-  layoutDescriptors: readonly SlideEditLayoutDescriptor[]
-  layoutPlaceholderVisibilityDescriptors: readonly SlideEditPlaceholderDescriptor<string, string>[]
-  layoutPlaceholders: readonly SlideEditResolvedLayoutPlaceholder[]
-  lastPlaceholderVisibilityEffect: PPTLayoutPlaceholderVisibilityHostCommandEffect | null
-  lastTextAutoFitEffect: SlideEditTextAutoFitHostCommandEffect<string, string> | null
-  onColorSwatchApply: (
-    elementId: string,
-    channel: PPTColorSwatchChannel,
-    color: string,
-    swatch: PPTColorSwatchSelection,
-  ) => void
-  onCommentBodyChange: (elementId: string, value: string) => void
-  onCommentReplyAdd: (elementId: string, value: string) => void
-  onCommentResolvedChange: (elementId: string, resolved: boolean) => void
-  onCommitText: (elementId: string, text: string) => void
-  onCopyHTML: () => void
-  onDownloadHTML: () => void
-  onElementAltTextChange: (elementId: string, altText: string) => void
-  onElementAnimationChange: (
-    elementId: string,
-    field: PPTElementAnimationUpdateField,
-    value: PPTElementAnimation[PPTElementAnimationUpdateField],
-  ) => void
-  onElementGeometryChange: (
-    elementId: string,
-    field: 'h' | 'w' | 'x' | 'y',
-    value: number,
-  ) => void
-  onElementHyperlinkChange: (elementId: string, url: string) => void
-  onElementNameChange: (elementId: string, name: string) => void
-  onElementOpacityChange: (elementId: string, opacity: number) => void
-  onElementRotationChange: (elementId: string, rotation: number) => void
-  onElementShadowChange: (
-    elementId: string,
-    field: PPTElementShadowUpdateField,
-    value: boolean | number | string,
-  ) => void
-  onElementStrokeChange: (
-    elementId: string,
-    field: keyof PPTStroke,
-    value: string | number,
-  ) => void
-  onElementTextStyleChange: (
-    elementId: string,
-    field: keyof PPTTextStyle,
-    value: string | number,
-  ) => void
-  onElementTextInsetChange: (
-    elementId: string,
-    field: PPTTextInsetField,
-    value: number,
-  ) => void
-  onImageCropChange: (
-    elementId: string,
-    field: 'x' | 'y',
-    value: number,
-  ) => void
-  onImageCropReset: (elementId: string) => void
-  onImageFitChange: (
-    elementId: string,
-    fit: PPTImageFit,
-  ) => void
-  onImageReplaceFile: (
-    elementId: string,
-    file: Blob & { name?: string },
-  ) => Promise<boolean>
-  onLayerPaneCommandEffect: (effect: PPTLayerPaneHostCommandEffect) => void
-  onObjectVisibilityCommandEffect: (
-    effect: PPTObjectVisibilityHostCommandEffect,
-  ) => void
-  onLayoutPlaceholderVisibilityChange: (
-    placeholderId: string,
-    isVisible: boolean,
-  ) => void
-  onLineMarkerChange: (
-    elementId: string,
-    field: 'endMarker' | 'startMarker',
-    value: PPTLineMarker,
-  ) => void
-  onLineRouteChange: (
-    elementId: string,
-    route: PPTLineRoute,
-  ) => void
-  onParagraphBulletChange: (
-    elementId: string,
-    enabled: boolean,
-  ) => void
-  onParagraphListLevelStep: (
-    elementId: string,
-    delta: number,
-  ) => void
-  onParagraphNumberedChange: (
-    elementId: string,
-    enabled: boolean,
-  ) => void
-  onParagraphAlignChange: (
-    elementId: string,
-    align: NonNullable<PPTParagraph['align']>,
-  ) => void
-  onParagraphSpacingChange: (
-    elementId: string,
-    field: PPTParagraphSpacingField,
-    value: number,
-  ) => void
-  onShapeCornerRadiusChange: (
-    elementId: string,
-    cornerRadius: number,
-  ) => void
-  onShapeFillChange: (
-    elementId: string,
-    field: keyof PPTFill,
-    value: number | string,
-  ) => void
-  onShapeKindChange: (elementId: string, shape: PPTShapeKind) => void
-  onSlideBackgroundChange: (color: string) => void
-  onSlideLayoutChange: (layoutId: string) => void
-  onSlideNameChange: (name: string) => void
-  onSlideNotesChange: (notes: string) => void
-  onSlideTransitionChange: (
-    field: PPTSlideTransitionUpdateField,
-    value: PPTSlideTransition[PPTSlideTransitionUpdateField],
-  ) => void
-  onTableRowsChange: (elementId: string, value: string) => void
-  onTextAutoFit: (elementId: string) => void
-  recentColors: readonly string[]
-  selection: string[]
-  selectedElement: PPTElement | null
-  selectedElementAnimation: PPTElementAnimation | null
-  selectedTextOverflow: boolean
-  textAutoFitIndicator: SlideEditTextOverflowIndicatorState<string, string> | null
-  slide: PPTSlide
-  slideMetadataDescriptor: PPTSlideMetadataInspectorDescriptor
-  slideLayoutId: string
-  slideThemeId: string
-  slideTransition: PPTSlideTransition
-  themeColorTokens: readonly SlideEditThemeColorToken[]
-}) {
+function PPTInspector({ model, onAction }: PPTInspectorProps) {
+  const {
+    exportCode,
+    hidden,
+    inspectorSurface,
+    layoutDescriptors,
+    layoutPlaceholderVisibilityDescriptors,
+    layoutPlaceholders,
+    lastPlaceholderVisibilityEffect,
+    lastTextAutoFitEffect,
+    recentColors,
+    selection,
+    selectedElement,
+    selectedElementAnimation,
+    selectedTextOverflow,
+    slide,
+    slideLayoutId,
+    slideMetadataDescriptor,
+    slideThemeId,
+    slideTransition,
+    textAutoFitIndicator,
+    themeColorTokens,
+  } = model
+
+  const {
+    onColorSwatchApply,
+    onCommentBodyChange,
+    onCommentReplyAdd,
+    onCommentResolvedChange,
+    onCommitText,
+    onCopyHTML,
+    onDownloadHTML,
+    onElementAltTextChange,
+    onElementAnimationChange,
+    onElementGeometryChange,
+    onElementHyperlinkChange,
+    onElementNameChange,
+    onElementOpacityChange,
+    onElementRotationChange,
+    onElementShadowChange,
+    onElementStrokeChange,
+    onElementTextInsetChange,
+    onElementTextStyleChange,
+    onImageCropChange,
+    onImageCropReset,
+    onImageFitChange,
+    onImageReplaceFile,
+    onLayerPaneCommandEffect,
+    onLayoutPlaceholderVisibilityChange,
+    onLineMarkerChange,
+    onLineRouteChange,
+    onObjectVisibilityCommandEffect,
+    onParagraphAlignChange,
+    onParagraphBulletChange,
+    onParagraphListLevelStep,
+    onParagraphNumberedChange,
+    onParagraphSpacingChange,
+    onShapeCornerRadiusChange,
+    onShapeFillChange,
+    onShapeKindChange,
+    onSlideBackgroundChange,
+    onSlideLayoutChange,
+    onSlideNameChange,
+    onSlideNotesChange,
+    onSlideTransitionChange,
+    onTableRowsChange,
+    onTextAutoFit,
+  } = createPPTInspectorActionDispatcher(onAction)
+
   const textStyle = selectedElement && isPPTTextElement(selectedElement)
     ? selectedElement.style
     : null

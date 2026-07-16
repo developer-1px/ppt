@@ -13,6 +13,7 @@ import {
   handlePPTCanvasRadioGroupKeyDown,
 } from '../../pptCanvasAppAffordanceAdapter'
 import type { PPTParagraph } from '../../pptModel'
+import './text-formatting.css'
 
 export type PPTParagraphAlign = NonNullable<PPTParagraph['align']>
 
