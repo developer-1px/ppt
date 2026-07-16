@@ -3,6 +3,7 @@ import './inspector.css'
 export {
   createPPTInspectorActionDispatcher,
 } from './PPTInspectorActionDispatcher'
+export { PPTColorSwatchStrip } from './PPTColorSwatchStrip'
 export { PPTCommentInspectorFields } from './PPTCommentInspectorFields'
 export { PPTImageInspectorFields } from './PPTImageInspectorFields'
 export { PPTLayerPane } from './PPTLayerPane'

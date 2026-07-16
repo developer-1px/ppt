@@ -1,5 +1,4 @@
 import type {
-  SlideEditColorSwatchSelection,
   SlideEditInspectorSurfaceId,
   SlideEditLayerPaneHostCommandEffect,
   SlideEditLayoutDescriptor,
@@ -31,6 +30,10 @@ import type {
 } from '../../pptModel'
 import type { PPTElementShadowUpdateField } from '../../pptObjectAdapter'
 import type { PPTElementAnimationUpdateField } from '../../pptObjectAnimationAdapter'
+import type {
+  PPTColorSwatchChannel,
+  PPTColorSwatchSelection,
+} from '../../pptColorSwatchAdapter'
 
 export type PPTInspectorSurfaceId = SlideEditInspectorSurfaceId
 
@@ -42,11 +45,7 @@ type PPTInspectorSlideMetadataDescriptor =
     }
   }
 
-export type PPTInspectorColorSwatchChannel =
-  | 'line-stroke'
-  | 'shape-fill'
-  | 'shape-stroke'
-  | 'text-color'
+export type PPTInspectorColorSwatchChannel = PPTColorSwatchChannel
 
 export type PPTInspectorElementAnimationField = PPTElementAnimationUpdateField
 
@@ -94,7 +93,7 @@ export type PPTInspectorAction =
       channel: PPTInspectorColorSwatchChannel
       color: string
       elementId: string
-      swatch: SlideEditColorSwatchSelection<string>
+      swatch: PPTColorSwatchSelection
       type: 'apply-color-swatch'
     }
   | { elementId: string; type: 'auto-fit-text' }

@@ -1,8 +1,8 @@
 import type {
-  SlideEditColorSwatchSelection,
   SlideEditLayerPaneHostCommandEffect,
   SlideEditObjectVisibilityHostCommandEffect,
 } from '../../pptSlideEditAffordanceAdapter'
+import type { PPTColorSwatchSelection } from '../../pptColorSwatchAdapter'
 import type {
   PPTElementAnimation,
   PPTFill,
@@ -33,7 +33,7 @@ export function createPPTInspectorActionDispatcher(
       elementId: string,
       channel: PPTInspectorColorSwatchChannel,
       color: string,
-      swatch: SlideEditColorSwatchSelection<string>,
+      swatch: PPTColorSwatchSelection,
     ) {
       onAction({
         channel,
