@@ -1,11 +1,24 @@
-# PPT Retouch
+# PPT
 
-Minimal editor for final retouching of AI-generated HTML/CSS slides.
+Lightweight PPT subset editor for AI-generated decks and final retouching.
 
-Architecture direction:
+## PPTX Viewer Goal
 
-- [North Star](NORTH_STAR.md)
-- [Standardization candidates](docs/standardization/README.md)
+- Open a real `.pptx` file through file input or drop.
+- Use the embedded PPT model when present; otherwise import from PPTX OpenXML.
+- Render every imported slide as both a selectable thumbnail and the active slide page.
+- Use `pnpm verify:pptx-render` as the fast gate for real-file page rendering.
+- Without `PPTX_RENDER_FILE`, `pnpm verify:pptx-render` creates a temporary 3-slide `.pptx` file with slide backgrounds, hidden/section/notes metadata, comments, theme-colored shapes, layout/master inherited marks, mixed-run font families and character spacing, text, shapes, lines, hyperlinks, a grouped object, a table, AlternateContent choice/fallback handling, chart/SmartArt/OLE/media/content-part fallbacks, unsupported graphic-frame fallbacks, shape image fills with crop/opacity/adjustments/outline/text overlay, and a cropped/flipped image on disk and opens it.
+- Use `PPTX_RENDER_FILE=/path/to/file.pptx pnpm verify:pptx-render` to verify a provided PPTX file.
+- Keep `pnpm verify:mvp` checking imported PPTX pages by iterating the rendered slides one by one.
+
+## Architecture
+
+- Source of truth: `PPTDeck`, `PPTSlide`, `PPTElement`
+- Canvas usage: local PPT adapters wrap `canvas/core`, `canvas/foundation`, `canvas/app`, `canvas/engine`, and `canvas/renderer`
+- Slide editing usage: `pptSlideEditAffordanceAdapter.ts` wraps the optional `@interactive-os/slide-edit-affordance` package
+- DOM editing usage: `pptDomEditAffordanceAdapter.ts` wraps the optional `@interactive-os/dom-edit-affordance` metadata
+- Product model: PPT types only. `CanvasItem` and `CanvasApp` stay package-side concepts.
 
 ## Run
 
@@ -19,5 +32,6 @@ pnpm dev
 ```sh
 pnpm lint
 pnpm build
+pnpm verify:pptx-render
 pnpm verify:mvp
 ```

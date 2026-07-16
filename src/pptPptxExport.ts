@@ -1,0 +1,2326 @@
+import PptxGenJS from 'pptxgenjs'
+import JSZip from 'jszip'
+import {
+  PPT_DEFAULT_THEME_ID,
+  type PPTComment,
+  type PPTDeck,
+  type PPTElement,
+  type PPTElementAnimation,
+  type PPTElementShadow,
+  type PPTFill,
+  type PPTFreeform,
+  type PPTGeometry,
+  type PPTImage,
+  type PPTLine,
+  type PPTLineConnection,
+  type PPTParagraph,
+  type PPTRun,
+  type PPTShape,
+  type PPTSlide,
+  type PPTSlideTransition,
+  type PPTStroke,
+  type PPTTable,
+  type PPTTableCellBorders,
+  type PPTTextBody,
+  type PPTTextAutoFit,
+  type PPTTextStyle,
+} from './pptModel'
+import {
+  getPPTTableCellBorders,
+  getPPTTableCellColSpan,
+  getPPTTableCellFill,
+  getPPTTableCellRowSpan,
+  getPPTTableCellTextStyle,
+  getPPTTableResolvedColumnWidths,
+  getPPTTableResolvedRowHeights,
+  isPPTTableCellHidden,
+} from './pptTableLayout'
+
+export const PPTX_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+
+const PPTX_PIXELS_PER_INCH = 96
+const PPTX_POINTS_PER_PIXEL = 0.75
+const PPTX_DEFAULT_TEXT_COLOR = '#111827'
+const PPTX_DEFAULT_FONT_FACE = 'Inter'
+const PPTX_DEFAULT_FONT_SIZE = 24
+const PPTX_DEFAULT_SHAPE_TEXT_INSET = Object.freeze({
+  bottom: 18,
+  left: 18,
+  right: 18,
+  top: 18,
+} as const)
+const PPTX_DEFAULT_TEXT_BOX_INSET = Object.freeze({
+  bottom: 0,
+  left: 0,
+  right: 0,
+  top: 0,
+} as const)
+const PPTX_DEFAULT_SHAPE_CORNER_RADIUS = 24
+const PPTX_MARKUP_COMPATIBILITY_NS =
+  'http://schemas.openxmlformats.org/markup-compatibility/2006'
+const PPTX_POWERPOINT_2010_NS =
+  'http://schemas.microsoft.com/office/powerpoint/2010/main'
+const PPTX_PACKAGE_RELATIONSHIP_NS =
+  'http://schemas.openxmlformats.org/package/2006/relationships'
+const PPTX_CUSTOM_XML_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml'
+const PPTX_CUSTOM_XML_PROPS_RELATIONSHIP_TYPE =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps'
+const PPTX_CUSTOM_XML_PROPS_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.customXmlProperties+xml'
+export const PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE =
+  'application/vnd.interactive-os.ppt.deck+json'
+export const PPTX_MODEL_CUSTOM_XML_NAMESPACE =
+  'https://interactive-os.dev/ppt/model/v1'
+export const PPTX_MODEL_CUSTOM_XML_PATH = 'customXml/item1.xml'
+const PPTX_MODEL_CUSTOM_XML_PROPS_PATH = 'customXml/itemProps1.xml'
+const PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH = 'customXml/_rels/item1.xml.rels'
+const PPTX_MODEL_CUSTOM_XML_ITEM_ID =
+  '{5B4D0724-5E4E-4F9A-9FD7-7B91A0712F8E}'
+const PPTX_FLY_IN_MOTION_PATH = 'M 0 0.25 L 0 0 E'
+const PPTX_EMUS_PER_PIXEL = 9_525
+const PPTX_ANGLE_UNITS_PER_DEGREE = 60_000
+const PPTX_DEFAULT_THEME_COLOR_SCHEME = Object.freeze({
+  accent1: '#2563eb',
+  accent2: '#0ea5e9',
+  accent3: '#22c55e',
+  accent4: '#fb923c',
+  accent5: '#7c2d12',
+  accent6: '#dc2626',
+  dk1: '#111827',
+  dk2: '#475569',
+  folHlink: '#7c3aed',
+  hlink: '#2563eb',
+  lt1: '#ffffff',
+  lt2: '#f8fafc',
+} as const)
+
+type PPTXPptx = InstanceType<typeof PptxGenJS>
+type PPTXSlide = ReturnType<PPTXPptx['addSlide']>
+type PPTXPosition = {
+  h: number
+  rotate?: number
+  w: number
+  x: number
+  y: number
+}
+type PPTXTextInset = {
+  bottom: number
+  left: number
+  right: number
+  top: number
+}
+type PPTXAnimationTarget = {
+  animation: PPTElementAnimation
+  objectId: string
+}
+type PPTXLockDescriptor = {
+  lockTagName: string
+  lockXml: string
+  propertyTagName: string
+}
+type PPTXThemeColorName = keyof typeof PPTX_DEFAULT_THEME_COLOR_SCHEME
+
+export function createPPTDeckPPTX(deck: PPTDeck) {
+  const pptx = new PptxGenJS()
+  const layoutName = getPPTXLayoutName(deck)
+
+  pptx.author = 'Interactive OS'
+  pptx.company = 'Interactive OS'
+  pptx.subject = 'PPT deck export'
+  pptx.title = deck.title
+  pptx.theme = {
+    bodyFontFace: PPTX_DEFAULT_FONT_FACE,
+    headFontFace: PPTX_DEFAULT_FONT_FACE,
+  }
+  pptx.defineLayout({
+    height: deck.size.h / PPTX_PIXELS_PER_INCH,
+    name: layoutName,
+    width: deck.size.w / PPTX_PIXELS_PER_INCH,
+  })
+  pptx.layout = layoutName
+
+  for (const deckSlide of deck.slides) {
+    addPPTXSlide({
+      pptxSlide: pptx.addSlide(),
+      slide: deckSlide,
+    })
+  }
+
+  return pptx
+}
+
+export async function exportPPTDeckPPTXBlob(deck: PPTDeck) {
+  const output = await createPPTDeckPPTX(deck).write({
+    compression: true,
+    outputType: 'arraybuffer',
+  })
+  const arrayBuffer = await toPPTXArrayBuffer(output)
+
+  if (!shouldPatchPPTXPackage(deck)) {
+    return createPPTXBlob(arrayBuffer)
+  }
+
+  const zip = await JSZip.loadAsync(arrayBuffer)
+  await applyPPTXPackagePatches({ deck, zip })
+  const patchedOutput = await zip.generateAsync({
+    compression: 'DEFLATE',
+    mimeType: PPTX_MIME_TYPE,
+    type: 'blob',
+  })
+
+  return createPPTXBlob(patchedOutput)
+}
+
+async function toPPTXArrayBuffer(
+  output: Awaited<ReturnType<PPTXPptx['write']>>,
+): Promise<ArrayBuffer> {
+  if (output instanceof Blob) {
+    return output.arrayBuffer()
+  }
+
+  if (output instanceof ArrayBuffer) {
+    return output
+  }
+
+  if (typeof output === 'string') {
+    return copyPPTXBytes(new TextEncoder().encode(output))
+  }
+
+  if (ArrayBuffer.isView(output)) {
+    return copyPPTXBytes(output)
+  }
+
+  return new Blob([output as BlobPart]).arrayBuffer()
+}
+
+function copyPPTXBytes(view: ArrayBufferView) {
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+  const copy = new Uint8Array(bytes.byteLength)
+
+  copy.set(bytes)
+
+  return copy.buffer
+}
+
+function createPPTXBlob(part: BlobPart | Blob) {
+  return part instanceof Blob && part.type === PPTX_MIME_TYPE
+    ? part
+    : new Blob([part], {
+        type: PPTX_MIME_TYPE,
+      })
+}
+
+export function getPPTDeckPPTXFilename(deck: Pick<PPTDeck, 'title'>) {
+  const slug = deck.title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return `${slug || 'ppt-deck'}.pptx`
+}
+
+function shouldPatchPPTXPackage(deck: PPTDeck) {
+  return hasPPTXModelPayload(deck) ||
+    hasPPTXDefaultTheme(deck) ||
+    deck.slides.some((slide) =>
+      hasPPTXSlideName(slide) ||
+      slide.transition !== undefined ||
+      hasPPTXSlideAnimations(slide) ||
+      hasPPTXFlippedElements(slide) ||
+      hasPPTXLineConnections(slide) ||
+      hasPPTXLockedElements(slide) ||
+      hasPPTXShadowedElements(slide) ||
+      slide.elements.some((element) =>
+        element.visible !== false &&
+        Boolean(element.accessibility?.altText.trim())))
+}
+
+async function applyPPTXPackagePatches({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  await applyPPTXModelPackagePatch({ deck, zip })
+  await applyPPTXThemePackagePatch({ deck, zip })
+
+  await Promise.all(deck.slides.map(async (slide, index) => {
+    const path = `ppt/slides/slide${index + 1}.xml`
+    const file = zip.file(path)
+
+    if (!file) {
+      return
+    }
+
+    const xml = await file.async('string')
+    const nextXml = setPPTXElementLocksXml(
+      setPPTXElementShadowXml(
+        setPPTXLineConnectionXml(
+          setPPTXElementAccessibilityXml(
+            setPPTXElementFlipXml(
+              setPPTXSlideTimingXml(
+                setPPTXSlideTransitionXml(
+                  setPPTXSlideNameXml(xml, slide),
+                  createPPTXSlideTransitionXml(slide.transition),
+                ),
+                slide,
+              ),
+              slide,
+            ),
+            slide,
+          ),
+          slide,
+        ),
+        slide,
+      ),
+      slide,
+    )
+
+    if (nextXml !== xml) {
+      zip.file(path, nextXml)
+    }
+  }))
+}
+
+async function applyPPTXModelPackagePatch({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  if (!hasPPTXModelPayload(deck)) {
+    return
+  }
+
+  zip.file(PPTX_MODEL_CUSTOM_XML_PATH, createPPTXModelCustomXml(deck))
+  zip.file(
+    PPTX_MODEL_CUSTOM_XML_PROPS_PATH,
+    createPPTXModelCustomXmlPropsXml(),
+  )
+  zip.file(
+    PPTX_MODEL_CUSTOM_XML_PROPS_RELS_PATH,
+    createPPTXRelationshipsXml([{
+      target: 'itemProps1.xml',
+      type: PPTX_CUSTOM_XML_PROPS_RELATIONSHIP_TYPE,
+    }]),
+  )
+
+  await patchPPTXContentTypesForModelXml(zip)
+  await patchPPTXPackageRelationshipsForModelXml(zip)
+}
+
+function hasPPTXModelPayload(deck: PPTDeck) {
+  return deck.slides.length > 0
+}
+
+function createPPTXModelCustomXml(deck: PPTDeck) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    `<pptDeck xmlns="${PPTX_MODEL_CUSTOM_XML_NAMESPACE}" `,
+    `contentType="${PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE}" version="1">`,
+    escapePPTXXmlText(JSON.stringify(deck)),
+    '</pptDeck>',
+  ].join('')
+}
+
+function createPPTXModelCustomXmlPropsXml() {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<ds:datastoreItem ',
+    `ds:itemID="${PPTX_MODEL_CUSTOM_XML_ITEM_ID}" `,
+    'xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml">',
+    '<ds:schemaRefs/>',
+    '</ds:datastoreItem>',
+  ].join('')
+}
+
+async function patchPPTXContentTypesForModelXml(zip: JSZip) {
+  const path = '[Content_Types].xml'
+  const file = zip.file(path)
+
+  if (!file) {
+    return
+  }
+
+  const xml = await file.async('string')
+  const nextXml = setPPTXContentTypeOverrideXml(
+    setPPTXContentTypeOverrideXml(
+      xml,
+      `/${PPTX_MODEL_CUSTOM_XML_PATH}`,
+      'application/xml',
+    ),
+    `/${PPTX_MODEL_CUSTOM_XML_PROPS_PATH}`,
+    PPTX_CUSTOM_XML_PROPS_CONTENT_TYPE,
+  )
+
+  if (nextXml !== xml) {
+    zip.file(path, nextXml)
+  }
+}
+
+async function patchPPTXPackageRelationshipsForModelXml(zip: JSZip) {
+  const path = '_rels/.rels'
+  const file = zip.file(path)
+  const xml = file
+    ? await file.async('string')
+    : createPPTXRelationshipsXml([])
+  const nextXml = setPPTXRelationshipXml(xml, {
+    target: PPTX_MODEL_CUSTOM_XML_PATH,
+    type: PPTX_CUSTOM_XML_RELATIONSHIP_TYPE,
+  })
+
+  if (nextXml !== xml || !file) {
+    zip.file(path, nextXml)
+  }
+}
+
+function setPPTXContentTypeOverrideXml(
+  xml: string,
+  partName: string,
+  contentType: string,
+) {
+  const overrideXml =
+    `<Override PartName="${escapePPTXXmlAttribute(partName)}" ` +
+    `ContentType="${escapePPTXXmlAttribute(contentType)}"/>`
+  const pattern = new RegExp(
+    `<Override\\b(?=[^>]*\\bPartName="${escapePPTXRegExp(partName)}")[^>]*/>`,
+  )
+
+  if (pattern.test(xml)) {
+    return xml.replace(pattern, overrideXml)
+  }
+
+  return xml.replace('</Types>', `${overrideXml}</Types>`)
+}
+
+function createPPTXRelationshipsXml(
+  relationships: ReadonlyArray<{ target: string, type: string }>,
+) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    `<Relationships xmlns="${PPTX_PACKAGE_RELATIONSHIP_NS}">`,
+    ...relationships.map((relationship, index) =>
+      createPPTXRelationshipXml({
+        id: `rId${index + 1}`,
+        ...relationship,
+      })),
+    '</Relationships>',
+  ].join('')
+}
+
+function setPPTXRelationshipXml(
+  xml: string,
+  relationship: { target: string, type: string },
+) {
+  const existingPattern = new RegExp(
+    `<Relationship\\b(?=[^>]*\\bType="${escapePPTXRegExp(relationship.type)}")` +
+    `(?=[^>]*\\bTarget="${escapePPTXRegExp(relationship.target)}")[^>]*/>`,
+  )
+
+  if (existingPattern.test(xml)) {
+    return xml
+  }
+
+  const nextId = getNextPPTXRelationshipId(xml)
+  const relationshipXml = createPPTXRelationshipXml({
+    id: nextId,
+    ...relationship,
+  })
+
+  return xml.replace('</Relationships>', `${relationshipXml}</Relationships>`)
+}
+
+function createPPTXRelationshipXml({
+  id,
+  target,
+  type,
+}: {
+  id: string
+  target: string
+  type: string
+}) {
+  return [
+    `<Relationship Id="${escapePPTXXmlAttribute(id)}" `,
+    `Type="${escapePPTXXmlAttribute(type)}" `,
+    `Target="${escapePPTXXmlAttribute(target)}"/>`,
+  ].join('')
+}
+
+function getNextPPTXRelationshipId(xml: string) {
+  const ids = [...xml.matchAll(/<Relationship\b[^>]*\bId="rId(\d+)"/g)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite)
+
+  return `rId${Math.max(0, ...ids) + 1}`
+}
+
+async function applyPPTXThemePackagePatch({
+  deck,
+  zip,
+}: {
+  deck: PPTDeck
+  zip: JSZip
+}) {
+  if (!hasPPTXDefaultTheme(deck)) {
+    return
+  }
+
+  const path = 'ppt/theme/theme1.xml'
+  const file = zip.file(path)
+
+  if (!file) {
+    return
+  }
+
+  const xml = await file.async('string')
+  const nextXml = setPPTXThemeColorSchemeXml(xml)
+
+  if (nextXml !== xml) {
+    zip.file(path, nextXml)
+  }
+}
+
+function hasPPTXDefaultTheme(deck: PPTDeck) {
+  return deck.slides.some((slide) =>
+    slide.themeId === undefined ||
+    slide.themeId === PPT_DEFAULT_THEME_ID)
+}
+
+function setPPTXThemeColorSchemeXml(xml: string) {
+  return (Object.entries(PPTX_DEFAULT_THEME_COLOR_SCHEME) as Array<[
+    PPTXThemeColorName,
+    string,
+  ]>).reduce((nextXml, [name, color]) =>
+    setPPTXThemeColorXml(nextXml, name, color), xml)
+}
+
+function setPPTXThemeColorXml(
+  xml: string,
+  name: PPTXThemeColorName,
+  color: string,
+) {
+  const fallback = PPTX_DEFAULT_THEME_COLOR_SCHEME[name].slice(1).toUpperCase()
+  const value = toPPTXColor(color, fallback)
+  const colorXml = `<a:${name}><a:srgbClr val="${value}"/></a:${name}>`
+  const pattern = new RegExp(`<a:${name}>[\\s\\S]*?</a:${name}>`)
+
+  return pattern.test(xml)
+    ? xml.replace(pattern, colorXml)
+    : xml
+}
+
+function hasPPTXSlideName(slide: PPTSlide) {
+  return slide.name.trim().length > 0
+}
+
+function hasPPTXSlideAnimations(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.animation !== undefined &&
+    element.animation.type !== 'none')
+}
+
+function hasPPTXLockedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.locked === true)
+}
+
+function hasPPTXFlippedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    (element.flipH === true || element.flipV === true))
+}
+
+function hasPPTXLineConnections(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.kind === 'line' &&
+    (element.startConnection !== undefined || element.endConnection !== undefined))
+}
+
+function hasPPTXShadowedElements(slide: PPTSlide) {
+  return slide.elements.some((element) =>
+    element.visible !== false &&
+    element.shadow !== undefined)
+}
+
+function setPPTXLineConnectionXml(xml: string, slide: PPTSlide) {
+  const objectIdsByName = getPPTXPatchObjectIdsByName(xml)
+  const objectIdByElementId = getPPTXPatchObjectIdByElementId(
+    objectIdsByName,
+    slide,
+  )
+
+  if (objectIdByElementId.size === 0) {
+    return xml
+  }
+
+  return slide.elements.reduce((nextXml, element) => {
+    if (
+      element.visible === false ||
+      element.kind !== 'line' ||
+      (element.startConnection === undefined && element.endConnection === undefined)
+    ) {
+      return nextXml
+    }
+
+    return getPPTXLineConnectionPatchTargets(element).reduce(
+      (patchedXml, target) => {
+        const objectId = getSinglePPTXPatchObjectIdByName(
+          objectIdsByName,
+          target.objectName,
+        )
+
+        return objectId
+          ? setPPTXLineObjectConnectionXml(
+            patchedXml,
+            objectId,
+            target.line,
+            objectIdByElementId,
+          )
+          : patchedXml
+      },
+      nextXml,
+    )
+  }, xml)
+}
+
+function getPPTXPatchObjectIdByElementId(
+  objectIdsByName: ReadonlyMap<string, readonly string[]>,
+  slide: PPTSlide,
+) {
+  const objectIdByElementId = new Map<string, string>()
+
+  for (const element of slide.elements) {
+    if (element.visible === false) {
+      continue
+    }
+
+    const objectNames = getPPTXElementObjectNames(element)
+
+    if (objectNames.length !== 1) {
+      continue
+    }
+
+    const objectId = getSinglePPTXPatchObjectIdByName(
+      objectIdsByName,
+      objectNames[0] ?? '',
+    )
+
+    if (objectId) {
+      objectIdByElementId.set(element.id, objectId)
+    }
+  }
+
+  return objectIdByElementId
+}
+
+function getPPTXLineConnectionPatchTargets(line: PPTLine) {
+  if (line.route === 'elbow') {
+    return [
+      {
+        line: { ...line, endConnection: undefined },
+        objectName: getPPTXElbowRouteObjectName(line, 0),
+      },
+      {
+        line: { ...line, startConnection: undefined },
+        objectName: getPPTXElbowRouteObjectName(line, 2),
+      },
+    ].filter((target) =>
+      target.line.startConnection !== undefined ||
+      target.line.endConnection !== undefined)
+  }
+
+  return [{
+    line,
+    objectName: line.name,
+  }]
+}
+
+function getPPTXPatchObjectIdsByName(xml: string) {
+  const objectIdsByName = new Map<string, string[]>()
+  const objectPattern = /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g
+
+  for (const match of xml.matchAll(objectPattern)) {
+    const nonVisualProperties = match[0].match(/<p:cNvPr\b[^>]*>/)?.[0] ?? ''
+    const objectId = getPPTXXmlTagAttribute(nonVisualProperties, 'id')
+    const objectName = getPPTXXmlTagAttribute(nonVisualProperties, 'name')
+
+    if (!objectId || !objectName) {
+      continue
+    }
+
+    const existing = objectIdsByName.get(objectName)
+
+    if (existing) {
+      existing.push(objectId)
+    } else {
+      objectIdsByName.set(objectName, [objectId])
+    }
+  }
+
+  return objectIdsByName
+}
+
+function getSinglePPTXPatchObjectIdByName(
+  objectIdsByName: ReadonlyMap<string, readonly string[]>,
+  objectName: string,
+) {
+  const objectIds = objectIdsByName.get(escapePPTXXmlAttribute(objectName))
+
+  return objectIds?.length === 1
+    ? objectIds[0]
+    : undefined
+}
+
+function setPPTXLineObjectConnectionXml(
+  xml: string,
+  objectId: string,
+  line: PPTLine,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  return xml.replace(
+    /<p:(sp|cxnSp)\b[\s\S]*?<\/p:\1>/g,
+    (segment) => {
+      if (!hasPPTXObjectIdXml(segment, objectId)) {
+        return segment
+      }
+
+      return setPPTXConnectionShapeConnectionXml(
+        convertPPTXLineShapeToConnectionShapeXml(segment),
+        line,
+        objectIdByElementId,
+      )
+    },
+  )
+}
+
+function convertPPTXLineShapeToConnectionShapeXml(segment: string) {
+  if (segment.startsWith('<p:cxnSp')) {
+    return segment
+  }
+
+  return segment
+    .replace(/^<p:sp\b/, '<p:cxnSp')
+    .replace(/<\/p:sp>$/, '</p:cxnSp>')
+    .replace('<p:nvSpPr>', '<p:nvCxnSpPr>')
+    .replace('</p:nvSpPr>', '</p:nvCxnSpPr>')
+    .replace(
+      /<p:cNvSpPr\b([^>]*)\/>/,
+      '<p:cNvCxnSpPr$1/>',
+    )
+    .replace(
+      /<p:cNvSpPr\b([^>]*)>([\s\S]*?)<\/p:cNvSpPr>/,
+      '<p:cNvCxnSpPr$1>$2</p:cNvCxnSpPr>',
+    )
+    .replace(
+      /<a:prstGeom\b[^>]*\bprst="line"[^>]*>/,
+      (tag) => setPPTXXmlTagAttribute(tag, 'prst', 'straightConnector1'),
+    )
+}
+
+function hasPPTXObjectIdXml(segment: string, objectId: string) {
+  const nonVisualProperties = segment.match(/<p:cNvPr\b[^>]*>/)?.[0] ?? ''
+
+  return getPPTXXmlTagAttribute(nonVisualProperties, 'id') === objectId
+}
+
+function setPPTXConnectionShapeConnectionXml(
+  segment: string,
+  line: PPTLine,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  const connectionXml = [
+    createPPTXLineConnectionXml('stCxn', line.startConnection, objectIdByElementId),
+    createPPTXLineConnectionXml('endCxn', line.endConnection, objectIdByElementId),
+  ].join('')
+
+  if (!connectionXml) {
+    return segment
+  }
+
+  const existingPropertyPattern = /<p:cNvCxnSpPr\b[^>]*>[\s\S]*?<\/p:cNvCxnSpPr>/
+
+  if (existingPropertyPattern.test(segment)) {
+    return segment.replace(existingPropertyPattern, (propertyXml) => {
+      const withoutConnections = propertyXml.replace(
+        /<a:(?:stCxn|endCxn)\b[^>]*\/>/g,
+        '',
+      )
+
+      return withoutConnections.replace(
+        /<p:cNvCxnSpPr\b[^>]*>/,
+        (tag) => `${tag}${connectionXml}`,
+      )
+    })
+  }
+
+  return segment.replace(
+    /<p:cNvCxnSpPr\b[^>]*\/>/,
+    (tag) => tag.replace(/\/>$/, `>${connectionXml}</p:cNvCxnSpPr>`),
+  )
+}
+
+function createPPTXLineConnectionXml(
+  tagName: 'endCxn' | 'stCxn',
+  connection: PPTLineConnection | undefined,
+  objectIdByElementId: ReadonlyMap<string, string>,
+) {
+  const objectId = connection
+    ? objectIdByElementId.get(connection.elementId)
+    : undefined
+  const connectionIndex = connection
+    ? getPPTXLineConnectionIndex(connection.anchor)
+    : undefined
+
+  return objectId && connectionIndex !== undefined
+    ? `<a:${tagName} id="${escapePPTXXmlAttribute(objectId)}" idx="${connectionIndex}"/>`
+    : ''
+}
+
+function getPPTXLineConnectionIndex(
+  anchor: PPTLineConnection['anchor'],
+): number | undefined {
+  if (anchor === 'left') {
+    return 0
+  }
+
+  if (anchor === 'top') {
+    return 1
+  }
+
+  if (anchor === 'right') {
+    return 2
+  }
+
+  return anchor === 'bottom' ? 3 : undefined
+}
+
+function setPPTXElementFlipXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false ||
+      (element.flipH !== true && element.flipV !== true)) {
+      return nextXml
+    }
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectFlipXml(patchedXml, objectName, element),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectFlipXml(
+  xml: string,
+  objectName: string,
+  element: PPTElement,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+
+  return xml.replace(
+    /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g,
+    (segment) =>
+      hasPPTXObjectNameXml(segment, name)
+        ? setPPTXObjectTransformFlipXml(segment, element)
+        : segment,
+  )
+}
+
+function hasPPTXObjectNameXml(segment: string, name: string) {
+  return new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[^>]*>`,
+  ).test(segment)
+}
+
+function setPPTXObjectTransformFlipXml(
+  segment: string,
+  element: PPTElement,
+) {
+  return segment.replace(/<a:xfrm\b[^>]*>/, (tag) => {
+    const withFlipH = element.flipH === true
+      ? setPPTXXmlTagAttribute(tag, 'flipH', '1')
+      : tag
+
+    return element.flipV === true
+      ? setPPTXXmlTagAttribute(withFlipH, 'flipV', '1')
+      : withFlipH
+  })
+}
+
+function setPPTXElementAccessibilityXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    const altText = element.visible === false
+      ? ''
+      : element.accessibility?.altText.trim() ?? ''
+
+    if (!altText) {
+      return nextXml
+    }
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectDescriptionXml(patchedXml, objectName, altText),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectDescriptionXml(
+  xml: string,
+  objectName: string,
+  description: string,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const descr = escapePPTXXmlAttribute(description)
+  const pattern = new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[^>]*>`,
+    'g',
+  )
+
+  return xml.replace(pattern, (tag) => {
+    if (tag.includes(' descr=')) {
+      return tag.replace(/\sdescr="[^"]*"/, ` descr="${descr}"`)
+    }
+
+    return tag.endsWith('/>')
+      ? tag.replace(/\/>$/, ` descr="${descr}"/>`)
+      : tag.replace(/>$/, ` descr="${descr}">`)
+  })
+}
+
+function getPPTXElementObjectNames(element: PPTElement) {
+  if (element.kind === 'freeform') {
+    return element.points.length > 1
+      ? element.points
+        .slice(1)
+        .map((_, index) => `${element.name} segment ${index + 1}`)
+      : []
+  }
+
+  if (element.kind === 'line' && element.route === 'elbow') {
+    return [0, 1, 2].map((index) =>
+      getPPTXElbowRouteObjectName(element, index))
+  }
+
+  return [element.name]
+}
+
+function getPPTXElbowRouteObjectName(element: PPTLine, index: number) {
+  return `${element.name} route ${index + 1}`
+}
+
+function setPPTXElementShadowXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false || element.shadow === undefined) {
+      return nextXml
+    }
+
+    const shadow = element.shadow
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectShadowXml(
+          patchedXml,
+          objectName,
+          shadow,
+          getPPTXElementOpacity(element),
+        ),
+      nextXml,
+    )
+  }, xml)
+}
+
+function setPPTXObjectShadowXml(
+  xml: string,
+  objectName: string,
+  shadow: PPTElementShadow,
+  opacity: number,
+) {
+  const outerShadowXml = createPPTXOuterShadowXml(shadow, opacity)
+
+  return replacePPTXObjectSegmentsByName(xml, objectName, (segment) =>
+    setPPTXObjectShadowSegmentXml(segment, outerShadowXml))
+}
+
+function replacePPTXObjectSegmentsByName(
+  xml: string,
+  objectName: string,
+  replace: (segment: string) => string,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+
+  return xml.replace(
+    /<p:(sp|pic|cxnSp|graphicFrame)\b[\s\S]*?<\/p:\1>/g,
+    (segment) =>
+      hasPPTXObjectNameXml(segment, name)
+        ? replace(segment)
+        : segment,
+  )
+}
+
+function setPPTXObjectShadowSegmentXml(
+  segment: string,
+  outerShadowXml: string,
+) {
+  return segment.replace(
+    /<p:spPr\b[\s\S]*?<\/p:spPr>/,
+    (shapePropertiesXml) =>
+      setPPTXShapePropertiesShadowXml(shapePropertiesXml, outerShadowXml),
+  )
+}
+
+function setPPTXShapePropertiesShadowXml(
+  shapePropertiesXml: string,
+  outerShadowXml: string,
+) {
+  if (/<a:effectLst\b/.test(shapePropertiesXml)) {
+    return shapePropertiesXml.replace(
+      /<a:effectLst\b[^>]*(?:\/>|>[\s\S]*?<\/a:effectLst>)/,
+      (effectListXml) =>
+        setPPTXEffectListOuterShadowXml(effectListXml, outerShadowXml),
+    )
+  }
+
+  return shapePropertiesXml.replace(
+    '</p:spPr>',
+    `<a:effectLst>${outerShadowXml}</a:effectLst></p:spPr>`,
+  )
+}
+
+function setPPTXEffectListOuterShadowXml(
+  effectListXml: string,
+  outerShadowXml: string,
+) {
+  if (effectListXml.endsWith('/>')) {
+    return effectListXml.replace(/\/>$/, `>${outerShadowXml}</a:effectLst>`)
+  }
+
+  const withoutOuterShadow = effectListXml.replace(
+    /<a:outerShdw\b[\s\S]*?<\/a:outerShdw>/g,
+    '',
+  )
+
+  return withoutOuterShadow.replace(
+    '</a:effectLst>',
+    `${outerShadowXml}</a:effectLst>`,
+  )
+}
+
+function createPPTXOuterShadowXml(
+  shadow: PPTElementShadow,
+  opacity: number,
+) {
+  return [
+    `<a:outerShdw blurRad="${pxToEmu(shadow.blur)}" `,
+    `dist="${pxToEmu(shadow.distance)}" `,
+    `dir="${toPPTXAngle(shadow.angle)}" algn="ctr" rotWithShape="0">`,
+    `<a:srgbClr val="${toPPTXColor(shadow.color, '000000')}">`,
+    `<a:alpha val="${toPPTXAlpha(shadow.opacity * opacity)}"/>`,
+    '</a:srgbClr>',
+    '</a:outerShdw>',
+  ].join('')
+}
+
+function setPPTXElementLocksXml(xml: string, slide: PPTSlide) {
+  return slide.elements.reduce((nextXml, element) => {
+    if (element.visible === false || element.locked !== true) {
+      return nextXml
+    }
+
+    const descriptor = getPPTXLockDescriptor(element)
+
+    return getPPTXElementObjectNames(element).reduce(
+      (patchedXml, objectName) =>
+        setPPTXObjectLocksXml(patchedXml, objectName, descriptor),
+      nextXml,
+    )
+  }, xml)
+}
+
+function getPPTXLockDescriptor(element: PPTElement): PPTXLockDescriptor {
+  if (element.kind === 'image') {
+    return {
+      lockTagName: 'picLocks',
+      lockXml: '<a:picLocks noMove="1" noResize="1" noRot="1"/>',
+      propertyTagName: 'cNvPicPr',
+    }
+  }
+
+  if (element.kind === 'line' || element.kind === 'freeform') {
+    return {
+      lockTagName: 'cxnSpLocks',
+      lockXml: '<a:cxnSpLocks noMove="1" noResize="1" noRot="1" noEditPoints="1"/>',
+      propertyTagName: 'cNvCxnSpPr',
+    }
+  }
+
+  if (element.kind === 'table') {
+    return {
+      lockTagName: 'graphicFrameLocks',
+      lockXml: '<a:graphicFrameLocks noMove="1" noResize="1"/>',
+      propertyTagName: 'cNvGraphicFramePr',
+    }
+  }
+
+  return {
+    lockTagName: 'spLocks',
+    lockXml: '<a:spLocks noMove="1" noResize="1" noRot="1" noTextEdit="1"/>',
+    propertyTagName: 'cNvSpPr',
+  }
+}
+
+function setPPTXObjectLocksXml(
+  xml: string,
+  objectName: string,
+  descriptor: PPTXLockDescriptor,
+) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const segmentPattern = new RegExp(
+    `<p:cNvPr\\b(?=[^>]*\\bname="${escapePPTXRegExp(name)}")[\\s\\S]*?</p:nv(?:Sp|Pic|CxnSp|GraphicFrame)Pr>`,
+    'g',
+  )
+
+  return xml.replace(segmentPattern, (segment) =>
+    setPPTXNonVisualPropertyLocksXml(segment, descriptor))
+}
+
+function setPPTXNonVisualPropertyLocksXml(
+  segment: string,
+  descriptor: PPTXLockDescriptor,
+) {
+  const lockPattern = new RegExp(`<a:${descriptor.lockTagName}\\b[^>]*/>`)
+
+  if (lockPattern.test(segment)) {
+    return segment.replace(lockPattern, (tag) =>
+      mergePPTXLockXmlAttributes(tag, descriptor.lockXml))
+  }
+
+  const propertyPattern = new RegExp(
+    `<p:${descriptor.propertyTagName}\\b([^>]*)/>`,
+  )
+
+  if (propertyPattern.test(segment)) {
+    return segment.replace(
+      propertyPattern,
+      `<p:${descriptor.propertyTagName}$1>${descriptor.lockXml}</p:${descriptor.propertyTagName}>`,
+    )
+  }
+
+  return segment.replace(
+    new RegExp(`</p:${descriptor.propertyTagName}>`),
+    `${descriptor.lockXml}</p:${descriptor.propertyTagName}>`,
+  )
+}
+
+function mergePPTXLockXmlAttributes(tag: string, lockXml: string) {
+  return getPPTXXmlAttributeEntries(lockXml).reduce(
+    (nextTag, [name, value]) => setPPTXXmlTagAttribute(nextTag, name, value),
+    tag,
+  )
+}
+
+function getPPTXXmlAttributeEntries(tag: string) {
+  return [...tag.matchAll(/\s([A-Za-z_:][A-Za-z0-9_.:-]*)="([^"]*)"/g)]
+    .map((match) => [match[1], match[2]] as const)
+}
+
+function setPPTXXmlTagAttribute(tag: string, name: string, value: string) {
+  const escapedName = escapePPTXRegExp(name)
+  const escapedValue = escapePPTXXmlAttribute(value)
+  const attributePattern = new RegExp(`\\s${escapedName}="[^"]*"`)
+
+  if (attributePattern.test(tag)) {
+    return tag.replace(attributePattern, ` ${name}="${escapedValue}"`)
+  }
+
+  return tag.endsWith('/>')
+    ? tag.replace(/\/>$/, ` ${name}="${escapedValue}"/>`)
+    : tag.replace(/>$/, ` ${name}="${escapedValue}">`)
+}
+
+function setPPTXSlideNameXml(xml: string, slide: PPTSlide) {
+  const name = slide.name.trim()
+
+  if (!name) {
+    return xml
+  }
+
+  return xml.replace(/<p:cSld\b[^>]*>/, (tag) =>
+    setPPTXXmlTagAttribute(tag, 'name', name))
+}
+
+function setPPTXSlideTimingXml(xml: string, slide: PPTSlide) {
+  if (!hasPPTXSlideAnimations(slide)) {
+    return xml
+  }
+
+  const xmlWithoutTiming = xml.replace(
+    /<p:timing\b[\s\S]*?<\/p:timing>/,
+    '',
+  )
+  const timingXml = createPPTXSlideTimingXml(xmlWithoutTiming, slide)
+
+  if (!timingXml) {
+    return xml
+  }
+
+  if (xmlWithoutTiming.includes('</p:transition>')) {
+    return xmlWithoutTiming.replace(
+      '</p:transition>',
+      `</p:transition>${timingXml}`,
+    )
+  }
+
+  if (/<p:transition\b[^/]*\/>/.test(xmlWithoutTiming)) {
+    return xmlWithoutTiming.replace(
+      /<p:transition\b[^/]*\/>/,
+      (tag) => `${tag}${timingXml}`,
+    )
+  }
+
+  const anchor = xmlWithoutTiming.includes('</p:clrMapOvr>')
+    ? '</p:clrMapOvr>'
+    : '</p:cSld>'
+
+  return xmlWithoutTiming.replace(anchor, `${anchor}${timingXml}`)
+}
+
+function createPPTXSlideTimingXml(xml: string, slide: PPTSlide) {
+  const targets = getPPTXSlideAnimationTargets(xml, slide)
+
+  if (targets.length === 0) {
+    return null
+  }
+
+  let nextTimeNodeId = 3
+  const effectXml = targets.map((target) => {
+    const startId = nextTimeNodeId
+    nextTimeNodeId += 3
+
+    return createPPTXAnimationEffectXml(target, startId)
+  }).join('')
+  const buildXml = targets.map(({ objectId }) =>
+    `<p:bldP spid="${objectId}" grpId="0" build="allAtOnce"/>`).join('')
+
+  return [
+    '<p:timing>',
+    '<p:tnLst>',
+    '<p:par>',
+    '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">',
+    '<p:childTnLst>',
+    '<p:seq concurrent="1" nextAc="seek">',
+    '<p:cTn id="2" dur="indefinite" nodeType="mainSeq">',
+    `<p:childTnLst>${effectXml}</p:childTnLst>`,
+    '</p:cTn>',
+    '</p:seq>',
+    '</p:childTnLst>',
+    '</p:cTn>',
+    '</p:par>',
+    '</p:tnLst>',
+    `<p:bldLst>${buildXml}</p:bldLst>`,
+    '</p:timing>',
+  ].join('')
+}
+
+function getPPTXSlideAnimationTargets(xml: string, slide: PPTSlide) {
+  const targets: PPTXAnimationTarget[] = []
+  const animatedElements = slide.elements
+    .filter((element) =>
+      element.visible !== false &&
+      element.animation !== undefined &&
+      element.animation.type !== 'none')
+    .sort((a, b) => (a.animation?.order ?? 0) - (b.animation?.order ?? 0))
+
+  for (const element of animatedElements) {
+    const objectIds = new Set(
+      getPPTXElementObjectNames(element)
+        .flatMap((objectName) => getPPTXObjectIdsByName(xml, objectName)),
+    )
+
+    for (const objectId of objectIds) {
+      if (element.animation) {
+        targets.push({
+          animation: element.animation,
+          objectId,
+        })
+      }
+    }
+  }
+
+  return targets
+}
+
+function getPPTXObjectIdsByName(xml: string, objectName: string) {
+  const name = escapePPTXXmlAttribute(objectName)
+  const objectIds: string[] = []
+
+  for (const match of xml.matchAll(/<p:cNvPr\b[^>]*>/g)) {
+    const tag = match[0]
+
+    if (getPPTXXmlTagAttribute(tag, 'name') === name) {
+      const objectId = getPPTXXmlTagAttribute(tag, 'id')
+
+      if (objectId) {
+        objectIds.push(objectId)
+      }
+    }
+  }
+
+  return objectIds
+}
+
+function getPPTXXmlTagAttribute(tag: string, name: string) {
+  const pattern = new RegExp(`\\b${escapePPTXRegExp(name)}="([^"]*)"`)
+
+  return tag.match(pattern)?.[1] ?? null
+}
+
+function createPPTXAnimationEffectXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+) {
+  const presetId = target.animation.type === 'flyIn' ? '2' : '10'
+  const presetSubtype = target.animation.type === 'flyIn' ? '8' : '0'
+  const nodeType = target.animation.trigger === 'withPrevious'
+    ? 'withEffect'
+    : 'clickEffect'
+  const startDelay = target.animation.trigger === 'withPrevious'
+    ? clampPPTXAnimationMs(target.animation.delayMs)
+    : 'indefinite'
+  const effectDelay = target.animation.trigger === 'withPrevious'
+    ? 0
+    : clampPPTXAnimationMs(target.animation.delayMs)
+  const effectXml = target.animation.type === 'flyIn'
+    ? createPPTXAnimationMotionXml(target, timeNodeId + 2, effectDelay)
+    : createPPTXAnimationFadeXml(target, timeNodeId + 2, effectDelay)
+
+  return [
+    '<p:par>',
+    `<p:cTn id="${timeNodeId}" presetID="${presetId}" presetClass="entr" `,
+    `presetSubtype="${presetSubtype}" fill="hold" nodeType="${nodeType}">`,
+    '<p:stCondLst>',
+    `<p:cond delay="${startDelay}"/>`,
+    '</p:stCondLst>',
+    '<p:childTnLst>',
+    createPPTXAnimationVisibilityXml(target, timeNodeId + 1),
+    effectXml,
+    '</p:childTnLst>',
+    '</p:cTn>',
+    '</p:par>',
+  ].join('')
+}
+
+function createPPTXAnimationVisibilityXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+) {
+  return [
+    '<p:set>',
+    '<p:cBhvr>',
+    `<p:cTn id="${timeNodeId}" dur="1" fill="hold"/>`,
+    createPPTXAnimationTargetXml(target.objectId),
+    '<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>',
+    '</p:cBhvr>',
+    '<p:to><p:strVal val="visible"/></p:to>',
+    '</p:set>',
+  ].join('')
+}
+
+function createPPTXAnimationFadeXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    '<p:animEffect transition="in" filter="fade">',
+    createPPTXAnimationBehaviorXml(target, timeNodeId, delayMs),
+    '</p:animEffect>',
+  ].join('')
+}
+
+function createPPTXAnimationMotionXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    `<p:animMotion origin="layout" path="${PPTX_FLY_IN_MOTION_PATH}" `,
+    'pathEditMode="relative">',
+    createPPTXAnimationBehaviorXml(target, timeNodeId, delayMs),
+    '</p:animMotion>',
+  ].join('')
+}
+
+function createPPTXAnimationBehaviorXml(
+  target: PPTXAnimationTarget,
+  timeNodeId: number,
+  delayMs: number,
+) {
+  return [
+    '<p:cBhvr>',
+    `<p:cTn id="${timeNodeId}" dur="${clampPPTXAnimationMs(target.animation.durationMs)}" fill="hold">`,
+    '<p:stCondLst>',
+    `<p:cond delay="${delayMs}"/>`,
+    '</p:stCondLst>',
+    '</p:cTn>',
+    createPPTXAnimationTargetXml(target.objectId),
+    '</p:cBhvr>',
+  ].join('')
+}
+
+function createPPTXAnimationTargetXml(objectId: string) {
+  return `<p:tgtEl><p:spTgt spid="${escapePPTXXmlAttribute(objectId)}"/></p:tgtEl>`
+}
+
+function setPPTXSlideTransitionXml(
+  xml: string,
+  transitionXml: string | null,
+) {
+  const xmlWithoutTransition = xml.replace(
+    /<p:transition\b[\s\S]*?<\/p:transition>|<p:transition\b[^/]*\/>/,
+    '',
+  )
+
+  if (!transitionXml) {
+    return xmlWithoutTransition
+  }
+
+  const xmlWithNamespaces = ensurePPTXSlideTransitionNamespaces(
+    xmlWithoutTransition,
+  )
+  const anchor = xmlWithNamespaces.includes('</p:clrMapOvr>')
+    ? '</p:clrMapOvr>'
+    : '</p:cSld>'
+
+  return xmlWithNamespaces.replace(anchor, `${anchor}${transitionXml}`)
+}
+
+function ensurePPTXSlideTransitionNamespaces(xml: string) {
+  return ensurePPTXIgnorableNamespace(
+    ensurePPTXRootNamespace(
+      ensurePPTXRootNamespace(xml, 'p14', PPTX_POWERPOINT_2010_NS),
+      'mc',
+      PPTX_MARKUP_COMPATIBILITY_NS,
+    ),
+    'p14',
+  )
+}
+
+function ensurePPTXRootNamespace(
+  xml: string,
+  prefix: string,
+  namespace: string,
+) {
+  if (xml.includes(`xmlns:${prefix}=`)) {
+    return xml
+  }
+
+  return xml.replace('<p:sld ', `<p:sld xmlns:${prefix}="${namespace}" `)
+}
+
+function ensurePPTXIgnorableNamespace(xml: string, prefix: string) {
+  return xml.replace(/<p:sld\b([^>]*)>/, (tag, attrs: string) => {
+    const ignorable = attrs.match(/\smc:Ignorable="([^"]*)"/)
+
+    if (!ignorable) {
+      return tag.replace('<p:sld', `<p:sld mc:Ignorable="${prefix}"`)
+    }
+
+    const prefixes = ignorable[1].split(/\s+/).filter(Boolean)
+
+    if (prefixes.includes(prefix)) {
+      return tag
+    }
+
+    return tag.replace(
+      /\smc:Ignorable="[^"]*"/,
+      ` mc:Ignorable="${[...prefixes, prefix].join(' ')}"`,
+    )
+  })
+}
+
+function createPPTXSlideTransitionXml(
+  transition: PPTSlideTransition | undefined,
+) {
+  if (!transition) {
+    return null
+  }
+
+  const attributes = [
+    `advClick="${transition.advanceOnClick === false ? '0' : '1'}"`,
+    `p14:dur="${clampPPTXTransitionMs(transition.durationMs)}"`,
+    `spd="${getPPTXSlideTransitionSpeed(transition.durationMs)}"`,
+  ]
+
+  if (transition.advanceAfterMs !== null &&
+    transition.advanceAfterMs !== undefined) {
+    attributes.push(`advTm="${clampPPTXTransitionMs(transition.advanceAfterMs)}"`)
+  }
+
+  const childXml = getPPTXSlideTransitionChildXml(transition.type)
+
+  return childXml
+    ? `<p:transition ${attributes.join(' ')}>${childXml}</p:transition>`
+    : `<p:transition ${attributes.join(' ')}/>`
+}
+
+function getPPTXSlideTransitionChildXml(
+  type: PPTSlideTransition['type'],
+) {
+  if (type === 'fade') {
+    return '<p:fade/>'
+  }
+
+  if (type === 'push') {
+    return '<p:push dir="l"/>'
+  }
+
+  return null
+}
+
+function getPPTXSlideTransitionSpeed(durationMs: number) {
+  if (durationMs <= 500) {
+    return 'fast'
+  }
+
+  return durationMs <= 1000 ? 'med' : 'slow'
+}
+
+function clampPPTXTransitionMs(value: number) {
+  return Math.round(clamp(value, 0, 2_147_483_647))
+}
+
+function clampPPTXAnimationMs(value: number) {
+  return Math.round(clamp(value, 0, 2_147_483_647))
+}
+
+function escapePPTXXmlAttribute(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+}
+
+function escapePPTXXmlText(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function escapePPTXRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function addPPTXSlide({
+  pptxSlide,
+  slide,
+}: {
+  pptxSlide: PPTXSlide
+  slide: PPTSlide
+}) {
+  pptxSlide.background = {
+    color: toPPTXColor(slide.background?.color ?? '#ffffff', 'FFFFFF'),
+  }
+
+  for (const element of slide.elements) {
+    if (element.visible === false) {
+      continue
+    }
+
+    addPPTXElement({
+      element,
+      pptxSlide,
+    })
+  }
+
+  const notes = slide.notes?.trim()
+
+  if (notes) {
+    pptxSlide.addNotes(notes)
+  }
+}
+
+function addPPTXElement({
+  element,
+  pptxSlide,
+}: {
+  element: PPTElement
+  pptxSlide: PPTXSlide
+}) {
+  if (element.kind === 'textBox') {
+    addPPTXTextBox({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  if (element.kind === 'shape') {
+    addPPTXShape({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  if (element.kind === 'image') {
+    addPPTXImage({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  if (element.kind === 'line') {
+    addPPTXLine({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  if (element.kind === 'freeform') {
+    addPPTXFreeform({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  if (element.kind === 'table') {
+    addPPTXTable({
+      element,
+      pptxSlide,
+    })
+    return
+  }
+
+  addPPTXComment({
+    element,
+    pptxSlide,
+  })
+}
+
+function addPPTXTextBox({
+  element,
+  pptxSlide,
+}: {
+  element: Extract<PPTElement, { kind: 'textBox' }>
+  pptxSlide: PPTXSlide
+}) {
+  const hyperlink = createPPTXHyperlink(element.hyperlink)
+  const opacity = getPPTXElementOpacity(element)
+
+  pptxSlide.addText(createPPTXTextRuns({
+    body: element.textBody,
+    hyperlink,
+    opacity,
+    style: element.style,
+  }), {
+    ...createPPTXElementTextOptions({
+      element,
+      hyperlink,
+      inset: getPPTXTextInset(element.style, PPTX_DEFAULT_TEXT_BOX_INSET),
+      opacity,
+    }),
+    isTextBox: true,
+  })
+}
+
+function addPPTXShape({
+  element,
+  pptxSlide,
+}: {
+  element: PPTShape
+  pptxSlide: PPTXSlide
+}) {
+  const shapeName = getPPTXShapeName(element)
+  const opacity = getPPTXElementOpacity(element)
+  const shapeOptions = {
+    ...createPPTXElementPosition(element.geometry),
+    fill: createPPTXFill(element.fill, opacity),
+    flipH: element.flipH === true,
+    flipV: element.flipV === true,
+    hyperlink: createPPTXHyperlink(element.hyperlink),
+    line: createPPTXLineProps(element.stroke, {}, opacity),
+    objectName: element.name,
+    rectRadius: getPPTXRectRadius(element),
+    shadow: createPPTXShadow(element.shadow, opacity),
+  }
+
+  if (element.textBody) {
+    const hyperlink = createPPTXHyperlink(element.hyperlink)
+
+    pptxSlide.addText(createPPTXTextRuns({
+      body: element.textBody,
+      hyperlink,
+      opacity,
+      style: element.style,
+    }), {
+      ...shapeOptions,
+      ...createPPTXTextStyleOptions(element.style, opacity),
+      fit: getPPTXTextFit(element.textAutoFit),
+      hyperlink,
+      margin: createPPTXMargin(getPPTXTextInset(
+        element.style,
+        PPTX_DEFAULT_SHAPE_TEXT_INSET,
+      )),
+      shape: shapeName,
+      valign: element.style?.verticalAlign ?? 'top',
+    })
+    return
+  }
+
+  pptxSlide.addShape(shapeName, shapeOptions)
+}
+
+function addPPTXImage({
+  element,
+  pptxSlide,
+}: {
+  element: PPTImage
+  pptxSlide: PPTXSlide
+}) {
+  const src = element.src.trim()
+  const source = src.startsWith('data:')
+    ? { data: src }
+    : { path: src }
+  const position = createPPTXElementPosition(element.geometry)
+  const opacity = getPPTXElementOpacity(element)
+
+  pptxSlide.addImage({
+    ...source,
+    ...position,
+    altText: element.accessibility?.altText ?? element.alt,
+    flipH: element.flipH === true,
+    flipV: element.flipV === true,
+    hyperlink: createPPTXHyperlink(element.hyperlink),
+    objectName: element.name,
+    rotate: element.geometry.rotation,
+    shadow: createPPTXShadow(element.shadow, opacity),
+    sizing: createPPTXImageSizing(element, position),
+    transparency: toPPTXTransparency(opacity),
+  })
+}
+
+function addPPTXLine({
+  element,
+  pptxSlide,
+}: {
+  element: PPTLine
+  pptxSlide: PPTXSlide
+}) {
+  const start = getPPTXLineWorldPoint(element, element.start)
+  const end = getPPTXLineWorldPoint(element, element.end)
+  const opacity = getPPTXElementOpacity(element)
+
+  if (element.route === 'elbow') {
+    addPPTXElbowRoute({
+      element,
+      pptxSlide,
+      opacity,
+      start,
+      end,
+    })
+    return
+  }
+
+  pptxSlide.addShape('line', {
+    h: pxToIn(end.y - start.y),
+    line: createPPTXLineProps(element.stroke, {
+      endMarker: element.endMarker,
+      startMarker: element.startMarker,
+    }, opacity),
+    objectName: element.name,
+    rotate: element.geometry.rotation,
+    shadow: createPPTXShadow(element.shadow, opacity),
+    w: pxToIn(end.x - start.x),
+    x: pxToIn(start.x),
+    y: pxToIn(start.y),
+  })
+
+}
+
+function addPPTXElbowRoute({
+  element,
+  end,
+  opacity,
+  pptxSlide,
+  start,
+}: {
+  element: PPTLine
+  end: { x: number, y: number }
+  opacity: number
+  pptxSlide: PPTXSlide
+  start: { x: number, y: number }
+}) {
+  const bendX = element.geometry.x +
+    element.geometry.w * (element.routeBend ?? 0.5)
+  const segments = [
+    [start, { x: bendX, y: start.y }],
+    [{ x: bendX, y: start.y }, { x: bendX, y: end.y }],
+    [{ x: bendX, y: end.y }, end],
+  ] as const
+
+  segments.forEach(([segmentStart, segmentEnd], index) => {
+    pptxSlide.addShape('line', {
+      h: pxToIn(segmentEnd.y - segmentStart.y),
+      line: createPPTXLineProps(element.stroke, {
+        endMarker: index === segments.length - 1 ? element.endMarker : undefined,
+        startMarker: index === 0 ? element.startMarker : undefined,
+      }, opacity),
+      objectName: getPPTXElbowRouteObjectName(element, index),
+      w: pxToIn(segmentEnd.x - segmentStart.x),
+      x: pxToIn(segmentStart.x),
+      y: pxToIn(segmentStart.y),
+    })
+  })
+}
+
+function addPPTXFreeform({
+  element,
+  pptxSlide,
+}: {
+  element: PPTFreeform
+  pptxSlide: PPTXSlide
+}) {
+  const opacity = getPPTXElementOpacity(element)
+
+  for (let index = 1; index < element.points.length; index += 1) {
+    const start = element.points[index - 1]
+    const end = element.points[index]
+
+    pptxSlide.addShape('line', {
+      h: pxToIn(end.y - start.y),
+      line: createPPTXLineProps(element.stroke, {}, opacity),
+      objectName: `${element.name} segment ${index}`,
+      w: pxToIn(end.x - start.x),
+      x: pxToIn(element.geometry.x + start.x),
+      y: pxToIn(element.geometry.y + start.y),
+    })
+  }
+
+  if (element.textBody) {
+    const hyperlink = createPPTXHyperlink(element.hyperlink)
+
+    pptxSlide.addText(createPPTXTextRuns({
+      body: element.textBody,
+      hyperlink,
+      opacity,
+      style: element.style,
+    }), {
+      ...createPPTXElementPosition(element.geometry),
+      ...createPPTXTextStyleOptions(element.style, opacity),
+      fit: getPPTXTextFit(element.textAutoFit),
+      hyperlink,
+      isTextBox: true,
+      margin: createPPTXMargin(getPPTXTextInset(
+        element.style,
+        PPTX_DEFAULT_SHAPE_TEXT_INSET,
+      )),
+      objectName: `${element.name} text`,
+      valign: element.style?.verticalAlign ?? 'middle',
+    })
+  }
+}
+
+function addPPTXTable({
+  element,
+  pptxSlide,
+}: {
+  element: PPTTable
+  pptxSlide: PPTXSlide
+}) {
+  const columnCount = Math.max(
+    1,
+    ...element.rows.map((row) => row.length),
+  )
+  const opacity = getPPTXElementOpacity(element)
+  const position = createPPTXElementPosition(element.geometry)
+  const colW = getPPTTableResolvedColumnWidths(element).map(pxToIn)
+  const rowH = element.rows.length > 0
+    ? getPPTTableResolvedRowHeights(element).map(pxToIn)
+    : undefined
+
+  pptxSlide.addTable(element.rows.map((row, rowIndex) =>
+    Array.from({ length: columnCount }).flatMap((_, columnIndex) => {
+      if (isPPTTableCellHidden(element, rowIndex, columnIndex)) {
+        return []
+      }
+
+      const cellBorders = getPPTTableCellBorders(element, rowIndex, columnIndex)
+      const colSpan = getPPTTableCellColSpan(element, rowIndex, columnIndex)
+      const cellFill = getPPTTableCellFill(element, rowIndex, columnIndex)
+      const rowSpan = getPPTTableCellRowSpan(element, rowIndex, columnIndex)
+      const cellTextStyle = getPPTTableCellTextStyle(element, rowIndex, columnIndex)
+      const fallbackFillColor = rowIndex === 0 ? 'EFF6FF' : 'FFFFFF'
+
+      return [{
+        options: {
+          align: cellTextStyle?.align,
+          bold: cellTextStyle?.fontWeight === undefined
+            ? rowIndex === 0
+            : cellTextStyle.fontWeight !== 'regular',
+          border: cellBorders
+            ? createPPTXTableCellBorders(cellBorders)
+            : { color: 'DBE3EF', pt: 0.75 },
+          color: toPPTXColor(cellTextStyle?.color ?? '#111827', '111827'),
+          fill: {
+            color: cellFill
+              ? toPPTXColor(cellFill.color, fallbackFillColor)
+              : fallbackFillColor,
+            transparency: toPPTXTransparency((cellFill?.opacity ?? 1) * opacity),
+          },
+          fontFace: PPTX_DEFAULT_FONT_FACE,
+          fontSize: cellTextStyle?.fontSize === undefined
+            ? 13.5
+            : pxToPt(cellTextStyle.fontSize),
+          colspan: colSpan > 1 ? colSpan : undefined,
+          margin: cellTextStyle?.textInset
+            ? createPPTXTableCellMargin(cellTextStyle.textInset)
+            : 0.08,
+          rowspan: rowSpan > 1 ? rowSpan : undefined,
+          transparency: toPPTXTransparency(opacity),
+          valign: cellTextStyle?.verticalAlign,
+        },
+        text: row[columnIndex] ?? '',
+      }]
+    })),
+  {
+    ...position,
+    border: { color: 'DBE3EF', pt: 0.75 },
+    colW,
+    objectName: element.name,
+    rowH,
+  })
+}
+
+function addPPTXComment({
+  element,
+  pptxSlide,
+}: {
+  element: PPTComment
+  pptxSlide: PPTXSlide
+}) {
+  const opacity = getPPTXElementOpacity(element)
+  const body = [
+    element.body,
+    ...(element.thread ?? []).map((message) =>
+      `${message.authorName}: ${message.body}`),
+  ].filter(Boolean).join('\n')
+
+  pptxSlide.addText(body, {
+    ...createPPTXElementPosition(element.geometry),
+    color: '78350F',
+    fill: {
+      color: element.resolved ? 'FEF3C7' : 'FFFBEB',
+      transparency: toPPTXTransparency(opacity),
+    },
+    fontFace: PPTX_DEFAULT_FONT_FACE,
+    fontSize: 12.75,
+    line: createPPTXLineProps({ color: '#D97706', width: 1 }, {}, opacity),
+    margin: [6, 8, 6, 8],
+    objectName: element.name,
+    shape: 'roundRect',
+    transparency: toPPTXTransparency(opacity),
+  })
+}
+
+function createPPTXElementTextOptions({
+  element,
+  hyperlink,
+  inset,
+  opacity,
+}: {
+  element: Extract<PPTElement, { kind: 'textBox' }>
+  hyperlink: PptxGenJS.HyperlinkProps | undefined
+  inset: PPTXTextInset
+  opacity: number
+}) {
+  return {
+    ...createPPTXElementPosition(element.geometry),
+    ...createPPTXTextStyleOptions(element.style, opacity),
+    fit: getPPTXTextFit(element.textAutoFit),
+    hyperlink,
+    margin: createPPTXMargin(inset),
+    objectName: element.name,
+    shadow: createPPTXShadow(element.shadow, opacity),
+    valign: element.style.verticalAlign ?? 'top',
+  }
+}
+
+function createPPTXTextRuns({
+  body,
+  hyperlink,
+  opacity = 1,
+  style,
+}: {
+  body: PPTTextBody
+  hyperlink?: PptxGenJS.HyperlinkProps
+  opacity?: number
+  style?: PPTTextStyle
+}): PptxGenJS.TextProps[] {
+  const runs: PptxGenJS.TextProps[] = []
+
+  body.paragraphs.forEach((paragraph, paragraphIndex) => {
+    const paragraphRuns = paragraph.runs.length > 0
+      ? paragraph.runs
+      : [{ text: '' }]
+
+    paragraphRuns.forEach((run, runIndex) => {
+      run.text.split('\n').forEach((text, segmentIndex) => {
+        runs.push({
+          options: {
+            ...createPPTXTextStyleOptions(style, opacity),
+            ...createPPTXParagraphOptions(paragraph),
+            ...createPPTXTextRunOptions(run),
+            breakLine: (
+              paragraphIndex > 0 &&
+              runIndex === 0 &&
+              segmentIndex === 0
+            ) || segmentIndex > 0,
+            hyperlink: createPPTXHyperlink(run.hyperlink) ?? hyperlink,
+          },
+          text,
+        })
+      })
+    })
+  })
+
+  return runs.length > 0
+    ? runs
+    : [{ text: '' }]
+}
+
+function createPPTXParagraphOptions(
+  paragraph: PPTParagraph,
+): Partial<PptxGenJS.TextPropsOptions> {
+  const listLevel = Math.max(0, paragraph.level ?? 0)
+  const bullet: PptxGenJS.TextPropsOptions['bullet'] = paragraph.bullet
+    ? {
+        indent: 14 + listLevel * 18,
+        type: paragraph.bullet === 'numbered' ? 'number' : 'bullet',
+      }
+    : undefined
+
+  return {
+    align: paragraph.align,
+    bullet,
+    indentLevel: listLevel,
+    lineSpacingMultiple: paragraph.lineHeight,
+    paraSpaceAfter: paragraph.spacingAfter === undefined
+      ? undefined
+      : pxToPt(paragraph.spacingAfter),
+    paraSpaceBefore: paragraph.spacingBefore === undefined
+      ? undefined
+      : pxToPt(paragraph.spacingBefore),
+  }
+}
+
+function createPPTXTextRunOptions(
+  run: PPTRun,
+): Partial<PptxGenJS.TextPropsOptions> {
+  const strike: PptxGenJS.TextPropsOptions['strike'] = run.strikethrough === true
+    ? 'sngStrike'
+    : undefined
+
+  return {
+    bold: run.bold === true,
+    charSpacing: run.characterSpacing === undefined
+      ? undefined
+      : pxToPt(run.characterSpacing),
+    color: run.color ? toPPTXColor(run.color, '111827') : undefined,
+    fontFace: run.fontFamily,
+    fontSize: run.size === undefined ? undefined : pxToPt(run.size),
+    highlight: run.highlight ? toPPTXColor(run.highlight, 'FEF08A') : undefined,
+    italic: run.italic === true,
+    strike,
+    underline: run.underline === true ? { style: 'sng' } : undefined,
+  }
+}
+
+function createPPTXTextStyleOptions(
+  style: PPTTextStyle | undefined,
+  opacity = 1,
+): Partial<PptxGenJS.TextPropsOptions> {
+  return {
+    bold: style?.fontWeight === 'bold',
+    color: toPPTXColor(style?.color ?? PPTX_DEFAULT_TEXT_COLOR, '111827'),
+    fontFace: style?.fontFamily ?? PPTX_DEFAULT_FONT_FACE,
+    fontSize: pxToPt(style?.fontSize ?? PPTX_DEFAULT_FONT_SIZE),
+    transparency: toPPTXTransparency(opacity),
+  }
+}
+
+function createPPTXElementPosition(
+  geometry: PPTGeometry,
+): PPTXPosition {
+  return {
+    h: pxToIn(geometry.h),
+    rotate: geometry.rotation,
+    w: pxToIn(geometry.w),
+    x: pxToIn(geometry.x),
+    y: pxToIn(geometry.y),
+  }
+}
+
+function createPPTXFill(fill: PPTFill, opacity = 1) {
+  return {
+    color: toPPTXColor(fill.color, 'FFFFFF'),
+    transparency: toPPTXTransparency((fill.opacity ?? 1) * opacity),
+  }
+}
+
+function createPPTXLineProps(
+  stroke: PPTStroke | undefined,
+  markers: {
+    endMarker?: PPTLine['endMarker']
+    startMarker?: PPTLine['startMarker']
+  } = {},
+  opacity = 1,
+): PptxGenJS.ShapeLineProps {
+  if (!stroke) {
+    return {
+      color: 'FFFFFF',
+      transparency: 100,
+      width: 0,
+    }
+  }
+
+  const dashType: PptxGenJS.ShapeLineProps['dashType'] = stroke.dash === 'dot'
+    ? 'sysDot'
+    : stroke.dash === 'dash'
+      ? 'dash'
+      : 'solid'
+
+  return {
+    beginArrowType: markers.startMarker === 'arrow' ? 'arrow' : undefined,
+    color: toPPTXColor(stroke.color, '000000'),
+    dashType,
+    endArrowType: markers.endMarker === 'arrow' ? 'arrow' : undefined,
+    transparency: toPPTXTransparency(opacity),
+    width: Math.max(0.25, pxToPt(stroke.width)),
+  }
+}
+
+function createPPTXHyperlink(
+  hyperlink: PPTElement['hyperlink'] | undefined,
+): PptxGenJS.HyperlinkProps | undefined {
+  return hyperlink?.url
+    ? { url: hyperlink.url }
+    : undefined
+}
+
+function createPPTXImageSizing(
+  element: PPTImage,
+  position: PPTXPosition,
+): PptxGenJS.ImageProps['sizing'] {
+  if (element.crop &&
+    (element.crop.x !== 50 || element.crop.y !== 50)) {
+    return {
+      h: position.h,
+      type: 'crop',
+      w: position.w,
+      x: getPPTXImageCropOffset(element.crop.x, position.w),
+      y: getPPTXImageCropOffset(element.crop.y, position.h),
+    }
+  }
+
+  return {
+    h: position.h,
+    type: element.fit === 'contain' ? 'contain' : 'cover',
+    w: position.w,
+  }
+}
+
+function getPPTXImageCropOffset(value: number, size: number) {
+  return ((clamp(value, 0, 100) - 50) / 100) * size
+}
+
+function getPPTXElementOpacity(element: Pick<PPTElement, 'opacity'>) {
+  return clamp(element.opacity ?? 1, 0, 1)
+}
+
+function createPPTXShadow(
+  shadow: PPTElementShadow | undefined,
+  opacity = 1,
+) {
+  if (!shadow) {
+    return undefined
+  }
+
+  return {
+    angle: shadow.angle,
+    blur: pxToPt(shadow.blur),
+    color: toPPTXColor(shadow.color, '000000'),
+    offset: pxToPt(shadow.distance),
+    opacity: clamp(shadow.opacity * opacity, 0, 1),
+    type: 'outer',
+  } satisfies PptxGenJS.ShadowProps
+}
+
+function createPPTXMargin(inset: PPTXTextInset): [number, number, number, number] {
+  return [
+    pxToPt(inset.top),
+    pxToPt(inset.right),
+    pxToPt(inset.bottom),
+    pxToPt(inset.left),
+  ]
+}
+
+function createPPTXTableCellMargin(
+  inset: PPTXTextInset,
+): [number, number, number, number] {
+  return [
+    pxToIn(inset.top),
+    pxToIn(inset.right),
+    pxToIn(inset.bottom),
+    pxToIn(inset.left),
+  ]
+}
+
+function createPPTXTableCellBorders(
+  borders: PPTTableCellBorders,
+): [PptxGenJS.BorderProps, PptxGenJS.BorderProps, PptxGenJS.BorderProps, PptxGenJS.BorderProps] {
+  const fallback = { color: 'DBE3EF', pt: 0.75 }
+
+  return [
+    createPPTXTableCellBorder(borders.top, fallback),
+    createPPTXTableCellBorder(borders.right, fallback),
+    createPPTXTableCellBorder(borders.bottom, fallback),
+    createPPTXTableCellBorder(borders.left, fallback),
+  ]
+}
+
+function createPPTXTableCellBorder(
+  stroke: PPTStroke | undefined,
+  fallback: PptxGenJS.BorderProps,
+): PptxGenJS.BorderProps {
+  if (!stroke) {
+    return fallback
+  }
+
+  return {
+    color: toPPTXColor(stroke.color, 'DBE3EF'),
+    pt: Math.max(0.25, pxToPt(stroke.width)),
+    type: stroke.dash === 'dash' || stroke.dash === 'dot' ? 'dash' : 'solid',
+  }
+}
+
+function getPPTXTextInset(
+  style: PPTTextStyle | undefined,
+  fallback: PPTXTextInset,
+) {
+  return style?.textInset ?? fallback
+}
+
+function getPPTXTextFit(
+  textAutoFit: PPTTextAutoFit | undefined,
+): PptxGenJS.TextPropsOptions['fit'] {
+  return textAutoFit === 'resizeShapeToFitText'
+    ? 'resize'
+    : 'none'
+}
+
+function getPPTXShapeName(element: PPTShape): PptxGenJS.SHAPE_NAME {
+  if (element.shape === 'ellipse') {
+    return 'ellipse'
+  }
+
+  if (element.shape === 'diamond') {
+    return 'diamond'
+  }
+
+  return getPPTXShapeCornerRadius(element) > 0
+    ? 'roundRect'
+    : 'rect'
+}
+
+function getPPTXRectRadius(element: PPTShape) {
+  if (element.shape !== 'rect') {
+    return undefined
+  }
+
+  const radius = getPPTXShapeCornerRadius(element)
+
+  if (radius <= 0) {
+    return undefined
+  }
+
+  return clamp(radius / Math.max(1, Math.min(element.geometry.w, element.geometry.h)), 0, 1)
+}
+
+function getPPTXShapeCornerRadius(element: PPTShape) {
+  return element.cornerRadius ?? PPTX_DEFAULT_SHAPE_CORNER_RADIUS
+}
+
+function getPPTXLineWorldPoint(
+  element: PPTLine,
+  point: PPTLine['start'],
+) {
+  return {
+    x: element.geometry.x + point.x,
+    y: element.geometry.y + point.y,
+  }
+}
+
+function getPPTXLayoutName(deck: PPTDeck) {
+  return `PPT_MODEL_${Math.round(deck.size.w)}x${Math.round(deck.size.h)}`
+}
+
+function toPPTXColor(color: string, fallback: string) {
+  const trimmed = color.trim()
+  const hex = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed
+
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    return hex
+      .split('')
+      .map((char) => `${char}${char}`)
+      .join('')
+      .toUpperCase()
+  }
+
+  return /^[0-9a-f]{6}$/i.test(hex)
+    ? hex.toUpperCase()
+    : fallback
+}
+
+function toPPTXTransparency(opacity: number) {
+  return Math.round((1 - clamp(opacity, 0, 1)) * 100)
+}
+
+function toPPTXAlpha(opacity: number) {
+  return Math.round(clamp(opacity, 0, 1) * 100_000)
+}
+
+function toPPTXAngle(angle: number) {
+  const normalized = ((angle % 360) + 360) % 360
+
+  return Math.round(normalized * PPTX_ANGLE_UNITS_PER_DEGREE)
+}
+
+function pxToIn(value: number) {
+  return value / PPTX_PIXELS_PER_INCH
+}
+
+function pxToPt(value: number) {
+  return value * PPTX_POINTS_PER_PIXEL
+}
+
+function pxToEmu(value: number) {
+  return Math.round(value * PPTX_EMUS_PER_PIXEL)
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}

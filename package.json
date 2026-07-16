@@ -6,30 +6,25 @@
   "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/verify-ui-core.mjs && tsc -b && vite build",
     "lint": "eslint .",
-    "verify:mvp": "node scripts/verify-retouch-mvp.mjs",
+    "verify:mvp": "node scripts/verify-ppt-mvp.mjs",
+    "verify:ui-core": "node scripts/verify-ui-core.mjs",
+    "verify:pptx-render": "PPT_VERIFY_SCENARIO=pptx-render node scripts/verify-ppt-mvp.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@interactive-os/aria": "link:../apg-patterns",
-    "@interactive-os/keyboard": "link:../keyboard/packages/keyboard",
-    "@interactive-os/object-surface": "link:../object-surface/packages/object-surface",
-    "@zod-crud/collection": "link:../zod-crud/packages/collection",
-    "@zod-crud/dirty-state": "link:../zod-crud/packages/dirty-state",
-    "@zod-crud/id-resolver": "link:../zod-crud/packages/id-resolver",
-    "@zod-crud/layer-order": "link:../zod-crud/labs/extensions/layer-order",
-    "@zod-crud/persist-web": "link:../zod-crud/packages/persist-web",
+    "@interactive-os/slide-edit-affordance": "link:../canvas/packages/slide-edit-affordance",
     "canvas": "link:../canvas",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.16.0",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "zod": "^4.4.3",
-    "zod-crud": "link:../zod-crud/packages/zod-crud"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -38,7 +33,6 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
-    "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"

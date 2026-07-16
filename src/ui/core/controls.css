@@ -1,0 +1,94 @@
+.ppt-icon-button,
+.ppt-button,
+.ppt-slide-action,
+.ppt-thumb {
+  border: 1px solid var(--panel-border);
+  background: var(--control);
+  color: var(--text);
+}
+
+.ppt-icon-button,
+.ppt-slide-action {
+  display: inline-grid;
+  place-items: center;
+  width: var(--ppt-ui-control-size);
+  height: var(--ppt-ui-control-size);
+  padding: 0;
+  border-radius: var(--ppt-ui-radius-md);
+}
+
+.ppt-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ppt-ui-space-3);
+  height: var(--ppt-ui-control-size);
+  padding: 0 var(--ppt-ui-space-5);
+  border-radius: var(--ppt-ui-radius-md);
+  font-size: 13px;
+}
+
+.ppt-icon-button:hover:not(:disabled),
+.ppt-button:hover:not(:disabled),
+.ppt-slide-action:hover:not(:disabled),
+.ppt-thumb:hover {
+  background: var(--control-hover);
+}
+
+.ppt-icon-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--control-active);
+  color: var(--accent-strong);
+}
+
+.ppt-icon-button:disabled,
+.ppt-button:disabled,
+.ppt-slide-action:disabled,
+.ppt-floating-command:disabled,
+.ppt-context-menu-item:disabled {
+  cursor: not-allowed;
+  color: var(--control-disabled);
+}
+
+.ppt-tab {
+  min-width: 0;
+  height: var(--ppt-ui-control-size-compact);
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--ppt-ui-radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppt-tab[aria-selected='true'] {
+  border-color: var(--panel-border);
+  background: var(--field-bg);
+  color: var(--text);
+}
+
+.ppt-floating-command {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--ppt-ui-control-size-compact);
+  height: var(--ppt-ui-control-size-compact);
+  padding: 0;
+  border: 0;
+  border-radius: var(--ppt-ui-radius-sm);
+  background: transparent;
+  color: var(--text);
+  pointer-events: auto;
+}
+
+.ppt-floating-command:hover:not(:disabled) {
+  background: var(--control-hover);
+}
+
+.ppt-floating-command[aria-pressed='true'] {
+  background: var(--control-active);
+  color: var(--accent-strong);
+}

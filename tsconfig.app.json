@@ -10,6 +10,31 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    "paths": {
+      "canvas/app": ["./src/pptCanvasAppCompat.ts"],
+      "canvas/app-public": ["../canvas/dist/package/canvas/app/index.d.ts"],
+      "canvas/app/command-palette-items": ["../canvas/src/canvas/app/feature-packs/command-palette/CanvasCommandPaletteItems.ts"],
+      "canvas/app/image-clipboard": ["../canvas/src/canvas/app/feature-packs/image-io/CanvasImageClipboard.ts"],
+      "canvas/app/image-import": ["./src/pptCanvasImageImportCompat.ts"],
+      "canvas/app/image-import-public": ["../canvas/dist/package/canvas/app/feature-packs/image-io/CanvasImageImport.d.ts"],
+      "canvas/app/inline-edit-dom": ["../canvas/src/canvas/app/affordances/editing/text-editor/CanvasInlineEditDom.ts"],
+      "canvas/app/keyboard-system-shortcuts": ["../canvas/src/canvas/app/affordances/interaction/keyboard/CanvasKeyboardSystemShortcuts.ts"],
+      "canvas/app/media-import": ["./src/pptCanvasMediaImportCompat.ts"],
+      "canvas/app/media-import-public": ["../canvas/dist/package/canvas/app/feature-packs/media-import/CanvasMediaImport.d.ts"],
+      "canvas/app/minimap-model": ["../canvas/src/canvas/app/feature-packs/minimap/CanvasMinimapModel.ts"],
+      "canvas/app/paste-position": ["../canvas/src/canvas/app/affordances/commands/CanvasPastePosition.ts"],
+      "canvas/app/pointer-click-memory": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerClickMemory.ts"],
+      "canvas/app/pointer-start-session": ["../canvas/src/canvas/app/affordances/interaction/pointer/CanvasPointerStartSession.ts"],
+      "canvas/engine": ["../canvas/src/canvas/engine/index.ts"],
+      "canvas/core": ["../canvas/src/canvas/core/index.ts"],
+      "canvas/foundation": ["../canvas/src/canvas/foundation/index.ts"],
+      "canvas/host": ["./src/pptCanvasHostCompat.ts"],
+      "canvas/host-public": ["../canvas/dist/package/canvas/host/index.d.ts"],
+      "canvas/renderer": ["../canvas/dist/package/canvas/renderer/index.d.ts"],
+      "canvas/renderer/svg-drawing-primitives": ["../canvas/src/canvas/renderer/svg/CanvasSvgDrawingPrimitives.ts"],
+      "@interactive-os/dom-edit-affordance/metadata": ["../canvas/packages/dom-edit-affordance/src/metadata.ts"],
+      "@interactive-os/slide-edit-affordance": ["../canvas/packages/slide-edit-affordance/src/index.ts"]
+    },
     "preserveSymlinks": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
@@ -20,7 +45,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": false
   },
   "include": ["src"]
 }

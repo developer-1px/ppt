@@ -1,0 +1,65 @@
+.ppt-app {
+  --app-bg: #e9edf3;
+  --panel: #fbfcfe;
+  --panel-border: #d8dee8;
+  --text: #111827;
+  --text-secondary: #344054;
+  --text-muted: #667085;
+  --control: #ffffff;
+  --control-hover: #eef2f7;
+  --control-active: #e0ecff;
+  --control-disabled: #98a2b3;
+  --floating-panel: #ffffff;
+  --field-bg: #ffffff;
+  --shortcut-bg: #f8fafc;
+  --stage-bg: #e9edf3;
+  --stage-grid-line: #d7dde7;
+  --slide-border: #cbd5e1;
+  --hover-outline: #64748b;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --ppt-ui-control-size: 34px;
+  --ppt-ui-control-size-compact: 30px;
+  --ppt-ui-control-gap: 3px;
+  --ppt-ui-radius-sm: 4px;
+  --ppt-ui-radius-md: 6px;
+  --ppt-ui-space-1: 2px;
+  --ppt-ui-space-2: 4px;
+  --ppt-ui-space-3: 6px;
+  --ppt-ui-space-4: 8px;
+  --ppt-ui-space-5: 10px;
+  --ppt-ui-space-6: 12px;
+  --ppt-ui-shadow-floating: 0 12px 30px rgb(15 23 42 / 14%);
+  --ppt-ui-shadow-overlay: 0 8px 24px rgb(15 23 42 / 14%);
+  --ppt-ui-z-selection-toolbar: 1;
+  --ppt-ui-z-selection: 10;
+  --ppt-ui-z-toolbar: 20;
+  --ppt-ui-z-popover: 30;
+  --ppt-ui-z-inspector: 40;
+  color-scheme: light;
+}
+
+.ppt-app[data-theme='dark'] {
+  --app-bg: #0d1117;
+  --panel: #181b21;
+  --panel-border: #343a46;
+  --text: #f8fafc;
+  --text-secondary: #d7dee9;
+  --text-muted: #aab3c2;
+  --control: #222733;
+  --control-hover: #303849;
+  --control-active: #1f3a5f;
+  --control-disabled: #667085;
+  --floating-panel: #20242d;
+  --field-bg: #151922;
+  --shortcut-bg: #161b24;
+  --stage-bg: #10151d;
+  --stage-grid-line: #242b36;
+  --slide-border: #475569;
+  --hover-outline: #94a3b8;
+  --accent: #60a5fa;
+  --accent-strong: #93c5fd;
+  --ppt-ui-shadow-floating: 0 12px 30px rgb(0 0 0 / 30%);
+  --ppt-ui-shadow-overlay: 0 8px 24px rgb(0 0 0 / 26%);
+  color-scheme: dark;
+}

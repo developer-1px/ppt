@@ -1,0 +1,8539 @@
+import JSZip from 'jszip'
+import {
+  PPT_DEFAULT_THEME_ID,
+  PPT_SLIDE_HEIGHT,
+  PPT_SLIDE_WIDTH,
+  PPTDeckSchema,
+  type PPTDeck,
+  type PPTComment,
+  type PPTElement,
+  type PPTElementAnimation,
+  type PPTElementShadow,
+  type PPTFill,
+  type PPTFreeform,
+  type PPTFreeformPathSegment,
+  type PPTGeometry,
+  type PPTImage,
+  type PPTLine,
+  type PPTLineConnection,
+  type PPTParagraph,
+  type PPTRun,
+  type PPTShape,
+  type PPTShapeKind,
+  type PPTSlide,
+  type PPTSlideTransition,
+  type PPTStroke,
+  type PPTTable,
+  type PPTTableCellBorders,
+  type PPTTableCellStyle,
+  type PPTTableCellTextStyle,
+  type PPTTextAutoFit,
+  type PPTTextBody,
+  type PPTTextBox,
+  type PPTTextStyle,
+} from './pptModel'
+import { getPPTTableColumnCount } from './pptTableLayout'
+import {
+  PPTX_MIME_TYPE,
+  PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE,
+  PPTX_MODEL_CUSTOM_XML_NAMESPACE,
+  PPTX_MODEL_CUSTOM_XML_PATH,
+} from './pptPptxExport'
+
+export const PPTX_DECK_MODEL_IMPORT_FORMAT = 'pptx-custom-xml-ppt-deck' as const
+export const PPTX_OPEN_XML_IMPORT_FORMAT = 'pptx-open-xml-ppt-deck' as const
+const PPTX_RELATIONSHIP_ATTRIBUTE_NS =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PPTX_COMMENT_DEFAULT_WIDTH = 220
+const PPTX_COMMENT_DEFAULT_HEIGHT = 96
+const PPTX_ROUND_RECT_DEFAULT_ADJUST = 16_667
+const PPTX_ROUND_RECT_MAX_ADJUST = 50_000
+
+type PPTDeckPPTXImportFormat =
+  | typeof PPTX_DECK_MODEL_IMPORT_FORMAT
+  | typeof PPTX_OPEN_XML_IMPORT_FORMAT
+
+export type PPTDeckPPTXImportResult = {
+  deck: PPTDeck
+  format: PPTDeckPPTXImportFormat
+  jsonLength: number
+}
+
+type PPTXRelationship = {
+  target: string
+  targetMode: string
+  type: string
+}
+type PPTXRelationshipMap = Map<string, PPTXRelationship>
+type PPTXCommentAuthorMap = Map<string, string>
+type PPTXImportedAnimation = {
+  animation: PPTElementAnimation
+  objectName?: string
+  objectId: string
+}
+type PPTXGroupTransform = {
+  a: number
+  b: number
+  c: number
+  childOffsetX: number
+  childOffsetY: number
+  d: number
+  e: number
+  f: number
+  flipH: boolean
+  flipV: boolean
+  offsetX: number
+  offsetY: number
+  rotation: number
+  scaleX: number
+  scaleY: number
+}
+type PPTXSlideObjectNode = {
+  element: Element
+  groupId?: string
+  transform: PPTXGroupTransform
+}
+type PPTXImportedElementResult = PPTElement | PPTElement[] | null
+type PPTXLineConnectionRef = {
+  anchor: PPTLineConnection['anchor']
+  objectId: string
+}
+type PPTXLineConnectionRefs = {
+  end?: PPTXLineConnectionRef
+  start?: PPTXLineConnectionRef
+}
+type PPTXThemeColorMap = Readonly<Record<string, string>>
+type PPTXThemeFontMap = Readonly<Record<string, string>>
+type PPTXThemeLineStyle = Partial<PPTStroke>
+type PPTXThemeStyleMap = {
+  effectStyles: ReadonlyMap<number, Element>
+  fillStyles: ReadonlyMap<number, Element>
+  lineStyles: ReadonlyMap<number, Element>
+}
+type PPTXThemeContext = {
+  colors: PPTXThemeColorMap
+  fonts: PPTXThemeFontMap
+  styles: PPTXThemeStyleMap
+}
+type PPTXThemeColorMapping = Readonly<Record<string, string>>
+type PPTXPlaceholderRef = {
+  idx?: string
+  type?: string
+}
+type PPTXPlaceholderGeometryMap = Map<string, PPTGeometry>
+type PPTXPlaceholderTextBodyMap = Map<string, Element>
+type PPTXInheritedElementSource = 'layout' | 'master'
+type PPTXHeaderFooterPlaceholderType = 'dt' | 'ftr' | 'hdr' | 'sldNum'
+type PPTXHeaderFooterVisibility = Readonly<
+  Partial<Record<PPTXHeaderFooterPlaceholderType, boolean>>
+>
+type PPTXTextFieldContext = {
+  slideNumber: number
+}
+type PPTXImageSource = {
+  fileName: string
+  mimeType: string
+  renderable: boolean
+  src: string
+}
+type PPTXChartWorkbook = {
+  firstSheetName: string
+  sheets: ReadonlyMap<string, ReadonlyMap<string, string>>
+}
+type PPTXSpreadsheetCellRef = {
+  col: number
+  row: number
+}
+type PPTXRatioPoint = {
+  x: number
+  y: number
+}
+type PPTXCustomGeometryPathData = {
+  points: PPTLine['start'][]
+  segments: PPTFreeformPathSegment[]
+}
+
+function createPPTXRegularPolygonRatios(
+  sides: number,
+): readonly PPTXRatioPoint[] {
+  const points = Array.from({ length: sides }, (_, index) => {
+    const angle = (-90 + (index * 360) / sides) * Math.PI / 180
+
+    return {
+      x: 0.5 + Math.cos(angle) * 0.5,
+      y: 0.5 + Math.sin(angle) * 0.5,
+    }
+  })
+
+  return [...points, points[0] ?? { x: 0.5, y: 0 }]
+}
+
+const PPTX_EMUS_PER_PIXEL = 9_525
+const PPTX_TEXT_SIZE_UNITS_PER_POINT = 100
+const PPTX_POINTS_PER_PIXEL = 0.75
+const PPTX_DEFAULT_TEXT_COLOR = '#111827'
+const PPTX_DEFAULT_TEXT_SIZE = 24
+const PPTX_DEFAULT_PARAGRAPH_LINE_HEIGHT = 1.14
+const PPTX_DEFAULT_FILL_COLOR = '#ffffff'
+const PPTX_DEFAULT_STROKE_COLOR = '#111827'
+const PPTX_IDENTITY_GROUP_TRANSFORM: PPTXGroupTransform = {
+  a: 1,
+  b: 0,
+  c: 0,
+  childOffsetX: 0,
+  childOffsetY: 0,
+  d: 1,
+  e: 0,
+  f: 0,
+  flipH: false,
+  flipV: false,
+  offsetX: 0,
+  offsetY: 0,
+  rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+}
+const PPTX_LOCK_ATTRIBUTE_NAMES = [
+  'noAdjustHandles',
+  'noEditPoints',
+  'noMove',
+  'noResize',
+  'noRot',
+  'noSelect',
+  'noTextEdit',
+] as const
+const PPTX_LOCK_TAG_NAMES = [
+  'cxnSpLocks',
+  'graphicFrameLocks',
+  'grpSpLocks',
+  'picLocks',
+  'spLocks',
+] as const
+const PPTX_SCHEME_COLORS: Record<string, string> = {
+  accent1: '#2563eb',
+  accent2: '#0ea5e9',
+  accent3: '#22c55e',
+  accent4: '#fb923c',
+  accent5: '#7c2d12',
+  accent6: '#dc2626',
+  bg1: '#ffffff',
+  bg2: '#f8fafc',
+  dk1: '#111827',
+  dk2: '#475569',
+  lt1: '#ffffff',
+  lt2: '#f8fafc',
+  tx1: '#111827',
+  tx2: '#475569',
+}
+const PPTX_PRESET_COLORS: Record<string, string> = {
+  black: '#000000',
+  blue: '#0000ff',
+  cyan: '#00ffff',
+  dkBlue: '#00008b',
+  dkCyan: '#008b8b',
+  dkGray: '#a9a9a9',
+  dkGreen: '#006400',
+  dkMagenta: '#8b008b',
+  dkRed: '#8b0000',
+  dkYellow: '#808000',
+  gold: '#ffd700',
+  green: '#008000',
+  ltBlue: '#add8e6',
+  ltCyan: '#e0ffff',
+  ltGray: '#d3d3d3',
+  ltGreen: '#90ee90',
+  ltMagenta: '#ff77ff',
+  ltYellow: '#ffffe0',
+  magenta: '#ff00ff',
+  orange: '#ffa500',
+  purple: '#800080',
+  red: '#ff0000',
+  white: '#ffffff',
+  yellow: '#ffff00',
+}
+const PPTX_SYSTEM_COLORS: Record<string, string> = {
+  '3dDkShadow': '#696969',
+  '3dLight': '#e3e3e3',
+  activeBorder: '#b4b4b4',
+  activeCaption: '#99b4d1',
+  appWorkspace: '#ababab',
+  background: '#000000',
+  btnFace: '#f0f0f0',
+  btnHighlight: '#ffffff',
+  btnShadow: '#a0a0a0',
+  btnText: '#000000',
+  captionText: '#000000',
+  gradientActiveCaption: '#b9d1ea',
+  gradientInactiveCaption: '#d7e4f2',
+  grayText: '#6d6d6d',
+  highlight: '#0078d7',
+  highlightText: '#ffffff',
+  hotLight: '#0066cc',
+  inactiveBorder: '#f4f7fc',
+  inactiveCaption: '#bfcddb',
+  inactiveCaptionText: '#000000',
+  infoBk: '#ffffe1',
+  infoText: '#000000',
+  menu: '#f0f0f0',
+  menuBar: '#f0f0f0',
+  menuHighlight: '#3399ff',
+  menuText: '#000000',
+  scrollBar: '#c8c8c8',
+  window: '#ffffff',
+  windowFrame: '#646464',
+  windowText: '#000000',
+}
+const PPTX_THEME_SCHEME_ALIASES: Record<string, string> = {
+  bg1: 'lt1',
+  bg2: 'lt2',
+  tx1: 'dk1',
+  tx2: 'dk2',
+}
+const PPTX_PRESET_FREEFORM_POINT_RATIOS: Readonly<Record<string, readonly PPTXRatioPoint[]>> = {
+  blockArc: [
+    { x: 0.86, y: 0.16 },
+    { x: 1, y: 0.5 },
+    { x: 0.86, y: 0.84 },
+    { x: 0.5, y: 1 },
+    { x: 0.16, y: 0.84 },
+    { x: 0, y: 0.5 },
+    { x: 0.16, y: 0.16 },
+    { x: 0.36, y: 0.36 },
+    { x: 0.28, y: 0.5 },
+    { x: 0.36, y: 0.64 },
+    { x: 0.5, y: 0.72 },
+    { x: 0.64, y: 0.64 },
+    { x: 0.72, y: 0.5 },
+    { x: 0.64, y: 0.36 },
+    { x: 0.86, y: 0.16 },
+  ],
+  chevron: [
+    { x: 0, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.35, y: 0.5 },
+    { x: 0, y: 0 },
+  ],
+  corner: [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 0.28 },
+    { x: 0.28, y: 0.28 },
+    { x: 0.28, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  decagon: createPPTXRegularPolygonRatios(10),
+  diagStripe: [
+    { x: 0.28, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0.72, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.28, y: 0 },
+  ],
+  downArrow: [
+    { x: 0.25, y: 0 },
+    { x: 0.75, y: 0 },
+    { x: 0.75, y: 0.65 },
+    { x: 1, y: 0.65 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.65 },
+    { x: 0.25, y: 0.65 },
+    { x: 0.25, y: 0 },
+  ],
+  dodecagon: createPPTXRegularPolygonRatios(12),
+  foldedCorner: [
+    { x: 0, y: 0 },
+    { x: 0.78, y: 0 },
+    { x: 1, y: 0.22 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  hexagon: [
+    { x: 0.25, y: 0 },
+    { x: 0.75, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.75, y: 1 },
+    { x: 0.25, y: 1 },
+    { x: 0, y: 0.5 },
+    { x: 0.25, y: 0 },
+  ],
+  can: [
+    { x: 0.16, y: 0.18 },
+    { x: 0.5, y: 0 },
+    { x: 0.84, y: 0.18 },
+    { x: 0.84, y: 0.82 },
+    { x: 0.5, y: 1 },
+    { x: 0.16, y: 0.82 },
+    { x: 0.16, y: 0.18 },
+  ],
+  cloud: [
+    { x: 0.12, y: 0.58 },
+    { x: 0.02, y: 0.5 },
+    { x: 0.12, y: 0.38 },
+    { x: 0.25, y: 0.4 },
+    { x: 0.3, y: 0.22 },
+    { x: 0.48, y: 0.15 },
+    { x: 0.62, y: 0.24 },
+    { x: 0.72, y: 0.2 },
+    { x: 0.86, y: 0.3 },
+    { x: 0.88, y: 0.44 },
+    { x: 0.98, y: 0.5 },
+    { x: 0.9, y: 0.64 },
+    { x: 0.76, y: 0.64 },
+    { x: 0.68, y: 0.8 },
+    { x: 0.46, y: 0.82 },
+    { x: 0.36, y: 0.68 },
+    { x: 0.12, y: 0.58 },
+  ],
+  cube: [
+    { x: 0.28, y: 0 },
+    { x: 0.78, y: 0.16 },
+    { x: 0.78, y: 0.72 },
+    { x: 0.5, y: 1 },
+    { x: 0.08, y: 0.84 },
+    { x: 0.08, y: 0.28 },
+    { x: 0.28, y: 0 },
+  ],
+  flowChartDecision: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.5 },
+    { x: 0.5, y: 0 },
+  ],
+  flowChartDocument: [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 0.78 },
+    { x: 0.82, y: 0.88 },
+    { x: 0.62, y: 0.82 },
+    { x: 0.38, y: 0.72 },
+    { x: 0.18, y: 0.82 },
+    { x: 0, y: 0.78 },
+    { x: 0, y: 0 },
+  ],
+  flowChartTerminator: [
+    { x: 0.2, y: 0 },
+    { x: 0.8, y: 0 },
+    { x: 1, y: 0.2 },
+    { x: 1, y: 0.8 },
+    { x: 0.8, y: 1 },
+    { x: 0.2, y: 1 },
+    { x: 0, y: 0.8 },
+    { x: 0, y: 0.2 },
+    { x: 0.2, y: 0 },
+  ],
+  heart: [
+    { x: 0.5, y: 1 },
+    { x: 0.08, y: 0.62 },
+    { x: 0, y: 0.35 },
+    { x: 0.08, y: 0.12 },
+    { x: 0.28, y: 0 },
+    { x: 0.5, y: 0.18 },
+    { x: 0.72, y: 0 },
+    { x: 0.92, y: 0.12 },
+    { x: 1, y: 0.35 },
+    { x: 0.92, y: 0.62 },
+    { x: 0.5, y: 1 },
+  ],
+  homePlate: [
+    { x: 0, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  leftArrow: [
+    { x: 1, y: 0.25 },
+    { x: 0.35, y: 0.25 },
+    { x: 0.35, y: 0 },
+    { x: 0, y: 0.5 },
+    { x: 0.35, y: 1 },
+    { x: 0.35, y: 0.75 },
+    { x: 1, y: 0.75 },
+    { x: 1, y: 0.25 },
+  ],
+  leftRightArrow: [
+    { x: 0, y: 0.5 },
+    { x: 0.35, y: 0 },
+    { x: 0.35, y: 0.25 },
+    { x: 0.65, y: 0.25 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0.65, y: 0.75 },
+    { x: 0.35, y: 0.75 },
+    { x: 0.35, y: 1 },
+    { x: 0, y: 0.5 },
+  ],
+  lightningBolt: [
+    { x: 0.62, y: 0 },
+    { x: 0.25, y: 0.55 },
+    { x: 0.52, y: 0.55 },
+    { x: 0.38, y: 1 },
+    { x: 0.78, y: 0.38 },
+    { x: 0.52, y: 0.38 },
+    { x: 0.62, y: 0 },
+  ],
+  mathMultiply: [
+    { x: 0.2, y: 0 },
+    { x: 0.5, y: 0.3 },
+    { x: 0.8, y: 0 },
+    { x: 1, y: 0.2 },
+    { x: 0.7, y: 0.5 },
+    { x: 1, y: 0.8 },
+    { x: 0.8, y: 1 },
+    { x: 0.5, y: 0.7 },
+    { x: 0.2, y: 1 },
+    { x: 0, y: 0.8 },
+    { x: 0.3, y: 0.5 },
+    { x: 0, y: 0.2 },
+    { x: 0.2, y: 0 },
+  ],
+  mathPlus: [
+    { x: 0.35, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 0.65, y: 0.35 },
+    { x: 1, y: 0.35 },
+    { x: 1, y: 0.65 },
+    { x: 0.65, y: 0.65 },
+    { x: 0.65, y: 1 },
+    { x: 0.35, y: 1 },
+    { x: 0.35, y: 0.65 },
+    { x: 0, y: 0.65 },
+    { x: 0, y: 0.35 },
+    { x: 0.35, y: 0.35 },
+    { x: 0.35, y: 0 },
+  ],
+  moon: [
+    { x: 0.68, y: 0 },
+    { x: 0.42, y: 0.04 },
+    { x: 0.2, y: 0.24 },
+    { x: 0.12, y: 0.5 },
+    { x: 0.2, y: 0.76 },
+    { x: 0.42, y: 0.96 },
+    { x: 0.68, y: 1 },
+    { x: 0.54, y: 0.82 },
+    { x: 0.46, y: 0.66 },
+    { x: 0.43, y: 0.5 },
+    { x: 0.46, y: 0.34 },
+    { x: 0.54, y: 0.18 },
+    { x: 0.68, y: 0 },
+  ],
+  octagon: [
+    { x: 0.3, y: 0 },
+    { x: 0.7, y: 0 },
+    { x: 1, y: 0.3 },
+    { x: 1, y: 0.7 },
+    { x: 0.7, y: 1 },
+    { x: 0.3, y: 1 },
+    { x: 0, y: 0.7 },
+    { x: 0, y: 0.3 },
+    { x: 0.3, y: 0 },
+  ],
+  parallelogram: [
+    { x: 0.25, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0.75, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.25, y: 0 },
+  ],
+  pentagon: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.38 },
+    { x: 0.82, y: 1 },
+    { x: 0.18, y: 1 },
+    { x: 0, y: 0.38 },
+    { x: 0.5, y: 0 },
+  ],
+  pie: [
+    { x: 0.5, y: 0.5 },
+    { x: 0.5, y: 0 },
+    { x: 0.72, y: 0.05 },
+    { x: 0.9, y: 0.2 },
+    { x: 1, y: 0.5 },
+    { x: 0.9, y: 0.8 },
+    { x: 0.72, y: 0.95 },
+    { x: 0.5, y: 1 },
+    { x: 0.5, y: 0.5 },
+  ],
+  plus: [
+    { x: 0.35, y: 0 },
+    { x: 0.65, y: 0 },
+    { x: 0.65, y: 0.35 },
+    { x: 1, y: 0.35 },
+    { x: 1, y: 0.65 },
+    { x: 0.65, y: 0.65 },
+    { x: 0.65, y: 1 },
+    { x: 0.35, y: 1 },
+    { x: 0.35, y: 0.65 },
+    { x: 0, y: 0.65 },
+    { x: 0, y: 0.35 },
+    { x: 0.35, y: 0.35 },
+    { x: 0.35, y: 0 },
+  ],
+  quadArrow: [
+    { x: 0.5, y: 0 },
+    { x: 0.65, y: 0.2 },
+    { x: 0.58, y: 0.2 },
+    { x: 0.58, y: 0.42 },
+    { x: 0.8, y: 0.42 },
+    { x: 0.8, y: 0.35 },
+    { x: 1, y: 0.5 },
+    { x: 0.8, y: 0.65 },
+    { x: 0.8, y: 0.58 },
+    { x: 0.58, y: 0.58 },
+    { x: 0.58, y: 0.8 },
+    { x: 0.65, y: 0.8 },
+    { x: 0.5, y: 1 },
+    { x: 0.35, y: 0.8 },
+    { x: 0.42, y: 0.8 },
+    { x: 0.42, y: 0.58 },
+    { x: 0.2, y: 0.58 },
+    { x: 0.2, y: 0.65 },
+    { x: 0, y: 0.5 },
+    { x: 0.2, y: 0.35 },
+    { x: 0.2, y: 0.42 },
+    { x: 0.42, y: 0.42 },
+    { x: 0.42, y: 0.2 },
+    { x: 0.35, y: 0.2 },
+    { x: 0.5, y: 0 },
+  ],
+  rightArrow: [
+    { x: 0, y: 0.25 },
+    { x: 0.65, y: 0.25 },
+    { x: 0.65, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.65, y: 1 },
+    { x: 0.65, y: 0.75 },
+    { x: 0, y: 0.75 },
+    { x: 0, y: 0.25 },
+  ],
+  rtTriangle: [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ],
+  star5: [
+    { x: 0.5, y: 0 },
+    { x: 0.61, y: 0.35 },
+    { x: 0.98, y: 0.35 },
+    { x: 0.68, y: 0.57 },
+    { x: 0.79, y: 0.91 },
+    { x: 0.5, y: 0.7 },
+    { x: 0.21, y: 0.91 },
+    { x: 0.32, y: 0.57 },
+    { x: 0.02, y: 0.35 },
+    { x: 0.39, y: 0.35 },
+    { x: 0.5, y: 0 },
+  ],
+  sun: [
+    { x: 0.5, y: 0 },
+    { x: 0.58, y: 0.25 },
+    { x: 0.85, y: 0.15 },
+    { x: 0.75, y: 0.42 },
+    { x: 1, y: 0.5 },
+    { x: 0.75, y: 0.58 },
+    { x: 0.85, y: 0.85 },
+    { x: 0.58, y: 0.75 },
+    { x: 0.5, y: 1 },
+    { x: 0.42, y: 0.75 },
+    { x: 0.15, y: 0.85 },
+    { x: 0.25, y: 0.58 },
+    { x: 0, y: 0.5 },
+    { x: 0.25, y: 0.42 },
+    { x: 0.15, y: 0.15 },
+    { x: 0.42, y: 0.25 },
+    { x: 0.5, y: 0 },
+  ],
+  trapezoid: [
+    { x: 0.2, y: 0 },
+    { x: 0.8, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.2, y: 0 },
+  ],
+  triangle: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0.5, y: 0 },
+  ],
+  upArrow: [
+    { x: 0.25, y: 1 },
+    { x: 0.25, y: 0.35 },
+    { x: 0, y: 0.35 },
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.35 },
+    { x: 0.75, y: 0.35 },
+    { x: 0.75, y: 1 },
+    { x: 0.25, y: 1 },
+  ],
+  upDownArrow: [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.35 },
+    { x: 0.75, y: 0.35 },
+    { x: 0.75, y: 0.65 },
+    { x: 1, y: 0.65 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.65 },
+    { x: 0.25, y: 0.65 },
+    { x: 0.25, y: 0.35 },
+    { x: 0, y: 0.35 },
+    { x: 0.5, y: 0 },
+  ],
+}
+
+export async function importPPTDeckFromPPTXBlob(
+  blob: Blob,
+): Promise<PPTDeckPPTXImportResult | null> {
+  try {
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const embeddedModel = await importPPTDeckFromCustomXmlZip(zip)
+
+    if (embeddedModel) {
+      return embeddedModel
+    }
+
+    return await importPPTDeckFromOpenXmlZip(zip)
+  } catch {
+    return null
+  }
+}
+
+async function importPPTDeckFromCustomXmlZip(
+  zip: JSZip,
+): Promise<PPTDeckPPTXImportResult | null> {
+  const xml = await zip.file(PPTX_MODEL_CUSTOM_XML_PATH)?.async('string')
+
+  if (!xml) {
+    return null
+  }
+
+  const payload = getPPTDeckModelPayloadFromCustomXml(xml)
+
+  if (!payload) {
+    return null
+  }
+
+  try {
+    const parsed = PPTDeckSchema.safeParse(JSON.parse(payload))
+
+    if (parsed.success) {
+      return {
+        deck: parsed.data,
+        format: PPTX_DECK_MODEL_IMPORT_FORMAT,
+        jsonLength: payload.length,
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+async function importPPTDeckFromOpenXmlZip(
+  zip: JSZip,
+): Promise<PPTDeckPPTXImportResult | null> {
+  const slidePaths = await getPPTXOpenXmlSlidePaths(zip)
+
+  if (slidePaths.length === 0) {
+    return null
+  }
+
+  const size = await readPPTXOpenXmlDeckSize(zip)
+  const themePath = await readPPTXOpenXmlThemePath(zip)
+  const defaultThemeContext = await readPPTXOpenXmlThemeContext(zip, themePath)
+  const themeContextByPath = new Map<string, Promise<PPTXThemeContext>>()
+  const title = await readPPTXOpenXmlDeckTitle(zip)
+  const firstSlideNumber = await readPPTXOpenXmlFirstSlideNumber(zip)
+  const commentAuthors = await readPPTXOpenXmlCommentAuthors(zip)
+  const sectionNameBySlidePath =
+    await readPPTXPresentationSectionNamesBySlidePath(zip)
+  const slides = await Promise.all(slidePaths.map((path, index) =>
+    readPPTXOpenXmlSlide({
+      commentAuthors,
+      defaultThemeContext,
+      index,
+      path,
+      sectionName: sectionNameBySlidePath.get(path),
+      size,
+      slideNumber: firstSlideNumber + index,
+      themeContextByPath,
+      zip,
+    }),
+  ))
+  const parsed = PPTDeckSchema.safeParse({
+    id: 'pptx-openxml-import',
+    size,
+    slides,
+    title,
+  })
+
+  if (!parsed.success) {
+    return null
+  }
+
+  return {
+    deck: parsed.data,
+    format: PPTX_OPEN_XML_IMPORT_FORMAT,
+    jsonLength: 0,
+  }
+}
+
+export function getPPTDeckPPTXFileFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTDeckPPTXFilesFromDataTransfer(dataTransfer)[0] ?? null
+}
+
+export function getPPTDeckPPTXFileFromList(files: FileList | null) {
+  return getPPTDeckPPTXFilesFromList(files)[0] ?? null
+}
+
+export function canImportPPTDeckPPTXFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTDeckPPTXFilesFromDataTransfer(dataTransfer).length > 0 ||
+    hasPPTDeckPPTXItem(dataTransfer)
+}
+
+function getPPTDeckPPTXFilesFromDataTransfer(
+  dataTransfer: DataTransfer | null,
+) {
+  return getPPTDeckPPTXFilesFromList(dataTransfer?.files ?? null)
+}
+
+function getPPTDeckPPTXFilesFromList(files: FileList | null) {
+  return Array.from(files ?? []).filter(isPPTDeckPPTXFile)
+}
+
+function hasPPTDeckPPTXItem(dataTransfer: DataTransfer | null) {
+  return Array.from(dataTransfer?.items ?? [])
+    .some((item) => item.kind === 'file' && item.type === PPTX_MIME_TYPE)
+}
+
+function isPPTDeckPPTXFile(file: File) {
+  return file.type === PPTX_MIME_TYPE ||
+    file.name.toLowerCase().endsWith('.pptx')
+}
+
+async function getPPTXOpenXmlSlidePaths(zip: JSZip) {
+  const pathsByFileName = getPPTXOpenXmlSlidePathsByFileName(zip)
+  const orderedPaths = await readPPTXPresentationSlideOrder(zip)
+
+  return orderedPaths.length > 0
+    ? [
+        ...orderedPaths,
+        ...pathsByFileName.filter((path) => !orderedPaths.includes(path)),
+      ]
+    : pathsByFileName
+}
+
+function getPPTXOpenXmlSlidePathsByFileName(zip: JSZip) {
+  return Object.keys(zip.files)
+    .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)
+}
+
+async function readPPTXPresentationSlideOrder(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const xml = await zip.file(presentationPath)?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+
+  if (!doc || relationships.size === 0) {
+    return []
+  }
+
+  return getPPTXDescendantsByLocalName(doc, 'sldId')
+    .map((slideId) =>
+      slideId.getAttribute('r:id') ?? slideId.getAttribute('id'))
+    .map((relationshipId) =>
+      relationshipId ? relationships.get(relationshipId) : undefined)
+    .filter((relationship): relationship is PPTXRelationship =>
+      relationship !== undefined &&
+      relationship.type.endsWith('/slide'))
+    .map((relationship) =>
+      resolvePPTXRelationshipTarget(presentationPath, relationship.target))
+    .filter((path) => zip.file(path) !== null)
+}
+
+async function readPPTXPresentationSectionNamesBySlidePath(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const xml = await zip.file(presentationPath)?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const sectionNameBySlidePath = new Map<string, string>()
+
+  if (!doc || relationships.size === 0) {
+    return sectionNameBySlidePath
+  }
+
+  const slidePathByPresentationSlideId = new Map<string, string>()
+  const presentationSlideList = getDirectPPTXChildByLocalName(
+    doc.documentElement,
+    'sldIdLst',
+  )
+
+  for (const slideId of getDirectPPTXChildrenByLocalName(
+    presentationSlideList,
+    'sldId',
+  )) {
+    const id = slideId.getAttribute('id')?.trim()
+    const relationshipId = slideId.getAttribute('r:id')?.trim()
+    const relationship = relationshipId
+      ? relationships.get(relationshipId)
+      : undefined
+
+    if (!id || !relationship || !relationship.type.endsWith('/slide')) {
+      continue
+    }
+
+    const path = resolvePPTXRelationshipTarget(
+      presentationPath,
+      relationship.target,
+    )
+
+    if (zip.file(path) !== null) {
+      slidePathByPresentationSlideId.set(id, path)
+    }
+  }
+
+  for (const sectionList of getPPTXDescendantsByLocalName(
+    doc.documentElement,
+    'sectionLst',
+  )) {
+    for (const section of getDirectPPTXChildrenByLocalName(
+      sectionList,
+      'section',
+    )) {
+      const sectionName = section.getAttribute('name')?.trim()
+      const sectionSlideList = getDirectPPTXChildByLocalName(section, 'sldIdLst')
+
+      if (!sectionName) {
+        continue
+      }
+
+      for (const slideId of getDirectPPTXChildrenByLocalName(
+        sectionSlideList,
+        'sldId',
+      )) {
+        const id = slideId.getAttribute('id')?.trim()
+        const path = id ? slidePathByPresentationSlideId.get(id) : undefined
+
+        if (path) {
+          sectionNameBySlidePath.set(path, sectionName)
+        }
+      }
+    }
+  }
+
+  return sectionNameBySlidePath
+}
+
+async function readPPTXOpenXmlDeckSize(zip: JSZip) {
+  const presentationXml = await zip.file('ppt/presentation.xml')?.async('string')
+  const doc = presentationXml ? parsePPTXXmlDocument(presentationXml) : null
+  const slideSize = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'sldSz')
+    : null
+  const width = toPPTXPositiveNumber(slideSize?.getAttribute('cx'))
+  const height = toPPTXPositiveNumber(slideSize?.getAttribute('cy'))
+
+  return {
+    h: height === null ? PPT_SLIDE_HEIGHT : emuToPx(height),
+    w: width === null ? PPT_SLIDE_WIDTH : emuToPx(width),
+  }
+}
+
+async function readPPTXOpenXmlFirstSlideNumber(zip: JSZip) {
+  const presentationXml = await zip.file('ppt/presentation.xml')?.async('string')
+  const doc = presentationXml ? parsePPTXXmlDocument(presentationXml) : null
+  const value = toPPTXPositiveNumber(
+    doc?.documentElement?.getAttribute('firstSlideNum'),
+  )
+
+  return value === null || value < 1 ? 1 : Math.floor(value)
+}
+
+async function readPPTXOpenXmlDeckTitle(zip: JSZip) {
+  const coreXml = await zip.file('docProps/core.xml')?.async('string')
+  const doc = coreXml ? parsePPTXXmlDocument(coreXml) : null
+  const title = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'title')?.textContent?.trim()
+    : ''
+
+  return title || 'Imported PPTX Deck'
+}
+
+async function readPPTXOpenXmlCommentAuthors(
+  zip: JSZip,
+): Promise<PPTXCommentAuthorMap> {
+  const authors: PPTXCommentAuthorMap = new Map()
+  const paths = await readPPTXOpenXmlCommentAuthorPaths(zip)
+
+  for (const path of paths) {
+    const xml = await zip.file(path)?.async('string')
+    const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+    if (!doc) {
+      continue
+    }
+
+    for (const author of [
+      ...getPPTXDescendantsByLocalName(doc, 'cmAuthor'),
+      ...getPPTXDescendantsByLocalName(doc, 'author'),
+    ]) {
+      const id = author.getAttribute('id')?.trim()
+      const name = author.getAttribute('name')?.trim() ??
+        author.getAttribute('initials')?.trim()
+
+      if (id && name) {
+        authors.set(id, name)
+      }
+    }
+  }
+
+  return authors
+}
+
+async function readPPTXOpenXmlCommentAuthorPaths(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const relatedPaths = Array.from(relationships.values())
+    .filter((relationship) =>
+      relationship.targetMode !== 'External' &&
+      (
+        relationship.type.endsWith('/commentAuthors') ||
+        relationship.type.endsWith('/powerPointAuthors') ||
+        relationship.type.endsWith('/authors')
+      ))
+    .map((relationship) =>
+      resolvePPTXRelationshipTarget(presentationPath, relationship.target))
+
+  return [...new Set([...relatedPaths, 'ppt/commentAuthors.xml'])]
+    .filter((path) => zip.file(path))
+}
+
+async function readPPTXOpenXmlThemeColors(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeColorMap> {
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const colorScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'clrScheme')
+    : null
+
+  if (!colorScheme) {
+    return PPTX_SCHEME_COLORS
+  }
+
+  const colors = Array.from(colorScheme.children)
+    .reduce<Record<string, string>>((next, colorNode) => {
+      const color = readPPTXThemeColorNode(colorNode)
+
+      return color
+        ? { ...next, [colorNode.localName]: color }
+        : next
+    }, {})
+
+  return resolvePPTXThemeSchemeColors(colors)
+}
+
+async function readPPTXOpenXmlThemeFonts(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeFontMap> {
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const fontScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'fontScheme')
+    : null
+  const majorFont = getDirectPPTXChildByLocalName(fontScheme, 'majorFont')
+  const minorFont = getDirectPPTXChildByLocalName(fontScheme, 'minorFont')
+
+  return {
+    ...readPPTXThemeFontGroup(majorFont, '+mj'),
+    ...readPPTXThemeFontGroup(minorFont, '+mn'),
+  }
+}
+
+function readPPTXThemeFontGroup(
+  fontGroup: Element | null,
+  prefix: '+mj' | '+mn',
+): Record<string, string> {
+  const latin = readPPTXThemeTypeface(fontGroup, 'latin')
+  const eastAsian = readPPTXThemeTypeface(fontGroup, 'ea') ?? latin
+  const complexScript = readPPTXThemeTypeface(fontGroup, 'cs') ?? latin
+
+  return {
+    ...(latin ? { [`${prefix}-lt`]: latin } : {}),
+    ...(eastAsian ? { [`${prefix}-ea`]: eastAsian } : {}),
+    ...(complexScript ? { [`${prefix}-cs`]: complexScript } : {}),
+  }
+}
+
+function readPPTXThemeTypeface(
+  fontGroup: Element | null,
+  localName: 'cs' | 'ea' | 'latin',
+) {
+  const typeface = getDirectPPTXChildByLocalName(fontGroup, localName)
+    ?.getAttribute('typeface')
+    ?.trim()
+
+  return typeface && !typeface.startsWith('+') ? typeface : undefined
+}
+
+async function readPPTXOpenXmlThemeStyles(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeStyleMap> {
+  const xml = themePath ? await zip.file(themePath)?.async('string') : null
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const formatScheme = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'fmtScheme')
+    : null
+  const lineStyleList = getDirectPPTXChildByLocalName(
+    formatScheme,
+    'lnStyleLst',
+  )
+  const effectStyleList = getDirectPPTXChildByLocalName(
+    formatScheme,
+    'effectStyleLst',
+  )
+  const effectStyles = new Map<number, Element>()
+  const fillStyles = readPPTXThemeFillStyles(formatScheme)
+  const lineStyles = new Map<number, Element>()
+
+  readPPTXThemeEffectStyles(effectStyleList)
+    .forEach((effectStyle, index) => {
+      effectStyles.set(index + 1, effectStyle)
+    })
+
+  getDirectPPTXChildrenByLocalName(lineStyleList, 'ln')
+    .forEach((line, index) => {
+      lineStyles.set(index + 1, line)
+    })
+
+  return { effectStyles, fillStyles, lineStyles }
+}
+
+async function readPPTXOpenXmlThemeContext(
+  zip: JSZip,
+  themePath: string | null,
+): Promise<PPTXThemeContext> {
+  const colors = await readPPTXOpenXmlThemeColors(zip, themePath)
+  const fonts = await readPPTXOpenXmlThemeFonts(zip, themePath)
+  const styles = await readPPTXOpenXmlThemeStyles(zip, themePath)
+
+  return { colors, fonts, styles }
+}
+
+async function readPPTXOpenXmlThemeContextCached(
+  zip: JSZip,
+  themePath: string,
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>,
+) {
+  const cached = themeContextByPath.get(themePath)
+
+  if (cached) {
+    return await cached
+  }
+
+  const pending = readPPTXOpenXmlThemeContext(zip, themePath)
+
+  themeContextByPath.set(themePath, pending)
+
+  return await pending
+}
+
+function readPPTXThemeEffectStyles(
+  effectStyleList: Element | null,
+): Element[] {
+  return effectStyleList
+    ? getPPTXDescendantsByLocalName(effectStyleList, 'effectStyle')
+    : []
+}
+
+function readPPTXThemeFillStyles(
+  formatScheme: Element | null,
+): ReadonlyMap<number, Element> {
+  const fillStyles = new Map<number, Element>()
+
+  readPPTXThemeFillStyleList(formatScheme, 'fillStyleLst', 0, fillStyles)
+  readPPTXThemeFillStyleList(formatScheme, 'bgFillStyleLst', 1000, fillStyles)
+
+  return fillStyles
+}
+
+function readPPTXThemeFillStyleList(
+  formatScheme: Element | null,
+  listName: 'bgFillStyleLst' | 'fillStyleLst',
+  indexOffset: number,
+  fillStyles: Map<number, Element>,
+) {
+  const fillStyleList = getDirectPPTXChildByLocalName(formatScheme, listName)
+
+  Array.from(fillStyleList?.children ?? [])
+    .filter(isPPTXFillStyleElement)
+    .forEach((fill, index) => {
+      fillStyles.set(indexOffset + index + 1, fill)
+    })
+}
+
+function isPPTXFillStyleElement(element: Element) {
+  return element.localName === 'solidFill' ||
+    element.localName === 'gradFill' ||
+    element.localName === 'pattFill'
+}
+
+async function readPPTXOpenXmlThemePath(zip: JSZip) {
+  const presentationPath = 'ppt/presentation.xml'
+  const relationships = await readPPTXRelationships(zip, presentationPath)
+  const themeRelationship = Array.from(relationships.values())
+    .find((relationship) =>
+      relationship.targetMode !== 'External' &&
+      relationship.type.endsWith('/theme'))
+  const relatedThemePath = themeRelationship
+    ? resolvePPTXRelationshipTarget(presentationPath, themeRelationship.target)
+    : null
+
+  if (relatedThemePath && zip.file(relatedThemePath)) {
+    return relatedThemePath
+  }
+
+  return Object.keys(zip.files)
+    .filter((path) => /^ppt\/theme\/theme\d+\.xml$/.test(path))
+    .sort(comparePPTXNumberedPaths)[0] ?? null
+}
+
+async function readPPTXSlideThemeContext({
+  defaultThemeContext,
+  relationships,
+  slidePath,
+  themeContextByPath,
+  zip,
+}: {
+  defaultThemeContext: PPTXThemeContext
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>
+  zip: JSZip
+}) {
+  const themePath = await readPPTXSlideThemePath({
+    relationships,
+    slidePath,
+    zip,
+  })
+
+  return themePath
+    ? await readPPTXOpenXmlThemeContextCached(
+        zip,
+        themePath,
+        themeContextByPath,
+      )
+    : defaultThemeContext
+}
+
+async function readPPTXSlideThemePath({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const slideThemePath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (slideThemePath) {
+    return slideThemePath
+  }
+
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const layoutThemePath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (layoutThemePath) {
+    return layoutThemePath
+  }
+
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (!masterPath) {
+    return null
+  }
+
+  const masterRelationships = await readPPTXRelationships(zip, masterPath)
+
+  return readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/theme',
+    relationships: masterRelationships,
+    sourcePath: masterPath,
+    zip,
+  })
+}
+
+async function readPPTXSlideColorMapping({
+  doc,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  doc: Document | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXThemeColorMapping | null> {
+  const slideMapping = readPPTXColorMappingOverride(doc)
+
+  if (slideMapping) {
+    return slideMapping
+  }
+
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutXml = await zip.file(layoutPath)?.async('string') ?? ''
+  const layoutDoc = layoutXml ? parsePPTXXmlDocument(layoutXml) : null
+  const layoutMapping = readPPTXColorMappingOverride(layoutDoc)
+
+  if (layoutMapping) {
+    return layoutMapping
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+
+  if (!masterPath) {
+    return null
+  }
+
+  const masterXml = await zip.file(masterPath)?.async('string') ?? ''
+  const masterDoc = masterXml ? parsePPTXXmlDocument(masterXml) : null
+
+  return readPPTXColorMappingElement(
+    masterDoc ? getFirstPPTXDescendantByLocalName(masterDoc, 'clrMap') : null,
+  )
+}
+
+function readPPTXColorMappingOverride(
+  doc: Document | null,
+): PPTXThemeColorMapping | null {
+  const colorMapOverride = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'clrMapOvr')
+    : null
+  const overrideMapping = getDirectPPTXChildByLocalName(
+    colorMapOverride,
+    'overrideClrMapping',
+  )
+
+  return readPPTXColorMappingElement(overrideMapping)
+}
+
+function readPPTXColorMappingElement(
+  element: Element | null,
+): PPTXThemeColorMapping | null {
+  const entries = Array.from(element?.attributes ?? [])
+    .map((attribute) => [
+      attribute.localName,
+      attribute.value.trim(),
+    ])
+    .filter((entry) => entry[0] && entry[1])
+
+  return entries.length > 0 ? Object.fromEntries(entries) : null
+}
+
+function applyPPTXThemeColorMapping(
+  themeColors: PPTXThemeColorMap,
+  mapping: PPTXThemeColorMapping | null,
+): PPTXThemeColorMap {
+  if (!mapping) {
+    return themeColors
+  }
+
+  const colors = { ...themeColors }
+
+  for (const [alias, source] of Object.entries(mapping)) {
+    colors[alias] = themeColors[source] ?? themeColors[alias] ?? colors[alias]
+  }
+
+  return colors
+}
+
+function readPPTXThemeColorNode(colorNode: Element) {
+  const srgbColor = getDirectPPTXChildByLocalName(colorNode, 'srgbClr')
+  const scrgbColor = getDirectPPTXChildByLocalName(colorNode, 'scrgbClr')
+  const hslColor = getDirectPPTXChildByLocalName(colorNode, 'hslClr')
+  const presetColor = getDirectPPTXChildByLocalName(colorNode, 'prstClr')
+  const systemColor = getDirectPPTXChildByLocalName(colorNode, 'sysClr')
+  const color = [
+    {
+      color: readPPTXHexColor(srgbColor?.getAttribute('val')),
+      element: srgbColor,
+    },
+    {
+      color: readPPTXScrgbColor(scrgbColor),
+      element: scrgbColor,
+    },
+    {
+      color: readPPTXHslColor(hslColor),
+      element: hslColor,
+    },
+    {
+      color: readPPTXPresetColor(presetColor?.getAttribute('val')),
+      element: presetColor,
+    },
+    {
+      color: readPPTXHexColor(systemColor?.getAttribute('lastClr')) ??
+        readPPTXSystemColor(systemColor?.getAttribute('val')),
+      element: systemColor,
+    },
+  ].find((candidate) => candidate.color && candidate.element)
+
+  return color?.color && color.element
+    ? applyPPTXColorModifiers(color.color, color.element)
+    : color?.color
+}
+
+function resolvePPTXThemeSchemeColors(
+  themeColors: Readonly<Record<string, string>>,
+): PPTXThemeColorMap {
+  const colors = { ...PPTX_SCHEME_COLORS, ...themeColors }
+
+  for (const [alias, source] of Object.entries(PPTX_THEME_SCHEME_ALIASES)) {
+    colors[alias] = themeColors[source] ?? themeColors[alias] ?? colors[alias]
+  }
+
+  return colors
+}
+
+async function readPPTXOpenXmlSlide({
+  commentAuthors,
+  defaultThemeContext,
+  index,
+  path,
+  sectionName,
+  size,
+  slideNumber,
+  themeContextByPath,
+  zip,
+}: {
+  commentAuthors: PPTXCommentAuthorMap
+  defaultThemeContext: PPTXThemeContext
+  index: number
+  path: string
+  sectionName?: string
+  size: PPTDeck['size']
+  slideNumber: number
+  themeContextByPath: Map<string, Promise<PPTXThemeContext>>
+  zip: JSZip
+}): Promise<PPTSlide> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = parsePPTXXmlDocument(xml)
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+  const spTree = cSld
+    ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
+    : null
+  const relationships = await readPPTXSlideRelationships(zip, path)
+  const themeContext = await readPPTXSlideThemeContext({
+    defaultThemeContext,
+    relationships,
+    slidePath: path,
+    themeContextByPath,
+    zip,
+  })
+  const themeColorMapping = await readPPTXSlideColorMapping({
+    doc,
+    relationships,
+    slidePath: path,
+    zip,
+  })
+  const themeColors = applyPPTXThemeColorMapping(
+    themeContext.colors,
+    themeColorMapping,
+  )
+  const themeFonts = themeContext.fonts
+  const themeStyles = themeContext.styles
+  const placeholderGeometries = await readPPTXSlideLayoutPlaceholderGeometries({
+    relationships,
+    slidePath: path,
+    zip,
+  })
+  const placeholderTextBodies = await readPPTXSlideLayoutPlaceholderTextBodies({
+    relationships,
+    slidePath: path,
+    zip,
+  })
+  const notes = await readPPTXSlideNotes({
+    relationships,
+    slidePath: path,
+    zip,
+  })
+  const comments = await readPPTXSlideComments({
+    authors: commentAuthors,
+    relationships,
+    slideIndex: index,
+    slidePath: path,
+    zip,
+  })
+  const hidden = readPPTXSlideHidden(doc, xml)
+  const transition = readPPTXSlideTransition(doc, xml)
+  const elementIdByPptxObjectId = new Map<string, string>()
+  const lineConnectionRefsByElementId = new Map<string, PPTXLineConnectionRefs>()
+  const inheritedElements = await readPPTXInheritedLayoutElements({
+    index,
+    slideDoc: doc,
+    relationships,
+    slidePath: path,
+    slideXml: xml,
+    themeColors,
+    themeFonts,
+    themeStyles,
+    textFieldContext: { slideNumber },
+    zip,
+  })
+  const elements: PPTElement[] = [...inheritedElements]
+  const slideBackgroundImage = await readPPTXSlideBackgroundImage({
+    cSld,
+    index,
+    relationships,
+    slidePath: path,
+    size,
+    zip,
+  })
+  const layoutBackgroundImage = slideBackgroundImage
+    ? null
+    : await readPPTXSlideLayoutBackgroundImage({
+        index,
+        relationships,
+        slidePath: path,
+        size,
+        zip,
+      })
+  const backgroundImage = slideBackgroundImage ?? layoutBackgroundImage
+  const layoutBackground = await readPPTXSlideLayoutBackground({
+    relationships,
+    slidePath: path,
+    themeColors,
+    themeStyles,
+    zip,
+  })
+  let objectIndex = 1
+
+  for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
+    const child = objectNode.element
+    let element: PPTXImportedElementResult = null
+
+    if (child.localName === 'sp') {
+      element = isPPTXLineShape(child)
+        ? readPPTXLineElement(
+          child,
+          index,
+          objectIndex,
+          relationships,
+          themeColors,
+          themeStyles,
+        )
+        : await readPPTXShapeElement(
+          child,
+          index,
+          objectIndex,
+          relationships,
+          path,
+          themeColors,
+          themeFonts,
+          themeStyles,
+          placeholderGeometries,
+          placeholderTextBodies,
+          { slideNumber },
+          zip,
+        )
+    } else if (child.localName === 'cxnSp') {
+      element = readPPTXLineElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        themeColors,
+        themeStyles,
+      )
+    } else if (child.localName === 'pic') {
+      element = await readPPTXPictureElement({
+        index,
+        objectIndex,
+        pic: child,
+        relationships,
+        slidePath: path,
+        themeColors,
+        themeStyles,
+        zip,
+      })
+    } else if (child.localName === 'graphicFrame') {
+      element = await readPPTXGraphicFrameElement({
+        graphicFrame: child,
+        index,
+        objectIndex,
+        relationships,
+        slidePath: path,
+        themeColors,
+        zip,
+      })
+    } else if (child.localName === 'contentPart') {
+      element = readPPTXContentPartElement({
+        contentPart: child,
+        index,
+        objectIndex,
+        relationships,
+        slidePath: path,
+        themeColors,
+      })
+    }
+
+    if (element) {
+      const elementList = Array.isArray(element) ? element : [element]
+      const transformedElements = elementList.map((item) =>
+        applyPPTXGroupObjectNode(item, objectNode))
+      const firstTransformedElementId = transformedElements[0]?.id ?? ''
+
+      elements.push(...transformedElements)
+      for (const transformedElement of transformedElements) {
+        if (transformedElement.kind !== 'line') {
+          continue
+        }
+        const lineConnectionRefs = readPPTXLineConnectionRefs(child)
+
+        if (lineConnectionRefs) {
+          lineConnectionRefsByElementId.set(transformedElement.id, lineConnectionRefs)
+        }
+      }
+      if (firstTransformedElementId) {
+        for (const pptxObjectId of readPPTXObjectIds(child)) {
+          elementIdByPptxObjectId.set(pptxObjectId, firstTransformedElementId)
+        }
+      }
+      objectIndex += 1
+    }
+  }
+  const connectedElements = applyPPTXLineConnections({
+    elementIdByPptxObjectId,
+    elements,
+    lineConnectionRefsByElementId,
+  })
+  const animatedElements = applyPPTXElementAnimations({
+    elementIdByPptxObjectId,
+    elements: connectedElements,
+    importedAnimations: readPPTXSlideAnimations(doc, xml),
+  })
+  const slideBackground = readPPTXSlideBackground(cSld, themeColors, themeStyles) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors, themeStyles) ??
+    layoutBackground ?? {
+      background: { color: PPTX_DEFAULT_FILL_COLOR },
+    }
+
+  return {
+    ...slideBackground,
+    elements: backgroundImage
+      ? [backgroundImage, ...animatedElements, ...comments]
+      : [...animatedElements, ...comments],
+    id: `pptx-slide-${index + 1}`,
+    ...(hidden ? { hidden: true } : {}),
+    name: readPPTXSlideName(cSld, index, xml),
+    ...(notes ? { notes } : {}),
+    ...(sectionName ? { sectionName } : {}),
+    themeId: PPT_DEFAULT_THEME_ID,
+    ...(transition ? { transition } : {}),
+  }
+}
+
+function readPPTXSlideHidden(doc: Document | null, xml: string) {
+  const slide = doc?.documentElement?.localName === 'sld'
+    ? doc.documentElement
+    : null
+  const rootShow = slide?.getAttribute('show')
+  const xmlShow = xml.match(/<[\w.-]+:sld\b[^>]*\bshow="([^"]*)"/)?.[1] ??
+    xml.match(/<sld\b[^>]*\bshow="([^"]*)"/)?.[1]
+
+  return isPPTXFalse(rootShow) || isPPTXFalse(xmlShow)
+}
+
+function applyPPTXLineConnections({
+  elementIdByPptxObjectId,
+  elements,
+  lineConnectionRefsByElementId,
+}: {
+  elementIdByPptxObjectId: ReadonlyMap<string, string>
+  elements: readonly PPTElement[]
+  lineConnectionRefsByElementId: ReadonlyMap<string, PPTXLineConnectionRefs>
+}) {
+  return elements.map((element) => {
+    if (element.kind !== 'line') {
+      return element
+    }
+
+    const refs = lineConnectionRefsByElementId.get(element.id)
+
+    if (!refs) {
+      return element
+    }
+
+    const startConnection = resolvePPTXLineConnection(
+      refs.start,
+      elementIdByPptxObjectId,
+    )
+    const endConnection = resolvePPTXLineConnection(
+      refs.end,
+      elementIdByPptxObjectId,
+    )
+
+    return {
+      ...element,
+      ...(startConnection ? { startConnection } : {}),
+      ...(endConnection ? { endConnection } : {}),
+    }
+  })
+}
+
+function resolvePPTXLineConnection(
+  connection: PPTXLineConnectionRef | undefined,
+  elementIdByPptxObjectId: ReadonlyMap<string, string>,
+): PPTLineConnection | undefined {
+  if (!connection) {
+    return undefined
+  }
+
+  const elementId = elementIdByPptxObjectId.get(connection.objectId)
+
+  return elementId ? { anchor: connection.anchor, elementId } : undefined
+}
+
+function applyPPTXElementAnimations({
+  elementIdByPptxObjectId,
+  elements,
+  importedAnimations,
+}: {
+  elementIdByPptxObjectId: ReadonlyMap<string, string>
+  elements: readonly PPTElement[]
+  importedAnimations: readonly PPTXImportedAnimation[]
+}) {
+  const animationByElementId = new Map<string, PPTElementAnimation>()
+  const elementIdByObjectName = new Map(
+    elements.map((element) => [element.name, element.id]),
+  )
+
+  importedAnimations.forEach((imported, index) => {
+    const elementId = elementIdByPptxObjectId.get(imported.objectId) ??
+      (imported.objectName
+        ? elementIdByObjectName.get(imported.objectName)
+        : undefined)
+
+    if (elementId && !animationByElementId.has(elementId)) {
+      animationByElementId.set(elementId, {
+        ...imported.animation,
+        order: index + 1,
+      })
+    }
+  })
+
+  return elements.map((element) => {
+    const animation = animationByElementId.get(element.id)
+
+    return animation ? { ...element, animation } : element
+  })
+}
+
+function readPPTXObjectIds(element: Element) {
+  return getPPTXDescendantsByLocalName(element, 'cNvPr')
+    .map((nonVisualProperties) =>
+      nonVisualProperties.getAttribute('id')?.trim() ?? '')
+    .filter((id) => id.length > 0)
+}
+
+function applyPPTXGroupObjectNode(
+  element: PPTElement,
+  objectNode: PPTXSlideObjectNode,
+): PPTElement {
+  const withGroup = objectNode.groupId
+    ? { ...element, groupId: objectNode.groupId }
+    : element
+
+  return isPPTXIdentityGroupTransform(objectNode.transform)
+    ? withGroup
+    : transformPPTXElement(withGroup, objectNode.transform)
+}
+
+function getPPTXSlideObjectNodes(
+  spTree: Element | null,
+  xml: string,
+  slideIndex: number,
+) {
+  const treeNodes = spTree
+    ? getPPTXSlideObjectNodesFromContainer({
+        container: spTree,
+        groupId: undefined,
+        slideIndex,
+        transform: PPTX_IDENTITY_GROUP_TRANSFORM,
+      })
+    : []
+
+  if (treeNodes.length > 0) {
+    return treeNodes
+  }
+
+  const objectXml = selectPPTXAlternateContentXml(xml)
+
+  return [...objectXml.matchAll(/<p:(sp|cxnSp|pic|graphicFrame|contentPart)\b[\s\S]*?<\/p:\1>/g)]
+    .map((match) => parsePPTXXmlElementFragment(match[0], match[1]))
+    .filter((element): element is Element => element !== null)
+    .map((element) => ({
+      element,
+      transform: PPTX_IDENTITY_GROUP_TRANSFORM,
+    }))
+}
+
+function selectPPTXAlternateContentXml(xml: string) {
+  return xml.replace(
+    /<(?:[\w.-]+:)?AlternateContent\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?AlternateContent>/g,
+    (_match, content: string) => {
+      const choice = content.match(
+        /<(?:[\w.-]+:)?Choice\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Choice>/,
+      )
+      const fallback = content.match(
+        /<(?:[\w.-]+:)?Fallback\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Fallback>/,
+      )
+
+      return choice?.[1] ?? fallback?.[1] ?? ''
+    },
+  )
+}
+
+function getPPTXSlideObjectNodesFromContainer({
+  container,
+  groupId,
+  slideIndex,
+  transform,
+}: {
+  container: Element
+  groupId: string | undefined
+  slideIndex: number
+  transform: PPTXGroupTransform
+}): PPTXSlideObjectNode[] {
+  return Array.from(container.children).flatMap((child) => {
+    if (isPPTXSlideObjectNode(child)) {
+      return [{
+        element: child,
+        ...(groupId ? { groupId } : {}),
+        transform,
+      }]
+    }
+
+    if (child.localName === 'AlternateContent') {
+      return getPPTXSlideObjectNodesFromAlternateContent({
+        alternateContent: child,
+        groupId,
+        slideIndex,
+        transform,
+      })
+    }
+
+    if (child.localName !== 'grpSp') {
+      return []
+    }
+
+    const nextTransform = composePPTXGroupTransforms(
+      transform,
+      readPPTXGroupTransform(child),
+    )
+    const nextGroupId = groupId ??
+      readPPTXGroupId(child, slideIndex)
+
+    return getPPTXSlideObjectNodesFromContainer({
+      container: child,
+      groupId: nextGroupId,
+      slideIndex,
+      transform: nextTransform,
+    })
+  })
+}
+
+function getPPTXSlideObjectNodesFromAlternateContent({
+  alternateContent,
+  groupId,
+  slideIndex,
+  transform,
+}: {
+  alternateContent: Element
+  groupId: string | undefined
+  slideIndex: number
+  transform: PPTXGroupTransform
+}) {
+  const choices = getDirectPPTXChildrenByLocalName(alternateContent, 'Choice')
+  const fallback = getDirectPPTXChildByLocalName(alternateContent, 'Fallback')
+
+  for (const container of [
+    ...choices,
+    ...(fallback ? [fallback] : []),
+  ]) {
+    const nodes = getPPTXSlideObjectNodesFromContainer({
+      container,
+      groupId,
+      slideIndex,
+      transform,
+    })
+
+    if (nodes.length > 0) {
+      return nodes
+    }
+  }
+
+  return []
+}
+
+function isPPTXSlideObjectNode(element: Element) {
+  return element.localName === 'sp' ||
+    element.localName === 'cxnSp' ||
+    element.localName === 'contentPart' ||
+    element.localName === 'pic' ||
+    element.localName === 'graphicFrame'
+}
+
+function readPPTXGroupId(group: Element, slideIndex: number) {
+  const id = getFirstPPTXDescendantByLocalName(group, 'cNvPr')
+    ?.getAttribute('id')
+    ?.trim()
+  const name = readPPTXObjectName(group, 'group')
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return `pptx-slide-${slideIndex + 1}-group-${id || name || 'object'}`
+}
+
+function readPPTXSlideName(
+  cSld: Element | null,
+  index: number,
+  xml: string,
+) {
+  const explicitName = cSld?.getAttribute('name')?.trim() ??
+    xml.match(/<p:cSld\b[^>]*\bname="([^"]*)"/)?.[1]
+
+  return explicitName
+    ? unescapePPTXXmlAttribute(explicitName)
+    : `Slide ${index + 1}`
+}
+
+function readPPTXSlideBackground(
+  cSld: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+) {
+  const background = cSld
+    ? getDirectPPTXChildByLocalName(cSld, 'bg')
+    : null
+  const bgPr = getDirectPPTXChildByLocalName(background, 'bgPr') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr') : null)
+  const bgRef = getDirectPPTXChildByLocalName(background, 'bgRef') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgRef') : null)
+  const fill = readPPTXFill(bgPr, themeColors) ??
+    readPPTXBackgroundRefFill(bgRef, themeColors, themeStyles)
+
+  return fill ? { background: fill } : null
+}
+
+function readPPTXSlideBackgroundFromXml(
+  xml: string,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+) {
+  const bgPrXml = xml.match(/<p:bgPr\b[\s\S]*?<\/p:bgPr>/)?.[0]
+  const bgRefXml = xml.match(/<p:bgRef\b[\s\S]*?<\/p:bgRef>/)?.[0]
+  const bgPr = bgPrXml ? parsePPTXXmlElementFragment(bgPrXml, 'bgPr') : null
+  const bgRef = bgRefXml ? parsePPTXXmlElementFragment(bgRefXml, 'bgRef') : null
+  const fill = readPPTXFill(bgPr, themeColors) ??
+    readPPTXBackgroundRefFill(bgRef, themeColors, themeStyles)
+
+  return fill ? { background: fill } : null
+}
+
+function readPPTXBackgroundRefFill(
+  bgRef: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTFill | null {
+  const referenceFill = readPPTXColorFill(bgRef, themeColors)
+  const styleFill = readPPTXStyleReferenceFill(
+    bgRef,
+    themeColors,
+    themeStyles,
+    referenceFill?.color,
+  )
+
+  return styleFill ?? referenceFill
+}
+
+async function readPPTXSlideLayoutBackground({
+  relationships,
+  slidePath,
+  themeColors,
+  themeStyles,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
+  zip: JSZip
+}): Promise<Pick<PPTSlide, 'background'> | null> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterBackground = masterPath
+    ? await readPPTXPartBackground(zip, masterPath, themeColors, themeStyles)
+    : null
+  const layoutBackground = await readPPTXPartBackground(
+    zip,
+    layoutPath,
+    themeColors,
+    themeStyles,
+  )
+
+  return layoutBackground ?? masterBackground
+}
+
+async function readPPTXPartBackground(
+  zip: JSZip,
+  path: string,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): Promise<Pick<PPTSlide, 'background'> | null> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+
+  return readPPTXSlideBackground(cSld, themeColors, themeStyles) ??
+    readPPTXSlideBackgroundFromXml(xml, themeColors, themeStyles)
+}
+
+async function readPPTXSlideBackgroundImage({
+  cSld,
+  index,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  cSld: Element | null
+  index: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  return await readPPTXBackgroundImage({
+    alt: 'Slide background image',
+    cSld,
+    id: `pptx-slide-${index + 1}-background-image`,
+    name: 'Background Image',
+    relationships,
+    slidePath,
+    size,
+    zip,
+  })
+}
+
+async function readPPTXSlideLayoutBackgroundImage({
+  index,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  index: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return null
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterBackgroundImage = masterPath
+    ? await readPPTXPartBackgroundImage({
+        index,
+        path: masterPath,
+        relationships: await readPPTXRelationships(zip, masterPath),
+        source: 'master',
+        size,
+        zip,
+      })
+    : null
+  const layoutBackgroundImage = await readPPTXPartBackgroundImage({
+    index,
+    path: layoutPath,
+    relationships: layoutRelationships,
+    source: 'layout',
+    size,
+    zip,
+  })
+
+  return layoutBackgroundImage ?? masterBackgroundImage
+}
+
+async function readPPTXPartBackgroundImage({
+  index,
+  path,
+  relationships,
+  source,
+  size,
+  zip,
+}: {
+  index: number
+  path: string
+  relationships: PPTXRelationshipMap
+  source: PPTXInheritedElementSource
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+  const label = source === 'layout' ? 'Layout' : 'Master'
+
+  return await readPPTXBackgroundImage({
+    alt: `${label} background image`,
+    cSld,
+    id: `pptx-slide-${index + 1}-${source}-background-image`,
+    name: `${label} Background Image`,
+    relationships,
+    slidePath: path,
+    size,
+    zip,
+  })
+}
+
+async function readPPTXBackgroundImage({
+  alt,
+  cSld,
+  id,
+  name,
+  relationships,
+  slidePath,
+  size,
+  zip,
+}: {
+  alt: string
+  cSld: Element | null
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  size: PPTDeck['size']
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const background = cSld
+    ? getDirectPPTXChildByLocalName(cSld, 'bg')
+    : null
+  const bgPr = getDirectPPTXChildByLocalName(background, 'bgPr') ??
+    (cSld ? getFirstPPTXDescendantByLocalName(cSld, 'bgPr') : null)
+  const blipFill = getDirectPPTXChildByLocalName(bgPr, 'blipFill') ??
+    getFirstPPTXDescendantByLocalName(bgPr, 'blipFill')
+  const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
+  const source = await readPPTXImageSource({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const placeholderElement = bgPr ?? background ?? cSld
+  const geometry = {
+    h: size.h,
+    w: size.w,
+    x: 0,
+    y: 0,
+  }
+
+  if (!source) {
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource && placeholderElement
+      ? {
+          ...createPPTXUnsupportedImagePlaceholderElement({
+            element: placeholderElement,
+            geometry,
+            id,
+            name,
+            relationships,
+            shadow: null,
+            source: missingSource,
+            spPr: bgPr,
+          }),
+          locked: true,
+        }
+      : null
+  }
+
+  if (!source.renderable) {
+    return placeholderElement
+      ? {
+          ...createPPTXUnsupportedImagePlaceholderElement({
+            element: placeholderElement,
+            geometry,
+            id,
+            name,
+            relationships,
+            shadow: null,
+            source,
+            spPr: bgPr,
+          }),
+          locked: true,
+        }
+      : null
+  }
+
+  const crop = readPPTXImageCrop(blipFill ?? bgPr ?? background ?? cSld)
+  const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
+
+  return {
+    ...(adjustments ? { adjustments } : {}),
+    alt,
+    ...(crop ? { crop } : {}),
+    fit: 'cover',
+    geometry,
+    id,
+    kind: 'image',
+    locked: true,
+    name,
+    ...(opacity === null ? {} : { opacity }),
+    src: source.src,
+  }
+}
+
+async function readPPTXSlideLayoutPlaceholderGeometries({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXPlaceholderGeometryMap> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return new Map()
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterGeometries = masterPath
+    ? await readPPTXPartPlaceholderGeometries(zip, masterPath)
+    : new Map()
+  const layoutGeometries = await readPPTXPartPlaceholderGeometries(zip, layoutPath)
+
+  return new Map([...masterGeometries, ...layoutGeometries])
+}
+
+async function readPPTXSlideLayoutPlaceholderTextBodies({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXPlaceholderTextBodyMap> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return new Map()
+  }
+
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const masterTextBodies = masterPath
+    ? await readPPTXPartPlaceholderTextBodies(zip, masterPath)
+    : new Map()
+  const layoutTextBodies = await readPPTXPartPlaceholderTextBodies(zip, layoutPath)
+
+  return new Map([...masterTextBodies, ...layoutTextBodies])
+}
+
+async function readPPTXInheritedLayoutElements({
+  index,
+  relationships,
+  slideDoc,
+  slidePath,
+  slideXml,
+  themeColors,
+  themeFonts,
+  themeStyles,
+  textFieldContext,
+  zip,
+}: {
+  index: number
+  relationships: PPTXRelationshipMap
+  slideDoc: Document | null
+  slidePath: string
+  slideXml: string
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
+  zip: JSZip
+}): Promise<PPTElement[]> {
+  const layoutPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideLayout',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+
+  if (!layoutPath) {
+    return []
+  }
+
+  const slideShowsMasterShapes = readPPTXPartShowsMasterShapes(slideDoc, slideXml)
+  const slideHeaderFooterVisibility = readPPTXHeaderFooterVisibility(
+    slideDoc,
+    slideXml,
+  )
+  const layoutRelationships = await readPPTXRelationships(zip, layoutPath)
+  const layoutXml = await zip.file(layoutPath)?.async('string') ?? ''
+  const layoutDoc = layoutXml ? parsePPTXXmlDocument(layoutXml) : null
+  const layoutShowsMasterShapes = readPPTXPartShowsMasterShapes(
+    layoutDoc,
+    layoutXml,
+  )
+  const layoutHeaderFooterVisibility = readPPTXHeaderFooterVisibility(
+    layoutDoc,
+    layoutXml,
+  )
+  const masterPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/slideMaster',
+    relationships: layoutRelationships,
+    sourcePath: layoutPath,
+    zip,
+  })
+  const showsMasterShapes = slideShowsMasterShapes && layoutShowsMasterShapes
+  const masterElements = masterPath && showsMasterShapes
+    ? await readPPTXPartInheritedElements({
+        headerFooterVisibility: resolvePPTXHeaderFooterVisibility(
+          slideHeaderFooterVisibility,
+          layoutHeaderFooterVisibility,
+        ),
+        index,
+        path: masterPath,
+        relationships: await readPPTXRelationships(zip, masterPath),
+        source: 'master',
+        themeColors,
+        themeFonts,
+        themeStyles,
+        textFieldContext,
+        zip,
+      })
+    : []
+  const layoutElements = await readPPTXPartInheritedElements({
+    headerFooterVisibility: slideHeaderFooterVisibility,
+    index,
+    path: layoutPath,
+    relationships: layoutRelationships,
+    source: 'layout',
+    themeColors,
+    themeFonts,
+    themeStyles,
+    textFieldContext,
+    zip,
+  })
+
+  return [...masterElements, ...layoutElements]
+}
+
+function readPPTXPartShowsMasterShapes(
+  doc: Document | null,
+  xml: string,
+) {
+  const rootValue = doc?.documentElement?.getAttribute('showMasterSp')
+  const xmlValue = xml.match(
+    /<[\w.-]+:(?:sld|sldLayout)\b[^>]*\bshowMasterSp="([^"]*)"/,
+  )?.[1] ??
+    xml.match(/<(?:sld|sldLayout)\b[^>]*\bshowMasterSp="([^"]*)"/)?.[1]
+
+  return !isPPTXFalse(rootValue ?? xmlValue)
+}
+
+function readPPTXHeaderFooterVisibility(
+  doc: Document | null,
+  xml: string,
+): PPTXHeaderFooterVisibility {
+  const headerFooter = doc ? getFirstPPTXDescendantByLocalName(doc, 'hf') : null
+  const xmlHeaderFooter = xml.match(/<[\w.-]+:hf\b[^>]*\/?>/)?.[0] ??
+    xml.match(/<hf\b[^>]*\/?>/)?.[0] ??
+    ''
+
+  return {
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'dt'),
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'ftr'),
+    ...readPPTXHeaderFooterVisibilityAttribute(headerFooter, xmlHeaderFooter, 'hdr'),
+    ...readPPTXHeaderFooterVisibilityAttribute(
+      headerFooter,
+      xmlHeaderFooter,
+      'sldNum',
+    ),
+  }
+}
+
+function readPPTXHeaderFooterVisibilityAttribute(
+  headerFooter: Element | null,
+  xml: string,
+  attribute: PPTXHeaderFooterPlaceholderType,
+): PPTXHeaderFooterVisibility {
+  const value = headerFooter?.getAttribute(attribute) ??
+    xml.match(new RegExp(`\\b${attribute}="([^"]*)"`))?.[1]
+
+  if (isPPTXTrue(value)) {
+    return { [attribute]: true }
+  }
+
+  return isPPTXFalse(value) ? { [attribute]: false } : {}
+}
+
+function resolvePPTXHeaderFooterVisibility(
+  ...items: PPTXHeaderFooterVisibility[]
+): PPTXHeaderFooterVisibility {
+  const next: Partial<Record<PPTXHeaderFooterPlaceholderType, boolean>> = {}
+
+  for (const key of ['dt', 'ftr', 'hdr', 'sldNum'] as const) {
+    const values = items.map((item) => item[key])
+    const explicitValue = values.find((value) => value !== undefined)
+
+    if (explicitValue !== undefined) {
+      next[key] = explicitValue
+    }
+  }
+
+  return next
+}
+
+async function readPPTXPartInheritedElements({
+  headerFooterVisibility,
+  index,
+  path,
+  relationships,
+  source,
+  themeColors,
+  themeFonts,
+  themeStyles,
+  textFieldContext,
+  zip,
+}: {
+  headerFooterVisibility: PPTXHeaderFooterVisibility
+  index: number
+  path: string
+  relationships: PPTXRelationshipMap
+  source: PPTXInheritedElementSource
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
+  zip: JSZip
+}): Promise<PPTElement[]> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const cSld = doc ? getFirstPPTXDescendantByLocalName(doc, 'cSld') : null
+  const spTree = cSld
+    ? getFirstPPTXDescendantByLocalName(cSld, 'spTree')
+    : null
+  const effectiveHeaderFooterVisibility = resolvePPTXHeaderFooterVisibility(
+    headerFooterVisibility,
+    readPPTXHeaderFooterVisibility(doc, xml),
+  )
+  const inheritedElements: PPTElement[] = []
+  let objectIndex = 1
+
+  for (const objectNode of getPPTXSlideObjectNodes(spTree, xml, index)) {
+    const child = objectNode.element
+    const placeholder = readPPTXPlaceholderRef(child)
+
+    if (
+      placeholder &&
+      !isPPTXRenderableInheritedPlaceholder(
+        child,
+        placeholder,
+        effectiveHeaderFooterVisibility,
+      )
+    ) {
+      continue
+    }
+
+    const element = await readPPTXInheritedElement({
+      child,
+      index,
+      objectIndex,
+      path,
+      relationships,
+      themeColors,
+      themeFonts,
+      themeStyles,
+      textFieldContext,
+      zip,
+    })
+
+    if (!element) {
+      continue
+    }
+
+    const elementList = Array.isArray(element) ? element : [element]
+
+    inheritedElements.push(...elementList.map((item) =>
+      applyPPTXInheritedElementSource(
+        applyPPTXGroupObjectNode(item, objectNode),
+        index,
+        objectIndex,
+        source,
+      )))
+    objectIndex += 1
+  }
+
+  return inheritedElements
+}
+
+function isPPTXRenderableInheritedPlaceholder(
+  element: Element,
+  placeholder: PPTXPlaceholderRef,
+  headerFooterVisibility: PPTXHeaderFooterVisibility,
+) {
+  const type = placeholder.type
+
+  if (!isPPTXHeaderFooterPlaceholderType(type)) {
+    return false
+  }
+
+  if (headerFooterVisibility[type] === false) {
+    return false
+  }
+
+  const txBody = getDirectPPTXChildByLocalName(element, 'txBody')
+
+  return txBody ? readPPTXPlainTextBody(txBody).trim().length > 0 : false
+}
+
+function isPPTXHeaderFooterPlaceholderType(
+  type: string | undefined,
+): type is PPTXHeaderFooterPlaceholderType {
+  return type === 'dt' ||
+    type === 'ftr' ||
+    type === 'hdr' ||
+    type === 'sldNum'
+}
+
+async function readPPTXInheritedElement({
+  child,
+  index,
+  objectIndex,
+  path,
+  relationships,
+  themeColors,
+  themeFonts,
+  themeStyles,
+  textFieldContext,
+  zip,
+}: {
+  child: Element
+  index: number
+  objectIndex: number
+  path: string
+  relationships: PPTXRelationshipMap
+  themeColors: PPTXThemeColorMap
+  themeFonts: PPTXThemeFontMap
+  themeStyles: PPTXThemeStyleMap
+  textFieldContext: PPTXTextFieldContext
+  zip: JSZip
+}): Promise<PPTXImportedElementResult> {
+  if (child.localName === 'sp') {
+    return isPPTXLineShape(child)
+      ? readPPTXLineElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        themeColors,
+        themeStyles,
+      )
+      : await readPPTXShapeElement(
+        child,
+        index,
+        objectIndex,
+        relationships,
+        path,
+        themeColors,
+        themeFonts,
+        themeStyles,
+        new Map(),
+        new Map(),
+        textFieldContext,
+        zip,
+      )
+  }
+
+  if (child.localName === 'cxnSp') {
+    return readPPTXLineElement(
+      child,
+      index,
+      objectIndex,
+      relationships,
+      themeColors,
+      themeStyles,
+    )
+  }
+
+  if (child.localName === 'pic') {
+    return await readPPTXPictureElement({
+      index,
+      objectIndex,
+      pic: child,
+      relationships,
+      slidePath: path,
+      themeColors,
+      themeStyles,
+      zip,
+    })
+  }
+
+  if (child.localName === 'graphicFrame') {
+    return await readPPTXGraphicFrameElement({
+      graphicFrame: child,
+      index,
+      objectIndex,
+      relationships,
+      slidePath: path,
+      themeColors,
+      zip,
+    })
+  }
+
+  if (child.localName === 'contentPart') {
+    return readPPTXContentPartElement({
+      contentPart: child,
+      index,
+      objectIndex,
+      relationships,
+      slidePath: path,
+      themeColors,
+    })
+  }
+
+  return null
+}
+
+function applyPPTXInheritedElementSource(
+  element: PPTElement,
+  slideIndex: number,
+  objectIndex: number,
+  source: PPTXInheritedElementSource,
+): PPTElement {
+  return {
+    ...element,
+    id: `pptx-slide-${slideIndex + 1}-${source}-object-${objectIndex}`,
+    locked: true,
+  }
+}
+
+async function readPPTXPartPlaceholderGeometries(
+  zip: JSZip,
+  path: string,
+): Promise<PPTXPlaceholderGeometryMap> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const geometries: PPTXPlaceholderGeometryMap = new Map()
+
+  if (!doc) {
+    return geometries
+  }
+
+  for (const shape of getPPTXDescendantsByLocalName(doc, 'sp')) {
+    const placeholder = readPPTXPlaceholderRef(shape)
+    const geometry = readPPTXElementGeometry(
+      getDirectPPTXChildByLocalName(shape, 'spPr'),
+    )
+
+    if (!placeholder || !geometry) {
+      continue
+    }
+
+    for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+      if (!geometries.has(key)) {
+        geometries.set(key, geometry)
+      }
+    }
+  }
+
+  return geometries
+}
+
+async function readPPTXPartPlaceholderTextBodies(
+  zip: JSZip,
+  path: string,
+): Promise<PPTXPlaceholderTextBodyMap> {
+  const xml = await zip.file(path)?.async('string') ?? ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const textBodies: PPTXPlaceholderTextBodyMap = new Map()
+
+  if (!doc) {
+    return textBodies
+  }
+
+  for (const shape of getPPTXDescendantsByLocalName(doc, 'sp')) {
+    const placeholder = readPPTXPlaceholderRef(shape)
+    const txBody = getDirectPPTXChildByLocalName(shape, 'txBody')
+
+    if (!placeholder || !txBody) {
+      continue
+    }
+
+    for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+      if (!textBodies.has(key)) {
+        textBodies.set(key, txBody)
+      }
+    }
+  }
+
+  return textBodies
+}
+
+function readPPTXPlaceholderGeometry(
+  element: Element,
+  geometries: PPTXPlaceholderGeometryMap,
+): PPTGeometry | null {
+  const placeholder = readPPTXPlaceholderRef(element)
+
+  if (!placeholder) {
+    return null
+  }
+
+  for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+    const geometry = geometries.get(key)
+
+    if (geometry) {
+      return { ...geometry }
+    }
+  }
+
+  return null
+}
+
+function readPPTXPlaceholderTextBody(
+  element: Element,
+  textBodies: PPTXPlaceholderTextBodyMap,
+): Element | null {
+  const placeholder = readPPTXPlaceholderRef(element)
+
+  if (!placeholder) {
+    return null
+  }
+
+  for (const key of getPPTXPlaceholderLookupKeys(placeholder)) {
+    const txBody = textBodies.get(key)
+
+    if (txBody) {
+      return txBody
+    }
+  }
+
+  return null
+}
+
+function readPPTXPlaceholderRef(element: Element): PPTXPlaceholderRef | null {
+  const placeholder = getFirstPPTXDescendantByLocalName(element, 'ph')
+  const type = placeholder?.getAttribute('type')?.trim() || undefined
+  const idx = placeholder?.getAttribute('idx')?.trim() || undefined
+
+  return type || idx ? {
+    ...(idx ? { idx } : {}),
+    ...(type ? { type } : {}),
+  } : null
+}
+
+function getPPTXPlaceholderLookupKeys(placeholder: PPTXPlaceholderRef) {
+  const keys: string[] = []
+  const types = getPPTXPlaceholderTypeCandidates(placeholder.type)
+
+  if (placeholder.idx) {
+    for (const type of types) {
+      keys.push(`type:${type}:idx:${placeholder.idx}`)
+    }
+    keys.push(`idx:${placeholder.idx}`)
+  }
+
+  for (const type of types) {
+    keys.push(`type:${type}`)
+  }
+
+  return [...new Set(keys)]
+}
+
+function getPPTXPlaceholderTypeCandidates(type: string | undefined) {
+  if (!type) {
+    return []
+  }
+
+  if (type === 'title') {
+    return ['title', 'ctrTitle']
+  }
+
+  if (type === 'ctrTitle') {
+    return ['ctrTitle', 'title']
+  }
+
+  if (type === 'body') {
+    return ['body', 'obj']
+  }
+
+  if (type === 'obj') {
+    return ['obj', 'body']
+  }
+
+  return [type]
+}
+
+function readPPTXRelatedPartPath({
+  relationshipTypeSuffix,
+  relationships,
+  sourcePath,
+  zip,
+}: {
+  relationshipTypeSuffix: string
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+  zip: JSZip
+}) {
+  const relationship = Array.from(relationships.values())
+    .find((candidate) =>
+      candidate.targetMode !== 'External' &&
+      candidate.type.endsWith(relationshipTypeSuffix))
+  const path = relationship
+    ? resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
+}
+
+function readPPTXRelationshipPartPath({
+  relationshipId,
+  relationships,
+  sourcePath,
+  zip,
+}: {
+  relationshipId: string
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+  zip: JSZip
+}) {
+  const relationship = relationships.get(relationshipId)
+  const path = relationship && relationship.targetMode !== 'External'
+    ? resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
+}
+
+function readPPTXSlideTransition(
+  doc: Document | null,
+  xml: string,
+): PPTSlideTransition | null {
+  const transition = doc
+    ? getFirstPPTXDescendantByLocalName(doc, 'transition')
+    : null
+
+  if (!transition) {
+    return readPPTXSlideTransitionFromXml(xml)
+  }
+
+  return readPPTXSlideTransitionElement(transition)
+}
+
+function readPPTXSlideTransitionElement(
+  transition: Element,
+): PPTSlideTransition {
+  return {
+    advanceAfterMs: toPPTXPositiveNumber(transition.getAttribute('advTm')),
+    advanceOnClick: transition.getAttribute('advClick') !== '0',
+    durationMs: readPPTXSlideTransitionDuration(transition),
+    type: readPPTXSlideTransitionType(transition),
+  }
+}
+
+function readPPTXSlideTransitionFromXml(xml: string): PPTSlideTransition | null {
+  const match = xml.match(/<p:transition\b([^>]*)>([\s\S]*?)<\/p:transition>|<p:transition\b([^>]*)\/>/)
+
+  if (!match) {
+    return null
+  }
+
+  const attributes = match[1] ?? match[3] ?? ''
+  const body = match[2] ?? ''
+
+  return {
+    advanceAfterMs: toPPTXPositiveNumber(readPPTXXmlAttribute(attributes, 'advTm')),
+    advanceOnClick: readPPTXXmlAttribute(attributes, 'advClick') !== '0',
+    durationMs: toPPTXPositiveNumber(
+      readPPTXXmlAttribute(attributes, 'dur') ??
+        readPPTXXmlAttribute(attributes, 'p14:dur'),
+    ) ?? readPPTXSlideTransitionSpeedDurationFromValue(
+      readPPTXXmlAttribute(attributes, 'spd'),
+    ),
+    type: body.includes('<p:push')
+      ? 'push'
+      : body.includes('<p:fade')
+        ? 'fade'
+        : 'none',
+  }
+}
+
+function readPPTXSlideTransitionDuration(transition: Element) {
+  return toPPTXPositiveNumber(
+    transition.getAttribute('p14:dur') ??
+      getPPTXAttributeByLocalName(transition, 'dur'),
+  ) ?? readPPTXSlideTransitionSpeedDurationFromValue(
+    transition.getAttribute('spd'),
+  )
+}
+
+function readPPTXSlideTransitionSpeedDurationFromValue(
+  speed: string | null,
+) {
+  if (speed === 'fast') {
+    return 500
+  }
+
+  if (speed === 'slow') {
+    return 1500
+  }
+
+  return 650
+}
+
+function readPPTXSlideTransitionType(
+  transition: Element,
+): PPTSlideTransition['type'] {
+  if (getDirectPPTXChildByLocalName(transition, 'push')) {
+    return 'push'
+  }
+
+  return getDirectPPTXChildByLocalName(transition, 'fade') ? 'fade' : 'none'
+}
+
+function readPPTXSlideAnimations(
+  doc: Document | null,
+  xml: string,
+): PPTXImportedAnimation[] {
+  const objectNameById = readPPTXObjectNameByIdFromXml(xml)
+  const fromDom = doc
+    ? Array.from(doc.getElementsByTagName('*'))
+      .filter((element) =>
+        element.localName === 'animEffect' ||
+        element.localName === 'animMotion')
+      .map(readPPTXAnimationEffect)
+      .filter((animation): animation is PPTXImportedAnimation => animation !== null)
+    : []
+  const fromXml = readPPTXSlideAnimationsFromXml(xml)
+  const seen = new Set<string>()
+
+  return [...fromDom, ...fromXml]
+    .map((animation) => ({
+      ...animation,
+      ...(objectNameById.get(animation.objectId)
+        ? { objectName: objectNameById.get(animation.objectId) }
+        : {}),
+    }))
+    .filter((animation) => {
+      const key = [
+        animation.objectId,
+        animation.animation.delayMs,
+        animation.animation.durationMs,
+        animation.animation.trigger,
+        animation.animation.type,
+      ].join(':')
+
+      if (seen.has(key)) {
+        return false
+      }
+
+      seen.add(key)
+      return true
+    })
+}
+
+function readPPTXAnimationEffect(effect: Element): PPTXImportedAnimation | null {
+  const objectId = getFirstPPTXDescendantByLocalName(effect, 'spTgt')
+    ?.getAttribute('spid')
+    ?.trim()
+  const behavior = getDirectPPTXChildByLocalName(effect, 'cBhvr') ??
+    getFirstPPTXDescendantByLocalName(effect, 'cBhvr')
+  const behaviorTiming = getDirectPPTXChildByLocalName(behavior, 'cTn')
+  const containerTiming = findPPTXAncestorByLocalName(effect, 'cTn')
+
+  if (!objectId || !behaviorTiming || !containerTiming) {
+    return null
+  }
+
+  const trigger: PPTElementAnimation['trigger'] =
+    containerTiming.getAttribute('nodeType') === 'withEffect'
+      ? 'withPrevious'
+      : 'onClick'
+  const behaviorDelayMs = readPPTXAnimationDelayMs(behaviorTiming) ?? 0
+  const containerDelayMs = readPPTXAnimationDelayMs(containerTiming) ?? 0
+  const type = readPPTXAnimationType(effect)
+
+  if (!type) {
+    return null
+  }
+
+  return {
+    animation: {
+      delayMs: trigger === 'withPrevious' ? containerDelayMs : behaviorDelayMs,
+      durationMs: toPPTXPositiveNumber(behaviorTiming.getAttribute('dur')) ?? 500,
+      order: 1,
+      trigger,
+      type,
+    },
+    objectId,
+  }
+}
+
+function readPPTXAnimationType(
+  effect: Element,
+): PPTElementAnimation['type'] | null {
+  if (effect.localName === 'animMotion') {
+    return 'flyIn'
+  }
+
+  const filter = effect.getAttribute('filter')?.toLowerCase() ?? ''
+  const transition = effect.getAttribute('transition')
+
+  return effect.localName === 'animEffect' &&
+    transition === 'in' &&
+    filter.includes('fade')
+    ? 'fadeIn'
+    : null
+}
+
+function readPPTXAnimationDelayMs(timing: Element) {
+  const stCondLst = getDirectPPTXChildByLocalName(timing, 'stCondLst')
+  const condition = getDirectPPTXChildByLocalName(stCondLst, 'cond')
+
+  return toPPTXPositiveNumber(condition?.getAttribute('delay'))
+}
+
+function readPPTXSlideAnimationsFromXml(xml: string): PPTXImportedAnimation[] {
+  const animations: PPTXImportedAnimation[] = []
+
+  for (const match of xml.matchAll(/<p:par>([\s\S]*?)<\/p:par>/g)) {
+    const block = match[1]
+
+    if (!block.includes('<p:animEffect') && !block.includes('<p:animMotion')) {
+      continue
+    }
+
+    const animation = readPPTXAnimationEffectFromXml(block)
+
+    if (animation) {
+      animations.push(animation)
+    }
+  }
+
+  return animations
+}
+
+function readPPTXAnimationEffectFromXml(
+  block: string,
+): PPTXImportedAnimation | null {
+  const targetAttributes = block.match(/<p:spTgt\b([^>]*)\/>/)?.[1] ?? ''
+  const objectId = readPPTXXmlAttribute(targetAttributes, 'spid')?.trim()
+  const effectMatch = block.match(/<p:(animEffect|animMotion)\b([^>]*)>([\s\S]*?)<\/p:\1>/)
+  const containerAttributes = block.match(/<p:cTn\b([^>]*)>/)?.[1] ?? ''
+  const behaviorMatch = effectMatch?.[3]
+    .match(/<p:cBhvr>[\s\S]*?<p:cTn\b([^>]*)>([\s\S]*?)<\/p:cTn>/)
+  const behaviorAttributes = behaviorMatch?.[1] ?? ''
+  const behaviorBody = behaviorMatch?.[2] ?? ''
+
+  if (!objectId || !effectMatch || !behaviorMatch) {
+    return null
+  }
+
+  const type = readPPTXAnimationTypeFromXml(
+    effectMatch[1],
+    effectMatch[2],
+  )
+
+  if (!type) {
+    return null
+  }
+
+  const trigger: PPTElementAnimation['trigger'] =
+    readPPTXXmlAttribute(containerAttributes, 'nodeType') === 'withEffect'
+      ? 'withPrevious'
+      : 'onClick'
+  const behaviorDelayMs = readPPTXAnimationDelayMsFromXml(behaviorBody) ?? 0
+  const containerDelayMs = readPPTXAnimationDelayMsFromXml(block) ?? 0
+
+  return {
+    animation: {
+      delayMs: trigger === 'withPrevious' ? containerDelayMs : behaviorDelayMs,
+      durationMs: toPPTXPositiveNumber(
+        readPPTXXmlAttribute(behaviorAttributes, 'dur'),
+      ) ?? 500,
+      order: 1,
+      trigger,
+      type,
+    },
+    objectId,
+  }
+}
+
+function readPPTXAnimationTypeFromXml(
+  tagName: string,
+  attributes: string,
+): PPTElementAnimation['type'] | null {
+  if (tagName === 'animMotion') {
+    return 'flyIn'
+  }
+
+  const filter = readPPTXXmlAttribute(attributes, 'filter')?.toLowerCase() ?? ''
+  const transition = readPPTXXmlAttribute(attributes, 'transition')
+
+  return tagName === 'animEffect' &&
+    transition === 'in' &&
+    filter.includes('fade')
+    ? 'fadeIn'
+    : null
+}
+
+function readPPTXAnimationDelayMsFromXml(xml: string) {
+  const conditionAttributes = xml.match(/<p:cond\b([^>]*)\/>/)?.[1] ?? ''
+
+  return toPPTXPositiveNumber(
+    readPPTXXmlAttribute(conditionAttributes, 'delay'),
+  )
+}
+
+function readPPTXObjectNameByIdFromXml(xml: string) {
+  const objectNameById = new Map<string, string>()
+
+  for (const match of xml.matchAll(/<p:cNvPr\b([^>]*)>/g)) {
+    const id = readPPTXXmlAttribute(match[1], 'id')?.trim()
+    const name = readPPTXXmlAttribute(match[1], 'name')?.trim()
+
+    if (id && name) {
+      objectNameById.set(id, unescapePPTXXmlAttribute(name))
+    }
+  }
+
+  return objectNameById
+}
+
+function findPPTXAncestorByLocalName(
+  element: Element,
+  localName: string,
+) {
+  let current = getPPTXParentElement(element)
+
+  while (current) {
+    if (current.localName === localName) {
+      return current
+    }
+
+    current = getPPTXParentElement(current)
+  }
+
+  return null
+}
+
+function getPPTXParentElement(element: Element) {
+  const parent = element.parentElement ?? element.parentNode
+
+  return parent instanceof Element ? parent : null
+}
+
+async function readPPTXSlideNotes({
+  relationships,
+  slidePath,
+  zip,
+}: {
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const notesRelationship = Array.from(relationships.values())
+    .find((relationship) => relationship.type.endsWith('/notesSlide'))
+  const notesPath = notesRelationship
+    ? resolvePPTXRelationshipTarget(slidePath, notesRelationship.target)
+    : null
+  const xml = notesPath ? await zip.file(notesPath)?.async('string') : ''
+
+  if (!xml) {
+    return undefined
+  }
+
+  const doc = parsePPTXXmlDocument(xml)
+
+  if (!doc) {
+    return undefined
+  }
+
+  const bodyPlaceholder = getPPTXDescendantsByLocalName(doc, 'sp')
+    .find((shape) =>
+      getFirstPPTXDescendantByLocalName(shape, 'ph')
+        ?.getAttribute('type') === 'body')
+  const textBody = bodyPlaceholder
+    ? getFirstPPTXDescendantByLocalName(bodyPlaceholder, 'txBody')
+    : null
+  const text = textBody
+    ? readPPTXPlainTextBody(textBody)
+    : readPPTXPlainTextBody(doc)
+
+  return text.trim() || undefined
+}
+
+async function readPPTXSlideComments({
+  authors,
+  relationships,
+  slideIndex,
+  slidePath,
+  zip,
+}: {
+  authors: PPTXCommentAuthorMap
+  relationships: PPTXRelationshipMap
+  slideIndex: number
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTComment[]> {
+  const commentsPath = readPPTXRelatedPartPath({
+    relationshipTypeSuffix: '/comments',
+    relationships,
+    sourcePath: slidePath,
+    zip,
+  })
+  const xml = commentsPath ? await zip.file(commentsPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+  if (!doc) {
+    return []
+  }
+
+  return getPPTXDescendantsByLocalName(doc, 'cm')
+    .map((comment, commentIndex): PPTComment | null => {
+      const body = readPPTXCommentBody(comment)
+
+      if (!body) {
+        return null
+      }
+
+      const position = getDirectPPTXChildByLocalName(comment, 'pos')
+      const rawX = toPPTXNumber(position?.getAttribute('x'))
+      const rawY = toPPTXNumber(position?.getAttribute('y'))
+      const authorName = readPPTXCommentAuthorName(comment, authors)
+      const createdAt = readPPTXCommentCreatedAt(comment)
+      const resolved = readPPTXCommentResolved(comment)
+      const id = `pptx-slide-${slideIndex + 1}-comment-${commentIndex + 1}`
+
+      return {
+        authorName,
+        body,
+        createdAt,
+        geometry: {
+          h: PPTX_COMMENT_DEFAULT_HEIGHT,
+          w: PPTX_COMMENT_DEFAULT_WIDTH,
+          x: rawX === null ? 40 : Math.max(0, emuToPx(rawX)),
+          y: rawY === null ? 40 : Math.max(0, emuToPx(rawY)),
+        },
+        id,
+        kind: 'comment',
+        name: `PPTX Comment ${commentIndex + 1}`,
+        ...(resolved === true ? { resolved } : {}),
+        thread: readPPTXCommentThread({
+          authors,
+          body,
+          comment,
+          createdAt,
+          id,
+        }),
+      }
+    })
+    .filter((comment): comment is PPTComment => comment !== null)
+}
+
+function readPPTXCommentBody(comment: Element) {
+  const classicText = getDirectPPTXChildByLocalName(comment, 'text')?.textContent
+
+  if (classicText !== undefined) {
+    return classicText.replace(/\r\n?/g, '\n').trim()
+  }
+
+  const textBody = getDirectPPTXChildByLocalName(comment, 'txBody')
+  const fallbackText =
+    getFirstPPTXDescendantByLocalName(comment, 'text')?.textContent ?? ''
+  const text = textBody ? readPPTXPlainTextBody(textBody) : fallbackText
+
+  return text.replace(/\r\n?/g, '\n').trim()
+}
+
+function readPPTXCommentAuthorName(
+  comment: Element,
+  authors: PPTXCommentAuthorMap,
+) {
+  const authorId = comment.getAttribute('authorId')?.trim()
+
+  return authorId
+    ? authors.get(authorId) ?? `Author ${authorId}`
+    : 'PowerPoint'
+}
+
+function readPPTXCommentCreatedAt(comment: Element) {
+  return comment.getAttribute('dt')?.trim() ||
+    comment.getAttribute('created')?.trim() ||
+    'Imported'
+}
+
+function readPPTXCommentResolved(comment: Element): PPTComment['resolved'] {
+  const status = comment.getAttribute('status')?.trim().toLowerCase()
+
+  return status === 'resolved' || status === 'closed' ? true : undefined
+}
+
+function readPPTXCommentThread({
+  authors,
+  body,
+  comment,
+  createdAt,
+  id,
+}: {
+  authors: PPTXCommentAuthorMap
+  body: string
+  comment: Element
+  createdAt: string
+  id: string
+}): NonNullable<PPTComment['thread']> {
+  const messages: NonNullable<PPTComment['thread']> = [{
+    authorName: readPPTXCommentAuthorName(comment, authors),
+    body,
+    createdAt,
+    id: `${id}:message-1`,
+  }]
+  const replyList = getDirectPPTXChildByLocalName(comment, 'replyLst')
+
+  for (const [replyIndex, reply] of getDirectPPTXChildrenByLocalName(
+    replyList,
+    'reply',
+  ).entries()) {
+    const replyBody = readPPTXCommentBody(reply)
+
+    if (!replyBody) {
+      continue
+    }
+
+    messages.push({
+      authorName: readPPTXCommentAuthorName(reply, authors),
+      body: replyBody,
+      createdAt: readPPTXCommentCreatedAt(reply),
+      id: `${id}:message-${replyIndex + 2}`,
+    })
+  }
+
+  return messages
+}
+
+function readPPTXLineElement(
+  element: Element,
+  slideIndex: number,
+  objectIndex: number,
+  relationships: PPTXRelationshipMap,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTElement | null {
+  const spPr = getDirectPPTXChildByLocalName(element, 'spPr')
+  const style = getDirectPPTXChildByLocalName(element, 'style')
+  const line = getDirectPPTXChildByLocalName(spPr, 'ln')
+  const stroke = readPPTXStroke(spPr, themeColors) ??
+    readPPTXStyleStroke(style, themeColors, themeStyles)
+  const opacity = readPPTXLineOpacity(line)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
+  const lineGeometry = readPPTXLineGeometry(spPr)
+
+  if (!stroke || !lineGeometry) {
+    return null
+  }
+
+  return {
+    ...(readPPTXElementAccessibility(element) ?? {}),
+    end: lineGeometry.end,
+    endMarker: readPPTXLineMarker(line, 'tailEnd'),
+    geometry: lineGeometry.geometry,
+    ...(readPPTXElementHyperlink(element, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'line',
+    ...(readPPTXElementLocked(element) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(element) ?? {}),
+    name: readPPTXObjectName(element, `Line ${objectIndex}`),
+    ...(opacity === null ? {} : { opacity }),
+    route: readPPTXLineRoute(spPr),
+    ...(shadow ? { shadow } : {}),
+    start: lineGeometry.start,
+    startMarker: readPPTXLineMarker(line, 'headEnd'),
+    stroke,
+  }
+}
+
+function isPPTXLineShape(sp: Element) {
+  const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
+  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst')
+
+  return preset === 'line' || isPPTXConnectorPreset(preset)
+}
+
+function isPPTXConnectorPreset(preset: string | null | undefined) {
+  return preset?.startsWith('bentConnector') === true ||
+    preset?.startsWith('curvedConnector') === true ||
+    preset?.startsWith('straightConnector') === true
+}
+
+function readPPTXLineRoute(spPr: Element | null): PPTLine['route'] {
+  const preset = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst')
+
+  return preset?.startsWith('bentConnector') ? 'elbow' : 'straight'
+}
+
+function readPPTXLineConnectionRefs(
+  element: Element,
+): PPTXLineConnectionRefs | null {
+  const nonVisualConnection = getFirstPPTXDescendantByLocalName(element, 'cNvCxnSpPr')
+  const start = readPPTXLineConnectionRef(
+    getDirectPPTXChildByLocalName(nonVisualConnection, 'stCxn'),
+  )
+  const end = readPPTXLineConnectionRef(
+    getDirectPPTXChildByLocalName(nonVisualConnection, 'endCxn'),
+  )
+
+  return start || end
+    ? {
+        ...(start ? { start } : {}),
+        ...(end ? { end } : {}),
+      }
+    : null
+}
+
+function readPPTXLineConnectionRef(
+  connection: Element | null,
+): PPTXLineConnectionRef | null {
+  if (!connection) {
+    return null
+  }
+
+  const objectId = connection.getAttribute('id')?.trim()
+
+  return objectId
+    ? {
+        anchor: readPPTXLineConnectionAnchor(connection),
+        objectId,
+      }
+    : null
+}
+
+function readPPTXLineConnectionAnchor(
+  connection: Element,
+): PPTLineConnection['anchor'] {
+  const index = toPPTXNumber(connection.getAttribute('idx'))
+
+  if (index === 0) {
+    return 'left'
+  }
+
+  if (index === 1) {
+    return 'top'
+  }
+
+  if (index === 2) {
+    return 'right'
+  }
+
+  return index === 3 ? 'bottom' : 'center'
+}
+
+function readPPTXLineGeometry(spPr: Element | null): {
+  end: PPTLine['end']
+  geometry: PPTGeometry
+  start: PPTLine['start']
+} | null {
+  const xfrm = spPr ? getDirectPPTXChildByLocalName(spPr, 'xfrm') : null
+  const off = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'off') : null
+  const ext = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'ext') : null
+  const rawWidth = toPPTXNumber(ext?.getAttribute('cx'))
+  const rawHeight = toPPTXNumber(ext?.getAttribute('cy'))
+
+  if (!xfrm || rawWidth === null || rawHeight === null) {
+    return null
+  }
+
+  let start = {
+    x: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
+    y: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
+  }
+  let end = {
+    x: start.x + emuToPx(rawWidth),
+    y: start.y + emuToPx(rawHeight),
+  }
+
+  if (isPPTXTrue(xfrm.getAttribute('flipH'))) {
+    const startX = start.x
+    start = { ...start, x: end.x }
+    end = { ...end, x: startX }
+  }
+
+  if (isPPTXTrue(xfrm.getAttribute('flipV'))) {
+    const startY = start.y
+    start = { ...start, y: end.y }
+    end = { ...end, y: startY }
+  }
+
+  const minX = Math.min(start.x, end.x)
+  const minY = Math.min(start.y, end.y)
+  const rawBounds = {
+    h: Math.abs(end.y - start.y),
+    w: Math.abs(end.x - start.x),
+  }
+  const geometry = {
+    h: Math.max(24, rawBounds.h),
+    ...(readPPTXRotation(xfrm) ?? {}),
+    w: Math.max(24, rawBounds.w),
+    x: minX - Math.max(0, 24 - rawBounds.w) / 2,
+    y: minY - Math.max(0, 24 - rawBounds.h) / 2,
+  }
+
+  return {
+    end: {
+      x: end.x - geometry.x,
+      y: end.y - geometry.y,
+    },
+    geometry,
+    start: {
+      x: start.x - geometry.x,
+      y: start.y - geometry.y,
+    },
+  }
+}
+
+function readPPTXLineMarker(
+  line: Element | null,
+  marker: 'headEnd' | 'tailEnd',
+): PPTLine['endMarker'] {
+  const type = getDirectPPTXChildByLocalName(line, marker)
+    ?.getAttribute('type')
+
+  return type && type !== 'none' ? 'arrow' : 'none'
+}
+
+function readPPTXLineOpacity(line: Element | null) {
+  const solidFill = getDirectPPTXChildByLocalName(line, 'solidFill')
+  const opacity = solidFill ? readPPTXAlphaOpacity(solidFill) : null
+
+  return opacity === null || opacity === 1 ? null : opacity
+}
+
+async function readPPTXShapeElement(
+  sp: Element,
+  slideIndex: number,
+  objectIndex: number,
+  relationships: PPTXRelationshipMap,
+  slidePath: string,
+  themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
+  themeStyles: PPTXThemeStyleMap,
+  placeholderGeometries: PPTXPlaceholderGeometryMap,
+  placeholderTextBodies: PPTXPlaceholderTextBodyMap,
+  textFieldContext: PPTXTextFieldContext,
+  zip: JSZip,
+): Promise<PPTXImportedElementResult> {
+  const spPr = getDirectPPTXChildByLocalName(sp, 'spPr')
+  const txBody = getDirectPPTXChildByLocalName(sp, 'txBody')
+  const fallbackTxBody = readPPTXPlaceholderTextBody(sp, placeholderTextBodies)
+  const style = getDirectPPTXChildByLocalName(sp, 'style')
+  const fallbackTextColor = readPPTXStyleTextColor(style, themeColors)
+  const fallbackFontFamily = readPPTXStyleFontFamily(style, themeFonts)
+  const geometry = readPPTXElementGeometry(spPr) ??
+    readPPTXPlaceholderGeometry(sp, placeholderGeometries)
+  const textBody = readPPTXTextBody(
+    txBody,
+    themeColors,
+    fallbackTxBody,
+    fallbackTextColor,
+    textFieldContext,
+    relationships,
+    themeFonts,
+  )
+  const hasTextContent = hasPPTXTextBodyText(textBody)
+  const stroke = readPPTXStroke(spPr, themeColors) ??
+    readPPTXStyleStroke(style, themeColors, themeStyles)
+  const fill = readPPTXShapeFill(spPr, stroke, themeColors) ??
+    readPPTXStyleFill(style, themeColors, themeStyles)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
+  const hasPaint = fill !== null || stroke !== undefined
+  const textAutoFit = readPPTXTextAutoFit(txBody)
+  const textStyle = textBody
+    ? readPPTXTextStyle(
+        textBody,
+        txBody,
+        themeFonts,
+        fallbackTxBody,
+        fallbackFontFamily,
+      )
+    : undefined
+  const id = createPPTXImportedElementId(slideIndex, objectIndex)
+  const name = readPPTXObjectName(sp, `Object ${objectIndex}`)
+  const imageFill = geometry
+    ? await readPPTXShapeImageFillElement({
+        geometry,
+        objectIndex,
+        relationships,
+        shadow,
+        slideIndex,
+        slidePath,
+        sp,
+        spPr,
+        stroke,
+        zip,
+      })
+    : null
+
+  if (!geometry || (!textBody && !hasPaint && !imageFill)) {
+    return null
+  }
+
+  const isTextBox = isPPTXTextBoxShape(sp) || (textBody !== null && !hasPaint)
+
+  if (imageFill && textBody && hasTextContent) {
+    return [
+      {
+        ...imageFill,
+        id,
+        name,
+      },
+      readPPTXShapeImageFillTextOverlayElement({
+        fallbackFontFamily,
+        fallbackTxBody,
+        geometry,
+        id: `${id}-text`,
+        name: `${name} Text`,
+        relationships,
+        sp,
+        spPr,
+        textAutoFit,
+        textBody,
+        textStyle,
+        txBody,
+      }),
+    ]
+  }
+
+  if (imageFill) {
+    return {
+      ...imageFill,
+      id,
+      name,
+    }
+  }
+
+  if (!isTextBox) {
+    const freeform = readPPTXCustomGeometryFreeformElement({
+      fill,
+      geometry,
+      id,
+      name,
+      relationships,
+      shadow,
+      sp,
+      spPr,
+      stroke,
+      textAutoFit,
+      textBody,
+      textStyle,
+    })
+
+    if (freeform) {
+      return freeform
+    }
+
+    const presetFreeform = readPPTXPresetGeometryFreeformElement({
+      fill,
+      geometry,
+      id,
+      name,
+      relationships,
+      shadow,
+      sp,
+      spPr,
+      stroke,
+      textAutoFit,
+      textBody,
+      textStyle,
+    })
+
+    if (presetFreeform) {
+      return presetFreeform
+    }
+  }
+
+  if (isTextBox) {
+    return {
+      ...(readPPTXElementAccessibility(sp) ?? {}),
+      ...readPPTXElementFlip(spPr),
+      geometry: readPPTXTextBoxGeometry(geometry, txBody, fallbackTxBody),
+      ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+      id,
+      kind: 'textBox',
+      ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+      ...(readPPTXElementVisibility(sp) ?? {}),
+      name,
+      ...(shadow ? { shadow } : {}),
+      style: textStyle ?? readPPTXTextStyle(
+        textBody,
+        txBody,
+        themeFonts,
+        fallbackTxBody,
+        fallbackFontFamily,
+      ),
+      ...(textAutoFit ? { textAutoFit } : {}),
+      textBody: textBody ?? { paragraphs: [] },
+    }
+  }
+
+  return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
+    ...(readPPTXShapeCornerRadius(spPr, geometry) ?? {}),
+    ...readPPTXElementFlip(spPr),
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    ...(stroke ? { stroke } : {}),
+    ...(textBody ? {
+      style: textStyle,
+      ...(textAutoFit ? { textAutoFit } : {}),
+      textBody,
+    } : {}),
+    fill: fill ?? { color: PPTX_DEFAULT_FILL_COLOR },
+    geometry,
+    id,
+    kind: 'shape',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    ...(shadow ? { shadow } : {}),
+    shape: readPPTXShapeKind(spPr),
+  }
+}
+
+function readPPTXShapeImageFillTextOverlayElement({
+  fallbackFontFamily,
+  fallbackTxBody,
+  geometry,
+  id,
+  name,
+  relationships,
+  sp,
+  spPr,
+  textAutoFit,
+  textBody,
+  textStyle,
+  txBody,
+}: {
+  fallbackFontFamily: string | undefined
+  fallbackTxBody: Element | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  sp: Element
+  spPr: Element | null
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody
+  textStyle: PPTTextStyle | undefined
+  txBody: Element | null
+}): PPTTextBox {
+  return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
+    ...readPPTXElementFlip(spPr),
+    geometry: readPPTXTextBoxGeometry(geometry, txBody, fallbackTxBody),
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id,
+    kind: 'textBox',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    style: textStyle ?? readPPTXTextStyle(
+      textBody,
+      txBody,
+      {},
+      fallbackTxBody,
+      fallbackFontFamily,
+    ),
+    ...(textAutoFit ? { textAutoFit } : {}),
+    textBody,
+  }
+}
+
+function readPPTXTextBoxGeometry(
+  geometry: PPTGeometry,
+  txBody: Element | null,
+  fallbackTxBody: Element | null,
+): PPTGeometry {
+  const rotation = readPPTXTextBodyRotation(txBody) ??
+    readPPTXTextBodyRotation(fallbackTxBody)
+
+  if (rotation === undefined || rotation === 0) {
+    return geometry
+  }
+
+  return {
+    ...geometry,
+    rotation: normalizePPTXAngle((geometry.rotation ?? 0) + rotation),
+  }
+}
+
+function readPPTXTextBodyRotation(txBody: Element | null) {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const rotation = toPPTXNumber(bodyPr?.getAttribute('rot'))
+  const verticalRotation = readPPTXTextBodyVerticalRotation(bodyPr)
+
+  return rotation === null && verticalRotation === undefined
+    ? undefined
+    : normalizePPTXAngle((rotation ?? 0) / 60_000 + (verticalRotation ?? 0))
+}
+
+function readPPTXTextBodyVerticalRotation(bodyPr: Element | null) {
+  const vertical = bodyPr?.getAttribute('vert')?.trim()
+
+  if (
+    vertical === 'vert' ||
+    vertical === 'eaVert' ||
+    vertical === 'mongolianVert' ||
+    vertical === 'wordArtVert'
+  ) {
+    return 90
+  }
+
+  if (vertical === 'vert270' || vertical === 'wordArtVertRtl') {
+    return 270
+  }
+
+  return undefined
+}
+
+async function readPPTXShapeImageFillElement({
+  geometry,
+  objectIndex,
+  relationships,
+  shadow,
+  slideIndex,
+  slidePath,
+  sp,
+  spPr,
+  stroke,
+  zip,
+}: {
+  geometry: PPTGeometry
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  slideIndex: number
+  slidePath: string
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+  zip: JSZip
+}): Promise<PPTImage | PPTShape | null> {
+  const blipFill = getDirectPPTXChildByLocalName(spPr, 'blipFill')
+  const blip = getFirstPPTXDescendantByLocalName(blipFill, 'blip')
+  const source = await readPPTXImageSource({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+
+  if (!source) {
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource
+      ? createPPTXUnsupportedImagePlaceholderElement({
+          element: sp,
+          geometry,
+          id: createPPTXImportedElementId(slideIndex, objectIndex),
+          name: readPPTXObjectName(sp, `Image ${objectIndex}`),
+          relationships,
+          shadow,
+          source: missingSource,
+          spPr,
+        })
+      : null
+  }
+
+  const name = readPPTXObjectName(sp, `Image ${objectIndex}`)
+  const altText = readPPTXObjectDescription(sp)
+  const accessibility = readPPTXElementAccessibility(sp)
+  const crop = readPPTXImageCrop(blipFill ?? spPr ?? sp)
+  const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
+  const clipShape = readPPTXImageClipShape(spPr)
+
+  if (!source.renderable) {
+    return createPPTXUnsupportedImagePlaceholderElement({
+      element: sp,
+      geometry,
+      id: createPPTXImportedElementId(slideIndex, objectIndex),
+      name,
+      relationships,
+      shadow,
+      source,
+      spPr,
+    })
+  }
+
+  return {
+    ...(accessibility ?? {}),
+    ...(adjustments ? { adjustments } : {}),
+    alt: altText || name,
+    ...(clipShape ? { clipShape } : {}),
+    ...(crop ? { crop } : {}),
+    fit: crop ? 'cover' : 'contain',
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'image',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    ...(opacity === null ? {} : { opacity }),
+    ...(shadow ? { shadow } : {}),
+    ...(stroke ? { stroke } : {}),
+    src: source.src,
+  }
+}
+
+function readPPTXCustomGeometryFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
+}): PPTFreeform | null {
+  const pathData = readPPTXCustomGeometryData(spPr, geometry)
+
+  if (!pathData || pathData.points.length < 2) {
+    return null
+  }
+
+  return createPPTXShapeFreeformElement({
+    fill,
+    geometry,
+    id,
+    name,
+    points: pathData.points,
+    relationships,
+    segments: pathData.segments,
+    shadow,
+    sp,
+    spPr,
+    stroke,
+    textAutoFit,
+    textBody,
+    textStyle,
+  })
+}
+
+function readPPTXPresetGeometryFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
+}): PPTFreeform | null {
+  const points = readPPTXPresetGeometryFreeformPoints(spPr, geometry)
+
+  if (points.length < 2) {
+    return null
+  }
+
+  return createPPTXShapeFreeformElement({
+    fill,
+    geometry,
+    id,
+    name,
+    points,
+    relationships,
+    shadow,
+    sp,
+    spPr,
+    stroke,
+    textAutoFit,
+    textBody,
+    textStyle,
+  })
+}
+
+function createPPTXShapeFreeformElement({
+  fill,
+  geometry,
+  id,
+  name,
+  points,
+  relationships,
+  segments,
+  shadow,
+  sp,
+  spPr,
+  stroke,
+  textAutoFit,
+  textBody,
+  textStyle,
+}: {
+  fill: PPTFill | null
+  geometry: PPTGeometry
+  id: string
+  name: string
+  points: readonly PPTLine['start'][]
+  relationships: PPTXRelationshipMap
+  segments?: readonly PPTFreeformPathSegment[]
+  shadow: PPTElementShadow | null
+  sp: Element
+  spPr: Element | null
+  stroke: PPTStroke | undefined
+  textAutoFit: PPTTextAutoFit | undefined
+  textBody: PPTTextBody | null
+  textStyle: PPTTextStyle | undefined
+}): PPTFreeform {
+  const fallbackStroke = fill
+    ? { color: fill.color, width: 0 }
+    : { color: PPTX_DEFAULT_STROKE_COLOR, width: 1 }
+
+  return {
+    ...(readPPTXElementAccessibility(sp) ?? {}),
+    ...(fill ? { fill } : {}),
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(sp, relationships) ?? {}),
+    id,
+    kind: 'freeform',
+    ...(readPPTXElementLocked(sp) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(sp) ?? {}),
+    name,
+    pointMode: 'polyline',
+    points: points.map((point) => ({ ...point })),
+    ...(segments && segments.length > 0 ? { segments: segments.map((segment) =>
+      copyPPTFreeformPathSegment(segment)) } : {}),
+    ...(shadow ? { shadow } : {}),
+    stroke: stroke ?? fallbackStroke,
+    ...(textBody ? {
+      style: textStyle,
+      ...(textAutoFit ? { textAutoFit } : {}),
+      textBody,
+    } : {}),
+  }
+}
+
+function readPPTXPresetGeometryFreeformPoints(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+) {
+  const preset = readPPTXPresetGeometryName(spPr)
+  const ratios = preset ? PPTX_PRESET_FREEFORM_POINT_RATIOS[preset] : undefined
+
+  return ratios
+    ? ratios.map((point) => ({
+        x: point.x * geometry.w,
+        y: point.y * geometry.h,
+      }))
+    : []
+}
+
+function readPPTXCustomGeometryData(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+): PPTXCustomGeometryPathData | null {
+  const customGeometry = getDirectPPTXChildByLocalName(spPr, 'custGeom')
+  const pathList = getDirectPPTXChildByLocalName(customGeometry, 'pathLst')
+  const paths = getDirectPPTXChildrenByLocalName(pathList, 'path')
+
+  if (paths.length === 0) {
+    return null
+  }
+
+  const rawPathData = paths
+    .map(readPPTXCustomGeometryPathData)
+    .filter((pathData) => pathData.points.length >= 2)
+
+  if (rawPathData.length === 0) {
+    return null
+  }
+
+  const rawPoints = rawPathData.flatMap((pathData) => pathData.points)
+  const rawSegments = rawPathData.flatMap((pathData) => pathData.segments)
+  const bounds = rawPoints.reduce(
+    (acc, point) => ({
+      maxX: Math.max(acc.maxX, point.x),
+      maxY: Math.max(acc.maxY, point.y),
+      minX: Math.min(acc.minX, point.x),
+      minY: Math.min(acc.minY, point.y),
+    }),
+    {
+      maxX: rawPoints[0]?.x ?? 0,
+      maxY: rawPoints[0]?.y ?? 0,
+      minX: rawPoints[0]?.x ?? 0,
+      minY: rawPoints[0]?.y ?? 0,
+    },
+  )
+  const pathWidths = paths
+    .map((path) => toPPTXPositiveNumber(path.getAttribute('w')))
+    .filter((value): value is number => value !== null && value > 0)
+  const pathHeights = paths
+    .map((path) => toPPTXPositiveNumber(path.getAttribute('h')))
+    .filter((value): value is number => value !== null && value > 0)
+  const pathWidth = pathWidths.length > 0 ? Math.max(...pathWidths) : null
+  const pathHeight = pathHeights.length > 0 ? Math.max(...pathHeights) : null
+  const sourceWidth = pathWidth ?? Math.max(1, bounds.maxX - bounds.minX)
+  const sourceHeight = pathHeight ?? Math.max(1, bounds.maxY - bounds.minY)
+  const originX = pathWidth === null ? bounds.minX : 0
+  const originY = pathHeight === null ? bounds.minY : 0
+  const scalePoint = (point: PPTLine['start']) => ({
+    x: ((point.x - originX) / sourceWidth) * geometry.w,
+    y: ((point.y - originY) / sourceHeight) * geometry.h,
+  })
+
+  return {
+    points: rawPoints.map(scalePoint),
+    segments: rawSegments.map((segment) =>
+      scalePPTXCustomGeometryPathSegment(segment, scalePoint)),
+  }
+}
+
+const PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS = 4
+const PPTX_CUSTOM_GEOMETRY_ARC_SAMPLE_DEGREES = 15
+const PPTX_CUSTOM_GEOMETRY_ARC_MAX_SAMPLE_STEPS = 32
+const PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE = 60_000
+
+function readPPTXCustomGeometryPathData(path: Element): PPTXCustomGeometryPathData {
+  const points: PPTLine['start'][] = []
+  const segments: PPTFreeformPathSegment[] = []
+  let firstPoint: PPTLine['start'] | null = null
+  let currentPoint: PPTLine['start'] | null = null
+
+  for (const command of Array.from(path.children)) {
+    if (command.localName === 'close' && firstPoint) {
+      points.push(firstPoint)
+      segments.push({ point: firstPoint, type: 'line' })
+      currentPoint = firstPoint
+      continue
+    }
+
+    if (command.localName === 'arcTo' && currentPoint) {
+      const arcPoints = approximatePPTXCustomGeometryArcToPoints(
+        command,
+        currentPoint,
+      )
+
+      if (arcPoints.length > 0) {
+        points.push(...arcPoints)
+        segments.push(
+          ...arcPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
+        )
+        currentPoint = arcPoints.at(-1) ?? currentPoint
+        continue
+      }
+    }
+
+    const commandPoints = readPPTXCustomGeometryCommandPoints(command)
+    const endpoint = commandPoints.at(-1) ?? null
+
+    if (!endpoint) {
+      continue
+    }
+
+    if (command.localName === 'moveTo') {
+      firstPoint = endpoint
+      currentPoint = endpoint
+      points.push(endpoint)
+      segments.push({ point: endpoint, type: 'move' })
+      continue
+    }
+
+    if (command.localName === 'quadBezTo' && currentPoint) {
+      const controlPoint = commandPoints.at(0) ?? null
+
+      if (controlPoint) {
+        const sampledPoints =
+          approximatePPTXCustomGeometryQuadraticBezierPoints(
+            currentPoint,
+            controlPoint,
+            endpoint,
+          )
+
+        points.push(...sampledPoints)
+        segments.push(
+          ...sampledPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
+        )
+        currentPoint = endpoint
+        continue
+      }
+    }
+
+    if (command.localName === 'cubicBezTo' && currentPoint) {
+      const firstControlPoint = commandPoints.at(0) ?? null
+      const secondControlPoint = commandPoints.at(1) ?? null
+
+      if (firstControlPoint && secondControlPoint) {
+        const sampledPoints = approximatePPTXCustomGeometryCubicBezierPoints(
+          currentPoint,
+          firstControlPoint,
+          secondControlPoint,
+          endpoint,
+        )
+
+        points.push(...sampledPoints)
+        segments.push(
+          ...sampledPoints.map((point): PPTFreeformPathSegment => ({
+            point,
+            type: 'line',
+          })),
+        )
+        currentPoint = endpoint
+        continue
+      }
+    }
+
+    points.push(endpoint)
+    segments.push({ point: endpoint, type: 'line' })
+    currentPoint = endpoint
+  }
+
+  return { points, segments }
+}
+
+function readPPTXCustomGeometryCommandPoints(command: Element) {
+  if (![
+    'cubicBezTo',
+    'lnTo',
+    'moveTo',
+    'quadBezTo',
+  ].includes(command.localName)) {
+    return []
+  }
+
+  return getDirectPPTXChildrenByLocalName(command, 'pt').flatMap((point) => {
+    const x = toPPTXNumber(point.getAttribute('x'))
+    const y = toPPTXNumber(point.getAttribute('y'))
+
+    return x === null || y === null ? [] : [{ x, y }]
+  })
+}
+
+function scalePPTXCustomGeometryPathSegment(
+  segment: PPTFreeformPathSegment,
+  scalePoint: (point: PPTLine['start']) => PPTLine['start'],
+): PPTFreeformPathSegment {
+  if (segment.type !== 'cubic') {
+    return {
+      point: scalePoint(segment.point),
+      type: segment.type,
+    }
+  }
+
+  return {
+    control1: scalePoint(segment.control1),
+    control2: scalePoint(segment.control2),
+    point: scalePoint(segment.point),
+    type: segment.type,
+  }
+}
+
+function copyPPTFreeformPathSegment(
+  segment: PPTFreeformPathSegment,
+): PPTFreeformPathSegment {
+  if (segment.type !== 'cubic') {
+    return {
+      point: { ...segment.point },
+      type: segment.type,
+    }
+  }
+
+  return {
+    control1: { ...segment.control1 },
+    control2: { ...segment.control2 },
+    point: { ...segment.point },
+    type: segment.type,
+  }
+}
+
+function approximatePPTXCustomGeometryQuadraticBezierPoints(
+  start: PPTLine['start'],
+  control: PPTLine['start'],
+  end: PPTLine['start'],
+) {
+  return Array.from(
+    { length: PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS },
+    (_, index) => {
+      const t = (index + 1) / PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS
+      const inverse = 1 - t
+
+      return {
+        x: inverse * inverse * start.x +
+          2 * inverse * t * control.x +
+          t * t * end.x,
+        y: inverse * inverse * start.y +
+          2 * inverse * t * control.y +
+          t * t * end.y,
+      }
+    },
+  )
+}
+
+function approximatePPTXCustomGeometryCubicBezierPoints(
+  start: PPTLine['start'],
+  firstControl: PPTLine['start'],
+  secondControl: PPTLine['start'],
+  end: PPTLine['start'],
+) {
+  return Array.from(
+    { length: PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS },
+    (_, index) => {
+      const t = (index + 1) / PPTX_CUSTOM_GEOMETRY_CURVE_SAMPLE_STEPS
+      const inverse = 1 - t
+
+      return {
+        x: inverse * inverse * inverse * start.x +
+          3 * inverse * inverse * t * firstControl.x +
+          3 * inverse * t * t * secondControl.x +
+          t * t * t * end.x,
+        y: inverse * inverse * inverse * start.y +
+          3 * inverse * inverse * t * firstControl.y +
+          3 * inverse * t * t * secondControl.y +
+          t * t * t * end.y,
+      }
+    },
+  )
+}
+
+function approximatePPTXCustomGeometryArcToPoints(
+  command: Element,
+  start: PPTLine['start'],
+) {
+  const widthRadius = toPPTXPositiveNumber(command.getAttribute('wR'))
+  const heightRadius = toPPTXPositiveNumber(command.getAttribute('hR'))
+  const startAngle = toPPTXNumber(command.getAttribute('stAng'))
+  const sweepAngle = toPPTXNumber(command.getAttribute('swAng'))
+
+  if (
+    !widthRadius ||
+    !heightRadius ||
+    startAngle === null ||
+    sweepAngle === null ||
+    sweepAngle === 0
+  ) {
+    return []
+  }
+
+  const startRadians = pptxAngleToRadians(startAngle)
+  const sweepDegrees = sweepAngle / PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE
+  const sampleSteps = Math.min(
+    PPTX_CUSTOM_GEOMETRY_ARC_MAX_SAMPLE_STEPS,
+    Math.max(
+      1,
+      Math.ceil(Math.abs(sweepDegrees) / PPTX_CUSTOM_GEOMETRY_ARC_SAMPLE_DEGREES),
+    ),
+  )
+  const center = {
+    x: start.x - Math.cos(startRadians) * widthRadius,
+    y: start.y - Math.sin(startRadians) * heightRadius,
+  }
+
+  return Array.from({ length: sampleSteps }, (_, index) => {
+    const ratio = (index + 1) / sampleSteps
+    const angle = pptxAngleToRadians(startAngle + sweepAngle * ratio)
+
+    return {
+      x: center.x + Math.cos(angle) * widthRadius,
+      y: center.y + Math.sin(angle) * heightRadius,
+    }
+  })
+}
+
+function pptxAngleToRadians(angle: number) {
+  return angle / PPTX_CUSTOM_GEOMETRY_ANGLE_UNITS_PER_DEGREE * Math.PI / 180
+}
+
+async function readPPTXPictureElement({
+  index,
+  objectIndex,
+  pic,
+  relationships,
+  slidePath,
+  themeColors,
+  themeStyles,
+  zip,
+}: {
+  index: number
+  objectIndex: number
+  pic: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const spPr = getDirectPPTXChildByLocalName(pic, 'spPr')
+  const style = getDirectPPTXChildByLocalName(pic, 'style')
+  const geometry = readPPTXElementGeometry(spPr)
+  const blip = getFirstPPTXDescendantByLocalName(pic, 'blip')
+  const source = await readPPTXImageSource({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const name = readPPTXObjectName(pic, `Image ${objectIndex}`)
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
+
+  if (!geometry) {
+    return null
+  }
+
+  if (!source) {
+    const mediaPlaceholder = readPPTXPictureMediaPlaceholderElement({
+      geometry,
+      index,
+      objectIndex,
+      pic,
+      relationships,
+      slidePath,
+      spPr,
+      themeColors,
+      themeStyles,
+    })
+
+    if (mediaPlaceholder) {
+      return mediaPlaceholder
+    }
+
+    const missingSource = readPPTXMissingImageSource({
+      blip,
+      relationships,
+      slidePath,
+    })
+
+    return missingSource
+      ? createPPTXUnsupportedImagePlaceholderElement({
+          element: pic,
+          geometry,
+          id: createPPTXImportedElementId(index, objectIndex),
+          name,
+          relationships,
+          shadow,
+          source: missingSource,
+          spPr,
+        })
+      : null
+  }
+
+  const altText = readPPTXObjectDescription(pic)
+  const accessibility = readPPTXElementAccessibility(pic)
+  const crop = readPPTXImageCrop(pic)
+  const opacity = readPPTXImageOpacity(blip)
+  const adjustments = readPPTXImageAdjustments(blip)
+  const clipShape = readPPTXImageClipShape(spPr)
+  const stroke = readPPTXStroke(spPr, themeColors)
+
+  if (!source.renderable) {
+    return createPPTXUnsupportedImagePlaceholderElement({
+      element: pic,
+      geometry,
+      id: createPPTXImportedElementId(index, objectIndex),
+      name,
+      relationships,
+      shadow,
+      source,
+      spPr,
+    })
+  }
+
+  return {
+    ...(accessibility ?? {}),
+    ...(adjustments ? { adjustments } : {}),
+    alt: altText || name,
+    ...(clipShape ? { clipShape } : {}),
+    ...(crop ? { crop } : {}),
+    fit: crop ? 'cover' : 'contain',
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'image',
+    ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(pic) ?? {}),
+    name,
+    ...(opacity === null ? {} : { opacity }),
+    ...(shadow ? { shadow } : {}),
+    ...(stroke ? { stroke } : {}),
+    src: source.src,
+  }
+}
+
+function readPPTXPictureMediaPlaceholderElement({
+  geometry,
+  index,
+  objectIndex,
+  pic,
+  relationships,
+  slidePath,
+  spPr,
+  themeColors,
+  themeStyles,
+}: {
+  geometry: PPTGeometry
+  index: number
+  objectIndex: number
+  pic: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  spPr: Element | null
+  themeColors: PPTXThemeColorMap
+  themeStyles: PPTXThemeStyleMap
+}): PPTElement | null {
+  const media = readPPTXPictureMediaInfo({
+    pic,
+    relationships,
+    slidePath,
+  })
+
+  if (!media) {
+    return null
+  }
+
+  const name = readPPTXObjectName(pic, `${media.type} ${objectIndex}`)
+  const style = getDirectPPTXChildByLocalName(pic, 'style')
+  const shadow = readPPTXElementShadow(spPr, themeColors) ??
+    readPPTXStyleShadow(style, themeColors, themeStyles)
+  const details = [media.type, media.fileName]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(pic) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(pic, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(pic) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(pic) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXPictureMediaInfo({
+  pic,
+  relationships,
+  slidePath,
+}: {
+  pic: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}): { fileName: string; type: 'Audio' | 'Media' | 'Video' } | null {
+  const candidates: Array<{
+    element: Element | null
+    type: 'Audio' | 'Media' | 'Video'
+  }> = [
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'videoFile'),
+      type: 'Video',
+    },
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'audioFile'),
+      type: 'Audio',
+    },
+    {
+      element: getFirstPPTXDescendantByLocalName(pic, 'media'),
+      type: 'Media',
+    },
+  ]
+  const candidate = candidates.find((item) => item.element)
+
+  if (!candidate?.element) {
+    return null
+  }
+
+  const relationshipId = readPPTXEmbedRelationshipId(candidate.element) ??
+    readPPTXLinkRelationshipId(candidate.element) ??
+    readPPTXRelationshipAttributeId(candidate.element)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : ''
+  const inferredType = candidate.type === 'Media'
+    ? readPPTXMediaTypeFromTarget(target) ?? 'Media'
+    : candidate.type
+
+  return {
+    fileName: target.split('/').at(-1)?.trim() ?? '',
+    type: inferredType,
+  }
+}
+
+function readPPTXMediaTypeFromTarget(target: string) {
+  const extension = target.split(/[?#]/)[0]?.split('.').at(-1)?.toLowerCase()
+
+  if (!extension) {
+    return null
+  }
+
+  if ([
+    'm4v',
+    'mov',
+    'mp4',
+    'mpeg',
+    'mpg',
+    'webm',
+    'wmv',
+  ].includes(extension)) {
+    return 'Video'
+  }
+
+  if ([
+    'aac',
+    'm4a',
+    'mp3',
+    'wav',
+    'wma',
+  ].includes(extension)) {
+    return 'Audio'
+  }
+
+  return null
+}
+
+function readPPTXContentPartElement({
+  contentPart,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+}: {
+  contentPart: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const geometry = readPPTXElementGeometry(contentPart)
+
+  if (!geometry) {
+    return null
+  }
+
+  const relationshipId = readPPTXRelationshipAttributeId(contentPart)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : ''
+  const fileName = target.split('/').at(-1)?.trim() ?? ''
+  const relationshipType = relationship?.type.split('/').at(-1)?.trim() ?? ''
+  const name = readPPTXObjectName(contentPart, `Content Part ${objectIndex}`)
+  const shadow = readPPTXElementShadow(contentPart, themeColors)
+  const details = [relationshipType, fileName]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(contentPart) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(contentPart),
+    geometry,
+    ...(readPPTXElementHyperlink(contentPart, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(contentPart) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(contentPart) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+async function readPPTXImageSource({
+  blip,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTXImageSource | null> {
+  const mediaPath = readPPTXPictureMediaPath({
+    blip,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const media = mediaPath ? zip.file(mediaPath) : null
+
+  if (!mediaPath || !media) {
+    return readPPTXExternalImageSource({
+      blip,
+      relationships,
+    })
+  }
+
+  const base64 = await media.async('base64')
+  const mimeType = getPPTXMediaMimeType(mediaPath)
+
+  return {
+    fileName: mediaPath.split('/').at(-1)?.trim() ?? '',
+    mimeType,
+    renderable: isPPTXRenderableImageMediaPath(mediaPath),
+    src: `data:${mimeType};base64,${base64}`,
+  }
+}
+
+function readPPTXExternalImageSource({
+  blip,
+  relationships,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+}) {
+  const relationshipId = readPPTXLinkRelationshipId(blip)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target.trim()
+    : ''
+
+  return url
+    ? {
+        fileName: url.split(/[?#]/)[0]?.split('/').at(-1)?.trim() ?? '',
+        mimeType: '',
+        renderable: true,
+        src: url,
+      }
+    : null
+}
+
+function readPPTXMissingImageSource({
+  blip,
+  relationships,
+  slidePath,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}): PPTXImageSource | null {
+  const relationshipId = readPPTXEmbedRelationshipId(blip) ??
+    readPPTXLinkRelationshipId(blip)
+
+  if (!relationshipId) {
+    return null
+  }
+
+  const relationship = relationships.get(relationshipId)
+  const target = relationship
+    ? relationship.targetMode === 'External'
+      ? relationship.target
+      : resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : relationshipId
+  const fileName = target.split(/[?#]/)[0]?.split('/').at(-1)?.trim() || target
+
+  return {
+    fileName,
+    mimeType: getPPTXMediaMimeType(target),
+    renderable: false,
+    src: '',
+  }
+}
+
+function createPPTXUnsupportedImagePlaceholderElement({
+  element,
+  geometry,
+  id,
+  name,
+  relationships,
+  shadow,
+  source,
+  spPr,
+}: {
+  element: Element
+  geometry: PPTGeometry
+  id: string
+  name: string
+  relationships: PPTXRelationshipMap
+  shadow: PPTElementShadow | null
+  source: PPTXImageSource
+  spPr: Element | null
+}): PPTShape {
+  const details = ['Unsupported image', source.fileName, source.mimeType]
+    .filter((detail) => detail.length > 0)
+
+  return {
+    ...(readPPTXElementAccessibility(element) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(spPr),
+    geometry,
+    ...(readPPTXElementHyperlink(element, relationships) ?? {}),
+    id,
+    kind: 'shape',
+    ...(readPPTXElementLocked(element) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(element) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXPictureMediaPath({
+  blip,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  blip: Element | null
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const svgBlip = getFirstPPTXDescendantByLocalName(blip, 'svgBlip')
+  const relationshipIds = [
+    readPPTXEmbedRelationshipId(svgBlip),
+    readPPTXEmbedRelationshipId(blip),
+  ].filter((id): id is string => id !== null)
+  const seen = new Set<string>()
+
+  for (const relationshipId of relationshipIds) {
+    if (seen.has(relationshipId)) {
+      continue
+    }
+
+    seen.add(relationshipId)
+
+    const relationship = relationships.get(relationshipId)
+    const mediaPath = relationship
+      ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+      : null
+
+    if (mediaPath && zip.file(mediaPath)) {
+      return mediaPath
+    }
+  }
+
+  return null
+}
+
+function readPPTXEmbedRelationshipId(element: Element | null) {
+  return element?.getAttribute('r:embed') ??
+    element?.getAttribute('embed') ??
+    null
+}
+
+function readPPTXLinkRelationshipId(element: Element | null) {
+  return element?.getAttribute('r:link') ??
+    element?.getAttribute('link') ??
+    null
+}
+
+function readPPTXImageCrop(pic: Element | null): PPTImage['crop'] | null {
+  const srcRect = getFirstPPTXDescendantByLocalName(pic, 'srcRect')
+
+  if (!srcRect) {
+    return null
+  }
+
+  const left = readPPTXImageCropSide(srcRect, 'l')
+  const right = readPPTXImageCropSide(srcRect, 'r')
+  const top = readPPTXImageCropSide(srcRect, 't')
+  const bottom = readPPTXImageCropSide(srcRect, 'b')
+  const x = clampPPTXPercent(50 + (left - right) / 2_000)
+  const y = clampPPTXPercent(50 + (top - bottom) / 2_000)
+
+  if (x === 50 && y === 50 && left === 0 && right === 0 && top === 0 && bottom === 0) {
+    return null
+  }
+
+  return {
+    ...(bottom === 0 ? {} : { bottom: bottom / 1000 }),
+    ...(left === 0 ? {} : { left: left / 1000 }),
+    ...(right === 0 ? {} : { right: right / 1000 }),
+    ...(top === 0 ? {} : { top: top / 1000 }),
+    x,
+    y,
+  }
+}
+
+function readPPTXImageCropSide(
+  srcRect: Element,
+  attribute: 'b' | 'l' | 'r' | 't',
+) {
+  return toPPTXNumber(srcRect.getAttribute(attribute)) ?? 0
+}
+
+function readPPTXImageAdjustments(
+  blip: Element | null,
+): PPTImage['adjustments'] | undefined {
+  if (!blip) {
+    return undefined
+  }
+
+  const grayscale =
+    getDirectPPTXChildByLocalName(blip, 'grayscl') !== null
+  const lum = getDirectPPTXChildByLocalName(blip, 'lum')
+  const brightness = readPPTXImageAdjustmentMultiplier(
+    lum?.getAttribute('bright'),
+  )
+  const contrast = readPPTXImageAdjustmentMultiplier(
+    lum?.getAttribute('contrast'),
+  )
+  const adjustments: PPTImage['adjustments'] = {
+    ...(brightness === undefined ? {} : { brightness }),
+    ...(contrast === undefined ? {} : { contrast }),
+    ...(grayscale ? { grayscale: true } : {}),
+  }
+
+  return Object.keys(adjustments).length > 0 ? adjustments : undefined
+}
+
+function readPPTXImageAdjustmentMultiplier(
+  value: string | null | undefined,
+) {
+  const raw = toPPTXNumber(value)
+
+  if (raw === null) {
+    return undefined
+  }
+
+  const multiplier = Math.max(0, Math.min(2, 1 + raw / 100_000))
+
+  return multiplier === 1
+    ? undefined
+    : Math.round(multiplier * 1000) / 1000
+}
+
+function readPPTXImageClipShape(
+  spPr: Element | null,
+): PPTImage['clipShape'] | undefined {
+  const shape = readPPTXShapeKind(spPr)
+
+  return shape === 'ellipse' || shape === 'diamond' ? shape : undefined
+}
+
+async function readPPTXGraphicFrameElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  return readPPTXTableElement(
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    themeColors,
+  ) ?? await readPPTXChartTableElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
+    zip,
+  }) ?? await readPPTXDiagramTextElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    zip,
+  }) ?? await readPPTXOleObjectElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
+    zip,
+  }) ?? readPPTXUnsupportedGraphicFrameElement({
+    graphicFrame,
+    index,
+    objectIndex,
+    relationships,
+    slidePath,
+    themeColors,
+  })
+}
+
+function readPPTXUnsupportedGraphicFrameElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+}): PPTElement | null {
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!geometry) {
+    return null
+  }
+
+  const name = readPPTXObjectName(graphicFrame, `Graphic Frame ${objectIndex}`)
+  const graphicData = getFirstPPTXDescendantByLocalName(graphicFrame, 'graphicData')
+  const uri = graphicData?.getAttribute('uri')?.trim() ?? ''
+  const details = [
+    uri ? readPPTXGraphicFrameUriLabel(uri) : 'graphicFrame',
+    ...readPPTXGraphicFrameRelationshipDetails({
+      element: graphicFrame,
+      relationships,
+      sourcePath: slidePath,
+    }),
+  ].filter((detail) => detail.length > 0)
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name,
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: name }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXGraphicFrameUriLabel(uri: string) {
+  return uri
+    .split(/[/:#]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .at(-1) ?? uri
+}
+
+function readPPTXGraphicFrameRelationshipDetails({
+  element,
+  relationships,
+  sourcePath,
+}: {
+  element: Element
+  relationships: PPTXRelationshipMap
+  sourcePath: string
+}) {
+  return readPPTXRelationshipAttributeIds(element)
+    .map((relationshipId) => relationships.get(relationshipId))
+    .filter((relationship): relationship is PPTXRelationship =>
+      relationship !== undefined)
+    .map((relationship) => {
+      const type = relationship.type.split('/').at(-1) ?? 'relationship'
+      const target = relationship.targetMode === 'External'
+        ? relationship.target
+        : resolvePPTXRelationshipTarget(sourcePath, relationship.target)
+      const fileName = target.split('/').at(-1)?.trim() || target
+
+      return `${type}: ${fileName}`
+    })
+}
+
+function readPPTXRelationshipAttributeIds(element: Element) {
+  const ids = new Set<string>()
+
+  for (const item of [element, ...Array.from(element.getElementsByTagName('*'))]) {
+    for (const attribute of Array.from(item.attributes)) {
+      if (
+        attribute.namespaceURI === PPTX_RELATIONSHIP_ATTRIBUTE_NS ||
+        attribute.name.startsWith('r:')
+      ) {
+        const value = attribute.value.trim()
+
+        if (value) {
+          ids.add(value)
+        }
+      }
+    }
+  }
+
+  return [...ids]
+}
+
+async function readPPTXOleObjectElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const oleObject = getFirstPPTXDescendantByLocalName(graphicFrame, 'oleObj')
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!oleObject || !geometry) {
+    return null
+  }
+
+  const objectName = oleObject.getAttribute('name')?.trim() ||
+    readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`)
+  const progId = oleObject.getAttribute('progId')?.trim() || ''
+  const targetName = readPPTXOleObjectTargetName({
+    oleObject,
+    relationships,
+    slidePath,
+  })
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+  const details = [progId, targetName]
+    .filter((detail) => detail.length > 0)
+  const previewBlip = getFirstPPTXDescendantByLocalName(oleObject, 'blip') ??
+    getFirstPPTXDescendantByLocalName(graphicFrame, 'blip')
+  const previewSource = await readPPTXImageSource({
+    blip: previewBlip,
+    relationships,
+    slidePath,
+    zip,
+  })
+
+  if (previewSource?.renderable) {
+    const crop = readPPTXImageCrop(graphicFrame)
+    const opacity = readPPTXImageOpacity(previewBlip)
+    const adjustments = readPPTXImageAdjustments(previewBlip)
+
+    return {
+      ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+      ...(adjustments ? { adjustments } : {}),
+      alt: objectName,
+      ...(crop ? { crop } : {}),
+      fit: crop ? 'cover' : 'contain',
+      ...readPPTXElementFlip(graphicFrame),
+      geometry,
+      ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+      id: createPPTXImportedElementId(index, objectIndex),
+      kind: 'image',
+      ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+      ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+      name: readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`),
+      ...(opacity === null ? {} : { opacity }),
+      ...(shadow ? { shadow } : {}),
+      src: previewSource.src,
+    }
+  }
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    fill: { color: '#f8fafc' },
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'shape',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Embedded Object ${objectIndex}`),
+    shape: 'rect',
+    ...(shadow ? { shadow } : {}),
+    stroke: { color: '#94a3b8', dash: 'dash', width: 2 },
+    style: {
+      color: '#1f2937',
+      fontSize: 22,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 14,
+        right: 14,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: [
+        { runs: [{ text: objectName }] },
+        ...details.map((detail) => ({ runs: [{ text: detail }] })),
+      ],
+    },
+  }
+}
+
+function readPPTXOleObjectTargetName({
+  oleObject,
+  relationships,
+  slidePath,
+}: {
+  oleObject: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+}) {
+  const relationshipId = readPPTXRelationshipAttributeId(oleObject)
+  const relationship = relationshipId ? relationships.get(relationshipId) : undefined
+  const path = relationship && relationship.targetMode !== 'External'
+    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : relationship?.target
+  const fileName = path?.split('/').at(-1)?.trim()
+
+  return fileName ?? ''
+}
+
+async function readPPTXDiagramTextElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}): Promise<PPTElement | null> {
+  const geometry = readPPTXElementGeometry(graphicFrame)
+  const diagramPath = readPPTXDiagramDataPartPath({
+    graphicFrame,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const xml = diagramPath ? await zip.file(diagramPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const items = doc ? readPPTXDiagramTextItems(doc) : []
+
+  if (!geometry || items.length === 0) {
+    return null
+  }
+
+  const bullet = items.length > 1 ? 'bullet' : undefined
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'textBox',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Diagram ${objectIndex}`),
+    style: {
+      color: '#111827',
+      fontSize: 24,
+      fontWeight: 'semibold',
+      textInset: {
+        bottom: 12,
+        left: 16,
+        right: 16,
+        top: 12,
+      },
+      verticalAlign: 'middle',
+    },
+    textAutoFit: 'resizeShapeToFitText',
+    textBody: {
+      paragraphs: items.map((text) => ({
+        ...(bullet ? { bullet } : {}),
+        runs: [{ text }],
+      })),
+    },
+  }
+}
+
+function readPPTXDiagramDataPartPath({
+  graphicFrame,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const relIds = getFirstPPTXDescendantByLocalName(graphicFrame, 'relIds')
+  const relationshipId = relIds?.getAttribute('r:dm') ??
+    relIds?.getAttributeNS(PPTX_RELATIONSHIP_ATTRIBUTE_NS, 'dm') ??
+    relIds?.getAttribute('dm') ??
+    null
+
+  return relationshipId
+    ? readPPTXRelationshipPartPath({
+        relationshipId,
+        relationships,
+        sourcePath: slidePath,
+        zip,
+      })
+    : null
+}
+
+function readPPTXDiagramTextItems(doc: Document) {
+  return getPPTXDescendantsByLocalName(doc, 'pt')
+    .flatMap((point) => {
+      const textNode = getDirectPPTXChildByLocalName(point, 't')
+      const text = textNode ? readPPTXPlainTextBody(textNode) : ''
+
+      return text.split('\n')
+    })
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+}
+
+async function readPPTXChartTableElement({
+  graphicFrame,
+  index,
+  objectIndex,
+  relationships,
+  slidePath,
+  themeColors,
+  zip,
+}: {
+  graphicFrame: Element
+  index: number
+  objectIndex: number
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  themeColors: PPTXThemeColorMap
+  zip: JSZip
+}): Promise<PPTTable | null> {
+  const chartPath = readPPTXChartPartPath({
+    graphicFrame,
+    relationships,
+    slidePath,
+    zip,
+  })
+  const xml = chartPath ? await zip.file(chartPath)?.async('string') : ''
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+  const workbook = doc && chartPath
+    ? await readPPTXChartWorkbook({
+        chartPath,
+        doc,
+        zip,
+      })
+    : null
+  const rows = doc ? readPPTXChartTableRows(doc, workbook) : []
+  const geometry = readPPTXElementGeometry(graphicFrame)
+
+  if (!geometry || rows.length < 2) {
+    return null
+  }
+
+  const columnCount = getPPTTableColumnCount(rows)
+  const rowCount = rows.length
+  const headerFill: PPTFill = { color: '#eff6ff' }
+  const headerTextStyle: PPTTableCellTextStyle = {
+    color: '#1e3a8a',
+    fontWeight: 'bold',
+    verticalAlign: 'middle',
+  }
+  const cellStyles = rows.map((row, rowIndex) =>
+    row.map((): PPTTableCellStyle => ({
+      fill: rowIndex === 0 ? headerFill : { color: '#ffffff' },
+      textStyle: rowIndex === 0
+        ? headerTextStyle
+        : { color: '#1f2937', verticalAlign: 'middle' },
+    })))
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    cellStyles,
+    columnWidths: Array.from({ length: columnCount }, () =>
+      Math.round(geometry.w / columnCount)),
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(index, objectIndex),
+    kind: 'table',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Chart ${objectIndex}`),
+    rowHeights: Array.from({ length: rowCount }, () =>
+      Math.round(geometry.h / rowCount)),
+    rows,
+    ...(shadow ? { shadow } : {}),
+  }
+}
+
+function readPPTXChartPartPath({
+  graphicFrame,
+  relationships,
+  slidePath,
+  zip,
+}: {
+  graphicFrame: Element
+  relationships: PPTXRelationshipMap
+  slidePath: string
+  zip: JSZip
+}) {
+  const chart = getFirstPPTXDescendantByLocalName(graphicFrame, 'chart')
+  const relationshipId = readPPTXRelationshipAttributeId(chart)
+  const relationship = relationshipId ? relationships.get(relationshipId) : null
+  const path = relationship
+    ? resolvePPTXRelationshipTarget(slidePath, relationship.target)
+    : null
+
+  return path && zip.file(path) ? path : null
+}
+
+function readPPTXChartTableRows(
+  root: Document,
+  workbook: PPTXChartWorkbook | null,
+) {
+  const series = getPPTXDescendantsByLocalName(root, 'ser')
+    .map((item, index) => readPPTXChartSeries(item, index, workbook))
+    .filter((item) => item.values.length > 0)
+
+  if (series.length === 0) {
+    return []
+  }
+
+  const maxDataLength = Math.max(
+    0,
+    ...series.map((item) => Math.max(item.categories.length, item.values.length)),
+  )
+  const categories = Array.from({ length: maxDataLength }, (_, index) =>
+    series.find((item) => item.categories[index])?.categories[index] ??
+      `Item ${index + 1}`)
+
+  return [
+    ['Category', ...series.map((item) => item.name)],
+    ...categories.map((category, rowIndex) => [
+      category,
+      ...series.map((item) => item.values[rowIndex] ?? ''),
+    ]),
+  ]
+}
+
+function readPPTXChartSeries(
+  ser: Element,
+  index: number,
+  workbook: PPTXChartWorkbook | null,
+) {
+  const tx = getDirectPPTXChildByLocalName(ser, 'tx')
+  const cat = getDirectPPTXChildByLocalName(ser, 'cat') ??
+    getDirectPPTXChildByLocalName(ser, 'xVal')
+  const val = getDirectPPTXChildByLocalName(ser, 'val') ??
+    getDirectPPTXChildByLocalName(ser, 'yVal')
+  const name = readPPTXChartTextValue(tx, workbook) || `Series ${index + 1}`
+  const categories = readPPTXChartCachedValues(cat)
+  const values = readPPTXChartCachedValues(val)
+
+  return {
+    categories: categories.length > 0
+      ? categories
+      : readPPTXChartWorkbookValues(cat, workbook),
+    name,
+    values: values.length > 0
+      ? values
+      : readPPTXChartWorkbookValues(val, workbook),
+  }
+}
+
+function readPPTXChartTextValue(
+  root: Element | null,
+  workbook: PPTXChartWorkbook | null,
+) {
+  const cachedValue = readPPTXChartCachedValues(root)[0]
+
+  if (cachedValue) {
+    return cachedValue
+  }
+
+  const directValue = getDirectPPTXChildByLocalName(root, 'v')
+    ?.textContent
+    ?.trim()
+
+  if (directValue) {
+    return directValue
+  }
+
+  const workbookValue = readPPTXChartWorkbookValues(root, workbook)[0]
+
+  if (workbookValue) {
+    return workbookValue
+  }
+
+  return root ? readPPTXPlainTextBody(root).trim() : ''
+}
+
+function readPPTXChartCachedValues(root: Element | null) {
+  const cache = getFirstPPTXDescendantByLocalName(root, 'strCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'numCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'multiLvlStrCache') ??
+    getFirstPPTXDescendantByLocalName(root, 'strLit') ??
+    getFirstPPTXDescendantByLocalName(root, 'numLit')
+
+  return cache
+    ? getPPTXDescendantsByLocalName(cache, 'pt')
+      .sort(comparePPTXChartPointIndex)
+      .map((point) =>
+        getDirectPPTXChildByLocalName(point, 'v')?.textContent?.trim() ?? '')
+      .filter((value) => value.length > 0)
+    : []
+}
+
+function comparePPTXChartPointIndex(left: Element, right: Element) {
+  return (toPPTXPositiveNumber(left.getAttribute('idx')) ?? 0) -
+    (toPPTXPositiveNumber(right.getAttribute('idx')) ?? 0)
+}
+
+async function readPPTXChartWorkbook({
+  chartPath,
+  doc,
+  zip,
+}: {
+  chartPath: string
+  doc: Document
+  zip: JSZip
+}): Promise<PPTXChartWorkbook | null> {
+  const relationships = await readPPTXRelationships(zip, chartPath)
+  const workbookPath = readPPTXChartWorkbookPartPath({
+    chartPath,
+    doc,
+    relationships,
+    zip,
+  })
+  const workbookBytes = workbookPath
+    ? await zip.file(workbookPath)?.async('uint8array')
+    : null
+
+  if (!workbookBytes) {
+    return null
+  }
+
+  try {
+    const workbookZip = await JSZip.loadAsync(workbookBytes)
+
+    return await readPPTXSpreadsheetWorkbook(workbookZip)
+  } catch {
+    return null
+  }
+}
+
+function readPPTXChartWorkbookPartPath({
+  chartPath,
+  doc,
+  relationships,
+  zip,
+}: {
+  chartPath: string
+  doc: Document
+  relationships: PPTXRelationshipMap
+  zip: JSZip
+}) {
+  const externalData = getFirstPPTXDescendantByLocalName(doc, 'externalData')
+  const externalDataRelationshipId = readPPTXRelationshipAttributeId(externalData)
+  const relationship = externalDataRelationshipId
+    ? relationships.get(externalDataRelationshipId)
+    : Array.from(relationships.values())
+      .find((item) =>
+        item.targetMode !== 'External' &&
+        (item.type.endsWith('/package') ||
+          item.target.toLowerCase().endsWith('.xlsx')))
+
+  if (!relationship || relationship.targetMode === 'External') {
+    return null
+  }
+
+  const workbookPath = resolvePPTXRelationshipTarget(chartPath, relationship.target)
+
+  return zip.file(workbookPath) ? workbookPath : null
+}
+
+async function readPPTXSpreadsheetWorkbook(
+  zip: JSZip,
+): Promise<PPTXChartWorkbook | null> {
+  const workbookXml = await zip.file('xl/workbook.xml')?.async('string')
+  const workbookDoc = workbookXml ? parsePPTXXmlDocument(workbookXml) : null
+
+  if (!workbookDoc) {
+    return null
+  }
+
+  const relationships = await readPPTXRelationships(zip, 'xl/workbook.xml')
+  const sharedStrings = await readPPTXSpreadsheetSharedStrings(zip)
+  const sheets = new Map<string, ReadonlyMap<string, string>>()
+  let firstSheetName = ''
+
+  for (const sheet of getPPTXDescendantsByLocalName(workbookDoc, 'sheet')) {
+    const name = sheet.getAttribute('name')?.trim()
+    const relationshipId = readPPTXRelationshipAttributeId(sheet)
+    const relationship = relationshipId ? relationships.get(relationshipId) : null
+    const path = relationship && relationship.targetMode !== 'External'
+      ? resolvePPTXRelationshipTarget('xl/workbook.xml', relationship.target)
+      : null
+
+    if (!name || !path || !zip.file(path)) {
+      continue
+    }
+
+    const worksheetXml = await zip.file(path)?.async('string')
+    const worksheetDoc = worksheetXml ? parsePPTXXmlDocument(worksheetXml) : null
+    const cells = worksheetDoc
+      ? readPPTXSpreadsheetWorksheetCells(worksheetDoc, sharedStrings)
+      : null
+
+    if (cells) {
+      if (!firstSheetName) {
+        firstSheetName = name
+      }
+
+      sheets.set(name, cells)
+    }
+  }
+
+  return sheets.size === 0 ? null : { firstSheetName, sheets }
+}
+
+async function readPPTXSpreadsheetSharedStrings(zip: JSZip) {
+  const xml = await zip.file('xl/sharedStrings.xml')?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+  return doc
+    ? getPPTXDescendantsByLocalName(doc, 'si')
+      .map(readPPTXSpreadsheetTextContainer)
+    : []
+}
+
+function readPPTXSpreadsheetWorksheetCells(
+  doc: Document,
+  sharedStrings: readonly string[],
+) {
+  const cells = new Map<string, string>()
+
+  for (const cell of getPPTXDescendantsByLocalName(doc, 'c')) {
+    const ref = cell.getAttribute('r')?.trim().toUpperCase()
+    const value = readPPTXSpreadsheetCellValue(cell, sharedStrings)
+
+    if (ref && value !== null) {
+      cells.set(ref, value)
+    }
+  }
+
+  return cells
+}
+
+function readPPTXSpreadsheetCellValue(
+  cell: Element,
+  sharedStrings: readonly string[],
+) {
+  const type = cell.getAttribute('t')?.trim()
+
+  if (type === 'inlineStr') {
+    return readPPTXSpreadsheetTextContainer(
+      getDirectPPTXChildByLocalName(cell, 'is') ?? cell,
+    )
+  }
+
+  const value = getDirectPPTXChildByLocalName(cell, 'v')?.textContent?.trim()
+
+  if (value === undefined) {
+    return null
+  }
+
+  if (type === 's') {
+    return sharedStrings[toPPTXPositiveNumber(value) ?? -1] ?? value
+  }
+
+  return value
+}
+
+function readPPTXSpreadsheetTextContainer(root: Element) {
+  return getPPTXDescendantsByLocalName(root, 't')
+    .map((text) => text.textContent ?? '')
+    .join('')
+}
+
+function readPPTXChartWorkbookValues(
+  root: Element | null,
+  workbook: PPTXChartWorkbook | null,
+) {
+  const formula = getFirstPPTXDescendantByLocalName(root, 'f')
+    ?.textContent
+    ?.trim()
+
+  return formula && workbook
+    ? readPPTXSpreadsheetFormulaValues(workbook, formula)
+    : []
+}
+
+function readPPTXSpreadsheetFormulaValues(
+  workbook: PPTXChartWorkbook,
+  formula: string,
+) {
+  const range = readPPTXSpreadsheetFormulaRange(formula, workbook)
+
+  if (!range) {
+    return []
+  }
+
+  const sheet = workbook.sheets.get(range.sheetName)
+
+  if (!sheet) {
+    return []
+  }
+
+  const minCol = Math.min(range.start.col, range.end.col)
+  const maxCol = Math.max(range.start.col, range.end.col)
+  const minRow = Math.min(range.start.row, range.end.row)
+  const maxRow = Math.max(range.start.row, range.end.row)
+  const values: string[] = []
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      values.push(sheet.get(`${formatPPTXSpreadsheetColumn(col)}${row}`) ?? '')
+    }
+  }
+
+  return values.filter((value) => value.length > 0)
+}
+
+function readPPTXSpreadsheetFormulaRange(
+  formula: string,
+  workbook: PPTXChartWorkbook,
+) {
+  const normalized = formula.trim().replace(/^=/, '')
+  const match = normalized.match(
+    /^(?:(?:'((?:[^']|'')+)'|([^!']+))!)?(\$?[A-Z]{1,4}\$?\d+)(?::(\$?[A-Z]{1,4}\$?\d+))?$/i,
+  )
+
+  if (!match) {
+    return null
+  }
+
+  const sheetName = readPPTXSpreadsheetFormulaSheetName(match[1] ?? match[2]) ??
+    workbook.firstSheetName
+  const start = readPPTXSpreadsheetCellRef(match[3])
+  const end = readPPTXSpreadsheetCellRef(match[4] ?? match[3])
+
+  return start && end
+    ? {
+        end,
+        sheetName,
+        start,
+      }
+    : null
+}
+
+function readPPTXSpreadsheetFormulaSheetName(value: string | undefined) {
+  const sheetName = value
+    ?.replace(/^\[[^\]]+\]/, '')
+    .replace(/''/g, "'")
+    .trim()
+
+  return sheetName || undefined
+}
+
+function readPPTXSpreadsheetCellRef(
+  value: string | undefined,
+): PPTXSpreadsheetCellRef | null {
+  const match = value?.match(/^\$?([A-Z]{1,4})\$?(\d+)$/i)
+  const row = toPPTXPositiveNumber(match?.[2])
+
+  return match && row !== null
+    ? {
+        col: readPPTXSpreadsheetColumnIndex(match[1]),
+        row,
+      }
+    : null
+}
+
+function readPPTXSpreadsheetColumnIndex(column: string) {
+  return column.toUpperCase().split('').reduce((total, char) =>
+    total * 26 + char.charCodeAt(0) - 64, 0)
+}
+
+function formatPPTXSpreadsheetColumn(index: number) {
+  let value = Math.max(1, Math.floor(index))
+  let column = ''
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    column = String.fromCharCode(65 + remainder) + column
+    value = Math.floor((value - 1) / 26)
+  }
+
+  return column
+}
+
+function readPPTXTableElement(
+  graphicFrame: Element,
+  slideIndex: number,
+  objectIndex: number,
+  relationships: PPTXRelationshipMap,
+  themeColors: PPTXThemeColorMap,
+): PPTElement | null {
+  const table = getFirstPPTXDescendantByLocalName(graphicFrame, 'tbl')
+  const geometry = readPPTXElementGeometry(graphicFrame)
+  const shadow = readPPTXElementShadow(graphicFrame, themeColors)
+  const cellRows = table
+    ? getDirectPPTXChildrenByLocalName(table, 'tr')
+      .map((row) => getDirectPPTXChildrenByLocalName(row, 'tc'))
+      .filter((row) => row.length > 0)
+    : []
+  const rows = cellRows.map((row) =>
+    row.map((cell) => readPPTXPlainTextBody(cell).trim()))
+
+  if (!geometry || rows.length === 0) {
+    return null
+  }
+
+  const cellStyles = readPPTXTableCellStyles(cellRows, themeColors)
+  const columnWidths = table
+    ? readPPTXTableColumnWidths(table, getPPTTableColumnCount(rows))
+    : undefined
+  const rowHeights = table
+    ? readPPTXTableRowHeights(table, rows.length)
+    : undefined
+
+  return {
+    ...(readPPTXElementAccessibility(graphicFrame) ?? {}),
+    ...(cellStyles ? { cellStyles } : {}),
+    ...(columnWidths ? { columnWidths } : {}),
+    ...readPPTXElementFlip(graphicFrame),
+    geometry,
+    ...(readPPTXElementHyperlink(graphicFrame, relationships) ?? {}),
+    id: createPPTXImportedElementId(slideIndex, objectIndex),
+    kind: 'table',
+    ...(readPPTXElementLocked(graphicFrame) ? { locked: true } : {}),
+    ...(readPPTXElementVisibility(graphicFrame) ?? {}),
+    name: readPPTXObjectName(graphicFrame, `Table ${objectIndex}`),
+    ...(rowHeights ? { rowHeights } : {}),
+    ...(shadow ? { shadow } : {}),
+    rows,
+  }
+}
+
+function readPPTXTableCellStyles(
+  cellRows: readonly (readonly Element[])[],
+  themeColors: PPTXThemeColorMap,
+): PPTTable['cellStyles'] {
+  const styles = cellRows.map((row) =>
+    row.map((cell): PPTTableCellStyle => {
+      const borders = readPPTXTableCellBorders(cell, themeColors)
+      const fill = readPPTXTableCellFill(cell, themeColors)
+      const span = readPPTXTableCellSpan(cell)
+      const textStyle = readPPTXTableCellTextStyle(cell, themeColors)
+
+      return {
+        ...(borders ? { borders } : {}),
+        ...(fill ? { fill } : {}),
+        ...span,
+        ...(textStyle ? { textStyle } : {}),
+      }
+    }))
+
+  return styles.some((row) =>
+    row.some((style) =>
+      style.borders ||
+      style.colSpan ||
+      style.fill ||
+      style.hidden ||
+      style.rowSpan ||
+      style.textStyle))
+    ? styles
+    : undefined
+}
+
+function readPPTXTableCellSpan(cell: Element): Pick<
+  PPTTableCellStyle,
+  'colSpan' | 'hidden' | 'rowSpan'
+> {
+  const colSpan = readPPTXTableCellSpanValue(cell, 'gridSpan')
+  const rowSpan = readPPTXTableCellSpanValue(cell, 'rowSpan')
+  const hidden = isPPTXTrue(cell.getAttribute('hMerge')) ||
+    isPPTXTrue(cell.getAttribute('vMerge'))
+
+  return {
+    ...(colSpan > 1 ? { colSpan } : {}),
+    ...(hidden ? { hidden: true } : {}),
+    ...(rowSpan > 1 ? { rowSpan } : {}),
+  }
+}
+
+function readPPTXTableCellSpanValue(
+  cell: Element,
+  attribute: 'gridSpan' | 'rowSpan',
+) {
+  const value = toPPTXPositiveNumber(cell.getAttribute(attribute))
+
+  return value === null ? 1 : Math.max(1, Math.floor(value))
+}
+
+function readPPTXTableCellBorders(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTTableCellBorders | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
+  const borders = {
+    bottom: readPPTXTableCellBorderSide(tcPr, 'lnB', themeColors),
+    left: readPPTXTableCellBorderSide(tcPr, 'lnL', themeColors),
+    right: readPPTXTableCellBorderSide(tcPr, 'lnR', themeColors),
+    top: readPPTXTableCellBorderSide(tcPr, 'lnT', themeColors),
+  }
+
+  return borders.bottom || borders.left || borders.right || borders.top
+    ? borders
+    : undefined
+}
+
+function readPPTXTableCellBorderSide(
+  tcPr: Element | null,
+  tagName: 'lnB' | 'lnL' | 'lnR' | 'lnT',
+  themeColors: PPTXThemeColorMap,
+) {
+  return readPPTXStrokeLine(
+    getDirectPPTXChildByLocalName(tcPr, tagName),
+    themeColors,
+  )
+}
+
+function readPPTXTableCellFill(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
+
+  return readPPTXFill(tcPr, themeColors) ?? undefined
+}
+
+function readPPTXTableCellTextStyle(
+  cell: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTTableCellTextStyle | undefined {
+  const tcPr = getDirectPPTXChildByLocalName(cell, 'tcPr')
+  const txBody = getDirectPPTXChildByLocalName(cell, 'txBody')
+  const textBody = readPPTXTextBody(txBody, themeColors)
+  const textInset = readPPTXTextInset(tcPr)
+  const verticalAlign = readPPTXTableCellVerticalAlign(tcPr)
+  const firstParagraph = textBody?.paragraphs
+    .find((paragraph) =>
+      paragraph.runs.some((run) => run.text.trim().length > 0)) ??
+    textBody?.paragraphs[0]
+  const firstRun = firstParagraph?.runs
+    .find((run) => run.text.trim().length > 0) ??
+    firstParagraph?.runs[0]
+
+  const textStyle = {
+    ...(firstParagraph?.align ? { align: firstParagraph.align } : {}),
+    ...(firstRun?.color ? { color: firstRun.color } : {}),
+    ...(firstRun?.size === undefined ? {} : { fontSize: firstRun.size }),
+    ...(firstRun?.bold === true ? { fontWeight: 'bold' as const } : {}),
+    ...(textInset ? { textInset } : {}),
+    ...(verticalAlign ? { verticalAlign } : {}),
+  }
+
+  return Object.keys(textStyle).length > 0 ? textStyle : undefined
+}
+
+function readPPTXTableCellVerticalAlign(
+  tcPr: Element | null,
+): PPTTableCellTextStyle['verticalAlign'] | undefined {
+  const anchor = tcPr?.getAttribute('anchor')
+
+  if (anchor === 'ctr') {
+    return 'middle'
+  }
+
+  if (anchor === 'b') {
+    return 'bottom'
+  }
+
+  return anchor === 't' ? 'top' : undefined
+}
+
+function readPPTXTableColumnWidths(
+  table: Element,
+  columnCount: number,
+): PPTTable['columnWidths'] {
+  const grid = getDirectPPTXChildByLocalName(table, 'tblGrid')
+  const widths = grid
+    ? getDirectPPTXChildrenByLocalName(grid, 'gridCol')
+      .map((column) => toPPTXPositiveNumber(column.getAttribute('w')))
+    : []
+  const visibleWidths = widths.slice(0, columnCount)
+
+  return visibleWidths.length === columnCount &&
+    visibleWidths.every((width) => width !== null && width > 0)
+    ? visibleWidths.map((width) => emuToPx(width ?? 0))
+    : undefined
+}
+
+function readPPTXTableRowHeights(
+  table: Element,
+  rowCount: number,
+): PPTTable['rowHeights'] {
+  const heights = getDirectPPTXChildrenByLocalName(table, 'tr')
+    .map((row) => toPPTXPositiveNumber(row.getAttribute('h')))
+  const visibleHeights = heights.slice(0, rowCount)
+
+  return visibleHeights.length === rowCount &&
+    visibleHeights.every((height) => height !== null && height > 0)
+    ? visibleHeights.map((height) => emuToPx(height ?? 0))
+    : undefined
+}
+
+async function readPPTXSlideRelationships(zip: JSZip, slidePath: string) {
+  return await readPPTXRelationships(zip, slidePath)
+}
+
+async function readPPTXRelationships(zip: JSZip, sourcePath: string) {
+  const relationships = new Map<string, PPTXRelationship>()
+  const relsPath = getPPTXRelationshipsPath(sourcePath)
+  const xml = await zip.file(relsPath)?.async('string')
+  const doc = xml ? parsePPTXXmlDocument(xml) : null
+
+  if (!doc) {
+    return relationships
+  }
+
+  for (const relationship of getPPTXDescendantsByLocalName(doc, 'Relationship')) {
+    const id = relationship.getAttribute('Id')
+    const target = relationship.getAttribute('Target')
+    const targetMode = relationship.getAttribute('TargetMode') ?? ''
+    const type = relationship.getAttribute('Type') ?? ''
+
+    if (id && target) {
+      relationships.set(id, {
+        target,
+        targetMode,
+        type,
+      })
+    }
+  }
+
+  return relationships
+}
+
+function getPPTXRelationshipsPath(sourcePath: string) {
+  const slashIndex = sourcePath.lastIndexOf('/')
+  const directory = slashIndex >= 0 ? sourcePath.slice(0, slashIndex) : ''
+  const fileName = slashIndex >= 0 ? sourcePath.slice(slashIndex + 1) : sourcePath
+
+  return `${directory}/_rels/${fileName}.rels`
+}
+
+function resolvePPTXRelationshipTarget(basePath: string, target: string) {
+  if (target.startsWith('/')) {
+    return target.slice(1)
+  }
+
+  const baseDirectory = basePath.slice(0, basePath.lastIndexOf('/'))
+  const parts = `${baseDirectory}/${target}`.split('/')
+  const normalized: string[] = []
+
+  for (const part of parts) {
+    if (!part || part === '.') {
+      continue
+    }
+
+    if (part === '..') {
+      normalized.pop()
+      continue
+    }
+
+    normalized.push(part)
+  }
+
+  return normalized.join('/')
+}
+
+function readPPTXGroupTransform(group: Element): PPTXGroupTransform {
+  const grpSpPr = getDirectPPTXChildByLocalName(group, 'grpSpPr')
+  const xfrm = getDirectPPTXChildByLocalName(grpSpPr, 'xfrm')
+  const off = getDirectPPTXChildByLocalName(xfrm, 'off')
+  const ext = getDirectPPTXChildByLocalName(xfrm, 'ext')
+  const childOff = getDirectPPTXChildByLocalName(xfrm, 'chOff')
+  const childExt = getDirectPPTXChildByLocalName(xfrm, 'chExt')
+  const rawWidth = toPPTXPositiveNumber(ext?.getAttribute('cx'))
+  const rawHeight = toPPTXPositiveNumber(ext?.getAttribute('cy'))
+  const rawChildWidth = toPPTXPositiveNumber(childExt?.getAttribute('cx'))
+  const rawChildHeight = toPPTXPositiveNumber(childExt?.getAttribute('cy'))
+  const childOffsetX = emuToPx(toPPTXNumber(childOff?.getAttribute('x')) ?? 0)
+  const childOffsetY = emuToPx(toPPTXNumber(childOff?.getAttribute('y')) ?? 0)
+  const offsetX = emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0)
+  const offsetY = emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0)
+  const width = emuToPx(rawWidth ?? rawChildWidth ?? 0)
+  const height = emuToPx(rawHeight ?? rawChildHeight ?? 0)
+  const scaleX = rawWidth !== null && rawChildWidth !== null && rawChildWidth > 0
+    ? rawWidth / rawChildWidth
+    : 1
+  const scaleY = rawHeight !== null && rawChildHeight !== null && rawChildHeight > 0
+    ? rawHeight / rawChildHeight
+    : 1
+  const rotation = readPPTXRotation(xfrm)?.rotation ?? 0
+  const flipH = isPPTXTrue(xfrm?.getAttribute('flipH'))
+  const flipV = isPPTXTrue(xfrm?.getAttribute('flipV'))
+  const matrix = createPPTXGroupTransformMatrix({
+    childOffsetX,
+    childOffsetY,
+    flipH,
+    flipV,
+    height,
+    offsetX,
+    offsetY,
+    rotation,
+    scaleX,
+    scaleY,
+    width,
+  })
+
+  return {
+    ...matrix,
+    childOffsetX,
+    childOffsetY,
+    flipH,
+    flipV,
+    offsetX,
+    offsetY,
+    rotation,
+    scaleX,
+    scaleY,
+  }
+}
+
+function composePPTXGroupTransforms(
+  parent: PPTXGroupTransform,
+  child: PPTXGroupTransform,
+): PPTXGroupTransform {
+  const matrix = multiplyPPTXGroupMatrices(parent, child)
+
+  return {
+    ...matrix,
+    childOffsetX: child.childOffsetX,
+    childOffsetY: child.childOffsetY,
+    flipH: parent.flipH !== child.flipH,
+    flipV: parent.flipV !== child.flipV,
+    offsetX: matrix.e,
+    offsetY: matrix.f,
+    rotation: normalizePPTXAngle(parent.rotation + child.rotation),
+    scaleX: parent.scaleX * child.scaleX,
+    scaleY: parent.scaleY * child.scaleY,
+  }
+}
+
+function createPPTXGroupTransformMatrix({
+  childOffsetX,
+  childOffsetY,
+  flipH,
+  flipV,
+  height,
+  offsetX,
+  offsetY,
+  rotation,
+  scaleX,
+  scaleY,
+  width,
+}: Pick<PPTXGroupTransform,
+  | 'childOffsetX'
+  | 'childOffsetY'
+  | 'flipH'
+  | 'flipV'
+  | 'offsetX'
+  | 'offsetY'
+  | 'rotation'
+  | 'scaleX'
+  | 'scaleY'
+> & {
+  height: number
+  width: number
+}): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  const centerX = width / 2
+  const centerY = height / 2
+
+  return [
+    createPPTXTranslationMatrix(offsetX, offsetY),
+    createPPTXTranslationMatrix(centerX, centerY),
+    createPPTXRotationMatrix(rotation),
+    createPPTXScaleMatrix(flipH ? -1 : 1, flipV ? -1 : 1),
+    createPPTXTranslationMatrix(-centerX, -centerY),
+    createPPTXScaleMatrix(scaleX, scaleY),
+    createPPTXTranslationMatrix(-childOffsetX, -childOffsetY),
+  ].reduce(multiplyPPTXGroupMatrices)
+}
+
+function createPPTXTranslationMatrix(
+  x: number,
+  y: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: 1,
+    b: 0,
+    c: 0,
+    d: 1,
+    e: x,
+    f: y,
+  }
+}
+
+function createPPTXRotationMatrix(
+  angle: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  const radians = angle * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+
+  return {
+    a: cos,
+    b: sin,
+    c: -sin,
+    d: cos,
+    e: 0,
+    f: 0,
+  }
+}
+
+function createPPTXScaleMatrix(
+  x: number,
+  y: number,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: x,
+    b: 0,
+    c: 0,
+    d: y,
+    e: 0,
+    f: 0,
+  }
+}
+
+function multiplyPPTXGroupMatrices<
+  TLeft extends Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>,
+  TRight extends Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>,
+>(
+  left: TLeft,
+  right: TRight,
+): Pick<PPTXGroupTransform, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'> {
+  return {
+    a: left.a * right.a + left.c * right.b,
+    b: left.b * right.a + left.d * right.b,
+    c: left.a * right.c + left.c * right.d,
+    d: left.b * right.c + left.d * right.d,
+    e: left.a * right.e + left.c * right.f + left.e,
+    f: left.b * right.e + left.d * right.f + left.f,
+  }
+}
+
+function transformPPTXElement(
+  element: PPTElement,
+  transform: PPTXGroupTransform,
+): PPTElement {
+  const geometry = transformPPTXGeometry(element.geometry, transform)
+
+  if (element.kind === 'line') {
+    const transformedElement = transformPPTXElementFlip(element, transform)
+
+    return {
+      ...transformedElement,
+      end: transformPPTXLinePoint(element.end, geometry, transform),
+      geometry,
+      start: transformPPTXLinePoint(element.start, geometry, transform),
+    }
+  }
+
+  if (element.kind === 'table') {
+    const transformedElement = transformPPTXElementFlip(element, transform)
+
+    return {
+      ...transformedElement,
+      ...(element.columnWidths
+        ? { columnWidths: transformPPTXTableTrackSizes(element.columnWidths, transform.scaleX) }
+        : {}),
+      geometry,
+      ...(element.rowHeights
+        ? { rowHeights: transformPPTXTableTrackSizes(element.rowHeights, transform.scaleY) }
+        : {}),
+    }
+  }
+
+  const transformedElement = transformPPTXElementFlip(element, transform)
+
+  return {
+    ...transformedElement,
+    geometry,
+  }
+}
+
+function transformPPTXElementFlip<TElement extends PPTElement>(
+  element: TElement,
+  transform: PPTXGroupTransform,
+): TElement {
+  const flipH = element.flipH === true
+    ? !transform.flipH
+    : transform.flipH
+  const flipV = element.flipV === true
+    ? !transform.flipV
+    : transform.flipV
+
+  return {
+    ...element,
+    flipH: flipH ? true : undefined,
+    flipV: flipV ? true : undefined,
+  }
+}
+
+function transformPPTXTableTrackSizes(
+  trackSizes: readonly number[],
+  scale: number,
+) {
+  return trackSizes.map((size) => Math.max(1, Math.round(size * scale)))
+}
+
+function transformPPTXGeometry(
+  geometry: PPTGeometry,
+  transform: PPTXGroupTransform,
+): PPTGeometry {
+  const center = transformPPTXGroupPoint({
+    x: geometry.x + geometry.w / 2,
+    y: geometry.y + geometry.h / 2,
+  }, transform)
+  const width = Math.max(1, Math.round(geometry.w * transform.scaleX))
+  const height = Math.max(1, Math.round(geometry.h * transform.scaleY))
+  const rotation = normalizePPTXAngle(
+    (geometry.rotation ?? 0) + transform.rotation,
+  )
+
+  return {
+    h: height,
+    ...(rotation === 0 ? {} : { rotation }),
+    w: width,
+    x: Math.round(center.x - width / 2),
+    y: Math.round(center.y - height / 2),
+  }
+}
+
+function transformPPTXLinePoint(
+  point: PPTLine['start'],
+  nextGeometry: PPTGeometry,
+  transform: PPTXGroupTransform,
+) {
+  const x = point.x * transform.scaleX
+  const y = point.y * transform.scaleY
+
+  return {
+    x: Math.round(transform.flipH ? nextGeometry.w - x : x),
+    y: Math.round(transform.flipV ? nextGeometry.h - y : y),
+  }
+}
+
+function transformPPTXGroupPoint(
+  point: PPTLine['start'],
+  transform: PPTXGroupTransform,
+) {
+  return {
+    x: transform.a * point.x + transform.c * point.y + transform.e,
+    y: transform.b * point.x + transform.d * point.y + transform.f,
+  }
+}
+
+function isPPTXIdentityGroupTransform(transform: PPTXGroupTransform) {
+  return transform.a === 1 &&
+    transform.b === 0 &&
+    transform.c === 0 &&
+    transform.d === 1 &&
+    transform.e === 0 &&
+    transform.f === 0 &&
+    transform.childOffsetX === 0 &&
+    transform.childOffsetY === 0 &&
+    transform.flipH === false &&
+    transform.flipV === false &&
+    transform.offsetX === 0 &&
+    transform.offsetY === 0 &&
+    transform.rotation === 0 &&
+    transform.scaleX === 1 &&
+    transform.scaleY === 1
+}
+
+function readPPTXElementGeometry(spPr: Element | null): PPTGeometry | null {
+  const xfrm = spPr ? getDirectPPTXChildByLocalName(spPr, 'xfrm') : null
+  const off = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'off') : null
+  const ext = xfrm ? getDirectPPTXChildByLocalName(xfrm, 'ext') : null
+  const width = toPPTXPositiveNumber(ext?.getAttribute('cx'))
+  const height = toPPTXPositiveNumber(ext?.getAttribute('cy'))
+
+  if (!xfrm || width === null || height === null) {
+    return null
+  }
+
+  return {
+    h: emuToPx(height),
+    ...(readPPTXRotation(xfrm) ?? {}),
+    w: emuToPx(width),
+    x: emuToPx(toPPTXNumber(off?.getAttribute('x')) ?? 0),
+    y: emuToPx(toPPTXNumber(off?.getAttribute('y')) ?? 0),
+  }
+}
+
+function readPPTXElementFlip(container: Element | null) {
+  const xfrm = container ? getDirectPPTXChildByLocalName(container, 'xfrm') : null
+
+  return {
+    ...(isPPTXTrue(xfrm?.getAttribute('flipH')) ? { flipH: true } : {}),
+    ...(isPPTXTrue(xfrm?.getAttribute('flipV')) ? { flipV: true } : {}),
+  }
+}
+
+function readPPTXElementShadow(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTElementShadow | null {
+  const outerShadow = getFirstPPTXDescendantByLocalName(container, 'outerShdw')
+
+  if (!outerShadow) {
+    return null
+  }
+
+  const direction = toPPTXNumber(outerShadow.getAttribute('dir'))
+
+  return {
+    angle: direction === null ? 45 : normalizePPTXAngle(direction / 60_000),
+    blur: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('blurRad')) ?? 0),
+    color: readPPTXColor(outerShadow, themeColors, placeholderColor) ?? '#000000',
+    distance: emuToPx(toPPTXPositiveNumber(outerShadow.getAttribute('dist')) ?? 0),
+    opacity: readPPTXAlphaOpacity(outerShadow) ?? 1,
+  }
+}
+
+function readPPTXElementAccessibility(element: Element) {
+  const altText = readPPTXObjectDescription(element)
+
+  return altText ? { accessibility: { altText } } : null
+}
+
+function readPPTXElementLocked(element: Element) {
+  return PPTX_LOCK_TAG_NAMES.some((tagName) =>
+    getPPTXDescendantsByLocalName(element, tagName)
+      .some((locks) =>
+        PPTX_LOCK_ATTRIBUTE_NAMES.some((attribute) =>
+          isPPTXTrue(locks.getAttribute(attribute)))))
+}
+
+function readPPTXElementVisibility(element: Element) {
+  const hidden = getFirstPPTXDescendantByLocalName(element, 'cNvPr')
+    ?.getAttribute('hidden')
+
+  return isPPTXTrue(hidden) ? { visible: false } : null
+}
+
+function readPPTXRotation(xfrm: Element) {
+  const rotation = toPPTXNumber(xfrm.getAttribute('rot'))
+
+  return rotation === null ? null : { rotation: rotation / 60_000 }
+}
+
+function readPPTXTextBody(
+  txBody: Element | null,
+  themeColors: PPTXThemeColorMap,
+  fallbackTxBody: Element | null = null,
+  fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
+  themeFonts: PPTXThemeFontMap = {},
+): PPTTextBody | null {
+  if (!txBody) {
+    return null
+  }
+
+  const listStyle = getDirectPPTXChildByLocalName(txBody, 'lstStyle')
+  const fallbackListStyle = getDirectPPTXChildByLocalName(fallbackTxBody, 'lstStyle')
+  const paragraphs = getDirectPPTXChildrenByLocalName(txBody, 'p')
+    .map((paragraph) =>
+      readPPTXParagraph(
+        paragraph,
+        listStyle,
+        fallbackListStyle,
+        themeColors,
+        themeFonts,
+        fallbackTextColor,
+        textFieldContext,
+        relationships,
+      ))
+  const normalAutoFit = readPPTXNormalAutoFit(txBody)
+  const scaledParagraphs = normalAutoFit === null
+    ? paragraphs
+    : applyPPTXNormalAutoFitToParagraphs(paragraphs, normalAutoFit)
+  const hasText = paragraphs.some((paragraph) =>
+    paragraph.runs.some((run) => run.text.length > 0))
+
+  return hasText || paragraphs.length > 0 ? { paragraphs: scaledParagraphs } : null
+}
+
+function readPPTXNormalAutoFit(txBody: Element | null) {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const normalAutoFit = getDirectPPTXChildByLocalName(bodyPr, 'normAutofit')
+  const fontScale = toPPTXPositiveNumber(normalAutoFit?.getAttribute('fontScale'))
+  const lineSpacingReduction = toPPTXPositiveNumber(
+    normalAutoFit?.getAttribute('lnSpcReduction'),
+  )
+
+  if (!normalAutoFit || (fontScale === null && lineSpacingReduction === null)) {
+    return null
+  }
+
+  return {
+    fontScale: fontScale === null ? 1 : fontScale / 100_000,
+    lineSpacingReduction: lineSpacingReduction === null
+      ? 0
+      : lineSpacingReduction / 100_000,
+  }
+}
+
+function applyPPTXNormalAutoFitToParagraphs(
+  paragraphs: readonly PPTParagraph[],
+  normalAutoFit: { fontScale: number; lineSpacingReduction: number },
+): PPTParagraph[] {
+  return paragraphs.map((paragraph) => ({
+    ...paragraph,
+    ...(normalAutoFit.lineSpacingReduction <= 0
+      ? {}
+      : {
+          lineHeight: Math.max(
+            0.1,
+            Math.round(
+              ((paragraph.lineHeight ?? PPTX_DEFAULT_PARAGRAPH_LINE_HEIGHT) -
+                normalAutoFit.lineSpacingReduction) * 1000,
+            ) / 1000,
+          ),
+        }),
+    runs: paragraph.runs.map((run) => ({
+      ...run,
+      ...(normalAutoFit.fontScale <= 0 || normalAutoFit.fontScale === 1
+        ? {}
+        : {
+            size: Math.max(
+              1,
+              Math.round(
+                (run.size ?? PPTX_DEFAULT_TEXT_SIZE) *
+                  normalAutoFit.fontScale,
+              ),
+            ),
+          }),
+    })),
+  }))
+}
+
+function hasPPTXTextBodyText(textBody: PPTTextBody | null) {
+  return textBody?.paragraphs.some((paragraph) =>
+    paragraph.runs.some((run) => run.text.length > 0)) === true
+}
+
+function readPPTXPlainTextBody(root: Document | Element) {
+  return getPPTXDescendantsByLocalName(root, 'p')
+    .map(readPPTXPlainParagraphText)
+    .filter((text) => text.length > 0)
+    .join('\n')
+}
+
+function readPPTXPlainParagraphText(paragraph: Element) {
+  return Array.from(paragraph.children)
+    .map((child) => {
+      if (child.localName === 'br') {
+        return '\n'
+      }
+
+      if (child.localName === 'tab') {
+        return '\t'
+      }
+
+      if (child.localName === 'r' || child.localName === 'fld') {
+        return getFirstPPTXDescendantByLocalName(child, 't')?.textContent ?? ''
+      }
+
+      return ''
+    })
+    .join('')
+}
+
+function readPPTXParagraph(
+  paragraph: Element,
+  listStyle: Element | null,
+  fallbackListStyle: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
+  fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
+): PPTParagraph {
+  const pPr = getDirectPPTXChildByLocalName(paragraph, 'pPr')
+  const level = readPPTXParagraphLevel(pPr)
+  const listStylePPr = readPPTXTextListStyleParagraphProperties(
+    listStyle,
+    level ?? 0,
+  )
+  const fallbackListStylePPr = readPPTXTextListStyleParagraphProperties(
+    fallbackListStyle,
+    level ?? 0,
+  )
+  const effectiveListStylePPr = listStylePPr ?? fallbackListStylePPr
+  const defaultRunProperties = readPPTXParagraphDefaultRunProperties(
+    paragraph,
+    pPr,
+    effectiveListStylePPr,
+  )
+  const align = readPPTXParagraphAlign(pPr) ??
+    readPPTXParagraphAlign(effectiveListStylePPr)
+  const bullet = readPPTXParagraphBullet(pPr, effectiveListStylePPr)
+  const spacing = readPPTXParagraphSpacing(
+    pPr,
+    effectiveListStylePPr,
+    defaultRunProperties,
+  )
+  const runs = Array.from(paragraph.children)
+    .flatMap((child) =>
+      readPPTXTextRun(
+        child,
+        defaultRunProperties,
+        themeColors,
+        themeFonts,
+        fallbackTextColor,
+        textFieldContext,
+        relationships,
+      ))
+
+  return {
+    ...(align ? { align } : {}),
+    ...(bullet ? { bullet } : {}),
+    ...(level === undefined ? {} : { level }),
+    ...spacing,
+    runs: runs.length > 0 ? runs : [{ text: '' }],
+  }
+}
+
+function readPPTXParagraphDefaultRunProperties(
+  paragraph: Element,
+  pPr: Element | null,
+  listStylePPr: Element | null,
+) {
+  return getDirectPPTXChildByLocalName(pPr, 'defRPr') ??
+    getDirectPPTXChildByLocalName(listStylePPr, 'defRPr') ??
+    getDirectPPTXChildByLocalName(paragraph, 'endParaRPr')
+}
+
+function readPPTXTextListStyleParagraphProperties(
+  listStyle: Element | null,
+  level: number,
+) {
+  if (!listStyle) {
+    return null
+  }
+
+  const clampedLevel = Math.max(0, Math.min(8, Math.floor(level)))
+
+  return getDirectPPTXChildByLocalName(listStyle, `lvl${clampedLevel + 1}pPr`) ??
+    getDirectPPTXChildByLocalName(listStyle, 'defPPr')
+}
+
+function readPPTXTextRun(
+  node: Element,
+  defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
+  fallbackTextColor?: string,
+  textFieldContext?: PPTXTextFieldContext,
+  relationships?: PPTXRelationshipMap,
+): PPTRun[] {
+  if (
+    node.localName !== 'r' &&
+    node.localName !== 'fld' &&
+    node.localName !== 'br' &&
+    node.localName !== 'tab'
+  ) {
+    return []
+  }
+
+  const rPr = getDirectPPTXChildByLocalName(node, 'rPr')
+  const style = readPPTXTextRunStyle(
+    rPr,
+    defaultRunProperties,
+    themeColors,
+    themeFonts,
+    fallbackTextColor,
+  )
+  const hyperlink = readPPTXTextRunHyperlink(rPr, relationships)
+  const runStyle = hyperlink ? { ...style, hyperlink } : style
+
+  if (node.localName === 'br') {
+    return [{ ...runStyle, text: '\n' }]
+  }
+
+  if (node.localName === 'tab') {
+    return [{ ...runStyle, text: '\t' }]
+  }
+
+  const text = getFirstPPTXDescendantByLocalName(node, 't')?.textContent ?? ''
+  const resolvedText = node.localName === 'fld'
+    ? readPPTXTextFieldText(node, text, textFieldContext)
+    : text
+
+  return [{ ...runStyle, text: resolvedText }]
+}
+
+function readPPTXTextRunHyperlink(
+  rPr: Element | null,
+  relationships: PPTXRelationshipMap | undefined,
+): PPTRun['hyperlink'] | undefined {
+  const relationshipId = readPPTXRelationshipAttributeId(
+    getDirectPPTXChildByLocalName(rPr, 'hlinkClick'),
+  )
+  const relationship = relationshipId && relationships
+    ? relationships.get(relationshipId)
+    : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target
+    : undefined
+
+  return url ? { url } : undefined
+}
+
+function readPPTXTextFieldText(
+  field: Element,
+  fallbackText: string,
+  context?: PPTXTextFieldContext,
+) {
+  const type = field.getAttribute('type')?.trim().toLowerCase() ?? ''
+
+  if (type === 'slidenum' && context) {
+    return String(context.slideNumber)
+  }
+
+  return fallbackText
+}
+
+function readPPTXTextRunStyle(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeFonts: PPTXThemeFontMap,
+  fallbackTextColor?: string,
+): Omit<PPTRun, 'text'> {
+  const color = readPPTXRunColor(
+    rPr,
+    defaultRunProperties,
+    themeColors,
+    fallbackTextColor,
+  )
+  const highlight = readPPTXRunHighlight(rPr, themeColors) ??
+    readPPTXRunHighlight(defaultRunProperties, themeColors)
+  const fontFamily = readPPTXTypeface(rPr, themeFonts) ??
+    readPPTXTypeface(defaultRunProperties, themeFonts)
+  const characterSpacing = readPPTXRunCharacterSpacing(
+    rPr,
+    defaultRunProperties,
+  )
+  const size = readPPTXRunSize(rPr, defaultRunProperties)
+
+  return {
+    ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'b')
+      ? { bold: true }
+      : {}),
+    ...(characterSpacing === undefined ? {} : { characterSpacing }),
+    ...(color ? { color } : {}),
+    ...(fontFamily ? { fontFamily } : {}),
+    ...(highlight ? { highlight } : {}),
+    ...(readPPTXRunBooleanAttribute(rPr, defaultRunProperties, 'i')
+      ? { italic: true }
+      : {}),
+    ...(size === null ? {} : { size: textSizeToPx(size) }),
+    ...(readPPTXRunStrikethrough(rPr, defaultRunProperties)
+      ? { strikethrough: true }
+      : {}),
+    ...(readPPTXRunUnderline(rPr, defaultRunProperties)
+      ? { underline: true }
+      : {}),
+  }
+}
+
+function readPPTXRunCharacterSpacing(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  const own = toPPTXNumber(rPr?.getAttribute('spc'))
+  const inherited = toPPTXNumber(defaultRunProperties?.getAttribute('spc'))
+  const value = own ?? inherited
+
+  return value === null || value === 0
+    ? undefined
+    : textSpacingToPx(value)
+}
+
+function readPPTXRunColor(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+  themeColors: PPTXThemeColorMap,
+  fallbackTextColor?: string,
+) {
+  return readPPTXFill(rPr, themeColors)?.color ??
+    readPPTXFill(defaultRunProperties, themeColors)?.color ??
+    fallbackTextColor
+}
+
+function readPPTXRunSize(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return toPPTXPositiveNumber(rPr?.getAttribute('sz')) ??
+    toPPTXPositiveNumber(defaultRunProperties?.getAttribute('sz'))
+}
+
+function readPPTXRunBooleanAttribute(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+  attribute: 'b' | 'i',
+) {
+  const own = rPr?.getAttribute(attribute)
+
+  return own === null || own === undefined
+    ? isPPTXTrue(defaultRunProperties?.getAttribute(attribute))
+    : isPPTXTrue(own)
+}
+
+function readPPTXRunUnderline(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return hasPPTXAttribute(rPr, 'u')
+    ? readPPTXUnderline(rPr)
+    : readPPTXUnderline(defaultRunProperties)
+}
+
+function readPPTXRunStrikethrough(
+  rPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  return hasPPTXAttribute(rPr, 'strike')
+    ? readPPTXStrikethrough(rPr)
+    : readPPTXStrikethrough(defaultRunProperties)
+}
+
+function readPPTXTextStyle(
+  textBody: PPTTextBody | null,
+  txBody: Element | null,
+  themeFonts: PPTXThemeFontMap,
+  fallbackTxBody: Element | null = null,
+  fallbackFontFamily?: string,
+): PPTTextStyle {
+  const firstRun = textBody?.paragraphs
+    .flatMap((paragraph) => paragraph.runs)
+    .find((run) => run.text.trim().length > 0) ??
+    textBody?.paragraphs[0]?.runs[0]
+  const fontFamily = readPPTXFirstTypeface(txBody, themeFonts) ??
+    readPPTXFirstTypeface(fallbackTxBody, themeFonts) ??
+    fallbackFontFamily
+
+  return {
+    color: firstRun?.color ?? PPTX_DEFAULT_TEXT_COLOR,
+    ...(fontFamily ? { fontFamily } : {}),
+    fontSize: firstRun?.size ?? PPTX_DEFAULT_TEXT_SIZE,
+    ...(firstRun?.bold === true ? { fontWeight: 'bold' } : {}),
+    ...readPPTXTextFrameStyle(fallbackTxBody),
+    ...readPPTXTextFrameStyle(txBody),
+  }
+}
+
+function readPPTXTextFrameStyle(
+  txBody: Element | null,
+): Pick<PPTTextStyle, 'textInset' | 'verticalAlign'> {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+  const verticalAlign = readPPTXTextVerticalAlign(bodyPr)
+  const textInset = readPPTXTextInset(bodyPr)
+
+  return {
+    ...(textInset ? { textInset } : {}),
+    ...(verticalAlign ? { verticalAlign } : {}),
+  }
+}
+
+function readPPTXTextAutoFit(
+  txBody: Element | null,
+): PPTTextAutoFit | undefined {
+  const bodyPr = getDirectPPTXChildByLocalName(txBody, 'bodyPr')
+
+  return getDirectPPTXChildByLocalName(bodyPr, 'spAutoFit')
+    ? 'resizeShapeToFitText'
+    : undefined
+}
+
+function readPPTXTextVerticalAlign(
+  bodyPr: Element | null,
+): PPTTextStyle['verticalAlign'] | undefined {
+  const anchor = bodyPr?.getAttribute('anchor')
+
+  if (anchor === 'ctr') {
+    return 'middle'
+  }
+
+  if (anchor === 'b') {
+    return 'bottom'
+  }
+
+  return anchor === 't' ? 'top' : undefined
+}
+
+function readPPTXTextInset(
+  bodyPr: Element | null,
+): PPTTextStyle['textInset'] | undefined {
+  if (!bodyPr) {
+    return undefined
+  }
+
+  const top = readPPTXTextInsetSide(bodyPr, 'tIns', 'marT')
+  const right = readPPTXTextInsetSide(bodyPr, 'rIns', 'marR')
+  const bottom = readPPTXTextInsetSide(bodyPr, 'bIns', 'marB')
+  const left = readPPTXTextInsetSide(bodyPr, 'lIns', 'marL')
+
+  return top === undefined &&
+    right === undefined &&
+    bottom === undefined &&
+    left === undefined
+    ? undefined
+    : {
+        bottom: bottom ?? 0,
+        left: left ?? 0,
+        right: right ?? 0,
+        top: top ?? 0,
+      }
+}
+
+function readPPTXTextInsetSide(
+  bodyPr: Element,
+  insetAttribute: 'bIns' | 'lIns' | 'rIns' | 'tIns',
+  legacyMarginAttribute: 'marB' | 'marL' | 'marR' | 'marT',
+) {
+  const value = toPPTXPositiveNumber(
+    bodyPr.getAttribute(insetAttribute) ??
+      bodyPr.getAttribute(legacyMarginAttribute),
+  )
+
+  return value === null ? undefined : emuToPx(value)
+}
+
+function readPPTXParagraphAlign(
+  pPr: Element | null,
+): PPTParagraph['align'] | undefined {
+  const align = pPr?.getAttribute('algn')
+
+  if (align === 'ctr') {
+    return 'center'
+  }
+
+  if (align === 'r') {
+    return 'right'
+  }
+
+  if (align === 'just') {
+    return 'justify'
+  }
+
+  return align === 'l' ? 'left' : undefined
+}
+
+function readPPTXParagraphBullet(
+  pPr: Element | null,
+  fallbackPPr: Element | null,
+): PPTParagraph['bullet'] | undefined {
+  if (getDirectPPTXChildByLocalName(pPr, 'buNone')) {
+    return undefined
+  }
+
+  const bullet = readPPTXParagraphBulletFromProperties(pPr)
+
+  if (bullet) {
+    return bullet
+  }
+
+  if (getDirectPPTXChildByLocalName(fallbackPPr, 'buNone')) {
+    return undefined
+  }
+
+  return readPPTXParagraphBulletFromProperties(fallbackPPr)
+}
+
+function readPPTXParagraphBulletFromProperties(
+  pPr: Element | null,
+): PPTParagraph['bullet'] | undefined {
+  if (!pPr) {
+    return undefined
+  }
+
+  if (getDirectPPTXChildByLocalName(pPr, 'buAutoNum')) {
+    return 'numbered'
+  }
+
+  return getDirectPPTXChildByLocalName(pPr, 'buChar') ||
+    getDirectPPTXChildByLocalName(pPr, 'buBlip')
+    ? 'bullet'
+    : undefined
+}
+
+function readPPTXParagraphLevel(pPr: Element | null) {
+  const level = toPPTXNumber(pPr?.getAttribute('lvl'))
+
+  return level === null ? undefined : Math.max(0, level)
+}
+
+function readPPTXParagraphSpacing(
+  pPr: Element | null,
+  fallbackPPr: Element | null,
+  defaultRunProperties: Element | null,
+): Pick<PPTParagraph, 'lineHeight' | 'spacingAfter' | 'spacingBefore'> {
+  const lineHeight = readPPTXParagraphLineHeight(pPr, defaultRunProperties) ??
+    readPPTXParagraphLineHeight(fallbackPPr, defaultRunProperties)
+  const spacingBefore = readPPTXParagraphSpacingPixels(
+    pPr,
+    'spcBef',
+    defaultRunProperties,
+  ) ?? readPPTXParagraphSpacingPixels(
+    fallbackPPr,
+    'spcBef',
+    defaultRunProperties,
+  )
+  const spacingAfter = readPPTXParagraphSpacingPixels(
+    pPr,
+    'spcAft',
+    defaultRunProperties,
+  ) ?? readPPTXParagraphSpacingPixels(
+    fallbackPPr,
+    'spcAft',
+    defaultRunProperties,
+  )
+
+  return {
+    ...(lineHeight === undefined ? {} : { lineHeight }),
+    ...(spacingAfter === undefined ? {} : { spacingAfter }),
+    ...(spacingBefore === undefined ? {} : { spacingBefore }),
+  }
+}
+
+function readPPTXParagraphLineHeight(
+  pPr: Element | null,
+  defaultRunProperties: Element | null,
+) {
+  const spacing = getDirectPPTXChildByLocalName(pPr, 'lnSpc')
+  const percent = getDirectPPTXChildByLocalName(spacing, 'spcPct')
+  const percentValue = toPPTXPositiveNumber(percent?.getAttribute('val'))
+
+  if (percentValue !== null) {
+    return percentValue / 100_000
+  }
+
+  const points = getDirectPPTXChildByLocalName(spacing, 'spcPts')
+  const pointValue = toPPTXPositiveNumber(points?.getAttribute('val'))
+
+  if (pointValue === null) {
+    return undefined
+  }
+
+  const exactPoints = pointValue / 100
+  const fontSizeUnits = readPPTXRunSize(defaultRunProperties, null)
+  const fontPoints = fontSizeUnits === null
+    ? PPTX_DEFAULT_TEXT_SIZE * PPTX_POINTS_PER_PIXEL
+    : fontSizeUnits / PPTX_TEXT_SIZE_UNITS_PER_POINT
+
+  return fontPoints > 0
+    ? Math.round((exactPoints / fontPoints) * 1000) / 1000
+    : undefined
+}
+
+function readPPTXParagraphSpacingPixels(
+  pPr: Element | null,
+  localName: 'spcAft' | 'spcBef',
+  defaultRunProperties: Element | null,
+) {
+  const spacing = getDirectPPTXChildByLocalName(pPr, localName)
+  const points = getDirectPPTXChildByLocalName(spacing, 'spcPts')
+  const pointValue = toPPTXPositiveNumber(points?.getAttribute('val'))
+
+  if (pointValue !== null) {
+    return pointToPx(pointValue / 100)
+  }
+
+  const percent = getDirectPPTXChildByLocalName(spacing, 'spcPct')
+  const percentValue = toPPTXPositiveNumber(percent?.getAttribute('val'))
+
+  return percentValue === null
+    ? undefined
+    : Math.round(
+      readPPTXDefaultRunFontSizePx(defaultRunProperties) *
+        (percentValue / 100_000),
+    )
+}
+
+function readPPTXDefaultRunFontSizePx(
+  defaultRunProperties: Element | null,
+) {
+  const fontSizeUnits = readPPTXRunSize(defaultRunProperties, null)
+
+  return fontSizeUnits === null
+    ? PPTX_DEFAULT_TEXT_SIZE
+    : textSizeToPx(fontSizeUnits)
+}
+
+function readPPTXUnderline(rPr: Element | null) {
+  const underline = rPr?.getAttribute('u')
+
+  return underline !== null && underline !== undefined && underline !== 'none'
+}
+
+function readPPTXStrikethrough(rPr: Element | null) {
+  const strike = rPr?.getAttribute('strike')
+
+  return strike !== null &&
+    strike !== undefined &&
+    strike !== 'noStrike' &&
+    strike !== 'none'
+}
+
+function readPPTXRunHighlight(
+  rPr: Element | null,
+  themeColors: PPTXThemeColorMap,
+) {
+  const highlight = getDirectPPTXChildByLocalName(rPr, 'highlight')
+
+  return highlight ? readPPTXColor(highlight, themeColors) : undefined
+}
+
+function readPPTXTypeface(
+  rPr: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
+  for (const localName of ['latin', 'ea', 'cs']) {
+    const typeface = getDirectPPTXChildByLocalName(rPr, localName)
+      ?.getAttribute('typeface')
+      ?.trim()
+
+    if (!typeface) {
+      continue
+    }
+
+    if (!typeface.startsWith('+')) {
+      return typeface
+    }
+
+    const themeTypeface = themeFonts[typeface]
+
+    if (themeTypeface) {
+      return themeTypeface
+    }
+  }
+
+  return undefined
+}
+
+function readPPTXFirstTypeface(
+  txBody: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
+  if (!txBody) {
+    return undefined
+  }
+
+  for (const properties of Array.from(txBody.getElementsByTagName('*'))) {
+    if (properties.localName !== 'rPr' &&
+      properties.localName !== 'defRPr' &&
+      properties.localName !== 'endParaRPr') {
+      continue
+    }
+
+    const typeface = readPPTXTypeface(properties, themeFonts)
+
+    if (typeface) {
+      return typeface
+    }
+  }
+
+  return undefined
+}
+
+function isPPTXTextBoxShape(sp: Element) {
+  return getFirstPPTXDescendantByLocalName(sp, 'cNvSpPr')
+    ?.getAttribute('txBox') === '1'
+}
+
+function readPPTXShapeKind(spPr: Element | null): PPTShapeKind {
+  const preset = readPPTXPresetGeometryName(spPr)
+
+  if (preset === 'ellipse') {
+    return 'ellipse'
+  }
+
+  if (preset === 'diamond') {
+    return 'diamond'
+  }
+
+  return 'rect'
+}
+
+function readPPTXPresetGeometryName(spPr: Element | null) {
+  return getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+    ?.getAttribute('prst') ?? null
+}
+
+function readPPTXShapeCornerRadius(
+  spPr: Element | null,
+  geometry: PPTGeometry,
+) {
+  const presetGeometry = getFirstPPTXDescendantByLocalName(spPr, 'prstGeom')
+  const preset = readPPTXPresetGeometryName(spPr)
+
+  if (preset !== 'roundRect') {
+    return null
+  }
+
+  const adjust = readPPTXPresetGeometryAdjust(
+    presetGeometry,
+    'adj',
+    PPTX_ROUND_RECT_DEFAULT_ADJUST,
+  )
+  const radius = Math.round(
+    Math.min(geometry.w, geometry.h) * adjust / 100_000,
+  )
+
+  return { cornerRadius: Math.max(0, radius) }
+}
+
+function readPPTXPresetGeometryAdjust(
+  presetGeometry: Element | null,
+  name: string,
+  fallback: number,
+) {
+  const formula = presetGeometry
+    ? getPPTXDescendantsByLocalName(presetGeometry, 'gd')
+      .find((guide) => guide.getAttribute('name') === name)
+      ?.getAttribute('fmla') ?? ''
+    : ''
+  const value = toPPTXNumber(formula.match(/^val\s+(-?\d+(?:\.\d+)?)$/)?.[1])
+  const normalized = value === null ? fallback : value
+
+  return Math.min(
+    PPTX_ROUND_RECT_MAX_ADJUST,
+    Math.max(0, normalized),
+  )
+}
+
+function readPPTXShapeFill(
+  spPr: Element | null,
+  stroke: PPTStroke | undefined,
+  themeColors: PPTXThemeColorMap,
+): PPTFill | null {
+  const fill = readPPTXFill(spPr, themeColors)
+
+  if (fill || !hasPPTXNoFill(spPr) || !stroke) {
+    return fill
+  }
+
+  return {
+    color: PPTX_DEFAULT_FILL_COLOR,
+    opacity: 0,
+  }
+}
+
+function readPPTXFill(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  if (!container || hasPPTXNoFill(container)) {
+    return null
+  }
+
+  return readPPTXSolidFill(container, themeColors, placeholderColor) ??
+    readPPTXGradientFill(container, themeColors, placeholderColor) ??
+    readPPTXPatternFill(container, themeColors, placeholderColor)
+}
+
+function readPPTXFillStyleElement(
+  fillElement: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  if (!fillElement || hasPPTXNoFill(fillElement)) {
+    return null
+  }
+
+  if (fillElement.localName === 'solidFill') {
+    return readPPTXColorFill(fillElement, themeColors, placeholderColor)
+  }
+
+  if (fillElement.localName === 'gradFill') {
+    return readPPTXGradientFillElement(
+      fillElement,
+      themeColors,
+      placeholderColor,
+    )
+  }
+
+  if (fillElement.localName === 'pattFill') {
+    return readPPTXPatternFillElement(
+      fillElement,
+      themeColors,
+      placeholderColor,
+    )
+  }
+
+  return null
+}
+
+function readPPTXSolidFill(
+  container: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const solidFill = getDirectPPTXChildByLocalName(container, 'solidFill')
+
+  return solidFill
+    ? readPPTXColorFill(solidFill, themeColors, placeholderColor)
+    : null
+}
+
+function readPPTXGradientFill(
+  container: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const gradFill = getDirectPPTXChildByLocalName(container, 'gradFill')
+
+  return gradFill
+    ? readPPTXGradientFillElement(gradFill, themeColors, placeholderColor)
+    : null
+}
+
+function readPPTXGradientFillElement(
+  gradFill: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const stop = gradFill
+    ? getPPTXDescendantsByLocalName(gradFill, 'gs')
+      .sort(comparePPTXGradientStopPositions)
+      .find((gradientStop) =>
+        readPPTXColor(gradientStop, themeColors, placeholderColor))
+    : null
+
+  return stop
+    ? readPPTXColorFill(stop, themeColors, placeholderColor)
+    : null
+}
+
+function readPPTXPatternFill(
+  container: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const pattFill = getDirectPPTXChildByLocalName(container, 'pattFill')
+
+  return pattFill
+    ? readPPTXPatternFillElement(pattFill, themeColors, placeholderColor)
+    : null
+}
+
+function readPPTXPatternFillElement(
+  pattFill: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const foreground = getDirectPPTXChildByLocalName(pattFill, 'fgClr')
+  const background = getDirectPPTXChildByLocalName(pattFill, 'bgClr')
+
+  return readPPTXColorFill(foreground, themeColors, placeholderColor) ??
+    readPPTXColorFill(background, themeColors, placeholderColor)
+}
+
+function readPPTXColorFill(
+  colorContainer: Element | null,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const color = colorContainer
+    ? readPPTXColor(colorContainer, themeColors, placeholderColor)
+    : undefined
+
+  if (!color || !colorContainer) {
+    return null
+  }
+
+  const opacity = readPPTXAlphaOpacity(colorContainer)
+
+  return opacity === null ? { color } : { color, opacity }
+}
+
+function readPPTXStroke(
+  spPr: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTStroke | undefined {
+  const line = spPr ? getDirectPPTXChildByLocalName(spPr, 'ln') : null
+
+  return readPPTXStrokeLine(line, themeColors)
+}
+
+function readPPTXStyleFill(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTFill | null {
+  const fillRef = getDirectPPTXChildByLocalName(style, 'fillRef')
+
+  if (fillRef?.getAttribute('idx') === '0') {
+    return null
+  }
+
+  const referenceFill = readPPTXColorFill(fillRef, themeColors)
+  const styleFill = readPPTXStyleReferenceFill(
+    fillRef,
+    themeColors,
+    themeStyles,
+    referenceFill?.color,
+  )
+
+  return styleFill ?? referenceFill
+}
+
+function readPPTXStyleReferenceFill(
+  fillRef: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+  placeholderColor?: string,
+): PPTFill | null {
+  const index = toPPTXPositiveNumber(fillRef?.getAttribute('idx'))
+  const fillStyle = index === null ? null : themeStyles.fillStyles.get(index)
+
+  return readPPTXFillStyleElement(fillStyle ?? null, themeColors, placeholderColor)
+}
+
+function readPPTXStyleTextColor(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+) {
+  const fontRef = getDirectPPTXChildByLocalName(style, 'fontRef')
+
+  return fontRef ? readPPTXColor(fontRef, themeColors) : undefined
+}
+
+function readPPTXStyleFontFamily(
+  style: Element | null,
+  themeFonts: PPTXThemeFontMap,
+) {
+  const fontRef = getDirectPPTXChildByLocalName(style, 'fontRef')
+  const index = fontRef?.getAttribute('idx')?.trim()
+
+  if (index === 'major') {
+    return themeFonts['+mj-lt']
+  }
+
+  return index === 'minor' ? themeFonts['+mn-lt'] : undefined
+}
+
+function readPPTXStyleStroke(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTStroke | undefined {
+  const lineRef = getDirectPPTXChildByLocalName(style, 'lnRef')
+
+  if (lineRef?.getAttribute('idx') === '0') {
+    return undefined
+  }
+
+  const fill = readPPTXColorFill(lineRef, themeColors)
+  const styleStroke = readPPTXStyleReferenceLineStyle(
+    lineRef,
+    themeColors,
+    themeStyles,
+  )
+  const color = fill?.color ?? styleStroke?.color
+
+  return color || styleStroke
+    ? {
+        ...(styleStroke?.dash ? { dash: styleStroke.dash } : {}),
+        color: color ?? PPTX_DEFAULT_STROKE_COLOR,
+        width: styleStroke?.width ?? 1,
+      }
+    : undefined
+}
+
+function readPPTXStyleShadow(
+  style: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTElementShadow | null {
+  const effectRef = getDirectPPTXChildByLocalName(style, 'effectRef')
+
+  if (effectRef?.getAttribute('idx') === '0') {
+    return null
+  }
+
+  const index = toPPTXPositiveNumber(effectRef?.getAttribute('idx'))
+  const effectStyle = index === null
+    ? null
+    : themeStyles.effectStyles.get(index)
+  const placeholderColor = effectRef
+    ? readPPTXColor(effectRef, themeColors)
+    : undefined
+
+  return readPPTXElementShadow(effectStyle ?? null, themeColors, placeholderColor)
+}
+
+function readPPTXStyleReferenceLineStyle(
+  lineRef: Element | null,
+  themeColors: PPTXThemeColorMap,
+  themeStyles: PPTXThemeStyleMap,
+): PPTXThemeLineStyle | undefined {
+  const index = toPPTXPositiveNumber(lineRef?.getAttribute('idx'))
+  const line = index === null ? null : themeStyles.lineStyles.get(index)
+
+  return line ? readPPTXThemeLineStyle(line, themeColors) ?? undefined : undefined
+}
+
+function readPPTXStrokeLine(
+  line: Element | null,
+  themeColors: PPTXThemeColorMap,
+): PPTStroke | undefined {
+  if (!line || hasPPTXNoFill(line)) {
+    return undefined
+  }
+
+  const lineStyle = readPPTXLineStrokeStyle(line)
+
+  return {
+    ...(lineStyle.dash ? { dash: lineStyle.dash } : {}),
+    color: readPPTXFill(line, themeColors)?.color ?? PPTX_DEFAULT_STROKE_COLOR,
+    width: lineStyle.width,
+  }
+}
+
+function readPPTXThemeLineStyle(
+  line: Element,
+  themeColors: PPTXThemeColorMap,
+): PPTXThemeLineStyle | null {
+  if (hasPPTXNoFill(line)) {
+    return null
+  }
+
+  const fill = readPPTXFill(line, themeColors)
+  const lineStyle = readPPTXLineStrokeStyle(line)
+
+  return {
+    ...(lineStyle.dash ? { dash: lineStyle.dash } : {}),
+    ...(fill ? { color: fill.color } : {}),
+    width: lineStyle.width,
+  }
+}
+
+function readPPTXLineStrokeStyle(line: Element): Pick<PPTStroke, 'width'> & {
+  dash?: PPTStroke['dash']
+} {
+  const dash = readPPTXStrokeDash(line)
+
+  return {
+    ...(dash ? { dash } : {}),
+    width: Math.max(
+      1,
+      emuToPx(toPPTXPositiveNumber(line.getAttribute('w')) ?? PPTX_EMUS_PER_PIXEL),
+    ),
+  }
+}
+
+function comparePPTXGradientStopPositions(left: Element, right: Element) {
+  return (toPPTXPositiveNumber(left.getAttribute('pos')) ?? 0) -
+    (toPPTXPositiveNumber(right.getAttribute('pos')) ?? 0)
+}
+
+function readPPTXStrokeDash(line: Element): PPTStroke['dash'] | undefined {
+  const value = getDirectPPTXChildByLocalName(line, 'prstDash')
+    ?.getAttribute('val')
+
+  if (value === 'dot' || value === 'sysDot') {
+    return 'dot'
+  }
+
+  return value === 'dash' ||
+    value === 'dashDot' ||
+    value === 'lgDash' ||
+    value === 'lgDashDot' ||
+    value === 'lgDashDotDot' ||
+    value === 'sysDash' ||
+    value === 'sysDashDot' ||
+    value === 'sysDashDotDot'
+    ? 'dash'
+    : undefined
+}
+
+function readPPTXColor(
+  solidFill: Element,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+) {
+  const srgbColor = getDirectPPTXChildByLocalName(solidFill, 'srgbClr')
+  const scrgbColor = getDirectPPTXChildByLocalName(solidFill, 'scrgbClr')
+  const hslColor = getDirectPPTXChildByLocalName(solidFill, 'hslClr')
+  const schemeColor = getDirectPPTXChildByLocalName(solidFill, 'schemeClr')
+  const presetColor = getDirectPPTXChildByLocalName(solidFill, 'prstClr')
+  const systemColor = getDirectPPTXChildByLocalName(solidFill, 'sysClr')
+  const color = [
+    {
+      color: readPPTXHexColor(srgbColor?.getAttribute('val')),
+      element: srgbColor,
+    },
+    {
+      color: readPPTXScrgbColor(scrgbColor),
+      element: scrgbColor,
+    },
+    {
+      color: readPPTXHslColor(hslColor),
+      element: hslColor,
+    },
+    {
+      color: readPPTXSchemeColor(
+        schemeColor?.getAttribute('val'),
+        themeColors,
+        placeholderColor,
+      ),
+      element: schemeColor,
+    },
+    {
+      color: readPPTXPresetColor(presetColor?.getAttribute('val')),
+      element: presetColor,
+    },
+    {
+      color: readPPTXHexColor(systemColor?.getAttribute('lastClr')) ??
+        readPPTXSystemColor(systemColor?.getAttribute('val')),
+      element: systemColor,
+    },
+  ].find((candidate) => candidate.color && candidate.element)
+
+  return color?.color && color.element
+    ? applyPPTXColorModifiers(color.color, color.element)
+    : color?.color
+}
+
+function readPPTXHexColor(value: string | null | undefined) {
+  return value && /^[\da-f]{6}$/i.test(value)
+    ? `#${value.toLowerCase()}`
+    : undefined
+}
+
+function readPPTXScrgbColor(element: Element | null) {
+  if (!element) {
+    return undefined
+  }
+
+  const red = readPPTXPercentageColorChannel(element.getAttribute('r'))
+  const green = readPPTXPercentageColorChannel(element.getAttribute('g'))
+  const blue = readPPTXPercentageColorChannel(element.getAttribute('b'))
+
+  return red === null || green === null || blue === null
+    ? undefined
+    : formatPPTXHexColor([red, green, blue])
+}
+
+function readPPTXPercentageColorChannel(value: string | null | undefined) {
+  const percentage = toPPTXPositiveNumber(value)
+
+  return percentage === null
+    ? null
+    : Math.max(0, Math.min(255, (percentage / 100_000) * 255))
+}
+
+function readPPTXHslColor(element: Element | null) {
+  if (!element) {
+    return undefined
+  }
+
+  const hue = toPPTXPositiveNumber(element.getAttribute('hue'))
+  const saturation = toPPTXPositiveNumber(element.getAttribute('sat'))
+  const lightness = toPPTXPositiveNumber(element.getAttribute('lum'))
+
+  if (hue === null || saturation === null || lightness === null) {
+    return undefined
+  }
+
+  return formatPPTXHexColor(
+    hslToPPTXRgb({
+      h: hue / 60_000,
+      l: Math.max(0, Math.min(1, lightness / 100_000)),
+      s: Math.max(0, Math.min(1, saturation / 100_000)),
+    }),
+  )
+}
+
+function readPPTXSchemeColor(
+  value: string | null | undefined,
+  themeColors: PPTXThemeColorMap,
+  placeholderColor?: string,
+) {
+  if (value === 'phClr') {
+    return placeholderColor
+  }
+
+  return value ? themeColors[value] : undefined
+}
+
+function readPPTXPresetColor(value: string | null | undefined) {
+  return value ? PPTX_PRESET_COLORS[value] : undefined
+}
+
+function readPPTXSystemColor(value: string | null | undefined) {
+  return value ? PPTX_SYSTEM_COLORS[value] : undefined
+}
+
+function applyPPTXColorModifiers(color: string, colorElement: Element) {
+  let rgb = parsePPTXHexColor(color)
+
+  if (!rgb) {
+    return color
+  }
+
+  for (const modifier of Array.from(colorElement.children)) {
+    if (modifier.localName === 'comp') {
+      rgb = applyPPTXHueTransform(rgb, (hue) => hue + 180)
+      continue
+    }
+
+    if (modifier.localName === 'gray') {
+      rgb = applyPPTXGrayscaleColorModifier(rgb)
+      continue
+    }
+
+    if (modifier.localName === 'inv') {
+      rgb = rgb.map((channel) => 255 - channel) as [number, number, number]
+      continue
+    }
+
+    if (
+      modifier.localName === 'hue' ||
+      modifier.localName === 'hueMod' ||
+      modifier.localName === 'hueOff'
+    ) {
+      const hueValue = readPPTXHueModifierValue(modifier)
+
+      if (hueValue !== null) {
+        rgb = applyPPTXHueColorModifier(rgb, modifier.localName, hueValue)
+      }
+      continue
+    }
+
+    const ratio = readPPTXColorModifierRatio(modifier)
+
+    if (ratio === null) {
+      continue
+    }
+
+    if (modifier.localName === 'shade') {
+      rgb = rgb.map((channel) => channel * ratio) as [number, number, number]
+    } else if (modifier.localName === 'tint') {
+      rgb = rgb.map((channel) =>
+        channel + (255 - channel) * ratio) as [number, number, number]
+    } else if (modifier.localName === 'lumMod') {
+      rgb = rgb.map((channel) => channel * ratio) as [number, number, number]
+    } else if (modifier.localName === 'lumOff') {
+      rgb = rgb.map((channel) =>
+        channel + 255 * ratio) as [number, number, number]
+    } else if (
+      modifier.localName === 'satMod' ||
+      modifier.localName === 'satOff'
+    ) {
+      const hsl = rgbToPPTXHsl(rgb)
+      const saturation = modifier.localName === 'satMod'
+        ? hsl.s * ratio
+        : hsl.s + ratio
+
+      rgb = hslToPPTXRgb({
+        ...hsl,
+        s: Math.max(0, Math.min(1, saturation)),
+      })
+    } else if (isPPTXColorChannelModifier(modifier.localName)) {
+      rgb = applyPPTXColorChannelModifier(rgb, modifier.localName, ratio)
+    }
+  }
+
+  return formatPPTXHexColor(rgb)
+}
+
+function applyPPTXHueColorModifier(
+  rgb: [number, number, number],
+  modifierName: 'hue' | 'hueMod' | 'hueOff',
+  value: number,
+): [number, number, number] {
+  if (modifierName === 'hue') {
+    return applyPPTXHueTransform(rgb, () => value)
+  }
+
+  if (modifierName === 'hueMod') {
+    return applyPPTXHueTransform(rgb, (hue) => hue * value)
+  }
+
+  return applyPPTXHueTransform(rgb, (hue) => hue + value)
+}
+
+function applyPPTXHueTransform(
+  rgb: [number, number, number],
+  transform: (hue: number) => number,
+): [number, number, number] {
+  const hsl = rgbToPPTXHsl(rgb)
+
+  return hslToPPTXRgb({
+    ...hsl,
+    h: transform(hsl.h),
+  })
+}
+
+function applyPPTXGrayscaleColorModifier(
+  rgb: [number, number, number],
+): [number, number, number] {
+  const gray = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+
+  return [gray, gray, gray]
+}
+
+function isPPTXColorChannelModifier(
+  modifierName: string,
+): modifierName is
+  | 'blueMod'
+  | 'blueOff'
+  | 'greenMod'
+  | 'greenOff'
+  | 'redMod'
+  | 'redOff' {
+  return modifierName === 'redMod' ||
+    modifierName === 'redOff' ||
+    modifierName === 'greenMod' ||
+    modifierName === 'greenOff' ||
+    modifierName === 'blueMod' ||
+    modifierName === 'blueOff'
+}
+
+function applyPPTXColorChannelModifier(
+  rgb: [number, number, number],
+  modifierName:
+    | 'blueMod'
+    | 'blueOff'
+    | 'greenMod'
+    | 'greenOff'
+    | 'redMod'
+    | 'redOff',
+  ratio: number,
+): [number, number, number] {
+  const channelIndex = modifierName.startsWith('red')
+    ? 0
+    : modifierName.startsWith('green')
+      ? 1
+      : 2
+  const value = modifierName.endsWith('Mod')
+    ? rgb[channelIndex] * ratio
+    : rgb[channelIndex] + 255 * ratio
+
+  return rgb.map((channel, index) =>
+    index === channelIndex ? value : channel) as [number, number, number]
+}
+
+function readPPTXHueModifierValue(modifier: Element) {
+  const value = toPPTXNumber(modifier.getAttribute('val'))
+
+  if (value === null) {
+    return null
+  }
+
+  return modifier.localName === 'hueMod'
+    ? Math.max(0, value / 100_000)
+    : value / 60_000
+}
+
+function readPPTXColorModifierRatio(modifier: Element) {
+  const value = toPPTXPositiveNumber(modifier.getAttribute('val'))
+
+  return value === null
+    ? null
+    : Math.max(0, Math.min(1, value / 100_000))
+}
+
+function parsePPTXHexColor(color: string): [number, number, number] | null {
+  const match = color.match(/^#?([\da-f]{6})$/i)
+
+  if (!match) {
+    return null
+  }
+
+  return [
+    Number.parseInt(match[1].slice(0, 2), 16),
+    Number.parseInt(match[1].slice(2, 4), 16),
+    Number.parseInt(match[1].slice(4, 6), 16),
+  ]
+}
+
+function rgbToPPTXHsl(rgb: readonly number[]) {
+  const [red, green, blue] = rgb.map((channel) =>
+    Math.max(0, Math.min(255, channel)) / 255)
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const lightness = (max + min) / 2
+  const delta = max - min
+
+  if (delta === 0) {
+    return { h: 0, l: lightness, s: 0 }
+  }
+
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1))
+  const hue = max === red
+    ? ((green - blue) / delta) % 6
+    : max === green
+      ? (blue - red) / delta + 2
+      : (red - green) / delta + 4
+
+  return {
+    h: (hue * 60 + 360) % 360,
+    l: lightness,
+    s: saturation,
+  }
+}
+
+function hslToPPTXRgb(hsl: {
+  h: number
+  l: number
+  s: number
+}): [number, number, number] {
+  const chroma = (1 - Math.abs(2 * hsl.l - 1)) * hsl.s
+  const hue = ((hsl.h % 360) + 360) % 360
+  const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1))
+  const match = hsl.l - chroma / 2
+  const [red, green, blue] = hue < 60
+    ? [chroma, x, 0]
+    : hue < 120
+      ? [x, chroma, 0]
+      : hue < 180
+        ? [0, chroma, x]
+        : hue < 240
+          ? [0, x, chroma]
+          : hue < 300
+            ? [x, 0, chroma]
+            : [chroma, 0, x]
+
+  return [
+    (red + match) * 255,
+    (green + match) * 255,
+    (blue + match) * 255,
+  ]
+}
+
+function formatPPTXHexColor(rgb: readonly number[]) {
+  return `#${rgb
+    .map((channel) =>
+      Math.max(0, Math.min(255, Math.round(channel)))
+        .toString(16)
+        .padStart(2, '0'))
+    .join('')}`
+}
+
+function hasPPTXNoFill(container: Element | null) {
+  return getDirectPPTXChildByLocalName(container, 'noFill') !== null
+}
+
+function readPPTXAlphaOpacity(solidFill: Element) {
+  const transforms = getPPTXAlphaTransformElements(solidFill)
+
+  if (transforms.length === 0) {
+    return null
+  }
+
+  let opacity = 1
+  let hasTransform = false
+
+  for (const transform of transforms) {
+    const value = readPPTXAlphaTransformValue(transform)
+
+    if (value === null) {
+      continue
+    }
+
+    const ratio = value / 100_000
+
+    if (transform.localName === 'alpha') {
+      opacity = ratio
+      hasTransform = true
+    } else if (
+      transform.localName === 'alphaMod' ||
+      transform.localName === 'alphaModFix'
+    ) {
+      opacity *= ratio
+      hasTransform = true
+    } else if (transform.localName === 'alphaOff') {
+      opacity += ratio
+      hasTransform = true
+    }
+
+    opacity = Math.max(0, Math.min(1, opacity))
+  }
+
+  return hasTransform ? opacity : null
+}
+
+function readPPTXAlphaTransformValue(transform: Element) {
+  const rawValue =
+    transform.localName === 'alphaMod' ||
+      transform.localName === 'alphaModFix'
+      ? transform.getAttribute('amt') ?? transform.getAttribute('val')
+      : transform.getAttribute('val') ?? transform.getAttribute('amt')
+
+  return transform.localName === 'alphaOff'
+    ? toPPTXNumber(rawValue)
+    : toPPTXPositiveNumber(rawValue)
+}
+
+function getPPTXAlphaTransformElements(root: Element) {
+  return Array.from(root.getElementsByTagName('*'))
+    .filter((element) =>
+      element.localName === 'alpha' ||
+      element.localName === 'alphaMod' ||
+      element.localName === 'alphaModFix' ||
+      element.localName === 'alphaOff')
+}
+
+function readPPTXImageOpacity(blip: Element | null) {
+  if (!blip) {
+    return null
+  }
+
+  const opacity = readPPTXAlphaOpacity(blip)
+
+  return opacity === null || opacity === 1 ? null : opacity
+}
+
+function readPPTXObjectName(element: Element, fallback: string) {
+  return getFirstPPTXDescendantByLocalName(element, 'cNvPr')
+    ?.getAttribute('name')
+    ?.trim() || fallback
+}
+
+function readPPTXObjectDescription(element: Element) {
+  return getFirstPPTXDescendantByLocalName(element, 'cNvPr')
+    ?.getAttribute('descr')
+    ?.trim() ?? ''
+}
+
+function readPPTXElementHyperlink(
+  element: Element,
+  relationships: PPTXRelationshipMap,
+) {
+  const nonVisualProperties =
+    getFirstPPTXDescendantByLocalName(element, 'cNvPr')
+  const relationshipId = readPPTXRelationshipAttributeId(
+    getDirectPPTXChildByLocalName(nonVisualProperties, 'hlinkClick'),
+  )
+  const relationship = relationshipId
+    ? relationships.get(relationshipId)
+    : undefined
+  const url = relationship?.targetMode === 'External'
+    ? relationship.target
+    : undefined
+
+  return url ? { hyperlink: { url } } : null
+}
+
+function readPPTXRelationshipAttributeId(element: Element | null) {
+  return element?.getAttribute('r:id') ??
+    element?.getAttributeNS(PPTX_RELATIONSHIP_ATTRIBUTE_NS, 'id') ??
+    element?.getAttribute('id') ??
+    null
+}
+
+function createPPTXImportedElementId(slideIndex: number, objectIndex: number) {
+  return `pptx-slide-${slideIndex + 1}-object-${objectIndex}`
+}
+
+function getPPTXMediaMimeType(path: string) {
+  return readPPTXRenderableImageMimeType(path) ?? 'application/octet-stream'
+}
+
+function isPPTXRenderableImageMediaPath(path: string) {
+  return readPPTXRenderableImageMimeType(path) !== null
+}
+
+function readPPTXRenderableImageMimeType(path: string) {
+  const extension = path.split(/[?#]/)[0]?.split('.').at(-1)?.toLowerCase()
+
+  if (extension === 'svg') {
+    return 'image/svg+xml'
+  }
+
+  if (extension === 'jpg' || extension === 'jpeg') {
+    return 'image/jpeg'
+  }
+
+  if (extension === 'gif') {
+    return 'image/gif'
+  }
+
+  if (extension === 'webp') {
+    return 'image/webp'
+  }
+
+  if (extension === 'bmp') {
+    return 'image/bmp'
+  }
+
+  if (extension === 'avif') {
+    return 'image/avif'
+  }
+
+  return extension === 'png' ? 'image/png' : null
+}
+
+function parsePPTXXmlDocument(xml: string) {
+  if (typeof DOMParser === 'undefined') {
+    return null
+  }
+
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+
+  return getPPTXDescendantsByLocalName(doc, 'parsererror').length > 0
+    ? null
+    : doc
+}
+
+function parsePPTXXmlElementFragment(xml: string, localName: string) {
+  const doc = parsePPTXXmlDocument([
+    '<pptxFragment ',
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ',
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ',
+    'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">',
+    xml,
+    '</pptxFragment>',
+  ].join(''))
+
+  return doc ? getFirstPPTXDescendantByLocalName(doc, localName) : null
+}
+
+function readPPTXXmlAttribute(attributes: string, name: string) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const localName = name.includes(':') ? name.split(':').at(-1) : name
+  const escapedLocalName = localName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const exact = attributes.match(new RegExp(`\\s${escapedName}="([^"]*)"`))
+  const byLocalName = escapedLocalName
+    ? attributes.match(new RegExp(`\\s(?:[\\w.-]+:)?${escapedLocalName}="([^"]*)"`))
+    : null
+
+  return exact?.[1] ?? byLocalName?.[1] ?? null
+}
+
+function getFirstPPTXDescendantByLocalName(
+  root: Document | Element | null,
+  localName: string,
+) {
+  return root ? getPPTXDescendantsByLocalName(root, localName)[0] ?? null : null
+}
+
+function getPPTXDescendantsByLocalName(
+  root: Document | Element,
+  localName: string,
+) {
+  return Array.from(root.getElementsByTagName('*'))
+    .filter((element) => element.localName === localName)
+}
+
+function getDirectPPTXChildByLocalName(
+  element: Element | null,
+  localName: string,
+) {
+  return getDirectPPTXChildrenByLocalName(element, localName)[0] ?? null
+}
+
+function getDirectPPTXChildrenByLocalName(
+  element: Element | null,
+  localName: string,
+) {
+  return element
+    ? Array.from(element.children)
+      .filter((child) => child.localName === localName)
+    : []
+}
+
+function getPPTXAttributeByLocalName(
+  element: Element,
+  localName: string,
+) {
+  return Array.from(element.attributes)
+    .find((attribute) => attribute.localName === localName)
+    ?.value ?? null
+}
+
+function hasPPTXAttribute(
+  element: Element | null,
+  localName: string,
+) {
+  return element
+    ? Array.from(element.attributes)
+      .some((attribute) => attribute.localName === localName)
+    : false
+}
+
+function comparePPTXNumberedPaths(left: string, right: string) {
+  return getPPTXPathNumber(left) - getPPTXPathNumber(right)
+}
+
+function getPPTXPathNumber(path: string) {
+  return Number(path.match(/(\d+)\.xml$/)?.[1] ?? 0)
+}
+
+function toPPTXNumber(value: string | null | undefined) {
+  if (value === null || value === undefined || value.trim() === '') {
+    return null
+  }
+
+  const parsed = Number(value)
+
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function toPPTXPositiveNumber(value: string | null | undefined) {
+  const parsed = toPPTXNumber(value)
+
+  return parsed === null || parsed < 0 ? null : parsed
+}
+
+function isPPTXTrue(value: string | null | undefined) {
+  return value === '1' || value === 'true'
+}
+
+function isPPTXFalse(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase()
+
+  return normalized === '0' || normalized === 'false'
+}
+
+function clampPPTXPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function normalizePPTXAngle(value: number) {
+  return ((value % 360) + 360) % 360
+}
+
+function emuToPx(value: number) {
+  return Math.round(value / PPTX_EMUS_PER_PIXEL)
+}
+
+function pointToPx(value: number) {
+  return Math.round(value / PPTX_POINTS_PER_PIXEL)
+}
+
+function textSizeToPx(value: number) {
+  return Math.round(
+    value / PPTX_TEXT_SIZE_UNITS_PER_POINT / PPTX_POINTS_PER_PIXEL,
+  )
+}
+
+function textSpacingToPx(value: number) {
+  return Math.round(
+    value /
+      PPTX_TEXT_SIZE_UNITS_PER_POINT /
+      PPTX_POINTS_PER_PIXEL *
+      100,
+  ) / 100
+}
+
+function getPPTDeckModelPayloadFromCustomXml(xml: string) {
+  const match = xml.match(/<pptDeck\b([^>]*)>([\s\S]*?)<\/pptDeck>/)
+
+  if (!match) {
+    return null
+  }
+
+  const attributes = match[1]
+
+  if (!attributes.includes(`xmlns="${PPTX_MODEL_CUSTOM_XML_NAMESPACE}"`) ||
+    !attributes.includes(`contentType="${PPTX_MODEL_CUSTOM_XML_CONTENT_TYPE}"`)) {
+    return null
+  }
+
+  return unescapePPTXXmlText(match[2]).trim()
+}
+
+function unescapePPTXXmlText(value: string) {
+  return value
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+}
+
+function unescapePPTXXmlAttribute(value: string) {
+  return unescapePPTXXmlText(value)
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+}
